@@ -50,6 +50,8 @@ module Make (V : ORDERED) : sig
 
   val round_up : node -> Axis_lattice.t
 
+  val is_const : node -> bool
+
   val map_rigid : (V.t -> node) -> node -> node
 
   (* Clear all memo tables *)

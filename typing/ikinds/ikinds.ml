@@ -90,6 +90,8 @@ module JK = struct
       constr_to_coeffs = ConstrTbl.create 64
     }
 
+  let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
+
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : kind =
     match ctx.mode with
     | Normal -> Ldd.var (Ldd.rigid name)
@@ -192,7 +194,8 @@ module JK = struct
             then
               failwith
                 (Printf.sprintf
-                   "jkind_solver: coeffs mismatch for constr %s (length %d vs %d)"
+                   "jkind_solver: coeffs mismatch for constr %s\
+                    (length %d vs %d)"
                    (constr_to_string c) (Array.length coeff_vars)
                    (Array.length coeffs'));
             if abstract
@@ -294,7 +297,9 @@ let kind_of (ctx : JK.ctx) (ty : Types.type_expr) : JK.kind =
   incr kind_of_depth;
   if !kind_of_depth > 500 then failwith "kind_of_depth too deep" else ();
   incr kind_of_counter;
-  if !kind_of_counter > 100000000 then failwith "kind_of_counter too big" else ();
+  if !kind_of_counter > 100000000
+  then failwith "kind_of_counter too big"
+  else ();
   let res =
     (* [ty] is expected to be representative: no links/substs/fields/nil. *)
     match Types.get_desc ty with
@@ -432,9 +437,12 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
             Option.is_some umc_opt
           | Types.Type_abstract _ | Types.Type_open -> false
         in
-        let use_decl_jkind () = 
-          let kind : JK.ckind = fun ctx -> ckind_of_jkind_l ctx decl.type_jkind in
-          JK.Ty { args = decl.type_params; kind; abstract = true } in
+        let use_decl_jkind () =
+          let kind : JK.ckind =
+            fun ctx -> ckind_of_jkind_l ctx decl.type_jkind
+          in
+          JK.Ty { args = decl.type_params; kind; abstract = true }
+        in
         (* If we cannot soundly derive a polynomial from components, fall back
            to the stored jkind and mark it abstract. *)
         match decl.type_kind with
@@ -563,7 +571,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         | Types.Type_open ->
           (* Use the stored jkind here in case it is `exn`,
              which is special. *)
-          let kind : JK.ckind = fun ctx -> ckind_of_jkind_l ctx decl.type_jkind in
+          let kind : JK.ckind =
+            fun ctx -> ckind_of_jkind_l ctx decl.type_jkind
+          in
           JK.Ty { args = decl.type_params; kind; abstract = false }
           (* 
           (* This is the code we'd use otherwise *)
@@ -595,7 +605,10 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         | JK.Ty _ -> "Ty"
         | JK.Poly (base, coeffs) ->
             let coeffs =
-              coeffs |> Array.map Ikind.Ldd.pp |> Array.to_list |> String.concat "; "
+              coeffs
+              |> Array.map Ikind.Ldd.pp
+              |> Array.to_list
+              |> String.concat "; "
             in
             Format.asprintf "Poly(base=%s; coeffs=[%s])"
               (Ikind.Ldd.pp base) coeffs
@@ -642,7 +655,8 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
         Path.print path
         stored_jkind
         (Ikind.Ldd.pp payload.base)
-        (String.concat "; " (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs)))
+        (String.concat "; "
+           (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs)))
     end;
     Types.Constructor_ikind ikind
 
@@ -702,8 +716,17 @@ let sub_jkind_l ?allow_any_crossing ?origin
       Ok ())
     else
       let ctx = make_ctx ~context in
-      let sub_poly = ckind_of_jkind_l ctx sub in
       let super_poly = ckind_of_jkind_l ctx super in
+      let super_is_constant =
+        Ldd.solve_pending ();
+        Ldd.is_const super_poly
+      in
+      let sub_ctx =
+        if super_is_constant
+        then JK.reset_for_mode ctx ~mode:JK.Round_up
+        else ctx
+      in
+      let sub_poly = ckind_of_jkind_l sub_ctx sub in
       Ldd.solve_pending ();
       if !Types.ikind_debug then (
         let origin_suffix =
@@ -791,7 +814,8 @@ let sub_or_intersect ?origin:_origin
     ~(context : Jkind.jkind_context) ~level
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
-  if not (enable_sub_or_intersect && !Clflags.ikinds) (* CR jujacobs: fix this *)
+  (* CR jujacobs: fix this *)
+  if not (enable_sub_or_intersect && !Clflags.ikinds)
   then Jkind.sub_or_intersect ~type_equal ~context ~level t1 t2
   else
     (* CR jujacobs: enable this *)

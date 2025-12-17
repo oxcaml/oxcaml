@@ -79,6 +79,8 @@ module Ldd : sig
 
   val round_up : node -> lat
 
+  val is_const : node -> bool
+
   val map_rigid : (Name.t -> node) -> node -> node
 
   val clear_memos : unit -> unit

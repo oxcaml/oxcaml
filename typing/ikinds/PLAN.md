@@ -50,7 +50,7 @@ need review.
   - Update `kind_of` to take `ctx` as an explicit argument, avoiding closure allocation for every type node traversal.
   - This is a high-impact optimization for the hot path.
 
-**Phase 3: Main algorithm improvements**
+**Phase 3: Main algorithm improvements (DONE)**
 
 For mode crossing we are going to round up at the end so it doesn't make much sense to first compute a complex formula with many variables and params in it, and then round it up. So we want to implement a different ikinds mode, which is either normal or round up mode. In round up mode, we map all variables to top eagerly, instead of doing it at the end. This should keep formulas small and efficient.
 

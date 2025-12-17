@@ -98,6 +98,8 @@ module Ldd = struct
 
   let round_up = Base.round_up
 
+  let is_const = Base.is_const
+
   let map_rigid = Base.map_rigid
 
   let clear_memos = Base.clear_memos

@@ -412,6 +412,10 @@ module Make (V : ORDERED) = struct
     let n = force n in
     round_up' n
 
+  let is_const (n : node) : bool =
+    let n = force n in
+    is_leaf n
+
   (* --------- polynomial-style pretty printer --------- *)
   let to_named_terms_with (pp_unsolved : var -> string) (w : node) :
       (C.t * string list) list =

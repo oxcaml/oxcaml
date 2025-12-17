@@ -50,6 +50,8 @@ module Make (V : ORDERED) : sig
 
   val round_up : node -> Axis_lattice.t
 
+  val is_const : node -> bool
+
   (* Apply [f] to every rigid variable, replacing it with the returned node. *)
   val map_rigid : (V.t -> node) -> node -> node
 
