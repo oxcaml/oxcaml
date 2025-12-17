@@ -1907,42 +1907,46 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     match Code_metadata.result_types code_metadata with
     | Unknown | Bottom -> code_metadata
     | Ok result_types ->
-      let old_typing_env =
-        match env.old_typing_env with
-        | None -> Misc.fatal_errorf "Result types without typing env"
-        | Some old_typing_env -> old_typing_env
-      in
       let result_types =
-        if Sys.getenv_opt "FORGETALL" <> None && true
-        then Or_unknown_or_bottom.Unknown
-        else
-          let params_vars_and_keep, results_vars_and_keep =
-            match updating_calling_convention with
-            | Not_changing_calling_convention ->
-              ( List.map (fun p -> p, DS.Keep) params_vars,
-                List.map (fun p -> p, DS.Keep) results_vars )
-            | Changing_calling_convention code_id ->
-              let return_decisions =
-                Code_id.Map.find code_id env.function_return_decision
-              in
-              let params_decision =
-                Code_id.Map.find code_id env.function_params_to_keep
-              in
-              ( List.map2
-                  (fun p -> function
-                    | Keep _ | Unbox _ -> p, DS.Keep
-                    | Delete -> p, DS.Delete)
-                  params_vars params_decision,
-                List.map2
-                  (fun p -> function
-                    | Keep _ | Unbox _ -> p, DS.Keep
-                    | Delete -> p, DS.Delete)
-                  results_vars return_decisions )
-          in
-          Or_unknown_or_bottom.Ok
-            (Dep_solver.rewrite_result_types env.uses ~old_typing_env
-               ~my_closure ~params:params_vars_and_keep
-               ~results:results_vars_and_keep result_types)
+        match env.old_typing_env with
+        | None ->
+          (* This can happen if the result continuation of the compilation unit
+             is never used. If this happens, this compilation unit either always
+             raises an exception or diverges. In any case, it will not be
+             possible to use this compilation unit in another compilation unit,
+             so keeping the result types is useless. *)
+          Or_unknown_or_bottom.Unknown
+        | Some old_typing_env ->
+          if Sys.getenv_opt "FORGETALL" <> None && true
+          then Or_unknown_or_bottom.Unknown
+          else
+            let params_vars_and_keep, results_vars_and_keep =
+              match updating_calling_convention with
+              | Not_changing_calling_convention ->
+                ( List.map (fun p -> p, DS.Keep) params_vars,
+                  List.map (fun p -> p, DS.Keep) results_vars )
+              | Changing_calling_convention code_id ->
+                let return_decisions =
+                  Code_id.Map.find code_id env.function_return_decision
+                in
+                let params_decision =
+                  Code_id.Map.find code_id env.function_params_to_keep
+                in
+                ( List.map2
+                    (fun p -> function
+                      | Keep _ | Unbox _ -> p, DS.Keep
+                      | Delete -> p, DS.Delete)
+                    params_vars params_decision,
+                  List.map2
+                    (fun p -> function
+                      | Keep _ | Unbox _ -> p, DS.Keep
+                      | Delete -> p, DS.Delete)
+                    results_vars return_decisions )
+            in
+            Or_unknown_or_bottom.Ok
+              (Dep_solver.rewrite_result_types env.uses ~old_typing_env
+                 ~my_closure ~params:params_vars_and_keep
+                 ~results:results_vars_and_keep result_types)
       in
       Code_metadata.with_result_types result_types code_metadata
   in
