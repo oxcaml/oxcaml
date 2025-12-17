@@ -792,7 +792,7 @@ module Rec_constr_env = Hash_consed.Dedup (struct
 
   let equal =
     let equal_entry (args1, rb1) (args2, rb2) =
-      List.equal Shape.equal args1 args2 && Recursive_binder.equal rb1 rb2
+      Recursive_binder.equal rb1 rb2 && List.equal Shape.equal args1 args2
     in
     fun m1 m2 -> m1 == m2 || Ident.Map.equal (List.equal equal_entry) m1 m2
 end)
@@ -855,6 +855,20 @@ module Eval_env = struct
   let extend_type_var_env t id shape =
     let map = Ident.Map.add id shape (Type_var_env.value t.type_var_env) in
     { t with type_var_env = Type_var_env.create map }
+end
+
+module Shape_dedup = struct
+  include Hash_consed.Dedup (struct
+    type t = Shape.t
+
+    let initial_size = 1024
+
+    let hash t = t.Shape.hash
+
+    let equal = Shape.equal
+  end)
+
+  let dedup shape = value (create shape)
 end
 
 module Evaluation_diagnostics = struct
@@ -1070,6 +1084,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining ~env (t : Shape.t)
       | Unknown_type ->
         t)
   in
+  let result = Shape_dedup.dedup result in
   Eval_cache.add ~key:t ~data:result env;
   result
 
