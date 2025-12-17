@@ -243,9 +243,11 @@ module Flambda2 = struct
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
+    type pass = Last_pass | This_pass of string
 
     let rawfexpr = ref Nowhere
     let fexpr = ref Nowhere
+    let fexpr_after = ref Last_pass
     let flexpect = ref Nowhere
     let slot_offsets = ref false
     let freshen = ref false

@@ -215,6 +215,9 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
       print_flambda last_pass_name
         (Flambda_features.dump_simplify ())
         ppf flambda;
+      print_fexpr "simplify"
+        (Flambda_features.dump_fexpr (This_pass "simplify"))
+        ppf flambda;
       print_flexpect "simplify" ppf ~raw_flambda flambda;
       let ( flambda,
             free_names,
@@ -229,6 +232,9 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
                   ~final_typing_env flambda)
           in
+          print_fexpr "reaper"
+            (Flambda_features.dump_fexpr (This_pass "reaper"))
+            ppf flambda;
           print_flexpect "reaper" ppf ~raw_flambda flambda;
           ( flambda,
             free_names,
@@ -247,7 +253,9 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
       print_flambda last_pass_name
         (Flambda_features.dump_flambda ())
         ppf flambda;
-      print_fexpr last_pass_name (Flambda_features.dump_fexpr ()) ppf flambda;
+      print_fexpr last_pass_name
+        (Flambda_features.dump_fexpr Last_pass)
+        ppf flambda;
       let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
         build_run_result flambda ~free_names ~final_typing_env ~all_code
           slot_offsets

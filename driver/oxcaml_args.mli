@@ -156,6 +156,7 @@ module type Oxcaml_options = sig
   val drawfexpr_to : string -> unit
   val dfexpr : unit -> unit
   val dfexpr_to : string -> unit
+  val dfexpr_after : string -> unit
   val dflexpect_to : string -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit

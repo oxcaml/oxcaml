@@ -183,9 +183,11 @@ module Flambda2 : sig
 
   module Dump : sig
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
+    type pass = Last_pass | This_pass of string
 
     val rawfexpr : target ref
     val fexpr : target ref
+    val fexpr_after : pass ref
     val flexpect : target ref
     val slot_offsets : bool ref
     val freshen : bool ref

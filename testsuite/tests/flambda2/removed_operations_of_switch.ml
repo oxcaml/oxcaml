@@ -1,6 +1,6 @@
 (* TEST
  compile_only = "true";
- ocamlopt_flags = "-flambda2-inline-small-function-size 26 -flambda2-inline-threshold 26.99 -flambda2-inline-large-function-size 100 -dfexpr";
+ ocamlopt_flags = "-flambda2-inline-small-function-size 26 -flambda2-inline-threshold 26.99 -flambda2-inline-large-function-size 100 -dfexpr-after simplify";
  flambda2;
  setup-ocamlopt.byte-build-env;
  ocamlopt.byte;
