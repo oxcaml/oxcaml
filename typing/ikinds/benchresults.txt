@@ -816,3 +816,76 @@ run 3:
   user 665.91
   sys  119.41
 
+
+=== 2025-12-17T06:32:13Z ===
+desc: sub-or-intersect
+git: e26bdc94a68178a28b2a441bd7b34399f5863db5 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-syzkPmjU
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M testsuite/tests/typing-jkind-bounds/basics.ml
+   M testsuite/tests/typing-jkind-bounds/composite.ml
+   M testsuite/tests/typing-jkind-bounds/predef.ml
+   M testsuite/tests/typing-jkind-bounds/printing.ml
+   M testsuite/tests/typing-jkind-bounds/records.ml
+   M testsuite/tests/typing-jkind-bounds/subsumption/fuel.ml
+   M testsuite/tests/typing-jkind-bounds/universal.ml
+   M testsuite/tests/typing-jkind-bounds/variants.ml
+   M testsuite/tests/typing-jkind-bounds/with_basics.ml
+   M testsuite/tests/typing-layouts-or-null/separability.ml
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 155.58
+  user 689.00
+  sys  117.01
+
+run 2:
+  real 154.07
+  user 688.40
+  sys  117.60
+
+run 3:
+  real 152.90
+  user 687.46
+  sys  118.98
+
+
+=== 2025-12-17T06:40:24Z ===
+desc: sub-or-intersect
+git: e26bdc94a68178a28b2a441bd7b34399f5863db5 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-UQ7IE5rq
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M testsuite/tests/typing-jkind-bounds/basics.ml
+   M testsuite/tests/typing-jkind-bounds/composite.ml
+   M testsuite/tests/typing-jkind-bounds/predef.ml
+   M testsuite/tests/typing-jkind-bounds/printing.ml
+   M testsuite/tests/typing-jkind-bounds/records.ml
+   M testsuite/tests/typing-jkind-bounds/subsumption/fuel.ml
+   M testsuite/tests/typing-jkind-bounds/universal.ml
+   M testsuite/tests/typing-jkind-bounds/variants.ml
+   M testsuite/tests/typing-jkind-bounds/with_basics.ml
+   M testsuite/tests/typing-layouts-or-null/separability.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 151.22
+  user 680.93
+  sys  118.35
+
+run 2:
+  real 151.13
+  user 680.71
+  sys  116.46
+
+run 3:
+  real 151.05
+  user 680.72
+  sys  116.48
+

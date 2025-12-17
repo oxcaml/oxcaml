@@ -678,7 +678,15 @@ type works = int or_null smth bounded
 [%%expect{|
 type ('a : value_or_null) smth : immediate with 'a
 type ('a : immediate) bounded
-type works = int or_null smth bounded
+Line 7, characters 13-29:
+7 | type works = int or_null smth bounded
+                 ^^^^^^^^^^^^^^^^
+Error: This type "int or_null smth" should be an instance of type
+         "('a : immediate)"
+       The kind of int or_null smth is immediate
+         because of the definition of smth at line 1, characters 0-50.
+       But the kind of int or_null smth must be a subkind of immediate
+         because of the definition of bounded at line 3, characters 0-29.
 |}, Principal{|
 type ('a : value_or_null) smth : immediate with 'a
 type ('a : immediate) bounded

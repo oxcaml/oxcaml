@@ -7,7 +7,7 @@ Clflags.ikinds := true;
 Types.ikind_debug := false
 let enable_crossing = true
 let enable_sub_jkind_l = true
-let enable_sub_or_intersect = false
+let enable_sub_or_intersect = true
 let enable_sub_or_error = false
 let reset_constructor_ikind_on_substitution = false
 
@@ -86,8 +86,8 @@ module JK = struct
     Ldd.clear_memos ();
     { env;
       mode;
-      ty_to_kind = TyTbl.create 64;
-      constr_to_coeffs = ConstrTbl.create 64
+      ty_to_kind = TyTbl.create 0;
+      constr_to_coeffs = ConstrTbl.create 0
     }
 
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
@@ -826,13 +826,37 @@ let sub_or_intersect ?origin:_origin
   if not (enable_sub_or_intersect && !Clflags.ikinds)
   then Jkind.sub_or_intersect ~type_equal ~context ~level t1 t2
   else
-    (* CR jujacobs: enable this *)
-    let _ik =
-      sub ~type_equal ~context ~level (Jkind.disallow_right t1)
-        (Jkind.disallow_left t2)
+    let layout_sub =
+      Jkind.Layout.sub ~level t1.jkind.layout t2.jkind.layout
     in
-    (* Preserve canonical Jkind classification for now. *)
-    Jkind.sub_or_intersect ~type_equal ~context ~level t1 t2
+    match layout_sub with
+    | Jkind.Sub_result.Not_le reasons ->
+        if Jkind.has_intersection ~level t1 t2
+        then Jkind.Has_intersection reasons
+        else Jkind.Disjoint reasons
+    | Jkind.Sub_result.Equal | Jkind.Sub_result.Less ->
+        (* The RHS is a jkind_r (no with-bounds), so its ikind is constant. *)
+        let ctx = make_ctx_with_mode ~mode:JK.Round_up ~context in
+        let sub_poly = ckind_of_jkind_l ctx (Jkind.disallow_right t1) in
+        let super_poly = ckind_of_jkind_r (Jkind.disallow_left t2) in
+        (* Layouts already checked above. Remaining failure reasons are
+           per-axis disagreements. *)
+        match JK.leq_with_reason sub_poly super_poly with
+        | None -> Jkind.Sub
+        | Some violating_axes ->
+            let axis_reasons =
+              List.map
+                (fun axis ->
+                  Jkind.Sub_failure_reason.Axis_disagreement
+                    (Axis_lattice.axis_number_to_axis_packed axis))
+                violating_axes
+            in
+            let reasons : Jkind.Sub_failure_reason.t Misc.Nonempty_list.t =
+              match axis_reasons with
+              | [] -> Jkind.Sub_failure_reason.Layout_disagreement :: []
+              | hd :: tl -> hd :: tl
+            in
+            Jkind.Has_intersection reasons
 
 let sub_or_error ?origin:_origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)

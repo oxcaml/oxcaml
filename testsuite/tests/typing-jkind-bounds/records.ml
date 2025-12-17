@@ -624,16 +624,6 @@ let () =
   cross_nonnull func
 (* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
-|}, Principal{|
-Line 2, characters 13-16:
-2 |   cross_many int;
-                 ^^^
-Error: This expression has type "int t" but an expression was expected of type
-         "('a : value mod many)"
-       The kind of int t is immutable_data with int
-         because of the definition of t at line 1, characters 0-22.
-       But the kind of int t must be a subkind of value mod many
-         because of the definition of cross_many at line 11, characters 49-60.
 |}]
 
 let () = cross_aliased int
@@ -725,16 +715,6 @@ type t_test = int t require_contended
 type t_test = (unit -> unit) t require_contended
 type ('a : value mod contended) t_test = 'a t require_contended
 type 'a t_test = 'a t require_nonnull
-|}, Principal{|
-type 'a t = { x : 'a; }
-Line 2, characters 14-19:
-2 | type t_test = int t require_many
-                  ^^^^^
-Error: This type "int t" should be an instance of type "('a : value mod many)"
-       The kind of int t is immutable_data with int
-         because of the definition of t at line 1, characters 0-22.
-       But the kind of int t must be a subkind of value mod many
-         because of the definition of require_many at line 19, characters 0-39.
 |}]
 
 type t_test = int t require_global
