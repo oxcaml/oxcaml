@@ -24,6 +24,8 @@
 #include "misc.h"
 #include "gc_stats.h"
 #include "major_gc.h"
+#include <assert.h>
+#include "sizeclasses.h"
 
 CAMLextern atomic_uintnat caml_compactions_count;
 
@@ -107,6 +109,51 @@ Caml_inline status caml_allocation_status(void) {
     ? caml_global_heap_state.MARKED
     : caml_global_heap_state.UNMARKED;
 }
+
+/* Notionally-opaque type to support fast inline allocation on a shared heap */
+
+typedef struct shared_heap_fast_data_s *shared_heap_fast_data_p;
+
+/* Get the fast-allocation structure for the given heap. */
+
+shared_heap_fast_data_p caml_shared_fast_data(struct caml_heap_state *);
+
+/* Call back into the shared-heap code from the inline fast allocation
+ * code (below), when the "fast allocation data" is somehow exhausted. */
+
+void caml_shared_fast_data_refill(struct caml_heap_state *,
+                                  sizeclass_t);
+
+/* Expose implementation of this opaque type to allow the inline
+ * function below to access the contents. Clients should not rely on
+ * the contents of this data structure. */
+struct shared_heap_fast_data_s {
+  value **lists[NUM_SIZECLASSES];
+};
+
+Caml_inline void *caml_shared_fast_alloc (mlsize_t whsize,
+                                          shared_heap_fast_data_p fast_data,
+                                          caml_domain_state *domain)
+{
+  sizeclass_t sz = sizeclass_wsize[whsize];
+  value **free_p = fast_data->lists[sz];
+  if (!free_p) {
+    return NULL;
+  }
+  value *block = *free_p;
+  value *next = (value*)(block[1]);
+  *free_p = next;
+  if (!next) caml_shared_fast_data_refill(domain->shared_heap, sz);
+  return (void*)block;
+}
+
+/* Update shared-heap stats at the end of a minor GC, to account for
+ * some number of free-list allocations. */
+
+void caml_shared_add_pool_stats(struct caml_heap_state *,
+                                uintnat /* pool_live_blocks */,
+                                uintnat /* pool_live_words */,
+                                uintnat /* pool_frag_words */);
 
 void caml_redarken_pool(struct pool*, scanning_action, void*);
 
