@@ -52,26 +52,9 @@ need review.
 
 **Phase 3: Main algorithm improvements**
 
-General principle: if we need to compare k1 <= k2 with variables in k1 and k2, then we can assume that all variables that occur in k1 but not in k2 to top. This is in particular for variables associated with abstract types.
+For mode crossing we are going to round up at the end so it doesn't make much sense to first compute a complex formula with many variables and params in it, and then round it up. So we want to implement a different ikinds mode, which is either normal or round up mode. In round up mode, we map all variables to top eagerly, instead of doing it at the end. This should keep formulas small and efficient.
 
-Example:
-a join (b meet c) <= a join c
-  ==> assume b = top ==>
-a join (top meet c) <= a join c
-
-The latter problem is equivalent.
-
-This is particularly effective when the rhs doesn't have any variables, because then we can just compute the lhs to a constant.
-
-- LHS normalization in sub checks:
-  - Before `Ldd.leq_with_reason`, compute RHS atom support and map LHS-only
-    abstract atoms to `⊤`.
-  - Think carefully about whether we can use existing hash tables for this instead of doing an explicit pass. In general, think carefully about how this would work.
-  - While computing LHS, immediately map all other abstract atoms to `⊤`.
-  - May introduce a `Left / `Right mode for computing a kind to handle this.
-- Mode-crossing special case:
-  - Since RHS is effectively plain mod-bounds, treat all abstract atoms as `⊤`
-    before rounding up; still meet in abstract bounds for non-variables.
+Can you implement this mode? Don't cause code duplication, just pass around which mode we are in.
 
 **Phase 4: Reduce memoization pressure**
 

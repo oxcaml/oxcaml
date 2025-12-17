@@ -34,6 +34,10 @@ module JK = struct
 
   type kind = Ldd.node
 
+  type mode =
+    | Normal
+    | Round_up
+
   (* Hash tables avoiding polymorphic structural comparison on deep values.
      We key types by their unique [Types.get_id] to keep lookups cheap. *)
   module TyTbl = Hashtbl.Make (struct
@@ -71,23 +75,30 @@ module JK = struct
 
   and ctx =
     { env : env;
+      mode : mode;
       ty_to_kind : kind TyTbl.t;
       constr_to_coeffs : (poly * poly array) ConstrTbl.t
     }
 
   (* Start a new solver context.
      LDD memo tables are global; clearing them keeps solves independent. *)
-  let create (env : env) : ctx =
+  let create ~(mode : mode) (env : env) : ctx =
     Ldd.clear_memos ();
     { env;
+      mode;
       ty_to_kind = TyTbl.create 64;
       constr_to_coeffs = ConstrTbl.create 64
     }
 
+  let rigid_name (ctx : ctx) (name : Ldd.Name.t) : kind =
+    match ctx.mode with
+    | Normal -> Ldd.var (Ldd.rigid name)
+    | Round_up -> Ldd.const Axis_lattice.top
+
   (* A rigid variable corresponding to a type parameter [t]. *)
-  let rigid (t : ty) : kind =
+  let rigid (ctx : ctx) (t : ty) : kind =
     let param = Types.get_id t in
-    Ldd.var (Ldd.rigid (Ldd.Name.param param))
+    rigid_name ctx (Ldd.Name.param param)
 
   (* Compute the kind for [t], memoizing results to preserve sharing.
      For recursive types we install a fresh placeholder var, then solve a
@@ -127,10 +138,11 @@ module JK = struct
                [c] are kept rigid to avoid infinite expansion. *)
             let instantiate (name : Ldd.Name.t) : kind =
               match name with
-              | Ldd.Name.Param _  | Ldd.Name.Unknown _ -> Ldd.var (Ldd.rigid name)
+              | Ldd.Name.Param _ | Ldd.Name.Unknown _ ->
+                  rigid_name ctx name
               | Ldd.Name.Atom { constr = constr'; arg_index } ->
                   if Path.compare constr' c = 0
-                  then Ldd.var (Ldd.rigid name)
+                  then rigid_name ctx name
                   else
                     let base', coeffs' = constr_kind ctx constr' in
                     if arg_index = 0
@@ -138,13 +150,15 @@ module JK = struct
                     else
                       if arg_index - 1 < Array.length coeffs'
                       then coeffs'.(arg_index - 1)
-                      else Ldd.var (Ldd.rigid name)
+                      else rigid_name ctx name
             in
             let rehydrate node = Ldd.map_rigid instantiate node in
             let base_rhs = rehydrate base in
             let coeffs_rhs = Array.map rehydrate coeffs in
             Ldd.solve_lfp base_var base_rhs;
-            Array.iter2 (fun v rhs -> Ldd.solve_lfp v rhs) coeff_vars coeffs_rhs;
+            Array.iter2
+              (fun v rhs -> Ldd.solve_lfp v rhs)
+              coeff_vars coeffs_rhs;
             base_node, coeff_nodes
         | Ty { args; kind = body; abstract } ->
             let base_var = Ldd.new_var () in
@@ -188,14 +202,16 @@ module JK = struct
                  keeping the original rigid atoms around as conservative
                  unknowns. *)
               Ldd.enqueue_gfp base_var
-                (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
+                (Ldd.meet base'
+                   (rigid_name ctx (Ldd.Name.atomic c 0)));
               Array.iteri
                 (fun idx coeff ->
                   let coeff' = coeffs'.(idx) in
                   let rhs = Ldd.join coeff' base' in
                   let bound =
                     Ldd.meet rhs
-                      (Ldd.var (Ldd.rigid (Ldd.Name.atomic c (idx + 1))))
+                      (rigid_name ctx
+                         (Ldd.Name.atomic c (idx + 1)))
                   in
                   Ldd.enqueue_gfp coeff bound)
                 coeff_vars)
@@ -258,7 +274,8 @@ let ckind_of_jkind (ctx : JK.ctx) (j : ('l * 'r) Types.jkind) : JK.kind =
          Ldd.join acc (Ldd.meet (Ldd.const mask) kty))
        base
 
-let ckind_of_jkind_l (ctx : JK.ctx) (j : Types.jkind_l) : JK.kind = ckind_of_jkind ctx j
+let ckind_of_jkind_l (ctx : JK.ctx) (j : Types.jkind_l) : JK.kind =
+  ckind_of_jkind ctx j
 
 let ckind_of_jkind_r (j : Types.jkind_r) : JK.kind =
   (* For r-jkinds used in sub checks, with-bounds are not present
@@ -286,7 +303,7 @@ let kind_of (ctx : JK.ctx) (ty : Types.type_expr) : JK.kind =
       (* TODO: allow general jkinds here (including with-bounds) *)
       let jkind_l = Jkind.disallow_right jkind in
       (* Keep a rigid param, but cap it by its annotated jkind. *)
-      Ldd.meet (JK.rigid ty) (ckind_of_jkind_l ctx jkind_l)
+      Ldd.meet (JK.rigid ctx ty) (ckind_of_jkind_l ctx jkind_l)
     | Types.Tconstr (p, args, _abbrev_memo) ->
       let arg_kinds = List.map (fun t -> JK.kind ctx t) args in
       JK.constr ctx p arg_kinds
@@ -350,9 +367,7 @@ let kind_of (ctx : JK.ctx) (ty : Types.type_expr) : JK.kind =
         else
           (* Open row: conservative non-float value (boxed) intersected with an
              unknown rigid so the solver treats it as an unknown element. *)
-          let unknown =
-            Ldd.var (Ldd.rigid (Ldd.Name.fresh_unknown ()))
-          in
+          let unknown = JK.rigid_name ctx (Ldd.Name.fresh_unknown ()) in
           Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
       else
         (* All-constant (immediate) polymorphic variant. *)
@@ -590,9 +605,13 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     ikind
 
 (* Package the above into a full evaluation context. *)
+let make_ctx_with_mode
+    ~(mode : JK.mode)
+    ~(context : Jkind.jkind_context) : JK.ctx =
+  JK.create ~mode { kind_of; lookup = lookup_of_context ~context }
+
 let make_ctx ~(context : Jkind.jkind_context) : JK.ctx =
-  JK.create
-    { kind_of = kind_of; lookup = lookup_of_context ~context }
+  make_ctx_with_mode ~mode:JK.Normal ~context
 
 let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
     Ikind.Ldd.node =
@@ -756,7 +775,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   if not (enable_crossing && !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.get_mode_crossing ~context jkind
   else
-    let ctx = make_ctx ~context in
+    let ctx = make_ctx_with_mode ~mode:JK.Round_up ~context in
     let lat = JK.round_up (ckind_of_jkind ctx jkind) in
     let mb = Axis_lattice_conv.to_mod_bounds lat in
     Jkind.Mod_bounds.to_mode_crossing mb
@@ -871,7 +890,7 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   let lookup p = identity_lookup_from_arity_map arity p in
   let kind_of_identity = kind_of in
   let env : JK.env = { kind_of = kind_of_identity; lookup } in
-  let ctx = JK.create env in
+  let ctx = JK.create ~mode:JK.Normal env in
   let poly = JK.normalize (kind_of_identity ctx body)
   in
   let rigid_vars =

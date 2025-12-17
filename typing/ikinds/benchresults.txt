@@ -761,3 +761,58 @@ run 3:
   user 674.21
   sys  121.68
 
+
+=== 2025-12-17T04:35:18Z ===
+desc: modes
+git: 122baf58a26981b8166f4a2bdbcce840c4da1b83 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-IfCALoNI
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 148.58
+  user 662.58
+  sys  122.60
+
+run 2:
+  real 148.54
+  user 665.42
+  sys  120.20
+
+run 3:
+  real 148.47
+  user 665.64
+  sys  120.45
+
+
+=== 2025-12-17T04:45:33Z ===
+desc: modes
+git: 122baf58a26981b8166f4a2bdbcce840c4da1b83 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-ee1gUYdw
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 153.24
+  user 679.51
+  sys  124.91
+
+run 2:
+  real 153.91
+  user 681.58
+  sys  124.95
+
+run 3:
+  real 150.43
+  user 665.91
+  sys  119.41
+
