@@ -978,6 +978,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             })
       in
       let code_size =
+        (* CR ncourant: what to do here? *)
         Code.cost_metrics code |> Cost_metrics.size |> Code_size.to_int
       in
       let result_mode : Fexpr.alloc_mode_for_assignments =

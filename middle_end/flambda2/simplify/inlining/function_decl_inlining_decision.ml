@@ -32,7 +32,7 @@ let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
       let small_function_size =
         Inlining_arguments.small_function_size args |> Code_size.of_int
       in
-      let size = Cost_metrics.size metrics in
+      let size = Cost_metrics.total_size metrics in
       let is_small = Code_size.( <= ) size small_function_size in
       let is_large = Code_size.( <= ) large_function_size size in
       let is_recursive =
@@ -51,10 +51,11 @@ let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
       then Function_body_too_large large_function_size
       else if is_small
       then
-        Small_function { size = Cost_metrics.size metrics; small_function_size }
+        Small_function
+          { size = Cost_metrics.total_size metrics; small_function_size }
       else
         Speculatively_inlinable
-          { size = Cost_metrics.size metrics;
+          { size = Cost_metrics.total_size metrics;
             small_function_size;
             large_function_size
           }
