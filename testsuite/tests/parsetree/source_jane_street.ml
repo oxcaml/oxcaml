@@ -749,6 +749,13 @@ module (G @ portable) () = F
 module G : functor () -> (functor () -> sig end) @ contended @@ portable
 |}]
 
+module (G @ portable) (F : (S @ unique -> S @ once) @ local) @ contended = struct end
+[%%expect{|
+module G :
+  functor (F : (S @ unique -> S @ once) @ local) -> sig end @ contended @@
+  stateless
+|}]
+
 module (G' @ portable) = F
 [%%expect{|
 module G' = F @@ stateless

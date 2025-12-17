@@ -51,10 +51,62 @@ Line 2, characters 8-9:
 Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" structure.
 |}]
 
-(* At top-level, functors, just like functions, will have their parameter mode and return
-mode zapped to legacy. Therefore, we explicitly annotate the functor type. Alternatively,
-put the functor at a deeper level, and its return mode can be infered. *)
+module F : S -> T = functor (M : S) -> struct
+  let g = M.f
+end
+[%%expect{|
+module F : S -> T @@ stateless
+|}]
 
+module F (M : S @ portable) (M' : S) = struct
+end
+[%%expect{|
+module F : functor (M : S @ portable) (M' : S) -> sig end @@ stateless
+|}]
+
+module F (M : S) (M' : S @ portable) @ portable = struct
+end
+[%%expect{|
+module F : functor (M : S) (M' : S @ portable) -> sig end @@ stateless
+|}]
+
+module F (M : S @ portable) (M' : S @ portable) : T @ portable = struct
+  let g = M.f
+end
+[%%expect{|
+module F : functor (M : S @ portable) (M' : S @ portable) -> T @@ stateless
+|}]
+
+(* In REPL (called "toplevel" in the compiler source code), functors, just like
+functions, will have their parameter mode and return mode zapped to legacy. In
+the example below, the functor's return mode is zapped to [nonportable], even
+though the implementation allows returning [portable]. *)
+module F (M : S @ portable) @ portable = struct
+    let g = M.f
+    let () = use_portable M.f
+    let () = use_portable g
+end
+[%%expect{|
+module F : functor (M : S @ portable) -> sig val g : unit -> unit end
+|}]
+
+(* ..and as a result, the following is mode error *)
+module M = struct
+    let f () = ()
+end
+[%%expect{|
+module M : sig val f : unit -> unit end @@ stateless
+|}]
+
+module _ @ portable = F(M)
+[%%expect{|
+Line 1, characters 22-26:
+1 | module _ @ portable = F(M)
+                          ^^^^
+Error: This is "nonportable", but expected to be "portable".
+|}]
+
+(* To avoid zapping, explicitly annotate the functor type like below. *)
 module F : S @ portable -> T @ portable = functor (M : S @ portable) -> struct
     let g = M.f
     let () = use_portable M.f
@@ -64,11 +116,27 @@ end
 module F : S @ portable -> T @ portable
 |}]
 
-module M = struct
-    let f () = ()
+module M' @ portable = F(M)
+[%%expect{|
+module M' : sig val g : unit -> unit end @@ portable
+|}]
+
+(* Alternatively, define the functor and the use-sites in a structure.
+The use-site will constrain the functor's type as needed. *)
+module Workaround = struct
+  module F (M : S @ portable) = struct
+      let g = M.f
+  end
+  module M' @ portable = F(M)
 end
 [%%expect{|
-module M : sig val f : unit -> unit end @@ stateless
+module Workaround :
+  sig
+    module F :
+      functor (M : S @ portable) -> sig val g : unit -> unit end @ portable
+      @@ stateless nonportable
+    module M' : sig val g : unit -> unit end
+  end @@ portable
 |}]
 
 let () =
