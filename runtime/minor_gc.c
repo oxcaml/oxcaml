@@ -18,6 +18,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "caml/config.h"
 #include "caml/custom.h"
@@ -39,6 +40,7 @@
 #include "caml/roots.h"
 #include "caml/shared_heap.h"
 #include "caml/signals.h"
+#include "caml/sizeclasses.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
 
@@ -191,22 +193,16 @@ bool caml_maybe_minor_gc_before_writes(mlsize_t count)
 
 struct oldify_state {
   value todo_list;
-  uintnat live_bytes;
   caml_domain_state* domain;
+  bool domain_alone;
+  status status;
+  value ***free_ps;
+  uintnat live_bytes;
+  uintnat pool_live_blocks;
+  uintnat pool_live_words;
+  uintnat pool_frag_words;
+  uintnat allocated_words;
 };
-
-Caml_inline value alloc_shared(caml_domain_state* d,
-                               mlsize_t wosize, tag_t tag,
-                               reserved_t reserved)
-{
-  void* mem = caml_shared_try_alloc(d->shared_heap, wosize, tag,
-                                    reserved);
-  if (mem == NULL) {
-    caml_fatal_error("allocation failure during minor GC");
-  }
-  d->allocated_words += Whsize_wosize(wosize);
-  return Val_hp(mem);
-}
 
 /* In-progress headers are zeros except for the lowest color bit set
    to 1. */
@@ -237,21 +233,50 @@ Caml_inline header_t get_header_val(value v) {
  * block. Win or lose, update `*p` with the new block plus
  * `infix_offset`.
  *
- * `hd` is the header of `v`
+ * `hd` is the header of `v`.
 
  * `prefix` is the size of any unscannable prefix of `v`. If `v`
  * includes any infix tags, they must be within this prefix.
  *
- * `domain_alone` is true iff this is the only domain (so we don't
- * have to do the atomic update protocol).
+ * `st` points to the oldify_state, which is where we cache all sorts
+ * of handy values and accumulators during a single minor GC.
 */
 
 Caml_inline value try_forward(value v, volatile value *p, header_t hd,
                               mlsize_t infix_offset, mlsize_t prefix,
-                              caml_domain_state *domain, bool domain_alone)
+                              struct oldify_state *st)
 {
-  value result = alloc_shared(domain, Wosize_hd(hd),
-                              Tag_hd(hd), Reserved_hd(hd));
+  caml_domain_state *domain = st->domain;
+  void *mem = NULL;
+
+  /* manual inline of parts of caml_shared_try_alloc */
+  mlsize_t wosize = Wosize_hd(hd);
+  mlsize_t whsize = Whsize_wosize(wosize);
+  if (whsize <= SIZECLASS_MAX) {
+    sizeclass_t sz = sizeclass_wsize[whsize];
+    value **free_p = st->free_ps[sz];
+    if (free_p) {
+      value *block = *free_p;
+      CAML_EV_ALLOC(wosize);
+      mem = block;
+      value *next = (value*)(block[1]);
+      *free_p = next;
+      if (!next) caml_shared_empty_free_list(domain->shared_heap, whsize);
+      ++ st->pool_live_blocks;
+      st->pool_live_words += whsize;
+      st->pool_frag_words += wsize_sizeclass[sz] - whsize;
+      Hd_hp(block) = Hd_with_color(hd, st->status);
+    }
+  }
+  if (!mem) {
+    mem = caml_shared_try_alloc(domain->shared_heap, Wosize_hd(hd),
+                                Tag_hd(hd), Reserved_hd(hd));
+  }
+  if (mem == NULL) {
+    caml_fatal_error("allocation failure during minor GC");
+  }
+  st->allocated_words += Whsize_wosize(wosize);
+  value result = Val_hp(mem);
 
   /* Copy unscannable prefix, which will include any infix tags, so
    * that infix pointers to `v` can be oldified into pointers with
@@ -265,7 +290,7 @@ Caml_inline value try_forward(value v, volatile value *p, header_t hd,
     Field(result, j) = Field(v, j);
   }
 
-  if (domain_alone) {
+  if (st->domain_alone) {
     *Hp_val (v) = Promoted_hd;
     Field(v, 0) = result;
   } else {
@@ -280,10 +305,9 @@ Caml_inline value try_forward(value v, volatile value *p, header_t hd,
          and use the one from the other domain. */
       (void)spin_on_header(v);
 
-      mlsize_t sz = Wosize_hd(hd);
-      *Hp_val(result) = Make_header(sz, No_scan_tag, caml_allocation_status());
+      *Hp_val(result) = Make_header(wosize, No_scan_tag, st->status);
 #ifdef DEBUG
-      for (mlsize_t i = 0; i < sz ; i++) {
+      for (mlsize_t i = 0; i < wosize ; i++) {
         Field(result, i) = Val_long(1);
       }
 #endif
@@ -293,6 +317,7 @@ Caml_inline value try_forward(value v, volatile value *p, header_t hd,
     }
   }
 
+  st->live_bytes += Bhsize_hd(hd);
   *p = result + infix_offset;
   return result;
 }
@@ -311,12 +336,9 @@ tail_call:
   }
 
   struct oldify_state* st = st_v;
-  caml_domain_state *domain = st->domain;
   header_t hd;
   tag_t tag;
   mlsize_t infix_offset = 0;
-
-  bool alone = caml_domain_alone();
 
   do {
     hd = get_header_val(v);
@@ -349,9 +371,8 @@ tail_call:
     if (ft == Forward_tag || ft == Lazy_tag ||
         ft == Forcing_tag || ft == Double_tag) {
       /* Do not short-circuit the pointer.  Copy as a normal block. */
-      value result = try_forward(v, p, hd, infix_offset, 0, domain, alone);
+      value result = try_forward(v, p, hd, infix_offset, 0, st);
       if (result) {
-        st->live_bytes += Bhsize_hd(hd);
         p = Op_val (result);
         v = f;
         goto tail_call;
@@ -363,11 +384,9 @@ tail_call:
   } else {
     mlsize_t unscannable_prefix =
       (tag == Closure_tag) ? Start_env_closinfo(Closinfo_val(v)) : 0;
-    value result = try_forward(v, p, hd, infix_offset, unscannable_prefix,
-                               domain, alone);
+    value result = try_forward(v, p, hd, infix_offset, unscannable_prefix, st);
 
     if (result) {
-      st->live_bytes += Bhsize_hd(hd);
       if (tag == Cont_tag) {
         CAMLassert(infix_offset == 0);
         CAMLassert(sz == 2);
@@ -502,8 +521,8 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
       /* Limits of *this* minor heap, not other domains' */
       struct caml_ephe_ref_table ephe_ref_table =
         st->domain->minor_tables->ephe_ref;
-      value young_start = (value)Caml_state->young_start;
-      value young_end = (value)Caml_state->young_end;
+      value young_start = (value)st->domain->young_start;
+      value young_end = (value)st->domain->young_end;
       for (struct caml_ephe_ref_elt *re = ephe_ref_table.base;
            re < ephe_ref_table.ptr; re++) {
         if (re->stash != caml_ephe_none)
@@ -591,6 +610,9 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   promote_result_s result = { .locked_ephemerons = false, };
 
   st.domain = domain;
+  st.domain_alone = caml_domain_alone();
+  st.status = caml_allocation_status();
+  st.free_ps = caml_shared_free_lists(domain->shared_heap);
 
   prev_alloc_words = domain->allocated_words;
 
@@ -743,6 +765,12 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   (void)oldify_mopup (&st, 0); /* ignore result as we're not doing ephemerons */
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS_PROMOTE);
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS);
+  caml_shared_add_pool_stats(domain->shared_heap,
+                             st.pool_live_blocks,
+                             st.pool_live_words,
+                             st.pool_frag_words);
+  domain->allocated_words += st.allocated_words;
+
   if (minor_allocated_bytes) {
     CAML_GC_MESSAGE(MINOR,
                     "Promoted %"ARCH_INTNAT_PRINTF_FORMAT"u bytes "
