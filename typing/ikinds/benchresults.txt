@@ -354,3 +354,410 @@ run 3:
   user 673.96
   sys  122.80
 
+
+=== 2025-12-16T23:56:44Z ===
+desc: ikinds=true
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-ZFtt8o5A
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 154.40
+  user 680.70
+  sys  122.70
+
+run 2: FAIL
+  make log: /tmp/oxcaml-ikinds-bench-ZFtt8o5A/run2.make.log
+  time log: /tmp/oxcaml-ikinds-bench-ZFtt8o5A/run2.time
+    CC closure.o
+    CC error.o
+    CC lalr.o
+    CC lr0.o
+    CC main.o
+    CC mkpar.o
+    CC output.o
+    CC reader.o
+    CC skeleton.o
+    CC symtab.o
+    CC verbose.o
+    CC warshall.o
+  gcc -c -O2 -fno-strict-aliasing -fwrapv -g -Wall -Wno-pragmas -Wint-conversion -Wundef -Werror -fno-common -g -Wno-unknown-warning-option  -I../runtime4  -D_FILE_OFFSET_BITS=64  -DCAMLDLLIMPORT= -DCAML_NAME_SPACE  -o sak.o sak.c
+  cc -o sak sak.o 
+    CC prims.o
+  touch camlheader
+  touch camlheaderd
+  touch camlheaderi
+  touch camlheader_ur
+  File "backend/debug/dwarf/dwarf_low/.dwarf_low.objs/byte/_unknown_", line 1, characters 0-0:
+  Context: main
+  >> Fatal error: Warnings.letter '\017' (for_debug="+a-4-30-40-41-42", ocamlparam_from_env="-" ocamlparam_from_compenv="<not-set>")
+  Fatal error: exception Misc.Fatal_error
+  Raised at Misc.fatal_errorf.(fun) in file "utils/misc.ml", line 22, characters 14-31
+  Called from Warnings.parse_opt.eval in file "utils/warnings.ml", line 941, characters 36-49
+  Called from Stdlib__List.iter in file "list.ml", line 110, characters 12-15
+  Called from Warnings.parse_opt.parse_and_eval in file "utils/warnings.ml", line 947, characters 4-25
+  Called from Warnings.parse_options in file "utils/warnings.ml", line 966, characters 15-47
+  Called from Builtin_attributes.warning_attribute.process in file "parsing/builtin_attributes.ml", line 367, characters 12-46
+  Called from Builtin_attributes.parse_standard_interface_attributes in file "parsing/builtin_attributes.ml", line 648, characters 2-24
+  Called from Typemod.transl_signature.transl_sig_item in file "typing/typemod.ml", line 2343, characters 8-67
+  Called from Typemod.transl_signature.(fun) in file "typing/typemod.ml", line 2363, characters 9-63
+  Called from Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 427, characters 14-18
+  Re-raised at Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 432, characters 4-13
+  Called from Typemod.type_interface in file "typing/typemod.ml", line 4434, characters 11-35
+  Called from Compile_common.typecheck_intf.(fun) in file "driver/compile_common.ml", line 97, characters 4-138
+  Called from Profile.record_call_internal.(fun) in file "utils/profile.ml", line 128, characters 23-27
+  Called from Misc.try_finally in file "utils/misc.ml", line 34, characters 8-15
+  Re-raised at Misc.try_finally in file "utils/misc.ml", line 48, characters 10-56
+  Called from Compile_common.interface.(fun) in file "driver/compile_common.ml", line 143, characters 22-45
+  Called from Misc.try_finally in file "utils/misc.ml", line 34, characters 8-15
+  Re-raised at Misc.try_finally in file "utils/misc.ml", line 48, characters 10-56
+  Called from Misc.try_finally in file "utils/misc.ml", line 34, characters 8-15
+  Re-raised at Misc.try_finally in file "utils/misc.ml", line 48, characters 10-56
+  Called from Compenv.process_action in file "driver/compenv.ml", line 706, characters 6-54
+  Called from Stdlib__List.iter in file "list.ml", line 110, characters 12-15
+  Called from Compenv.process_deferred_actions in file "driver/compenv.ml", line 794, characters 2-85
+  Called from Maindriver.main in file "driver/maindriver.ml", line 36, characters 6-147
+  Re-raised at Location.report_exception.loop in file "parsing/location.ml", line 1086, characters 14-25
+  Called from Maindriver.main in file "driver/maindriver.ml", line 144, characters 4-35
+  Called from Main_native in file "driver/main_native.ml", line 2, characters 7-54
+  make: *** [compiler] Error 1
+  real 130.89
+  user 481.93
+  sys 90.11
+
+
+=== 2025-12-17T00:02:42Z ===
+desc: ikinds=true
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-7C6umcPc
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 152.32
+  user 672.55
+  sys  121.64
+
+run 2:
+  real 156.76
+  user 685.58
+  sys  124.19
+
+run 3:
+  real 157.09
+  user 685.27
+  sys  124.26
+
+
+=== 2025-12-17T00:12:51Z ===
+desc: ikinds=true
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-A14RlS9U
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 154.43
+  user 679.75
+  sys  121.58
+
+run 2:
+  real 156.13
+  user 689.45
+  sys  124.54
+
+run 3:
+  real 155.34
+  user 683.27
+  sys  124.83
+
+
+=== 2025-12-17T00:23:22Z ===
+desc: ikinds=true(stashed)
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-boyOf6H9
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+
+run 1:
+  real 153.19
+  user 679.32
+  sys  122.27
+
+run 2:
+  real 153.49
+  user 686.72
+  sys  123.04
+
+run 3:
+  real 152.22
+  user 679.50
+  sys  121.83
+
+
+=== 2025-12-17T00:32:34Z ===
+desc: ikinds=true(stashed)
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-poKDAcW1
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+
+run 1:
+  real 153.15
+  user 681.52
+  sys  120.99
+
+run 2: FAIL
+  make log: /tmp/oxcaml-ikinds-bench-poKDAcW1/run2.make.log
+  time log: /tmp/oxcaml-ikinds-bench-poKDAcW1/run2.time
+    CC closure.o
+    CC error.o
+    CC lalr.o
+    CC lr0.o
+    CC main.o
+    CC mkpar.o
+    CC output.o
+    CC reader.o
+    CC skeleton.o
+    CC symtab.o
+    CC verbose.o
+    CC warshall.o
+  gcc -c -O2 -fno-strict-aliasing -fwrapv -g -Wall -Wno-pragmas -Wint-conversion -Wundef -Werror -fno-common -g -Wno-unknown-warning-option  -I../runtime4  -D_FILE_OFFSET_BITS=64  -DCAMLDLLIMPORT= -DCAML_NAME_SPACE  -o sak.o sak.c
+  cc -o sak sak.o 
+    CC prims.o
+  touch camlheader
+  touch camlheaderd
+  touch camlheaderi
+  touch camlheader_ur
+  File "backend/debug/dwarf/dwarf_low/.dwarf_low.objs/byte/_unknown_", line 1, characters 0-0:
+  Context: main
+  >> Fatal error: Warnings.letter '\210' (for_debug="+a-4-30-40-41-42", ocamlparam_from_env="-" ocamlparam_from_compenv="<not-set>")
+  Fatal error: exception Misc.Fatal_error
+  Raised at Misc.fatal_errorf.(fun) in file "utils/misc.ml", line 22, characters 14-31
+  Called from Warnings.parse_opt.eval in file "utils/warnings.ml", line 941, characters 36-49
+  Called from Stdlib__List.iter in file "list.ml", line 110, characters 12-15
+  Called from Warnings.parse_opt.parse_and_eval in file "utils/warnings.ml", line 947, characters 4-25
+  Called from Warnings.parse_options in file "utils/warnings.ml", line 966, characters 15-47
+  Called from Builtin_attributes.warning_attribute.process in file "parsing/builtin_attributes.ml", line 367, characters 12-46
+  Called from Builtin_attributes.parse_standard_interface_attributes in file "parsing/builtin_attributes.ml", line 648, characters 2-24
+  Called from Typemod.transl_signature.transl_sig_item in file "typing/typemod.ml", line 2343, characters 8-67
+  Called from Typemod.transl_signature.(fun) in file "typing/typemod.ml", line 2363, characters 9-63
+  Called from Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 427, characters 14-18
+  Re-raised at Builtin_attributes.warning_scope in file "parsing/builtin_attributes.ml", line 432, characters 4-13
+  Called from Typemod.type_interface in file "typing/typemod.ml", line 4434, characters 11-35
+  Called from Compile_common.typecheck_intf.(fun) in file "driver/compile_common.ml", line 97, characters 4-138
+  Called from Profile.record_call_internal.(fun) in file "utils/profile.ml", line 128, characters 23-27
+  Called from Misc.try_finally in file "utils/misc.ml", line 34, characters 8-15
+  Re-raised at Misc.try_finally in file "utils/misc.ml", line 48, characters 10-56
+  Called from Compile_common.interface.(fun) in file "driver/compile_common.ml", line 143, characters 22-45
+  Called from Misc.try_finally in file "utils/misc.ml", line 34, characters 8-15
+  Re-raised at Misc.try_finally in file "utils/misc.ml", line 48, characters 10-56
+  Called from Misc.try_finally in file "utils/misc.ml", line 34, characters 8-15
+  Re-raised at Misc.try_finally in file "utils/misc.ml", line 48, characters 10-56
+  Called from Compenv.process_action in file "driver/compenv.ml", line 706, characters 6-54
+  Called from Stdlib__List.iter in file "list.ml", line 110, characters 12-15
+  Called from Compenv.process_deferred_actions in file "driver/compenv.ml", line 794, characters 2-85
+  Called from Maindriver.main in file "driver/maindriver.ml", line 36, characters 6-147
+  Re-raised at Location.report_exception.loop in file "parsing/location.ml", line 1086, characters 14-25
+  Called from Maindriver.main in file "driver/maindriver.ml", line 144, characters 4-35
+  Called from Main_native in file "driver/main_native.ml", line 2, characters 7-54
+  make: *** [compiler] Error 1
+  real 130.47
+  user 486.57
+  sys 93.23
+
+
+=== 2025-12-17T00:38:16Z ===
+desc: ikinds=true(stashed)
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-2MgIOhJ7
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+
+
+=== 2025-12-17T00:38:43Z ===
+desc: ikinds=trueStashed
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-u52KIPGK
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+
+run 1:
+  real 151.59
+  user 675.24
+  sys  121.29
+
+run 2:
+  real 152.20
+  user 673.50
+  sys  119.99
+
+run 3:
+  real 152.44
+  user 678.68
+  sys  121.45
+
+
+=== 2025-12-17T00:48:20Z ===
+desc: ikinds=trueStashed
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-09dB3hyY
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+
+run 1:
+  real 153.38
+  user 681.68
+  sys  121.28
+
+run 2:
+  real 153.47
+  user 687.18
+  sys  122.01
+
+run 3:
+  real 152.52
+  user 677.87
+  sys  122.18
+
+
+=== 2025-12-17T00:57:21Z ===
+desc: ikinds=true
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-pUeIdHb2
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 151.83
+  user 675.29
+  sys  121.19
+
+run 2:
+  real 152.84
+  user 684.26
+  sys  121.93
+
+run 3:
+  real 149.46
+  user 668.81
+  sys  119.86
+
+
+=== 2025-12-17T01:05:06Z ===
+desc: ikinds=true
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-czFZj3M6
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 152.92
+  user 672.40
+  sys  122.67
+
+run 2:
+  real 152.83
+  user 677.62
+  sys  122.18
+
+run 3:
+  real 153.89
+  user 676.99
+  sys  122.73
+
+
+=== 2025-12-17T01:13:01Z ===
+desc: ikinds=true
+git: 7c5dfc3aee7907691b82d11a770d962185931949 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-glhkAp9o
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D testsuite/tests/typing-jkind-bounds/inclusion/test.compilers.reference
+   M testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 152.69
+  user 674.51
+  sys  122.77
+
+run 2:
+  real 153.18
+  user 677.54
+  sys  121.24
+
+run 3:
+  real 151.45
+  user 674.21
+  sys  121.68
+
