@@ -58,9 +58,10 @@ Can you implement this mode? Don't cause code duplication, just pass around whic
 
 **Phase 4: Reduce memoization pressure**
 
-- Limit `ty_to_kind` memoization to types that are potentially circular
+-[done] Limit `ty_to_kind` memoization to types that are potentially circular
   (polymorphic variants); keep `constr_to_coeffs` memoization.
 - Re-check whether the remaining hotspots justify larger refactors.
+- For types that don't need the memoization, we can just recurse, without creating ldd variables for recursing that are later solved.
 
 **Phase 5: Preserve ikinds more broadly**
 

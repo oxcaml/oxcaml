@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true;
+Clflags.ikinds := false;
 
 (* Global feature toggles for the ikinds experiment.
    These are intended to be easy to flip while iterating on
@@ -102,19 +102,27 @@ module JK = struct
     let param = Types.get_id t in
     rigid_name ctx (Ldd.Name.param param)
 
-  (* Compute the kind for [t], memoizing results to preserve sharing.
-     For recursive types we install a fresh placeholder var, then solve a
-     least fixed point against the RHS produced by [env.kind_of]. *)
+  let type_may_be_circular (t : ty) : bool =
+    match Types.get_desc t with
+    | Types.Tvariant _ -> true
+    | _ -> false
+
+  (* Compute the kind for [t].
+     We only memoize types that can be cyclic (polymorphic variants), keeping
+     the per-constructor memoization in [constr_to_coeffs]. *)
   let rec kind (ctx : ctx) (t : ty) : kind =
     match TyTbl.find_opt ctx.ty_to_kind t with
     | Some k -> k
     | None ->
-        let v = Ldd.new_var () in
-        let placeholder = Ldd.var v in
-        TyTbl.add ctx.ty_to_kind t placeholder;
-        let rhs = ctx.env.kind_of ctx t in
-        Ldd.solve_lfp v rhs;
-        rhs
+        if type_may_be_circular t
+        then (
+          let v = Ldd.new_var () in
+          let placeholder = Ldd.var v in
+          TyTbl.add ctx.ty_to_kind t placeholder;
+          let rhs = ctx.env.kind_of ctx t in
+          Ldd.solve_lfp v rhs;
+          rhs)
+        else ctx.env.kind_of ctx t
 
   (* Fetch or compute the polynomial for constructor [c].  The returned
      nodes are placeholders stored in [constr_to_coeffs] so that mutually
