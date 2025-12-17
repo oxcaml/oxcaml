@@ -283,6 +283,7 @@
   printslambda
   runtimedef
   runtimetags
+  structured_mangling
   tmc
   simplif
   slambda0
