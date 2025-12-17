@@ -3181,7 +3181,7 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
         (fun (patterns, vars) (funcv, to_keep) typev ->
           let pat, vs = variable_pattern funcv to_keep in
           ( Variable.Map.add (Bound_parameter.var typev) pat patterns,
-            List.rev_append vs vars ))
+            List.append vs vars ))
         (Variable.Map.empty, []) func_vars
         (Bound_parameters.to_list type_vars)
     in
