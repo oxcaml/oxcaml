@@ -56,7 +56,7 @@ For mode crossing we are going to round up at the end so it doesn't make much se
 
 Can you implement this mode? Don't cause code duplication, just pass around which mode we are in.
 
-**Phase 4: Reduce memoization pressure**
+**Phase 4: Reduce memoization pressure (DONE)**
 
 -[done] Limit `ty_to_kind` memoization to types that are potentially circular
   (polymorphic variants); keep `constr_to_coeffs` memoization.
