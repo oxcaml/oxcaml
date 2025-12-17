@@ -13,7 +13,7 @@ sequence-blank-line=compact
 space-around-lists=false
 space-around-variants=false
 type-decl=sparse
-version=0.24.1
+version=0.28.1
 
 # The existing comments are hand-formatted and lose a lot of readability
 # if we wrap them. We should either convert the comments we care about to
