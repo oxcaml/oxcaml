@@ -720,6 +720,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     CC.close_let_rec acc ccenv ~function_declarations ~body
       ~current_region:
         (Env.current_region env |> Option.map Env.Region_stack_element.region)
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lprim (prim, args, loc) -> (
     match[@ocaml.warning "-fragile-match"] prim with
     | Praise raise_kind -> (
@@ -1681,6 +1682,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
         | Ldelayedletrec _ -> Misc.unsimplified_delayedletrec ()
+        | Lrecmodule _ -> Misc.unsimplified_recmodule ()
         | Lsplice _ -> Misc.splices_should_not_exist_after_eval ())
       ([], wrappers) cases
   in

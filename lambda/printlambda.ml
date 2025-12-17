@@ -1267,6 +1267,30 @@ let rec lam ppf = function
           id_arg_list in
       fprintf ppf
         "@[<2>(letrec@ (@[<hv 1>%a@])@ %a)@]" bindings id_arg_list lam body
+  | Lrecmodule(bindings, body) ->
+      let pp_id_or_ignore ppf = function
+        | Lambda.Id (id, duid) -> fprintf ppf "%a%a" Ident.print id debug_uid duid
+        | Lambda.Ignore_loc _ -> fprintf ppf "_"
+      in
+      let pp_init ppf (init : (_, _) result) = match init with
+        | Ok (loc_lam, shape_lam) ->
+            fprintf ppf "init(%a, %a)" lam loc_lam lam shape_lam
+        | Error _ -> fprintf ppf "unsafe"
+      in
+      let pp_bindings ppf bindings =
+        let spc = ref false in
+        List.iter
+          (fun (id_or_ignore, _, init, rhs) ->
+            if !spc then fprintf ppf "@ " else spc := true;
+            fprintf ppf "@[<2>%a %a =@ %a@]"
+              pp_id_or_ignore id_or_ignore
+              pp_init init
+              lam rhs)
+          bindings in
+      fprintf ppf
+        "@[<2>(recmodule@ (@[<hv 1>%a@])@ %a)@]"
+        pp_bindings bindings
+        lam body
   | Lprim(prim, largs, _) ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in

@@ -35,6 +35,10 @@ let unsimplified_delayedletrec () =
   fatal_error
     "Ldelayedletrec should have been removed by Simplif.simplify_letrec"
 
+let unsimplified_recmodule () =
+  fatal_error
+    "Lrecmodule should have been removed by Simplif.simplify_recmodule"
+
 (* Exceptions *)
 
 let try_finally ?(always=(fun () -> ())) ?(exceptionally=(fun () -> ())) work =

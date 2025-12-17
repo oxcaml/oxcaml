@@ -251,6 +251,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         free_variables_of_decls =
           Lambda.free_variables (Lletrec (decl, Lambda.lambda_unit))
       }
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lstaticcatch (body, (static_label, args), handler, _, _) ->
     Staticcatch
       { body = comp_expr body;

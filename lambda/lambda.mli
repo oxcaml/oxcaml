@@ -798,6 +798,21 @@ type pop_region =
   | Popped_region
   | Same_region
 
+type id_or_ignore_loc =
+  | Id of Ident.t * debug_uid
+  | Ignore_loc of scoped_location
+
+type unsafe_component =
+  | Unsafe_module_binding
+  | Unsafe_functor
+  | Unsafe_non_function
+  | Unsafe_typext
+  | Unsafe_non_value_arg
+
+type unsafe_info =
+  | Unsafe of { reason:unsafe_component; loc:Location.t; subid:Ident.t }
+  | Unnamed
+
 type lambda =
     Lvar of Ident.t
   | Lmutvar of Ident.t
@@ -811,6 +826,13 @@ type lambda =
       list
       * lambda
   | Lletrec of rec_binding list * lambda
+  | Lrecmodule of
+      (id_or_ignore_loc
+      * scoped_location
+      * (lambda * lambda, unsafe_info) result
+      * lambda)
+      list
+      * lambda
   | Lprim of primitive * lambda list * scoped_location
   | Lswitch of lambda * lambda_switch * scoped_location * layout
 (* switch on strings, clauses are sorted by string order,

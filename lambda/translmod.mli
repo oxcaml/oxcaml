@@ -67,19 +67,7 @@ val toplevel_name: Ident.t -> string
 
 val primitive_declarations: Primitive.description list ref
 
-type unsafe_component =
-  | Unsafe_module_binding
-  | Unsafe_functor
-  | Unsafe_non_function
-  | Unsafe_typext
-  | Unsafe_non_value_arg
-
-type unsafe_info =
-  | Unsafe of { reason:unsafe_component; loc:Location.t; subid:Ident.t }
-  | Unnamed
-
 type error =
-  Circular_dependency of (Ident.t * unsafe_info) list
 | Conflicting_inline_attributes
 | Instantiating_packed of Compilation_unit.t
 

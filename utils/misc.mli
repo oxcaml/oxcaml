@@ -38,7 +38,11 @@ val splices_should_not_exist_after_eval : unit -> _
 
 val unsimplified_delayedletrec : unit -> _
   (** Raise a [Fatal_error] explaining that the Ldelayedletrec should have
-      already been removed by [Simplif.simplify_letrec] *)
+      already been removed by [Simplif.simplify_delayedletrec] *)
+
+val unsimplified_recmodule : unit -> _
+  (** Raise a [Fatal_error] explaining that the Lrecmodule should have
+      already been removed by [Simplif.simplify_recmodule] *)
 
 exception Fatal_error
 

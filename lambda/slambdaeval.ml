@@ -59,7 +59,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lfunction func -> assert_function_contains_no_splices func
   | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
-  | Ldelayedletrec (_, _) | Lletrec (_, _) -> ()
+  | Ldelayedletrec (_, _) | Lletrec (_, _) | Lrecmodule _ -> ()
   | Lprim (prim, _, _) -> assert_primitive_contains_no_splices prim
   | Lswitch (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lstringswitch (_, _, _, _, layout) ->

@@ -845,6 +845,21 @@ type pop_region =
   | Popped_region
   | Same_region
 
+type id_or_ignore_loc =
+  | Id of Ident.t * debug_uid
+  | Ignore_loc of scoped_location
+
+type unsafe_component =
+  | Unsafe_module_binding
+  | Unsafe_functor
+  | Unsafe_non_function
+  | Unsafe_typext
+  | Unsafe_non_value_arg
+
+type unsafe_info =
+  | Unsafe of { reason:unsafe_component; loc:Location.t; subid:Ident.t }
+  | Unnamed
+
 type lambda =
     Lvar of Ident.t
   | Lmutvar of Ident.t
@@ -858,6 +873,13 @@ type lambda =
       list
       * lambda
   | Lletrec of rec_binding list * lambda
+  | Lrecmodule of
+      (id_or_ignore_loc
+      * scoped_location
+      * (lambda * lambda, unsafe_info) result
+      * lambda)
+      list
+      * lambda
   | Lprim of primitive * lambda list * scoped_location
   | Lswitch of lambda * lambda_switch * scoped_location * layout
   | Lstringswitch of
@@ -1239,6 +1261,7 @@ let make_key e =
     | Lexclave e -> Lexclave (tr_rec env e)
     | Ldelayedletrec _
     | Lletrec _|Lfunction _
+    | Lrecmodule _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1310,6 +1333,13 @@ let shallow_iter ~tail ~non_tail:f = function
   | Lletrec(decl, body) ->
       tail body;
       List.iter (fun { def } -> f (Lfunction def)) decl
+  | Lrecmodule(bindings, body) ->
+      tail body;
+      List.iter (fun (_, _, init, rhs) ->
+        f rhs;
+        match init with
+        | Ok (loc, shape) -> f loc; f shape
+        | Error _ -> ()) bindings
   | Lprim (Psequand, [l1; l2], _)
   | Lprim (Psequor, [l1; l2], _) ->
       f l1;
@@ -1383,6 +1413,29 @@ let rec free_variables = function
       in
       Ident.Set.diff set
         (Ident.Set.of_list (List.map (fun { id } -> id) decl))
+  | Lrecmodule(bindings, body) ->
+      let fv_rhs =
+        free_variables_list (free_variables body)
+          (List.map (fun (_, _, _, rhs) -> rhs) bindings)
+      in
+      let fv_init =
+        List.fold_left (fun acc (_, _, init, _) ->
+          match init with
+          | Ok (loc, shape) ->
+              Ident.Set.union acc
+                (Ident.Set.union (free_variables loc) (free_variables shape))
+          | Error _ -> acc)
+          Ident.Set.empty bindings
+      in
+      let set = Ident.Set.union fv_rhs fv_init in
+      let bound_ids =
+        List.filter_map (fun (id_or_ignore, _, _, _) ->
+          match id_or_ignore with
+          | Id (id, _) -> Some id
+          | Ignore_loc _ -> None)
+          bindings
+      in
+      Ident.Set.diff set (Ident.Set.of_list bound_ids)
   | Lprim(_p, args, _loc) ->
       free_variables_list Ident.Set.empty args
   | Lswitch(arg, sw,_,_) ->
@@ -1670,6 +1723,16 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         ({ rb with id = id'; debug_uid = duid' } :: ids' , l)
       ) ids ([], l)
   in
+  let bind_recmodule bindings l =
+    List.fold_right (fun (id_or_ignore, loc, init, rhs) (bindings', l) ->
+        match id_or_ignore with
+        | Id (id, duid) ->
+            let id', duid', l = bind id duid l in
+            ((Id (id', duid'), loc, init, rhs) :: bindings' , l)
+        | Ignore_loc _ as id_or_ignore ->
+            ((id_or_ignore, loc, init, rhs) :: bindings' , l)
+      ) bindings ([], l)
+  in
   let rec subst s l lam =
     match lam with
     | Lvar id as lam ->
@@ -1707,6 +1770,10 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lletrec(decl, body) ->
         let decl, l' = bind_rec decl l in
         Lletrec(List.map (subst_decl s l') decl, subst s l' body)
+    | Lrecmodule(bindings, body) ->
+        let bindings, l' = bind_recmodule bindings l in
+        Lrecmodule
+          (List.map (subst_recmodule_bind s l') bindings, subst s l' body)
     | Lprim(p, args, loc) -> Lprim(p, subst_list s l args, loc)
     | Lswitch(arg, sw, loc,kind) ->
         Lswitch(subst s l arg,
@@ -1795,6 +1862,12 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
   and subst_list s l li = List.map (subst s l) li
   and subst_rec_bind s l (id, duid, rec_kind, rhs) =
     (id, duid, rec_kind, subst s l rhs)
+  and subst_recmodule_bind s l (id_or_ignore, loc, init, rhs) =
+    let init' = match init with
+      | Ok (lam_loc, shape) -> Ok (subst s l lam_loc, subst s l shape)
+      | Error _ as e -> e
+    in
+    (id_or_ignore, loc, init', subst s l rhs)
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
     let params, l' = bind_params lf.params l in
@@ -1895,6 +1968,12 @@ let shallow_map ~tail ~non_tail:f = function
              { rb with def = map_lfunction f rb.def })
             idel,
          tail e2)
+  | Lrecmodule (bindings, body) ->
+      Lrecmodule
+        (List.map
+            (fun (id, duid, rec_kind, value) -> (id, duid, rec_kind, f value))
+            bindings,
+          tail body)
   | Lprim (Psequand as p, [l1; l2], loc)
   | Lprim (Psequor as p, [l1; l2], loc) ->
       Lprim(p, [f l1; tail l2], loc)
@@ -2871,10 +2950,10 @@ let may_allocate_in_region lam =
        We should fix that at some point. *)
     | Lsplice _ -> raise Exit
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Ldelayedletrec _ | Lletrec _ | Lswitch _
-      | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
-      | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
-      | Levent _ | Lifused _) as lam ->
+    | ( Lapply _ | Llet _ | Lmutlet _ | Ldelayedletrec _ | Lletrec _
+      | Lrecmodule _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
+      | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _
+      | Lsend _ | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
   in
   if not Config.stack_allocation then false
@@ -2905,6 +2984,7 @@ let rec try_to_find_location lam =
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
+  | Lrecmodule ((_, loc, _, _) :: _, _)
   | Lapply { ap_loc = loc; _ }
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
@@ -2927,7 +3007,7 @@ let rec try_to_find_location lam =
   | Lexclave lam
   | Ltrywith (lam, _, _, _, _) ->
     try_to_find_location lam
-  | Lvar _ | Lmutvar _ | Lconst _ | Ldelayedletrec _ | Lletrec _
+  | Lvar _ | Lmutvar _ | Lconst _ | Ldelayedletrec _ | Lletrec _ | Lrecmodule _
   | Lstaticraise (_, []) ->
     Debuginfo.Scoped_location.Loc_unknown
 

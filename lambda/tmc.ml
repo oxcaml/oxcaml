@@ -634,6 +634,7 @@ let rec choice ctx t =
         let ctx, bindings = traverse_letrec ctx bindings in
         let+ body = choice ctx ~tail body in
         Lletrec(bindings, body)
+    | Lrecmodule _ -> Misc.unsimplified_recmodule ()
     | Lswitch (l1, sw, loc, kind) ->
         (* decompose *)
         let consts_lhs, consts_rhs = List.split sw.sw_consts in

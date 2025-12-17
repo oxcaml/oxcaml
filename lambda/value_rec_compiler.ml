@@ -149,6 +149,7 @@ let compute_static_size lam =
           env bindings
       in
       compute_expression_size env body
+    | Lrecmodule _ -> Misc.unsimplified_recmodule ()
     | Lprim (p, args, _) ->
       size_of_primitive env p args
     | Lswitch (_, sw, _, _) ->
@@ -705,6 +706,7 @@ let rec split_static_function lfun block_var local_idents lam :
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lsplice _ ->
     Misc.fatal_error "letrec: layout poly not supported"
 and rebuild_arms :

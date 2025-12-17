@@ -30,18 +30,7 @@ module SL = Slambda
 
 let const_int i = Lambda.const_int i
 
-type unsafe_component =
-  | Unsafe_module_binding
-  | Unsafe_functor
-  | Unsafe_non_function
-  | Unsafe_typext
-  | Unsafe_non_value_arg
-
-type unsafe_info =
-  | Unsafe of { reason:unsafe_component; loc:Location.t; subid:Ident.t }
-  | Unnamed
 type error =
-  Circular_dependency of (Ident.t * unsafe_info) list
 | Conflicting_inline_attributes
 | Instantiating_packed of Compilation_unit.t
 
@@ -278,8 +267,6 @@ let record_primitive = function
 
 (* Utilities for compiling "module rec" definitions *)
 
-let mod_prim = Lambda.transl_prim "CamlinternalMod"
-
 let undefined_location loc =
   let (fname, line, char) = Location.get_pos_info loc.Location.loc_start in
   Lconst(Const_block(0,
@@ -358,145 +345,22 @@ let init_shape id modl =
        Lconst(init_shape_mod id modl.mod_loc modl.mod_env modl.mod_type))
   with Initialization_failure reason -> Result.Error(reason)
 
-(* Reorder bindings to honor dependencies.  *)
-
-type binding_status =
-  | Undefined
-  | Inprogress of int option (** parent node *)
-  | Defined
-
-type id_or_ignore_loc =
-  | Id of Ident.t * Lambda.debug_uid
-  | Ignore_loc of Lambda.scoped_location
-
-let extract_unsafe_cycle id status init cycle_start =
-  let info i = match init.(i) with
-    | Result.Error r ->
-        begin match id.(i) with
-        | Id (id, _) -> id, r
-        | Ignore_loc _ ->
-            assert false (* Can't refer to something without a name. *)
-        end
-    | Ok _ -> assert false in
-  let rec collect stop l i = match status.(i) with
-    | Inprogress None | Undefined | Defined -> assert false
-    | Inprogress Some i when i = stop -> info i :: l
-    | Inprogress Some i -> collect stop (info i::l) i in
-  collect cycle_start [] cycle_start
-
-let reorder_rec_bindings bindings =
-  let id = Array.of_list (List.map (fun (id,_,_,_) -> id) bindings)
-  and loc = Array.of_list (List.map (fun (_,loc,_,_) -> loc) bindings)
-  and init = Array.of_list (List.map (fun (_,_,init,_) -> init) bindings)
-  and rhs = Array.of_list (List.map (fun (_,_,_,rhs) -> rhs) bindings) in
-  let fv = Array.map Lambda.free_variables rhs in
-  let num_bindings = Array.length id in
-  let status = Array.make num_bindings Undefined in
-  let res = ref [] in
-  let is_unsafe i = match init.(i) with
-    | Ok _ -> false
-    | Result.Error _ -> true in
-  let init_res i = match init.(i) with
-    | Result.Error _ -> None
-    | Ok(a,b) -> Some(a,b) in
-  let rec emit_binding parent i =
-    match status.(i) with
-      Defined -> ()
-    | Inprogress _ ->
-        status.(i) <- Inprogress parent;
-        let cycle = extract_unsafe_cycle id status init i in
-        raise(Error(loc.(i), Circular_dependency cycle))
-    | Undefined ->
-        if is_unsafe i then begin
-          status.(i) <- Inprogress parent;
-          for j = 0 to num_bindings - 1 do
-            match id.(j) with
-            | Id (id, _) when Ident.Set.mem id fv.(i) -> emit_binding (Some i) j
-            | _ -> ()
-          done
-        end;
-        res := (id.(i), init_res i, rhs.(i)) :: !res;
-        status.(i) <- Defined in
-  for i = 0 to num_bindings - 1 do
-    match status.(i) with
-      Undefined -> emit_binding None i
-    | Inprogress _ -> assert false
-    | Defined -> ()
-  done;
-  List.rev !res
-
-(* Generate lambda-code for a reordered list of bindings *)
-
-let eval_rec_bindings bindings cont =
-  let rec bind_inits = function
-    [] ->
-      bind_strict bindings
-  | (Ignore_loc _, _, _) :: rem
-  | (_, None, _) :: rem ->
-      bind_inits rem
-  | (Id (id, id_duid), Some(loc, shape), _rhs) :: rem ->
-      Llet(Strict, Lambda.layout_module, id, id_duid,
-           Lapply{
-             ap_loc=Loc_unknown;
-             ap_func=mod_prim "init_mod";
-             ap_result_layout = Lambda.layout_module;
-             ap_args=[loc; shape];
-             ap_region_close=Rc_normal;
-             ap_mode=alloc_heap;
-             ap_tailcall=Default_tailcall;
-             ap_inlined=Default_inlined;
-             ap_specialised=Default_specialise;
-             ap_probe=None;
-           },
-           bind_inits rem)
-  and bind_strict = function
-    [] ->
-      patch_forwards bindings
-  | (Ignore_loc loc, None, rhs) :: rem ->
-      Lsequence(Lprim(Pignore, [rhs], loc), bind_strict rem)
-  | (Id (id, id_duid), None, rhs) :: rem ->
-      Llet(Strict, Lambda.layout_module, id, id_duid, rhs, bind_strict rem)
-  | (_id, Some _, _rhs) :: rem ->
-      bind_strict rem
-  and patch_forwards = function
-    [] ->
-      cont
-  | (Ignore_loc _, _, _rhs) :: rem
-  | (_, None, _rhs) :: rem ->
-      patch_forwards rem
-  | (Id (id, _), Some(_loc, shape), rhs) :: rem ->
-      Lsequence(
-        Lapply {
-          ap_loc=Loc_unknown;
-          ap_func=mod_prim "update_mod";
-          ap_result_layout = Lambda.layout_unit;
-          ap_args=[shape; Lvar id; rhs];
-          ap_region_close=Rc_normal;
-          ap_mode=alloc_heap;
-          ap_tailcall=Default_tailcall;
-          ap_inlined=Default_inlined;
-          ap_specialised=Default_specialise;
-          ap_probe=None;
-        },
-        patch_forwards rem)
-  in
-    bind_inits bindings
-
 let compile_recmodule ~scopes compile_rhs bindings cont =
-  eval_rec_bindings
-    (reorder_rec_bindings
-       (List.map
-          (fun {mb_id=id; mb_uid=id_duid; mb_name; mb_expr=modl; _} ->
-             let id_or_ignore_loc, shape =
-               match id with
-               | None ->
-                 let loc = of_location ~scopes mb_name.loc in
-                 Ignore_loc loc, Result.Error Unnamed
-               | Some id -> Id (id, id_duid), init_shape id modl
-             in
-             (id_or_ignore_loc, modl.mod_loc, shape, compile_rhs id modl))
-          bindings))
-    cont
+  let bindings =
+    (List.map
+      (fun {mb_id=id; mb_uid=id_duid; mb_name; mb_expr=modl; _} ->
+          let id_or_ignore_loc, shape =
+            match id with
+            | None ->
+              let loc = of_location ~scopes mb_name.loc in
+              Ignore_loc loc, Result.Error Unnamed
+            | Some id -> Id (id, id_duid), init_shape id modl
+          in
+          let mod_loc = of_location ~scopes modl.mod_loc in
+          (id_or_ignore_loc, mod_loc, shape, compile_rhs id modl))
+      bindings)
+  in
+  Lrecmodule (bindings, cont)
 
 (* Code to translate class entries in a structure *)
 
@@ -1420,46 +1284,7 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
 
 (* Error report *)
 
-open Format
-module Style = Misc.Style
-
-let print_cycle ppf cycle =
-  let print_ident ppf (x,_) = Format.pp_print_string ppf (Ident.name x) in
-  let pp_sep ppf () = fprintf ppf "@ -> " in
-  Format.fprintf ppf "%a%a%s"
-    (Format.pp_print_list ~pp_sep print_ident) cycle
-    pp_sep ()
-    (Ident.name @@ fst @@ List.hd cycle)
-(* we repeat the first element to make the cycle more apparent *)
-
-let explanation_submsg (id, unsafe_info) =
-  match unsafe_info with
-  | Unnamed -> assert false (* can't be part of a cycle. *)
-  | Unsafe {reason;loc;subid} ->
-      let print fmt =
-        let printer = Format.dprintf fmt
-            Style.inline_code (Ident.name id)
-            Style.inline_code (Ident.name subid) in
-        Location.mkloc printer loc in
-      match reason with
-      | Unsafe_module_binding ->
-          print "Module %a defines an unsafe module, %a ."
-      | Unsafe_functor -> print "Module %a defines an unsafe functor, %a ."
-      | Unsafe_typext ->
-          print "Module %a defines an unsafe extension constructor, %a ."
-      | Unsafe_non_function -> print "Module %a defines an unsafe value, %a ."
-      | Unsafe_non_value_arg ->
-        print "Module %a defines a function whose first argument \
-               is not a value, %a ."
-
 let report_error loc = function
-  | Circular_dependency cycle ->
-      let[@manual.ref "s:recursive-modules"] manual_ref = [ 12; 2 ] in
-      Location.errorf ~loc ~sub:(List.map explanation_submsg cycle)
-        "Cannot safely evaluate the definition of the following cycle@ \
-         of recursively-defined modules:@ %a.@ \
-         There are no safe modules in this cycle@ %a."
-        print_cycle cycle Misc.print_see_manual manual_ref
   | Conflicting_inline_attributes ->
       Location.errorf "@[Conflicting %a attributes@]"
         Style.inline_code "inline"

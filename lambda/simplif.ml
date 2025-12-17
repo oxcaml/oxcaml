@@ -48,6 +48,7 @@ let rec eliminate_ref id = function
   | Lletrec(idel, e2) ->
       List.iter (fun rb -> check_function_escape id rb.def) idel;
       Lletrec(idel, eliminate_ref id e2)
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lprim(Pfield (0, _, _), [Lvar v], _) when Ident.same v id ->
       Lmutvar id
   | Lprim(Psetfield(0, _, _), [Lvar v; e], _) when Ident.same v id ->
@@ -146,6 +147,7 @@ let simplify_exits lam =
   | Lletrec(bindings, body) ->
       List.iter (fun { def = { body } } -> count ~try_depth body) bindings;
       count ~try_depth body
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lprim(_p, ll, _) -> List.iter (count ~try_depth) ll
   | Lswitch(l, sw, _loc, _kind) ->
       count_default ~try_depth sw ;
@@ -270,6 +272,7 @@ let simplify_exits lam =
           bindings
       in
       Lletrec(bindings, simplif ~layout ~try_depth body)
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lprim(p, ll, loc) -> begin
     let ll = List.map (simplif ~layout:None ~try_depth) ll in
     match p, ll with
@@ -510,6 +513,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   | Lletrec(bindings, body) ->
       List.iter (fun { def } -> count_lfunction def) bindings;
       count bv body
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lprim(_p, ll, _) -> List.iter (count bv) ll
   | Lswitch(l, sw, _loc, _kind) ->
       count_default bv sw ;
@@ -683,6 +687,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
           ) bindings
       in
       Lletrec(bindings, simplif body)
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lprim(p, ll, loc) -> Lprim(p, List.map simplif ll, loc)
   | Lswitch(l, sw, loc, kind) ->
       let new_l = simplif l
@@ -764,6 +769,7 @@ let rec emit_tail_infos is_tail lambda =
   | Lletrec (bindings, body) ->
       List.iter (fun { def } -> emit_tail_infos_lfunction is_tail def) bindings;
       emit_tail_infos is_tail body
+  | Lrecmodule _ -> Misc.unsimplified_recmodule ()
   | Lprim ((Pbytes_to_string | Pbytes_of_string |
             Parray_to_iarray | Parray_of_iarray),
            [arg],
@@ -1157,13 +1163,197 @@ let simplify_local_functions lam =
   else
     rewrite lam
 
-let simplify_letrec lam =
+let simplify_delayedletrec lam =
   Lambda.map
     (function
     | Ldelayedletrec (bindings, body) ->
         Value_rec_compiler.compile_letrec bindings body
     | lam -> lam)
     lam
+
+
+(* Reorder module bindings to honor dependencies.  *)
+
+type circular_dependency = Location.t * (Ident.t * Lambda.unsafe_info) list
+
+exception Circular_dependency of circular_dependency
+
+let print_cycle ppf cycle =
+  let open Format in
+  let print_ident ppf (x,_) = Format.pp_print_string ppf (Ident.name x) in
+  let pp_sep ppf () = fprintf ppf "@ -> " in
+  Format.fprintf ppf "%a%a%s"
+    (Format.pp_print_list ~pp_sep print_ident) cycle
+    pp_sep ()
+    (Ident.name @@ fst @@ List.hd cycle)
+(* we repeat the first element to make the cycle more apparent *)
+
+let explanation_submsg (id, unsafe_info) =
+  match unsafe_info with
+  | Unnamed -> assert false (* can't be part of a cycle. *)
+  | Unsafe {reason;loc;subid} ->
+      let print fmt =
+        let printer = Format.dprintf fmt
+            Misc.Style.inline_code (Ident.name id)
+            Misc.Style.inline_code (Ident.name subid) in
+        Location.mkloc printer loc in
+      match reason with
+      | Unsafe_module_binding ->
+          print "Module %a defines an unsafe module, %a ."
+      | Unsafe_functor -> print "Module %a defines an unsafe functor, %a ."
+      | Unsafe_typext ->
+          print "Module %a defines an unsafe extension constructor, %a ."
+      | Unsafe_non_function -> print "Module %a defines an unsafe value, %a ."
+      | Unsafe_non_value_arg ->
+        print "Module %a defines a function whose first argument \
+               is not a value, %a ."
+
+let report_circular_dependency_error loc cycle =
+  let[@manual.ref "s:recursive-modules"] manual_ref = [ 12; 2 ] in
+  Location.errorf ~loc ~sub:(List.map explanation_submsg cycle)
+    "Cannot safely evaluate the definition of the following cycle@ \
+      of recursively-defined modules:@ %a.@ \
+      There are no safe modules in this cycle@ %a."
+    print_cycle cycle Misc.print_see_manual manual_ref
+
+let () =
+  Location.register_error_of_exn
+    (function
+      | Circular_dependency (loc, cycle) ->
+        Some (report_circular_dependency_error loc cycle)
+      | _ ->
+        None
+    )
+
+type binding_status =
+  | Undefined
+  | Inprogress of int option (** parent node *)
+  | Defined
+
+  let mod_prim = Lambda.transl_prim "CamlinternalMod"
+
+let extract_unsafe_cycle id status init cycle_start =
+  let info i = match init.(i) with
+    | Result.Error r ->
+        begin match id.(i) with
+        | Id (id, _) -> id, r
+        | Ignore_loc _ ->
+            assert false (* Can't refer to something without a name. *)
+        end
+    | Ok _ -> assert false in
+  let rec collect stop l i = match status.(i) with
+    | Inprogress None | Undefined | Defined -> assert false
+    | Inprogress Some i when i = stop -> info i :: l
+    | Inprogress Some i -> collect stop (info i::l) i in
+  collect cycle_start [] cycle_start
+
+let reorder_mod_rec_bindings bindings =
+  let id = Array.of_list (List.map (fun (id,_,_,_) -> id) bindings)
+  and loc =
+    Array.of_list (List.map (fun (_,loc,_,_) -> to_location loc) bindings)
+  and init = Array.of_list (List.map (fun (_,_,init,_) -> init) bindings)
+  and rhs = Array.of_list (List.map (fun (_,_,_,rhs) -> rhs) bindings) in
+  let fv = Array.map Lambda.free_variables rhs in
+  let num_bindings = Array.length id in
+  let status = Array.make num_bindings Undefined in
+  let res = ref [] in
+  let is_unsafe i = match init.(i) with
+    | Ok _ -> false
+    | Result.Error _ -> true in
+  let init_res i = match init.(i) with
+    | Result.Error _ -> None
+    | Ok(a,b) -> Some(a,b) in
+  let rec emit_binding parent i =
+    match status.(i) with
+      Defined -> ()
+    | Inprogress _ ->
+        status.(i) <- Inprogress parent;
+        let cycle = extract_unsafe_cycle id status init i in
+        raise(Circular_dependency (loc.(i), cycle))
+    | Undefined ->
+        if is_unsafe i then begin
+          status.(i) <- Inprogress parent;
+          for j = 0 to num_bindings - 1 do
+            match id.(j) with
+            | Id (id, _) when Ident.Set.mem id fv.(i) -> emit_binding (Some i) j
+            | _ -> ()
+          done
+        end;
+        res := (id.(i), init_res i, rhs.(i)) :: !res;
+        status.(i) <- Defined in
+  for i = 0 to num_bindings - 1 do
+    match status.(i) with
+      Undefined -> emit_binding None i
+    | Inprogress _ -> assert false
+    | Defined -> ()
+  done;
+  List.rev !res
+
+(* Generate lambda-code for a reordered list of bindings *)
+
+let eval_mod_rec_bindings bindings cont =
+  let rec bind_inits = function
+    [] ->
+      bind_strict bindings
+  | (Ignore_loc _, _, _) :: rem
+  | (_, None, _) :: rem ->
+      bind_inits rem
+  | (Id (id, id_duid), Some(loc, shape), _rhs) :: rem ->
+      Llet(Strict, Lambda.layout_module, id, id_duid,
+           Lapply{
+             ap_loc=Loc_unknown;
+             ap_func=mod_prim "init_mod";
+             ap_result_layout = Lambda.layout_module;
+             ap_args=[loc; shape];
+             ap_region_close=Rc_normal;
+             ap_mode=alloc_heap;
+             ap_tailcall=Default_tailcall;
+             ap_inlined=Default_inlined;
+             ap_specialised=Default_specialise;
+             ap_probe=None;
+           },
+           bind_inits rem)
+  and bind_strict = function
+    [] ->
+      patch_forwards bindings
+  | (Ignore_loc loc, None, rhs) :: rem ->
+      Lsequence(Lprim(Pignore, [rhs], loc), bind_strict rem)
+  | (Id (id, id_duid), None, rhs) :: rem ->
+      Llet(Strict, Lambda.layout_module, id, id_duid, rhs, bind_strict rem)
+  | (_id, Some _, _rhs) :: rem ->
+      bind_strict rem
+  and patch_forwards = function
+    [] ->
+      cont
+  | (Ignore_loc _, _, _rhs) :: rem
+  | (_, None, _rhs) :: rem ->
+      patch_forwards rem
+  | (Id (id, _), Some(_loc, shape), rhs) :: rem ->
+      Lsequence(
+        Lapply {
+          ap_loc=Loc_unknown;
+          ap_func=mod_prim "update_mod";
+          ap_result_layout = Lambda.layout_unit;
+          ap_args=[shape; Lvar id; rhs];
+          ap_region_close=Rc_normal;
+          ap_mode=alloc_heap;
+          ap_tailcall=Default_tailcall;
+          ap_inlined=Default_inlined;
+          ap_specialised=Default_specialise;
+          ap_probe=None;
+        },
+        patch_forwards rem)
+  in
+    bind_inits bindings
+
+let simplify_recmodule lam =
+  Lambda.map
+    (function
+    | Lrecmodule (bindings, lambda) ->
+        eval_mod_rec_bindings (reorder_mod_rec_bindings bindings) lambda
+    | lam -> lam)
+    lam
+
 
 (* The entry point:
    simplification
@@ -1174,7 +1364,8 @@ let simplify_letrec lam =
 let simplify_lambda lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   let lam =
     lam
-    |> simplify_letrec
+    |> simplify_recmodule
+    |> simplify_delayedletrec
     |> (if !Clflags.native_code || Clflags.is_flambda2() || not !Clflags.debug
         then simplify_local_functions else Fun.id
        )

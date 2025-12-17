@@ -776,6 +776,13 @@ let free_methods l =
         List.iter (fun (id, _, _, _) -> fv := Ident.Set.remove id !fv) bindings
     | Lletrec(decl, _body) ->
         List.iter (fun { id } -> fv := Ident.Set.remove id !fv) decl
+    | Lrecmodule (bindings, _body) ->
+        List.iter
+          (fun (id, _, _, _) ->
+            match id with
+            | Id (id, _duid) -> fv := Ident.Set.remove id !fv
+            | Ignore_loc _ -> ())
+          bindings
     | Lstaticcatch(_e1, (_,vars), _e2, _, _kind) ->
         List.iter (fun (id, _, _) -> fv := Ident.Set.remove id !fv) vars
     | Ltrywith(_e1, exn, _duid, _e2, _k) ->
