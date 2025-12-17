@@ -4,7 +4,6 @@
    module = "inclusion.mli";
    ocamlc.byte;
    module = "inclusion.ml";
-   ocamlc_byte_exit_status = "2";
    ocamlc.byte;
    check-ocamlc.byte-output;
 *)

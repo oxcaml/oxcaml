@@ -189,18 +189,16 @@ module JK = struct
                  unknowns. *)
               Ldd.enqueue_gfp base_var
                 (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
-              let i = ref 0 in
-              Array.iter2
-                (fun coeff coeff' ->
-                  let idx = !i in
+              Array.iteri
+                (fun idx coeff ->
+                  let coeff' = coeffs'.(idx) in
                   let rhs = Ldd.join coeff' base' in
                   let bound =
                     Ldd.meet rhs
                       (Ldd.var (Ldd.rigid (Ldd.Name.atomic c (idx + 1))))
                   in
-                  incr i;
                   Ldd.enqueue_gfp coeff bound)
-                coeff_vars coeffs')
+                coeff_vars)
             else (
               Ldd.solve_lfp base_var base';
               Array.iter2
@@ -211,16 +209,16 @@ module JK = struct
   (* Apply a constructor polynomial to argument kinds. *)
   let constr (ctx : ctx) (c : constr) (args : kind list) : kind =
     let base, coeffs = constr_kind ctx c in
-    let args = Array.of_list args in
-    let ks =
-      Array.mapi
-        (fun i coeff ->
-          if i < Array.length args
-          then Ldd.meet args.(i) coeff
-          else failwith "Missing arg")
-        coeffs
+    let rec loop acc args i =
+      if i = Array.length coeffs
+      then acc
+      else
+        match args with
+        | arg :: rest ->
+            loop (Ldd.join acc (Ldd.meet arg coeffs.(i))) rest (i + 1)
+        | [] -> failwith "Missing arg"
     in
-    Array.fold_left Ldd.join base ks
+    loop base args 0
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (k : kind) : poly =
@@ -296,22 +294,23 @@ let kind_of (ctx : JK.ctx) (ty : Types.type_expr) : JK.kind =
       (* Boxed tuples: immutable_data base + per-element contributions
          under id modality. *)
       let base = Ldd.const Axis_lattice.immutable_data in
+      let mask = Ldd.const Axis_lattice.mask_shallow in
       List.fold_left
         (fun acc (_lbl, t) ->
-          let mask = Axis_lattice.mask_shallow in
-          Ldd.join acc (Ldd.meet (Ldd.const mask) (JK.kind ctx t)))
+          Ldd.join acc (Ldd.meet mask (JK.kind ctx t)))
         base elts
     | Types.Tunboxed_tuple elts ->
       (* Unboxed tuples: per-element contributions; shallow axes relevant
          only for arity = 1. *)
       let mask =
-        match List.length elts with
-        | 1 -> Axis_lattice.top  (* arity 1: include all axes *)
+        match elts with
+        | [ _ ] -> Axis_lattice.top  (* arity 1: include all axes *)
         | _ -> Axis_lattice.mask_shallow  (* arity > 1: exclude shallow axes *)
       in
+      let mask = Ldd.const mask in
       List.fold_left
         (fun acc (_lbl, t) ->
-          Ldd.join acc (Ldd.meet (Ldd.const mask) (JK.kind ctx t)))
+          Ldd.join acc (Ldd.meet mask (JK.kind ctx t)))
         (Ldd.const Axis_lattice.bot) elts
     | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
       (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
@@ -341,11 +340,11 @@ let kind_of (ctx : JK.ctx) (ty : Types.type_expr) : JK.kind =
           (* Closed, boxed polymorphic variant: immutable_data base plus
              per-constructor args. *)
           let base = Ldd.const Axis_lattice.immutable_data in
-          let mask = Axis_lattice.mask_shallow in
+          let mask = Ldd.const Axis_lattice.mask_shallow in
           Btype.fold_row
             (fun acc ty ->
               let k_ty = JK.kind ctx ty in
-              let k = Ldd.meet (Ldd.const mask) k_ty in
+              let k = Ldd.meet mask k_ty in
               Ldd.join acc k)
             base row
         else
@@ -670,26 +669,29 @@ let sub_jkind_l ?allow_any_crossing ?origin
     let allow_any =
       match allow_any_crossing with Some true -> true | _ -> false
     in
-    let origin_suffix =
-      match origin with
-      | None -> ""
-      | Some o -> " origin=" ^ o
-    in
     if allow_any
     then (
-      if !Types.ikind_debug
-      then
+      if !Types.ikind_debug then (
+        let origin_suffix =
+          match origin with
+          | None -> ""
+          | Some o -> " origin=" ^ o
+        in
         Format.eprintf
           "[ikind-subjkind] call%s allow_any=true@;sub=%a@;super=%a@."
-          origin_suffix Jkind.format sub Jkind.format super;
+          origin_suffix Jkind.format sub Jkind.format super);
       Ok ())
     else
       let ctx = make_ctx ~context in
       let sub_poly = ckind_of_jkind_l ctx sub in
       let super_poly = ckind_of_jkind_l ctx super in
       Ldd.solve_pending ();
-      if !Types.ikind_debug
-      then
+      if !Types.ikind_debug then (
+        let origin_suffix =
+          match origin with
+          | None -> ""
+          | Some o -> " origin=" ^ o
+        in
         Format.eprintf
           "[ikind-subjkind] call%s allow_any=false@;sub=%a@;super=%a@;@;\
            sub_poly=%s@;super_poly=%s@."
@@ -697,7 +699,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
           Jkind.format sub
           Jkind.format super
           (Ldd.pp sub_poly)
-          (Ldd.pp super_poly);
+          (Ldd.pp super_poly));
       let ik_leq = Ldd.leq_with_reason sub_poly super_poly in
       match ik_leq with
       | None -> Ok ()
@@ -737,7 +739,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
 let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) ~level (sub : Types.jkind_l)
     (super : Types.jkind_r) : bool =
-  let _ = type_equal, origin, level in
+  ignore origin;
   if not !Clflags.ikinds
   then Jkind.sub ~type_equal ~context ~level sub super
   else
@@ -756,7 +758,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   else
     let ctx = make_ctx ~context in
     let lat = JK.round_up (ckind_of_jkind ctx jkind) in
-  let mb = Axis_lattice_conv.to_mod_bounds lat in
+    let mb = Axis_lattice_conv.to_mod_bounds lat in
     Jkind.Mod_bounds.to_mode_crossing mb
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
