@@ -36,6 +36,8 @@ type discriminant =
 
 type accessor =
   | Untag_imm
+  | Is_int
+  | Get_tag
   | Block_field of TI.t * K.t
   | Array_field of TI.t * K.t
   | Value_slot of Value_slot.t
@@ -52,6 +54,8 @@ module Accessor = struct
       in
       match accessor with
       | Untag_imm -> Format.fprintf ppf "untag_imm"
+      | Is_int -> Format.fprintf ppf "is_int"
+      | Get_tag -> Format.fprintf ppf "get_tag"
       | Block_field (index, kind) ->
         Format.fprintf ppf "@[<hov 1>(field@ %a@ %a)@]" TI.print index
           print_kind kind
@@ -70,7 +74,7 @@ module Accessor = struct
 
     let equal accessor1 accessor2 =
       match accessor1, accessor2 with
-      | Untag_imm, Untag_imm -> true
+      | Untag_imm, Untag_imm | Is_int, Is_int | Get_tag, Get_tag -> true
       | Block_field (index1, kind1), Block_field (index2, kind2) ->
         TI.equal index1 index2 && K.equal kind1 kind2
       | Array_field (index1, kind1), Array_field (index2, kind2) ->
@@ -79,14 +83,14 @@ module Accessor = struct
       | Function_slot slot1, Function_slot slot2 ->
         Function_slot.equal slot1 slot2
       | Rec_info slot1, Rec_info slot2 -> Function_slot.equal slot1 slot2
-      | ( ( Untag_imm | Block_field _ | Array_field _ | Value_slot _
-          | Function_slot _ | Rec_info _ ),
+      | ( ( Untag_imm | Is_int | Get_tag | Block_field _ | Array_field _
+          | Value_slot _ | Function_slot _ | Rec_info _ ),
           _ ) ->
         false
 
     let compare accessor1 accessor2 =
       match accessor1, accessor2 with
-      | Untag_imm, Untag_imm -> 0
+      | Untag_imm, Untag_imm | Is_int, Is_int | Get_tag, Get_tag -> 0
       | Block_field (index1, kind1), Block_field (index2, kind2) ->
         let c = TI.compare index1 index2 in
         if c <> 0 then c else K.compare kind1 kind2
@@ -98,6 +102,12 @@ module Accessor = struct
         Function_slot.compare slot1 slot2
       | Rec_info slot1, Rec_info slot2 -> Function_slot.compare slot1 slot2
       | ( Untag_imm,
+          ( Is_int | Get_tag | Block_field _ | Array_field _ | Value_slot _
+          | Function_slot _ | Rec_info _ ) )
+      | ( Is_int,
+          ( Get_tag | Block_field _ | Array_field _ | Value_slot _
+          | Function_slot _ | Rec_info _ ) )
+      | ( Get_tag,
           ( Block_field _ | Array_field _ | Value_slot _ | Function_slot _
           | Rec_info _ ) )
       | ( Block_field _,
@@ -106,14 +116,16 @@ module Accessor = struct
       | Value_slot _, (Function_slot _ | Rec_info _)
       | Function_slot _, Rec_info _ ->
         -1
-      | ( ( Block_field _ | Array_field _ | Value_slot _ | Function_slot _
-          | Rec_info _ ),
+      | ( ( Is_int | Get_tag | Block_field _ | Array_field _ | Value_slot _
+          | Function_slot _ | Rec_info _ ),
           _ ) ->
         1
 
     let hash accessor =
       match accessor with
       | Untag_imm -> Hashtbl.hash 0
+      | Is_int -> Hashtbl.hash 1
+      | Get_tag -> Hashtbl.hash 2
       | Block_field (index, kind) -> Hashtbl.hash (0, TI.hash index, K.hash kind)
       | Array_field (index, kind) -> Hashtbl.hash (1, TI.hash index, K.hash kind)
       | Value_slot slot -> Hashtbl.hash (2, Value_slot.hash slot)
@@ -125,21 +137,25 @@ module Accessor = struct
   include Container_types.Make (T0)
 end
 
-let unknown_accessor = function
-  | Untag_imm -> TG.any_naked_immediate
+let unknown_accessor ~machine_width = function
+  | Untag_imm | Get_tag -> TG.any_naked_immediate
+  | Is_int -> MTC.any_naked_bool ~machine_width
   | Block_field (_, kind) | Array_field (_, kind) -> MTC.unknown kind
   | Value_slot value_slot -> MTC.unknown (Value_slot.kind value_slot)
   | Function_slot function_slot ->
     MTC.unknown (Function_slot.kind function_slot)
   | Rec_info _ -> MTC.unknown K.rec_info
 
-let bottom_accessor accessor = MTC.bottom_like (unknown_accessor accessor)
+let bottom_accessor ~machine_width accessor =
+  MTC.bottom_like (unknown_accessor ~machine_width accessor)
 
-let rec destructure_expanded_head discriminant accessor expanded =
+let rec destructure_expanded_head ~machine_width discriminant accessor expanded
+    =
   match ET.descr expanded with
-  | Unknown -> unknown_accessor accessor
-  | Bottom -> bottom_accessor accessor
-  | Ok (Value head) -> destructure_head_of_kind_value discriminant accessor head
+  | Unknown -> unknown_accessor ~machine_width accessor
+  | Bottom -> bottom_accessor ~machine_width accessor
+  | Ok (Value head) ->
+    destructure_head_of_kind_value ~machine_width discriminant accessor head
   | Ok
       ( Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
@@ -147,15 +163,17 @@ let rec destructure_expanded_head discriminant accessor expanded =
         ) ->
     Misc.fatal_error "Cannot destructure non-value kinds"
 
-and destructure_head_of_kind_value discriminant accessor head =
+and destructure_head_of_kind_value ~machine_width discriminant accessor head =
   let ({ non_null; is_null = _ } : TG.head_of_kind_value) = head in
   match non_null with
-  | Unknown -> unknown_accessor accessor
-  | Bottom -> bottom_accessor accessor
+  | Unknown -> unknown_accessor ~machine_width accessor
+  | Bottom -> bottom_accessor ~machine_width accessor
   | Ok head ->
-    destructure_head_of_kind_value_non_null discriminant accessor head
+    destructure_head_of_kind_value_non_null ~machine_width discriminant accessor
+      head
 
-and destructure_head_of_kind_value_non_null discriminant accessor head =
+and destructure_head_of_kind_value_non_null ~machine_width discriminant accessor
+    head =
   match discriminant, accessor, (head : TG.head_of_kind_value_non_null) with
   | ( Tagged_immediate,
       Untag_imm,
@@ -168,9 +186,12 @@ and destructure_head_of_kind_value_non_null discriminant accessor head =
           get_tag = _
         } ) -> (
     match immediates with
-    | Unknown -> unknown_accessor accessor
+    | Unknown -> unknown_accessor ~machine_width accessor
     | Known ty -> ty)
-  | Block _, Block_field (_, _), Mutable_block _ -> unknown_accessor accessor
+  | Tagged_immediate, Is_int, Variant _ ->
+    TG.this_naked_immediate (TI.bool_true machine_width)
+  | Block _, Block_field (_, _), Mutable_block _ ->
+    unknown_accessor ~machine_width accessor
   | ( Block tag,
       Block_field (index, kind),
       Variant
@@ -182,28 +203,37 @@ and destructure_head_of_kind_value_non_null discriminant accessor head =
           get_tag = _
         } ) -> (
     match blocks with
-    | Unknown -> unknown_accessor accessor
+    | Unknown -> unknown_accessor ~machine_width accessor
     | Known row_like ->
-      destructure_block_field_row_like_for_blocks tag index kind row_like)
+      destructure_block_field_row_like_for_blocks ~machine_width tag index kind
+        row_like)
+  | Block _, Is_int, (Mutable_block _ | Variant _) ->
+    TG.this_naked_immediate (TI.bool_false machine_width)
+  | Block (Some tag), Get_tag, (Mutable_block _ | Variant _) ->
+    TG.this_naked_immediate (Tag.to_targetint_31_63 machine_width tag)
+  | Block None, Get_tag, (Mutable_block _ | Variant { get_tag = None; _ }) ->
+    unknown_accessor ~machine_width accessor
+  | Block None, Get_tag, Variant { get_tag = Some tag_var; _ } ->
+    TG.alias_type_of K.naked_immediate (Simple.var tag_var)
   | Array, Array_field (index, kind), Array { contents; element_kind; _ } -> (
     match element_kind with
-    | Bottom -> bottom_accessor accessor
+    | Bottom -> bottom_accessor ~machine_width accessor
     | Ok element_kind when not (K.equal kind (K.With_subkind.kind element_kind))
       ->
-      bottom_accessor accessor
+      bottom_accessor ~machine_width accessor
     | Unknown | Ok _ -> (
       match contents with
-      | Unknown | Known Mutable -> unknown_accessor accessor
+      | Unknown | Known Mutable -> unknown_accessor ~machine_width accessor
       | Known (Immutable { fields }) ->
         let index = TI.to_int index in
         if 0 <= index && index < Array.length fields
         then fields.(index)
-        else bottom_accessor accessor))
+        else bottom_accessor ~machine_width accessor))
   | ( Closure,
       Value_slot value_slot,
       Closures { by_function_slot; alloc_mode = _ } ) -> (
     match TG.Row_like_for_closures.get_env_var by_function_slot value_slot with
-    | Unknown -> unknown_accessor accessor
+    | Unknown -> unknown_accessor ~machine_width accessor
     | Known ty -> ty)
   | ( Closure,
       Function_slot function_slot,
@@ -211,29 +241,30 @@ and destructure_head_of_kind_value_non_null discriminant accessor head =
     match
       TG.Row_like_for_closures.get_closure by_function_slot function_slot
     with
-    | Unknown -> unknown_accessor accessor
+    | Unknown -> unknown_accessor ~machine_width accessor
     | Known ty -> ty)
   | ( Closure,
       Rec_info function_slot,
       Closures { by_function_slot; alloc_mode = _ } ) -> (
     match TG.Row_like_for_closures.get_single_tag by_function_slot with
-    | No_singleton -> unknown_accessor accessor
+    | No_singleton -> unknown_accessor ~machine_width accessor
     | Exact_closure (_tag, maps_to) | Incomplete_closure (_tag, maps_to) -> (
       match
         TG.Closures_entry.find_function_type maps_to ~exact:false function_slot
       with
-      | Bottom -> bottom_accessor accessor
-      | Unknown -> unknown_accessor accessor
+      | Bottom -> bottom_accessor ~machine_width accessor
+      | Unknown -> unknown_accessor ~machine_width accessor
       | Ok function_type -> TG.Function_type.rec_info function_type))
   | ( (Tagged_immediate | Block _ | Array | Closure),
-      ( Untag_imm | Block_field _ | Array_field _ | Value_slot _
-      | Function_slot _ | Rec_info _ ),
+      ( Untag_imm | Is_int | Get_tag | Block_field _ | Array_field _
+      | Value_slot _ | Function_slot _ | Rec_info _ ),
       ( Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_float _
       | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
       | Boxed_vec256 _ | Boxed_vec512 _ | Closures _ | String _ | Array _ ) ) ->
-    bottom_accessor accessor
+    bottom_accessor ~machine_width accessor
 
-and destructure_block_field_row_like_for_blocks tag index kind row_like =
+and destructure_block_field_row_like_for_blocks ~machine_width tag index kind
+    row_like =
   let ({ known_tags; other_tags; alloc_mode = _ } : TG.row_like_for_blocks) =
     row_like
   in
@@ -244,25 +275,30 @@ and destructure_block_field_row_like_for_blocks tag index kind row_like =
       match other_tags with
       | Bottom -> MTC.bottom kind
       | Ok row_like_case ->
-        destructure_block_field_row_like_block_case index kind row_like_case)
+        destructure_block_field_row_like_block_case ~machine_width index kind
+          row_like_case)
     | Some Unknown -> MTC.unknown kind
     | Some (Known row_like_case) ->
-      destructure_block_field_row_like_block_case index kind row_like_case)
+      destructure_block_field_row_like_block_case ~machine_width index kind
+        row_like_case)
   | None -> (
     (* CR bclement: We could create a variable to represent the union of
        multiple fields, but it is not clear it would be that useful. *)
     match other_tags with
     | Ok row_like_case ->
       if Tag.Map.is_empty known_tags
-      then destructure_block_field_row_like_block_case index kind row_like_case
+      then
+        destructure_block_field_row_like_block_case ~machine_width index kind
+          row_like_case
       else MTC.unknown kind
     | Bottom -> (
       match Tag.Map.get_singleton known_tags with
       | Some (_, Unknown) | None -> MTC.unknown kind
       | Some (_, Known row_like_case) ->
-        destructure_block_field_row_like_block_case index kind row_like_case))
+        destructure_block_field_row_like_block_case ~machine_width index kind
+          row_like_case))
 
-and destructure_block_field_row_like_block_case index kind
+and destructure_block_field_row_like_block_case ~machine_width:_ index kind
     ({ maps_to; _ } : TG.row_like_block_case) =
   let index = TI.to_int index in
   if 0 <= index && index < Array.length maps_to
@@ -319,6 +355,10 @@ module Pattern : sig
 
   val block_field : TI.t -> K.t -> 'a t -> 'a block_field
 
+  val is_int : 'a t -> 'a block_field
+
+  val get_tag : 'a t -> 'a block_field
+
   val block : ?tag:Tag.t -> 'a block_field list -> 'a t
 
   type 'a array_field
@@ -360,6 +400,10 @@ end = struct
 
   let untag var = unbox Tagged_immediate [accessor Untag_imm var]
 
+  let is_int t = accessor Is_int t
+
+  let get_tag t = accessor Get_tag t
+
   let block_field index kind t = accessor (Block_field (index, kind)) t
 
   let array_field index kind t = accessor (Array_field (index, kind)) t
@@ -378,6 +422,7 @@ end = struct
 end
 
 let rec fold_destructuring ~f destructuring env ty acc =
+  let machine_width = TE.machine_width env in
   match destructuring with
   | Any -> acc
   | Keep id -> f id ty acc
@@ -386,7 +431,8 @@ let rec fold_destructuring ~f destructuring env ty acc =
     Accessor.Map.fold
       (fun accessor accessor_destructuring acc ->
         let accessor_ty =
-          destructure_expanded_head discriminant accessor expanded
+          destructure_expanded_head ~machine_width discriminant accessor
+            expanded
         in
         fold_destructuring ~f accessor_destructuring env accessor_ty acc)
       accessors acc

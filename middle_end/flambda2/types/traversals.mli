@@ -22,6 +22,10 @@ module Pattern : sig
   val block_field :
     Target_ocaml_int.t -> Flambda_kind.t -> 'a t -> 'a block_field
 
+  val is_int : 'a t -> 'a block_field
+
+  val get_tag : 'a t -> 'a block_field
+
   val block : ?tag:Tag.t -> 'a block_field list -> 'a t
 
   type 'a array_field
