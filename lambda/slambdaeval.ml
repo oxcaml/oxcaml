@@ -82,16 +82,14 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   Lambda.iter_head_constructor assert_no_splices lam
 
 (* Check that slambda is trivial (a quote and contains no splices) *)
-let assert_slambda_is_trivial (slam : Lambda.slambda) =
+let is_slambda_trivial (slam : Lambda.slambda) =
   match slam with
   | SLquote lam -> (
-    try assert_no_splices lam
-    with Found_a_splice ->
-      Misc.fatal_error
-        "Slambda contains splices but layout_poly extension is disabled")
-  | _ ->
-    Misc.fatal_error
-      "Encountered non-trivial slambda but layout_poly extension is disabled"
+    try
+      assert_no_splices lam;
+      true
+    with Found_a_splice -> false)
+  | _ -> false
 
 (* Introduce dependencies on modules referenced only by "external". *)
 
@@ -128,8 +126,11 @@ let required_globals ~flambda body =
   required
 
 let do_eval ({ Slambda.code = slam } as p) =
-  if not Language_extension.(is_enabled Layout_poly)
-  then assert_slambda_is_trivial slam;
+  if (not Language_extension.(is_enabled Layout_poly))
+     && not (is_slambda_trivial slam)
+  then
+    Misc.fatal_error
+      "Encountered non-trivial slambda but layout_poly extension is disabled";
   let lam =
     match slam with
     | SLquote lam -> lam
