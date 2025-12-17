@@ -84,14 +84,6 @@ module Layout = struct
   module Const = struct
     include Jkind_types.Layout.Const
 
-    let rec get_sort : t -> Sort.Const.t option = function
-      | Any -> None
-      | Base b -> Some (Base b)
-      | Product ts ->
-        Option.map
-          (fun x -> Sort.Const.Product x)
-          (Misc.Stdlib.List.map_option get_sort ts)
-
     let rec of_sort_const : Sort.Const.t -> t = function
       | Base b -> Base b
       | Product consts -> Product (List.map of_sort_const consts)
