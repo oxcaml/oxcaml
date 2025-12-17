@@ -162,6 +162,12 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             cc: musl-gcc
 
+          - name: runtime5 reaper
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,reaper=1'
+            ocamlparam: '_,reaper=1'
+
     env:
       J: "8"
       run_testsuite: "true"
