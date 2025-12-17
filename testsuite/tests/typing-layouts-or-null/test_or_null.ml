@@ -486,3 +486,9 @@ Error: This expression has type "('a, 'a or_null) gadt"
        But the kind of ('a, 'a or_null) gadt must be a subkind of value
          because of the definition of t at line 1, characters 0-69.
 |}]
+
+(* CR jujacobs: this should succeed, but doesn't when ikinds sub_or_intersect is enabled. *)
+type t : immediate & immediate = #(int or_null * int)
+[%%expect{|
+type t = #(int or_null * int)
+|}]
