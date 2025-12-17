@@ -3560,8 +3560,16 @@ let get_field_sources :
           [ ~~(One.flag any);
             in_ % [x];
             in_field % [field];
-            field_sources x field y ]
-          ==> out % [y]) ]
+            field_sources x field y;
+            any_source y ]
+          ==> One.flag any);
+         (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+          [ ~~(One.flag any);
+            in_ % [x];
+            in_field % [field];
+            field_sources x field y;
+            sources y z ]
+          ==> out % [z]) ]
      in
      if One.to_bool any then Any_source else Sources out)
 
