@@ -1582,7 +1582,7 @@ module Ast = struct
 
   and print_core_type_with_arrow env fmt ty =
     match ty with
-    | TypeArrow _ -> pp fmt "(@[%a@])" (print_core_type env) ty
+    | TypeArrow _ | TypePoly _ -> pp fmt "(@[%a@])" (print_core_type env) ty
     | _ -> print_core_type env fmt ty
 
   and print_core_type_with_parens env fmt ty =
@@ -1592,7 +1592,7 @@ module Ast = struct
     | _ -> print_core_type env fmt ty
 
   and print_object_field env fmt = function
-    | Oinherit ty -> pp fmt "<inherit %a TODO>" (print_core_type env) ty
+    | Oinherit ty -> pp fmt "%a@a " (print_core_type env) ty
     | Otag (name, ty) ->
       pp fmt "%a@ :@ %a" Name.print name (print_core_type env) ty
 
@@ -1669,9 +1669,10 @@ module Ast = struct
       List.iter (print_row_field env true fmt) row_fields;
       pp fmt " ]"
     | TypePoly ([], _) -> () (* fatal_error "Invalid poly-type" *)
-    | TypePoly (tv :: tvs, ty) ->
-      print_tuple_like "" "" "." (Var.Type_var.print env) fmt (tv :: tvs);
-      pp fmt "@ %a" (print_core_type env) ty
+    | TypePoly ((_ :: _) as tvs, ty) ->
+      pp fmt "%a@ %a"
+        (print_tuple_like "" "" "." (Var.Type_var.print env)) tvs
+        (print_core_type env) ty
     | TypePackage (ident, []) -> print_module_type env fmt ident
     | TypePackage (ident, (fragment, core_type) :: wcs) ->
       pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
