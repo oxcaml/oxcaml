@@ -989,77 +989,92 @@ let rebuild_apply env apply =
   (* TODO rewrite arities *)
   (* XXX mshinwell: does this "rewrite arities" need to be done now? *)
   match updating_calling_convention with
-  | Not_changing_calling_convention ->
-    (* Format.eprintf "NOT CHANGING CALLING CONVENTION %a@." Apply.print
-       apply; *)
-    let callee_and_known_arity =
-      match (call_kind : Call_kind.t) with
-      | Function { function_call = Direct _ | Indirect_known_arity _; _ } -> (
-        match Apply.callee apply with
-        | None -> None
-        | Some callee ->
-          Simple.pattern_match callee
+  | Not_changing_calling_convention -> (
+    match Apply.callee apply with
+    | Some callee when simple_is_unboxable env callee ->
+      (* The callee has been unboxed but the calling convention can't be
+         changed! This can only happen if the unboxed callee is not actually a
+         function. As such, we can replace everything with [Invalid]. *)
+      RE.from_expr
+        ~expr:
+          (Expr.create_invalid
+             (Message
+                (Format.asprintf
+                   "Unboxed callee %a cannot actually be a function"
+                   Simple.print callee)))
+        ~free_names:Name_occurrences.empty
+    | None | Some _ ->
+      (* Format.eprintf "NOT CHANGING CALLING CONVENTION %a@." Apply.print
+         apply; *)
+      let callee_and_known_arity =
+        match (call_kind : Call_kind.t) with
+        | Function { function_call = Direct _ | Indirect_known_arity _; _ } -> (
+          match Apply.callee apply with
+          | None -> None
+          | Some callee ->
+            Simple.pattern_match callee
+              ~const:(fun _ -> None)
+              ~name:(fun name ~coercion:_ ->
+                Some (Code_id_or_name.name name, true)))
+        | Function { function_call = Indirect_unknown_arity; _ } ->
+          Simple.pattern_match
+            (Option.get (Apply.callee apply))
             ~const:(fun _ -> None)
             ~name:(fun name ~coercion:_ ->
-              Some (Code_id_or_name.name name, true)))
-      | Function { function_call = Indirect_unknown_arity; _ } ->
-        Simple.pattern_match
-          (Option.get (Apply.callee apply))
-          ~const:(fun _ -> None)
-          ~name:(fun name ~coercion:_ ->
-            Some (Code_id_or_name.name name, false))
-      | C_call _ | Method _ | Effect _ -> None
-    in
-    let args =
-      match callee_and_known_arity with
-      | None -> List.map (rewrite_simple env) (Apply.args apply)
-      | Some (callee, known_arity) ->
-        let keep_or_poison (arg, to_keep) =
-          match (to_keep : DS.keep_or_delete) with
-          | Keep -> arg
-          | Delete ->
-            Simple.pattern_match arg
-              ~const:(fun _ -> arg)
-              ~name:(fun name ~coercion:_ -> name_poison env name)
-        in
-        let args_and_keep =
-          if known_arity
-          then
-            DS.arguments_used_by_known_arity_call env.uses callee
-              (Apply.args apply)
-          else
-            let grouped_args =
-              Flambda_arity.group_by_parameter (Apply.args_arity apply)
+              Some (Code_id_or_name.name name, false))
+        | C_call _ | Method _ | Effect _ -> None
+      in
+      let args =
+        match callee_and_known_arity with
+        | None -> List.map (rewrite_simple env) (Apply.args apply)
+        | Some (callee, known_arity) ->
+          let keep_or_poison (arg, to_keep) =
+            match (to_keep : DS.keep_or_delete) with
+            | Keep -> arg
+            | Delete ->
+              Simple.pattern_match arg
+                ~const:(fun _ -> arg)
+                ~name:(fun name ~coercion:_ -> name_poison env name)
+          in
+          let args_and_keep =
+            if known_arity
+            then
+              DS.arguments_used_by_known_arity_call env.uses callee
                 (Apply.args apply)
-            in
-            List.flatten
-              (DS.arguments_used_by_unknown_arity_call env.uses callee
-                 grouped_args)
-        in
-        List.map keep_or_poison args_and_keep
-    in
-    let args_arity = Apply.args_arity apply in
-    let return_arity = Apply.return_arity apply in
-    let make_apply =
-      Apply.create
-      (* Note here that callee is rewritten with [rewrite_simple_opt], which
-         will put [None] as the callee instead of a dummy value, as a dummy
-         value would then be further used in a later simplify pass to refine the
-         call kind and produce an invalid. *)
-        ~callee:(rewrite_simple_opt env (Apply.callee apply))
-        exn_continuation ~args ~args_arity ~return_arity ~call_kind
-        (Apply.dbg apply) ~inlined:(Apply.inlined apply)
-        ~inlining_state:(Apply.inlining_state apply)
-        ~probe:(Apply.probe apply) ~position:(Apply.position apply)
-        ~relative_history:(Apply.relative_history apply)
-    in
-    let func_decisions =
-      List.map
-        (fun kind ->
-          Keep (Variable.create "function_return" (KS.kind kind), kind))
-        (Flambda_arity.unarized_components return_arity)
-    in
-    make_apply_wrapper env make_apply (Apply.continuation apply) func_decisions
+            else
+              let grouped_args =
+                Flambda_arity.group_by_parameter (Apply.args_arity apply)
+                  (Apply.args apply)
+              in
+              List.flatten
+                (DS.arguments_used_by_unknown_arity_call env.uses callee
+                   grouped_args)
+          in
+          List.map keep_or_poison args_and_keep
+      in
+      let args_arity = Apply.args_arity apply in
+      let return_arity = Apply.return_arity apply in
+      let make_apply =
+        Apply.create
+        (* Note here that callee is rewritten with [rewrite_simple_opt], which
+           will put [None] as the callee instead of a dummy value, as a dummy
+           value would then be further used in a later simplify pass to refine
+           the call kind and produce an invalid. *)
+          ~callee:(rewrite_simple_opt env (Apply.callee apply))
+          exn_continuation ~args ~args_arity ~return_arity ~call_kind
+          (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+          ~inlining_state:(Apply.inlining_state apply)
+          ~probe:(Apply.probe apply) ~position:(Apply.position apply)
+          ~relative_history:(Apply.relative_history apply)
+      in
+      let func_decisions =
+        List.map
+          (fun kind ->
+            Keep (Variable.create "function_return" (KS.kind kind), kind))
+          (Flambda_arity.unarized_components return_arity)
+      in
+      make_apply_wrapper env make_apply (Apply.continuation apply)
+        func_decisions)
   | Changing_calling_convention code_id ->
     (* Format.eprintf "CHANGING CALLING CONVENTION %a %a@." Code_id.print
        code_id Apply.print apply; *)
