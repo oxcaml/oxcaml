@@ -187,6 +187,8 @@ Error: This type "a" = "int ref" should be an instance of type
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended
+         portability: mod portable with int ≰ mod portable
+         statefulness: mod stateless with int ≰ mod stateless
          visibility: mod read_write ≰ mod immutable
 |}]
 
@@ -221,9 +223,11 @@ Error: This type "(int -> int) u" should be an instance of type
 
        The first mode-crosses less than the second along:
          linearity: mod many with int -> int ≰ mod many
+         contention: mod contended with int -> int ≰ mod contended
          forkable: mod forkable with int -> int ≰ mod forkable
          yielding: mod unyielding with int -> int ≰ mod unyielding
          statefulness: mod stateless with int -> int ≰ mod stateless
+         visibility: mod immutable with int -> int ≰ mod immutable
 |}]
 
 module M : sig

@@ -1679,6 +1679,19 @@ val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 type 'a t = Box of 'a
 val f : int -> unit = <fun>
+|}, Principal{|
+val id : 'a -> 'a = <fun>
+val require_portable : ('a : value mod portable). 'a -> unit = <fun>
+type 'a t = Box of 'a
+Lines 11-12, characters 4-10:
+11 | ....(Box x)
+12 |      |> id
+Error: This expression has type "int t" but an expression was expected of type
+         "('a : value mod portable)"
+       The kind of int t is immutable_data with int
+         because of the definition of t at line 3, characters 0-21.
+       But the kind of int t must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 21-57.
 |}]
 
 (*********************************)
@@ -1721,6 +1734,19 @@ val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 type 'a t = Box of 'a
 val f : int -> unit = <fun>
+|}, Principal{|
+val id : 'a -> 'a = <fun>
+val require_portable : ('a : value mod portable). 'a -> unit = <fun>
+type 'a t = Box of 'a
+Lines 11-12, characters 4-10:
+11 | ....(Box x)
+12 |      |> id
+Error: This expression has type "int t" but an expression was expected of type
+         "('a : value mod portable)"
+       The kind of int t is immutable_data with int
+         because of the definition of t at line 3, characters 0-21.
+       But the kind of int t must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 21-57.
 |}]
 
 (*********************************)

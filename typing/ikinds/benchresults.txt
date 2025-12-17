@@ -889,3 +889,251 @@ run 3:
   user 680.72
   sys  116.48
 
+
+=== 2025-12-17T14:34:41Z ===
+desc: sub-or-intersect
+git: 1ade74cedd40c69665f0f84ff9077d73a30a789c (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-Oho2ujjt
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+  UU typing/ikinds/benchresults.txt
+
+run 1:
+  real 151.14
+  user 678.42
+  sys  117.97
+
+run 2:
+  real 152.44
+  user 679.85
+  sys  117.22
+
+run 3:
+  real 150.30
+  user 678.11
+  sys  116.72
+
+
+=== 2025-12-17T14:43:11Z ===
+desc: sub-or-intersect
+git: 1ade74cedd40c69665f0f84ff9077d73a30a789c (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-3DwmHTRk
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+  UU typing/ikinds/benchresults.txt
+
+run 1:
+  real 154.89
+  user 681.48
+  sys  117.80
+
+run 2:
+  real 153.51
+  user 683.82
+  sys  118.43
+
+
+=== 2025-12-17T15:02:57Z ===
+desc: sub-or-intersect
+git: 1ade74cedd40c69665f0f84ff9077d73a30a789c (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-Wk6vbxJL
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+  UU typing/ikinds/benchresults.txt
+
+run 1:
+  real 149.85
+  user 677.37
+  sys  115.46
+
+run 2:
+  real 156.77
+  user 692.29
+  sys  119.05
+
+run 3:
+  real 164.90
+  user 700.81
+  sys  120.45
+
+
+=== 2025-12-17T15:11:13Z ===
+desc: sub-or-intersect
+git: 1ade74cedd40c69665f0f84ff9077d73a30a789c (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-NcLs8Scj
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+  UU typing/ikinds/benchresults.txt
+
+run 1:
+  real 163.32
+  user 690.55
+  sys  117.91
+
+run 2:
+  real 165.89
+  user 691.17
+  sys  117.29
+
+
+=== 2025-12-17T15:29:09Z ===
+desc: no-sub-or-intersect
+git: 1ade74cedd40c69665f0f84ff9077d73a30a789c (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-RMC46ca2
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+  UU typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 145.00
+  user 653.32
+  sys  117.42
+
+run 2:
+  real 149.43
+  user 664.91
+  sys  118.99
+
+run 3:
+  real 151.66
+  user 669.21
+  sys  118.40
+
+
+=== 2025-12-17T15:45:03Z ===
+desc: no-sub-or-intersect
+git: 1ade74cedd40c69665f0f84ff9077d73a30a789c (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-BvftpXHK
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+  UU typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 174.48
+  user 652.01
+  sys  115.02
+
+run 2:
+  real 403.09
+  user 664.55
+  sys  116.95
+
+
+=== 2025-12-17T15:56:19Z ===
+desc: no-sub-or-intersect
+git: 1ade74cedd40c69665f0f84ff9077d73a30a789c (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-Vg3iJMJB
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+  UU typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 152.51
+  user 672.74
+  sys  121.75
+
+run 2:
+  real 160.24
+  user 696.50
+  sys  124.98
+
+run 3: FAIL
+  make log: /tmp/oxcaml-ikinds-bench-Vg3iJMJB/run3.make.log
+  time log: /tmp/oxcaml-ikinds-bench-Vg3iJMJB/run3.time
+  File "ikinds.ml", line 1:
+  Error: The implementation ikinds.ml
+         does not match the interface .ocamlcommon.objs/byte/ikinds.cmi: 
+         Values do not match:
+           val sub_or_intersect :
+             ?origin:'a ->
+             type_equal:(JK.ty -> JK.ty -> bool) ->
+             context:Jkind.jkind_context ->
+             level:int ->
+             (Allowance.allowed * Allowance.disallowed) Types.jkind ->
+             ('l2 * Allowance.allowed) Types.jkind -> sub_or_intersect
+         is not included in
+           val sub_or_intersect :
+             ?origin:string ->
+             type_equal:(JK.ty -> JK.ty -> bool) ->
+             context:Jkind.jkind_context ->
+             level:int ->
+             (Allowance.allowed * 'r1) Types.jkind ->
+             ('l2 * Allowance.allowed) Types.jkind -> sub_or_intersect
+         The type
+           ?origin:string ->
+           type_equal:(JK.ty -> JK.ty -> bool) ->
+           context:Jkind.jkind_context ->
+           level:int ->
+           (Allowance.allowed * Allowance.disallowed) Types.jkind ->
+           ('a * Allowance.allowed) Types.jkind -> sub_or_intersect
+         is not compatible with the type
+           ?origin:string ->
+           type_equal:(JK.ty -> JK.ty -> bool) ->
+           context:Jkind.jkind_context ->
+           level:int ->
+           (Allowance.allowed * 'b) Types.jkind ->
+           ('c * Allowance.allowed) Types.jkind -> sub_or_intersect
+         Type Allowance.disallowed is not compatible with type 'b 
+         File "typing/ikinds/ikinds.mli", lines 38-45, characters 0-18:
+           Expected declaration
+         File "typing/ikinds/ikinds.ml", line 823, characters 4-20:
+           Actual declaration
+  make: *** [boot-compiler] Error 1
+  real 12.91
+  user 83.50
+  sys 36.92
+
+
+=== 2025-12-17T17:29:35Z ===
+desc: sub-or-intersect-opt
+git: 1ade74cedd40c69665f0f84ff9077d73a30a789c (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-y2Wr0qbH
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M testsuite/tests/typing-jkind-bounds/basics.ml
+   M testsuite/tests/typing-jkind-bounds/composite.ml
+   M testsuite/tests/typing-jkind-bounds/predef.ml
+   M testsuite/tests/typing-jkind-bounds/printing.ml
+   M testsuite/tests/typing-jkind-bounds/records.ml
+   M testsuite/tests/typing-jkind-bounds/subsumption/fuel.ml
+   M testsuite/tests/typing-jkind-bounds/universal.ml
+   M testsuite/tests/typing-jkind-bounds/variants.ml
+   M testsuite/tests/typing-jkind-bounds/with_basics.ml
+   M testsuite/tests/typing-layouts-or-null/separability.ml
+  UU typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 1048.98
+  user 677.46
+  sys  116.66
+
+run 2:
+  real 1467.43
+  user 1048.65
+  sys  171.06
+
+run 3:
+  real 2716.12
+  user 1001.22
+  sys  165.82
+
