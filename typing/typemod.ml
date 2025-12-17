@@ -2556,6 +2556,7 @@ let path_of_module mexp =
 (* Check that all core type schemes in a structure
    do not contain non-generalized type variable *)
 
+(** See [nongen_signature_item]. *)
 let rec nongen_modtype env f g = function
     Mty_ident _ -> None
   | Mty_alias _ -> None
@@ -2576,6 +2577,9 @@ let rec nongen_modtype env f g = function
       nongen_modtype env f g body
   | Mty_strengthen (mty,_ ,_) -> nongen_modtype env f g mty
 
+(** Iterate a signature, and:
+- call [f] on all types that potentailly contain non-generalized type variables.
+- call [g] on all module types that potentially contains loose mode variables. *)
 and nongen_signature_item env f g = function
   | Sig_value(_id, desc, _) ->
       f env desc.val_type
