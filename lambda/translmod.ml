@@ -389,6 +389,8 @@ let reorder_rec_bindings bindings =
   and loc = Array.of_list (List.map (fun (_,loc,_,_) -> loc) bindings)
   and init = Array.of_list (List.map (fun (_,_,init,_) -> init) bindings)
   and rhs = Array.of_list (List.map (fun (_,_,_,rhs) -> rhs) bindings) in
+  (* CR layout poly: This [free_variables] call means that recursive modules
+     can't contain slambda, we should fix that. *)
   let fv = Array.map Lambda.free_variables rhs in
   let num_bindings = Array.length id in
   let status = Array.make num_bindings Undefined in
