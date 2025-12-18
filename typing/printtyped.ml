@@ -365,6 +365,7 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       value_mode i ppf m;
       pattern i ppf p;
   | Tpat_constant (c) -> line i ppf "Tpat_constant %a\n" fmt_constant c;
+  | Tpat_unboxed_unit -> line i ppf "Tpat_unboxed_unit\n";
   | Tpat_tuple (l) ->
       line i ppf "Tpat_tuple\n";
       list i labeled_pattern ppf l;
@@ -553,6 +554,7 @@ and expression i ppf x =
       line i ppf "Texp_try\n";
       expression i ppf e;
       list i case ppf l;
+  | Texp_unboxed_unit -> line i ppf "Texp_unboxed_unit\n";
   | Texp_tuple (l, am) ->
       line i ppf "Texp_tuple\n";
       alloc_mode i ppf am;

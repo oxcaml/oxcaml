@@ -1985,6 +1985,9 @@ and pattern_match_barrier pat paths : UF.t =
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
   | Tpat_tuple _ -> borrow_memory_address ()
+  | Tpat_unboxed_unit ->
+    (* unboxed units are not allocations *)
+    no_memory_access ()
   | Tpat_unboxed_tuple _ ->
     (* unboxed tuples are not allocations *)
     no_memory_access ()
@@ -2007,6 +2010,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext1, uf = pattern_match_single pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf
     | Tpat_constant _ -> Ienv.Extension.empty, UF.unused
+    | Tpat_unboxed_unit -> Ienv.Extension.empty, UF.unused
     | Tpat_construct (lbl, cd, pats, _) ->
       let uf_tag =
         Paths.learn_tag { tag = cd.cstr_tag; name_for_error = lbl } paths
@@ -2282,6 +2286,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     let uf_cases = check_uniqueness_cases ienv value cases in
     (* we don't know how much of e will be run; safe to assume all of them *)
     UF.seq uf_body uf_cases
+  | Texp_unboxed_unit -> UF.unused
   | Texp_tuple (es, _) ->
     UF.pars
       (List.mapi

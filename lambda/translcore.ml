@@ -486,6 +486,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes sort pat_expr_list),
                return_layout)
+  | Texp_unboxed_unit ->
+      Lprim(Punbox_unit, [Lconst(Const_base(Const_int 0))],
+            of_location ~scopes e.exp_loc)
   | Texp_tuple (el, alloc_mode) ->
       let ll, shape =
         transl_value_list_with_shape ~scopes
