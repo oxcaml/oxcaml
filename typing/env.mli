@@ -29,7 +29,6 @@ type module_unbound_reason =
       { container : string option; unbound: string }
 
 type locks
-type stage_locks
 
 type summary =
     Env_empty

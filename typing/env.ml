@@ -157,7 +157,6 @@ type lock =
   | Stage_lock of stage_lock
 
 type locks = lock list
-type stage_locks = stage_lock list
 
 type summary =
     Env_empty
@@ -3645,7 +3644,7 @@ let lookup_ident_cltype ~errors ~use ~loc s env =
       may_lookup_error errors loc env (Unbound_cltype (Lident s))
 
 let find_all_labels (type rep) ~(record_form : rep record_form) ~mark s env
-  : (_ * rep gen_label_description * ('lock list * (unit -> unit))) list =
+  : (_ * rep gen_label_description * (stage_lock list * (unit -> unit))) list =
   match record_form with
   | Legacy -> TycompTbl.find_all_and_locks ~mark s env.labels
   | Unboxed_product -> TycompTbl.find_all_and_locks ~mark s env.unboxed_labels
