@@ -25,6 +25,10 @@
 #define NUM_EXTRA_PARAMS 64
 typedef value extra_params_area[NUM_EXTRA_PARAMS];
 
+/* Function pointer type for GC entry points (caml_call_gc and variants).
+   Used in domain state to avoid PLT indirection on amd64. */
+typedef void (*gc_entry_point_fn)(void);
+
 /* This structure sits in the TLS area and is also accessed efficiently
  * via native code, which is why the indices are important */
 typedef struct {

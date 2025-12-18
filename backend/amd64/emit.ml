@@ -2705,19 +2705,19 @@ let begin_assembly unix =
   | `Symbol sym -> D.define_symbol_label ~section:Text sym
   | `Label lbl -> D.define_label lbl);
   D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc"));
+  I.jmp (domain_field Domainstate.Domain_gc_entry_point);
   D.cfi_endproc ();
   (match emit_cmm_symbol call_gc_local_sym_avx with
   | `Symbol sym -> D.define_symbol_label ~section:Text sym
   | `Label lbl -> D.define_label lbl);
   D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc_avx"));
+  I.jmp (domain_field Domainstate.Domain_gc_entry_point_avx);
   D.cfi_endproc ();
   (match emit_cmm_symbol call_gc_local_sym_avx512 with
   | `Symbol sym -> D.define_symbol_label ~section:Text sym
   | `Label lbl -> D.define_label lbl);
   D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc_avx512"));
+  I.jmp (domain_field Domainstate.Domain_gc_entry_point_avx512);
   D.cfi_endproc ();
   ()
 

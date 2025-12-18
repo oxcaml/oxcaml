@@ -112,5 +112,12 @@ DOMAIN_STATE(void*, c_stack)
 DOMAIN_STATE(void*, current_stack)
 /* Unused: compatibility with runtime5 */
 
+DOMAIN_STATE(gc_entry_point_fn, gc_entry_point)
+DOMAIN_STATE(gc_entry_point_fn, gc_entry_point_avx)
+DOMAIN_STATE(gc_entry_point_fn, gc_entry_point_avx512)
+/* Pointers to the caml_call_gc functions.
+   Used to avoid PLT indirection on calls to the GC, which would
+   otherwise clobber r10 on amd64. */
+
 DOMAIN_STATE(extra_params_area, extra_params)
 /* This member must occur last, because it is an array, not a scalar */

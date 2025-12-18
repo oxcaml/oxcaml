@@ -21,6 +21,16 @@
 #include "caml/fail.h"
 #include "caml/signals.h"
 
+/* GC entry points kept in the runtime state, used to avoid PLT indirection.
+   Declared here to initialize domain_state->gc_entry_point* fields. */
+#if defined(NATIVE_CODE)
+extern void caml_call_gc(void);
+# if defined(TARGET_amd64)
+extern void caml_call_gc_avx(void);
+extern void caml_call_gc_avx512(void);
+# endif /* defined(TARGET_amd64) */
+#endif /* defined(NATIVE_CODE) */
+
 CAMLexport caml_domain_state* Caml_state;
 
 void caml_init_domain (void)
@@ -68,6 +78,17 @@ void caml_init_domain (void)
   Caml_state->bottom_of_stack = NULL; /* no stack initially */
   Caml_state->last_return_address = 1; /* not in OCaml code initially */
   Caml_state->gc_regs = NULL;
+
+#if defined(NATIVE_CODE)
+  Caml_state->gc_entry_point = caml_call_gc;
+# if defined(TARGET_amd64)
+  Caml_state->gc_entry_point_avx = caml_call_gc_avx;
+  Caml_state->gc_entry_point_avx512 = caml_call_gc_avx512;
+# else
+  Caml_state->gc_entry_point_avx = NULL;
+  Caml_state->gc_entry_point_avx512 = NULL;
+# endif /* defined(TARGET_amd64) */
+#endif /* defined(NATIVE_CODE) */
 
   Caml_state->tls_state = Val_unit;
   caml_register_generational_global_root(&Caml_state->tls_state);
