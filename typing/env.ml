@@ -3300,7 +3300,8 @@ let check_cross_quotation report_errors loc_use loc_def env path lid locks =
     may_lookup_error report_errors loc_use env
       (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
 
-let check_cross_staged_quotation report_errors loc_use loc_def env path lid locks =
+let check_cross_staged_quotation report_errors loc_use loc_def env path lid
+      locks =
   match does_not_cross_staged_quotation path locks with
   | Ok () -> ()
   | Error n ->
@@ -3661,7 +3662,9 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
   match lbls_filtered with
   | [] -> begin
       match lbls with
-      | [] -> may_lookup_error errors loc env (Unbound_label (Lident s, P record_form, usage))
+      | [] ->
+        may_lookup_error errors loc env
+          (Unbound_label (Lident s, P record_form, usage))
       | _ ->
         may_lookup_error errors loc env
           (Unbound_in_stage (Label_ctx, Lident s, loc, env.stage))
