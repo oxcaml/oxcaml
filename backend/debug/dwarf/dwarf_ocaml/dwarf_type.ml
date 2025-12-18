@@ -477,7 +477,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
         (Format.pp_print_list ~pp_sep:Format.pp_print_space pp_projected_field)
         (Array.to_list fields)
       (* field should exist *)
-    else None, Shape.leaf' None, Sort.Value
+    else None, Shape.unknown_type (), Sort.Value
   | [i] -> (
     match Array.get fields i with
     | name, sh, Base ly -> name, sh, ly
@@ -498,7 +498,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
     let field_name = Option.value ~default:("." ^ Int.to_string i) field_name in
     let field_name_with_projection = field_name_with_path field_name subpath in
     ( Some field_name_with_projection,
-      Shape.leaf' None,
+      Shape.unknown_type (),
       (* CR sspies: To properly support unboxed records in mixed records, we we
          need to propagate the right shape information here. *)
       project_layout field_layout subpath )
@@ -1405,9 +1405,17 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
        such that it is easier to change this code if in the future we want to
        change how the names of types are handled. *)
     (match type_shape.desc with
-    | Leaf ->
+    | Leaf | Unknown_type ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
+    | At_layout (sh, _) ->
+      let reference' =
+        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
+          type_layout ~rec_env
+      in
+      (* CR sspies: This typedef is only needed if the name is [Some]. Reduce
+         the number of typedefs here. *)
+      create_typedef_die ~reference ~parent_proto_die ?name reference'
     | Constr _ ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
@@ -1772,7 +1780,11 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   in
   let known_value = [Known (type_shape, Sort.Value)] in
   match type_shape.desc, type_layout with
-  | Leaf, _ -> unknown_base_layouts type_layout
+  | Leaf, _ | Unknown_type, _ -> unknown_base_layouts type_layout
+  | At_layout (shape, _), _ ->
+    flatten_shape shape type_layout
+    (* We simply drop these for now. The [flatten_shape] function will be
+       deleted when revisiting the layouts. *)
   | Tuple _, Base Value ->
     known_value (* boxed tuples are only a single base layout wide *)
   | Tuple _, _ ->
