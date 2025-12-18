@@ -538,7 +538,11 @@ type rcd = { x : int; y : string; }
 
 <[ {x = 42; y = "foo"} ]>;;
 [%%expect {|
-- : <[rcd]> expr = <[{ x = 42; y = "foo"; }]>
+Line 1, characters 4-5:
+1 | <[ {x = 42; y = "foo"} ]>;;
+        ^
+Error: Label "x" used at Line 1, characters 4-5 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
 |}];;
 
 type rcd_u = #{xu: int; yu: string};;
@@ -548,17 +552,31 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
 [%%expect {|
-- : <[unit -> rcd_u]> expr = <[fun () -> { xu = 42; yu = "foo"; }]>
+Line 1, characters 15-17:
+1 | <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
+                   ^^
+Error: Label "xu" used at Line 1, characters 15-17
+       cannot be used in this context;
+       "xu" is not defined inside a quotation (<[ ... ]>).
 |}];;
 
 <[ fun r -> r.x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun r -> r.x]>
+Line 1, characters 14-15:
+1 | <[ fun r -> r.x ]>;;
+                  ^
+Error: Label "x" used at Line 1, characters 14-15
+       cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
 |}];;
 
 <[ fun {x; y} -> x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun {x=x; y=y; } -> x]>
+Line 1, characters 8-9:
+1 | <[ fun {x; y} -> x ]>;;
+            ^
+Error: Label "x" used at Line 1, characters 8-9 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
 |}];;
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;

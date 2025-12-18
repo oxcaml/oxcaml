@@ -29,6 +29,7 @@ type module_unbound_reason =
       { container : string option; unbound: string }
 
 type locks
+type stage_locks
 
 type summary =
     Env_empty
@@ -218,6 +219,10 @@ type no_open_quotations_context =
   | Sig_qt
   | Open_qt
 
+type none_in_quotations_context =
+  | Constructor_ctx
+  | Label_ctx
+
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
   | Unbound_type of Longident.t
@@ -252,7 +257,8 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
-  | No_constructor_in_stage of Longident.t * Location.t * int
+  | Unbound_in_stage of
+      none_in_quotations_context * Longident.t * Location.t * int
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
