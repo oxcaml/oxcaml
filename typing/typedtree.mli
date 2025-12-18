@@ -220,6 +220,8 @@ and 'k pattern_desc =
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
+  | Tpat_unboxed_unit : value pattern_desc
+        (** #() *)
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
         (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
             (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
@@ -436,6 +438,8 @@ and expression_desc =
          *)
   | Texp_try of expression * value case list
         (** try E with P1 -> E1 | ... | PN -> EN *)
+  | Texp_unboxed_unit
+        (** #() *)
   | Texp_tuple of (string option * expression) list * alloc_mode
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]

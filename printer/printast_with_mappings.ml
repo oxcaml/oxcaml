@@ -286,6 +286,7 @@ and pattern i ppf x =
   | Ppat_constant (c) -> line i ppf "Ppat_constant %a\n" fmt_constant c;
   | Ppat_interval (c1, c2) ->
       line i ppf "Ppat_interval %a..%a\n" fmt_constant c1 fmt_constant c2;
+  | Ppat_unboxed_unit -> line i ppf "Ppat_unboxed_unit\n";
   | Ppat_tuple (l, c) ->
       line i ppf "Ppat_tuple %a\n" fmt_closed_flag c;
       list i (labeled_tuple_element pattern) ppf l;
@@ -372,6 +373,7 @@ and expression i ppf x =
       line i ppf "Pexp_try\n";
       expression i ppf e;
       list i case ppf l;
+  | Pexp_unboxed_unit -> line i ppf "Pexp_unboxed_unit\n";
   | Pexp_tuple (l) ->
       line i ppf "Pexp_tuple\n";
       list i (labeled_tuple_element expression) ppf l;
