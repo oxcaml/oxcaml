@@ -420,10 +420,16 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   (* Note: this currently ignores any GADT-installed equations. *)
   match context.lookup_type p with
   | None ->
-    Format.eprintf "ERROR: unknown constructor %a@." Path.print p;
+    (* Format.eprintf "ERROR: unknown constructor %a@." Path.print p; *)
+    (* WE CANNOT ACTUALLY GIVE AN ERROR HERE! *)
+    (* Explanation: build systems sometimes heuristically do not 
+      include all cmis for performance reasons. Because of that,
+      we could encounter types that appear not to exist. We must
+      treat those as abstract unknowns. *)
     (* Fallback for unknown constructors: treat them as abstract,
        non-recursive values. *)
-    let kind : JK.ckind = fun _ctx -> Ldd.const Axis_lattice.value in
+    let unknown = Ikind.Ldd.Name.fresh_unknown () in
+    let kind : JK.ckind = fun _ctx -> Ldd.var (Ldd.rigid unknown) in
     JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
     (* Here we can switch to using the cached ikind or not. *)
