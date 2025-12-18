@@ -254,6 +254,7 @@
   product_lattice
   ldd_memo
   ldd_cached_down0
+  ldd_hybrid_opt
   ldd
   ldd_no_memo
   ldd_unboxed
