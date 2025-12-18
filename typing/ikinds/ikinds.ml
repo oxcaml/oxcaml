@@ -105,6 +105,8 @@ module JK = struct
   let type_may_be_circular (t : ty) : bool =
     match Types.get_desc t with
     | Types.Tvariant _ -> true
+    | Types.Tconstr _ -> true
+    | Types.Tobject _ -> true
     | _ -> false
 
   (* Compute the kind for [t].
