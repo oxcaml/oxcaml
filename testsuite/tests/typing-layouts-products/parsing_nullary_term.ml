@@ -7,4 +7,4 @@
 
 (* This does not parse, but might one day. *)
 
-let x = #()
+let x = #(())
