@@ -3,4 +3,4 @@
   (modes native)
   (libraries
    ocamlcommon ocamloptcomp
-   flambda2 flambda2_compare flambda2_parser flambda2_terms flambda2_cmx))
+   flambda2 flambda2_compare flambda2_parser flambda2_newparser flambda2_terms flambda2_cmx))
