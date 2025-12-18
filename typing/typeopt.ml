@@ -116,15 +116,16 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 let type_representable_layout ~why env loc ty =
   let jkind = Ctype.type_jkind env ty in
   match Jkind.get_layout_defaulting_to_scannable jkind with
-  (* Surprisingly, it is possible to reach this branch; for example, when
-     translating [f] in the following example:
-
-     external foo : ('a : any mod separable). 'a array -> int = "%identity"
-     let f x = foo x
-
-     See also (3) in [Note regarding jkind checks on external declarations]. *)
   | Any _ ->
-    (* In this case (at least for now), we want to constrain [ty]'s jkind to
+    (* Surprisingly, it is possible to reach this branch; for example, when
+       translating [f] in the following example:
+
+       external foo : ('a : any mod separable). 'a array -> int = "%identity"
+       let f x = foo x
+
+       See also (3) in [Note regarding jkind checks on external declarations].
+
+       In this case (at least for now), we want to constrain [ty]'s jkind to
        be representable, which is achieved by [type_sort]. Recomputing the jkind
        will then yield one with the new, representable (defaulted) layout. *)
     (* We postpone calling [type_sort] until this branch to make the common case
@@ -132,10 +133,11 @@ let type_representable_layout ~why env loc ty =
     (match Ctype.type_sort ~why ~fixed:false env ty with
     | Ok _sort ->
       let jkind = Ctype.type_jkind env ty in
-      (match Jkind.get_layout_defaulting_to_scannable jkind with
-      | Any _ -> Misc.fatal_error
+      let layout = Jkind.get_layout_defaulting_to_scannable jkind in
+      (match Jkind_types.Layout.Const.get_sort layout with
+      | None -> Misc.fatal_error
                    "called type_sort but didn't get a representable layout"
-      | layout -> layout)
+      | Some _ -> layout)
     (* CR layouts: It seems as if this is unreachable (see ticket above). *)
     | Error err -> raise (Error (loc, Not_a_sort (ty, err))))
   | layout -> layout
