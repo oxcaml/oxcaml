@@ -20,10 +20,21 @@ BUILD_PID=0
 # This must correspond with the entry in appveyor.yml
 CACHE_DIRECTORY=/cygdrive/c/projects/cache
 
-if [[ -z $APPVEYOR_PULL_REQUEST_HEAD_COMMIT ]] ; then
-  MAKE="make -j$NUMBER_OF_PROCESSORS"
-else
-  MAKE=make
+MAKE=make
+
+# The environment is too large for xargs!
+unset ORIGINAL_PATH
+unset __VSCMD_PREINIT_PATH
+
+# There are some utilities on the AppVeyor runner which include mingw-w64
+# runtime DLLs which we don't want to be available in the build.
+export PATH="$(tr ':' '\n' <<<"$PATH" |
+               grep -vxFf <(which -a libwinpthread-1.dll |
+               xargs -r dirname) |
+               paste -sd:)"
+if which 'libwinpthread-1.dll' 2>/dev/null; then
+  echo 'Failed to remove libwinpthread-1.dll from PATH'
+  exit 1
 fi
 
 git config --global --add safe.directory '*'
@@ -148,6 +159,16 @@ case "$1" in
           $FULL_BUILD_PREFIX-$PORT/runtime/*.a \
           $FULL_BUILD_PREFIX-$PORT/otherlibs/*/lib*.a
     fi
+    # Check that libwinpthread-1.dll is not linked
+    cd "$FULL_BUILD_PREFIX-$PORT"
+    find . -name \*.exe | xargs ldd > results
+    winpthreads='^[[:blank:]]libwinpthread-[^.]\+\.dll =>'
+    if grep -q "$winpthreads" results; then
+      echo 'winpthreads is not being linked statically:'
+      grep ':$\|'"$winpthreads" results | grep -B 1 "$winpthreads"
+      exit 1
+    fi
+    rm -f results
     run_testsuite=true
     if [[ -n $APPVEYOR_PULL_REQUEST_NUMBER ]]; then
       API_URL="https://api.github.com/repos/$APPVEYOR_REPO_NAME/issues/$APPVEYOR_PULL_REQUEST_NUMBER"
@@ -219,10 +240,12 @@ case "$1" in
         set -o pipefail
         # For an explanation of the sed command, see
         # https://github.com/appveyor/ci/issues/1824
+        build="-C ../$BUILD_PREFIX-$PORT"
         script --quiet --return --command \
-          "$MAKE -C ../$BUILD_PREFIX-$PORT" \
+          "if ! $MAKE -j $build; then $MAKE $build; exit 1; fi" \
           "../$BUILD_PREFIX-$PORT/build.log" |
-            sed -e 's/\d027\[K//g' \
+            sed --unbuffered \
+                -e 's/\d027\[K//g' \
                 -e 's/\d027\[m/\d027[0m/g' \
                 -e 's/\d027\[01\([m;]\)/\d027[1\1/g'
         rm -f build.log;;
