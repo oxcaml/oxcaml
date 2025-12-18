@@ -1137,3 +1137,670 @@ run 3:
   user 1001.22
   sys  165.82
 
+
+=== 2025-12-18T02:59:48Z ===
+desc: hybrid
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-WdeN6Jb0
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 153.16
+  user 679.17
+  sys  122.42
+
+run 2:
+  real 153.73
+  user 683.80
+  sys  124.90
+
+
+=== 2025-12-18T03:06:17Z ===
+desc: hybrid
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-FuwUnMKc
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+
+=== 2025-12-18T03:08:21Z ===
+desc: hybrid2
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-8Rho4UgC
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 151.73
+  user 677.45
+  sys  121.92
+
+run 2:
+  real 154.18
+  user 683.20
+  sys  123.99
+
+
+=== 2025-12-18T03:14:46Z ===
+desc: hybrid2
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-CdrWWP5O
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+
+=== 2025-12-18T03:14:57Z ===
+desc: hybrid2
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-cZtiN29e
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 149.47
+  user 667.74
+  sys  119.31
+
+run 2:
+  real 162.87
+  user 707.61
+  sys  129.85
+
+run 3:
+  real 165.09
+  user 712.30
+  sys  134.12
+
+
+=== 2025-12-18T03:29:31Z ===
+desc: hybrid2
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-3jhP8twg
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+
+=== 2025-12-18T03:29:37Z ===
+desc: cd0
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-kEnfejEy
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 151.09
+  user 674.92
+  sys  122.22
+
+run 2:
+  real 151.23
+  user 678.75
+  sys  120.48
+
+run 3:
+  real 151.02
+  user 671.30
+  sys  120.84
+
+
+=== 2025-12-18T03:37:42Z ===
+desc: no-id
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-r2wJP2rJ
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 152.47
+  user 678.11
+  sys  122.09
+
+run 2:
+  real 152.55
+  user 680.33
+  sys  123.80
+
+run 3:
+  real 151.21
+  user 679.13
+  sys  118.35
+
+
+=== 2025-12-18T03:46:59Z ===
+desc: no-id
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-neVlHeEK
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 154.63
+  user 690.82
+  sys  121.59
+
+run 2:
+  real 152.46
+  user 681.27
+  sys  119.07
+
+run 3:
+  real 152.06
+  user 676.57
+  sys  121.17
+
+
+=== 2025-12-18T03:55:02Z ===
+desc: cd0
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-x6ExJDyF
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 149.66
+  user 670.40
+  sys  119.00
+
+run 2:
+  real 150.02
+  user 671.88
+  sys  120.17
+
+run 3:
+  real 150.54
+  user 672.71
+  sys  121.33
+
+
+=== 2025-12-18T04:03:06Z ===
+desc: hybrid
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-wiSPunRz
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 149.95
+  user 673.00
+  sys  119.99
+
+run 2:
+  real 148.86
+  user 668.50
+  sys  121.08
+
+run 3:
+  real 147.20
+  user 661.89
+  sys  118.48
+
+
+=== 2025-12-18T04:23:35Z ===
+desc: hybrid-opt
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-JRRgyfSW
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_hybrid_opt.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 151.68
+  user 673.36
+  sys  123.24
+
+run 2:
+  real 151.77
+  user 677.34
+  sys  123.46
+
+run 3:
+  real 152.10
+  user 676.69
+  sys  123.36
+
+
+=== 2025-12-18T04:31:42Z ===
+desc: hybrid
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-3OjZYFih
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_hybrid_opt.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 152.41
+  user 677.34
+  sys  123.47
+
+run 2:
+  real 150.88
+  user 673.12
+  sys  123.15
+
+run 3:
+  real 147.39
+  user 666.68
+  sys  120.46
+
+
+=== 2025-12-18T04:39:30Z ===
+desc: hybrid
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-wCKPWnqh
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_hybrid_opt.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 154.09
+  user 678.28
+  sys  123.34
+
+run 2:
+  real 166.02
+  user 719.62
+  sys  135.44
+
+
+=== 2025-12-18T04:47:16Z ===
+desc: hybrid-opt
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-uryNv5VY
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_hybrid_opt.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 151.45
+  user 675.01
+  sys  121.37
+
+run 2:
+  real 153.05
+  user 684.62
+  sys  124.41
+
+run 3:
+  real 151.01
+  user 673.92
+  sys  123.27
+
+
+=== 2025-12-18T04:58:08Z ===
+desc: hybrid-opt
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-84Z0Z2UZ
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_hybrid_opt.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 149.95
+  user 673.21
+  sys  121.00
+
+run 2:
+  real 149.12
+  user 671.86
+  sys  119.32
+
+run 3:
+  real 149.71
+  user 673.96
+  sys  120.11
+
+
+=== 2025-12-18T05:07:08Z ===
+desc: hybrid-opt
+git: 5d9c6d2024395173693aec993056ca115d062cda (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-HUbdqMRH
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M dune
+   M otherlibs/dynlink/dune
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_hybrid_opt.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 154.43
+  user 684.74
+  sys  122.93
+
+
+=== 2025-12-18T05:11:56Z ===
+desc: cd0
+git: f1529b67420956bd97f0f40b01a51dc992bbf6e4 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-GXdjZYbc
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+   M typing/ikinds/ldd.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 149.61
+  user 671.50
+  sys  118.84
+
+run 2:
+  real 150.08
+  user 667.30
+  sys  119.55
+
+run 3:
+  real 152.33
+  user 678.21
+  sys  121.36
+
+
+=== 2025-12-18T05:26:48Z ===
+desc: hybrid-opt
+git: f1529b67420956bd97f0f40b01a51dc992bbf6e4 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-fleqz4qY
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 145.96
+  user 659.01
+  sys  117.00
+
+run 2:
+  real 148.04
+  user 667.09
+  sys  118.11
+
+run 3:
+  real 157.64
+  user 693.84
+  sys  125.46
+
+
+=== 2025-12-18T05:35:14Z ===
+desc: hybrid-opt
+git: f1529b67420956bd97f0f40b01a51dc992bbf6e4 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-qBDt6Uxz
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M repro/bar.ml
+   M repro/bench.sh
+   M repro/foo.ml
+   M repro/foobar.ml
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikind.ml
+   M typing/ikinds/ikinds.ml
+  ?? typing/ikinds/ldd_hybrid.ml
+  ?? typing/ikinds/ldd_no_id.ml
+
+run 1:
+  real 151.07
+  user 675.44
+  sys  121.73
+
+run 2:
+  real 149.04
+  user 668.93
+  sys  119.75
+
+run 3:
+  real 148.97
+  user 669.77
+  sys  118.51
+

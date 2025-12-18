@@ -23,17 +23,18 @@ module RigidName = struct
 
   (* Ordering on rigid names used in the LDD to order the nodes. *)
   let compare a b =
+    if a == b then 0 else
     match a, b with
-    | Unknown x, Unknown y -> Int.compare x y
-    | Unknown _, _ -> 1
-    | _, Unknown _ -> -1
     | Atom a1, Atom a2 -> (
-      match Path.compare a1.constr a2.constr with
-      | 0 -> Int.compare a1.arg_index a2.arg_index
-      | c -> c)
+      let h = Path.compare a1.constr a2.constr in
+      if h <> 0 then h else
+      Int.compare a1.arg_index a2.arg_index)
     | Param x, Param y -> Int.compare x y
     | Atom _, Param _ -> -1
     | Param _, Atom _ -> 1
+    | Unknown x, Unknown y -> Int.compare x y
+    | Unknown _, _ -> 1
+    | _, Unknown _ -> -1
 
   let to_string = function
     | Atom { constr; arg_index } ->

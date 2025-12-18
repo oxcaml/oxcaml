@@ -7,7 +7,7 @@ Clflags.ikinds := true;
 Types.ikind_debug := false
 let enable_crossing = true
 let enable_sub_jkind_l = true
-let enable_sub_or_intersect = true
+let enable_sub_or_intersect = false
 let enable_sub_or_error = false
 let reset_constructor_ikind_on_substitution = false
 
@@ -53,7 +53,7 @@ module JK = struct
   module ConstrTbl = Hashtbl.Make (struct
     type t = constr
 
-    let equal a b = Path.compare a b = 0
+    let equal a b = Path.same a b
 
     let hash x = Path.hash x
   end)
@@ -121,8 +121,11 @@ module JK = struct
           TyTbl.add ctx.ty_to_kind t placeholder;
           let rhs = ctx.env.kind_of ctx t in
           Ldd.solve_lfp v rhs;
+          placeholder)
+        else ( 
+          let rhs = ctx.env.kind_of ctx t in
+          TyTbl.add ctx.ty_to_kind t rhs;
           rhs)
-        else ctx.env.kind_of ctx t
 
   (* Fetch or compute the polynomial for constructor [c].  The returned
      nodes are placeholders stored in [constr_to_coeffs] so that mutually
@@ -151,7 +154,7 @@ module JK = struct
               | Ldd.Name.Param _ | Ldd.Name.Unknown _ ->
                   rigid_name ctx name
               | Ldd.Name.Atom { constr = constr'; arg_index } ->
-                  if Path.compare constr' c = 0
+                  if Path.same constr' c
                   then rigid_name ctx name
                   else
                     let base', coeffs' = constr_kind ctx constr' in
@@ -511,6 +514,16 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         | Types.Type_variant (cstrs, rep, _umc_opt) ->
+          (* GADTs introduce existential type variables via [cd_res] and can
+             install local equations. For ikinds, we conservatively round up
+             when we see GADT constructors to avoid leaking existentials into
+             stored polynomials. *)
+          let has_gadt_constructor =
+            List.exists
+              (fun (c : Types.constructor_declaration) ->
+                Option.is_some c.cd_res)
+              cstrs
+          in
           (* Choose base: immediate for void-only variants; mutable if any
              record constructor has a mutable field; otherwise immutable. *)
           let all_args_void =
@@ -547,6 +560,11 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           let relevant_for_shallow = relevance_of_rep (`Variant rep) in
           let kind : JK.ckind =
            fun (ctx : JK.ctx) ->
+            let ctx =
+              if has_gadt_constructor
+              then JK.reset_for_mode ctx ~mode:JK.Round_up
+              else ctx
+            in
             let base = Ldd.const base_lat in
             List.fold_left
               (fun acc (c : Types.constructor_declaration) ->
