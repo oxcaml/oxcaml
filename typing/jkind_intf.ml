@@ -355,6 +355,8 @@ module History = struct
 
   type immediate_or_null_creation_reason = Primitive of Ident.t
 
+  type scannable_creation_reason = Dummy_jkind
+
   (* CR layouts v5: make new void_creation_reasons *)
   type void_creation_reason = |
 
@@ -387,6 +389,7 @@ module History = struct
     | Value_creation of value_creation_reason
     | Immediate_creation of immediate_creation_reason
     | Immediate_or_null_creation of immediate_or_null_creation_reason
+    | Scannable_creation of scannable_creation_reason
     | Void_creation of void_creation_reason
     | Any_creation of any_creation_reason
     | Product_creation of product_creation_reason

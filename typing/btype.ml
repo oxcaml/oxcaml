@@ -1836,7 +1836,7 @@ module Jkind0 = struct
 
       let scannable ~why =
         fresh_jkind Jkind_desc.Builtin.scannable
-          ~annotation:(mk_annot "scannable") ~why:(Any_creation why)
+          ~annotation:(mk_annot "scannable") ~why:(Scannable_creation why)
 
       let value_or_null ~why =
         match (why : Jkind_intf.History.value_or_null_creation_reason) with
