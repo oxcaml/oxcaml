@@ -3909,7 +3909,7 @@ let lookup_all_dot_labels ~record_form ~errors ~use ~loc usage l s env =
       List.map
         (fun lbl ->
            let use_fun () = use_label ~use ~loc usage env lbl in
-           lbl, use_fun)
+           (lbl, use_fun))
         lbls
 
 let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
