@@ -723,6 +723,7 @@ and comp_expr stack_info env exp sz cont =
         match lam with
         | Apply { nontail; _ } | Send { nontail; _ } -> not nontail
         | Prim _ -> false
+        | Context_switch ((With_stack | With_stack_bind), _) -> false
         | _ -> true
       in
       if preserve_tailcall && is_tailcall cont
@@ -733,7 +734,8 @@ and comp_expr stack_info env exp sz cont =
           match lam with
           | Apply { args; _ } -> Event_return (List.length args)
           | Send { obj; args; _ } -> Event_return (List.length (obj :: args))
-          | Prim (_, args) -> Event_return (List.length args)
+          | Prim (_, args) | Context_switch (_, args) ->
+            Event_return (List.length args)
           | _ -> Event_other
         in
         let ev = event (Event_after ty) info in
