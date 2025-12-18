@@ -3948,7 +3948,7 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             partial (divide_constructor ~scopes)
             (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr partial)
             ctx pm
-      | Array _ ->
+      | Array (_, _, _) ->
           let kind = Typeopt.array_pattern_kind pomega in
           compile_test
             (compile_match ~scopes value_kind repr partial)

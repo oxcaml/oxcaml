@@ -143,6 +143,8 @@ module Layout : sig
     val equal : t -> t -> bool
 
     val max : t
+
+    val get_sort : t -> Sort.Const.t option
   end
 
   val of_const : Const.t -> Sort.t t

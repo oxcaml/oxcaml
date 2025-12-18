@@ -1498,9 +1498,9 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pmixedfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
-  (* CR layouts-scannable: the shape here is potentially an underapproximation,
-     since the scannable axes in [shape] will all be [max]. This does not appear
-     to matter though, based on caml_modify tests *)
+  (* The shape here is potentially an underapproximation, since the scannable
+     axes in [shape] will all be [max]. This should not matter, though, since it
+     is not possible to reassign / directly mutate a [val] in a module. *)
   let shape =
     Array.map
       (fun sort ->

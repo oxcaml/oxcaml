@@ -2784,14 +2784,17 @@ let check_type_separability jkind env ty sep =
 
 let is_always_gc_ignorable env ty =
   (* CR layouts: calling [check_type_jkind] two times (indirectly) is sad. *)
+  check_type_externality env ty
+    (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
+  ||
+  (* Checking against the upper bound [scannable non_pointer(64)] ensures that
+     whenever [ty]'s layout is not scannable, the check will be [false]. *)
   (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
      a type of kind [value non_pointer & value non_pointer] will fail to be
      recognized as being always_gc_ignorable, even though it is. To avoid this,
      [non_pointer(64)] should imply [external(64)]. *)
-  check_type_externality env ty
-    (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-  || check_type_separability (Jkind.Builtin.scannable ~why:Dummy_jkind) env ty
-       (Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ())
+  check_type_separability (Jkind.Builtin.scannable ~why:Dummy_jkind) env ty
+      (Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ())
 
 let check_type_separability env ty sep =
   check_type_separability (Jkind.Builtin.any ~why:Dummy_jkind) env ty sep

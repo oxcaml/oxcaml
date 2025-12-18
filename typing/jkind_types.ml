@@ -706,6 +706,14 @@ module Layout = struct
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | (Base _ | Any _ | Product _), _ -> false
 
+    let rec get_sort : t -> Sort.Const.t option = function
+      | Any _ -> None
+      | Base (b, _) -> Some (Base b)
+      | Product ts ->
+        Option.map
+          (fun x -> Sort.Const.Product x)
+          (Misc.Stdlib.List.map_option get_sort ts)
+
     module Static = struct
       let scannable_non_null_non_pointer =
         Base
