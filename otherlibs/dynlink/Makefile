@@ -142,7 +142,6 @@ COMPILERLIBS_SOURCES=\
   typing/jkind.ml \
   typing/typedtree.ml \
   typing/ikinds/global_counters.ml \
-  typing/ikinds/product_lattice.ml \
   typing/ikinds/ldd.ml \
   typing/ikinds/axis_lattice.ml \
   typing/ikinds/axis_lattice_conv.ml \

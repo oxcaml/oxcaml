@@ -131,7 +131,6 @@
   typemode
  jkind
   ;; IKINDS
-  product_lattice
   ldd_hybrid_opt
   ldd
   axis_lattice
@@ -646,7 +645,6 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Product_lattice.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice_conv.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
@@ -752,7 +750,6 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Product_lattice.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice_conv.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
