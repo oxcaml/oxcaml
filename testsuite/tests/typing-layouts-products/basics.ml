@@ -48,7 +48,7 @@ Error: Tuple element types must have layout value.
          because it is an unboxed tuple.
        But the layout of "#(string * bool)" must be a value layout
          because it's the type of a tuple element.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type t_nope_inner = #{ s : string; b : bool }
@@ -63,7 +63,7 @@ Error: Tuple element types must have layout value.
          because of the definition of t_nope_inner at line 1, characters 0-45.
        But the layout of "t_nope_inner" must be a value layout
          because it's the type of a tuple element.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (********************************************)
@@ -94,7 +94,7 @@ Error: The layout of type "#(string option * t1)" is
        But the layout of type "#(string option * t1)" must be a sublayout of
            value & float64 & value
          because of the definition of t2_wrong at line 1, characters 0-63.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
@@ -108,7 +108,7 @@ Error: The layout of type "t2_wrong" is
        But the layout of type "t2_wrong" must be a sublayout of
            value & float64 & value
          because of the annotation on the declaration of the type t2_wrong.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : value & bits64) t3 = 'a
@@ -142,7 +142,7 @@ Error: This type "#(int * int)" should be an instance of type
          because it is an unboxed tuple.
        But the layout of #(int * int) must be a sublayout of value & bits64
          because of the definition of t3 at line 1, characters 0-34.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts v7.1: The above error should identify the component of the product
    that is problematic. *)
@@ -160,7 +160,7 @@ Error: This type "t4_wrong_inner" should be an instance of type
          because of the definition of t4_wrong_inner at line 1, characters 0-45.
        But the layout of t4_wrong_inner must be a sublayout of value & bits64
          because of the definition of t3 at line 1, characters 0-34.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 
@@ -184,7 +184,7 @@ Error: This type "bool" should be an instance of type "('a : value & bits64)"
          because it is the primitive type bool.
        But the layout of bool must be a sublayout of value & bits64
          because of the definition of t6 at line 1, characters 0-37.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : value & bits64) t6 = 'a t7
@@ -208,7 +208,7 @@ Error: This type "bool" should be an instance of type "('a : value & bits64)"
          because it is the primitive type bool.
        But the layout of bool must be a sublayout of value & bits64
          because of the definition of t6 at line 1, characters 0-37.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : value & bits64) t6_wrong = 'a t7_wrong
@@ -224,7 +224,7 @@ Error: This type "#(int * int64)" should be an instance of type
        But the layout of #(int * int64) must be a sublayout of value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts v7.1: The above error should identify the component of the product
    that is problematic. *)
@@ -467,7 +467,7 @@ Error: Polymorphic variant constructor argument types must have layout value.
          because it is an unboxed tuple.
        But the layout of "#(int * bool)" must be a value layout
          because it's the type of the field of a polymorphic variant.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 let poly_var_term = `Foo #(1,2)
@@ -494,7 +494,7 @@ Error: Tuple element types must have layout value.
          because it is an unboxed tuple.
        But the layout of "#(bool * float#)" must be a value layout
          because it's the type of a tuple element.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 let tuple_term = ("hi", #(1, 2))
@@ -550,7 +550,7 @@ Error: Object field types must have layout value.
          because it is an unboxed tuple.
        But the layout of "#(int * bool)" must be a value layout
          because it's the type of an object field.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 let object_term = object val x = #(1, 2) end
@@ -563,7 +563,7 @@ Error: Variables bound in a class must have layout value.
          because it is an unboxed tuple.
        But the layout of x must be a value layout
          because it's the type of a class field.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 class class_ =
@@ -615,7 +615,7 @@ Error: Polymorphic variant constructor argument types must have layout value.
          because of the definition of poly_var_inner at line 1, characters 0-44.
        But the layout of "poly_var_inner" must be a value layout
          because it's the type of the field of a polymorphic variant.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type poly_var_term_record = #{ i : int; i2 : int }
@@ -632,7 +632,7 @@ Error: This expression has type "poly_var_term_record"
          because of the definition of poly_var_term_record at line 1, characters 0-50.
        But the layout of poly_var_term_record must be a value layout
          because it's the type of the field of a polymorphic variant.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type record_inner = #{ b : bool; f : float# }
@@ -647,7 +647,7 @@ Error: Tuple element types must have layout value.
          because of the definition of record_inner at line 1, characters 0-45.
        But the layout of "record_inner" must be a value layout
          because it's the type of a tuple element.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type record = #{ i : int; i2 : int }
@@ -663,7 +663,7 @@ Error: This expression has type "record" but an expression was expected of type
          because of the definition of record at line 1, characters 0-36.
        But the layout of record must be a value layout
          because it's the type of a tuple element.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type record_inner = #{ i : int; b : bool }
@@ -717,7 +717,7 @@ Error: Object field types must have layout value.
          because of the definition of object_inner at line 1, characters 0-42.
        But the layout of "object_inner" must be a value layout
          because it's the type of an object field.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type object_term_record = #{ i1 : int; i2 : int }
@@ -732,7 +732,7 @@ Error: Variables bound in a class must have layout value.
          because of the definition of object_term_record at line 1, characters 0-49.
        But the layout of x must be a value layout
          because it's the type of a class field.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type class_record = #{ i1 : int; i2 : int }
@@ -751,7 +751,7 @@ Error: This expression has type "class_record"
          because of the definition of class_record at line 1, characters 0-43.
        But the layout of class_record must be a value layout
          because it's the type of an object field.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type capture_record = #{ x : int; y : int }
@@ -771,7 +771,7 @@ Error: This expression has type "('a : value_or_null)"
          because of the definition of capture_record at line 1, characters 0-43.
        But the layout of capture_record must be a value layout
          because it's the type of a variable captured in an object.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 (****************************************************)
@@ -1491,7 +1491,7 @@ Error: This expression has type "letrec_record"
          because of the definition of letrec_record at line 3, characters 0-44.
        But the layout of letrec_record must be a value layout
          because it's the type of the recursive variable x.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (* Unboxed records of kind value are also disallowed: *)
@@ -1535,7 +1535,7 @@ Error: This expression has type "letrec_simple"
          because of the definition of letrec_simple at line 1, characters 0-44.
        But the layout of letrec_simple must be a value layout
          because it's the type of the recursive variable _x.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (************************************************)
@@ -1710,7 +1710,7 @@ Error: This expression has type "array_init_record"
            value non_pointer & value non_pointer
          because of the definition of array_init_record at line 1, characters 0-48.
        But the layout of array_init_record must be a value layout.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (* Arrays of unboxed records of kind value *are* allowed in all cases *)
@@ -1765,7 +1765,7 @@ Error: This expression has type "('a : value)"
          because of the definition of class_arg_record at line 1, characters 0-45.
        But the layout of class_arg_record must be a value layout
          because it's the type of a term-level argument to a class constructor.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (* But unboxed records of kind value are: *)
@@ -1810,7 +1810,7 @@ Error: This type "#(int * int)" should be an instance of type "('a : value)"
          because it is an unboxed tuple.
        But the layout of #(int * int) must be a value layout
          because the type argument of lazy_t has layout value.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type lazy_record = #{ i1 : int; i2 : int }
@@ -1826,7 +1826,7 @@ Error: This expression has type "lazy_record"
          because of the definition of lazy_record at line 1, characters 0-42.
        But the layout of lazy_record must be a value layout
          because it's the type of a lazy expression.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type lazy_t_record = #{ i1 : int; i2 : int }
@@ -1841,7 +1841,7 @@ Error: This type "lazy_t_record" should be an instance of type "('a : value)"
          because of the definition of lazy_t_record at line 1, characters 0-44.
        But the layout of lazy_t_record must be a value layout
          because the type argument of lazy_t has layout value.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (* Again, unboxed records of kind value can be: *)
@@ -1928,7 +1928,7 @@ Error: This expression has type "optional_record"
          because of the definition of optional_record at line 1, characters 0-46.
        But the layout of optional_record must be a value layout
          because the type argument of option has layout value_or_null.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (******************************)
@@ -2362,7 +2362,7 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
        But the layout of type "t" must be a sublayout of
            value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (* modal axes have the same problem *)
@@ -2396,7 +2396,7 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
        But the layout of type "t" must be a sublayout of
            value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (* modal axes have the same problem *)
@@ -2414,5 +2414,5 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
        But the layout of type "t" must be a sublayout of
            value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]

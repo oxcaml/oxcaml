@@ -2646,12 +2646,10 @@ module Violation = struct
          benefit would outweigh the cost (time and code). *)
       if should_hint_immediate
       then
-        fprintf ppf "@;@[Hint: The kind of %a is %a.@]" Misc.Style.inline_code
-          "immediate" Misc.Style.inline_code "value non_pointer";
+        fprintf ppf "@;@[Hint: The layout of immediate is value non_pointer.@]";
       if should_hint_immediate64
       then
-        fprintf ppf "@;@[Hint: The kind of %a is %a.@]" Misc.Style.inline_code
-          "immediate64" Misc.Style.inline_code "value non_pointer64"
+        fprintf ppf "@;@[Hint: The layout of immediate64 is value non_pointer64.@]"
 
   let report_fuel ppf violation =
     let report_fuel_for_type which =
@@ -2674,6 +2672,10 @@ module Violation = struct
      value (scannable) layouts, a more useful error should be reported.
      Specifically, the first mismatched axis should be reported as a reason,
      like "because it is not non_pointer" for a value vs immediate error. *)
+  (* CR layouts-scannable: Also, better error messages should be reported for
+     products! For instance, an error message blaming an arity difference, or
+     an error message that drills down into two products to find the first
+     conflicing component. *)
   let report_general ~level preamble pp_former former ppf t =
     (* Sometimes, when reporting a layout conflict, the scannable axes of
        the expected layout should not be shown since the information is

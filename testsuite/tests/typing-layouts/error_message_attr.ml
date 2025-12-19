@@ -235,7 +235,7 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on the wildcard _ at line 1, characters 26-41.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (* Doesn't apply when the mismatch is deep *)

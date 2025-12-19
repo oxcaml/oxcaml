@@ -296,7 +296,7 @@ Error:
          because an abstract type has the value layout by default.
        But the layout of t must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t2.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 (* Float_record_field *)

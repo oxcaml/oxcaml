@@ -158,7 +158,7 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-25.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (******************************************************************)
@@ -233,7 +233,7 @@ Error: The layout of type "Bar3.t" is value
          because of the annotation on the declaration of the type t.
        But the layout of type "Bar3.t" must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-29.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 module rec Foo3 : sig
@@ -386,7 +386,7 @@ Error: This type "M4'.s" should be an instance of type "('a : float64)"
          because of the definition of s at line 2, characters 2-45.
        But the layout of M4'.s must be a sublayout of float64
          because of the definition of t4_float64 at line 1, characters 0-30.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 
@@ -421,7 +421,7 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of f at line 3, characters 2-20.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 module type S3_2 = sig
@@ -444,7 +444,7 @@ Error: In this "with" constraint, the new definition of "t"
          because it is the primitive type string.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (*****************************************)
@@ -480,7 +480,7 @@ Error: In this "with" constraint, the new definition of "t"
          because it is the primitive type int.
        But the layout of the first must be a sublayout of float64
          because of the definition of t at line 2, characters 2-18.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 module type S6_3 = sig
@@ -529,7 +529,7 @@ Error: In this "with" constraint, the new definition of "t"
          because it is the primitive type string.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 module type S6_6' = sig
@@ -550,7 +550,7 @@ Error: In this "with" constraint, the new definition of "t"
          because of the definition of s at line 2, characters 2-8.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 module type S6_6'' = sig

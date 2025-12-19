@@ -2163,7 +2163,7 @@ Error: This expression has type "#(float# * a * int * int64#) array"
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 let f_any_2 (type a : any mod separable) (x : #(string * a * bool option) array) =
@@ -2198,7 +2198,7 @@ Error: This expression has type "#(float# * a * int * int64#) array"
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 let f_any_external_2 (type a : any mod separable mod external_)

@@ -99,7 +99,7 @@ Error: This type "t_maybeptr_val" should be an instance of type
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 type succeeds = t_nonptr_val accepts_nonptr_val
 [%%expect{|
@@ -143,8 +143,8 @@ Error: This type "t_nonptr64_val" should be an instance of type
        But the layout of t_nonptr64_val must be a sublayout of
            value non_pointer
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
-       Hint: The kind of "immediate" is "value non_pointer".
-       Hint: The kind of "immediate64" is "value non_pointer64".
+       Hint: The layout of immediate is value non_pointer.
+       Hint: The layout of immediate64 is value non_pointer64.
 |}]
 
 type ('a : value non_pointer64) accepts_nonptr64_val
@@ -169,7 +169,7 @@ Error: This type "t_maybeptr_val" should be an instance of type
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer64
          because of the definition of accepts_nonptr64_val at line 1, characters 0-52.
-       Hint: The kind of "immediate64" is "value non_pointer64".
+       Hint: The layout of immediate64 is value non_pointer64.
 |}]
 
 type ('a : value non_pointer64 maybe_null) accepts_nonptr64_val_maybe_null
@@ -201,7 +201,7 @@ Error: This type "t_immediate64" should be an instance of type
        But the layout of t_immediate64 must be a sublayout of
            value non_pointer maybe_null
          because of the definition of accepts_nonptr_val_maybe_null at line 1, characters 0-70.
-       Hint: The kind of "immediate64" is "value non_pointer64".
+       Hint: The layout of immediate64 is value non_pointer64.
 |}]
 type fails = t_immediate64_or_null accepts_nonptr_val_maybe_null
 [%%expect{|
@@ -244,7 +244,7 @@ Error: This type "string" should be an instance of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : float64) accepts_float64
@@ -259,7 +259,7 @@ Error: This type "t_nonptr_val" should be an instance of type "('a : float64)"
          because of the definition of t_nonptr_val at line 2, characters 0-37.
        But the layout of t_nonptr_val must be a sublayout of float64
          because of the definition of accepts_float64 at line 1, characters 0-35.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type succeeds = #(t_nonptr * t_maybeptr) accepts_maybeptr
@@ -308,7 +308,7 @@ Error: The layout of type "fails" is value maybe_separable
          because it is an unboxed record.
        But the layout of type "fails" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type fails.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 type succeeds : value non_pointer = #{ a : t_nonptr_val }
 [%%expect{|
@@ -403,7 +403,7 @@ Error: This expression has type "a2" but an expression was expected of type
          because of the annotation on the abstract type declaration for a2.
        But the layout of a2 must be a sublayout of value non_pointer
          because of the definition of cant_promote_snd at line 4, characters 23-64.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 let f () =
@@ -449,7 +449,7 @@ Error: This expression has type "a or_null"
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be a sublayout of value non_pointer
          because of the definition of g at line 3, characters 10-51.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 
@@ -511,7 +511,7 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-29.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t at line 4, characters 2-39.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 module FailingTypeDecl : sig
@@ -537,7 +537,7 @@ Error: Signature mismatch:
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-53.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 external[@layout_poly] id : ('a : any non_pointer). 'a -> 'a = "%identity"

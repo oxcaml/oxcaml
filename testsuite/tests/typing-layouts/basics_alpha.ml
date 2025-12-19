@@ -239,7 +239,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of imm_id at line 1, characters 0-33.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 let id_for_imms (x : 'a imm_id) = x
@@ -263,7 +263,7 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of id_for_imms at line 1, characters 16-35.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (************************************)
@@ -280,7 +280,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 type s4 = string t4
@@ -295,7 +295,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type s4 = int t4
@@ -329,7 +329,7 @@ Error:
          because it is the primitive type string.
        But the layout of s5 must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : any) t4 = 'a
@@ -388,7 +388,7 @@ Error: This type "int" should be an instance of type "('a : void)"
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
          because of the definition of void5 at line 1, characters 0-37.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 let h5' (x : int) = Void5 x
@@ -402,7 +402,7 @@ Error: This expression has type "int" but an expression was expected of type
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
          because of the definition of void5 at line 1, characters 0-37.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 (* disallowed - tries to return void *)
@@ -440,7 +440,7 @@ Error: This definition has type "'b -> unit" which is less general than
          because it is or unifies with an unannotated universal variable.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t6_imm at line 1, characters 0-42.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 let o6 = object
@@ -457,7 +457,7 @@ Error: This method has type "'b -> unit" which is less general than
          because it is or unifies with an unannotated universal variable.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t6_imm at line 1, characters 0-42.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 (* CR layouts v1.5: add more tests here once you can annotate these types with
@@ -480,7 +480,7 @@ Error: This type "int * int" should be an instance of type "('a : immediate)"
          because it's a tuple type.
        But the layout of int * int must be a sublayout of value non_pointer
          because of the definition of t7 at line 1, characters 0-37.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (**********************************************************)
@@ -741,7 +741,7 @@ Error: Signature mismatch:
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of x at line 8, characters 10-26.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}];;
 
 (* This hits the second linktype in moregen (requires expansion to see it's a
@@ -783,7 +783,7 @@ Error: Signature mismatch:
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of x at line 8, characters 10-26.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (**************************************************************)
@@ -1738,7 +1738,7 @@ Error:
          because it's a function type.
        But the layout of 'a -> 'b must be a sublayout of value non_pointer
          because of the definition of t35 at line 1, characters 0-30.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (**************************************************)

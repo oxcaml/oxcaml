@@ -45,7 +45,7 @@ Error: This type "t_immediate_or_null" should be an instance of type
        But the layout of t_immediate_or_null must be a sublayout of
            value non_pointer
          because of the definition of accept_immediate at line 1, characters 0-38.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : value) accept_value
@@ -182,7 +182,7 @@ Error: This type "t_immediate64_or_null" should be an instance of type
        But the layout of t_immediate64_or_null must be a sublayout of
            value non_pointer64
          because of the definition of accept_immediate64 at line 1, characters 0-42.
-       Hint: The kind of "immediate64" is "value non_pointer64".
+       Hint: The layout of immediate64 is value non_pointer64.
 |}]
 
 type should_fail = t_immediate64_or_null accept_immediate
@@ -197,7 +197,7 @@ Error: This type "t_immediate64_or_null" should be an instance of type
        But the layout of t_immediate64_or_null must be a sublayout of
            value non_pointer
          because of the definition of accept_immediate at line 1, characters 0-38.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type should_fail = t_immediate64_or_null accept_value

@@ -458,7 +458,7 @@ Error: The layout of type "r#" is value non_pointer & value non_pointer
        But the layout of type "r#" must be a sublayout of
            value maybe_separable maybe_null & float64
          because it is an unboxed record.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 (* CR layouts-scannable: improve this error message *)
@@ -474,7 +474,7 @@ Error: The layout of type "r#" is value non_pointer & value non_pointer
        But the layout of type "r#" must be a sublayout of
            value maybe_separable maybe_null & float64
          because it is an unboxed record.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 module rec M : sig

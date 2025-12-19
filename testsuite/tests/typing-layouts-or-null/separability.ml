@@ -734,7 +734,7 @@ Error: The type constraints are not consistent.
          because of the definition of b at line 1, characters 0-51.
        But the layout of b must be a sublayout of value & value & float64
          because of the annotation on 'b in the declaration of the type fails.
-       Hint: The kind of "immediate" is "value non_pointer".
+       Hint: The layout of immediate is value non_pointer.
 |}]
 
 type c = #( float * float or_null * float# )
