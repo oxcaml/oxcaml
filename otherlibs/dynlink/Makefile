@@ -143,13 +143,7 @@ COMPILERLIBS_SOURCES=\
   typing/typedtree.ml \
   typing/ikinds/global_counters.ml \
   typing/ikinds/product_lattice.ml \
-  typing/ikinds/ldd_memo.ml \
-  typing/ikinds/ldd_cached_down0.ml \
   typing/ikinds/ldd.ml \
-  typing/ikinds/ldd_no_memo.ml \
-  typing/ikinds/ldd_unboxed.ml \
-  typing/ikinds/ldd_no_fast_path.ml \
-  typing/ikinds/ldd_leaf_specialized.ml \
   typing/ikinds/axis_lattice.ml \
   typing/ikinds/axis_lattice_conv.ml \
   typing/ikinds/axis_lattice_array.ml \

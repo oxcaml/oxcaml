@@ -250,20 +250,11 @@
   typemode
   jkind_axis
   ;; IKINDS
-  global_counters
   product_lattice
-  ldd_memo
-  ldd_cached_down0
   ldd_hybrid_opt
   ldd
-  ldd_no_memo
-  ldd_unboxed
-  ldd_no_fast_path
-  ldd_leaf_specialized
   axis_lattice
   axis_lattice_conv
-  axis_lattice_array
-  axis_lattice_array_conv
   ikind
   ikinds
   typetexp

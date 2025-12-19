@@ -131,20 +131,11 @@
   typemode
  jkind
   ;; IKINDS
-  global_counters
   product_lattice
-  ldd_memo
-  ldd_cached_down0
   ldd_hybrid_opt
   ldd
-  ldd_no_memo
-  ldd_unboxed
-  ldd_no_fast_path
-  ldd_leaf_specialized
   axis_lattice
   axis_lattice_conv
-  axis_lattice_array
-  axis_lattice_array_conv
   ikind
   ikinds
   value_rec_types
@@ -655,19 +646,10 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Global_counters.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Product_lattice.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice_conv.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice_array.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice_array_conv.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_memo.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_cached_down0.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_no_memo.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_unboxed.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_no_fast_path.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_leaf_specialized.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikinds.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Subst.cmo
@@ -770,19 +752,10 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Global_counters.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Product_lattice.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice_conv.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice_array.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice_array_conv.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_memo.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_cached_down0.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_no_memo.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_unboxed.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_no_fast_path.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_leaf_specialized.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikinds.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Subst.cmx
