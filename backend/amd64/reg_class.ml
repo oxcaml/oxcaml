@@ -1,6 +1,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 type save_simd_regs =
+  | Save_none
   | Save_xmm
   | Save_ymm
   | Save_zmm
@@ -65,8 +66,8 @@ module T = struct
     | Val | Int | Addr -> GPR
     | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2 -> SIMD
 
-  let gc_regs_offset ~(simd : save_simd_regs option)
-      (typ : Cmm.machtype_component) (reg_index : int) =
+  let gc_regs_offset ~(simd : save_simd_regs) (typ : Cmm.machtype_component)
+        (reg_index : int) =
     (* Given register with type [typ] and index [reg_index], return the offset
        (the number of [value] slots, not their size in bytes) of the register
        from the [gc_regs] pointer during GC at runtime. Keep in sync with
@@ -78,10 +79,11 @@ module T = struct
     | SIMD ->
       let slot_size_in_vals =
         match simd with
-        | None -> 0
-        | Some Save_xmm -> 2
-        | Some Save_ymm -> 4
-        | Some Save_zmm -> 8
+        | Save_none ->
+          Misc.fatal_error "reg_class=SIMD, but no simd regs are live"
+        | Save_xmm -> 2
+        | Save_ymm -> 4
+        | Save_zmm -> 8
       in
       if Config.runtime5
       then
@@ -95,9 +97,10 @@ module T = struct
         (* simd slots are below [gc_regs] pointer *)
         let num_simd_slots =
           match simd with
-          | None -> 0
-          | Some Save_xmm | Some Save_ymm -> 16
-          | Some Save_zmm -> 32
+          | Save_none ->
+            Misc.fatal_error "reg_class=SIMD, but no simd regs are live"
+          | Save_xmm | Save_ymm -> 16
+          | Save_zmm -> 32
         in
         let offset = Int.neg (num_simd_slots * slot_size_in_vals) in
         offset + (index * slot_size_in_vals)

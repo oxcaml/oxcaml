@@ -13,9 +13,9 @@ include Reg_class_utils.T with type t := t
 module Tbl : Reg_class_utils.Tbl with type reg_class = t
 
 type save_simd_regs =
+  | Save_none
   | Save_xmm
   | Save_ymm
   | Save_zmm
 
-val gc_regs_offset :
-  simd:save_simd_regs option -> Cmm.machtype_component -> int -> int
+val gc_regs_offset : simd:save_simd_regs -> Cmm.machtype_component -> int -> int
