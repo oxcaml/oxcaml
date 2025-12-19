@@ -185,7 +185,8 @@ module Make (V : ORDERED) = struct
       let vb = node_v other in
       let blo = node_lo other in
       let bhi = node_hi other in
-      node_raw vb (join_with_left_leaf leaf_a blo)
+      node_raw vb
+        (join_with_left_leaf leaf_a blo)
         (canonicalize_right_leaf bhi leaf_a)
 
   let rec meet (a : node) (b : node) =
@@ -216,8 +217,7 @@ module Make (V : ORDERED) = struct
       let vb = node_v other in
       let blo = node_lo other in
       let bhi = node_hi other in
-      node vb (meet_with_left_leaf leaf_a blo)
-        (meet_with_left_leaf leaf_a bhi)
+      node vb (meet_with_left_leaf leaf_a blo) (meet_with_left_leaf leaf_a bhi)
 
   (* --------- public constructors --------- *)
   let const (c : C.t) = leaf c
@@ -433,9 +433,7 @@ module Make (V : ORDERED) = struct
     let b = force b in
     let diff = sub_subsets a b |> force in
     let witness = round_up' diff in
-    match C.non_bot_axes witness with
-    | [] -> None
-    | axes -> Some axes
+    match C.non_bot_axes witness with [] -> None | axes -> Some axes
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let rec aux (n : node) : node =

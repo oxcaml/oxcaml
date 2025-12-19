@@ -44,8 +44,7 @@ module Make (V : ORDERED) = struct
 
     let make state =
       match state with
-      | Rigid _ ->
-        { id = 0; state }
+      | Rigid _ -> { id = 0; state }
       | _ ->
         incr var_id;
         { id = !var_id; state }
@@ -53,18 +52,18 @@ module Make (V : ORDERED) = struct
     let make_var () = make Unsolved
 
     let make_rigid ~name () =
-      if V.compare name name <> 0
-      then make (Rigid name)
-      else make (Rigid name)
+      if V.compare name name <> 0 then make (Rigid name) else make (Rigid name)
   end
 
   let compare_var (a : var) (b : var) : int =
-    if a == b then 0 else
-    match a.state, b.state with
-    | Rigid na, Rigid nb -> V.compare na nb
-    | Rigid _, _ -> 1
-    | _, Rigid _ -> -1
-    | _ -> Int.compare a.id b.id
+    if a == b
+    then 0
+    else
+      match a.state, b.state with
+      | Rigid na, Rigid nb -> V.compare na nb
+      | Rigid _, _ -> 1
+      | _, Rigid _ -> -1
+      | _ -> Int.compare a.id b.id
 
   (* --------- node helpers --------- *)
   let[@inline] is_leaf (n : node) : bool = Obj.is_int n
@@ -82,8 +81,7 @@ module Make (V : ORDERED) = struct
   let[@inline] node_down0 (n : node) : C.t = (node_block n).down0
 
   let[@inline] make_node (v : var) (lo : node) (hi : node) : node =
-    let down0 = if is_leaf lo then leaf_value lo else node_down0 lo
-    in
+    let down0 = if is_leaf lo then leaf_value lo else node_down0 lo in
     Obj.repr ({ v; lo; hi; down0 } : node_block)
 
   let[@inline] leaf (c : C.t) : node = Obj.repr c
@@ -115,16 +113,16 @@ module Make (V : ORDERED) = struct
       let llo = node_lo l in
       let lhi = node_hi l in
       let cmp = compare_var vh vl in
-      if cmp = 0 then
+      if cmp = 0
+      then
         let lo' = canonicalize hlo llo in
         let hi' = canonicalize (canonicalize hhi lhi) llo in
-        if hlo == lo' && hhi == hi' then h else
-        node_raw vh lo' hi'
-      else if cmp < 0 then
+        if hlo == lo' && hhi == hi' then h else node_raw vh lo' hi'
+      else if cmp < 0
+      then
         let lo' = canonicalize hlo l in
         let hi' = canonicalize hhi l in
-        if hlo == lo' && hhi == hi' then h else
-        node_raw vh lo' hi'
+        if hlo == lo' && hhi == hi' then h else node_raw vh lo' hi'
       else canonicalize h llo
 
   and canonicalize_right_leaf (h : node) (leaf_l : node) : node =
@@ -140,13 +138,10 @@ module Make (V : ORDERED) = struct
       let hhi = node_hi h in
       let lo' = canonicalize_right_leaf_aux hlo leaf_l in
       let hi' = canonicalize_right_leaf_aux hhi leaf_l in
-      if hlo == lo' && hhi == hi' then h else
-      node_raw vh lo' hi'
+      if hlo == lo' && hhi == hi' then h else node_raw vh lo' hi'
 
   let node (v : var) (lo : node) (hi : node) : node =
-    let hi' =
-      canonicalize hi lo
-    in
+    let hi' = canonicalize hi lo in
     node_raw v lo hi'
 
   (* --------- boolean algebra over nodes (no memoization) --------- *)
@@ -163,17 +158,20 @@ module Make (V : ORDERED) = struct
       let blo = node_lo b in
       let bhi = node_hi b in
       let cmp = compare_var va vb in
-      if cmp = 0 then
+      if cmp = 0
+      then
         node_raw va (join alo blo)
           (join (canonicalize ahi blo) (canonicalize bhi alo))
-      else if cmp < 0 then node_raw va (join alo b) (canonicalize ahi b)
+      else if cmp < 0
+      then node_raw va (join alo b) (canonicalize ahi b)
       else node_raw vb (join a blo) (canonicalize bhi a)
 
   and join_with_leaf (leaf_a : node) (other : node) =
     let leaf_val = leaf_value leaf_a in
     (* Fast path *)
-    if C.leq leaf_val (down0 other) then other else
-    join_with_leaf_aux leaf_val other
+    if C.leq leaf_val (down0 other)
+    then other
+    else join_with_leaf_aux leaf_val other
 
   and join_with_leaf_aux (leaf_a : C.t) (other : node) =
     if is_leaf other
@@ -184,8 +182,7 @@ module Make (V : ORDERED) = struct
       let bhi = node_hi other in
       let lo' = join_with_leaf_aux leaf_a blo in
       let hi' = canonicalize_right_leaf_aux bhi leaf_a in
-      if lo' == blo && hi' == bhi then other else
-      node_raw vb lo' hi'
+      if lo' == blo && hi' == bhi then other else node_raw vb lo' hi'
 
   let rec meet (a : node) (b : node) =
     if is_leaf a
@@ -200,11 +197,13 @@ module Make (V : ORDERED) = struct
       let blo = node_lo b in
       let bhi = node_hi b in
       let cmp = compare_var va vb in
-      if cmp = 0 then
+      if cmp = 0
+      then
         let lo = meet alo blo in
         let hi = meet (join ahi alo) (join bhi blo) in
         node va lo hi
-      else if cmp < 0 then node va (meet alo b) (meet ahi b)
+      else if cmp < 0
+      then node va (meet alo b) (meet ahi b)
       else node vb (meet a blo) (meet a bhi)
 
   and meet_with_leaf (leaf_a : node) (other : node) =
@@ -220,8 +219,7 @@ module Make (V : ORDERED) = struct
       let bhi = node_hi other in
       let lo' = meet_with_leaf_aux leaf_a blo in
       let hi' = meet_with_leaf_aux leaf_a bhi in
-      if lo' == blo && hi' == bhi then other else
-      node vb lo' hi'
+      if lo' == blo && hi' == bhi then other else node vb lo' hi'
 
   (* --------- public constructors --------- *)
   let[@inline] const (c : C.t) = leaf c
@@ -239,13 +237,14 @@ module Make (V : ORDERED) = struct
     else
       let n = node_block w in
       let cmp = compare_var x n.v in
-      if cmp < 0 then w
-      else if cmp = 0 then n.lo
+      if cmp < 0
+      then w
+      else if cmp = 0
+      then n.lo
       else
         let lo' = restrict0 x n.lo in
         let hi' = restrict0 x n.hi in
-        if lo' == n.lo && hi' == n.hi then w else
-        node n.v lo' hi'
+        if lo' == n.lo && hi' == n.hi then w else node n.v lo' hi'
 
   let rec restrict1 (x : var) (w : node) : node =
     if is_leaf w
@@ -253,13 +252,14 @@ module Make (V : ORDERED) = struct
     else
       let n = node_block w in
       let cmp = compare_var x n.v in
-      if cmp < 0 then w
-      else if cmp = 0 then join n.lo n.hi
+      if cmp < 0
+      then w
+      else if cmp = 0
+      then join n.lo n.hi
       else
         let lo' = restrict1 x n.lo in
         let hi' = restrict1 x n.hi in
-        if lo' == n.lo && hi' == n.hi then w else
-        node n.v lo' hi'
+        if lo' == n.lo && hi' == n.hi then w else node n.v lo' hi'
 
   (* --------- force (no memoization) --------- *)
   let rec force (w : node) : node =
@@ -288,25 +288,31 @@ module Make (V : ORDERED) = struct
 
   (* This function is equivalent to `restrict0 x (force w)` *)
   let rec restrict0_force (x : var) (w : node) : node =
-    if is_leaf w then w else
-    let n = node_block w in
-    match n.v.state with
-    | Solved d ->
-      let lo' = restrict0_force x n.lo in
-      let hi' = restrict0_force x n.hi in
-      (* let d' = restrict0_force x d in *)
-      let d_forced = force d in
-      n.v.state <- Solved d_forced;
-      let d' = restrict0 x d_forced in
-      join lo' (meet hi' d')
-    | Unsolved ->
-      let lo' = restrict0_force x n.lo in
-      if compare_var n.v x = 0 then lo' else
-      let hi' = restrict0_force x n.hi in
-      if lo' == n.lo && hi' == n.hi then w else
-      let d' = mk_var n.v in
-      join lo' (meet hi' d')
-    | Rigid _ -> w
+    if is_leaf w
+    then w
+    else
+      let n = node_block w in
+      match n.v.state with
+      | Solved d ->
+        let lo' = restrict0_force x n.lo in
+        let hi' = restrict0_force x n.hi in
+        (* let d' = restrict0_force x d in *)
+        let d_forced = force d in
+        n.v.state <- Solved d_forced;
+        let d' = restrict0 x d_forced in
+        join lo' (meet hi' d')
+      | Unsolved ->
+        let lo' = restrict0_force x n.lo in
+        if compare_var n.v x = 0
+        then lo'
+        else
+          let hi' = restrict0_force x n.hi in
+          if lo' == n.lo && hi' == n.hi
+          then w
+          else
+            let d' = mk_var n.v in
+            join lo' (meet hi' d')
+      | Rigid _ -> w
 
   let sub_subsets (a : node) (b : node) =
     let a = force a in
@@ -321,7 +327,7 @@ module Make (V : ORDERED) = struct
     | Solved _ -> invalid_arg "solve_lfp: solved variable"
     | Unsolved ->
       (* let rhs_forced = force rhs_raw in
-      var.state <- Solved (restrict0 var rhs_forced) *)
+         var.state <- Solved (restrict0 var rhs_forced) *)
       var.state <- Solved (restrict0_force var rhs_raw)
 
   let solve_gfp (var : var) (rhs_raw : node) : unit =
@@ -470,9 +476,7 @@ module Make (V : ORDERED) = struct
     let b = force b in
     let diff = sub_subsets a b in
     let witness = round_up' diff in
-    match C.non_bot_axes witness with
-    | [] -> None
-    | axes -> Some axes
+    match C.non_bot_axes witness with [] -> None | axes -> Some axes
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let rec aux (n : node) : node =

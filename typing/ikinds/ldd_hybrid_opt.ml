@@ -39,9 +39,7 @@ module Make (V : ORDERED) = struct
   let compare_var_full (a : var) (b : var) : int =
     match a.state, b.state with
     | Rigid na, Rigid nb -> V.compare na nb
-    | _ ->
-        invalid_arg
-          "compare_var: unexpected id collision on non-rigid vars"
+    | _ -> invalid_arg "compare_var: unexpected id collision on non-rigid vars"
 
   let[@inline] compare_var (a : var) (b : var) : int =
     if a == b
@@ -114,25 +112,25 @@ module Make (V : ORDERED) = struct
       let id = rigid_id name in
       match Hashtbl.find_opt rigid_tbl id with
       | None ->
+        let v = { id; state = Rigid name; var_node = bot } in
+        v.var_node <- node_raw v bot top;
+        Hashtbl.add rigid_tbl id [v];
+        v
+      | Some vars -> (
+        match
+          List.find_opt
+            (fun (v : t) ->
+              match v.state with
+              | Rigid name' -> name == name' || V.compare name name' = 0
+              | Unsolved | Solved _ -> false)
+            vars
+        with
+        | Some v -> v
+        | None ->
           let v = { id; state = Rigid name; var_node = bot } in
           v.var_node <- node_raw v bot top;
-          Hashtbl.add rigid_tbl id [v];
-          v
-      | Some vars -> (
-          match
-            List.find_opt
-              (fun (v : t) ->
-                match v.state with
-                | Rigid name' -> name == name' || V.compare name name' = 0
-                | Unsolved | Solved _ -> false)
-              vars
-          with
-          | Some v -> v
-          | None ->
-              let v = { id; state = Rigid name; var_node = bot } in
-              v.var_node <- node_raw v bot top;
-              Hashtbl.replace rigid_tbl id (v :: vars);
-              v)
+          Hashtbl.replace rigid_tbl id (v :: vars);
+          v)
   end
 
   (* Subtract subsets h - l (no memoization). *)
@@ -155,9 +153,7 @@ module Make (V : ORDERED) = struct
       if cmp = 0
       then
         let lo' = canonicalize hb.lo lb.lo in
-        let hi1 =
-          if lb.hi == bot then hb.hi else canonicalize hb.hi lb.hi
-        in
+        let hi1 = if lb.hi == bot then hb.hi else canonicalize hb.hi lb.hi in
         let hi' = if lb.lo == bot then hi1 else canonicalize hi1 lb.lo in
         if hb.lo == lo' && hb.hi == hi' then h else node_raw hb.v lo' hi'
       else if cmp < 0
@@ -169,8 +165,7 @@ module Make (V : ORDERED) = struct
 
   and canonicalize_right_leaf (h : node) (leaf_l : node) : node =
     let leaf_val = leaf_value leaf_l in
-    if C.equal leaf_val C.bot then h
-    else canonicalize_right_leaf_aux h leaf_val
+    if C.equal leaf_val C.bot then h else canonicalize_right_leaf_aux h leaf_val
 
   and canonicalize_right_leaf_aux (h : node) (leaf_l : C.t) : node =
     if is_leaf h
@@ -208,9 +203,9 @@ module Make (V : ORDERED) = struct
     let leaf_val = leaf_value leaf_a in
     if C.equal leaf_val C.top
     then top
-    else
-    (* Fast path *)
-    if C.leq leaf_val (down0 other) then other
+    else if (* Fast path *)
+            C.leq leaf_val (down0 other)
+    then other
     else join_with_leaf_aux leaf_val other
 
   and join_with_leaf_aux (leaf_a : C.t) (other : node) =
@@ -312,50 +307,49 @@ module Make (V : ORDERED) = struct
         let hi' = force n.hi in
         match n.v.state with
         | Solved d ->
-            let d' = force d in
-            n.v.state <- Solved d';
-            join lo' (meet hi' d')
+          let d' = force d in
+          n.v.state <- Solved d';
+          join lo' (meet hi' d')
         | Unsolved ->
-            if lo' == n.lo && hi' == n.hi
-            then w
-            else
-              let d' = mk_var n.v in
-              join lo' (meet hi' d')
+          if lo' == n.lo && hi' == n.hi
+          then w
+          else
+            let d' = mk_var n.v in
+            join lo' (meet hi' d')
         | Rigid _ -> failwith "force: rigid variable shouldn't be here"
 
   and var (v : var) = mk_var v
 
   (* This function is equivalent to `restrict0 x (force w)` *)
   let rec restrict0_force (x : var) (w : node) : node =
-    if x.id > Var.rigid_var_start then restrict0 x (force w)
-    else
-    if is_leaf w
+    if x.id > Var.rigid_var_start
+    then restrict0 x (force w)
+    else if is_leaf w
     then w
     else
       let n = node_block w in
       match n.v.state with
       | Solved d ->
-          let lo' = restrict0_force x n.lo in
-          let hi' = restrict0_force x n.hi in
-          let d_forced = force d in
-          n.v.state <- Solved d_forced;
-          let d' = restrict0 x d_forced in
-          join lo' (meet hi' d')
+        let lo' = restrict0_force x n.lo in
+        let hi' = restrict0_force x n.hi in
+        let d_forced = force d in
+        n.v.state <- Solved d_forced;
+        let d' = restrict0 x d_forced in
+        join lo' (meet hi' d')
       | Unsolved ->
-          let lo' = restrict0_force x n.lo in
-          if compare_var n.v x = 0
-          then lo'
+        let lo' = restrict0_force x n.lo in
+        if compare_var n.v x = 0
+        then lo'
+        else
+          let hi' = restrict0_force x n.hi in
+          if lo' == n.lo && hi' == n.hi
+          then w
           else
-            let hi' = restrict0_force x n.hi in
-            if lo' == n.lo && hi' == n.hi
-            then w
-            else
-              let d' = mk_var n.v in
-              join lo' (meet hi' d')
+            let d' = mk_var n.v in
+            join lo' (meet hi' d')
       | Rigid _ -> w
 
-  let sub_subsets (a : node) (b : node) =
-    canonicalize (force a) (force b)
+  let sub_subsets (a : node) (b : node) = canonicalize (force a) (force b)
 
   let sub_subsets_forced (a : node) (b : node) : node = canonicalize a b
 
@@ -372,8 +366,8 @@ module Make (V : ORDERED) = struct
     | Rigid _ -> invalid_arg "solve_gfp: rigid variable"
     | Solved _ -> invalid_arg "solve_gfp: solved variable"
     | Unsolved ->
-        let rhs_forced = force rhs_raw in
-        var.state <- Solved (restrict1 var rhs_forced)
+      let rhs_forced = force rhs_raw in
+      var.state <- Solved (restrict1 var rhs_forced)
 
   let lfp_queue = Stack.create ()
 
@@ -408,7 +402,7 @@ module Make (V : ORDERED) = struct
       match vs with
       | [] -> m, ns
       | v :: vs' ->
-          go vs' (restrict0 v m) (restrict1 v m :: List.map (restrict0 v) ns)
+        go vs' (restrict0 v m) (restrict1 v m :: List.map (restrict0 v) ns)
     in
     let base, linears = go universe (force n) [] in
     base, List.rev linears
@@ -464,8 +458,7 @@ module Make (V : ORDERED) = struct
         match v.state with
         | Rigid name -> V.to_string name
         | Unsolved -> "<unsolved-var:" ^ string_of_int v.id ^ ">"
-        | Solved _ ->
-            failwith "solved vars should not appear after force")
+        | Solved _ -> failwith "solved vars should not appear after force")
       w
 
   let pp (w : node) : string =
@@ -493,8 +486,7 @@ module Make (V : ORDERED) = struct
         | [], true -> "⊤", false
         | [], false -> pp_coeff c, false
         | _ :: _, true -> String.concat " ⊓ " vs, List.length vs > 1
-        | _ :: _, false ->
-            pp_coeff c ^ " ⊓ " ^ String.concat " ⊓ " vs, true
+        | _ :: _, false -> pp_coeff c ^ " ⊓ " ^ String.concat " ⊓ " vs, true
       in
       let items =
         terms
@@ -515,9 +507,7 @@ module Make (V : ORDERED) = struct
     let b = force b in
     let diff = sub_subsets_forced a b in
     let witness = round_up' diff in
-    match C.non_bot_axes witness with
-    | [] -> None
-    | axes -> Some axes
+    match C.non_bot_axes witness with [] -> None | axes -> Some axes
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let rec aux (n : node) : node =
@@ -530,20 +520,20 @@ module Make (V : ORDERED) = struct
         let hi = nb.hi in
         match v.state with
         | Rigid name ->
-            let lo' = aux lo in
-            let hi' = aux hi in
-            let replacement = f name in
-            join lo' (meet hi' replacement)
+          let lo' = aux lo in
+          let hi' = aux hi in
+          let replacement = f name in
+          join lo' (meet hi' replacement)
         | Unsolved ->
-            let lo' = aux lo in
-            let hi' = aux hi in
-            if lo' == lo && hi' == hi
-            then n
-            else
-              let var_node = mk_var v in
-              join lo' (meet hi' var_node)
+          let lo' = aux lo in
+          let hi' = aux hi in
+          if lo' == lo && hi' == hi
+          then n
+          else
+            let var_node = mk_var v in
+            join lo' (meet hi' var_node)
         | Solved _ ->
-            invalid_arg "map_rigid: solved vars should not appear after force"
+          invalid_arg "map_rigid: solved vars should not appear after force"
     in
     aux (force n)
 
@@ -570,10 +560,10 @@ module Make (V : ORDERED) = struct
       match NodeTbl.find_opt id_tbl n with
       | Some id -> id
       | None ->
-          let id = !next_id in
-          incr next_id;
-          NodeTbl.add id_tbl n id;
-          id
+        let id = !next_id in
+        incr next_id;
+        NodeTbl.add id_tbl n id;
+        id
     in
     let pp_var_info (v : var) : string =
       let state_s =

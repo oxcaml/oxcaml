@@ -145,9 +145,7 @@ module Levels = struct
     | Mode.Visibility.Const.Read_write -> 2
 
   let level_of_staticity_monadic (x : Mode.Staticity.const) : int =
-    match x with
-    | Mode.Staticity.Dynamic -> 0
-    | Mode.Staticity.Static -> 1
+    match x with Mode.Staticity.Dynamic -> 0 | Mode.Staticity.Static -> 1
 
   let level_of_externality (x : Jkind_axis.Externality.t) : int =
     match x with
@@ -239,10 +237,9 @@ module Levels = struct
     | _ -> invalid_arg "Axis_lattice_array.separability_of_level"
 end
 
-let const_of_levels
-    ~areality ~linearity ~uniqueness ~portability
-    ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity
-    ~externality ~nullability ~separability =
+let const_of_levels ~areality ~linearity ~uniqueness ~portability ~contention
+    ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality
+    ~nullability ~separability =
   let open Levels in
   encode
     ~levels:
@@ -263,85 +260,66 @@ let const_of_levels
 
 (* Lattice constant for non-float value base *)
 let nonfloat_value : t =
-  const_of_levels
-    ~areality:Mode.Regionality.Const.max
-    ~linearity:Mode.Linearity.Const.max
-    ~uniqueness:Mode.Uniqueness.Const.Unique
+  const_of_levels ~areality:Mode.Regionality.Const.max
+    ~linearity:Mode.Linearity.Const.max ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
-    ~forkable:Mode.Forkable.Const.max
-    ~yielding:Mode.Yielding.Const.max
+    ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static
-    ~externality:Jkind_axis.Externality.max
+    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
 
 (* Convenience constants matching JK builtins for record bases. *)
 
 let immutable_data : t =
-  const_of_levels
-    ~areality:Mode.Regionality.Const.max
-    ~linearity:Mode.Linearity.Const.min
-    ~uniqueness:Mode.Uniqueness.Const.Unique
+  const_of_levels ~areality:Mode.Regionality.Const.max
+    ~linearity:Mode.Linearity.Const.min ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Contended
-    ~forkable:Mode.Forkable.Const.max
-    ~yielding:Mode.Yielding.Const.min
+    ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
-    ~visibility:Mode.Visibility.Const.Immutable
-    ~staticity:Mode.Staticity.Static
+    ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
 
 let mutable_data : t =
-  const_of_levels
-    ~areality:Mode.Regionality.Const.max
-    ~linearity:Mode.Linearity.Const.min
-    ~uniqueness:Mode.Uniqueness.Const.Unique
+  const_of_levels ~areality:Mode.Regionality.Const.max
+    ~linearity:Mode.Linearity.Const.min ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Uncontended
-    ~forkable:Mode.Forkable.Const.max
-    ~yielding:Mode.Yielding.Const.min
+    ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static
-    ~externality:Jkind_axis.Externality.max
+    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
 
 (* Matches JK Builtin.value: boxed value, Non_null and Separable;
    no mode-crossing. *)
 let value : t =
-  const_of_levels
-    ~areality:Mode.Regionality.Const.max
-    ~linearity:Mode.Linearity.Const.max
-    ~uniqueness:Mode.Uniqueness.Const.Unique
+  const_of_levels ~areality:Mode.Regionality.Const.max
+    ~linearity:Mode.Linearity.Const.max ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
-    ~forkable:Mode.Forkable.Const.max
-    ~yielding:Mode.Yielding.Const.max
+    ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static
-    ~externality:Jkind_axis.Externality.max
+    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Separable
 
 let arrow : t =
-  const_of_levels
-    ~areality:Mode.Regionality.Const.max
+  const_of_levels ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.max
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Contended
-    ~forkable:Mode.Forkable.Const.max
-    ~yielding:Mode.Yielding.Const.max
+    ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
-    ~visibility:Mode.Visibility.Const.Immutable
-    ~staticity:Mode.Staticity.Static
+    ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -349,17 +327,14 @@ let arrow : t =
 (* A lattice constant matching JK Builtin.immediate (mode-crosses everything,
    with nullability Non_null and separability Non_float). *)
 let immediate : t =
-  const_of_levels
-    ~areality:Mode.Regionality.Const.min
+  const_of_levels ~areality:Mode.Regionality.Const.min
     ~linearity:Mode.Linearity.Const.min
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Contended
-    ~forkable:Mode.Forkable.Const.max
-    ~yielding:Mode.Yielding.Const.min
+    ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
-    ~visibility:Mode.Visibility.Const.Immutable
-    ~staticity:Mode.Staticity.Static
+    ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.min
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -371,18 +346,10 @@ let object_legacy : t =
         : Mode.Value.Comonadic.Const.t) =
     Mode.Value.Comonadic.Const.legacy
   in
-  const_of_levels
-    ~linearity
-    ~areality
-    ~uniqueness:Mode.Uniqueness.Const.Unique
-    ~portability
-    ~contention:Mode.Contention.Const.Uncontended
-    ~forkable
-    ~yielding
-    ~statefulness
-    ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static
-    ~externality:Jkind_axis.Externality.max
+  const_of_levels ~linearity ~areality ~uniqueness:Mode.Uniqueness.Const.Unique
+    ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
+    ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
 
@@ -399,8 +366,7 @@ let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
   | 6 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding))
   | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
   | 8 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility))
-  | 9 ->
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Staticity))
+  | 9 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Staticity))
   | 10 ->
     Jkind_axis.Axis.Pack
       (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)

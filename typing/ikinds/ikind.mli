@@ -9,17 +9,18 @@ module RigidName : sig
   type t =
     | Atom of
         { constr : constr;
-          (* arg_index = 0 refers to the base contribution, 
-            subsequent refer to the coefficients of the i-th argument. *)
-          arg_index : int 
+          (* arg_index = 0 refers to the base contribution,
+             subsequent refer to the coefficients of the i-th argument. *)
+          arg_index : int
         }
-    (* Param only occurs in the formula for a type constructor, 
+    (* Param only occurs in the formula for a type constructor,
        refers to the i-th parameter. *)
-    | Param of int 
-    (* An unknown quantity with a given id. Used to model not-best in ikinds. 
-       This is used when we couldn't compute a precise ikind, e.g. for a 
+    | Param of int
+    (* An unknown quantity with a given id. Used to model not-best in ikinds.
+       This is used when we couldn't compute a precise ikind, e.g. for a
        polymorphic variant with conjunctive type -- `Constr of (a & b & ...) *)
     | Unknown of int
+
   and constr = Path.t
 
   (* Ordering on rigid names used in the LDD to order the nodes. *)

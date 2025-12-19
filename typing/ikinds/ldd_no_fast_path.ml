@@ -415,9 +415,7 @@ module Make (V : ORDERED) = struct
     let b = force b in
     let diff = sub_subsets a b |> force in
     let witness = round_up' diff in
-    match C.non_bot_axes witness with
-    | [] -> None
-    | axes -> Some axes
+    match C.non_bot_axes witness with [] -> None | axes -> Some axes
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let rec aux (n : node) : node =

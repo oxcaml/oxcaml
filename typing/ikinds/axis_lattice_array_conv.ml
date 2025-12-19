@@ -5,17 +5,13 @@ let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
   let monadic =
     Monadic.create
       ~uniqueness:
-        (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_with uniqueness))
+        (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_with uniqueness))
       ~contention:
-        (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_with contention))
+        (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_with contention))
       ~visibility:
-        (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_with visibility))
+        (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_with visibility))
       ~staticity:
-        (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_with staticity))
+        (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_with staticity))
   in
   let comonadic =
     Comonadic.create
@@ -81,5 +77,4 @@ let to_mod_bounds (v : Axis_lattice_array.t) : Types.Jkind_mod_bounds.t =
     crossing_of_constants ~areality ~linearity ~uniqueness ~portability
       ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity
   in
-  Types.Jkind_mod_bounds.create crossing ~externality ~nullability
-    ~separability
+  Types.Jkind_mod_bounds.create crossing ~externality ~nullability ~separability

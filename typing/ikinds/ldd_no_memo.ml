@@ -13,6 +13,7 @@ end
 
 module Make (V : ORDERED) = struct
   module C = Axis_lattice
+
   (* --------- variables --------- *)
   type node =
     | Leaf of C.t
@@ -218,7 +219,7 @@ module Make (V : ORDERED) = struct
   let rec force (w : node) : node =
     match w with
     | Leaf _ -> w
-    | Node n ->
+    | Node n -> (
       if n.v.id > Var.rigid_var_start
       then w
       else
@@ -233,7 +234,7 @@ module Make (V : ORDERED) = struct
           else
             let d' = force (mk_var n.v) in
             join lo' (meet hi' d')
-        | Rigid _ -> failwith "force: rigid variable shouldn't be here"
+        | Rigid _ -> failwith "force: rigid variable shouldn't be here")
 
   and var (v : var) = mk_var v
 
@@ -400,9 +401,7 @@ module Make (V : ORDERED) = struct
     let b = force b in
     let diff = sub_subsets a b |> force in
     let witness = round_up' diff in
-    match C.non_bot_axes witness with
-    | [] -> None
-    | axes -> Some axes
+    match C.non_bot_axes witness with [] -> None | axes -> Some axes
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let rec aux (n : node) : node =

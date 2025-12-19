@@ -127,27 +127,26 @@ module Make (V : ORDERED) = struct
     then h
     else if is_top_node l
     then bot
+    else if is_leaf h
+    then leaf (C.co_sub (leaf_value h) (down0 l))
     else
-      if is_leaf h
-      then leaf (C.co_sub (leaf_value h) (down0 l))
+      let vh = node_v h in
+      let hlo = node_lo h in
+      let hhi = node_hi h in
+      if is_leaf l
+      then node_raw vh (canonicalize hlo l) (canonicalize hhi l)
       else
-        let vh = node_v h in
-        let hlo = node_lo h in
-        let hhi = node_hi h in
-        if is_leaf l
+        let vl = node_v l in
+        let llo = node_lo l in
+        let lhi = node_hi l in
+        if vh.id = vl.id
+        then
+          let lo' = canonicalize hlo llo in
+          let hi' = canonicalize (canonicalize hhi lhi) llo in
+          node_raw vh lo' hi'
+        else if vh.id < vl.id
         then node_raw vh (canonicalize hlo l) (canonicalize hhi l)
-        else
-          let vl = node_v l in
-          let llo = node_lo l in
-          let lhi = node_hi l in
-          if vh.id = vl.id
-          then
-            let lo' = canonicalize hlo llo in
-            let hi' = canonicalize (canonicalize hhi lhi) llo in
-            node_raw vh lo' hi'
-          else if vh.id < vl.id
-          then node_raw vh (canonicalize hlo l) (canonicalize hhi l)
-          else canonicalize h llo
+        else canonicalize h llo
 
   let node (v : var) (lo : node) (hi : node) : node =
     let hi' = canonicalize hi lo in
@@ -449,9 +448,7 @@ module Make (V : ORDERED) = struct
     let b = force b in
     let diff = sub_subsets a b |> force in
     let witness = round_up' diff in
-    match C.non_bot_axes witness with
-    | [] -> None
-    | axes -> Some axes
+    match C.non_bot_axes witness with [] -> None | axes -> Some axes
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let rec aux (n : node) : node =
