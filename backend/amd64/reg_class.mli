@@ -12,10 +12,19 @@ include Reg_class_utils.T with type t := t
 
 module Tbl : Reg_class_utils.Tbl with type reg_class = t
 
-type save_simd_regs =
-  | Save_none
-  | Save_xmm
-  | Save_ymm
-  | Save_zmm
+module Save_simd_regs : sig
+  type t =
+    | Save_none
+    | Save_xmm
+    | Save_ymm
+    | Save_zmm
 
-val gc_regs_offset : simd:save_simd_regs -> Cmm.machtype_component -> int -> int
+  val all : t list
+
+  val extension_name : t -> string option
+
+  val symbol_suffix : t -> string
+end
+
+val gc_regs_offset :
+  simd:Save_simd_regs.t -> Cmm.machtype_component -> int -> int

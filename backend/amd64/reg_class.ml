@@ -1,10 +1,23 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
-type save_simd_regs =
-  | Save_none
-  | Save_xmm
-  | Save_ymm
-  | Save_zmm
+module Save_simd_regs = struct
+  type t =
+    | Save_none
+    | Save_xmm
+    | Save_ymm
+    | Save_zmm
+
+  let all = [Save_none; Save_xmm; Save_ymm; Save_zmm]
+
+  let extension_name : t -> string option = function
+    | Save_none -> None
+    | Save_xmm -> Some "sse"
+    | Save_ymm -> Some "avx"
+    | Save_zmm -> Some "avx512"
+
+  let symbol_suffix t =
+    match extension_name t with None -> "" | Some ext -> "_" ^ ext
+end
 
 module T = struct
   type t =
@@ -66,8 +79,8 @@ module T = struct
     | Val | Int | Addr -> GPR
     | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2 -> SIMD
 
-  let gc_regs_offset ~(simd : save_simd_regs) (typ : Cmm.machtype_component)
-        (reg_index : int) =
+  let gc_regs_offset ~(simd : Save_simd_regs.t) (typ : Cmm.machtype_component)
+      (reg_index : int) =
     (* Given register with type [typ] and index [reg_index], return the offset
        (the number of [value] slots, not their size in bytes) of the register
        from the [gc_regs] pointer during GC at runtime. Keep in sync with
