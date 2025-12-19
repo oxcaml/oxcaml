@@ -1641,7 +1641,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
           in
           ty, mode
       end
-  | Tpat_constant _ | Tpat_unboxed_unit
+  | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
@@ -2714,6 +2714,7 @@ let rec has_literal_pattern p =
      true
   | Ppat_any
   | Ppat_unboxed_unit
+  | Ppat_unboxed_bool _
   | Ppat_variant (_, None)
   | Ppat_construct (_, None)
   | Ppat_type _
@@ -3118,6 +3119,15 @@ and type_pat_aux
         pat_desc = Tpat_unboxed_unit;
         pat_loc = loc; pat_extra=[];
         pat_type = instance Predef.type_unboxed_unit;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
+  | Ppat_unboxed_bool b ->
+      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
+      rvp @@ solve_expected {
+        pat_desc = Tpat_unboxed_bool b;
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance Predef.type_unboxed_bool;
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
@@ -3602,7 +3612,7 @@ let rec pat_tuple_arity spat =
   | Ppat_unboxed_tuple (args,_c) ->
       Local_tuple (List.map (fun (_, {ppat_loc; _}) -> ppat_loc) args)
   | Ppat_any | Ppat_exception _ | Ppat_var _ -> Maybe_local_tuple
-  | Ppat_constant _ | Ppat_unboxed_unit
+  | Ppat_constant _ | Ppat_unboxed_unit | Ppat_unboxed_bool _
   | Ppat_interval _ | Ppat_construct _ | Ppat_variant _
   | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _ | Ppat_type _
   | Ppat_lazy _ | Ppat_unpack _ | Ppat_extension _ -> Not_local_tuple
@@ -3839,6 +3849,11 @@ let rec check_counter_example_pat
       k @@
       solve_expected
         (mp Tpat_unboxed_unit ~pat_type:(instance Predef.type_unboxed_unit))
+  | Tpat_unboxed_bool b ->
+      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
+      k @@
+      solve_expected
+        (mp (Tpat_unboxed_bool b) ~pat_type:(instance Predef.type_unboxed_bool))
   | Tpat_constant cst ->
       let cst = constant_or_raise !!penv loc (Untypeast.constant cst) in
       k @@ solve_expected (mp (Tpat_constant cst) ~pat_type:(type_constant cst))
@@ -4515,6 +4530,7 @@ let rec is_nonexpansive exp =
   | Texp_ident _
   | Texp_constant _
   | Texp_unboxed_unit
+  | Texp_unboxed_bool _
   | Texp_unreachable
   | Texp_function _
   | Texp_probe_is_enabled _
@@ -5090,7 +5106,7 @@ let check_partial_application ~statement exp =
           else begin
             match exp_desc with
             | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit
-            | Texp_tuple _ | Texp_unboxed_tuple _
+            | Texp_unboxed_bool _ | Texp_tuple _ | Texp_unboxed_tuple _
             | Texp_construct _ | Texp_variant _ | Texp_record _
             | Texp_atomic_loc _
             | Texp_record_unboxed_product _ | Texp_unboxed_field _
@@ -5192,6 +5208,7 @@ let shallow_iter_ppat f p =
   match p.ppat_desc with
   | Ppat_any | Ppat_var _ | Ppat_constant _ | Ppat_interval _
   | Ppat_unboxed_unit
+  | Ppat_unboxed_bool _
   | Ppat_construct (_, None)
   | Ppat_extension _
   | Ppat_type _ | Ppat_unpack _ -> ()
@@ -6196,6 +6213,14 @@ and type_expect_
         exp_desc = Texp_unboxed_unit;
         exp_loc = loc; exp_extra = [];
         exp_type = instance Predef.type_unboxed_unit;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
+  | Pexp_unboxed_bool b ->
+      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
+      rue {
+        exp_desc = Texp_unboxed_bool b;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance Predef.type_unboxed_bool;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_constant cst ->

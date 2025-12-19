@@ -255,9 +255,9 @@ let iter_on_occurrences
           f ~namespace:Extension_constructor exp_env path lid
       | Texp_constant _ | Texp_let _ | Texp_letmutable _ | Texp_function _
       | Texp_apply _ | Texp_match _ | Texp_try _ | Texp_unboxed_unit
-      | Texp_tuple _ | Texp_unboxed_tuple _ | Texp_variant _ | Texp_array _
-      | Texp_ifthenelse _ | Texp_sequence _ | Texp_while _ | Texp_for _
-      | Texp_send _
+      | Texp_unboxed_bool _ | Texp_tuple _ | Texp_unboxed_tuple _
+      | Texp_variant _ | Texp_array _ | Texp_ifthenelse _ | Texp_sequence _
+      | Texp_while _ | Texp_for _ | Texp_send _
       | Texp_letmodule _ | Texp_letexception _ | Texp_assert _ | Texp_lazy _
       | Texp_object _ | Texp_pack _ | Texp_letop _ | Texp_unreachable
       | Texp_list_comprehension _ | Texp_array_comprehension _ | Texp_probe _
@@ -301,9 +301,9 @@ let iter_on_occurrences
       | Tpat_record_unboxed_product (fields, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ 
-      | Tpat_unboxed_unit | Tpat_tuple _ | Tpat_unboxed_tuple _
-      | Tpat_variant _ | Tpat_array _ | Tpat_lazy _ | Tpat_value _
-      | Tpat_exception _ | Tpat_or _ -> ());
+      | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
+      | Tpat_unboxed_tuple _ | Tpat_variant _ | Tpat_array _ | Tpat_lazy _
+      | Tpat_value _ | Tpat_exception _ | Tpat_or _ -> ());
       List.iter  (fun (pat_extra, _, _) ->
         match pat_extra with
         | Tpat_open (path, lid, _) ->
