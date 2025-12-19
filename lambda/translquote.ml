@@ -2847,7 +2847,11 @@ and quote_expression_desc transl stage e =
                 match vb.vb_pat.pat_extra with
                 | [(Tpat_constraint ct, _, _)] -> Some ct
                 | [] -> None
-                | _ -> assert false
+                | _ ->
+                  fatal_errorf
+                    "Translquote [at %a]: unexpected pattern annotations in \
+                     let rec - only a single constraint is expected"
+                    Location.print_loc_in_lowercase loc
               in
               match vb.vb_pat.pat_desc with
               | Tpat_var (ident, _, _, _, _) -> (ident, cstr), vb.vb_expr
