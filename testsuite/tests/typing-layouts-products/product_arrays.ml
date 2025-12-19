@@ -2157,12 +2157,13 @@ Line 5, characters 6-7:
 Error: This expression has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
        The layout of #(float# * a * int * int64#) is
-           float64 & any separable & immediate & bits64
+           float64 & any separable & value non_pointer & bits64
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64#) must be representable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let f_any_2 (type a : any mod separable) (x : #(string * a * bool option) array) =
@@ -2191,12 +2192,13 @@ Line 2, characters 53-54:
 Error: This expression has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
        The layout of #(float# * a * int * int64#) is
-           float64 & any separable & immediate & bits64
+           float64 & any separable & value non_pointer & bits64
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64#) must be representable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let f_any_external_2 (type a : any mod separable mod external_)
