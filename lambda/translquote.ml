@@ -1196,7 +1196,91 @@ end = struct
   let apply_unit loc a1 = apply1 "Module" "apply_unit" loc (extract a1)
 end
 
-module rec Variant_type : sig
+module rec Object_type : sig
+  module Object_closed_flag : sig
+    type s
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    val wrap : t' -> t
+
+    val open_ : t'
+
+    val closed : t'
+  end
+
+  module Object_field : sig
+    type s
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    val wrap : t' -> t
+
+    val inherit_ : Location.t -> Type.t -> t'
+
+    val tag : Location.t -> Method.t -> Type.t -> t'
+  end
+
+  type s
+
+  type t' = s lazy_t
+
+  type t = s lam
+
+  val wrap : t' -> t
+
+  val of_object_fields_list :
+    Location.t -> Object_field.t list -> Object_closed_flag.t -> t'
+end = struct
+  module Object_closed_flag = struct
+    type s = lambda
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    let wrap = inject_force
+
+    let open_ = use "Object_type.Object_closed_flag" "open_"
+
+    let closed = use "Object_type.Object_closed_flag" "closed"
+  end
+
+  module Object_field = struct
+    type s = lambda
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    let wrap = inject_force
+
+    let inherit_ loc a1 =
+      apply1 "Object_type.Object_field" "inherit_" loc (extract a1)
+
+    let tag loc a1 a2 =
+      apply2 "Object_type.Object_field" "tag" loc (extract a1) (extract a2)
+  end
+
+  type s = lambda
+
+  type t' = s lazy_t
+
+  type t = s lam
+
+  let wrap = inject_force
+
+  let of_object_fields_list loc a1 a2 =
+    apply2 "Object_type" "of_object_fields_list" loc
+      (mk_list (List.map extract a1))
+      (extract a2)
+end
+
+and Variant_type : sig
   module Variant_form : sig
     type s
 
@@ -1306,6 +1390,8 @@ and Type : sig
 
   val constr : Location.t -> Identifier.Type.t -> t list -> t'
 
+  val object_ : Location.t -> Object_type.t -> t'
+
   val alias : Location.t -> t -> Var.Type_var.t -> t'
 
   val variant : Location.t -> Variant_type.t -> t'
@@ -1342,6 +1428,8 @@ end = struct
 
   let constr loc a1 a2 =
     apply2 "Type" "constr" loc (extract a1) (mk_list (List.map extract a2))
+
+  let object_ loc a1 = apply1 "Type" "object_" loc (extract a1)
 
   let alias loc a1 a2 = apply2 "Type" "alias" loc (extract a1) (extract a2)
 
@@ -2511,8 +2599,36 @@ and quote_core_type ty =
   | Ttyp_constr (path, _, tys) ->
     let ident = type_for_path loc path and tys = List.map quote_core_type tys in
     Type.constr loc ident tys |> Type.wrap
-  | Ttyp_object (_, _) -> fatal_error "Still not implemented."
-  | Ttyp_class (_, _, _) -> fatal_error "Still not implemented."
+  | Ttyp_object (object_fields, closed) ->
+    let object_fields =
+      List.map
+        (fun { of_desc; of_loc = loc; of_attributes } ->
+          if of_attributes <> []
+          then
+            fatal_errorf
+              "Translquote [at %a]: attributes are not supported on fields in \
+               object types"
+              Location.print_loc_in_lowercase loc;
+          match of_desc with
+          | OTtag (name, ty) ->
+            Object_type.Object_field.tag loc
+              (Method.of_string name.loc name.txt |> Method.wrap)
+              (quote_core_type ty)
+          | OTinherit ty ->
+            Object_type.Object_field.inherit_ loc (quote_core_type ty))
+        object_fields
+    and object_closed_flag =
+      match closed with
+      | Open -> Object_type.Object_closed_flag.open_
+      | Closed -> Object_type.Object_closed_flag.closed
+    in
+    Object_type.of_object_fields_list loc
+      (List.map Object_type.Object_field.wrap object_fields)
+      (Object_type.Object_closed_flag.wrap object_closed_flag)
+    |> Object_type.wrap |> Type.object_ loc |> Type.wrap
+  | Ttyp_class (_, _, _) ->
+    fatal_errorf "Translquote [at %a]: class types are not supported"
+      Location.print_loc_in_lowercase loc
   | Ttyp_alias (ty, alias_opt, _) -> (
     let ty = quote_core_type ty in
     match alias_opt with
@@ -2523,14 +2639,20 @@ and quote_core_type ty =
   | Ttyp_variant (row_fields, closed_flag, labels) ->
     let row_fields =
       List.map
-        (fun rf ->
-          match rf.rf_desc with
+        (fun { rf_desc; rf_loc; rf_attributes } ->
+          if rf_attributes <> []
+          then
+            fatal_errorf
+              "Translquote [at %a]: attributes are not supported on fields in \
+               polymorphic variant types"
+              Location.print_loc_in_lowercase loc;
+          match rf_desc with
           | Tinherit ty ->
-            Variant_type.Row_field.inherit_ rf.rf_loc (quote_core_type ty)
+            Variant_type.Row_field.inherit_ rf_loc (quote_core_type ty)
             |> Variant_type.Row_field.wrap
           | Ttag (tag, b, tys) ->
             let variant = Variant.of_string tag.loc tag.txt |> Variant.wrap in
-            Variant_type.Row_field.tag rf.rf_loc variant b
+            Variant_type.Row_field.tag rf_loc variant b
               (List.map quote_core_type tys)
             |> Variant_type.Row_field.wrap)
         row_fields
