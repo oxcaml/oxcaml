@@ -5,6 +5,8 @@ open! Stdlib_stable
 [@@@ocaml.warning "-unused-type-declaration"]
 [@@@ocaml.warning "-unused-module"]
 
+(* CR jrayman *)
+
 type nonrec int8x32 = int8x32#
 type nonrec int16x16 = int16x16#
 type nonrec int32x8 = int32x8#

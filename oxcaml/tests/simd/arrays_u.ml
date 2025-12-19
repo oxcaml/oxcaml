@@ -7,6 +7,8 @@ CR-someday mslater: with layout polymorphism, the tests could be functorized.
 
 !!! *)
 
+(* CR jrayman *)
+
 [@@@ocaml.warning "-unused-value-declaration"]
 [@@@ocaml.warning "-unused-type-declaration"]
 [@@@ocaml.warning "-unused-module"]
