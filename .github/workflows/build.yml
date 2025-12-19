@@ -282,10 +282,6 @@ jobs:
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
-      - name: Build debug target
-        if: matrix.build_debug == true
-        run: make debug
-
       - name: Promote failed tests and capture diffs
         # Compute the diff for an arbitrary job, we expect all to have the same diff
         if: failure() && matrix.name == 'runtime5'
@@ -401,6 +397,10 @@ jobs:
       - name: Check other architectures
         if: matrix.check_arch == true
         run: make check_all_arches
+
+      - name: Build debug target
+        if: matrix.build_debug == true
+        run: make debug
 
       - name: Run register allocation on artifacts
         if: matrix.run_regalloc_tool == true
