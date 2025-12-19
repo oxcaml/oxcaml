@@ -1431,7 +1431,7 @@ module Ast = struct
     print_tuple_like "," "(" ")" (print_label_tup printer) fmt entries
 
   let print_obj_closed fmt closed_flag =
-    pp fmt "%s" (match closed_flag with OOpen -> ".." | OClosed -> "")
+    pp fmt "%s" (match closed_flag with OOpen -> "; .." | OClosed -> "")
 
   let print_prefix fmt rec_flag =
     match rec_flag with
@@ -1599,7 +1599,7 @@ module Ast = struct
     | _ -> print_core_type env fmt ty
 
   and print_object_field env fmt = function
-    | Oinherit ty -> pp fmt "%a@a " (print_core_type env) ty
+    | Oinherit ty -> pp fmt "%a@ " (print_core_type env) ty
     | Otag (name, ty) ->
       pp fmt "%a@ :@ %a" Name.print name (print_core_type env) ty
 
@@ -1655,7 +1655,7 @@ module Ast = struct
       pp fmt "< %a >" print_obj_closed closed_flag
     | TypeObject (f :: fs, closed_flag) ->
       pp fmt "<@ @[";
-      print_tuple_like "," "" "" (print_object_field env) fmt (f :: fs);
+      print_tuple_like ";" "" "" (print_object_field env) fmt (f :: fs);
       print_obj_closed fmt closed_flag;
       pp fmt "@]@ >"
     | TypeClass (name, []) -> Name.print fmt name
@@ -1675,7 +1675,7 @@ module Ast = struct
       print_row_field env false fmt rf;
       List.iter (print_row_field env true fmt) row_fields;
       pp fmt " ]"
-    | TypePoly ([], _) -> () (* fatal_error "Invalid poly-type" *)
+    | TypePoly ([], ty) -> print_core_type env fmt ty
     | TypePoly ((_ :: _) as tvs, ty) ->
       pp fmt "%a@ %a"
         (print_tuple_like "" "" "." (Var.Type_var.print env)) tvs
@@ -2112,20 +2112,6 @@ module Field = struct
   let of_string s = return (Ast.FBasic s)
 end
 
-module Object_field = struct
-  type t = Ast.object_field With_free_vars.t
-
-  let ( let+ ) m f = With_free_vars.map f m
-
-  let inherit_ ty =
-    let+ ty = ty in
-    Ast.Oinherit ty
-
-  let tag name ty =
-    let+ ty = ty in
-    Ast.Otag (name, ty)
-end
-
 module Pat = struct
   open With_free_and_bound_vars
 
@@ -2258,6 +2244,43 @@ module Exp_attribute = struct
   let tail_mod_cons = Ast.Tail_mod_cons
 end
 
+
+module Object_type = struct
+  module Object_closed_flag = struct
+    type t =
+      | Open
+      | Closed
+
+    let open_ = Open
+
+    let closed = Closed
+
+    let to_ast_object_closed_flag = function
+      | Open -> Ast.OOpen
+      | Closed -> Ast.OClosed
+  end
+
+  module Object_field = struct
+    type t = Ast.object_field With_free_vars.t
+
+    let ( let+ ) m f = With_free_vars.map f m
+
+    let inherit_ ty =
+      let+ ty = ty in
+      Ast.Oinherit ty
+
+    let tag method_ type_ =
+      let+ type_ in
+      Ast.Otag (method_, type_)
+  end
+
+  type t = Ast.object_field list With_free_vars.t * Ast.object_closed_flag
+
+  let of_object_fields_list object_fields object_closed_flag =
+    With_free_vars.all object_fields, Object_closed_flag.to_ast_object_closed_flag object_closed_flag
+end
+
+
 module Variant_type = struct
   module Variant_form = struct
     type t =
@@ -2340,9 +2363,8 @@ module Type = struct
     let+ ts = all typs and+ cons = cons in
     Ast.TypeConstr (cons, ts)
 
-  let object_ object_fields is_closed =
-    let closed_flag = if is_closed then Ast.OClosed else Ast.OOpen in
-    let+ object_fields = all object_fields in
+  let object_ (object_fields, closed_flag) =
+    let+ object_fields in
     Ast.TypeObject (object_fields, closed_flag)
 
   let class_ name tys =
