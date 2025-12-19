@@ -511,7 +511,12 @@ static void avail_pool_full(struct caml_heap_state* local, sizeclass_t sz)
   CAMLassert(p->next_obj == NULL);
 
   local->avail_pools[sz] = p->next;
-  local->free_p[sz] = p->next ? &p->next->next_obj : NULL;
+  if (p->next) {
+    caml_prefetch(p->next->next_obj);
+    local->free_p[sz] = &p->next->next_obj;
+  } else {
+    local->free_p[sz] = NULL;
+  }
   p->next = local->full_pools[sz];
   local->full_pools[sz] = p;
 }

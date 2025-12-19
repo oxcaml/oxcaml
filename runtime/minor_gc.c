@@ -260,6 +260,7 @@ Caml_inline value try_forward(value v, volatile value *p, header_t hd,
       CAML_EV_ALLOC(wosize);
       mem = block;
       value *next = (value*)(block[1]);
+      caml_prefetch(next);
       *free_p = next;
       if (!next) caml_shared_empty_free_list(domain->shared_heap, whsize);
       ++ st->pool_live_blocks;
