@@ -110,6 +110,10 @@ module Layout : sig
   end
 end
 
+module Mod_bounds : sig
+  val debug_print : Format.formatter -> Types.mod_bounds -> unit
+end
+
 module With_bounds : sig
   val debug_print_types : Format.formatter -> Types.with_bounds_types -> unit
 
