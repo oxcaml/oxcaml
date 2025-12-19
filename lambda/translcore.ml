@@ -488,6 +488,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                return_layout)
   | Texp_unboxed_unit ->
       Lprim(Punbox_unit, [lambda_unit], of_location ~scopes e.exp_loc)
+  | Texp_unboxed_bool b ->
+      Lconst(Const_base(Const_untagged_int8 (if b then 1 else 0)))
   | Texp_tuple (el, alloc_mode) ->
       let ll, shape =
         transl_value_list_with_shape ~scopes

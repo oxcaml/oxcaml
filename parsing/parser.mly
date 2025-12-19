@@ -1013,6 +1013,8 @@ let maybe_pmod_constraint mode expr =
 %token GREATERRBRACKET        ">]"
 %token HASHLPAREN             "#("
 %token HASHLBRACE             "#{"
+%token HASHFALSE              "#false"
+%token HASHTRUE               "#true"
 %token IF                     "if"
 %token IN                     "in"
 %token INCLUDE                "include"
@@ -1186,6 +1188,7 @@ The precedences must be listed from low to high.
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
           NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
+          HASHFALSE HASHTRUE
 
 /* Entry points */
 
@@ -3124,6 +3127,10 @@ block_access:
       { Pexp_construct($1, None) }
   | HASHLPAREN RPAREN
       { Pexp_unboxed_unit }
+  | HASHFALSE
+      { Pexp_unboxed_bool false }
+  | HASHTRUE
+      { Pexp_unboxed_bool true }
   | name_tag %prec prec_constant_constructor
       { Pexp_variant($1, None) }
   | op(PREFIXOP) simple_expr
@@ -3792,6 +3799,10 @@ simple_pattern_not_ident:
       { Ppat_construct($1, None) }
   | HASHLPAREN RPAREN
       { Ppat_unboxed_unit }
+  | HASHFALSE
+      { Ppat_unboxed_bool false }
+  | HASHTRUE
+      { Ppat_unboxed_bool true }
   | name_tag
       { Ppat_variant($1, None) }
   | hash mkrhs(type_longident)

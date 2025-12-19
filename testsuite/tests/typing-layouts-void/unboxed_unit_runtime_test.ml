@@ -54,6 +54,9 @@ let _ = test1 ()
 (****************************************)
 (* Test 2: matching *)
 
+let box_bool = function #false -> false | #true -> true
+let not = function #false -> #true | #true -> #false
+
 let test2 () =
   start_test "matching";
 
@@ -81,98 +84,98 @@ let test2 () =
   | #(#(), #(_, _)) -> ()
   end;
 
-  begin match #(true, #()) with
-  | #(false, #()) -> assert false
+  begin match #(#true, #()) with
+  | #(#false, #()) -> assert false
   | _ -> ()
   end;
-  begin match #(#(), false) with
-  | #(#(), true) -> assert false
-  | _ -> ()
-  end;
-
-  begin match #(true, #()) with
-  | #(false, #()) -> assert false
-  | #(true, #()) -> ()
-  end;
-  begin match #(#(), false) with
-  | #(#(), true) -> assert false
-  | #(#(), false) -> ()
-  end;
-
-  begin match #(true, #()) with
-  | #(true, #()) -> ()
-  | #(false, #()) -> assert false
-  end;
-  begin match #(#(), false) with
-  | #(#(), false) -> ()
-  | #(#(), true) -> assert false
-  end;
-
-  begin match #(true, #()) with
-  | #(x, #()) -> assert x
-  end;
-  begin match #(#(), false) with
-  | #(#(), x) -> assert (not x)
-  end;
-
-  begin match #(true, #(), true) with
-  | #(_, #(), false) | #(false, #(), _) -> assert false
-  | _ -> ()
-  end;
-  begin match #(false, #(), false) with
-  | #(true, #(), _) | #(_, #(), true) -> assert false
+  begin match #(#(), #false) with
+  | #(#(), #true) -> assert false
   | _ -> ()
   end;
 
-  begin match #(true, #(), true) with
-  | #(_, #(), false) | #(false, #(), _) -> assert false
-  | #(true, #(), true) -> ()
+  begin match #(#true, #()) with
+  | #(#false, #()) -> assert false
+  | #(#true, #()) -> ()
   end;
-  begin match #(false, #(), false) with
-  | #(true, #(), _) | #(_, #(), true) -> assert false
-  | #(false, #(), false) -> ()
-  end;
-
-  begin match #(true, #(), true) with
-  | #(true, #(), true) -> ()
-  | #(_, #(), false) | #(false, #(), _) -> assert false
-  end;
-  begin match #(false, #(), false) with
-  | #(false, #(), false) -> ()
-  | #(true, #(), _) | #(_, #(), true) -> assert false
+  begin match #(#(), #false) with
+  | #(#(), #true) -> assert false
+  | #(#(), #false) -> ()
   end;
 
-  begin match #(true, #(), true) with
-  | #(_, #(), false) -> assert false
-  | #(false, #(), _) -> assert false
+  begin match #(#true, #()) with
+  | #(#true, #()) -> ()
+  | #(#false, #()) -> assert false
+  end;
+  begin match #(#(), #false) with
+  | #(#(), #false) -> ()
+  | #(#(), #true) -> assert false
+  end;
+
+  begin match #(#true, #()) with
+  | #(x, #()) -> assert (box_bool x)
+  end;
+  begin match #(#(), #false) with
+  | #(#(), x) -> assert (box_bool (not x))
+  end;
+
+  begin match #(#true, #(), #true) with
+  | #(_, #(), #false) | #(#false, #(), _) -> assert false
   | _ -> ()
   end;
-  begin match #(false, #(), false) with
-  | #(true, #(), _) -> assert false
-  | #(_, #(), true) -> assert false
+  begin match #(#false, #(), #false) with
+  | #(#true, #(), _) | #(_, #(), #true) -> assert false
   | _ -> ()
   end;
 
-  begin match #(true, #(), true) with
-  | #(_, #(), false) -> assert false
-  | #(false, #(), _) -> assert false
-  | #(true, #(), true) -> ()
+  begin match #(#true, #(), #true) with
+  | #(_, #(), #false) | #(#false, #(), _) -> assert false
+  | #(#true, #(), #true) -> ()
   end;
-  begin match #(false, #(), false) with
-  | #(true, #(), _) -> assert false
-  | #(_, #(), true) -> assert false
-  | #(false, #(), false) -> ()
+  begin match #(#false, #(), #false) with
+  | #(#true, #(), _) | #(_, #(), #true) -> assert false
+  | #(#false, #(), #false) -> ()
   end;
 
-  begin match #(true, #(), true) with
-  | #(true, #(), true) -> ()
-  | #(_, #(), false) -> assert false
-  | #(false, #(), _) -> assert false
+  begin match #(#true, #(), #true) with
+  | #(#true, #(), #true) -> ()
+  | #(_, #(), #false) | #(#false, #(), _) -> assert false
   end;
-  begin match #(false, #(), false) with
-  | #(false, #(), false) -> ()
-  | #(true, #(), _) -> assert false
-  | #(_, #(), true) -> assert false
+  begin match #(#false, #(), #false) with
+  | #(#false, #(), #false) -> ()
+  | #(#true, #(), _) | #(_, #(), #true) -> assert false
+  end;
+
+  begin match #(#true, #(), #true) with
+  | #(_, #(), #false) -> assert false
+  | #(#false, #(), _) -> assert false
+  | _ -> ()
+  end;
+  begin match #(#false, #(), #false) with
+  | #(#true, #(), _) -> assert false
+  | #(_, #(), #true) -> assert false
+  | _ -> ()
+  end;
+
+  begin match #(#true, #(), #true) with
+  | #(_, #(), #false) -> assert false
+  | #(#false, #(), _) -> assert false
+  | #(#true, #(), #true) -> ()
+  end;
+  begin match #(#false, #(), #false) with
+  | #(#true, #(), _) -> assert false
+  | #(_, #(), #true) -> assert false
+  | #(#false, #(), #false) -> ()
+  end;
+
+  begin match #(#true, #(), #true) with
+  | #(#true, #(), #true) -> ()
+  | #(_, #(), #false) -> assert false
+  | #(#false, #(), _) -> assert false
+  end;
+  begin match #(#false, #(), #false) with
+  | #(#false, #(), #false) -> ()
+  | #(#true, #(), _) -> assert false
+  | #(_, #(), #true) -> assert false
   end;
 
   ()

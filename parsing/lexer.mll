@@ -774,6 +774,8 @@ rule token = parse
   | ")"  { RPAREN }
   | "#(" { HASHLPAREN }
   | "#{" { HASHLBRACE }
+  | "#false" { HASHFALSE }
+  | "#true" { HASHTRUE }
   | "*"  { STAR }
   | ","  { COMMA }
   | "->" { MINUSGREATER }

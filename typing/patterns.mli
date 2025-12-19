@@ -41,6 +41,7 @@ module Simple : sig
     | `Any
     | `Constant of constant
     | `Unboxed_unit
+    | `Unboxed_bool of bool
     | `Tuple of (string option * pattern) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
@@ -87,6 +88,7 @@ module Head : sig
     | Construct of constructor_description
     | Constant of constant
     | Unboxed_unit
+    | Unboxed_bool of bool
     | Tuple of string option list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of label_description list

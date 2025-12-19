@@ -1381,6 +1381,8 @@ module Pat : sig
 
   val unboxed_unit : t'
 
+  val unboxed_bool : Location.t -> bool -> t'
+
   val tuple : Location.t -> (Label.Nonoptional.t * t) list -> t'
 
   val unboxed_tuple : Location.t -> (Label.Nonoptional.t * t) list -> t'
@@ -1424,6 +1426,8 @@ end = struct
   let constant loc a1 = apply1 "Pat" "constant" loc (extract a1)
 
   let unboxed_unit = use "Pat" "unboxed_unit"
+
+  let unboxed_bool loc a1 = apply1 "Pat" "unboxed_bool" loc (quote_bool a1)
 
   let tuple loc a1 =
     apply1 "Pat" "tuple" loc
@@ -1716,6 +1720,8 @@ and Exp_desc : sig
 
   val unboxed_unit : t'
 
+  val unboxed_bool : Location.t -> bool -> t'
+
   val tuple : Location.t -> (Label.Nonoptional.t * Exp.t) list -> t'
 
   val construct : Location.t -> Constructor.t -> Exp.t option -> t'
@@ -1839,6 +1845,8 @@ end = struct
     apply2 "Exp_desc" "try_" loc (extract a1) (mk_list (List.map extract a2))
 
   let unboxed_unit = use "Exp_desc" "unboxed_unit"
+
+  let unboxed_bool loc a1 = apply1 "Exp_desc" "unboxed_bool" loc (quote_bool a1)
 
   let tuple loc a1 =
     apply1 "Exp_desc" "tuple" loc
@@ -2270,6 +2278,7 @@ let rec with_new_idents_pat pat =
     with_new_idents_pat pat
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
+  | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> with_new_idents_pat pat) args
   | Tpat_construct (_, _, args, _) ->
     List.iter (fun pat -> with_new_idents_pat pat) args
@@ -2300,6 +2309,7 @@ let rec without_idents_pat pat =
     without_idents_pat pat
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
+  | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> without_idents_pat pat) args
   | Tpat_construct (_, _, args, _) ->
     List.iter (fun pat -> without_idents_pat pat) args
@@ -2407,6 +2417,7 @@ and quote_value_pattern p =
       let const = quote_constant loc const in
       Pat.constant loc const
     | Tpat_unboxed_unit -> Pat.unboxed_unit
+    | Tpat_unboxed_bool b -> Pat.unboxed_bool loc b
     | Tpat_tuple pats ->
       let pats =
         List.map
@@ -2933,6 +2944,7 @@ and quote_expression_desc transl stage e =
       and cases = List.map (quote_value_pattern_case transl stage loc) cases in
       Exp_desc.try_ loc exp cases
     | Texp_unboxed_unit -> Exp_desc.unboxed_unit
+    | Texp_unboxed_bool b -> Exp_desc.unboxed_bool loc b
     | Texp_tuple (exps, _) ->
       let exps =
         List.map
