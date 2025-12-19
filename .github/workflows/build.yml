@@ -22,6 +22,7 @@ jobs:
           - name: runtime5 (x86_64-linux)
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
+            build_debug: true
 
           - name: runtime5 stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
@@ -282,7 +283,7 @@ jobs:
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Build debug target
-        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+        if: matrix.build_debug == true
         run: make debug
 
       - name: Promote failed tests and capture diffs
