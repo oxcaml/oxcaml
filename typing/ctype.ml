@@ -2440,6 +2440,27 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind = type_decl.type_jkind in
+      (* try to give a more approximate layout by *)
+      let jkind =
+        match unbox_once env ty with
+        | Stepped_or_null { ty; modality } ->
+          let layout =
+            begin
+            match
+            Jkind.apply_modality_l modality
+              (estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty)
+              |> Jkind.apply_or_null_l with
+            | Ok decl_jkind -> decl_jkind
+            | Error () ->
+              (* fall back to jkind on definition *)
+              jkind
+            end
+            |> Jkind.extract_layout
+          in
+          Jkind.set_layout jkind layout
+        | _ ->
+          jkind
+      in
       (* Checking [has_with_bounds] here is needed for correctness, because
          intersection types sometimes do not unify with themselves. Removing
          this check causes typing-misc/pr7937.ml to fail. *)
