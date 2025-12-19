@@ -142,6 +142,7 @@ Caml_inline void *caml_shared_fast_alloc (mlsize_t whsize,
   }
   value *block = *free_p;
   value *next = (value*)(block[1]);
+  caml_prefetch(next);
   *free_p = next;
   if (!next) caml_shared_fast_data_refill(domain->shared_heap, sz);
   return (void*)block;
