@@ -463,10 +463,10 @@ let destroyed_at_c_call =
   if win64 then destroyed_at_c_call_win64 else destroyed_at_c_call_unix
 
 let destroyed_at_alloc_or_poll =
-  if X86_proc.use_plt then
-    destroyed_by_plt_stub
-  else
-    [| r11 |]
+  (* Calls to [caml_call_gc] are marked to dereference GOT entries
+     directly (if at all), so there's no PLT stub involved. Hence,
+     r10 is safe, even with dynlinkable code. *)
+  [| r11 |]
 
 let destroyed_at_pushtrap =
   [| r11 |]
