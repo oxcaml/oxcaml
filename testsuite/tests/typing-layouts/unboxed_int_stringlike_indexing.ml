@@ -40,6 +40,43 @@ let create_s length =
 
 let create_b length = create_s length |> Bytes.of_string
 
+(* CR jrayman:
+   Change [type boxed_data = int] to [int16], duplicate to add [int16#].
+*)
+(* CR jrayman: Add tests for
+   [
+    index, data =
+      nativeint#, int8
+      nativeint#, int8#
+      int32#, int8
+      int32#, int8#
+      int64#, int8
+      int64#, int8#
+
+      int8#, int8
+      int8#, int16
+      int8#, int32
+      int8#, int64
+      int8#, int8#
+      int8#, int16#
+      int8#, int32#
+      int8#, int64#
+      int8#, float32
+      int8#, float32#
+
+      int16#, int8
+      int16#, int16
+      int16#, int32
+      int16#, int64
+      int16#, int8#
+      int16#, int16#
+      int16#, int32#
+      int16#, int64#
+      int16#, float32
+      int16#, float32#
+   ]
+*)
+
 open struct
   open Bigarray
 
