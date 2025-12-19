@@ -296,6 +296,7 @@ let pat_extra sub = function
       Tpat_open (path, map_loc sub loc, sub.env sub env)
   | Tpat_constraint ct -> Tpat_constraint (sub.typ sub ct)
   | Tpat_inspected_type Label_disambiguation as d -> d
+  | Tpat_inspected_type Polymorphic_application as d -> d
 
 let pat
   : type k . mapper -> k general_pattern -> k general_pattern

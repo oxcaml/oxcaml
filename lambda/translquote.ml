@@ -2385,6 +2385,7 @@ and quote_pat_extra loc pat_lam extra =
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
   | Tpat_open _ -> fatal_error "No support for open patterns."
   | Tpat_inspected_type Label_disambiguation -> pat_lam
+  | Tpat_inspected_type Polymorphic_application -> pat_lam
 
 and quote_value_pattern p =
   let env = p.pat_env and loc = p.pat_loc in

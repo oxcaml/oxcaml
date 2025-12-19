@@ -246,6 +246,7 @@ let pat_extra sub (e, loc, attrs) =
   | Tpat_open (_, lid, env) -> iter_loc sub lid; sub.env sub env
   | Tpat_constraint ct -> sub.typ sub ct
   | Tpat_inspected_type Label_disambiguation -> ()
+  | Tpat_inspected_type Polymorphic_application -> ()
 
 let pat
   : type k . iterator -> k general_pattern -> unit

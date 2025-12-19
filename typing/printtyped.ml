@@ -440,6 +440,9 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
   | Tpat_inspected_type Label_disambiguation ->
      line i ppf "Tpat_inspected_type Label_disambiguation\n";
      attributes i ppf attrs;
+  | Tpat_inspected_type Polymorphic_application ->
+     line i ppf "Tpat_inspected_type Polymorphic_application\n";
+     attributes i ppf attrs;
 
 and function_body i ppf (body : function_body) =
   match[@warning "+9"] body with
