@@ -427,7 +427,6 @@ let indexing_primitives =
       (Ptagged_int_index, "");
       (Punboxed_or_untagged_integer_index Unboxed_nativeint,
        "_indexed_by_nativeint#");
-      (Punboxed_or_untagged_integer_index Untagged_int, "_indexed_by_int#");
       (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
       (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
@@ -518,7 +517,6 @@ let array_vec_primitives =
       (Ptagged_int_index, "");
       (Punboxed_or_untagged_integer_index Unboxed_nativeint,
        "_indexed_by_nativeint#");
-      (Punboxed_or_untagged_integer_index Untagged_int, "_indexed_by_int#");
       (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
       (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
