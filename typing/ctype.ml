@@ -2440,6 +2440,27 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind = type_decl.type_jkind in
+      let more_precise_layout_for_or_null =
+        (* The kind on ['a or_null]'s type declaration is [scannable]. But when
+           ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
+           ['a or_null] the same separability (per [Jkind.apply_or_null_l]).
+           So we try to do so here. *)
+        match unbox_once env ty with
+        | Stepped_or_null { ty; modality = _ } -> begin
+          let param_jkind =
+            estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
+          in
+          match Jkind.apply_or_null_l param_jkind with
+          | Ok decl_jkind -> Some (Jkind.extract_layout decl_jkind)
+          | Error () -> None
+          end
+        | _ -> None
+      in
+      let jkind =
+        match more_precise_layout_for_or_null with
+        | Some layout -> Jkind.set_layout jkind layout
+        | None -> jkind
+      in
       (* Checking [has_with_bounds] here is needed for correctness, because
          intersection types sometimes do not unify with themselves. Removing
          this check causes typing-misc/pr7937.ml to fail. *)
