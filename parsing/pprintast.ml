@@ -268,6 +268,10 @@ let constant f = function
       paren (first_is '-' x) (fun f (x, suffix) -> pp f "%s%c" x suffix) f
         (Misc.format_as_unboxed_literal x, suffix)
 
+let bool f = function
+  | false -> pp f "false"
+  | true -> pp f "true"
+
 (* trailing space*)
 let mutable_flag f = function
   | Immutable -> ()
@@ -764,6 +768,7 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_record_unboxed_product (l, closed) ->
         record_pattern ctxt f ~unboxed:true l closed
     | Ppat_unboxed_unit -> pp f "#()"
+    | Ppat_unboxed_bool b -> pp f "#%a" bool b
     | Ppat_tuple (l, closed) ->
         labeled_tuple_pattern ctxt f ~unboxed:false l closed
     | Ppat_unboxed_tuple (l, closed) ->

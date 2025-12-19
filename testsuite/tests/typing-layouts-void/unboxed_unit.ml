@@ -90,30 +90,30 @@ Warning 11 [redundant-case]: this match case is unused.
 val f : #(unit# * unit#) -> unit# = <fun>
 |}]
 
-let f = function #(#(), false) -> #() 
+let f = function #(#(), #false) -> #()
 
 [%%expect{|
-Line 1, characters 8-37:
-1 | let f = function #(#(), false) -> #()
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 8-38:
+1 | let f = function #(#(), #false) -> #()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
-#(#(), true)
+#(#(), #true)
 
-val f : #(unit# * bool) -> unit# = <fun>
+val f : #(unit# * bool#) -> unit# = <fun>
 |}]
 
-let f = function #(true, #(#(), false)) -> #() | #(false, #(_, true)) -> #()
+let f = function #(#true, #(#(), #false)) -> #() | #(#false, #(_, #true)) -> #()
 
 [%%expect{|
-Line 1, characters 8-76:
-1 | let f = function #(true, #(#(), false)) -> #() | #(false, #(_, true)) -> #()
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 8-80:
+1 | let f = function #(#true, #(#(), #false)) -> #() | #(#false, #(_, #true)) -> #()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
-#(true, #(#(), true))
+#(#true, #(#(), #true))
 
-val f : #(bool * #(unit# * bool)) -> unit# = <fun>
+val f : #(bool# * #(unit# * bool#)) -> unit# = <fun>
 |}]
 
 let f () = match () with #() -> #()
