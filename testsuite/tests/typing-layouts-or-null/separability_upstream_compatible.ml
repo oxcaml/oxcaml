@@ -63,12 +63,12 @@ type exists = E : ('a : value mod non_float). 'a -> exists [@@unboxed]
 
 (* Non-value layouts. *)
 
-type 'a void : void
+type 'a void : void_internal
 
 type packed_void = P : 'a void -> packed_void [@@unboxed]
 
 [%%expect{|
-type 'a void : void
+type 'a void : void_internal
 Line 3, characters 0-57:
 3 | type packed_void = P : 'a void -> packed_void [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
