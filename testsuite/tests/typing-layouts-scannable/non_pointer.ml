@@ -623,3 +623,62 @@ end
 [%%expect{|
 module M : sig type t : value non_float end
 |}]
+
+(* Mixed records and mutual recursion edge cases *)
+
+module Equal_layout : sig
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end = struct
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end
+[%%expect{|
+module Equal_layout :
+  sig type t : value non_pointer type s type r = { r : #(t * s); } end
+|}]
+
+module Less_layout : sig
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end = struct
+  type t : value non_pointer
+  type s : value non_pointer
+  type r = { r : #(t * s) }
+end
+[%%expect{|
+module Less_layout :
+  sig type t : value non_pointer type s type r = { r : #(t * s); } end
+|}]
+
+module Not_le_layout : sig
+  type r = { r : #(t * s) }
+  and t : value non_pointer
+  and s
+end = struct
+  type r = { r : #(t * s) }
+  and t
+  and s
+end
+[%%expect{|
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type r = { r : #(t * s) }
+7 |   and t
+8 |   and s
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type r = { r : #(t * s); } and t and s end
+       is not included in
+         sig type r = { r : #(t * s); } and t : value non_pointer and s end
+       Type declarations do not match:
+         type r = { r : #(t * s); }
+       is not included in
+         type r = { r : #(t * s); }
+       Their internal representations differ:
+       This is likely caused by a layout mismatch in a later definition.
+|}]
