@@ -2622,22 +2622,20 @@ module Violation = struct
         | None -> false
         | Some const -> Layout.Const.has_component ~component const
       in
+      let check_both_jkinds jk1 jk2 =
+        let should_check_jk2 = not print_as_value_layout in
+        ( check_has_component immediate_layout jk1
+          || (should_check_jk2 && check_has_component immediate_layout jk2),
+          check_has_component immediate64_layout jk1
+          || (should_check_jk2 && check_has_component immediate64_layout jk2) )
+      in
       let should_note_immediate, should_note_immediate64 =
         match violation with
         (* If we are printing the jkind on the right as a value layout, then
            we should not look at it to determine whether to emit a note *)
-        | Not_a_subjkind (jkind1, jkind2, _) ->
-          let check_jkind2 = not print_as_value_layout in
-          ( check_has_component immediate_layout jkind1
-            || (check_jkind2 && check_has_component immediate_layout jkind2),
-            check_has_component immediate64_layout jkind1
-            || (check_jkind2 && check_has_component immediate64_layout jkind2) )
-        | No_intersection (jkind1, jkind2) ->
-          let check_jkind2 = not print_as_value_layout in
-          ( check_has_component immediate_layout jkind1
-            || (check_jkind2 && check_has_component immediate_layout jkind2),
-            check_has_component immediate64_layout jkind1
-            || (check_jkind2 && check_has_component immediate64_layout jkind2) )
+        (* Can't use an or-pattern since the jkinds have different allowances *)
+        | Not_a_subjkind (jkind1, jkind2, _) -> check_both_jkinds jkind1 jkind2
+        | No_intersection (jkind1, jkind2) -> check_both_jkinds jkind1 jkind2
       in
       if should_note_immediate
       then
