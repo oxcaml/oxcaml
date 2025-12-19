@@ -99,7 +99,7 @@ Line 1, characters 14-25:
                   ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : value maybe_separable)"
-       The layout of int or_null is value maybe_separable maybe_null
+       The layout of int or_null is value non_pointer maybe_null
          because it is the primitive type or_null.
        But the layout of int or_null must be a sublayout of
            value maybe_separable
@@ -288,7 +288,7 @@ Line 1, characters 26-42:
 1 | type object_with_null = < x : int or_null; .. >
                               ^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "int or_null" is value maybe_separable maybe_null
+       The layout of "int or_null" is value non_pointer maybe_null
          because it is the primitive type or_null.
        But the layout of "int or_null" must be a sublayout of value
          because it's the type of an object field.
@@ -408,7 +408,7 @@ Line 1, characters 35-51:
                                        ^^^^^^^^^^^^^^^^
 Error: This expression has type "unboxed_rec"
        but an expression was expected of type "('a : value)"
-       The layout of unboxed_rec is value maybe_separable maybe_null
+       The layout of unboxed_rec is value non_pointer maybe_null
          because it is the primitive type or_null.
        But the layout of unboxed_rec must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
@@ -422,7 +422,7 @@ Line 1, characters 35-46:
                                        ^^^^^^^^^^^
 Error: This expression has type "unboxed_var"
        but an expression was expected of type "('a : value)"
-       The layout of unboxed_var is value maybe_separable maybe_null
+       The layout of unboxed_var is value non_pointer maybe_null
          because it is the primitive type or_null.
        But the layout of unboxed_var must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
