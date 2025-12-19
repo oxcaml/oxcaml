@@ -434,6 +434,7 @@ end
 module M : sig type t : immediate_or_null end
 |}]
 
+(* CR layouts-scannable: This test should pass! *)
 module M : sig
   type t : immediate_or_null & float64
 end = struct
