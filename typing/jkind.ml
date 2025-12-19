@@ -2644,7 +2644,8 @@ module Violation = struct
         fprintf ppf "@;@[Note: The layout of immediate is value non_pointer.@]";
       if should_note_immediate64
       then
-        fprintf ppf "@;@[Note: The layout of immediate64 is value non_pointer64.@]"
+        fprintf ppf
+          "@;@[Note: The layout of immediate64 is value non_pointer64.@]"
 
   let report_fuel ppf violation =
     let report_fuel_for_type which =
