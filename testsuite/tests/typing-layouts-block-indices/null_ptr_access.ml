@@ -9,7 +9,7 @@
 *)
 
 (* Test [%unsafe_set_ptr] and [%unsafe_get_ptr] when the base is NULL, and the
-   byte offset is a pointer something external. *)
+   byte offset is a to pointer something external. *)
 
 open Stdlib_stable
 open Stdlib_upstream_compatible
@@ -18,10 +18,10 @@ module Int64_u = struct
   type t = int64#
 
   external to_int64 : t -> (int64[@local_opt]) @@ portable =
-    "%box_int64" [@@warning "-187"]
+    "%box_int64"
 
   external of_int64 : (int64[@local_opt]) -> t @@ portable =
-    "%unbox_int64" [@@warning "-187"]
+    "%unbox_int64"
 
   let[@inline always] add x y = of_int64 (Int64.add (to_int64 x) (to_int64 y))
 end
@@ -67,8 +67,6 @@ let () =
   set_int_field pt 200;
   let pt = Sys.opaque_identity pt in
   Printf.printf "  set: expected (10, 200), got (%d, %d)\n" pt.x pt.y;
-  (* keep [pt] live until this point *)
-  let (_ : pt_int) = Sys.opaque_identity pt in
   ()
 
 (******************************************************)
@@ -89,12 +87,11 @@ let () =
   print_endline "Test 2: float# field (flat type)";
   let pt = stack_ { x = 10; y = #20.5 } in
   let f : float# = get_float_field pt in
-  Printf.printf "  get: expected 20.5, got %f\n" (Float_u.to_float f);
+  Printf.printf "  get: expected 20.5, got %.1f\n" (Float_u.to_float f);
   set_float_field pt #200.5;
   let pt = Sys.opaque_identity pt in
-  Printf.printf "  set: expected (10, 200.5), got (%d, %f)\n"
+  Printf.printf "  set: expected (10, 200.5), got (%d, %.1f)\n"
     pt.x (Float_u.to_float pt.y);
-  let (_ : pt_float) = Sys.opaque_identity pt in
   ()
 
 (********************************************************)
@@ -115,13 +112,12 @@ let () =
   print_endline "Test 3: float32# field (flat type)";
   let pt = stack_ { x = 10; y = #20.5s } in
   let f : float32# = get_float32_field pt in
-  Printf.printf "  get: expected 20.5, got %f\n"
+  Printf.printf "  get: expected 20.5, got %.1f\n"
     (Float_u.to_float (Float32_u.to_float f));
   set_float32_field pt #200.5s;
   let pt = Sys.opaque_identity pt in
-  Printf.printf "  set: expected (10, 200.5), got (%d, %f)\n"
+  Printf.printf "  set: expected (10, 200.5), got (%d, %.1f)\n"
     pt.x (Float_u.to_float (Float32_u.to_float pt.y));
-  let (_ : pt_float32) = Sys.opaque_identity pt in
   ()
 
 (******************************************************)
@@ -147,7 +143,6 @@ let () =
   let pt = Sys.opaque_identity pt in
   Printf.printf "  set: expected (10, 200), got (%d, %ld)\n"
     pt.x (Int32_u.to_int32 pt.y);
-  let (_ : pt_int32) = Sys.opaque_identity pt in
   ()
 
 (******************************************************)
@@ -173,7 +168,6 @@ let () =
   let pt = Sys.opaque_identity pt in
   Printf.printf "  set: expected (10, 200), got (%d, %Ld)\n"
     pt.x (Int64_u.to_int64 pt.y);
-  let (_ : pt_int64) = Sys.opaque_identity pt in
   ()
 
 (**********************************************************)
@@ -199,7 +193,6 @@ let () =
   let pt = Sys.opaque_identity pt in
   Printf.printf "  set: expected (10, 200), got (%d, %nd)\n"
     pt.x (Nativeint_u.to_nativeint pt.y);
-  let (_ : pt_nativeint) = Sys.opaque_identity pt in
   ()
 
 (***************************************************************)
@@ -227,7 +220,6 @@ let () =
   let #{ a; b } = pt.y in
   Printf.printf "  set: expected (10, (200, 300)), got (%d, (%d, %d))\n"
     pt.x a b;
-  let (_ : pt_int_pair) = Sys.opaque_identity pt in
   ()
 
 (**************************************************)
@@ -249,12 +241,11 @@ let () =
   print_endline "Test 8: unboxed product of floats (flat types)";
   let pt = stack_ { x = 10; y = #{ a = #20.5; b = #30.5 } } in
   let #{ a; b } : float_pair = get_float_pair_field pt in
-  Printf.printf "  get: expected (20.5, 30.5), got (%f, %f)\n"
+  Printf.printf "  get: expected (20.5, 30.5), got (%.1f, %.1f)\n"
     (Float_u.to_float a) (Float_u.to_float b);
   set_float_pair_field pt #{ a = #200.5; b = #300.5 };
   let pt = Sys.opaque_identity pt in
   let #{ a; b } = pt.y in
-  Printf.printf "  set: expected (10, (200.5, 300.5)), got (%d, (%f, %f))\n"
+  Printf.printf "  set: expected (10, (200.5, 300.5)), got (%d, (%.1f, %.1f))\n"
     pt.x (Float_u.to_float a) (Float_u.to_float b);
-  let (_ : pt_float_pair) = Sys.opaque_identity pt in
   ()
