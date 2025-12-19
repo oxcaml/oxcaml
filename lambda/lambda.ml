@@ -2095,7 +2095,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbigarrayref (_, _, _, _) ->
      (* Boxes arising from Bigarray access are always Alloc_heap *)
      Some alloc_heap
-  | Pstring_load_16 _ | Pbytes_load_16 _ -> None
+  | Pstring_load_8 _ | Pstring_load_16 _ | Pbytes_load_8 _
+  | Pbytes_load_16 _ -> None
   | Pstring_load_32 { mode = m; boxed = true; _ }
   | Pbytes_load_32 { mode = m; boxed = true; _ }
   | Pstring_load_f32 { mode = m; boxed = true; _ }
@@ -2109,6 +2110,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pint_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_float_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_float32_array_load_vec { mode = m; boxed = true; _ }
+  | Puntagged_int8_array_load_vec { mode = m; boxed = true; _ }
+  | Puntagged_int16_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_int32_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_int64_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_nativeint_array_load_vec { mode = m; boxed = true; _ }
@@ -2126,12 +2129,14 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pint_array_load_vec { boxed = false; _ }
   | Punboxed_float_array_load_vec { boxed = false; _ }
   | Punboxed_float32_array_load_vec { boxed = false; _ }
+  | Puntagged_int8_array_load_vec { boxed = false; _ }
+  | Puntagged_int16_array_load_vec { boxed = false; _ }
   | Punboxed_int32_array_load_vec { boxed = false; _ }
   | Punboxed_int64_array_load_vec { boxed = false; _ }
   | Punboxed_nativeint_array_load_vec { boxed = false; _ } -> None
-  | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+  | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
   | Pbytes_set_64 _ | Pbytes_set_vec _ -> None
-  | Pbigstring_load_16 _ -> None
+  | Pbigstring_load_8 _ | Pbigstring_load_16 _ -> None
   | Pbigstring_load_32 { mode = m; boxed = true; _ }
   | Pbigstring_load_f32 { mode = m; boxed = true; _ }
   | Pbigstring_load_64 { mode = m; boxed = true; _ }
@@ -2140,10 +2145,11 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbigstring_load_f32 { boxed = false; _ }
   | Pbigstring_load_64 { boxed = false; _ }
   | Pbigstring_load_vec { boxed = false; _ } -> None
-  | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
-  | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
   | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _ -> None
   | Pctconst _ -> None
@@ -2234,6 +2240,8 @@ let primitive_can_raise prim =
   | Pint_array_load_vec { unsafe = false; _ }
   | Punboxed_float_array_load_vec { unsafe = false; _ }
   | Punboxed_float32_array_load_vec { unsafe = false; _ }
+  | Puntagged_int8_array_load_vec { unsafe = false; _ }
+  | Puntagged_int16_array_load_vec { unsafe = false; _ }
   | Punboxed_int32_array_load_vec { unsafe = false; _ }
   | Punboxed_int64_array_load_vec { unsafe = false; _ }
   | Punboxed_nativeint_array_load_vec { unsafe = false; _ }
@@ -2242,6 +2250,8 @@ let primitive_can_raise prim =
   | Pint_array_set_vec { unsafe = false; _ }
   | Punboxed_float_array_set_vec { unsafe = false; _ }
   | Punboxed_float32_array_set_vec { unsafe = false; _ }
+  | Puntagged_int8_array_set_vec { unsafe = false; _ }
+  | Puntagged_int16_array_set_vec { unsafe = false; _ }
   | Punboxed_int32_array_set_vec { unsafe = false; _ }
   | Punboxed_int64_array_set_vec { unsafe = false; _ }
   | Punboxed_nativeint_array_set_vec { unsafe = false; _ }
@@ -2320,6 +2330,8 @@ let primitive_can_raise prim =
   | Pint_array_load_vec { unsafe = true; _ }
   | Punboxed_float_array_load_vec { unsafe = true; _ }
   | Punboxed_float32_array_load_vec { unsafe = true; _ }
+  | Puntagged_int8_array_load_vec { unsafe = true; _ }
+  | Puntagged_int16_array_load_vec { unsafe = true; _ }
   | Punboxed_int32_array_load_vec { unsafe = true; _ }
   | Punboxed_int64_array_load_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_load_vec { unsafe = true; _ }
@@ -2328,6 +2340,8 @@ let primitive_can_raise prim =
   | Pint_array_set_vec { unsafe = true; _ }
   | Punboxed_float_array_set_vec { unsafe = true; _ }
   | Punboxed_float32_array_set_vec { unsafe = true; _ }
+  | Puntagged_int8_array_set_vec { unsafe = true; _ }
+  | Puntagged_int16_array_set_vec { unsafe = true; _ }
   | Punboxed_int32_array_set_vec { unsafe = true; _ }
   | Punboxed_int64_array_set_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_set_vec { unsafe = true; _ }
@@ -2604,6 +2618,7 @@ let primitive_result_layout (p : primitive) =
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
   | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
   | Parrayblit _
@@ -2673,6 +2688,8 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_float_array_load_vec { size; boxed = false; _ }
   | Punboxed_float32_array_load_vec { size; boxed = false; _ }
   | Pint_array_load_vec { size; boxed = false; _ }
+  | Puntagged_int8_array_load_vec { size; boxed = false; _ }
+  | Puntagged_int16_array_load_vec { size; boxed = false; _ }
   | Punboxed_int64_array_load_vec { size; boxed = false; _ }
   | Punboxed_nativeint_array_load_vec { size; boxed = false; _ }
   | Punboxed_int32_array_load_vec { size; boxed = false; _ } ->
@@ -2685,6 +2702,8 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_float_array_load_vec { size; boxed = true; _ }
   | Punboxed_float32_array_load_vec { size; boxed = true; _ }
   | Pint_array_load_vec { size; boxed = true; _ }
+  | Puntagged_int8_array_load_vec { size; boxed = true; _ }
+  | Puntagged_int16_array_load_vec { size; boxed = true; _ }
   | Punboxed_int64_array_load_vec { size; boxed = true; _ }
   | Punboxed_nativeint_array_load_vec { size; boxed = true; _ }
   | Punboxed_int32_array_load_vec { size; boxed = true; _ } ->

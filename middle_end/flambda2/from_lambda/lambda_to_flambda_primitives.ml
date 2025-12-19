@@ -2414,6 +2414,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ string_like_load ~unsafe:false ~dbg ~machine_width ~access_size:Eight
         Bytes ~boxed:false None bytes ~index_kind:Ptagged_int_index index
         ~current_region ]
+  | Pstring_load_8 { unsafe; index_kind }, [[str]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight String
+        ~boxed:false None str ~index_kind index ~current_region ]
+  | Pbytes_load_8 { unsafe; index_kind }, [[bytes]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight Bytes
+        ~boxed:false None bytes ~index_kind index ~current_region ]
   | Pstring_load_16 { unsafe; index_kind }, [[str]; [index]] ->
     [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen String
         ~boxed:false None str ~index_kind index ~current_region ]
@@ -2448,6 +2454,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ string_like_load ~unsafe ~dbg ~machine_width
         ~access_size:(vec_accessor_width ~aligned:false size)
         Bytes ~boxed (Some mode) str ~index_kind index ~current_region ]
+  | Pbytes_set_8 { unsafe; index_kind }, [[bytes]; [index]; [new_value]] ->
+    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Eight Bytes
+        ~boxed:false bytes ~index_kind index new_value ]
   | Pbytes_set_16 { unsafe; index_kind }, [[bytes]; [index]; [new_value]] ->
     [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixteen Bytes
         ~boxed:false bytes ~index_kind index new_value ]
@@ -2839,6 +2848,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
          with an unknown layout should have been removed by Lambda_to_flambda.")
   | Pbigarraydim dimension, [[arg]] ->
     [tag_int (Unary (Bigarray_length { dimension }, arg))]
+  | Pbigstring_load_8 { unsafe; index_kind }, [[big_str]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight Bigstring
+        ~boxed:false None big_str ~index_kind index ~current_region ]
   | Pbigstring_load_16 { unsafe; index_kind }, [[big_str]; [index]] ->
     [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen
         Bigstring ~boxed:false None big_str ~index_kind index ~current_region ]
@@ -2862,6 +2874,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~access_size:(vec_accessor_width ~aligned size)
         Bigstring (Some mode) ~boxed big_str ~index_kind index ~current_region
     ]
+  | Pbigstring_set_8 { unsafe; index_kind }, [[bigstring]; [index]; [new_value]]
+    ->
+    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Eight Bigstring
+        ~boxed:false bigstring ~index_kind index new_value ]
   | Pbigstring_set_16 { unsafe; index_kind }, [[bigstring]; [index]; [new_value]]
     ->
     [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixteen Bigstring
@@ -2925,6 +2941,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[array]; [index]] ) ->
     [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
         ~boxed ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index ]
+  | ( Puntagged_int8_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
+    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
+        ~boxed ~vec_kind:(vec_kind size) Naked_int8s array ~index_kind index ]
+  | ( Puntagged_int16_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
+    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
+        ~boxed ~vec_kind:(vec_kind size) Naked_int16s array ~index_kind index ]
   | ( Pfloat_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
     check_float_array_optimisation_enabled "Pfloat_array_set_vec";
@@ -2971,6 +2995,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[array]; [index]; [new_value]] ) ->
     [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
         ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index new_value
+    ]
+  | ( Puntagged_int8_array_set_vec { size; unsafe; index_kind; boxed },
+      [[array]; [index]; [new_value]] ) ->
+    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+        ~vec_kind:(vec_kind size) Naked_int8s array ~index_kind index new_value
+    ]
+  | ( Puntagged_int16_array_set_vec { size; unsafe; index_kind; boxed },
+      [[array]; [index]; [new_value]] ) ->
+    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+        ~vec_kind:(vec_kind size) Naked_int16s array ~index_kind index new_value
     ]
   | Pprobe_is_enabled { name; enabled_at_init }, [] ->
     [tag_int (Nullary (Probe_is_enabled { name; enabled_at_init }))]
@@ -3117,15 +3151,17 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Psetfield _ | Pstringrefu | Pbytesrefu | Pstringrefs | Pbytesrefs
-      | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-      | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_16 _
-      | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
-      | Pbytes_load_vec _ | Pisout | Pfield_computed _ | Psetfloatfield _
-      | Psetufloatfield _ | Psetmixedfield _ | Pbigstring_load_16 _
+      | Pstring_load_8 _ | Pstring_load_16 _ | Pstring_load_32 _
+      | Pstring_load_f32 _ | Pstring_load_64 _ | Pstring_load_vec _
+      | Pbytes_load_8 _ | Pbytes_load_16 _ | Pbytes_load_32 _
+      | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout
+      | Pfield_computed _ | Psetfloatfield _ | Psetufloatfield _
+      | Psetmixedfield _ | Pbigstring_load_8 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
       | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
       | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-      | Punboxed_float32_array_load_vec _ | Punboxed_int32_array_load_vec _
+      | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
+      | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
       | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
       | Parrayrefu
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
@@ -3166,11 +3202,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
             | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
             _ )
-      | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
-      | Pbytes_set_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
-      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-      | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+      | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+      | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _
+      | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
+      | Pbigstring_set_64 _ | Pbigstring_set_vec _ | Pfloatarray_set_vec _
+      | Pfloat_array_set_vec _ | Pint_array_set_vec _
       | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+      | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
       | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
       | Punboxed_nativeint_array_set_vec _ | Patomic_set_field _
       | Patomic_exchange_field _ | Patomic_fetch_add_field | Patomic_add_field
