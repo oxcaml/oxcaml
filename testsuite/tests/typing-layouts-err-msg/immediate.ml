@@ -32,7 +32,7 @@ Error: This expression has type "v" = "unit"
          because it is the primitive type unit.
        But the layout of unit must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Primitive *)
@@ -49,7 +49,7 @@ Error: This expression has type "int" but an expression was expected of type
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Immediate_polymorphic_variant *)
@@ -66,6 +66,6 @@ Error: This expression has type "[ `A | `B ]"
          because it's an enumeration variant type (all constructors are constant).
        But the layout of [ `A | `B ] must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 

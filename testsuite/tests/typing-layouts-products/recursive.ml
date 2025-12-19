@@ -499,5 +499,5 @@ Error: The layout of type "r" is value non_pointer & value non_pointer
        But the layout of type "r" must be a sublayout of
            value maybe_separable maybe_null & float64
          because it is an unboxed record.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]

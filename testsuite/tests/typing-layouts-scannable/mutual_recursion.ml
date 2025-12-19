@@ -26,7 +26,7 @@ Error: The layout of type "a" is
        But the layout of type "a" must be a sublayout of
            value non_pointer & value non_pointer
          because of the annotation on the declaration of the type a.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* BUT adding in the additional kind annotation on [b] makes this work! *)
@@ -53,7 +53,7 @@ Error: The layout of type "a" is
        But the layout of type "a" must be a sublayout of
            value non_pointer & value non_pointer
          because of the annotation on the declaration of the type a.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Same example as above, split across two recursive modules *)
@@ -80,7 +80,7 @@ Error: The layout of type "a" is value
        But the layout of type "a" must be a sublayout of
            value non_pointer & value non_pointer
          because of the annotation on the declaration of the type a.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* These almost demonstrate the bad mutual recursion behavior, but work. *)
@@ -118,7 +118,7 @@ Error: The layout of type "r" is value non_pointer & float64
            value maybe_separable maybe_null
            & value maybe_separable maybe_null
          because it is an unboxed record.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Adding the annotation fixes this, like the case above *)
@@ -143,7 +143,7 @@ Error: The layout of type "r#" is value non_pointer & float64
            value maybe_separable maybe_null
            & value maybe_separable maybe_null
          because it is an unboxed record.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type 'a t = #{ a : 'a ; a' : 'a } constraint ('a : immediate & float64) = r#

@@ -330,7 +330,7 @@ Error: This expression has type "float" but an expression was expected of type
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_pointer
          because of the definition of s6 at line 2, characters 0-35.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (*****************************************************)
@@ -414,7 +414,7 @@ Error: Layout mismatch in final type declaration consistency check.
            chosen to have layout value.
          But the layout of 'a must be a sublayout of value non_pointer
            because of the definition of imm_t at line 1, characters 0-27.
-         Hint: The layout of immediate is value non_pointer.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]

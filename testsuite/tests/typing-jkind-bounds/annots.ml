@@ -225,7 +225,7 @@ Error: This alias is bound to type "int" but is used as an instance of type
          because it is the primitive type int.
        But the layout of int must be a sublayout of float64
          because of the annotation on the type variable 'a.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let x : (int as ('a : immediate)) list as ('b : value) = [3;4;5]
@@ -246,7 +246,7 @@ Error: This alias is bound to type "int list"
          because it's a boxed variant type.
        But the layout of int list must be a sublayout of value non_pointer
          because of the annotation on the type variable 'a.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts: error message could be phrased better *)
 
@@ -400,7 +400,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of t2_imm at line 1, characters 0-28.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type t = string t2_global
@@ -652,7 +652,7 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of r at line 1, characters 0-47.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let f { fieldg } = fieldg "hello"
@@ -719,7 +719,7 @@ Error: This field value has type "'b -> 'b" which is less general than
          because of the definition of r_value at line 1, characters 0-39.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the annotation on the abstract type declaration for a.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts v1.5: that's a pretty awful error message *)
 
@@ -756,7 +756,7 @@ Error: Layout mismatch in final type declaration consistency check.
            because of the annotation on the universal variable 'a.
          But the layout of 'a must be a sublayout of value non_pointer
            because of the definition of t_imm at line 1, characters 0-27.
-         Hint: The layout of immediate is value non_pointer.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
@@ -1070,7 +1070,7 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on the universal variable 'a.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let f (x : ('a : value mod global). 'a -> 'a) = x "string"
@@ -1693,7 +1693,7 @@ Error: This definition has type "'b -> 'b" which is less general than
          because of the annotation on the universal variable 'a.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of f_imm at line 1, characters 4-9.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type (_ : value) g =

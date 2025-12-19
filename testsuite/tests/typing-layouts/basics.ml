@@ -497,7 +497,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of imm_id at line 1, characters 0-33.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 let id_for_imms (x : 'a imm_id) = x
@@ -521,7 +521,7 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of id_for_imms at line 1, characters 16-35.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (************************************)
@@ -538,7 +538,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 type s4 = string t4
@@ -553,7 +553,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type s4 = int t4
@@ -587,7 +587,7 @@ Error:
          because it is the primitive type string.
        But the layout of s5 must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : any) t4 = 'a
@@ -647,7 +647,7 @@ Error: This definition has type "'b -> unit" which is less general than
          because it is or unifies with an unannotated universal variable.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t6_imm at line 1, characters 0-42.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 let o6 = object
@@ -664,7 +664,7 @@ Error: This method has type "'b -> unit" which is less general than
          because it is or unifies with an unannotated universal variable.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t6_imm at line 1, characters 0-42.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* CR layouts v1.5: add more tests here once you can annotate these types with
@@ -686,7 +686,7 @@ Error: This type "int * int" should be an instance of type "('a : immediate)"
          because it's a tuple type.
        But the layout of int * int must be a sublayout of value non_pointer
          because of the definition of t7 at line 1, characters 0-37.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (**********************************************************)
@@ -912,7 +912,7 @@ Error: Signature mismatch:
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of x at line 8, characters 10-26.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* This hits the second linktype in moregen (requires expansion to see it's a
@@ -954,7 +954,7 @@ Error: Signature mismatch:
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of x at line 8, characters 10-26.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (**********************************************************************)
@@ -1863,7 +1863,7 @@ Error: Layout mismatch in final type declaration consistency check.
            because of the annotation on the universal variable 'a.
          But the layout of 'a must be a sublayout of value non_pointer
            because of the definition of t2_imm at line 1, characters 0-28.
-         Hint: The layout of immediate is value non_pointer.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
@@ -1884,7 +1884,7 @@ Error:
          because it's a function type.
        But the layout of 'a -> 'b must be a sublayout of value non_pointer
          because of the definition of t35 at line 1, characters 0-30.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (**************************************************)
@@ -2372,7 +2372,7 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
            chosen to have layout value.
          But the layout of 'a t2 must be a sublayout of value non_pointer
            because of the annotation on the wildcard _ at line 1, characters 28-37.
-         Hint: The layout of immediate is value non_pointer.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
@@ -2389,7 +2389,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because it is the primitive type string.
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t2.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* This example is unfortunately rejected as a consequence of the fix for the
@@ -2413,7 +2413,7 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
            chosen to have layout value.
          But the layout of 'a t2 must be a sublayout of value non_pointer
            because of the annotation on the wildcard _ at line 1, characters 27-36.
-         Hint: The layout of immediate is value non_pointer.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
@@ -2444,7 +2444,7 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
            chosen to have layout value.
          But the layout of 'a t2 must be a sublayout of value non_pointer
            because of the annotation on the wildcard _ at line 1, characters 25-34.
-         Hint: The layout of immediate is value non_pointer.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
@@ -2965,5 +2965,5 @@ Error: This type "t1" should be an instance of type
        But the layout of t1 must be a sublayout of
            value non_pointer & value non_pointer
          because of the definition of t2 at line 2, characters 0-36.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]

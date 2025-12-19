@@ -339,7 +339,7 @@ Error: This expression has type "float" but an expression was expected of type
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_pointer
          because of the definition of s6 at line 2, characters 0-35.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (*****************************************************)

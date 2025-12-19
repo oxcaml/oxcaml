@@ -44,7 +44,7 @@ Error: Signature mismatch:
          because of the definition of t at line 4, characters 2-43.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-43.
-       Hint: The layout of immediate is value non_pointer.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 module M : sig

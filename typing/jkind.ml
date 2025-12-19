@@ -2607,11 +2607,11 @@ module Violation = struct
                  pp_bound sub.jkind pp_bound super.jkind))
     | No_intersection _ -> ()
 
-  (* CR layouts-scannable: For now, this is special-cased to print out hints in
-     the presence of a layout error containing [value non_pointer(64)] since
-      [immediate(64)] is such a common jkind abbreviation. There is probably room
-      to print out better hints (maybe by looking at the full jkinds?) *)
-  let report_layout_hints ppf violation mismatch_type ~print_as_value_layout =
+  (* CR layouts-scannable: For now, this is special-cased to print out notes iff
+     the layout error message prints containing [value non_pointer(64)] since
+     [immediate(64)] is such a common jkind abbreviation. There is probably room
+     to print out better notes (maybe by looking at the full jkinds?) *)
+  let report_layout_notes ppf violation mismatch_type ~print_as_value_layout =
     match mismatch_type with
     | Mode -> ()
     | Layout ->
@@ -2622,10 +2622,10 @@ module Violation = struct
         | None -> false
         | Some const -> Layout.Const.has_component ~component const
       in
-      let should_hint_immediate, should_hint_immediate64 =
+      let should_note_immediate, should_note_immediate64 =
         match violation with
         (* If we are printing the jkind on the right as a value layout, then
-           we should not look at it to determine whether to emit a hint *)
+           we should not look at it to determine whether to emit a note *)
         | Not_a_subjkind (jkind1, jkind2, _) ->
           let check_jkind2 = not print_as_value_layout in
           ( check_has_component immediate_layout jkind1
@@ -2639,17 +2639,12 @@ module Violation = struct
             check_has_component immediate64_layout jkind1
             || (check_jkind2 && check_has_component immediate64_layout jkind2) )
       in
-      (* CR zeisbach: nowhere else in this file uses inline_code. Should this
-         be the first place? Just check; super easy tweak regardless.
-         Also, it's ever so slightly sad that the order of reporting doesn't
-         match the order in which the layouts appear, but I don't believe the
-         benefit would outweigh the cost (time and code). *)
-      if should_hint_immediate
+      if should_note_immediate
       then
-        fprintf ppf "@;@[Hint: The layout of immediate is value non_pointer.@]";
-      if should_hint_immediate64
+        fprintf ppf "@;@[Note: The layout of immediate is value non_pointer.@]";
+      if should_note_immediate64
       then
-        fprintf ppf "@;@[Hint: The layout of immediate64 is value non_pointer64.@]"
+        fprintf ppf "@;@[Note: The layout of immediate64 is value non_pointer64.@]"
 
   let report_fuel ppf violation =
     let report_fuel_for_type which =
@@ -2675,7 +2670,7 @@ module Violation = struct
   (* CR layouts-scannable: Also, better error messages should be reported for
      products! For instance, an error message blaming an arity difference, or
      an error message that drills down into two products to find the first
-     conflicing component. *)
+     conflicing component. Note reporting should be adjusted appropriately. *)
   let report_general ~level preamble pp_former former ppf t =
     (* Sometimes, when reporting a layout conflict, the scannable axes of
        the expected layout should not be shown since the information is
@@ -2791,8 +2786,8 @@ module Violation = struct
         fmt_k1 fmt_k2;
     report_missing_cmi ppf missing_cmi_option;
     report_reason ppf t.violation;
-    (* otherwise, we get hints for layout abbreviations that get omitted. *)
-    report_layout_hints ppf t.violation mismatch_type ~print_as_value_layout;
+    (* otherwise, we get notes for layout abbreviations that get omitted. *)
+    report_layout_notes ppf t.violation mismatch_type ~print_as_value_layout;
     report_fuel ppf t.violation
 
   let pp_t ppf x = fprintf ppf "%t" x
