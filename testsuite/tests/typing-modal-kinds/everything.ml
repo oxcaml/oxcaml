@@ -2,17 +2,17 @@
    expect;
 *)
 
-(* The kinds [value] and [float64] don't mode cross, but the kinds [value mod
-   everything] and [float64 mod everything] cross everything (ignoring
+(* The kinds [value] and [float64_internal] don't mode cross, but the kinds [value mod
+   everything] and [float64_internal mod everything] cross everything (ignoring
    nullability and separability) *)
 type t_value : value
 type t_value_mod_e : value mod everything
-type t_float64 : float64
-type t_float64_mod_e : float64 mod everything
+type t_float64 : float64_internal
+type t_float64_mod_e : float64_internal mod everything
 [%%expect{|
 type t_value
 type t_value_mod_e : value_or_null mod everything mod non_null separable
-type t_float64 : float64
+type t_float64 : float64_internal
 type t_float64_mod_e : float64 mod everything
 |}]
 
@@ -38,8 +38,8 @@ type bad : float64 mod global = t_float64
 Line 1, characters 0-41:
 1 | type bad : float64 mod global = t_float64
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_float64" is float64
-         because of the definition of t_float64 at line 3, characters 0-24.
+Error: The kind of type "t_float64" is float64_internal
+         because of the definition of t_float64 at line 3, characters 0-33.
        But the kind of type "t_float64" must be a subkind of float64 mod global
          because of the definition of bad at line 1, characters 0-41.
 |}]
@@ -71,8 +71,8 @@ type bad : float64 mod many = t_float64
 Line 1, characters 0-39:
 1 | type bad : float64 mod many = t_float64
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_float64" is float64
-         because of the definition of t_float64 at line 3, characters 0-24.
+Error: The kind of type "t_float64" is float64_internal
+         because of the definition of t_float64 at line 3, characters 0-33.
        But the kind of type "t_float64" must be a subkind of float64 mod many
          because of the definition of bad at line 1, characters 0-39.
 |}]
@@ -104,8 +104,8 @@ type bad : float64 mod aliased = t_float64
 Line 1, characters 0-42:
 1 | type bad : float64 mod aliased = t_float64
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_float64" is float64
-         because of the definition of t_float64 at line 3, characters 0-24.
+Error: The kind of type "t_float64" is float64_internal
+         because of the definition of t_float64 at line 3, characters 0-33.
        But the kind of type "t_float64" must be a subkind of
            float64 mod aliased
          because of the definition of bad at line 1, characters 0-42.
@@ -138,8 +138,8 @@ type bad : float64 mod portable = t_float64
 Line 1, characters 0-43:
 1 | type bad : float64 mod portable = t_float64
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_float64" is float64
-         because of the definition of t_float64 at line 3, characters 0-24.
+Error: The kind of type "t_float64" is float64_internal
+         because of the definition of t_float64 at line 3, characters 0-33.
        But the kind of type "t_float64" must be a subkind of
            float64 mod portable
          because of the definition of bad at line 1, characters 0-43.
@@ -172,8 +172,8 @@ type bad : float64 mod contended = t_float64
 Line 1, characters 0-44:
 1 | type bad : float64 mod contended = t_float64
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_float64" is float64
-         because of the definition of t_float64 at line 3, characters 0-24.
+Error: The kind of type "t_float64" is float64_internal
+         because of the definition of t_float64 at line 3, characters 0-33.
        But the kind of type "t_float64" must be a subkind of
            float64 mod contended
          because of the definition of bad at line 1, characters 0-44.
@@ -206,8 +206,8 @@ type bad : float64 mod unyielding = t_float64
 Line 1, characters 0-45:
 1 | type bad : float64 mod unyielding = t_float64
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_float64" is float64
-         because of the definition of t_float64 at line 3, characters 0-24.
+Error: The kind of type "t_float64" is float64_internal
+         because of the definition of t_float64 at line 3, characters 0-33.
        But the kind of type "t_float64" must be a subkind of
            float64 mod unyielding
          because of the definition of bad at line 1, characters 0-45.
@@ -235,19 +235,18 @@ type good : value mod external_ = t_value_mod_e
 type good = t_value_mod_e
 |}]
 
-type bad : float64 mod external_ = t_float64
+type bad : float64 = t_float64
 [%%expect{|
-Line 1, characters 0-44:
-1 | type bad : float64 mod external_ = t_float64
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_float64" is float64
-         because of the definition of t_float64 at line 3, characters 0-24.
-       But the kind of type "t_float64" must be a subkind of
-           float64 mod external_
-         because of the definition of bad at line 1, characters 0-44.
+Line 1, characters 0-30:
+1 | type bad : float64 = t_float64
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t_float64" is float64_internal
+         because of the definition of t_float64 at line 3, characters 0-33.
+       But the kind of type "t_float64" must be a subkind of float64
+         because of the definition of bad at line 1, characters 0-30.
 |}]
 
-type good : float64 mod external_ = t_float64_mod_e
+type good : float64 = t_float64_mod_e
 [%%expect{|
 type good = t_float64_mod_e
 |}]
