@@ -281,6 +281,10 @@ jobs:
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
+      - name: Build debug target
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+        run: make debug
+
       - name: Promote failed tests and capture diffs
         # Compute the diff for an arbitrary job, we expect all to have the same diff
         if: failure() && matrix.name == 'runtime5'
