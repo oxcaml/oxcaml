@@ -2439,22 +2439,36 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
      Jkind.Builtin.product ~why:Unboxed_tuple tys_modalities layouts
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
-      let jkind = type_decl.type_jkind in
-      (* Checking [has_with_bounds] here is needed for correctness, because
-         intersection types sometimes do not unify with themselves. Removing
-         this check causes typing-misc/pr7937.ml to fail. *)
-      if not ignore_mod_bounds
-         && Jkind.has_with_bounds jkind
-         && List.compare_length_with args 0 <> 0
-      then
-        let level = get_level ty in
-        (* CR layouts v2.8: We could possibly skip this substitution if we're
-           called from [constrain_type_jkind]; the jkind returned without
-           substing is just weaker than the one we would get by substing.
-           Internal ticket 5107. *)
-        jkind_subst env level type_decl.type_params args jkind
-      else
-        jkind
+      begin match unbox_once env ty with
+      | Stepped_or_null { ty; modality } ->
+          begin match
+          Jkind.apply_modality_l modality
+            (estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty)
+            |> Jkind.apply_or_null_l with
+          | Ok decl_jkind -> decl_jkind
+          | Error () ->
+            Misc.fatal_error "Ctype.check_decl_jkind: \
+              the constructor argument inside a Variant_with_null \
+              is already maybe-null."
+          end
+      | _ ->
+        let jkind = type_decl.type_jkind in
+        (* Checking [has_with_bounds] here is needed for correctness, because
+          intersection types sometimes do not unify with themselves. Removing
+          this check causes typing-misc/pr7937.ml to fail. *)
+        if not ignore_mod_bounds
+          && Jkind.has_with_bounds jkind
+          && List.compare_length_with args 0 <> 0
+        then
+          let level = get_level ty in
+          (* CR layouts v2.8: We could possibly skip this substitution if we're
+            called from [constrain_type_jkind]; the jkind returned without
+            substing is just weaker than the one we would get by substing.
+            Internal ticket 5107. *)
+          jkind_subst env level type_decl.type_params args jkind
+        else
+          jkind
+      end
     with
     (* CR layouts v2.8: It will be confusing when a [Cannot_subst] leads to
        a [Missing_cmi]. Internal ticket 5109. *)
