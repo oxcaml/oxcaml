@@ -1082,7 +1082,8 @@ and expression ctxt f x =
         (* @;@[<2>else@ %a@]@] *)
         let fmt:(_,_,_)format ="@[<hv0>@[<2>%aif@ %a@]@;@[<2>then@ %a@]%a@]" in
         let expression_under_ifthenelse = expression (under_ifthenelse ctxt) in
-        pp f fmt boxing b expression_under_ifthenelse e1 expression_under_ifthenelse e2
+        pp f fmt boxing b expression_under_ifthenelse e1
+          expression_under_ifthenelse e2
           (fun f eo -> match eo with
              | Some x ->
                  pp f "@;@[<2>else@;%a@]" (expression (under_semi ctxt)) x

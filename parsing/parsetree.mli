@@ -473,8 +473,9 @@ and expression_desc =
       (** [if E1 then E2 else E3] *)
   | Pexp_sequence of boxing * expression * expression  (** [E1; E2] *)
   | Pexp_while of boxing * expression * expression  (** [while E1 do E2 done] *)
-  | Pexp_for of boxing * pattern * expression * expression * direction_flag * expression
-      (** [Pexp_for(i, E1, E2, direction, E3)] represents:
+  | Pexp_for of
+      boxing * pattern * expression * expression * direction_flag * expression
+      (** [Pexp_for(_, i, E1, E2, direction, E3)] represents:
             - [for i = E1 to E2 do E3 done]
                  when [direction] is {{!Asttypes.direction_flag.Upto}[Upto]}
             - [for i = E1 downto E2 do E3 done]

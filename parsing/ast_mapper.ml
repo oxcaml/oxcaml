@@ -593,8 +593,8 @@ module E = struct
     | Pexp_while (box, e1, e2) ->
         while_ ~loc ~attrs box (sub.expr sub e1) (sub.expr sub e2)
     | Pexp_for (box, p, e1, e2, d, e3) ->
-        for_ ~loc ~attrs box (sub.pat sub p) (sub.expr sub e1) (sub.expr sub e2) d
-          (sub.expr sub e3)
+        for_ ~loc ~attrs box (sub.pat sub p) (sub.expr sub e1) (sub.expr sub e2)
+          d (sub.expr sub e3)
     | Pexp_coerce (e, t1, t2) ->
         coerce ~loc ~attrs (sub.expr sub e) (map_opt (sub.typ sub) t1)
           (sub.typ sub t2)

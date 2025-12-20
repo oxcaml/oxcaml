@@ -185,14 +185,14 @@ module Exp:
       expression
     val idx : ?loc:loc -> ?attrs:attrs -> block_access -> unboxed_access list
       -> expression
-    val ifthenelse: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
-                    -> expression option -> expression
+    val ifthenelse: ?loc:loc -> ?attrs:attrs -> boxing -> expression
+                    -> expression -> expression option -> expression
     val sequence: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
                   -> expression
     val while_: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
                 -> expression
-    val for_: ?loc:loc -> ?attrs:attrs -> boxing -> pattern -> expression -> expression
-              -> direction_flag -> expression -> expression
+    val for_: ?loc:loc -> ?attrs:attrs -> boxing -> pattern -> expression
+              -> expression -> direction_flag -> expression -> expression
     val coerce: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
                 -> core_type -> expression
     val constraint_: ?loc:loc -> ?attrs:attrs -> expression -> core_type option

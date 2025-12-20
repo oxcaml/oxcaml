@@ -97,7 +97,9 @@ val mkTexp_function :
 
 val mkTexp_sequence :
   ?box:Asttypes.boxing ->
-  ?id:texp_sequence_identifier -> expression * expression -> expression_desc
+  ?id:texp_sequence_identifier ->
+  expression * expression ->
+  expression_desc
 
 val mkTexp_match :
   ?id:texp_match_identifier ->

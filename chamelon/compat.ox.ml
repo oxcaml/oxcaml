@@ -208,7 +208,7 @@ let mkTexp_function ?(id = texp_function_defaults)
 type texp_sequence_identifier = Jkind.sort
 
 let mkTexp_sequence ?(box = Asttypes.Boxed) ?id:(sort = Jkind.Sort.value)
-      (e1, e2) =
+    (e1, e2) =
   Texp_sequence (box, e1, sort, e2)
 
 type texp_match_identifier = Jkind.sort

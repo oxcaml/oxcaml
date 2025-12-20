@@ -572,11 +572,8 @@ let clause ~transl_exp ~scopes ~loc = function
         match box with
         | Boxed -> cond
         | Unboxed -> 
-          static_cast
-            ~src:(Naked (Integral (Taggable Int8)))
-            ~dst:(Value (Integral (Taggable Int)))
-            cond
-            ~loc
+          static_cast ~src:(Naked (Integral (Taggable Int8)))
+            ~dst:(Value (Integral (Taggable Int))) cond ~loc
       in
       Lifthenelse (cond, body, lambda_unit, layout_unit)
 

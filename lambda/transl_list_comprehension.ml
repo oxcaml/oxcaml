@@ -313,11 +313,8 @@ let rec translate_clauses ~transl_exp ~scopes ~loc ~comprehension_body
         match box with
         | Boxed -> cond
         | Unboxed -> 
-          static_cast
-            ~src:(Naked (Integral (Taggable Int8)))
-            ~dst:(Value (Integral (Taggable Int)))
-            cond
-            ~loc
+          static_cast ~src:(Naked (Integral (Taggable Int8)))
+            ~dst:(Value (Integral (Taggable Int))) cond ~loc
       in
       Lifthenelse
         ( cond,

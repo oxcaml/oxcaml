@@ -240,10 +240,12 @@ module Exp = struct
   let setfield ?loc ?attrs a b c d = mk ?loc ?attrs (Pexp_setfield (a, b, c, d))
   let array ?loc ?attrs a b = mk ?loc ?attrs (Pexp_array (a, b))
   let idx ?loc ?attrs a b = mk ?loc ?attrs (Pexp_idx (a, b))
-  let ifthenelse ?loc ?attrs a b c d = mk ?loc ?attrs (Pexp_ifthenelse (a, b, c, d))
+  let ifthenelse ?loc ?attrs a b c d =
+    mk ?loc ?attrs (Pexp_ifthenelse (a, b, c, d))
   let sequence ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_sequence (a, b, c))
   let while_ ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_while (a, b, c))
-  let for_ ?loc ?attrs a b c d e f = mk ?loc ?attrs (Pexp_for (a, b, c, d, e, f))
+  let for_ ?loc ?attrs a b c d e f =
+    mk ?loc ?attrs (Pexp_for (a, b, c, d, e, f))
   let constraint_ ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_constraint (a, b, c))
   let coerce ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_coerce (a, b, c))
   let send ?loc ?attrs a b = mk ?loc ?attrs (Pexp_send (a, b))

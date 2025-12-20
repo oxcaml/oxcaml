@@ -68,9 +68,7 @@ let false_ = Lconst (Const_base (Const_int 0))
 
 let quote_bool b = if b then true_ else false_
 
-let is_unboxed = function
-  | Boxed -> false
-  | Unboxed -> true
+let is_unboxed = function Boxed -> false | Unboxed -> true
 
 (* Lambdas that represent the option type *)
 
