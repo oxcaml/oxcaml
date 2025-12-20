@@ -1241,6 +1241,7 @@ module Ast = struct
     | PatVar of Var.Value.t
     | PatAlias of pattern * Var.Value.t
     | PatConstant of constant
+    | PatUnboxedUnit
     | PatTuple of (tuple_label * pattern) list
     | PatUnboxedTuple of (tuple_label * pattern) list
     | PatConstruct of constr * pattern option
@@ -1315,6 +1316,7 @@ module Ast = struct
     | Src_pos
     | Stack of expression
     | Exclave of expression
+    | Unboxed_unit
     | Unboxed_tuple of (tuple_label * expression) list
     | Unboxed_record_product of
         (record_field * expression) list * expression option
@@ -1490,6 +1492,7 @@ module Ast = struct
     | PatAlias (pat, v) ->
       pp fmt "%a@ as@ %a" (print_pat env) pat (Var.Value.print env) v
     | PatConstant c -> print_const fmt c
+    | PatUnboxedUnit -> pp fmt "#()"
     | PatTuple ts -> print_tuple (print_pat env) fmt ts
     | PatUnboxedTuple ts -> pp fmt "#%a" (print_tuple (print_pat env)) ts
     | PatConstruct (ident, pat_opt) -> (
@@ -1962,6 +1965,7 @@ module Ast = struct
       pp fmt "@[<2>let@ exception@ %s@ in@ %a@]" name (print_exp env) exp
     | Extension_constructor name ->
       pp fmt "@[[%%extension_constructor@ %a]@]" Name.print name
+    | Unboxed_unit -> pp fmt "#()"
     | Unboxed_tuple ts ->
       pp fmt "#";
       print_tuple (print_exp env) fmt ts
@@ -2152,6 +2156,8 @@ module Pat = struct
     Ast.PatAlias (p, v)
 
   let constant const = return (Ast.PatConstant const)
+
+  let unboxed_unit = return Ast.PatUnboxedUnit
 
   let tuple ts =
     let ps =
@@ -2869,6 +2875,8 @@ module Exp_desc = struct
   let immutable_array_comprehension compr =
     let+ compr = compr in
     Ast.Immutable_array_comprehension compr
+
+  let unboxed_unit = return Ast.Unboxed_unit
 
   let unboxed_tuple fs =
     let entries =
