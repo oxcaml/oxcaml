@@ -1895,9 +1895,9 @@ module Ast = struct
          pp fmt "@]");
       pp fmt "@]"
     | Setfield (unboxed, obj, field, exp) ->
-      pp fmt "%a#%a %a<- %a"
+      pp fmt "%a.%a %a<- %a"
         (print_exp_with_parens env)
-        obj print_unboxed unboxed (print_field env) field (print_exp env) exp
+        obj (print_field env) field print_unboxed unboxed (print_exp env) exp
     | Letmodule (None, module_exp, exp) ->
       pp fmt "@[<2>let@ module@ _@ =@ @[%a@]@ in@ %a@]" (print_module_exp env)
         module_exp (print_exp env) exp

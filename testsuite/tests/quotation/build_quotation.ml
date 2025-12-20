@@ -302,12 +302,12 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ fun r -> r.contents <- () ]>;;
 [%%expect{|
-- : <[unit ref -> unit]> expr = <[fun r -> r# Stdlib.contents<- ()]>
+- : <[unit ref -> unit]> expr = <[fun r -> r.Stdlib.contents <- ()]>
 |}];;
 
 <[ fun r -> r.contents #<- () ]>;;
 [%%expect{|
-- : <[unit ref -> unit#]> expr = <[fun r -> r## Stdlib.contents<- ()]>
+- : <[unit ref -> unit#]> expr = <[fun r -> r.Stdlib.contents #<- ()]>
 |}];;
 
 <[ fun l -> List.map (fun x -> 2 * x) l ]>;;
