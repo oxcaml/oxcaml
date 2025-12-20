@@ -1101,7 +1101,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            transl_exp ~scopes sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
-  | Texp_assert (_, {exp_desc=Texp_construct(_, {cstr_name="false"}, _, _)}, loc) ->
+  | Texp_assert (_, {exp_desc=Texp_construct(_, {cstr_name="false"}, _, _)
+                             |Texp_unboxed_bool false}, loc) ->
       assert_failed loc ~scopes e
   | Texp_assert (box, cond, loc) ->
       let assert_passed = lambda_unboxable_unit ~box ~scopes e.exp_loc in

@@ -6873,7 +6873,8 @@ and type_expect_
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
       let exp_type =
         match wh_cond.exp_desc with
-        | Texp_construct(_, {cstr_name="true"}, _, _) -> instance ty_expected
+        | Texp_construct(_, {cstr_name="true"}, _, _)
+        | Texp_unboxed_bool true -> instance ty_expected
         | _ -> instance (type_unboxable_unit box)
       in
       let wh_body, wh_body_sort =

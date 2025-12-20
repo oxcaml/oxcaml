@@ -25,6 +25,12 @@ let f ~head ~tail = head #()#; tail #()
 val f : head:(unit# -> unit#) -> tail:(unit# -> 'a) -> 'a = <fun>
 |}]
 
+let f ~do_ = #while #true do do_ #() done
+
+[%%expect{|
+val f : do_:(unit# -> unit#) -> 'a = <fun>
+|}]
+
 let f ~while_ ~do_ = #while while_ #() do do_ #() done
 
 [%%expect{|
@@ -47,11 +53,10 @@ val f : assert_:(unit# -> bool#) -> unit# = <fun>
 
 let f ~match_ ~when_ ~case_ =
   match match_ #() with
-  | _ #when when_ #() -> case_ #()
+  | x #when when_ x -> case_ x
   | _ -> #assert #false
 
 [%%expect{|
-val f :
-  match_:(unit# -> 'a) -> when_:(unit# -> bool#) -> case_:(unit# -> 'b) -> 'b =
+val f : match_:(unit# -> 'a) -> when_:('a -> bool#) -> case_:('a -> 'b) -> 'b =
   <fun>
 |}]
