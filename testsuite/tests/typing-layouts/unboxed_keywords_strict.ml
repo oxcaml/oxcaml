@@ -41,7 +41,7 @@ let f ~from_ ~to_ ~do_ = #for _ = from_ #() to to_ #() do do_ #() done
 
 [%%expect{|
 val f :
-  from_:(unit# -> int) -> to_:(unit# -> int) -> do_:(unit# -> unit#) -> unit =
+  from_:(unit# -> int) -> to_:(unit# -> int) -> do_:(unit# -> unit#) -> unit# =
   <fun>
 |}]
 

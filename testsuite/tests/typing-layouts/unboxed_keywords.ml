@@ -41,7 +41,7 @@ let f ~from_ ~to_ ~do_ = #for _ = from_ #() to to_ #() do do_ #() done
 
 [%%expect{|
 val f :
-  from_:(unit# -> int) -> to_:(unit# -> int) -> do_:(unit# -> 'a) -> unit =
+  from_:(unit# -> int) -> to_:(unit# -> int) -> do_:(unit# -> 'a) -> unit# =
   <fun>
 |}]
 
@@ -137,7 +137,7 @@ val f : unit -> 'a = <fun>
 let f () = #for _ = 0 to 0 do () done
 
 [%%expect{|
-val f : unit -> unit = <fun>
+val f : unit -> unit# = <fun>
 |}]
 
 let f () = #assert true

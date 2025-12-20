@@ -675,7 +675,7 @@ Ptop_def
             module_expr (//toplevel//[2,1+8]..[2,1+9])
               Pmod_ident "M" (//toplevel//[2,1+8]..[2,1+9])
             expression (//toplevel//[2,1+12]..[2,1+16])
-              Pexp_sequence
+              Pexp_sequence Boxed
               expression (//toplevel//[2,1+12]..[2,1+13])
                 Pexp_constant PConst_int (3,None)
               expression (//toplevel//[2,1+15]..[2,1+16])
