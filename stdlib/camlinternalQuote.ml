@@ -1458,8 +1458,9 @@ module Ast = struct
 
   and print_pat_with_parens env fmt pat =
     match pat with
-    | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedTuple _
-    | PatVariant (_, Some _) | PatRecord _ | PatUnboxedRecord _ | PatArray _ ->
+    | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedUnit
+    | PatUnboxedTuple _ | PatVariant (_, Some _) | PatRecord _
+    | PatUnboxedRecord _ | PatArray _ ->
       print_pat env fmt pat
     | _ -> pp fmt "(@[%a@])" (print_pat env) pat
 
@@ -1526,8 +1527,8 @@ module Ast = struct
     | Construct (_, None)
     | Variant (_, None)
     | Record (_, None)
-    | Field _ | Array _ | Send _ | Unreachable | Src_pos | Unboxed_tuple _
-    | Unboxed_record_product (_, None)
+    | Field _ | Array _ | Send _ | Unreachable | Src_pos | Unboxed_unit
+    | Unboxed_tuple _ | Unboxed_record_product (_, None)
     | List_comprehension _ | Array_comprehension _ | Quote _ ->
       (print_exp env) fmt exp
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
