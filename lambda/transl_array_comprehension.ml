@@ -560,13 +560,22 @@ let clause ~transl_exp ~scopes ~loc = function
       Let_binding.let_all
         (Iterator_bindings.all_let_bindings var_bindings)
         (make_clause body)
-  | Texp_comp_when cond ->
+  | Texp_comp_when (box, cond) ->
     fun body ->
-      Lifthenelse
-        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
-          body,
-          lambda_unit,
-          layout_unit )
+      let jkind =
+        match box with
+        | Boxed -> Jkind.Sort.Const.for_predef_value
+        | Unboxed -> Jkind.Sort.Const.bits8
+      in
+      let cond = transl_exp ~scopes jkind cond in
+      let cond =
+        match box with
+        | Boxed -> cond
+        | Unboxed ->
+          static_cast ~src:(Naked (Integral (Taggable Int8)))
+            ~dst:(Value (Integral (Taggable Int))) cond ~loc
+      in
+      Lifthenelse (cond, body, lambda_unit, layout_unit)
 
 (** The [array_sizing] type describes whether an array comprehension has been
     translated using the fixed-size array optimization ([Fixed_size]), or it has

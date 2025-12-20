@@ -1634,3 +1634,30 @@ let f = function #false -> #true | #true -> #false
 [%%expect{|
 val f : bool# -> bool# = <fun>
 |}]
+
+(*************************)
+(* unboxed keywords *)
+
+let f #() = #if #true then #()
+let g #() = #()#; #()
+let h #() = #while #false do #() done
+let i #() = #for _ = 0 to 0 do #() done
+let j #() = #assert #true
+let k #() = match #() with #() #when #true -> #() | _ -> #()
+let l = [: () for _ = 0 to 0 #when #true :]
+let m #() = (ref ()).contents #<- ()
+let n #() = let mutable x = #() in x #<- #()#; x
+let o = object val mutable x = () method set #() = x #<- () end
+
+[%%expect{|
+val f : unit# -> unit# = <fun>
+val g : unit# -> unit# = <fun>
+val h : unit# -> unit# = <fun>
+val i : unit# -> unit# = <fun>
+val j : unit# -> unit# = <fun>
+val k : unit# -> unit# = <fun>
+val l : unit iarray = [:():]
+val m : unit# -> unit# = <fun>
+val n : unit# -> unit# = <fun>
+val o : < set : unit# -> unit# > = <obj>
+|}]

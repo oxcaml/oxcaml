@@ -179,27 +179,28 @@ module Exp:
                 -> expression option -> expression
     val field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
     val unboxed_field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
-    val setfield: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
-                  -> expression
+    val setfield: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> lid
+                  -> expression -> expression
     val array: ?loc:loc -> ?attrs:attrs -> mutable_flag -> expression list ->
       expression
     val idx : ?loc:loc -> ?attrs:attrs -> block_access -> unboxed_access list
       -> expression
-    val ifthenelse: ?loc:loc -> ?attrs:attrs -> expression -> expression
-                    -> expression option -> expression
-    val sequence: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val ifthenelse: ?loc:loc -> ?attrs:attrs -> boxing -> expression
+                    -> expression -> expression option -> expression
+    val sequence: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
                   -> expression
-    val while_: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val while_: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
                 -> expression
-    val for_: ?loc:loc -> ?attrs:attrs -> pattern -> expression -> expression
-              -> direction_flag -> expression -> expression
+    val for_: ?loc:loc -> ?attrs:attrs -> boxing -> pattern -> expression
+              -> expression -> direction_flag -> expression -> expression
     val coerce: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
                 -> core_type -> expression
     val constraint_: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
                      -> mode with_loc list -> expression
     val send: ?loc:loc -> ?attrs:attrs -> expression -> str -> expression
     val new_: ?loc:loc -> ?attrs:attrs -> lid -> expression
-    val setinstvar: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
+    val setinstvar: ?loc:loc -> ?attrs:attrs -> boxing -> str -> expression
+                    -> expression
     val override: ?loc:loc -> ?attrs:attrs -> (str * expression) list
                   -> expression
     val letmodule: ?loc:loc -> ?attrs:attrs -> str_opt -> module_expr
@@ -207,7 +208,7 @@ module Exp:
     val letexception:
       ?loc:loc -> ?attrs:attrs -> extension_constructor -> expression
       -> expression
-    val assert_: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val assert_: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
     val lazy_: ?loc:loc -> ?attrs:attrs -> expression -> expression
     val poly: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
               -> expression
@@ -229,7 +230,7 @@ module Exp:
     val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
     val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
 
-    val case: pattern -> ?guard:expression -> expression -> case
+    val case: pattern -> ?guard:(boxing * expression) -> expression -> case
     val binding_op: str -> pattern -> expression -> loc -> binding_op
   end
 

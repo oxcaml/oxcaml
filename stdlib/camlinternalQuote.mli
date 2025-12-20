@@ -476,6 +476,7 @@ module rec Case : sig
 
   val guarded :
     Loc.t ->
+    unboxed:bool ->
     bound_values:Name.t list ->
     bound_modules:Name.t list ->
     (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t * Exp.t) lam ->
@@ -525,7 +526,7 @@ and Comprehension : sig
 
   val body : Exp.t -> t
 
-  val when_clause : Exp.t -> t -> t
+  val when_clause : unboxed:bool -> Exp.t -> t -> t
 
   val for_range :
     Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> t) lam -> t
@@ -570,24 +571,25 @@ and Exp_desc : sig
 
   val field : Exp.t -> Field.t -> t
 
-  val setfield : Exp.t -> Field.t -> Exp.t -> t
+  val setfield : unboxed:bool -> Exp.t -> Field.t -> Exp.t -> t
 
   val array : Exp.t list -> t
 
-  val ifthenelse : Exp.t -> Exp.t -> Exp.t option -> t
+  val ifthenelse : unboxed:bool -> Exp.t -> Exp.t -> Exp.t option -> t
 
-  val sequence : Exp.t -> Exp.t -> t
+  val sequence : unboxed:bool -> Exp.t -> Exp.t -> t
 
-  val while_ : Exp.t -> Exp.t -> t
+  val while_ : unboxed:bool -> Exp.t -> Exp.t -> t
 
   val for_nonbinding : Loc.t -> Pat.t -> Exp.t -> Exp.t -> bool -> Exp.t -> t
 
   val for_simple :
-    Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> Exp.t) lam -> t
+    unboxed:bool -> Loc.t -> Name.t -> Exp.t -> Exp.t -> bool ->
+    (Var.Value.t -> Exp.t) lam -> t
 
   val send : Exp.t -> Method.t -> t
 
-  val assert_ : Exp.t -> t
+  val assert_ : unboxed:bool -> Exp.t -> t
 
   val lazy_ : Exp.t -> t
 

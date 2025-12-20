@@ -48,7 +48,7 @@ let bind_cases l =
         let open Location in
         match c_guard with
         | None -> c_rhs.exp_loc
-        | Some g -> {c_rhs.exp_loc with loc_start=g.exp_loc.loc_start}
+        | Some (_, e) -> {c_rhs.exp_loc with loc_start=e.exp_loc.loc_start}
       in
       bind_variables loc c_lhs
     )

@@ -265,16 +265,16 @@ let rec add_expr bv exp =
       List.iter (fun (lbl, e) -> add bv lbl; add_expr bv e) lblel;
       add_opt add_expr bv opte
   | Pexp_field(e, fld) | Pexp_unboxed_field(e, fld) -> add_expr bv e; add bv fld
-  | Pexp_setfield(e1, fld, e2) -> add_expr bv e1; add bv fld; add_expr bv e2
+  | Pexp_setfield(_, e1, fld, e2) -> add_expr bv e1; add bv fld; add_expr bv e2
   | Pexp_array (_, el) -> List.iter (add_expr bv) el
   | Pexp_idx (ba, uas) ->
     add_block_access bv ba;
     List.iter (add_unboxed_access bv) uas
-  | Pexp_ifthenelse(e1, e2, opte3) ->
+  | Pexp_ifthenelse(_box, e1, e2, opte3) ->
       add_expr bv e1; add_expr bv e2; add_opt add_expr bv opte3
-  | Pexp_sequence(e1, e2) -> add_expr bv e1; add_expr bv e2
-  | Pexp_while(e1, e2) -> add_expr bv e1; add_expr bv e2
-  | Pexp_for( _, e1, e2, _, e3) ->
+  | Pexp_sequence(_box, e1, e2) -> add_expr bv e1; add_expr bv e2
+  | Pexp_while(_box, e1, e2) -> add_expr bv e1; add_expr bv e2
+  | Pexp_for(_box, _, e1, e2, _, e3) ->
       add_expr bv e1; add_expr bv e2; add_expr bv e3
   | Pexp_coerce(e1, oty2, ty3) ->
       add_expr bv e1;
@@ -285,7 +285,7 @@ let rec add_expr bv exp =
       Option.iter (add_type bv) ty2
   | Pexp_send(e, _m) -> add_expr bv e
   | Pexp_new li -> add bv li
-  | Pexp_setvar(_v, e) -> add_expr bv e
+  | Pexp_setvar(_b, _v, e) -> add_expr bv e
   | Pexp_override sel -> List.iter (fun (_s, e) -> add_expr bv e) sel
   | Pexp_letmodule(id, m, e) ->
       let b = add_module_binding bv m in
@@ -296,7 +296,7 @@ let rec add_expr bv exp =
       in
       add_expr bv e
   | Pexp_letexception(_, e) -> add_expr bv e
-  | Pexp_assert (e) -> add_expr bv e
+  | Pexp_assert (_box, e) -> add_expr bv e
   | Pexp_lazy (e) -> add_expr bv e
   | Pexp_poly (e, t) -> add_expr bv e; add_opt add_type bv t
   | Pexp_object { pcstr_self = pat; pcstr_fields = fieldl } ->
@@ -346,7 +346,7 @@ and add_comprehension_clause bv = function
        clauses should be interpreted in parallel. But this treatment
        echoes the treatment in [Pexp_let] (in [add_bindings]). *)
   | Pcomp_for cbs -> List.fold_left add_comprehension_clause_binding bv cbs
-  | Pcomp_when expr -> add_expr bv expr; bv
+  | Pcomp_when (_box, expr) -> add_expr bv expr; bv
 
 and add_comprehension_clause_binding bv
       { pcomp_cb_pattern; pcomp_cb_iterator; pcomp_cb_attributes = _ } =
@@ -401,7 +401,7 @@ and add_cases bv cases =
 
 and add_case bv {pc_lhs; pc_guard; pc_rhs} =
   let bv = add_pattern bv pc_lhs in
-  add_opt add_expr bv pc_guard;
+  add_opt (fun bv (_box, e) -> add_expr bv e) bv pc_guard;
   add_expr bv pc_rhs
 
 and add_bindings recf bv pel =

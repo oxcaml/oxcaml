@@ -30,7 +30,7 @@
                       Pexp_constant PConst_int (4,None)
                 ]
                 expression (shortcut_ext_attr.ml[12,222+2]..[30,721+31])
-                  Pexp_sequence
+                  Pexp_sequence Boxed
                   expression (shortcut_ext_attr.ml[12,222+2]..[12,222+36])
                     Pexp_extension "foo"
                     [
@@ -47,7 +47,7 @@
                             None
                     ]
                   expression (shortcut_ext_attr.ml[13,261+2]..[30,721+31])
-                    Pexp_sequence
+                    Pexp_sequence Boxed
                     expression (shortcut_ext_attr.ml[13,261+2]..[13,261+30])
                       Pexp_extension "foo"
                       [
@@ -64,7 +64,7 @@
                               None
                       ]
                     expression (shortcut_ext_attr.ml[14,294+2]..[30,721+31])
-                      Pexp_sequence
+                      Pexp_sequence Boxed
                       expression (shortcut_ext_attr.ml[14,294+2]..[14,294+25])
                         Pexp_extension "foo"
                         [
@@ -88,7 +88,7 @@
                                   None
                         ]
                       expression (shortcut_ext_attr.ml[15,322+2]..[30,721+31])
-                        Pexp_sequence
+                        Pexp_sequence Boxed
                         expression (shortcut_ext_attr.ml[15,322+2]..[15,322+30])
                           Pexp_extension "foo"
                           [
@@ -111,7 +111,7 @@
                                   ]
                           ]
                         expression (shortcut_ext_attr.ml[16,355+2]..[30,721+31])
-                          Pexp_sequence
+                          Pexp_sequence Boxed
                           expression (shortcut_ext_attr.ml[16,355+2]..[16,355+33])
                             Pexp_extension "foo"
                             [
@@ -134,7 +134,7 @@
                                   ]
                             ]
                           expression (shortcut_ext_attr.ml[17,391+2]..[30,721+31])
-                            Pexp_sequence
+                            Pexp_sequence Boxed
                             expression (shortcut_ext_attr.ml[17,391+2]..[17,391+35])
                               Pexp_extension "foo"
                               [
@@ -143,7 +143,7 @@
                                   expression (shortcut_ext_attr.ml[17,391+3]..[17,391+34])
                                     attribute "foo"
                                       []
-                                    Pexp_ifthenelse
+                                    Pexp_ifthenelse Boxed
                                     expression (shortcut_ext_attr.ml[17,391+16]..[17,391+18])
                                       Pexp_construct "()" (shortcut_ext_attr.ml[17,391+16]..[17,391+18])
                                       None
@@ -156,7 +156,7 @@
                                         None
                               ]
                             expression (shortcut_ext_attr.ml[18,429+2]..[30,721+31])
-                              Pexp_sequence
+                              Pexp_sequence Boxed
                               expression (shortcut_ext_attr.ml[18,429+2]..[18,429+31]) ghost
                                 Pexp_extension "foo"
                                 [
@@ -165,7 +165,7 @@
                                     expression (shortcut_ext_attr.ml[18,429+2]..[18,429+31])
                                       attribute "foo"
                                         []
-                                      Pexp_while
+                                      Pexp_while Boxed
                                       expression (shortcut_ext_attr.ml[18,429+18]..[18,429+20])
                                         Pexp_construct "()" (shortcut_ext_attr.ml[18,429+18]..[18,429+20])
                                         None
@@ -174,7 +174,7 @@
                                         None
                                 ]
                               expression (shortcut_ext_attr.ml[19,463+2]..[30,721+31])
-                                Pexp_sequence
+                                Pexp_sequence Boxed
                                 expression (shortcut_ext_attr.ml[19,463+2]..[19,463+39]) ghost
                                   Pexp_extension "foo"
                                   [
@@ -183,7 +183,7 @@
                                       expression (shortcut_ext_attr.ml[19,463+2]..[19,463+39])
                                         attribute "foo"
                                           []
-                                        Pexp_for Up
+                                        Pexp_for Boxed Up
                                         pattern (shortcut_ext_attr.ml[19,463+16]..[19,463+17])
                                           Ppat_var "x" (shortcut_ext_attr.ml[19,463+16]..[19,463+17])
                                         expression (shortcut_ext_attr.ml[19,463+20]..[19,463+22])
@@ -202,17 +202,17 @@
                                     structure_item (shortcut_ext_attr.ml[20,505+2]..[30,721+31])
                                       Pstr_eval
                                       expression (shortcut_ext_attr.ml[20,505+2]..[30,721+31])
-                                        Pexp_sequence
+                                        Pexp_sequence Boxed
                                         expression (shortcut_ext_attr.ml[20,505+2]..[20,505+4])
                                           Pexp_construct "()" (shortcut_ext_attr.ml[20,505+2]..[20,505+4])
                                           None
                                         expression (shortcut_ext_attr.ml[20,505+11]..[30,721+31])
-                                          Pexp_sequence
+                                          Pexp_sequence Boxed
                                           expression (shortcut_ext_attr.ml[20,505+11]..[20,505+13])
                                             Pexp_construct "()" (shortcut_ext_attr.ml[20,505+11]..[20,505+13])
                                             None
                                           expression (shortcut_ext_attr.ml[21,521+2]..[30,721+31])
-                                            Pexp_sequence
+                                            Pexp_sequence Boxed
                                             expression (shortcut_ext_attr.ml[21,521+2]..[21,521+23]) ghost
                                               Pexp_extension "foo"
                                               [
@@ -221,13 +221,13 @@
                                                   expression (shortcut_ext_attr.ml[21,521+2]..[21,521+23])
                                                     attribute "foo"
                                                       []
-                                                    Pexp_assert
+                                                    Pexp_assert Boxed
                                                     expression (shortcut_ext_attr.ml[21,521+19]..[21,521+23])
                                                       Pexp_construct "true" (shortcut_ext_attr.ml[21,521+19]..[21,521+23])
                                                       None
                                               ]
                                             expression (shortcut_ext_attr.ml[22,547+2]..[30,721+31])
-                                              Pexp_sequence
+                                              Pexp_sequence Boxed
                                               expression (shortcut_ext_attr.ml[22,547+2]..[22,547+18]) ghost
                                                 Pexp_extension "foo"
                                                 [
@@ -241,7 +241,7 @@
                                                         Pexp_ident "x" (shortcut_ext_attr.ml[22,547+17]..[22,547+18])
                                                 ]
                                               expression (shortcut_ext_attr.ml[23,568+2]..[30,721+31])
-                                                Pexp_sequence
+                                                Pexp_sequence Boxed
                                                 expression (shortcut_ext_attr.ml[23,568+2]..[23,568+22]) ghost
                                                   Pexp_extension "foo"
                                                   [
@@ -257,7 +257,7 @@
                                                           []
                                                   ]
                                                 expression (shortcut_ext_attr.ml[24,593+2]..[30,721+31])
-                                                  Pexp_sequence
+                                                  Pexp_sequence Boxed
                                                   expression (shortcut_ext_attr.ml[24,593+2]..[24,593+23]) ghost
                                                     Pexp_extension "foo"
                                                     [
@@ -269,7 +269,7 @@
                                                           Pexp_constant PConst_int (3,None)
                                                     ]
                                                   expression (shortcut_ext_attr.ml[25,619+2]..[30,721+31])
-                                                    Pexp_sequence
+                                                    Pexp_sequence Boxed
                                                     expression (shortcut_ext_attr.ml[25,619+2]..[25,619+17]) ghost
                                                       Pexp_extension "foo"
                                                       [

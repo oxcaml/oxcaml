@@ -1178,7 +1178,7 @@ let report_error ppf = function
   | Non_value_layout (ty, err) ->
       fprintf ppf
         "Non-value detected in [value_kind].@ Please report this error to \
-         the Jane Street compilers team.";
+         the Jane Street compilers team.\n";
       begin match err with
       | None ->
         fprintf ppf "@ Could not find cmi for: %a" Printtyp.type_expr ty

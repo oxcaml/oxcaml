@@ -480,22 +480,25 @@ module Sort = struct
         (* path compression *)
         result)
 
-  let rec default_to_value_and_get : t -> Const.t = function
+  let rec default_to_const_and_get ~void : t -> Const.t = function
     | Base b -> Static.Const.of_base b
-    | Product ts -> Product (List.map default_to_value_and_get ts)
+    | Product ts -> Product (List.map (default_to_const_and_get ~void) ts)
     | Var r -> (
       match r.contents with
       | None ->
-        set r Static.T_option.value;
-        Static.Const.value
+        set r (if void then Static.T_option.void else Static.T_option.value);
+        if void then Static.Const.void else Static.Const.value
       | Some s ->
-        let result = default_to_value_and_get s in
+        let result = default_to_const_and_get ~void s in
         set r (Static.T_option.of_const result);
         (* path compression *)
         result)
 
+  let default_to_value_and_get = default_to_const_and_get ~void:false
+
   (* CR layouts v12: Default to void instead. *)
-  let default_for_transl_and_get s = default_to_value_and_get s
+  let default_for_transl_and_get ?(unboxed = false) s =
+    default_to_const_and_get ~void:unboxed s
 
   (***********************)
   (* equality *)

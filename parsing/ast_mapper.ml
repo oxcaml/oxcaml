@@ -523,7 +523,7 @@ module E = struct
 
   let map_clause sub = function
     | Pcomp_for cbs -> Pcomp_for (List.map (map_clause_binding sub) cbs)
-    | Pcomp_when expr -> Pcomp_when (sub.expr sub expr)
+    | Pcomp_when (box, expr) -> Pcomp_when (box, sub.expr sub expr)
 
   let map_comp sub = function
     | { pcomp_body; pcomp_clauses } ->
@@ -578,23 +578,23 @@ module E = struct
         field ~loc ~attrs (sub.expr sub e) (map_loc sub lid)
     | Pexp_unboxed_field (e, lid) ->
         unboxed_field ~loc ~attrs (sub.expr sub e) (map_loc sub lid)
-    | Pexp_setfield (e1, lid, e2) ->
-        setfield ~loc ~attrs (sub.expr sub e1) (map_loc sub lid)
+    | Pexp_setfield (box, e1, lid, e2) ->
+        setfield ~loc ~attrs box (sub.expr sub e1) (map_loc sub lid)
           (sub.expr sub e2)
     | Pexp_array (mut, el) -> array ~loc ~attrs mut (List.map (sub.expr sub) el)
     | Pexp_idx (ba, uas) ->
       idx ~loc ~attrs (map_block_access sub ba)
         (List.map (map_unboxed_access sub) uas)
-    | Pexp_ifthenelse (e1, e2, e3) ->
-        ifthenelse ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
+    | Pexp_ifthenelse (box, e1, e2, e3) ->
+        ifthenelse ~loc ~attrs box (sub.expr sub e1) (sub.expr sub e2)
           (map_opt (sub.expr sub) e3)
-    | Pexp_sequence (e1, e2) ->
-        sequence ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
-    | Pexp_while (e1, e2) ->
-        while_ ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
-    | Pexp_for (p, e1, e2, d, e3) ->
-        for_ ~loc ~attrs (sub.pat sub p) (sub.expr sub e1) (sub.expr sub e2) d
-          (sub.expr sub e3)
+    | Pexp_sequence (box, e1, e2) ->
+        sequence ~loc ~attrs box (sub.expr sub e1) (sub.expr sub e2)
+    | Pexp_while (box, e1, e2) ->
+        while_ ~loc ~attrs box (sub.expr sub e1) (sub.expr sub e2)
+    | Pexp_for (box, p, e1, e2, d, e3) ->
+        for_ ~loc ~attrs box (sub.pat sub p) (sub.expr sub e1) (sub.expr sub e2)
+          d (sub.expr sub e3)
     | Pexp_coerce (e, t1, t2) ->
         coerce ~loc ~attrs (sub.expr sub e) (map_opt (sub.typ sub) t1)
           (sub.typ sub t2)
@@ -603,8 +603,8 @@ module E = struct
     | Pexp_send (e, s) ->
         send ~loc ~attrs (sub.expr sub e) (map_loc sub s)
     | Pexp_new lid -> new_ ~loc ~attrs (map_loc sub lid)
-    | Pexp_setvar (s, e) ->
-        setinstvar ~loc ~attrs (map_loc sub s) (sub.expr sub e)
+    | Pexp_setvar (box, s, e) ->
+        setinstvar ~loc ~attrs box (map_loc sub s) (sub.expr sub e)
     | Pexp_override sel ->
         override ~loc ~attrs
           (List.map (map_tuple (map_loc sub) (sub.expr sub)) sel)
@@ -615,7 +615,7 @@ module E = struct
         letexception ~loc ~attrs
           (sub.extension_constructor sub cd)
           (sub.expr sub e)
-    | Pexp_assert e -> assert_ ~loc ~attrs (sub.expr sub e)
+    | Pexp_assert (box, e) -> assert_ ~loc ~attrs box (sub.expr sub e)
     | Pexp_lazy e -> lazy_ ~loc ~attrs (sub.expr sub e)
     | Pexp_poly (e, t) ->
         poly ~loc ~attrs (sub.expr sub e) (map_opt (sub.typ sub) t)
@@ -940,7 +940,7 @@ let default_mapper =
       (fun this {pc_lhs; pc_guard; pc_rhs} ->
          {
            pc_lhs = this.pat this pc_lhs;
-           pc_guard = map_opt (this.expr this) pc_guard;
+           pc_guard = map_opt (fun (box, e) -> box, this.expr this e) pc_guard;
            pc_rhs = this.expr this pc_rhs;
          }
       );

@@ -436,7 +436,7 @@ let exp_extra sub (extra, loc, attrs) sexp =
 let case : type k . mapper -> k case -> _ = fun sub {c_lhs; c_guard; c_rhs} ->
   {
    pc_lhs = sub.pat sub c_lhs;
-   pc_guard = Option.map (sub.expr sub) c_guard;
+   pc_guard = Option.map (fun (b, e) -> b, sub.expr sub e) c_guard;
    pc_rhs = sub.expr sub c_rhs;
   }
 
@@ -486,8 +486,8 @@ let comprehension sub comp =
     ; pcomp_cb_attributes = comp_cb_attributes }
   in
   let clause = function
-    | Texp_comp_for  bindings -> Pcomp_for (List.map binding bindings)
-    | Texp_comp_when cond     -> Pcomp_when (sub.expr sub cond)
+    | Texp_comp_for  bindings    -> Pcomp_for (List.map binding bindings)
+    | Texp_comp_when (box, cond) -> Pcomp_when (box, sub.expr sub cond)
   in
   let comprehension { comp_body; comp_clauses } =
     { pcomp_body    = sub.expr sub comp_body
@@ -635,8 +635,8 @@ let expression sub exp =
         Pexp_field (sub.expr sub exp, map_loc sub lid)
     | Texp_unboxed_field (exp, _, lid, _label, _) ->
         Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_setfield (exp1, _, lid, _label, exp2) ->
-        Pexp_setfield (sub.expr sub exp1, map_loc sub lid,
+    | Texp_setfield (box, exp1, _, lid, _label, exp2) ->
+        Pexp_setfield (box, sub.expr sub exp1, map_loc sub lid,
           sub.expr sub exp2)
     | Texp_array (amut, _, list, _) ->
         Pexp_array (mutable_ amut, List.map (sub.expr sub) list)
@@ -648,16 +648,16 @@ let expression sub exp =
     | Texp_array_comprehension (amut, _, comp) ->
         Pexp_comprehension
           (Pcomp_array_comprehension (mutable_ amut, comprehension sub comp))
-    | Texp_ifthenelse (exp1, exp2, expo) ->
-        Pexp_ifthenelse (sub.expr sub exp1,
+    | Texp_ifthenelse (box, exp1, exp2, expo) ->
+        Pexp_ifthenelse (box, sub.expr sub exp1,
           sub.expr sub exp2,
           Option.map (sub.expr sub) expo)
-    | Texp_sequence (exp1, _jkind, exp2) ->
-        Pexp_sequence (sub.expr sub exp1, sub.expr sub exp2)
-    | Texp_while {wh_cond; wh_body} ->
-        Pexp_while (sub.expr sub wh_cond, sub.expr sub wh_body)
-    | Texp_for {for_pat; for_from; for_to; for_dir; for_body} ->
-        Pexp_for (for_pat,
+    | Texp_sequence (box, exp1, _jkind, exp2) ->
+        Pexp_sequence (box, sub.expr sub exp1, sub.expr sub exp2)
+    | Texp_while {wh_box; wh_cond; wh_body} ->
+        Pexp_while (wh_box, sub.expr sub wh_cond, sub.expr sub wh_body)
+    | Texp_for {for_box; for_pat; for_from; for_to; for_dir; for_body} ->
+        Pexp_for (for_box, for_pat,
           sub.expr sub for_from, sub.expr sub for_to,
           for_dir, sub.expr sub for_body)
     | Texp_send (exp, meth, _) ->
@@ -671,12 +671,12 @@ let expression sub exp =
     | Texp_mutvar id ->
       Pexp_ident ({loc = sub.location sub id.loc;
                    txt = lident_of_path (Pident id.txt)})
-    | Texp_setinstvar (_, _path, lid, exp) ->
-        Pexp_setvar (map_loc sub lid, sub.expr sub exp)
-    | Texp_setmutvar(lid, _sort, exp) ->
+    | Texp_setinstvar (box, _, _path, lid, exp) ->
+        Pexp_setvar (box, map_loc sub lid, sub.expr sub exp)
+    | Texp_setmutvar(box, lid, _sort, exp) ->
         let lid = {loc = sub.location sub lid.loc;
                    txt = Ident.name lid.txt} in
-        Pexp_setvar (lid, sub.expr sub exp)
+        Pexp_setvar (box, lid, sub.expr sub exp)
     | Texp_override (_, list) ->
         Pexp_override (List.map (fun (_path, lid, exp) ->
               (map_loc sub lid, sub.expr sub exp)
@@ -687,7 +687,7 @@ let expression sub exp =
     | Texp_letexception (ext, exp) ->
         Pexp_letexception (sub.extension_constructor sub ext,
                            sub.expr sub exp)
-    | Texp_assert (exp, _) -> Pexp_assert (sub.expr sub exp)
+    | Texp_assert (box, exp, _) -> Pexp_assert (box, sub.expr sub exp)
     | Texp_lazy exp -> Pexp_lazy (sub.expr sub exp)
     | Texp_object (cl, _) ->
         Pexp_object (sub.class_structure sub cl)

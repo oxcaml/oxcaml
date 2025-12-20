@@ -1015,6 +1015,13 @@ let maybe_pmod_constraint mode expr =
 %token HASHLBRACE             "#{"
 %token HASHFALSE              "#false"
 %token HASHTRUE               "#true"
+%token HASHIF                 "#if"
+%token HASHSEMI               "#;"
+%token HASHASSERT             "#assert"
+%token HASHFOR                "#for"
+%token HASHWHILE              "#while"
+%token HASHWHEN               "#when"
+%token HASHLESSMINUS          "#<-"
 %token IF                     "if"
 %token IN                     "in"
 %token INCLUDE                "include"
@@ -1145,14 +1152,14 @@ The precedences must be listed from low to high.
 
 %nonassoc IN
 %nonassoc below_SEMI
-%nonassoc SEMI                          /* below EQUAL ({lbl=...; lbl=...}) */
+%nonassoc SEMI HASHSEMI                 /* below EQUAL ({lbl=...; lbl=...}) */
 %nonassoc LET FOR                       /* above SEMI ( ...; let ... in ...) */
 %nonassoc below_WITH
 %nonassoc FUNCTION WITH                 /* below BAR  (match ... with ...) */
 %nonassoc AND             /* above WITH (module rec A: SIG with ... and ...) */
 %nonassoc THEN                          /* below ELSE (if ... then ...) */
 %nonassoc ELSE                          /* (if ... then ... else ...) */
-%nonassoc LESSMINUS                     /* below COLONEQUAL (lbl <- x := e) */
+%nonassoc LESSMINUS HASHLESSMINUS       /* below COLONEQUAL (lbl <- x := e) */
 %right    COLONEQUAL                    /* expr (e := e := e) */
 %nonassoc AS
 %left     BAR                           /* pattern (p|p|p) */
@@ -2675,10 +2682,17 @@ fun_seq_expr:
   | fun_expr    %prec below_SEMI  { $1 }
   | fun_expr SEMI                 { $1 }
   | mkexp(fun_expr SEMI seq_expr
-    { Pexp_sequence($1, $3) })
+    { Pexp_sequence(Boxed, $1, $3) })
+    { $1 }
+  | mkexp(fun_expr HASHSEMI seq_expr
+    { Pexp_sequence(Unboxed, $1, $3) })
     { $1 }
   | fun_expr SEMI PERCENT attr_id seq_expr
-    { let seq = mkexp ~loc:$sloc (Pexp_sequence ($1, $5)) in
+    { let seq = mkexp ~loc:$sloc (Pexp_sequence (Boxed, $1, $5)) in
+      let payload = PStr [mkstrexp seq []] in
+      mkexp ~loc:$sloc (Pexp_extension ($4, payload)) }
+  | fun_expr HASHSEMI PERCENT attr_id seq_expr
+    { let seq = mkexp ~loc:$sloc (Pexp_sequence (Unboxed, $1, $5)) in
       let payload = PStr [mkstrexp seq []] in
       mkexp ~loc:$sloc (Pexp_extension ($4, payload)) }
 ;
@@ -2846,9 +2860,13 @@ fun_expr:
       { mkexp_cons ~loc:$sloc $loc($2)
           (ghexp ~loc:$sloc (Pexp_tuple[None, $1;None, $3])) }
   | mkrhs(label) LESSMINUS expr
-      { mkexp ~loc:$sloc (Pexp_setvar($1, $3)) }
+      { mkexp ~loc:$sloc (Pexp_setvar(Boxed, $1, $3)) }
+  | mkrhs(label) HASHLESSMINUS expr
+      { mkexp ~loc:$sloc (Pexp_setvar(Unboxed, $1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
-      { mkexp ~loc:$sloc (Pexp_setfield($1, $3, $5)) }
+      { mkexp ~loc:$sloc (Pexp_setfield(Boxed, $1, $3, $5)) }
+  | simple_expr DOT mkrhs(label_longident) HASHLESSMINUS expr
+      { mkexp ~loc:$sloc (Pexp_setfield(Unboxed, $1, $3, $5)) }
   | indexop_expr(DOT, seq_expr, LESSMINUS v=expr {Some v})
     { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
   | indexop_expr(qualified_dotop, expr_semi_list, LESSMINUS v=expr {Some v})
@@ -2884,16 +2902,27 @@ fun_expr:
   | OVERWRITE ext_attributes seq_expr WITH expr
       { Pexp_overwrite($3, $5), $2 }
   | IF ext_attributes seq_expr THEN expr ELSE expr
-      { Pexp_ifthenelse($3, $5, Some $7), $2 }
+      { Pexp_ifthenelse(Boxed, $3, $5, Some $7), $2 }
   | IF ext_attributes seq_expr THEN expr
-      { Pexp_ifthenelse($3, $5, None), $2 }
+      { Pexp_ifthenelse(Boxed, $3, $5, None), $2 }
+  | HASHIF ext_attributes seq_expr THEN expr ELSE expr
+      { Pexp_ifthenelse(Unboxed, $3, $5, Some $7), $2 }
+  | HASHIF ext_attributes seq_expr THEN expr
+      { Pexp_ifthenelse(Unboxed, $3, $5, None), $2 }
   | WHILE ext_attributes seq_expr do_done_expr
-      { Pexp_while($3, $4), $2 }
+      { Pexp_while(Boxed, $3, $4), $2 }
+  | HASHWHILE ext_attributes seq_expr do_done_expr
+      { Pexp_while(Unboxed, $3, $4), $2 }
   | FOR ext_attributes pattern EQUAL seq_expr direction_flag seq_expr
     do_done_expr
-      { Pexp_for($3, $5, $7, $6, $8), $2 }
+      { Pexp_for(Boxed, $3, $5, $7, $6, $8), $2 }
+  | HASHFOR ext_attributes pattern EQUAL seq_expr direction_flag seq_expr
+    do_done_expr
+      { Pexp_for(Unboxed, $3, $5, $7, $6, $8), $2 }
   | ASSERT ext_attributes simple_expr %prec below_HASH
-      { Pexp_assert $3, $2 }
+      { Pexp_assert (Boxed, $3), $2 }
+  | HASHASSERT ext_attributes simple_expr %prec below_HASH
+      { Pexp_assert (Unboxed, $3), $2 }
   | LAZY ext_attributes simple_expr %prec below_HASH
       { Pexp_lazy $3, $2 }
   | subtractive expr %prec prec_unary_minus
@@ -3017,7 +3046,9 @@ comprehension_clause:
   | FOR separated_nonempty_llist(AND, comprehension_clause_binding)
       { Pcomp_for $2 }
   | WHEN expr
-      { Pcomp_when $2 }
+      { Pcomp_when (Boxed, $2) }
+  | HASHWHEN expr
+      { Pcomp_when (Unboxed, $2) }
 
 %inline comprehension(lbracket, rbracket):
   lbracket expr nonempty_llist(comprehension_clause) rbracket
@@ -3432,7 +3463,9 @@ match_case:
     pattern MINUSGREATER seq_expr
       { Exp.case $1 $3 }
   | pattern WHEN seq_expr MINUSGREATER seq_expr
-      { Exp.case $1 ~guard:$3 $5 }
+      { Exp.case $1 ~guard:(Boxed, $3) $5 }
+  | pattern HASHWHEN seq_expr MINUSGREATER seq_expr
+      { Exp.case $1 ~guard:(Unboxed, $3) $5 }
   | pattern MINUSGREATER DOT
       { Exp.case $1 (Exp.unreachable ~loc:(make_loc $loc($3)) ()) }
 ;

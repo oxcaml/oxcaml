@@ -453,8 +453,8 @@ let expr sub x =
                         in
                         {comp_cb_iterator; comp_cb_attributes})
                      bindings)
-            | Texp_comp_when exp ->
-              Texp_comp_when (sub.expr sub exp))
+            | Texp_comp_when (box, exp) ->
+              Texp_comp_when (box, sub.expr sub exp))
           comp_clauses
     }
   in
@@ -546,8 +546,9 @@ let expr sub x =
         Texp_field (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr)
     | Texp_unboxed_field (exp, sort, lid, ld, uu) ->
         Texp_unboxed_field (sub.expr sub exp, sort, map_loc sub lid, ld, uu)
-    | Texp_setfield (exp1, am, lid, ld, exp2) ->
+    | Texp_setfield (box, exp1, am, lid, ld, exp2) ->
         Texp_setfield (
+          box,
           sub.expr sub exp1,
           am,
           map_loc sub lid,
@@ -566,23 +567,24 @@ let expr sub x =
         Texp_list_comprehension (map_comprehension comp)
     | Texp_array_comprehension (amut, sort, comp) ->
         Texp_array_comprehension (amut, sort, map_comprehension comp)
-    | Texp_ifthenelse (exp1, exp2, expo) ->
+    | Texp_ifthenelse (box, exp1, exp2, expo) ->
         Texp_ifthenelse (
+          box,
           sub.expr sub exp1,
           sub.expr sub exp2,
           Option.map (sub.expr sub) expo
         )
-    | Texp_sequence (exp1, jkind, exp2) ->
+    | Texp_sequence (box, exp1, jkind, exp2) ->
         Texp_sequence (
+          box,
           sub.expr sub exp1,
           jkind,
           sub.expr sub exp2
         )
     | Texp_while wh ->
-        Texp_while { wh_cond = sub.expr sub wh.wh_cond;
-                     wh_body = sub.expr sub wh.wh_body;
-                     wh_body_sort = wh.wh_body_sort
-                   }
+        Texp_while {wh with wh_cond = sub.expr sub wh.wh_cond;
+                            wh_body = sub.expr sub wh.wh_body;
+                            wh_body_sort = wh.wh_body_sort}
     | Texp_for tf ->
         Texp_for {tf with for_from = sub.expr sub tf.for_from;
                           for_to = sub.expr sub tf.for_to;
@@ -608,15 +610,16 @@ let expr sub x =
           map_loc sub id
         )
     | Texp_mutvar id -> Texp_mutvar (map_loc sub id)
-    | Texp_setinstvar (path1, path2, id, exp) ->
+    | Texp_setinstvar (box, path1, path2, id, exp) ->
         Texp_setinstvar (
+          box,
           path1,
           path2,
           map_loc sub id,
           sub.expr sub exp
         )
-    | Texp_setmutvar (id, sort, exp) ->
-        Texp_setmutvar (map_loc sub id, sort, sub.expr sub exp)
+    | Texp_setmutvar (box, id, sort, exp) ->
+        Texp_setmutvar (box, map_loc sub id, sort, sub.expr sub exp)
     | Texp_override (path, list) ->
         Texp_override (
           path,
@@ -635,8 +638,8 @@ let expr sub x =
           sub.extension_constructor sub cd,
           sub.expr sub exp
         )
-    | Texp_assert (exp, loc) ->
-        Texp_assert (sub.expr sub exp, loc)
+    | Texp_assert (box, exp, loc) ->
+        Texp_assert (box, sub.expr sub exp, loc)
     | Texp_lazy exp ->
         Texp_lazy (sub.expr sub exp)
     | Texp_object (cl, sl) ->
@@ -1056,7 +1059,7 @@ let case
   = fun sub {c_lhs; c_guard; c_rhs} ->
   {
     c_lhs = sub.pat sub c_lhs;
-    c_guard = Option.map (sub.expr sub) c_guard;
+    c_guard = Option.map (fun (b, e) -> b, sub.expr sub e) c_guard;
     c_rhs = sub.expr sub c_rhs;
   }
 

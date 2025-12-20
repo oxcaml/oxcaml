@@ -34,20 +34,20 @@ type comprehension_type =
 module Style = Misc.Style
 
 type type_forcing_context =
-  | If_conditional
-  | If_no_else_branch
-  | While_loop_conditional
-  | While_loop_body
+  | If_conditional of boxing
+  | If_no_else_branch of boxing
+  | While_loop_conditional of boxing
+  | While_loop_body of boxing
   | For_loop_start_index
   | For_loop_stop_index
-  | For_loop_body
-  | Assert_condition
-  | Sequence_left_hand_side
-  | When_guard
+  | For_loop_body of boxing
+  | Assert_condition of boxing
+  | Sequence_left_hand_side of boxing
+  | When_guard of boxing
   | Comprehension_in_iterator of comprehension_type
   | Comprehension_for_start
   | Comprehension_for_stop
-  | Comprehension_when
+  | Comprehension_when of boxing
   | Error_message_attr of string
 
 type type_expected = {
@@ -4007,9 +4007,9 @@ let force_delayed_checks () =
 let rec final_subexpression exp =
   match exp.exp_desc with
     Texp_let (_, _, e)
-  | Texp_sequence (_, _, e)
+  | Texp_sequence (_, _, _, e)
   | Texp_try (e, _)
-  | Texp_ifthenelse (_, e, _)
+  | Texp_ifthenelse (_, _, e, _)
   | Texp_match (_, _, {c_rhs=e} :: _, _)
   | Texp_letmodule (_, _, _, _, e)
   | Texp_letexception (_, e)
@@ -4526,7 +4526,7 @@ let rec is_nonexpansive exp =
       is_nonexpansive e &&
       List.for_all
         (fun {c_lhs; c_guard; c_rhs} ->
-           is_nonexpansive_opt c_guard && is_nonexpansive c_rhs
+           is_nonexpansive_opt (Option.map snd c_guard) && is_nonexpansive c_rhs
            && not (contains_exception_pat c_lhs)
         ) cases
   | Texp_probe {handler} -> is_nonexpansive handler
@@ -4575,9 +4575,9 @@ let rec is_nonexpansive exp =
          in case we add new unboxed access types *)
       let _unboxed_access = function Uaccess_unboxed_field _ -> true in
       block_access ba
-  | Texp_ifthenelse(_cond, ifso, ifnot) ->
+  | Texp_ifthenelse(_box, _cond, ifso, ifnot) ->
       is_nonexpansive ifso && is_nonexpansive_opt ifnot
-  | Texp_sequence (_e1, _jkind, e2) -> is_nonexpansive e2  (* PR#4354 *)
+  | Texp_sequence (_box, _e1, _jkind, e2) -> is_nonexpansive e2  (* PR#4354 *)
   | Texp_new (_, _, cl_decl, _) -> Btype.class_type_arity cl_decl.cty_type > 0
   (* Note: nonexpansive only means no _observable_ side effects *)
   | Texp_lazy e -> is_nonexpansive e
@@ -4607,7 +4607,7 @@ let rec is_nonexpansive exp =
      equivalent to (raise e; diverge), and a nonexpansive "diverge" can be
      produced using lazy values or the relaxed value restriction.
      See GPR#1142 *)
-  | Texp_assert (exp, _) ->
+  | Texp_assert (_, exp, _) ->
       is_nonexpansive exp
   | Texp_apply (
       { exp_desc = Texp_ident (_, _, {val_kind = Val_prim prim}, Id_prim _, _) },
@@ -4868,8 +4868,8 @@ let rec type_approx env sexp ty_expected =
   | Pexp_try (e, _) -> type_approx env e ty_expected
   | Pexp_tuple l ->
       type_tuple_approx env sexp.pexp_loc ty_expected l
-  | Pexp_ifthenelse (_,e,_) -> type_approx env e ty_expected
-  | Pexp_sequence (_,e) -> type_approx env e ty_expected
+  | Pexp_ifthenelse (_,_,e,_) -> type_approx env e ty_expected
+  | Pexp_sequence (_,_,e) -> type_approx env e ty_expected
   | Pexp_constraint (e, Some sty, _) ->
       let ty_expected =
         type_approx_constraint env (Pconstraint sty) ty_expected ~loc
@@ -5021,7 +5021,7 @@ let check_statement exp =
       let rec loop {exp_loc; exp_desc; exp_extra; _} =
         match exp_desc with
         | Texp_let (_, _, e)
-        | Texp_sequence (_, _, e)
+        | Texp_sequence (_, _, _, e)
         | Texp_letexception (_, e)
         | Texp_letmodule (_, _, _, _, e) ->
             loop e
@@ -5082,7 +5082,7 @@ let check_partial_application ~statement exp =
             | Texp_mutvar _ | Texp_setmutvar _
             | Texp_setinstvar _ | Texp_override _ | Texp_assert _
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
-            | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
+            | Texp_extension_constructor _ | Texp_ifthenelse (_, _, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
             | Texp_function _ | Texp_quotation _ | Texp_antiquotation _
             | Texp_eval _ ->
@@ -5093,10 +5093,10 @@ let check_partial_application ~statement exp =
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases
             | Texp_try (e, cases) ->
                 check e; List.iter (fun {c_rhs; _} -> check c_rhs) cases
-            | Texp_ifthenelse (_, e1, Some e2) ->
+            | Texp_ifthenelse (_, _, e1, Some e2) ->
                 check e1; check e2
             | Texp_let (_, _, e) | Texp_letmutable(_, e)
-            | Texp_sequence (_, _, e) | Texp_open (_, e)
+            | Texp_sequence (_, _, _, e) | Texp_open (_, e)
             | Texp_letexception (_, e) | Texp_letmodule (_, _, _, _, e)
             | Texp_exclave e ->
                 check e
@@ -5334,9 +5334,9 @@ let rec is_inferred sexp =
       is_inferred sbody
   | Pexp_ident _ | Pexp_apply _ | Pexp_field _ | Pexp_constraint (_, Some _, _)
   | Pexp_coerce _ | Pexp_send _ | Pexp_new _ -> true
-  | Pexp_sequence (_, e) | Pexp_open (_, e) | Pexp_constraint (e, None, _) ->
+  | Pexp_sequence (_, _, e) | Pexp_open (_, e) | Pexp_constraint (e, None, _) ->
       is_inferred e
-  | Pexp_ifthenelse (_, e1, Some e2) -> is_inferred e1 && is_inferred e2
+  | Pexp_ifthenelse (_, _, e1, Some e2) -> is_inferred e1 && is_inferred e2
   | _ -> false
 
 (* check if the type of %apply or %revapply matches the type expected by
@@ -5762,6 +5762,14 @@ let add_zero_alloc_attribute expr attributes =
       { expr with exp_desc }
     end
   | _ -> expr
+
+let type_unboxable_unit = function
+  | Boxed -> Predef.type_unit
+  | Unboxed -> Predef.type_unboxed_unit 
+
+let type_unboxable_bool = function
+  | Boxed -> Predef.type_bool
+  | Unboxed -> Predef.type_unboxed_bool 
 
 let rec type_exp ?recarg ?(overwrite=No_overwrite) env expected_mode sexp =
   (* We now delegate everything to type_expect *)
@@ -6644,7 +6652,7 @@ and type_expect_
         exp_type = ty_arg;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-  | Pexp_setfield(srecord, lid, snewval) ->
+  | Pexp_setfield(box, srecord, lid, snewval) ->
       let (record, _, rmode, label, expected_type) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
@@ -6670,12 +6678,12 @@ and type_expect_
       in
       unify_exp env record ty_record;
       rue {
-        exp_desc = Texp_setfield(record,
+        exp_desc = Texp_setfield(box, record,
           Locality.disallow_right (regional_to_local
             (Value.proj_comonadic Areality rmode)),
           label_loc, label, newval);
         exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unit;
+        exp_type = instance (type_unboxable_unit box);
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_array(mut, sargl) ->
@@ -6804,19 +6812,21 @@ and type_expect_
       exp_type = instance ty_expected;
       exp_attributes = sexp.pexp_attributes;
       exp_env = env }
-  | Pexp_ifthenelse(scond, sifso, sifnot) ->
+  | Pexp_ifthenelse(box, scond, sifso, sifnot) ->
       check_dynamic (loc, Expression) Branching expected_mode;
       let cond =
         type_expect env mode_max scond
-          (mk_expected ~explanation:If_conditional Predef.type_bool)
+          (mk_expected ~explanation:(If_conditional box)
+             (type_unboxable_bool box))
       in
       begin match sifnot with
         None ->
           let ifso =
             type_expect env expected_mode sifso
-              (mk_expected ~explanation:If_no_else_branch Predef.type_unit) in
+              (mk_expected ~explanation:(If_no_else_branch box)
+                 (type_unboxable_unit box)) in
           rue {
-            exp_desc = Texp_ifthenelse(cond, ifso, None);
+            exp_desc = Texp_ifthenelse(box, cond, ifso, None);
             exp_loc = loc; exp_extra = [];
             exp_type = ifso.exp_type;
             exp_attributes = sexp.pexp_attributes;
@@ -6831,24 +6841,24 @@ and type_expect_
           (* Keep sharing *)
           unify_exp env ifnot ifso.exp_type;
           re {
-            exp_desc = Texp_ifthenelse(cond, ifso, Some ifnot);
+            exp_desc = Texp_ifthenelse(box, cond, ifso, Some ifnot);
             exp_loc = loc; exp_extra = [];
             exp_type = ifso.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
       end
-  | Pexp_sequence(sexp1, sexp2) ->
+  | Pexp_sequence(box, sexp1, sexp2) ->
       let exp1, sort1 =
-        type_statement ~explanation:Sequence_left_hand_side env sexp1
+        type_statement ~box ~explanation:(Sequence_left_hand_side box) env sexp1
       in
       let exp2 = type_expect env expected_mode sexp2 ty_expected_explained in
       re {
-        exp_desc = Texp_sequence(exp1, sort1, exp2);
+        exp_desc = Texp_sequence(box, exp1, sort1, exp2);
         exp_loc = loc; exp_extra = [];
         exp_type = exp2.exp_type;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-  | Pexp_while(scond, sbody) ->
+  | Pexp_while(box, scond, sbody) ->
       let env =
         Env.add_const_closure_lock ~ghost:true (loc, Loop)
           {Value.Comonadic.Const.max with linearity = Many} env
@@ -6857,27 +6867,30 @@ and type_expect_
       let mode = mode_region Value.max in
       let wh_cond =
         type_expect cond_env mode scond
-          (mk_expected ~explanation:While_loop_conditional Predef.type_bool)
+          (mk_expected ~explanation:(While_loop_conditional box)
+             (type_unboxable_bool box))
       in
       let body_env = Env.add_region_lock env in
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
       let exp_type =
         match wh_cond.exp_desc with
-        | Texp_construct(_, {cstr_name="true"}, _, _) -> instance ty_expected
-        | _ -> instance Predef.type_unit
+        | Texp_construct(_, {cstr_name="true"}, _, _)
+        | Texp_unboxed_bool true -> instance ty_expected
+        | _ -> instance (type_unboxable_unit box)
       in
       let wh_body, wh_body_sort =
-        type_statement ~explanation:While_loop_body
+        type_statement ~box ~explanation:(While_loop_body box)
           ~position body_env sbody
       in
       rue {
         exp_desc =
-          Texp_while {wh_cond; wh_body; wh_body_sort};
+          Texp_while {wh_box = box; wh_cond; wh_body; wh_body_sort};
         exp_loc = loc; exp_extra = [];
         exp_type;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-  | Pexp_for(param, slow, shigh, dir, sbody) ->
+  | Pexp_for(box, param, slow, shigh, dir, sbody) ->
+      (* CR layouts: Consider unboxing the int bounds. *)
       let for_from =
         type_expect env (mode_region Value.max) slow
           (mk_expected ~explanation:For_loop_start_index Predef.type_int)
@@ -6896,14 +6909,15 @@ and type_expect_
       let new_env = Env.add_region_lock new_env in
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
       let for_body, for_body_sort =
-        type_statement ~explanation:For_loop_body ~position new_env sbody
+        type_statement ~box ~explanation:(For_loop_body box) ~position new_env
+          sbody
       in
       rue {
-        exp_desc = Texp_for {for_id; for_debug_uid = for_uid; for_pat = param;
-                             for_from; for_to; for_dir = dir; for_body;
-                             for_body_sort };
+        exp_desc = Texp_for {for_box = box; for_id; for_debug_uid = for_uid;
+                             for_pat = param; for_from; for_to; for_dir = dir;
+                             for_body; for_body_sort };
         exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unit;
+        exp_type = instance (type_unboxable_unit box);
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_constraint (sarg, None, modes) ->
@@ -7008,7 +7022,7 @@ and type_expect_
               exp_attributes = sexp.pexp_attributes;
               exp_env = env }
         end
-  | Pexp_setvar (lab, snewval) ->
+  | Pexp_setvar (box, lab, snewval) ->
       let desc =
         match Env.lookup_settable_variable ~loc lab.txt env with
         | Instance_variable (path, Mutable, cl_num,ty) ->
@@ -7020,7 +7034,7 @@ and type_expect_
                 (Longident.Lident ("self-" ^ cl_num))
                 env
             in
-            Texp_setinstvar(path_self, path, lab, newval)
+            Texp_setinstvar(box, path_self, path, lab, newval)
         | Instance_variable (_,Immutable,_,_) ->
             raise(Error(loc, env, Instance_variable_not_mutable lab.txt))
         | Mutable_variable (id, mode, ty, sort) ->
@@ -7029,12 +7043,12 @@ and type_expect_
                 snewval (mk_expected (instance ty))
             in
             let lid = {txt = id; loc} in
-            Texp_setmutvar(lid, sort, newval)
+            Texp_setmutvar(box, lid, sort, newval)
       in
       rue {
         exp_desc = desc;
         exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unit;
+        exp_type = instance (type_unboxable_unit box);
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_override lst ->
@@ -7148,17 +7162,19 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
 
-  | Pexp_assert (e) ->
+  | Pexp_assert (b, e) ->
       let cond =
         type_expect env mode_max e
-          (mk_expected ~explanation:Assert_condition Predef.type_bool)
+          (mk_expected ~explanation:(Assert_condition b)
+             (type_unboxable_bool b))
       in
       let exp_type =
         match cond.exp_desc with
-        | Texp_construct(_, {cstr_name="false"}, _, _) ->
+        | Texp_construct(_, {cstr_name="false"}, _, _) 
+        | Texp_unboxed_bool false ->
             instance ty_expected
         | _ ->
-            instance Predef.type_unit
+            instance (type_unboxable_unit b)
       in
       let rec innermost_location loc_stack =
         match loc_stack with
@@ -7167,7 +7183,8 @@ and type_expect_
         | _ :: s -> innermost_location s
       in
       rue {
-        exp_desc = Texp_assert (cond, innermost_location sexp.pexp_loc_stack);
+        exp_desc =
+          Texp_assert (b, cond, innermost_location sexp.pexp_loc_stack);
         exp_loc = loc; exp_extra = [];
         exp_type;
         exp_attributes = sexp.pexp_attributes;
@@ -9505,7 +9522,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
 
 (* Typing of statements (expressions whose values are discarded) *)
 
-and type_statement ?explanation ?(position=RNontail) env sexp =
+and type_statement ~box ?explanation ?(position=RNontail) env sexp =
   (* OCaml 5.2.0 changed the type of 'while' to give 'while true do e done'
      a polymorphic type.  The change has the potential to trigger a
      nonreturning-statement warning in existing code that follows
@@ -9535,10 +9552,14 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
       Warnings.Nonreturning_statement;
   if !Clflags.strict_sequence then
     (* CR layouts v5: when we have unboxed unit, allow it for -strict-sequence *)
-    let expected_ty = instance Predef.type_unit in
+    let expected_ty, sort = 
+      match box with
+      | Boxed -> instance Predef.type_unit, Jkind.Sort.value 
+      | Unboxed -> instance Predef.type_unboxed_unit, Jkind.Sort.void 
+    in
     with_explanation explanation (fun () ->
       unify_exp env exp expected_ty);
-    exp, Jkind.Sort.value
+    exp, sort
   else begin
     (* We're requiring the statement to have a representable jkind.  But that
        doesn't actually rule out things like "assert false"---we'll just end up
@@ -9921,10 +9942,12 @@ and type_cases
         let guard =
           match pc_guard with
           | None -> None
-          | Some scond ->
+          | Some (box, scond) ->
             Some
-              (type_expect ext_env mode_max scond
-                (mk_expected ~explanation:When_guard Predef.type_bool))
+              (box,
+               type_expect ext_env mode_max scond
+                 (mk_expected ~explanation:(When_guard box)
+                    (type_unboxable_bool box)))
         in
         let exp =
           type_expect ext_env expr_mode pc_rhs (mk_expected ?explanation ty_expected)
@@ -10798,7 +10821,7 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
         add_pattern_variables ~check ~check_as:check env pvs
       in
       env, Texp_comp_for tbindings
-  | Pcomp_when cond ->
+  | Pcomp_when (box, cond) ->
       let tcond =
         (* To understand why [when] conditions can be checked at an arbitrary
            mode, see "What modes should comprehensions use?" in
@@ -10807,9 +10830,10 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
           env
           mode_max
           cond
-          (mk_expected ~explanation:Comprehension_when Predef.type_bool)
+          (mk_expected ~explanation:(Comprehension_when box)
+             (type_unboxable_bool box))
       in
-      env, Texp_comp_when tcond
+      env, Texp_comp_when (box, tcond)
 
 and type_comprehension_binding
       ~loc
@@ -11148,26 +11172,42 @@ let report_pattern_type_clash_hints pat diff =
 let report_type_expected_explanation expl ppf =
   let because expl_str = fprintf ppf "@ because it is in %s" expl_str in
   match expl with
-  | If_conditional ->
+  | If_conditional Boxed ->
       because "the condition of an if-statement"
-  | If_no_else_branch ->
+  | If_conditional Unboxed ->
+      because "the condition of an unboxed if-statement"
+  | If_no_else_branch Boxed ->
       because "the result of a conditional with no else branch"
-  | While_loop_conditional ->
+  | If_no_else_branch Unboxed ->
+      because "the result of an unboxed conditional with no else branch"
+  | While_loop_conditional Boxed ->
       because "the condition of a while-loop"
-  | While_loop_body ->
+  | While_loop_conditional Unboxed ->
+      because "the condition of an unboxed while-loop"
+  | While_loop_body Boxed ->
       because "the body of a while-loop"
+  | While_loop_body Unboxed ->
+      because "the body of an unboxed while-loop"
   | For_loop_start_index ->
       because "a for-loop start index"
   | For_loop_stop_index ->
       because "a for-loop stop index"
-  | For_loop_body ->
+  | For_loop_body Boxed ->
       because "the body of a for-loop"
-  | Assert_condition ->
+  | For_loop_body Unboxed ->
+      because "the body of an unboxed for-loop"
+  | Assert_condition Boxed ->
       because "the condition of an assertion"
-  | Sequence_left_hand_side ->
+  | Assert_condition Unboxed ->
+      because "the condition of an unboxed assertion"
+  | Sequence_left_hand_side Boxed ->
       because "the left-hand side of a sequence"
-  | When_guard ->
+  | Sequence_left_hand_side Unboxed ->
+      because "the left-hand side of an unboxed sequence"
+  | When_guard Boxed ->
       because "a when-guard"
+  | When_guard Unboxed ->
+      because "an unboxed when-guard"
   | Comprehension_in_iterator comp_ty ->
       let a_comp_ty =
         match comp_ty with
@@ -11180,8 +11220,10 @@ let report_type_expected_explanation expl ppf =
       because "a range-based for iterator start index in a comprehension"
   | Comprehension_for_stop ->
       because "a range-based for iterator stop index in a comprehension"
-  | Comprehension_when ->
+  | Comprehension_when Boxed ->
       because "a when-clause in a comprehension"
+  | Comprehension_when Unboxed ->
+      because "an unboxed when-clause in a comprehension"
   | Error_message_attr msg ->
       fprintf ppf "@\n@[%s@]" msg
 

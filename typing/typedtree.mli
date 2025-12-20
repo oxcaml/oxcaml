@@ -472,21 +472,23 @@ and expression_desc =
       expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
         unique_use
   | Texp_setfield of
-      expression * Mode.Locality.l * Longident.t loc *
+      boxing * expression * Mode.Locality.l * Longident.t loc *
       Types.label_description * expression
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of Types.mutability * Jkind.sort * comprehension
-  | Texp_ifthenelse of expression * expression * expression option
-  | Texp_sequence of expression * Jkind.sort * expression
+  | Texp_ifthenelse of boxing * expression * expression * expression option
+  | Texp_sequence of boxing * expression * Jkind.sort * expression
   | Texp_while of {
+      wh_box : boxing;
       wh_cond : expression;
       wh_body : expression;
       wh_body_sort : Jkind.sort
     }
   | Texp_for of {
+      for_box : boxing;
       for_id  : Ident.t;
       for_debug_uid: Shape.Uid.t;
       for_pat : Parsetree.pattern;
@@ -501,14 +503,14 @@ and expression_desc =
       Path.t * Longident.t loc * Types.class_declaration * apply_position
   | Texp_instvar of Path.t * Path.t * string loc
   | Texp_mutvar of Ident.t loc
-  | Texp_setinstvar of Path.t * Path.t * string loc * expression
-  | Texp_setmutvar of Ident.t loc * Jkind.sort * expression
+  | Texp_setinstvar of boxing * Path.t * Path.t * string loc * expression
+  | Texp_setmutvar of boxing * Ident.t loc * Jkind.sort * expression
   | Texp_override of Path.t * (Ident.t * string loc * expression) list
   | Texp_letmodule of
       Ident.t option * string option loc * Types.module_presence * module_expr *
         expression
   | Texp_letexception of extension_constructor * expression
-  | Texp_assert of expression * Location.t
+  | Texp_assert of boxing * expression * Location.t
   | Texp_lazy of expression
   | Texp_object of class_structure * string list
   | Texp_pack of module_expr
@@ -644,7 +646,7 @@ and comprehension =
 
 and comprehension_clause =
   | Texp_comp_for of comprehension_clause_binding list
-  | Texp_comp_when of expression
+  | Texp_comp_when of boxing * expression
 
 and comprehension_clause_binding =
   {
@@ -675,7 +677,7 @@ and comprehension_iterator =
 and 'k case =
     {
      c_lhs: 'k general_pattern;
-     c_guard: expression option;
+     c_guard: (boxing * expression) option;
      c_rhs: expression;
     }
 

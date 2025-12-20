@@ -302,9 +302,22 @@ let rec translate_clauses ~transl_exp ~scopes ~loc ~comprehension_body
           ~accumulator bindings
       in
       Let_binding.let_all arg_lets bindings
-    | Texp_comp_when cond ->
+    | Texp_comp_when (box, cond) ->
+      let jkind =
+        match box with
+        | Boxed -> Jkind.Sort.Const.for_predef_value
+        | Unboxed -> Jkind.Sort.Const.bits8
+      in
+      let cond = transl_exp ~scopes jkind cond in
+      let cond =
+        match box with
+        | Boxed -> cond
+        | Unboxed ->
+          static_cast ~src:(Naked (Integral (Taggable Int8)))
+            ~dst:(Value (Integral (Taggable Int))) cond ~loc
+      in
       Lifthenelse
-        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+        ( cond,
           body ~accumulator,
           accumulator,
           layout_any_value (* [list]s have the standard representation *) ))

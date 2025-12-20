@@ -168,7 +168,7 @@ let classify_expression : Typedtree.expression -> sd =
     (* non-binding cases *)
     | Texp_open (_, e)
     | Texp_letmodule (None, _, _, _, e)
-    | Texp_sequence (_, _, e)
+    | Texp_sequence (_, _, _, e)
     | Texp_letexception (_, e)
     | Texp_exclave e ->
         classify_expression env e
@@ -856,7 +856,7 @@ let rec expression : Typedtree.expression -> term_judg =
           option expression (Option.map fst eo) << Dereference
         ]
       end
-    | Texp_ifthenelse (cond, ifso, ifnot) ->
+    | Texp_ifthenelse (_, cond, ifso, ifnot) ->
       (*
         Gc |- c: m[Dereference]
         G1 |- e1: m
@@ -872,7 +872,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression ifso;
         option expression ifnot;
       ]
-    | Texp_setfield (e1, _, _, _, e2) ->
+    | Texp_setfield (_, e1, _, _, _, e2) ->
       (*
         G1 |- e1: m[Dereference]
         G2 |- e2: m[Dereference]
@@ -887,7 +887,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e1 << Dereference;
         expression e2 << Dereference;
       ]
-    | Texp_sequence (e1, _, e2) ->
+    | Texp_sequence (_, e1, _, e2) ->
       (*
         G1 |- e1: m[Guard]
         G2 |- e2: m
@@ -900,7 +900,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e1 << Guard;
         expression e2;
       ]
-    | Texp_while {wh_cond; wh_body} ->
+    | Texp_while {wh_box = _; wh_cond; wh_body} ->
       (*
         G1 |- cond: m[Dereference]
         G2 |- body: m[Guard]
@@ -929,7 +929,7 @@ let rec expression : Typedtree.expression -> term_judg =
       expression e << Dereference
     | Texp_unboxed_field (e, _, _, _, _) ->
       expression e << Dereference
-    | Texp_setinstvar (pth,_,_,e) ->
+    | Texp_setinstvar (_, pth,_,_,e) ->
       (*
         G |- e: m[Dereference]
         ----------------------
@@ -939,7 +939,7 @@ let rec expression : Typedtree.expression -> term_judg =
         path pth << Dereference;
         expression e << Dereference;
       ]
-    | Texp_setmutvar (_id,_sort,e) ->
+    | Texp_setmutvar (_, _id,_sort,e) ->
       (*
         G |- e: m[Dereference]
         ----------------------
@@ -952,7 +952,7 @@ let rec expression : Typedtree.expression -> term_judg =
          G |- let exception A in e: m
       *)
       remove_id ext_id (expression e)
-    | Texp_assert (e, _) ->
+    | Texp_assert (_, e, _) ->
       (*
         G |- e: m[Dereference]
         -----------------------
@@ -1147,7 +1147,7 @@ and comprehension_clauses clauses =
                | Texp_comp_in { pattern = _; sequence } ->
                    [expression sequence << Dereference])
             bindings
-      | Texp_comp_when guard ->
+      | Texp_comp_when (_, guard) ->
           [expression guard << Dereference])
     clauses
 
@@ -1494,7 +1494,7 @@ and case
        G - p; m[mp] |- (p (when g)? -> e) : m
     *)
     let judg = join [
-        option expression c_guard << Dereference;
+        option (fun (_, e) -> expression e) c_guard << Dereference;
         expression c_rhs;
       ] in
     (fun m ->

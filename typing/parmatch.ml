@@ -2649,9 +2649,9 @@ let check_ambiguous_bindings =
     if is_active warn0 then
       let check_case ns case = match case with
         | { c_lhs = p; c_guard=None ; _} -> [p]::ns
-        | { c_lhs = p; c_guard=Some g; _} ->
+        | { c_lhs = p; c_guard=Some (_, e); _} ->
             let all =
-              Ident.Set.inter (pattern_vars p) (all_rhs_idents g) in
+              Ident.Set.inter (pattern_vars p) (all_rhs_idents e) in
             if not (Ident.Set.is_empty all) then begin
               match pattern_stable_vars ns p with
               | All -> ()

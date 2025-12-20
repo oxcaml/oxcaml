@@ -207,15 +207,16 @@ let mkTexp_function ?(id = texp_function_defaults)
 
 type texp_sequence_identifier = Jkind.sort
 
-let mkTexp_sequence ?id:(sort = Jkind.Sort.value) (e1, e2) =
-  Texp_sequence (e1, sort, e2)
+let mkTexp_sequence ?(box = Asttypes.Boxed) ?id:(sort = Jkind.Sort.value)
+    (e1, e2) =
+  Texp_sequence (box, e1, sort, e2)
 
 type texp_match_identifier = Jkind.sort
 
 let mkTexp_match ?id:(sort = Jkind.Sort.value) (e, cases, partial) =
   Texp_match (e, sort, cases, partial)
 
-let mkTexp_assert e loc = Texp_assert (e, loc)
+let mkTexp_assert ?(box = Asttypes.Boxed) e loc = Texp_assert (box, e, loc)
 
 type matched_expression_desc =
   | Texp_ident of
@@ -232,7 +233,8 @@ type matched_expression_desc =
       * texp_construct_identifier
   | Texp_tuple of expression list * texp_tuple_identifier
   | Texp_function of texp_function * texp_function_identifier
-  | Texp_sequence of expression * expression * texp_sequence_identifier
+  | Texp_sequence of
+      Asttypes.boxing * expression * expression * texp_sequence_identifier
   | Texp_match of
       expression * computation case list * partial * texp_match_identifier
   | O of expression_desc
@@ -303,7 +305,7 @@ let view_texp (e : expression_desc) =
       in
       Texp_function
         ({ params; body }, { alloc_mode; ret_sort; ret_mode; zero_alloc })
-  | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
+  | Texp_sequence (box, e1, sort, e2) -> Texp_sequence (box, e1, e2, sort)
   | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
   | _ -> O e
 

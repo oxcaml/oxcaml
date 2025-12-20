@@ -363,6 +363,55 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+let lambda_unbox_unit lambda_unit loc =
+  Lprim(Punbox_unit, [lambda_unit], loc)
+
+let maybe_unbox_unit ~box u loc =
+  match box with
+  | Boxed -> u
+  | Unboxed -> lambda_unbox_unit u loc
+
+let lambda_unboxed_unit ~scopes loc =
+  lambda_unbox_unit lambda_unit (of_location ~scopes loc)
+
+let lambda_unboxable_unit ~box ~scopes loc =
+  match box with
+  | Boxed -> lambda_unit
+  | Unboxed -> lambda_unboxed_unit ~scopes loc
+
+let layout_unboxable_unit ~box =
+  match box with
+  | Boxed -> layout_unit
+  | Unboxed -> layout_unboxed_unit
+
+let jkind_unboxable_bool ~box =
+  match box with
+  | Boxed -> Jkind.Sort.Const.for_predef_value
+  | Unboxed -> Jkind.Sort.Const.bits8
+
+let unboxable_default_sort ~box sort =
+  let unboxed = 
+    match box with
+    | Boxed -> false
+    | Unboxed -> true
+  in
+  Jkind.Sort.default_for_transl_and_get ~unboxed sort
+
+let maybe_tag_bool ~box ~scopes b loc =
+  match box with
+  | Boxed -> b
+  | Unboxed -> 
+    static_cast
+      ~src:(Naked (Integral (Taggable Int8)))
+      ~dst:(Value (Integral (Taggable Int)))
+      b
+      ~loc:(of_location ~scopes loc)
+
+let layout_unboxable_bool ~box =
+  match box with
+  | Boxed -> layout_int
+  | Unboxed -> Punboxed_or_untagged_integer Untagged_int8
+
 let rec transl_exp ~scopes sort e =
   transl_exp1 ~scopes ~in_new_scope:false sort e
 
@@ -486,8 +535,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes sort pat_expr_list),
                return_layout)
-  | Texp_unboxed_unit ->
-      Lprim(Punbox_unit, [lambda_unit], of_location ~scopes e.exp_loc)
+  | Texp_unboxed_unit -> lambda_unboxed_unit ~scopes e.exp_loc
   | Texp_unboxed_bool b ->
       Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
   | Texp_tuple (el, alloc_mode) ->
@@ -754,7 +802,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     end
-  | Texp_setfield(arg, arg_mode, _id, lbl, newval) ->
+  | Texp_setfield(box, arg, arg_mode, _id, lbl, newval) ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
@@ -818,7 +866,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
-      Lprim(prim, args, of_location ~scopes e.exp_loc)
+      let loc = of_location ~scopes e.exp_loc in
+      maybe_unbox_unit ~box (Lprim(prim, args, loc)) loc
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
@@ -911,33 +960,41 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       end;
       Transl_array_comprehension.comprehension
         ~transl_exp ~scopes ~loc ~array_kind comp
-  | Texp_ifthenelse(cond, ifso, Some ifnot) ->
-      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
-                  event_before ~scopes ifso (transl_exp ~scopes sort ifso),
-                  event_before ~scopes ifnot (transl_exp ~scopes sort ifnot),
-                  layout_exp sort e)
-  | Texp_ifthenelse(cond, ifso, None) ->
-      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
-                  event_before ~scopes ifso (transl_exp ~scopes sort ifso),
-                  lambda_unit,
-                  Lambda.layout_unit)
-  | Texp_sequence(expr1, sort', expr2) ->
-      let sort' = Jkind.Sort.default_for_transl_and_get sort' in
+  | Texp_ifthenelse(box, cond, ifso, ifnot) ->
+      let lcond = transl_exp ~scopes (jkind_unboxable_bool ~box) cond in
+      let lcond = maybe_tag_bool ~box ~scopes lcond cond.exp_loc in
+      let lifso = event_before ~scopes ifso (transl_exp ~scopes sort ifso) in
+      let lifnot, layout =
+        match ifnot with
+        | None ->
+          ( lambda_unboxable_unit ~box ~scopes e.exp_loc
+          , layout_unboxable_unit ~box )
+        | Some ifnot ->
+          ( event_before ~scopes ifnot (transl_exp ~scopes sort ifnot)
+          , layout_exp sort e )
+      in
+      Lifthenelse(lcond, lifso, lifnot, layout)
+  | Texp_sequence(box, expr1, sort', expr2) ->
+      let sort' = unboxable_default_sort ~box sort' in
       Lsequence(transl_exp ~scopes sort' expr1,
                 event_before ~scopes expr2 (transl_exp ~scopes sort expr2))
-  | Texp_while {wh_body; wh_body_sort; wh_cond} ->
-      let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
-      let cond = transl_exp ~scopes Jkind.Sort.Const.for_predef_value wh_cond in
-      let body = transl_exp ~scopes wh_body_sort wh_body in
+  | Texp_while {wh_box = box; wh_body; wh_body_sort; wh_cond} ->
+      let wh_body_sort = unboxable_default_sort ~box wh_body_sort in
+      let lcond = transl_exp ~scopes (jkind_unboxable_bool ~box) wh_cond in
+      let lcond = maybe_tag_bool ~box ~scopes lcond wh_cond.exp_loc in
+      let layout_cond = layout_unboxable_bool ~box in
+      let lbody = transl_exp ~scopes wh_body_sort wh_body in
+      let layout_body = layout_unboxable_unit ~box in
       Lwhile {
-        wh_cond = maybe_region_layout layout_int cond;
+        wh_cond = maybe_region_layout layout_cond lcond;
         wh_body = event_before ~scopes wh_body
-                    (maybe_region_layout layout_unit body);
+                    (maybe_region_layout layout_body lbody);
       }
-  | Texp_for {for_id; for_debug_uid; for_from; for_to; for_dir; for_body;
-              for_body_sort} ->
-      let for_body_sort = Jkind.Sort.default_for_transl_and_get for_body_sort in
-      let body = transl_exp ~scopes for_body_sort for_body in
+  | Texp_for {for_box = box; for_id; for_debug_uid; for_from; for_to; for_dir;
+              for_body; for_body_sort} ->
+      let for_body_sort = unboxable_default_sort ~box for_body_sort in
+      let lbody = transl_exp ~scopes for_body_sort for_body in
+      let layout_body = layout_unboxable_unit ~box in
       Lfor {
         for_id;
         for_debug_uid;
@@ -946,7 +1003,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         for_to = transl_exp ~scopes Jkind.Sort.Const.for_predef_value for_to;
         for_dir;
         for_body = event_before ~scopes for_body
-                     (maybe_region_layout layout_unit body);
+                     (maybe_region_layout layout_body lbody);
       }
   | Texp_send(expr, met, pos) ->
       let lam =
@@ -1000,14 +1057,17 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let var = transl_value_path loc e.exp_env path in
       Lprim(Pfield_computed Reads_vary, [self; var], loc)
   | Texp_mutvar id -> Lmutvar id.txt
-  | Texp_setinstvar(path_self, path, _, expr) ->
+  | Texp_setinstvar(box, path_self, path, _, expr) ->
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
       let var = transl_value_path loc e.exp_env path in
-      transl_setinstvar ~scopes loc self var expr
-  | Texp_setmutvar(id, expr_sort, expr) ->
-      Lassign(id.txt, transl_exp ~scopes
-        (Jkind.Sort.default_for_transl_and_get expr_sort) expr)
+      transl_setinstvar ~box ~scopes loc self var expr
+  | Texp_setmutvar(box, id, expr_sort, expr) ->
+      let lambda = 
+        Lassign(id.txt, transl_exp ~scopes
+          (Jkind.Sort.default_for_transl_and_get expr_sort) expr)
+      in
+      maybe_unbox_unit ~box lambda (of_location ~scopes e.exp_loc)
   | Texp_override(path_self, modifs) ->
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
@@ -1028,7 +1088,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            },
            List.fold_right
              (fun (id, _, expr) rem ->
-                Lsequence(transl_setinstvar ~scopes Loc_unknown
+                Lsequence(transl_setinstvar ~box:Boxed ~scopes Loc_unknown
                             (Lvar cpy) (Lvar id) expr, rem))
              modifs
              (Lvar cpy))
@@ -1053,17 +1113,21 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            transl_exp ~scopes sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
-  | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _)}, loc) ->
+  | Texp_assert (_, {exp_desc=Texp_construct(_, {cstr_name="false"}, _, _)
+                             |Texp_unboxed_bool false}, loc) ->
       assert_failed loc ~scopes e
-  | Texp_assert (cond, loc) ->
+  | Texp_assert (box, cond, loc) ->
+      let assert_passed = lambda_unboxable_unit ~box ~scopes e.exp_loc in
       if !Clflags.noassert
-      then lambda_unit
+      then assert_passed
       else begin
+        let lcond = transl_exp ~scopes (jkind_unboxable_bool ~box) cond in
+        let lcond = maybe_tag_bool ~box ~scopes lcond loc in
         Lifthenelse
-          (transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
-           lambda_unit,
+          (lcond,
+           assert_passed,
            assert_failed loc ~scopes e,
-           Lambda.layout_unit)
+           layout_unboxable_unit ~box)
       end
   | Texp_lazy e ->
       (* when e needs no computation (constants, identifiers, ...), we
@@ -1375,10 +1439,11 @@ and transl_guard ~scopes guard rhs_sort rhs =
   let expr = event_before ~scopes rhs (transl_exp ~scopes rhs_sort rhs) in
   match guard with
   | None -> expr
-  | Some cond ->
+  | Some (box, cond) ->
+      let lcond = transl_exp ~scopes (jkind_unboxable_bool ~box) cond in
+      let lcond = maybe_tag_bool ~box ~scopes lcond cond.exp_loc in
       event_before ~scopes cond
-        (Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
-                     expr, staticfail, layout))
+        (Lifthenelse(lcond, expr, staticfail, layout))
 
 and transl_case ~scopes rhs_sort {c_lhs; c_guard; c_rhs} =
   (c_lhs, transl_guard ~scopes c_guard rhs_sort c_rhs)
@@ -2044,10 +2109,15 @@ and transl_letmutable ~scopes ~return_layout
   Matching.for_let ~scopes ~return_layout ~arg_sort pat.pat_loc lam Mutable
     pat body
 
-and transl_setinstvar ~scopes loc self var expr =
+and transl_setinstvar ~box ~scopes loc self var expr =
   let ptr_or_imm, _ = maybe_pointer expr in
-  Lprim(Psetfield_computed (ptr_or_imm, Assignment modify_heap),
-    [self; var; transl_exp ~scopes Jkind.Sort.Const.for_instance_var expr], loc)
+  let lexpr = transl_exp ~scopes Jkind.Sort.Const.for_instance_var expr in
+  let lambda =
+    Lprim(Psetfield_computed (ptr_or_imm, Assignment modify_heap),
+          [self; var; lexpr],
+          loc)
+  in
+  maybe_unbox_unit ~box lambda loc
 
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
 and transl_record ~scopes loc env mode fields repres opt_init_expr =
