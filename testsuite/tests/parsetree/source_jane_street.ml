@@ -1625,3 +1625,12 @@ let f #() = #()
 [%%expect{|
 val f : unit# -> unit# = <fun>
 |}]
+
+(*************************)
+(* unboxed bool literals *)
+
+let f = function #false -> #true | #true -> #false
+
+[%%expect{|
+val f : bool# -> bool# = <fun>
+|}]
