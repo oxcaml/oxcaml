@@ -143,8 +143,8 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
       | O (Tpat_value _)
       (* p) -> as_computation_pattern (replace_in_pat mod_name p) *)
       | O
-          ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_variant _
-          | Tpat_exception _ ) ->
+          ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
+          | Tpat_variant _ | Tpat_exception _ ) ->
           pat.pat_desc
       | O (Tpat_var _ | Tpat_alias _ | Tpat_array _ | Tpat_tuple _) ->
           assert false);

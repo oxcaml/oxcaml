@@ -117,7 +117,10 @@ let rec var_from_pat pat_desc acc =
   | O (Tpat_or (p1, p2, _)) ->
       var_from_pat p1.pat_desc (var_from_pat p2.pat_desc acc)
   | O (Tpat_lazy pat) -> var_from_pat pat.pat_desc acc
-  | O (Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_variant _) -> []
+  | O
+      ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
+      | Tpat_variant _ ) ->
+      []
   | O (Tpat_var _ | Tpat_alias _ | Tpat_array _ | Tpat_tuple _) -> assert false
 
 let rec rem_in_pat str pat should_remove =
@@ -196,7 +199,10 @@ let rec rem_in_pat str pat should_remove =
       { pat with pat_desc = Tpat_or (p1, p2, a1) }
   | O (Tpat_lazy pat) ->
       { pat with pat_desc = Tpat_lazy (rem_in_pat str pat should_remove) }
-  | O (Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_variant _) -> pat
+  | O
+      ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
+      | Tpat_variant _ ) ->
+      pat
   | O (Tpat_var _ | Tpat_alias _ | Tpat_array _ | Tpat_tuple _) -> assert false
 
 let minimize should_remove map cur_name =
