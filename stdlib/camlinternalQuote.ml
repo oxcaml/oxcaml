@@ -1285,17 +1285,18 @@ module Ast = struct
     | Variant of string * expression option
     | Record of (record_field * expression) list * expression option
     | Field of expression * record_field
-    | Setfield of expression * record_field * expression
+    | Setfield of bool * expression * record_field * expression
     | Array of expression list
-    | Ifthenelse of expression * expression * expression option
-    | Sequence of expression * expression
-    | While of expression * expression
-    | For of pattern * expression * expression * direction_flag * expression
+    | Ifthenelse of bool * expression * expression * expression option
+    | Sequence of bool * expression * expression
+    | While of bool * expression * expression
+    | For of
+        bool * pattern * expression * expression * direction_flag * expression
     | Send of expression * Method.t
     | ConstraintExp of expression * core_type
     | CoerceExp of expression * core_type option * core_type
     | Letmodule of Var.Module.t option * module_expr * expression
-    | Assert of expression
+    | Assert of bool * expression
     | Lazy of expression
     | Pack of module_expr
     | New of raw_ident_value_t
@@ -1320,6 +1321,7 @@ module Ast = struct
 
   and case =
     { lhs : pattern;
+      unboxed : bool;
       guard : expression option;
       rhs : expression option
     }
@@ -1354,7 +1356,7 @@ module Ast = struct
 
   and comprehension =
     | Body of expression
-    | When of comprehension * expression
+    | When of bool * comprehension * expression
     | ForComp of comprehension * comprehension_clause
 
   (* quotation printing logic *)
@@ -1449,6 +1451,10 @@ module Ast = struct
     | false -> pp fmt "false"
     | true -> pp fmt "true"
 
+  and print_unboxed fmt = function
+    | false -> ()
+    | true -> pp fmt "#"
+
   and print_constr env fmt = function
     | CBasic s -> pp fmt "%s" s
     | CIdent id -> print_raw_ident_constructor env fmt id
@@ -1540,11 +1546,13 @@ module Ast = struct
       (print_exp env) fmt exp
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
 
-  and print_case env fmt { lhs; guard; rhs } =
+  and print_case env fmt { lhs; unboxed; guard; rhs } =
     pp fmt "@ |@ %a" (print_pat env) lhs;
     (match guard with
     | None -> ()
-    | Some guard -> pp fmt "@ with@ %a" (print_exp_with_parens env) guard);
+    | Some guard ->
+      pp fmt "@ %awhen@ %a" print_unboxed unboxed
+        (print_exp_with_parens env) guard);
     pp fmt "@ ->@ ";
     match rhs with None -> pp fmt "." | Some rhs -> print_exp env fmt rhs
 
@@ -1844,25 +1852,25 @@ module Ast = struct
       pp fmt "%a.%a" (print_exp_with_parens env) exp (print_field env) field
     | Array entries -> print_array (print_exp_with_parens env) fmt entries
     | Tuple entries -> print_tuple (print_exp_with_parens env) fmt entries
-    | Ifthenelse (cond, then_, else_) -> (
-      pp fmt "@[if@ %a@ @[<2>then@ %a@]"
+    | Ifthenelse (unboxed, cond, then_, else_) -> (
+      pp fmt "@[%aif@ %a@ @[<2>then@ %a@]"
+        print_unboxed unboxed
         (print_exp_with_parens env)
         cond (print_exp_with_parens env) then_;
       match else_ with
       | Some else_ -> pp fmt "@ @[<2>else@ %a@]@]" (print_exp env) else_
       | None -> pp fmt "@]")
-    | Sequence (exp1, exp2) ->
-      pp fmt "%a;@ @,%a" (print_exp env) exp1 (print_exp env) exp2
-    | While (cond, body) ->
-      pp fmt "@[<2>while@ %a@ do@; @[%a@]@]@;done" (print_exp env) cond
-        (print_exp_with_parens env)
-        body
-    | For (it, start, stop, dir, body) ->
+    | Sequence (unboxed, exp1, exp2) ->
+      pp fmt "%a%a;@ @,%a" (print_exp env) exp1 print_unboxed unboxed
+        (print_exp env) exp2
+    | While (unboxed, cond, body) ->
+      pp fmt "@[<2>%awhile@ %a@ do@; @[%a@]@]@;done" print_unboxed unboxed
+        (print_exp env) cond (print_exp_with_parens env) body
+    | For (unboxed, it, start, stop, dir, body) ->
       let dir = match dir with Upto -> "to" | Downto -> "downto" in
-      pp fmt "for@ %a@ =@ %a@ %s@ %a@ do@ @,@[<2>%a@]@ @,done" (print_pat env)
-        it (print_exp env) start dir (print_exp env) stop
-        (print_exp_with_parens env)
-        body
+      pp fmt "%afor@ %a@ =@ %a@ %s@ %a@ do@ @,@[<2>%a@]@ @,done" print_unboxed
+        unboxed (print_pat env) it (print_exp env) start dir (print_exp env)
+        stop (print_exp_with_parens env) body
     | Send (exp, meth) ->
       pp fmt "%a#@[%a@]" (print_exp_with_parens env) exp Method.print meth
     | ConstraintExp (exp, ty) ->
@@ -1886,17 +1894,18 @@ module Ast = struct
          List.iter (fun case -> pp fmt "%a" (print_case env) case) with_;
          pp fmt "@]");
       pp fmt "@]"
-    | Setfield (obj, field, exp) ->
-      pp fmt "%a#%a <- %a"
+    | Setfield (unboxed, obj, field, exp) ->
+      pp fmt "%a#%a %a<- %a"
         (print_exp_with_parens env)
-        obj (print_field env) field (print_exp env) exp
+        obj print_unboxed unboxed (print_field env) field (print_exp env) exp
     | Letmodule (None, module_exp, exp) ->
       pp fmt "@[<2>let@ module@ _@ =@ @[%a@]@ in@ %a@]" (print_module_exp env)
         module_exp (print_exp env) exp
     | Letmodule (Some modvar, module_exp, exp) ->
       pp fmt "@[<2>let@ module@ %a@ =@ @[%a@]@ in@ %a@]" (Var.Module.print env)
         modvar (print_module_exp env) module_exp (print_exp env) exp
-    | Assert exp -> pp fmt "@[<2>assert@ %a@]" (print_exp env) exp
+    | Assert (unboxed, exp) ->
+      pp fmt "@[<2>%aassert@ %a@]" print_unboxed unboxed (print_exp env) exp
     | Lazy exp -> pp fmt "@[<2>lazy@ %a@]" (print_exp env) exp
     | Pack module_exp ->
       pp fmt "(@[<2>module@ %a@])" (print_module_exp env) module_exp
@@ -2362,7 +2371,7 @@ end
 module Case = struct
   type t = Ast.case With_free_vars.t
 
-  let mk lhs guard rhs : Ast.case = { lhs; guard; rhs }
+  let mk lhs unboxed guard rhs : Ast.case = { lhs; unboxed; guard; rhs }
 
   let ( let+ ) m f = With_free_vars.map f m
 
@@ -2375,12 +2384,12 @@ module Case = struct
         ~extra:(Binding_error.unexpected_at_loc loc)
         pat
     in
-    mk lhs None (Some rhs)
+    mk lhs false None (Some rhs)
 
   let simple loc name f =
     With_free_vars.value_binding loc name (fun var ->
         let+ rhs = f var in
-        mk (Ast.PatVar var) None (Some rhs))
+        mk (Ast.PatVar var) false None (Some rhs))
 
   let pattern loc ~bound_values ~bound_modules f =
     let+ lhs, rhs =
@@ -2388,9 +2397,9 @@ module Case = struct
         ~extra:(Binding_error.unexpected_at_loc loc)
         ~missing:Binding_error.missing ~bound_values ~bound_modules f
     in
-    mk lhs None (Some rhs)
+    mk lhs false None (Some rhs)
 
-  let guarded loc ~bound_values ~bound_modules f =
+  let guarded loc ~unboxed ~bound_values ~bound_modules f =
     let+ lhs, (guard, rhs) =
       With_free_vars.complex_bindings loc
         ~extra:(Binding_error.unexpected_at_loc loc)
@@ -2399,7 +2408,7 @@ module Case = struct
           let lhs, guard, rhs = f value_vars module_vars in
           lhs, With_free_vars.both guard rhs)
     in
-    mk lhs (Some guard) (Some rhs)
+    mk lhs unboxed (Some guard) (Some rhs)
 
   let refutation loc ~bound_values ~bound_modules f =
     let+ lhs, _ =
@@ -2408,7 +2417,7 @@ module Case = struct
         ~missing:Binding_error.missing ~bound_values ~bound_modules (fun v m ->
           f v m, With_free_vars.return ())
     in
-    mk lhs None None
+    mk lhs false None None
 end
 
 module Type_constraint = struct
@@ -2498,9 +2507,9 @@ module Comprehension = struct
     let+ exp = exp in
     Ast.Body exp
 
-  let when_clause exp compr =
+  let when_clause ~unboxed exp compr =
     let+ exp = exp and+ compr = compr in
-    Ast.When (compr, exp)
+    Ast.When (unboxed, compr, exp)
 
   let for_range loc name start stop direction compr =
     With_free_vars.value_binding loc name (fun var ->
@@ -2671,25 +2680,25 @@ module Exp_desc = struct
     let+ exp = exp and+ field = field in
     Ast.Field (exp, field)
 
-  let setfield exp field value =
+  let setfield ~unboxed exp field value =
     let+ exp = exp and+ field = field and+ value = value in
-    Ast.Setfield (exp, field, value)
+    Ast.Setfield (unboxed, exp, field, value)
 
   let array elements =
     let+ elements = all elements in
     Ast.Array elements
 
-  let ifthenelse cond then_ else_ =
+  let ifthenelse ~unboxed cond then_ else_ =
     let+ cond = cond and+ then_ = then_ and+ else_ = optional else_ in
-    Ast.Ifthenelse (cond, then_, else_)
+    Ast.Ifthenelse (unboxed, cond, then_, else_)
 
-  let sequence lhs rhs =
+  let sequence ~unboxed lhs rhs =
     let+ lhs = lhs and+ rhs = rhs in
-    Ast.Sequence (lhs, rhs)
+    Ast.Sequence (unboxed, lhs, rhs)
 
-  let while_ cond body =
+  let while_ ~unboxed cond body =
     let+ cond = cond and+ body = body in
-    Ast.While (cond, body)
+    Ast.While (unboxed, cond, body)
 
   let for_nonbinding loc pat begin_ end_ dir body =
     let dir = if dir then Ast.Upto else Ast.Downto in
@@ -2699,9 +2708,9 @@ module Exp_desc = struct
         ~extra:(Binding_error.unexpected_at_loc loc)
         pat
     in
-    Ast.For (pat, begin_, end_, dir, body)
+    Ast.For (false, pat, begin_, end_, dir, body)
 
-  let for_simple loc name begin_ end_ dir body =
+  let for_simple ~unboxed loc name begin_ end_ dir body =
     let dir = if dir then Ast.Upto else Ast.Downto in
     let+ var, body =
       With_free_vars.value_binding loc name (fun var ->
@@ -2709,15 +2718,15 @@ module Exp_desc = struct
           var, body)
     and+ begin_ = begin_
     and+ end_ = end_ in
-    Ast.For (Ast.PatVar var, begin_, end_, dir, body)
+    Ast.For (unboxed, Ast.PatVar var, begin_, end_, dir, body)
 
   let send exp meth =
     let+ exp = exp in
     Ast.Send (exp, meth)
 
-  let assert_ exp =
+  let assert_ ~unboxed exp =
     let+ exp = exp in
-    Ast.Assert exp
+    Ast.Assert (unboxed, exp)
 
   let lazy_ exp =
     let+ exp = exp in

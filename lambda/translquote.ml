@@ -68,6 +68,10 @@ let false_ = Lconst (Const_base (Const_int 0))
 
 let quote_bool b = if b then true_ else false_
 
+let is_unboxed = function
+  | Boxed -> false
+  | Unboxed -> true
+
 (* Lambdas that represent the option type *)
 
 let none = Lconst (Const_base (Const_int 0))
@@ -366,6 +370,9 @@ let apply5 modname field loc arg1 arg2 arg3 arg4 arg5 =
 
 let apply6 modname field loc arg1 arg2 arg3 arg4 arg5 arg6 =
   apply modname field loc [arg1; arg2; arg3; arg4; arg5; arg6]
+
+let apply7 modname field loc arg1 arg2 arg3 arg4 arg5 arg6 arg7 =
+  apply modname field loc [arg1; arg2; arg3; arg4; arg5; arg6; arg7]
 
 module Loc : sig
   type s
@@ -1492,6 +1499,7 @@ module rec Case : sig
 
   val guarded :
     Location.t ->
+    bool ->
     Loc.t ->
     Name.t list ->
     Name.t list ->
@@ -1526,11 +1534,11 @@ end = struct
       (mk_list (List.map extract a3))
       (extract a4)
 
-  let guarded loc a1 a2 a3 a4 =
-    apply4 "Case" "guarded" loc (extract a1)
-      (mk_list (List.map extract a2))
+  let guarded loc a1 a2 a3 a4 a5 =
+    apply5 "Case" "guarded" loc (quote_bool a1) (extract a2)
       (mk_list (List.map extract a3))
-      (extract a4)
+      (mk_list (List.map extract a4))
+      (extract a5)
 
   let refutation loc a1 a2 a3 a4 =
     apply4 "Case" "refutation" loc (extract a1)
@@ -1651,7 +1659,7 @@ and Comprehension : sig
 
   val body : Location.t -> Exp.t -> t'
 
-  val when_clause : Location.t -> Exp.t -> t -> t'
+  val when_clause : Location.t -> bool -> Exp.t -> t -> t'
 
   val for_range :
     Location.t ->
@@ -1673,8 +1681,9 @@ end = struct
 
   let body loc a1 = apply1 "Comprehension" "body" loc (extract a1)
 
-  let when_clause loc a1 a2 =
-    apply2 "Comprehension" "when_clause" loc (extract a1) (extract a2)
+  let when_clause loc a1 a2 a3 =
+    apply3 "Comprehension" "when_clause" loc (quote_bool a1) (extract a2)
+      (extract a3)
 
   let for_range loc a1 a2 a3 a4 a5 a6 =
     apply6 "Comprehension" "for_range" loc (extract a1) (extract a2)
@@ -1732,18 +1741,19 @@ and Exp_desc : sig
 
   val field : Location.t -> Exp.t -> Field.t -> t'
 
-  val setfield : Location.t -> Exp.t -> Field.t -> Exp.t -> t'
+  val setfield : Location.t -> bool -> Exp.t -> Field.t -> Exp.t -> t'
 
   val array : Location.t -> Exp.t list -> t'
 
-  val ifthenelse : Location.t -> Exp.t -> Exp.t -> Exp.t option -> t'
+  val ifthenelse : Location.t -> bool -> Exp.t -> Exp.t -> Exp.t option -> t'
 
-  val sequence : Location.t -> Exp.t -> Exp.t -> t'
+  val sequence : Location.t -> bool -> Exp.t -> Exp.t -> t'
 
-  val while_ : Location.t -> Exp.t -> Exp.t -> t'
+  val while_ : Location.t -> bool -> Exp.t -> Exp.t -> t'
 
   val for_simple :
     Location.t ->
+    bool ->
     Loc.t ->
     Name.t ->
     Exp.t ->
@@ -1754,7 +1764,7 @@ and Exp_desc : sig
 
   val send : Location.t -> Exp.t -> Method.t -> t'
 
-  val assert_ : Location.t -> Exp.t -> t'
+  val assert_ : Location.t -> bool -> Exp.t -> t'
 
   val lazy_ : Location.t -> Exp.t -> t'
 
@@ -1867,29 +1877,31 @@ end = struct
 
   let field loc a1 a2 = apply2 "Exp_desc" "field" loc (extract a1) (extract a2)
 
-  let setfield loc a1 a2 a3 =
-    apply3 "Exp_desc" "setfield" loc (extract a1) (extract a2) (extract a3)
+  let setfield loc a1 a2 a3 a4 =
+    apply4 "Exp_desc" "setfield" loc (quote_bool a1) (extract a2) (extract a3)
+      (extract a4)
 
   let array loc a1 =
     apply1 "Exp_desc" "array" loc (mk_list (List.map extract a1))
 
-  let ifthenelse loc a1 a2 a3 =
-    apply3 "Exp_desc" "ifthenelse" loc (extract a1) (extract a2)
-      (option (Option.map extract a3))
+  let ifthenelse loc a1 a2 a3 a4 =
+    apply4 "Exp_desc" "ifthenelse" loc (quote_bool a1) (extract a2) (extract a3)
+      (option (Option.map extract a4))
 
-  let sequence loc a1 a2 =
-    apply2 "Exp_desc" "sequence" loc (extract a1) (extract a2)
+  let sequence loc a1 a2 a3 =
+    apply3 "Exp_desc" "sequence" loc (quote_bool a1) (extract a2) (extract a3)
 
-  let while_ loc a1 a2 =
-    apply2 "Exp_desc" "while_" loc (extract a1) (extract a2)
+  let while_ loc a1 a2 a3 =
+    apply3 "Exp_desc" "while_" loc (quote_bool a1) (extract a2) (extract a3)
 
-  let for_simple loc a1 a2 a3 a4 a5 a6 =
-    apply6 "Exp_desc" "for_simple" loc (extract a1) (extract a2) (extract a3)
-      (extract a4) (quote_bool a5) (extract a6)
+  let for_simple loc a1 a2 a3 a4 a5 a6 a7 =
+    apply7 "Exp_desc" "for_simple" loc (quote_bool a1) (extract a2) (extract a3)
+      (extract a4) (extract a5) (quote_bool a6) (extract a7)
 
   let send loc a1 a2 = apply2 "Exp_desc" "send" loc (extract a1) (extract a2)
 
-  let assert_ loc a1 = apply1 "Exp_desc" "assert_" loc (extract a1)
+  let assert_ loc a1 a2 =
+    apply2 "Exp_desc" "assert_" loc (quote_bool a1) (extract a2)
 
   let lazy_ loc a1 = apply1 "Exp_desc" "lazy_" loc (extract a1)
 
@@ -2358,7 +2370,8 @@ type case_binding =
       * Name.t list
       * (Var.Value.t list -> (Var.Module.t list -> Pat.t * Exp.t) lam) lam
   | Guarded of
-      Name.t list
+      bool
+      * Name.t list
       * Name.t list
       * (Var.Value.t list -> (Var.Module.t list -> Pat.t * Exp.t * Exp.t) lam)
         lam
@@ -2635,13 +2648,13 @@ let rec case_binding transl stage case =
         res
       | _ -> binding_with_computation_pat ())
     | _ -> binding_with_computation_pat ())
-  | Some (_box, guard) ->
-    (* CR metaprogramming: Handle [#when]. *)
+  | Some (box, guard) ->
     let ids = pat_bound_idents case.c_lhs in
     let names = List.map (name_of_ident guard.exp_loc) ids in
     let pat = quote_computation_pattern case.c_lhs in
     with_new_idents_values ids;
     let exp = quote_expression transl stage case.c_rhs in
+    let unboxed = is_unboxed box in
     let guard = quote_expression transl stage guard in
     let body =
       Lam.list_param_binding Var_value extract ids
@@ -2649,7 +2662,7 @@ let rec case_binding transl stage case =
            (fun (p, g, e) -> triple (extract p, extract g, extract e))
            [] (pat, guard, exp))
     in
-    let res = Guarded (names, [], body) in
+    let res = Guarded (unboxed, names, [], body) in
     without_idents_values ids;
     res
 
@@ -2663,8 +2676,8 @@ and quote_case_binding loc cb =
   | Simple (name, body) -> Case.simple loc (quote_loc loc) name body
   | Pattern (names_vals, names_mods, body) ->
     Case.pattern loc (quote_loc loc) names_vals names_mods body
-  | Guarded (names_vals, names_mods, body) ->
-    Case.guarded loc (quote_loc loc) names_vals names_mods body
+  | Guarded (unboxed, names_vals, names_mods, body) ->
+    Case.guarded loc unboxed (quote_loc loc) names_vals names_mods body
   | Refutation (names_vals, names_mods, body) ->
     Case.refutation loc (quote_loc loc) names_vals names_mods body)
   |> Case.wrap
@@ -2780,10 +2793,10 @@ and quote_module_exp transl stage loc mod_exp =
 
 and quote_comprehension transl stage loc { comp_body; comp_clauses } =
   let add_clause body = function
-    | Texp_comp_when (_box, exp) ->
-      (* CR metaprogramming: Handle [#when]. *)
+    | Texp_comp_when (box, exp) ->
+      let unboxed = is_unboxed box in
       let exp = quote_expression transl stage exp in
-      Comprehension.when_clause loc exp body |> Comprehension.wrap
+      Comprehension.when_clause loc unboxed exp body |> Comprehension.wrap
     | Texp_comp_for clause_bindings ->
       List.fold_left
         (fun body clb ->
@@ -3002,34 +3015,34 @@ and quote_expression_desc transl stage e =
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in
       Exp_desc.field loc rcd lbl
-    | Texp_setfield (_box, rcd, _, lid, lbl, exp) ->
-      (* CR metaprogramming: Handle [#<-]. *)
+    | Texp_setfield (box, rcd, _, lid, lbl, exp) ->
+      let unboxed = is_unboxed box in
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in
       let exp = quote_expression transl stage exp in
-      Exp_desc.setfield loc rcd lbl exp
+      Exp_desc.setfield loc unboxed rcd lbl exp
     | Texp_array (_, _, exps, _) ->
       let exps = List.map (quote_expression transl stage) exps in
       Exp_desc.array loc exps
-    | Texp_ifthenelse (_box, cond, then_, else_) ->
-      (* CR metaprogramming: Handle [#if]. *)
+    | Texp_ifthenelse (box, cond, then_, else_) ->
+      let unboxed = is_unboxed box in
       let cond = quote_expression transl stage cond in
       let then_ = quote_expression transl stage then_ in
       let else_ = Option.map (quote_expression transl stage) else_ in
-      Exp_desc.ifthenelse loc cond then_ else_
-    | Texp_sequence (_box, exp1, _, exp2) ->
-      (* CR metaprogramming: Handle [#;]. *)
+      Exp_desc.ifthenelse loc unboxed cond then_ else_
+    | Texp_sequence (box, exp1, _, exp2) ->
+      let unboxed = is_unboxed box in
       let exp1 = quote_expression transl stage exp1 in
       let exp2 = quote_expression transl stage exp2 in
-      Exp_desc.sequence loc exp1 exp2
+      Exp_desc.sequence loc unboxed exp1 exp2
     | Texp_while wh ->
-      (* CR metaprogramming: Handle [#while]. *)
+      let unboxed = is_unboxed wh.wh_box in
       let cond = quote_expression transl stage wh.wh_cond in
       let body = quote_expression transl stage wh.wh_body in
-      Exp_desc.while_ loc cond body
+      Exp_desc.while_ loc unboxed cond body
     | Texp_for floop ->
-      (* CR metaprogramming: Handle [#for]. *)
-      let low = quote_expression transl stage floop.for_from
+      let unboxed = is_unboxed floop.for_box
+      and low = quote_expression transl stage floop.for_from
       and high = quote_expression transl stage floop.for_to
       and dir =
         match floop.for_dir with
@@ -3039,7 +3052,7 @@ and quote_expression_desc transl stage e =
       with_new_idents_values [floop.for_id];
       let body = quote_expression transl stage floop.for_body in
       without_idents_values [floop.for_id];
-      Exp_desc.for_simple loc (quote_loc loc) name low high dir
+      Exp_desc.for_simple loc unboxed (quote_loc loc) name low high dir
         (Lam.func Var_value extract floop.for_id body)
     | Texp_send (obj, meth, _) ->
       let obj = quote_expression transl stage obj in
@@ -3059,10 +3072,10 @@ and quote_expression_desc transl stage e =
         without_idents_modules [ident];
         Exp_desc.letmodule loc (quote_loc loc) name mod_exp
           (Lam.func Var_module extract ident body))
-    | Texp_assert (_box, exp, _) ->
-      (* CR metaprogramming: Handle [#assert]. *)
+    | Texp_assert (box, exp, _) ->
+      let unboxed = is_unboxed box in
       let exp = quote_expression transl stage exp in
-      Exp_desc.assert_ loc exp
+      Exp_desc.assert_ loc unboxed exp
     | Texp_lazy exp ->
       let exp = quote_expression transl stage exp in
       Exp_desc.lazy_ loc exp

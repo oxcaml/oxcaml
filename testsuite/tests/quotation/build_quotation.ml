@@ -154,6 +154,16 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[if true then (`A 10) else `B ("foo", 42)]>
 |}];;
 
+<[ fun #() -> #if #true then #() ]>;;
+[%%expect {|
+- : <[unit# -> unit#]> expr = <[fun #() -> #if (#true) then (#())]>
+|}];;
+
+<[ fun #() -> #()#; #() ]>;;
+[%%expect{|
+- : <[unit# -> unit#]> expr = <[fun #() -> #()#; #()]>
+|}];;
+
 <[ function | `A x -> x | `B (_, foo) -> foo ]>;;
 [%%expect {|
 - : <[([< `A of '_weak6 | `B of '_weak7 * '_weak6 ] as '_weak5) -> '_weak6]>
@@ -282,6 +292,22 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 [%%expect {|
 - : <[$('a) option -> $('a) -> $('a)]> expr =
 <[fun x d -> match x with | Some (y) -> y | None -> d]>
+|}];;
+
+<[ function #() #when #true -> #() | _ -> #() ]>;;
+[%%expect{|
+- : <[unit# -> unit#]> expr =
+<[function | #() #when (#true) -> #() | _ -> #()]>
+|}];;
+
+<[ fun r -> r.contents <- () ]>;;
+[%%expect{|
+- : <[unit ref -> unit]> expr = <[fun r -> r# Stdlib.contents<- ()]>
+|}];;
+
+<[ fun r -> r.contents #<- () ]>;;
+[%%expect{|
+- : <[unit ref -> unit#]> expr = <[fun r -> r## Stdlib.contents<- ()]>
 |}];;
 
 <[ fun l -> List.map (fun x -> 2 * x) l ]>;;
@@ -476,6 +502,11 @@ Here is an example of a case that is not matched:
 ]>
 |}];;
 
+<[ fun #() -> #for _ = 0 to 0 do #() done ]>;;
+[%%expect{|
+- : <[unit# -> unit#]> expr = <[fun #() -> #for _for = 0 to 0 do (#()) done]>
+|}];;
+
 <[ while true do () done ]>;;
 [%%expect {|
 - : 'a expr = <[while true do  () done]>
@@ -497,6 +528,16 @@ Here is an example of a case that is not matched:
 ]>
 |}];;
 
+<[ fun #() -> #while #true do #() done ]>;;
+[%%expect{|
+- : <[unit# -> $('a)]> expr = <[fun #() -> #while #true do  (#()) done]>
+|}];;
+
+<[ fun #() -> #while #false do #() done ]>;;
+[%%expect{|
+- : <[unit# -> unit#]> expr = <[fun #() -> #while #false do  (#()) done]>
+|}];;
+
 <[ assert true ]>;;
 [%%expect {|
 - : <[unit]> expr = <[assert true]>
@@ -505,6 +546,16 @@ Here is an example of a case that is not matched:
 <[ assert false ]>;;
 [%%expect {|
 - : 'a expr = <[assert false]>
+|}];;
+
+<[ fun #() -> #assert #true ]>;;
+[%%expect {|
+- : <[unit# -> unit#]> expr = <[fun #() -> #assert #true]>
+|}];;
+
+<[ #assert #false ]>;;
+[%%expect {|
+- : 'a expr = <[#assert #false]>
 |}];;
 
 <[ lazy 42 ]>;;
