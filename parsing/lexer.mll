@@ -776,6 +776,12 @@ rule token = parse
   | "#{" { HASHLBRACE }
   | "#false" { HASHFALSE }
   | "#true" { HASHTRUE }
+  | "#if" { HASHIF }
+  | "#;" { HASHSEMI }
+  | "#assert" { HASHASSERT }
+  | "#for" { HASHFOR }
+  | "#while" { HASHWHILE }
+  | "#when" { HASHWHEN }
   | "*"  { STAR }
   | ","  { COMMA }
   | "->" { MINUSGREATER }

@@ -416,23 +416,23 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
                        sub.pat sub pattern;
                        sub.expr sub sequence)
                 bindings
-          | Texp_comp_when exp ->
+          | Texp_comp_when (_, exp) ->
             sub.expr sub exp)
         comp_clauses
   | Texp_atomic_loc (exp, _, lid, _, _) ->
       iter_loc sub lid;
       sub.expr sub exp
-  | Texp_ifthenelse (exp1, exp2, expo) ->
+  | Texp_ifthenelse (_, exp1, exp2, expo) ->
       sub.expr sub exp1;
       sub.expr sub exp2;
       Option.iter (sub.expr sub) expo
-  | Texp_sequence (exp1, _, exp2) ->
+  | Texp_sequence (_, exp1, _, exp2) ->
       sub.expr sub exp1;
       sub.expr sub exp2
-  | Texp_while { wh_cond; wh_body } ->
+  | Texp_while { wh_box = _; wh_cond; wh_body } ->
       sub.expr sub wh_cond;
       sub.expr sub wh_body
-  | Texp_for {for_from; for_to; for_body} ->
+  | Texp_for {for_box = _; for_from; for_to; for_body} ->
       sub.expr sub for_from;
       sub.expr sub for_to;
       sub.expr sub for_body
@@ -456,7 +456,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_letexception (cd, exp) ->
       sub.extension_constructor sub cd;
       sub.expr sub exp
-  | Texp_assert (exp, _) -> sub.expr sub exp
+  | Texp_assert (_, exp, _) -> sub.expr sub exp
   | Texp_lazy exp -> sub.expr sub exp
   | Texp_object (cl, _) -> sub.class_structure sub cl
   | Texp_pack mexpr -> sub.module_expr sub mexpr
@@ -750,7 +750,7 @@ let value_bindings sub (_, list) = List.iter (sub.value_binding sub) list
 
 let case sub {c_lhs; c_guard; c_rhs} =
   sub.pat sub c_lhs;
-  Option.iter (sub.expr sub) c_guard;
+  Option.iter (fun (_, e) -> sub.expr sub e) c_guard;
   sub.expr sub c_rhs
 
 let value_binding sub ({vb_loc; vb_pat; vb_expr; vb_attributes; _} as vb) =

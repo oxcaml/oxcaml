@@ -469,11 +469,11 @@ and expression_desc =
   | Pexp_idx of block_access * unboxed_access list
       (** [(BA1 UA1 UA2 ...)] e.g. [(.foo.#bar.#baz)]
           Above, BA1=.foo, UA1=.#bar, and UA2=#.baz *)
-  | Pexp_ifthenelse of expression * expression * expression option
+  | Pexp_ifthenelse of boxing * expression * expression * expression option
       (** [if E1 then E2 else E3] *)
-  | Pexp_sequence of expression * expression  (** [E1; E2] *)
-  | Pexp_while of expression * expression  (** [while E1 do E2 done] *)
-  | Pexp_for of pattern * expression * expression * direction_flag * expression
+  | Pexp_sequence of boxing * expression * expression  (** [E1; E2] *)
+  | Pexp_while of boxing * expression * expression  (** [while E1 do E2 done] *)
+  | Pexp_for of boxing * pattern * expression * expression * direction_flag * expression
       (** [Pexp_for(i, E1, E2, direction, E3)] represents:
             - [for i = E1 to E2 do E3 done]
                  when [direction] is {{!Asttypes.direction_flag.Upto}[Upto]}
@@ -499,7 +499,7 @@ and expression_desc =
       (** [let module M = ME in E] *)
   | Pexp_letexception of extension_constructor * expression
       (** [let exception C in E] *)
-  | Pexp_assert of expression
+  | Pexp_assert of boxing * expression
       (** [assert E].
 
            Note: [assert false] is treated in a special way by the
@@ -543,7 +543,7 @@ and expression_desc =
 and case =
     {
      pc_lhs: pattern;
-     pc_guard: expression option;
+     pc_guard: (boxing * expression) option;
      pc_rhs: expression;
    }
 (** Values of type {!case} represents [(P -> E)] or [(P when E0 -> E)] *)
@@ -686,7 +686,7 @@ and comprehension_clause_binding =
 and comprehension_clause =
   | Pcomp_for of comprehension_clause_binding list
       (** "for PAT (in/=) ... and PAT (in/=) ... and ..."; must be nonempty *)
-  | Pcomp_when of expression  (** "when EXPR" *)
+  | Pcomp_when of boxing * expression  (** "when EXPR" *)
 
 and comprehension =
   { pcomp_body : expression;

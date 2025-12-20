@@ -523,7 +523,7 @@ module E = struct
 
   let map_clause sub = function
     | Pcomp_for cbs -> Pcomp_for (List.map (map_clause_binding sub) cbs)
-    | Pcomp_when expr -> Pcomp_when (sub.expr sub expr)
+    | Pcomp_when (box, expr) -> Pcomp_when (box, sub.expr sub expr)
 
   let map_comp sub = function
     | { pcomp_body; pcomp_clauses } ->
@@ -585,15 +585,15 @@ module E = struct
     | Pexp_idx (ba, uas) ->
       idx ~loc ~attrs (map_block_access sub ba)
         (List.map (map_unboxed_access sub) uas)
-    | Pexp_ifthenelse (e1, e2, e3) ->
-        ifthenelse ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
+    | Pexp_ifthenelse (box, e1, e2, e3) ->
+        ifthenelse ~loc ~attrs box (sub.expr sub e1) (sub.expr sub e2)
           (map_opt (sub.expr sub) e3)
-    | Pexp_sequence (e1, e2) ->
-        sequence ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
-    | Pexp_while (e1, e2) ->
-        while_ ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
-    | Pexp_for (p, e1, e2, d, e3) ->
-        for_ ~loc ~attrs (sub.pat sub p) (sub.expr sub e1) (sub.expr sub e2) d
+    | Pexp_sequence (box, e1, e2) ->
+        sequence ~loc ~attrs box (sub.expr sub e1) (sub.expr sub e2)
+    | Pexp_while (box, e1, e2) ->
+        while_ ~loc ~attrs box (sub.expr sub e1) (sub.expr sub e2)
+    | Pexp_for (box, p, e1, e2, d, e3) ->
+        for_ ~loc ~attrs box (sub.pat sub p) (sub.expr sub e1) (sub.expr sub e2) d
           (sub.expr sub e3)
     | Pexp_coerce (e, t1, t2) ->
         coerce ~loc ~attrs (sub.expr sub e) (map_opt (sub.typ sub) t1)
@@ -615,7 +615,7 @@ module E = struct
         letexception ~loc ~attrs
           (sub.extension_constructor sub cd)
           (sub.expr sub e)
-    | Pexp_assert e -> assert_ ~loc ~attrs (sub.expr sub e)
+    | Pexp_assert (box, e) -> assert_ ~loc ~attrs box (sub.expr sub e)
     | Pexp_lazy e -> lazy_ ~loc ~attrs (sub.expr sub e)
     | Pexp_poly (e, t) ->
         poly ~loc ~attrs (sub.expr sub e) (map_opt (sub.typ sub) t)
@@ -940,7 +940,7 @@ let default_mapper =
       (fun this {pc_lhs; pc_guard; pc_rhs} ->
          {
            pc_lhs = this.pat this pc_lhs;
-           pc_guard = map_opt (this.expr this) pc_guard;
+           pc_guard = map_opt (fun (box, e) -> box, this.expr this e) pc_guard;
            pc_rhs = this.expr this pc_rhs;
          }
       );

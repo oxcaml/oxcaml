@@ -2635,7 +2635,8 @@ let rec case_binding transl stage case =
         res
       | _ -> binding_with_computation_pat ())
     | _ -> binding_with_computation_pat ())
-  | Some guard ->
+  | Some (_box, guard) ->
+    (* CR metaprogramming: Handle [#when]. *)
     let ids = pat_bound_idents case.c_lhs in
     let names = List.map (name_of_ident guard.exp_loc) ids in
     let pat = quote_computation_pattern case.c_lhs in
@@ -2779,7 +2780,8 @@ and quote_module_exp transl stage loc mod_exp =
 
 and quote_comprehension transl stage loc { comp_body; comp_clauses } =
   let add_clause body = function
-    | Texp_comp_when exp ->
+    | Texp_comp_when (_box, exp) ->
+      (* CR metaprogramming: Handle [#when]. *)
       let exp = quote_expression transl stage exp in
       Comprehension.when_clause loc exp body |> Comprehension.wrap
     | Texp_comp_for clause_bindings ->
@@ -3008,20 +3010,24 @@ and quote_expression_desc transl stage e =
     | Texp_array (_, _, exps, _) ->
       let exps = List.map (quote_expression transl stage) exps in
       Exp_desc.array loc exps
-    | Texp_ifthenelse (cond, then_, else_) ->
+    | Texp_ifthenelse (_box, cond, then_, else_) ->
+      (* CR metaprogramming: Handle [#if]. *)
       let cond = quote_expression transl stage cond in
       let then_ = quote_expression transl stage then_ in
       let else_ = Option.map (quote_expression transl stage) else_ in
       Exp_desc.ifthenelse loc cond then_ else_
-    | Texp_sequence (exp1, _, exp2) ->
+    | Texp_sequence (_box, exp1, _, exp2) ->
+      (* CR metaprogramming: Handle [#;]. *)
       let exp1 = quote_expression transl stage exp1 in
       let exp2 = quote_expression transl stage exp2 in
       Exp_desc.sequence loc exp1 exp2
     | Texp_while wh ->
+      (* CR metaprogramming: Handle [#while]. *)
       let cond = quote_expression transl stage wh.wh_cond in
       let body = quote_expression transl stage wh.wh_body in
       Exp_desc.while_ loc cond body
     | Texp_for floop ->
+      (* CR metaprogramming: Handle [#for]. *)
       let low = quote_expression transl stage floop.for_from
       and high = quote_expression transl stage floop.for_to
       and dir =
@@ -3052,7 +3058,8 @@ and quote_expression_desc transl stage e =
         without_idents_modules [ident];
         Exp_desc.letmodule loc (quote_loc loc) name mod_exp
           (Lam.func Var_module extract ident body))
-    | Texp_assert (exp, _) ->
+    | Texp_assert (_box, exp, _) ->
+      (* CR metaprogramming: Handle [#assert]. *)
       let exp = quote_expression transl stage exp in
       Exp_desc.assert_ loc exp
     | Texp_lazy exp ->

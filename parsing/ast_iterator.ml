@@ -412,7 +412,7 @@ module E = struct
 
   let iter_clause sub = function
     | Pcomp_for cbs -> List.iter (iter_clause_binding sub) cbs
-    | Pcomp_when expr -> sub.expr sub expr
+    | Pcomp_when (_box, expr) -> sub.expr sub expr
 
   let iter_comp sub { pcomp_body; pcomp_clauses } =
     sub.expr sub pcomp_body;
@@ -506,14 +506,14 @@ module E = struct
     | Pexp_idx (ba, uas) ->
         iter_block_access sub ba;
         List.iter (iter_unboxed_access sub) uas
-    | Pexp_ifthenelse (e1, e2, e3) ->
+    | Pexp_ifthenelse (_box, e1, e2, e3) ->
         sub.expr sub e1; sub.expr sub e2;
         iter_opt (sub.expr sub) e3
-    | Pexp_sequence (e1, e2) ->
+    | Pexp_sequence (_box, e1, e2) ->
         sub.expr sub e1; sub.expr sub e2
-    | Pexp_while (e1, e2) ->
+    | Pexp_while (_box, e1, e2) ->
         sub.expr sub e1; sub.expr sub e2
-    | Pexp_for (p, e1, e2, _d, e3) ->
+    | Pexp_for (_box, p, e1, e2, _d, e3) ->
         sub.pat sub p; sub.expr sub e1; sub.expr sub e2;
         sub.expr sub e3
     | Pexp_coerce (e, t1, t2) ->
@@ -535,7 +535,7 @@ module E = struct
     | Pexp_letexception (cd, e) ->
         sub.extension_constructor sub cd;
         sub.expr sub e
-    | Pexp_assert e -> sub.expr sub e
+    | Pexp_assert (_box, e) -> sub.expr sub e
     | Pexp_lazy e -> sub.expr sub e
     | Pexp_poly (e, t) ->
         sub.expr sub e; iter_opt (sub.typ sub) t
@@ -827,7 +827,7 @@ let default_iterator =
     case =
       (fun this {pc_lhs; pc_guard; pc_rhs} ->
          this.pat this pc_lhs;
-         iter_opt (this.expr this) pc_guard;
+         iter_opt (fun (_box, e) -> this.expr this e) pc_guard;
          this.expr this pc_rhs
       );
 

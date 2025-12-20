@@ -270,14 +270,16 @@ and expression_desc =
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of mutability * Jkind.sort * comprehension
-  | Texp_ifthenelse of expression * expression * expression option
-  | Texp_sequence of expression * Jkind.sort * expression
+  | Texp_ifthenelse of boxing * expression * expression * expression option
+  | Texp_sequence of boxing * expression * Jkind.sort * expression
   | Texp_while of {
+      wh_box : boxing;
       wh_cond : expression;
       wh_body : expression;
       wh_body_sort : Jkind.sort
     }
   | Texp_for of {
+      for_box : boxing;
       for_id  : Ident.t;
       for_debug_uid: Shape.Uid.t;
       for_pat : Parsetree.pattern;
@@ -299,7 +301,7 @@ and expression_desc =
       Ident.t option * string option loc * Types.module_presence * module_expr *
         expression
   | Texp_letexception of extension_constructor * expression
-  | Texp_assert of expression * Location.t
+  | Texp_assert of boxing * expression * Location.t
   | Texp_lazy of expression
   | Texp_object of class_structure * string list
   | Texp_pack of module_expr
@@ -358,7 +360,7 @@ and comprehension =
 
 and comprehension_clause =
   | Texp_comp_for of comprehension_clause_binding list
-  | Texp_comp_when of expression
+  | Texp_comp_when of boxing * expression
 
 and comprehension_clause_binding =
   {
@@ -381,7 +383,7 @@ and comprehension_iterator =
 and 'k case =
     {
      c_lhs: 'k general_pattern;
-     c_guard: expression option;
+     c_guard: (boxing * expression) option;
      c_rhs: expression;
     }
 
@@ -1163,7 +1165,9 @@ type 'sort full_bound_ident_action =
    [~of_const_sort]. *)
 
 let for_transl f =
-  f ~of_sort:Jkind.Sort.default_for_transl_and_get ~of_const_sort:Fun.id
+  f
+    ~of_sort:(Jkind.Sort.default_for_transl_and_get : _ -> _)
+    ~of_const_sort:Fun.id
 
 let for_typing f =
   f ~of_sort:Fun.id ~of_const_sort:Jkind.Sort.of_const
@@ -1454,17 +1458,17 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_array_comprehension (_, _, { comp_body; comp_clauses }) ->
       let acc = fold_antiquote_exp f acc comp_body in
       fold_antiquote_comprehension_clauses f acc comp_clauses
-  | Texp_ifthenelse (exp1, exp2, expo) ->
+  | Texp_ifthenelse (_, exp1, exp2, expo) ->
       let acc = fold_antiquote_exp f acc exp1 in
       let acc = fold_antiquote_exp f acc exp2 in
       fold_antiquote_exp_opt f acc expo
-  | Texp_sequence (exp1, _, exp2) ->
+  | Texp_sequence (_, exp1, _, exp2) ->
       let acc = fold_antiquote_exp f acc exp1 in
       fold_antiquote_exp f acc exp2
-  | Texp_while { wh_cond; wh_body } ->
+  | Texp_while { wh_box = _; wh_cond; wh_body } ->
       let acc = fold_antiquote_exp f acc wh_cond in
       fold_antiquote_exp f acc wh_body
-  | Texp_for {for_from; for_to; for_body} ->
+  | Texp_for {for_box = _; for_from; for_to; for_body} ->
       let acc = fold_antiquote_exp f acc for_from in
       let acc = fold_antiquote_exp f acc for_to in
       fold_antiquote_exp f acc for_body
@@ -1476,7 +1480,7 @@ let rec fold_antiquote_exp f  acc exp =
       List.fold_left (fun acc (_, _, e) -> fold_antiquote_exp f acc e) acc list
   | Texp_letmodule (_, _, _, _, exp) -> fold_antiquote_exp f acc exp
   | Texp_letexception (_, exp) -> fold_antiquote_exp f acc exp
-  | Texp_assert (exp, _) -> fold_antiquote_exp f acc exp
+  | Texp_assert (_, exp, _) -> fold_antiquote_exp f acc exp
   | Texp_lazy exp -> fold_antiquote_exp f acc exp
   | Texp_object (_, _) -> acc
   | Texp_pack _ -> acc
@@ -1529,7 +1533,7 @@ and fold_antiquote_function_body f acc = function
 
 and fold_antiquote_case : 'k. _ -> _ -> 'k case -> _ =
   fun f acc c ->
-    let acc = fold_antiquote_exp_opt f acc c.c_guard in
+    let acc = fold_antiquote_exp_opt f acc (Option.map snd c.c_guard) in
     fold_antiquote_exp f acc c.c_rhs
 
 and fold_antiquote_cases : 'k. _ -> _ -> 'k case list -> _ =
@@ -1560,7 +1564,7 @@ and fold_antiquote_comprehension_clause f acc = function
           | Texp_comp_in { pattern = _; sequence } ->
               fold_antiquote_exp f acc sequence)
         acc bindings
-  | Texp_comp_when exp ->
+  | Texp_comp_when (_, exp) ->
       fold_antiquote_exp f acc exp
 
 and fold_antiquote_comprehension_clauses f acc ccs =

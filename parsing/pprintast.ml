@@ -272,6 +272,10 @@ let bool f = function
   | false -> pp f "false"
   | true -> pp f "true"
 
+let boxing f = function
+  | Boxed -> ()
+  | Unboxed -> pp f "#"
+
 (* trailing space*)
 let mutable_flag f = function
   | Immutable -> ()
@@ -1074,23 +1078,26 @@ and expression ctxt f x =
     | Pexp_setfield (e1, li, e2) ->
         pp f "@[<2>%a.%a@ <-@ %a@]"
           (simple_expr ctxt) e1 longident_loc li (simple_expr ctxt) e2
-    | Pexp_ifthenelse (e1, e2, eo) ->
+    | Pexp_ifthenelse (b, e1, e2, eo) ->
         (* @;@[<2>else@ %a@]@] *)
-        let fmt:(_,_,_)format ="@[<hv0>@[<2>if@ %a@]@;@[<2>then@ %a@]%a@]" in
+        let fmt:(_,_,_)format ="@[<hv0>@[<2>%aif@ %a@]@;@[<2>then@ %a@]%a@]" in
         let expression_under_ifthenelse = expression (under_ifthenelse ctxt) in
-        pp f fmt expression_under_ifthenelse e1 expression_under_ifthenelse e2
+        pp f fmt boxing b expression_under_ifthenelse e1 expression_under_ifthenelse e2
           (fun f eo -> match eo with
              | Some x ->
                  pp f "@;@[<2>else@;%a@]" (expression (under_semi ctxt)) x
              | None -> () (* pp f "()" *)) eo
     | Pexp_sequence _ ->
         let rec sequence_helper acc = function
-          | {pexp_desc=Pexp_sequence(e1,e2); pexp_attributes = []} ->
-              sequence_helper (e1::acc) e2
-          | v -> List.rev (v::acc) in
+          | {pexp_desc=Pexp_sequence(b,e1,e2); pexp_attributes = []} ->
+              sequence_helper ((e1,b)::acc) e2
+          | v -> List.rev ((v,Boxed)::acc) in
         let lst = sequence_helper [] x in
         pp f "@[<hv>%a@]"
-          (list (expression (under_semi ctxt)) ~sep:";@;") lst
+          (list
+             (fun f (e,b) -> expression (under_semi ctxt) f e; boxing f b)
+             ~sep:";@;")
+          lst
     | Pexp_new (li) ->
         pp f "@[<hov2>new@ %a@]" longident_loc li;
     | Pexp_setvar (s, e) ->
@@ -1108,8 +1115,8 @@ and expression ctxt f x =
         pp f "@[<hov2>let@ exception@ %a@ in@ %a@]"
           (extension_constructor ctxt) cd
           (expression ctxt) e
-    | Pexp_assert e ->
-        pp f "@[<hov2>assert@ %a@]" (simple_expr ctxt) e
+    | Pexp_assert (b, e) ->
+        pp f "@[<hov2>%aassert@ %a@]" boxing b (simple_expr ctxt) e
     | Pexp_lazy (e) ->
         pp f "@[<hov2>lazy@ %a@]" (simple_expr ctxt) e
     (* Pexp_poly: impossible but we should print it anyway, rather than
@@ -1223,14 +1230,14 @@ and simple_expr ctxt f x =
     | Pexp_idx (ba, uas) ->
       pp f "(%a%a)" (block_access ctxt) ba (list unboxed_access ~sep:"") uas
     | Pexp_comprehension comp -> comprehension_expr ctxt f comp
-    | Pexp_while (e1, e2) ->
-        let fmt : (_,_,_) format = "@[<2>while@;%a@;do@;%a@;done@]" in
-        pp f fmt (expression ctxt) e1 (expression ctxt) e2
-    | Pexp_for (s, e1, e2, df, e3) ->
+    | Pexp_while (b, e1, e2) ->
+        let fmt : (_,_,_) format = "@[<2>%awhile@;%a@;do@;%a@;done@]" in
+        pp f fmt boxing b (expression ctxt) e1 (expression ctxt) e2
+    | Pexp_for (b, s, e1, e2, df, e3) ->
         let fmt:(_,_,_)format =
-          "@[<hv0>@[<hv2>@[<2>for %a =@;%a@;%a%a@;do@]@;%a@]@;done@]" in
+          "@[<hv0>@[<hv2>@[<2>%afor %a =@;%a@;%a%a@;do@]@;%a@]@;done@]" in
         let expression = expression ctxt in
-        pp f fmt (pattern ctxt) s expression e1 direction_flag
+        pp f fmt boxing b (pattern ctxt) s expression e1 direction_flag
           df expression e2 expression e3
     | _ ->  paren true (expression ctxt) f x
 
@@ -2205,8 +2212,11 @@ and extension_constructor ctxt f x =
 and case_list ctxt f l : unit =
   let aux f {pc_lhs; pc_guard; pc_rhs} =
     pp f "@;| @[<2>%a%a@;->@;%a@]"
-      (pattern ctxt) pc_lhs (option (expression ctxt) ~first:"@;when@;")
-      pc_guard (expression (under_pipe ctxt)) pc_rhs
+      (pattern ctxt) pc_lhs
+      (option 
+         (fun f (b, e) -> pp f "@;%awhen@;%a" boxing b (expression ctxt) e))
+      pc_guard
+      (expression (under_pipe ctxt)) pc_rhs
   in
   list aux f l ~sep:""
 
@@ -2304,8 +2314,8 @@ and comprehension_clause ctxt f x =
   match x with
   | Pcomp_for bindings ->
       pp f "@[for %a@]" (list ~sep:"@]@ @[and " (comprehension_binding ctxt)) bindings
-  | Pcomp_when cond ->
-      pp f "@[when %a@]" (expression ctxt) cond
+  | Pcomp_when (b, cond) ->
+      pp f "@[%awhen %a@]" boxing b (expression ctxt) cond
 
 and comprehension_binding ctxt f x =
   let { pcomp_cb_pattern = pat;

@@ -185,13 +185,13 @@ module Exp:
       expression
     val idx : ?loc:loc -> ?attrs:attrs -> block_access -> unboxed_access list
       -> expression
-    val ifthenelse: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val ifthenelse: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
                     -> expression option -> expression
-    val sequence: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val sequence: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
                   -> expression
-    val while_: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val while_: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
                 -> expression
-    val for_: ?loc:loc -> ?attrs:attrs -> pattern -> expression -> expression
+    val for_: ?loc:loc -> ?attrs:attrs -> boxing -> pattern -> expression -> expression
               -> direction_flag -> expression -> expression
     val coerce: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
                 -> core_type -> expression
@@ -207,7 +207,7 @@ module Exp:
     val letexception:
       ?loc:loc -> ?attrs:attrs -> extension_constructor -> expression
       -> expression
-    val assert_: ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val assert_: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> expression
     val lazy_: ?loc:loc -> ?attrs:attrs -> expression -> expression
     val poly: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
               -> expression
@@ -229,7 +229,7 @@ module Exp:
     val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
     val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
 
-    val case: pattern -> ?guard:expression -> expression -> case
+    val case: pattern -> ?guard:(boxing * expression) -> expression -> case
     val binding_op: str -> pattern -> expression -> loc -> binding_op
   end
 

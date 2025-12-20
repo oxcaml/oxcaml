@@ -479,14 +479,16 @@ and expression_desc =
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of Types.mutability * Jkind.sort * comprehension
-  | Texp_ifthenelse of expression * expression * expression option
-  | Texp_sequence of expression * Jkind.sort * expression
+  | Texp_ifthenelse of boxing * expression * expression * expression option
+  | Texp_sequence of boxing * expression * Jkind.sort * expression
   | Texp_while of {
+      wh_box : boxing;
       wh_cond : expression;
       wh_body : expression;
       wh_body_sort : Jkind.sort
     }
   | Texp_for of {
+      for_box : boxing;
       for_id  : Ident.t;
       for_debug_uid: Shape.Uid.t;
       for_pat : Parsetree.pattern;
@@ -508,7 +510,7 @@ and expression_desc =
       Ident.t option * string option loc * Types.module_presence * module_expr *
         expression
   | Texp_letexception of extension_constructor * expression
-  | Texp_assert of expression * Location.t
+  | Texp_assert of boxing * expression * Location.t
   | Texp_lazy of expression
   | Texp_object of class_structure * string list
   | Texp_pack of module_expr
@@ -644,7 +646,7 @@ and comprehension =
 
 and comprehension_clause =
   | Texp_comp_for of comprehension_clause_binding list
-  | Texp_comp_when of expression
+  | Texp_comp_when of boxing * expression
 
 and comprehension_clause_binding =
   {
@@ -675,7 +677,7 @@ and comprehension_iterator =
 and 'k case =
     {
      c_lhs: 'k general_pattern;
-     c_guard: expression option;
+     c_guard: (boxing * expression) option;
      c_rhs: expression;
     }
 

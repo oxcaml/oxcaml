@@ -205,7 +205,7 @@ module type Sort = sig
   (** [default_for_transl_and_get] extracts the sort as a `const`.  If it's a variable,
       it is set to [value] first. After we have support for [void], this will default to
       [void] instead. *)
-  val default_for_transl_and_get : t -> Const.t
+  val default_for_transl_and_get : ?unboxed:bool -> t -> Const.t
 
   (** To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
   type change

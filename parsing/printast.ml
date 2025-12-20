@@ -78,6 +78,11 @@ let fmt_bool f x =
   | true -> fprintf f "true";
 ;;
 
+let fmt_boxing f x =
+  match x with
+  | Boxed -> fprintf f "Boxed"
+  | Unboxed -> fprintf f "Unboxed"
+
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -397,21 +402,21 @@ and expression i ppf x =
       line i ppf "Pexp_idx\n";
       block_access i ppf ba;
       List.iter (unboxed_access i ppf) uas;
-  | Pexp_ifthenelse (e1, e2, eo) ->
-      line i ppf "Pexp_ifthenelse\n";
+  | Pexp_ifthenelse (box, e1, e2, eo) ->
+      line i ppf "Pexp_ifthenelse %a\n" fmt_boxing box;
       expression i ppf e1;
       expression i ppf e2;
       option i expression ppf eo;
-  | Pexp_sequence (e1, e2) ->
-      line i ppf "Pexp_sequence\n";
+  | Pexp_sequence (box, e1, e2) ->
+      line i ppf "Pexp_sequence %a\n" fmt_boxing box;
       expression i ppf e1;
       expression i ppf e2;
-  | Pexp_while (e1, e2) ->
-      line i ppf "Pexp_while\n";
+  | Pexp_while (box, e1, e2) ->
+      line i ppf "Pexp_while %a\n" fmt_boxing box;
       expression i ppf e1;
       expression i ppf e2;
-  | Pexp_for (p, e1, e2, df, e3) ->
-      line i ppf "Pexp_for %a\n" fmt_direction_flag df;
+  | Pexp_for (box, p, e1, e2, df, e3) ->
+      line i ppf "Pexp_for %a %a\n" fmt_boxing box fmt_direction_flag df;
       pattern i ppf p;
       expression i ppf e1;
       expression i ppf e2;
@@ -444,8 +449,8 @@ and expression i ppf x =
       line i ppf "Pexp_letexception\n";
       extension_constructor i ppf cd;
       expression i ppf e;
-  | Pexp_assert (e) ->
-      line i ppf "Pexp_assert\n";
+  | Pexp_assert (box, e) ->
+      line i ppf "Pexp_assert %a\n" fmt_boxing box;
       expression i ppf e;
   | Pexp_lazy (e) ->
       line i ppf "Pexp_lazy\n";
@@ -529,8 +534,8 @@ and comprehension_clause i ppf = function
   | Pcomp_for cbs ->
       line i ppf "Pcomp_for\n";
       list i comprehension_clause_binding ppf cbs
-  | Pcomp_when exp ->
-      line i ppf "Pcomp_when\n";
+  | Pcomp_when (box, exp) ->
+      line i ppf "Pcomp_when %a\n" fmt_boxing box;
       expression i ppf exp
 
 and comprehension_clause_binding i ppf
@@ -1176,7 +1181,8 @@ and case i ppf {pc_lhs; pc_guard; pc_rhs} =
   pattern (i+1) ppf pc_lhs;
   begin match pc_guard with
   | None -> ()
-  | Some g -> line (i+1) ppf "<when>\n"; expression (i + 2) ppf g
+  | Some (b, e) ->
+    line (i+1) ppf "<when> %a\n" fmt_boxing b; expression (i + 2) ppf e
   end;
   expression (i+1) ppf pc_rhs;
 

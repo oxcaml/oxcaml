@@ -2422,7 +2422,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
        we add new unboxed access types *)
     let _unboxed_access = function Uaccess_unboxed_field _ -> UF.unused in
     block_access ba
-  | Texp_ifthenelse (if_, then_, else_opt) ->
+  | Texp_ifthenelse (_, if_, then_, else_opt) ->
     (* if' is only borrowed, not used; but probably doesn't matter because of
        mode crossing *)
     let uf_cond = check_uniqueness_exp ~overwrite:None ienv if_ in
@@ -2433,7 +2433,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
       | None -> UF.unused
     in
     UF.seq uf_cond (UF.choose uf_then uf_else)
-  | Texp_sequence (e0, _, e1) ->
+  | Texp_sequence (_, e0, _, e1) ->
     let uf0 = check_uniqueness_exp ~overwrite:None ienv e0 in
     let uf1 = check_uniqueness_exp ~overwrite:None ienv e1 in
     UF.seq uf0 uf1
@@ -2474,7 +2474,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     let uf_body = check_uniqueness_exp ~overwrite:None ienv body in
     UF.seq uf_mod uf_body
   | Texp_letexception (_, e) -> check_uniqueness_exp ~overwrite:None ienv e
-  | Texp_assert (e, _) -> check_uniqueness_exp ~overwrite:None ienv e
+  | Texp_assert (_, e, _) -> check_uniqueness_exp ~overwrite:None ienv e
   | Texp_lazy e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     lift_implicit_borrowing uf
@@ -2661,8 +2661,8 @@ and check_uniqueness_cases_gen :
            let uf_guard =
              match case.c_guard with
              | None -> UF.unused
-             | Some g ->
-               check_uniqueness_exp ~overwrite:None (Ienv.extend ienv ext) g
+             | Some (_, e) ->
+               check_uniqueness_exp ~overwrite:None (Ienv.extend ienv ext) e
            in
            ext, (uf_lhs, uf_guard))
          cases)
@@ -2696,7 +2696,7 @@ and check_uniqueness_comprehensions ienv cs =
     (List.map
        (fun c ->
          match c with
-         | Texp_comp_when e -> check_uniqueness_exp ~overwrite:None ienv e
+         | Texp_comp_when (_, e) -> check_uniqueness_exp ~overwrite:None ienv e
          | Texp_comp_for cbs ->
            check_uniqueness_comprehension_clause_binding ienv cbs)
        cs)

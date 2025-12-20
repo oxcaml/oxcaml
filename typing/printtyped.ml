@@ -95,6 +95,11 @@ let fmt_bool f x =
   | false -> fprintf f "false"
   | true -> fprintf f "true"
 
+let fmt_boxing f x =
+  match x with
+  | Boxed -> fprintf f "Boxed"
+  | Unboxed -> fprintf f "Unboxed"
+
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -632,23 +637,23 @@ and expression i ppf x =
       line i ppf "Texp_array_comprehension %a\n" fmt_mutable_mode_flag amut;
       line i ppf "%a\n" Jkind.Sort.format sort;
       comprehension i ppf comp
-  | Texp_ifthenelse (e1, e2, eo) ->
-      line i ppf "Texp_ifthenelse\n";
+  | Texp_ifthenelse (b, e1, e2, eo) ->
+      line i ppf "Texp_ifthenelse %a\n" fmt_boxing b;
       expression i ppf e1;
       expression i ppf e2;
       option i expression ppf eo;
-  | Texp_sequence (e1, s, e2) ->
-      line i ppf "Texp_sequence\n";
+  | Texp_sequence (b, e1, s, e2) ->
+      line i ppf "Texp_sequence %a\n" fmt_boxing b;
       expression i ppf e1;
       line i ppf "%a\n" Jkind.Sort.format s;
       expression i ppf e2;
-  | Texp_while {wh_cond; wh_body} ->
-      line i ppf "Texp_while\n";
+  | Texp_while {wh_box; wh_cond; wh_body} ->
+      line i ppf "Texp_while %a\n" fmt_boxing wh_box;
       expression i ppf wh_cond;
       expression i ppf wh_body;
-  | Texp_for {for_id; for_from; for_to; for_dir; for_body} ->
-      line i ppf "Texp_for \"%a\" %a\n"
-        fmt_ident for_id fmt_direction_flag for_dir;
+  | Texp_for {for_box; for_id; for_from; for_to; for_dir; for_body} ->
+      line i ppf "Texp_for %a \"%a\" %a\n"
+        fmt_boxing for_box fmt_ident for_id fmt_direction_flag for_dir;
       expression i ppf for_from;
       expression i ppf for_to;
       expression i ppf for_body
@@ -679,8 +684,8 @@ and expression i ppf x =
       line i ppf "Texp_letexception\n";
       extension_constructor i ppf cd;
       expression i ppf e;
-  | Texp_assert (e, _) ->
-      line i ppf "Texp_assert";
+  | Texp_assert (b, e, _) ->
+      line i ppf "Texp_assert %a" fmt_boxing b;
       expression i ppf e;
   | Texp_lazy (e) ->
       line i ppf "Texp_lazy";
@@ -1255,8 +1260,8 @@ and comprehension_clause i ppf = function
   | Texp_comp_for ccbs ->
       line i ppf "Texp_comp_for\n";
       List.iter (comprehension_clause_binding i ppf) ccbs
-  | Texp_comp_when cond ->
-      line i ppf "Texp_comp_when\n";
+  | Texp_comp_when (box, cond) ->
+      line i ppf "Texp_comp_when %a\n" fmt_boxing box;
       expression i ppf cond
 
 and comprehension_clause_binding
@@ -1284,7 +1289,8 @@ and case
   pattern (i+1) ppf c_lhs;
   begin match c_guard with
   | None -> ()
-  | Some g -> line (i+1) ppf "<when>\n"; expression (i + 2) ppf g
+  | Some (b, e) ->
+    line (i+1) ppf "<when> %a\n" fmt_boxing b; expression (i + 2) ppf e
   end;
   expression (i+1) ppf c_rhs;
 
