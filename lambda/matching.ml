@@ -3264,9 +3264,7 @@ let combine_unboxed_bool value_kind loc arg partial ctx def
     make_test_sequence value_kind loc fail
       (Scalar.integral (Naked (Taggable Int8)))
       arg
-      (List.map
-         (fun (b, l) ->
-            (if b then Const_untagged_int8 1 else Const_untagged_int8 0), l)
+      (List.map (fun (b, l) -> Const_untagged_int8 (Bool.to_int b), l)
          bool_list)
   in
   (lambda1, Jumps.union local_jumps total)
