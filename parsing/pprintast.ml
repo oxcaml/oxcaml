@@ -1186,6 +1186,7 @@ and simple_expr ctxt f x =
     | Pexp_pack me ->
         pp f "(module@;%a)" (module_expr ctxt) me
     | Pexp_unboxed_unit -> pp f "#()"
+    | Pexp_unboxed_bool b -> pp f "#%a" bool b
     | Pexp_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:false l
     | Pexp_unboxed_tuple l ->
