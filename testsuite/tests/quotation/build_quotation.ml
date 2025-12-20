@@ -156,7 +156,7 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ fun #() -> #if #true then #() ]>;;
 [%%expect {|
-- : <[unit# -> unit#]> expr = <[fun #() -> #if (#true) then (#())]>
+- : <[unit# -> unit#]> expr = <[fun #() -> #if #true then #()]>
 |}];;
 
 <[ fun #() -> #()#; #() ]>;;
@@ -296,8 +296,8 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ function #() #when #true -> #() | _ -> #() ]>;;
 [%%expect{|
-- : <[unit# -> unit#]> expr =
-<[function | #() #when (#true) -> #() | _ -> #()]>
+- : <[unit# -> unit#]> expr = <[function | #() #when #true -> #() | _ -> #()
+]>
 |}];;
 
 <[ fun r -> r.contents <- () ]>;;
@@ -504,7 +504,7 @@ Here is an example of a case that is not matched:
 
 <[ fun #() -> #for _ = 0 to 0 do #() done ]>;;
 [%%expect{|
-- : <[unit# -> unit#]> expr = <[fun #() -> #for _for = 0 to 0 do (#()) done]>
+- : <[unit# -> unit#]> expr = <[fun #() -> #for _for = 0 to 0 do #() done]>
 |}];;
 
 <[ while true do () done ]>;;
@@ -530,12 +530,12 @@ Here is an example of a case that is not matched:
 
 <[ fun #() -> #while #true do #() done ]>;;
 [%%expect{|
-- : <[unit# -> $('a)]> expr = <[fun #() -> #while #true do  (#()) done]>
+- : <[unit# -> $('a)]> expr = <[fun #() -> #while #true do  #() done]>
 |}];;
 
 <[ fun #() -> #while #false do #() done ]>;;
 [%%expect{|
-- : <[unit# -> unit#]> expr = <[fun #() -> #while #false do  (#()) done]>
+- : <[unit# -> unit#]> expr = <[fun #() -> #while #false do  #() done]>
 |}];;
 
 <[ assert true ]>;;
