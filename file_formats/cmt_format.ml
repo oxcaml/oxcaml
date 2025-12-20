@@ -225,7 +225,7 @@ let iter_on_occurrences
       | Texp_construct (lid, constr_desc, _, _) ->
           add_constructor_description exp_env lid constr_desc
       | Texp_field (_, _, lid, label_desc, _, _)
-      | Texp_setfield (_, _, lid, label_desc, _) ->
+      | Texp_setfield (_, _, _, lid, label_desc, _) ->
           add_label ~namespace:Label exp_env lid label_desc
       | Texp_unboxed_field (_, _, lid, label_desc, _) ->
           add_label ~namespace:Unboxed_label exp_env lid label_desc
@@ -243,7 +243,7 @@ let iter_on_occurrences
       | Texp_instvar  (_self_path, path, name) ->
           let lid = { name with txt = Longident.Lident name.txt } in
           f ~namespace:Value exp_env path lid
-      | Texp_setinstvar  (_self_path, path, name, _) ->
+      | Texp_setinstvar  (_box, _self_path, path, name, _) ->
           let lid = { name with txt = Longident.Lident name.txt } in
           f ~namespace:Value exp_env path lid
       | Texp_override (_self_path, modifs) ->

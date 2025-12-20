@@ -1075,9 +1075,9 @@ and expression ctxt f x =
              pp f "@[<2>%a@;%a@]" longident_loc li
                (simple_expr ctxt) eo
          | _ -> assert false)
-    | Pexp_setfield (e1, li, e2) ->
-        pp f "@[<2>%a.%a@ <-@ %a@]"
-          (simple_expr ctxt) e1 longident_loc li (simple_expr ctxt) e2
+    | Pexp_setfield (b, e1, li, e2) ->
+        pp f "@[<2>%a.%a@ %a<-@ %a@]"
+          (simple_expr ctxt) e1 longident_loc li boxing b (simple_expr ctxt) e2
     | Pexp_ifthenelse (b, e1, e2, eo) ->
         (* @;@[<2>else@ %a@]@] *)
         let fmt:(_,_,_)format ="@[<hv0>@[<2>%aif@ %a@]@;@[<2>then@ %a@]%a@]" in
@@ -1100,8 +1100,9 @@ and expression ctxt f x =
           lst
     | Pexp_new (li) ->
         pp f "@[<hov2>new@ %a@]" longident_loc li;
-    | Pexp_setvar (s, e) ->
-        pp f "@[<hov2>%a@ <-@ %a@]" ident_of_name s.txt (expression ctxt) e
+    | Pexp_setvar (b, s, e) ->
+        pp f "@[<hov2>%a@ %a<-@ %a@]" ident_of_name s.txt boxing b
+          (expression ctxt) e
     | Pexp_override l -> (* FIXME *)
         let string_x_expression f (s, e) =
           pp f "@[<hov2>%a@ =@ %a@]" ident_of_name s.txt (expression ctxt) e in

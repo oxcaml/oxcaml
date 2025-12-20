@@ -391,7 +391,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_unboxed_field (exp, _, lid, _, _) ->
       iter_loc sub lid;
       sub.expr sub exp
-  | Texp_setfield (exp1, _, lid, _, exp2) ->
+  | Texp_setfield (_, exp1, _, lid, _, exp2) ->
       iter_loc sub lid;
       sub.expr sub exp1;
       sub.expr sub exp2
@@ -441,10 +441,10 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_new (_, lid, _, _) -> iter_loc sub lid
   | Texp_instvar (_, _, s) -> iter_loc sub s
   | Texp_mutvar id -> iter_loc sub id
-  | Texp_setinstvar (_, _, s, exp) ->
+  | Texp_setinstvar (_, _, _, s, exp) ->
       iter_loc sub s;
       sub.expr sub exp
-  | Texp_setmutvar (id, _, exp) ->
+  | Texp_setmutvar (_, id, _, exp) ->
       iter_loc sub id;
       sub.expr sub exp
   | Texp_override (_, list) ->

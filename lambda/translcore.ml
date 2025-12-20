@@ -363,8 +363,16 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+let lambda_unbox_unit lambda_unit loc =
+  Lprim(Punbox_unit, [lambda_unit], loc)
+
+let maybe_unbox_unit ~box u loc =
+  match box with
+  | Boxed -> u
+  | Unboxed -> lambda_unbox_unit u loc
+
 let lambda_unboxed_unit ~scopes loc =
-  Lprim(Punbox_unit, [Lconst(Const_base(Const_int 0))], of_location ~scopes loc)
+  lambda_unbox_unit lambda_unit (of_location ~scopes loc)
 
 let lambda_unboxable_unit ~box ~scopes loc =
   match box with
@@ -794,7 +802,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     end
-  | Texp_setfield(arg, arg_mode, _id, lbl, newval) ->
+  | Texp_setfield(box, arg, arg_mode, _id, lbl, newval) ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
@@ -858,7 +866,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
-      Lprim(prim, args, of_location ~scopes e.exp_loc)
+      let loc = of_location ~scopes e.exp_loc in
+      maybe_unbox_unit ~box (Lprim(prim, args, loc)) loc
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
@@ -1048,14 +1057,17 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let var = transl_value_path loc e.exp_env path in
       Lprim(Pfield_computed Reads_vary, [self; var], loc)
   | Texp_mutvar id -> Lmutvar id.txt
-  | Texp_setinstvar(path_self, path, _, expr) ->
+  | Texp_setinstvar(box, path_self, path, _, expr) ->
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
       let var = transl_value_path loc e.exp_env path in
-      transl_setinstvar ~scopes loc self var expr
-  | Texp_setmutvar(id, expr_sort, expr) ->
-      Lassign(id.txt, transl_exp ~scopes
-        (Jkind.Sort.default_for_transl_and_get expr_sort) expr)
+      transl_setinstvar ~box ~scopes loc self var expr
+  | Texp_setmutvar(box, id, expr_sort, expr) ->
+      let lambda = 
+        Lassign(id.txt, transl_exp ~scopes
+          (Jkind.Sort.default_for_transl_and_get expr_sort) expr)
+      in
+      maybe_unbox_unit ~box lambda (of_location ~scopes e.exp_loc)
   | Texp_override(path_self, modifs) ->
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
@@ -1076,7 +1088,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            },
            List.fold_right
              (fun (id, _, expr) rem ->
-                Lsequence(transl_setinstvar ~scopes Loc_unknown
+                Lsequence(transl_setinstvar ~box:Boxed ~scopes Loc_unknown
                             (Lvar cpy) (Lvar id) expr, rem))
              modifs
              (Lvar cpy))
@@ -2097,10 +2109,15 @@ and transl_letmutable ~scopes ~return_layout
   Matching.for_let ~scopes ~return_layout ~arg_sort pat.pat_loc lam Mutable
     pat body
 
-and transl_setinstvar ~scopes loc self var expr =
+and transl_setinstvar ~box ~scopes loc self var expr =
   let ptr_or_imm, _ = maybe_pointer expr in
-  Lprim(Psetfield_computed (ptr_or_imm, Assignment modify_heap),
-    [self; var; transl_exp ~scopes Jkind.Sort.Const.for_instance_var expr], loc)
+  let lexpr = transl_exp ~scopes Jkind.Sort.Const.for_instance_var expr in
+  let lambda =
+    Lprim(Psetfield_computed (ptr_or_imm, Assignment modify_heap),
+          [self; var; lexpr],
+          loc)
+  in
+  maybe_unbox_unit ~box lambda loc
 
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
 and transl_record ~scopes loc env mode fields repres opt_init_expr =

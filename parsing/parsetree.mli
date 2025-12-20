@@ -462,7 +462,7 @@ and expression_desc =
          *)
   | Pexp_field of expression * Longident.t loc  (** [E.l] *)
   | Pexp_unboxed_field of expression * Longident.t loc  (** [E.#l] *)
-  | Pexp_setfield of expression * Longident.t loc * expression
+  | Pexp_setfield of boxing * expression * Longident.t loc * expression
       (** [E1.l <- E2] *)
   | Pexp_array of mutable_flag * expression list
       (** [[| E1; ...; En |]] or [[: E1; ...; En :]] *)
@@ -488,7 +488,7 @@ and expression_desc =
          *)
   | Pexp_send of expression * label loc  (** [E # m] *)
   | Pexp_new of Longident.t loc  (** [new M.c] *)
-  | Pexp_setvar of label loc * expression
+  | Pexp_setvar of boxing * label loc * expression
       (** [x <- 2]
 
            Represents both setting an instance variable

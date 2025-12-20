@@ -3002,7 +3002,8 @@ and quote_expression_desc transl stage e =
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in
       Exp_desc.field loc rcd lbl
-    | Texp_setfield (rcd, _, lid, lbl, exp) ->
+    | Texp_setfield (_box, rcd, _, lid, lbl, exp) ->
+      (* CR metaprogramming: Handle [#<-]. *)
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in
       let exp = quote_expression transl stage exp in

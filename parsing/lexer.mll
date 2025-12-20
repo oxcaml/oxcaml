@@ -624,8 +624,11 @@ rule token = parse
         lookup_keyword name }
   | (lowercase identchar * as name) '#'
       (* See Note [Lexing hack for float#] *)
-      { enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
-        lookup_keyword name }
+      { match lookup_keyword name with
+        | LIDENT _ as name -> 
+          enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
+          name
+        | kw -> produce_and_backtrack lexbuf kw 1 }
   | raw_ident_escape (lowercase identchar * as name)
       { LIDENT name }
   | lowercase identchar * as name
@@ -782,6 +785,7 @@ rule token = parse
   | "#for" { HASHFOR }
   | "#while" { HASHWHILE }
   | "#when" { HASHWHEN }
+  | "#<-" { HASHLESSMINUS }
   | "*"  { STAR }
   | ","  { COMMA }
   | "->" { MINUSGREATER }

@@ -499,7 +499,7 @@ module E = struct
     | Pexp_field (e, lid)
     | Pexp_unboxed_field (e, lid) ->
         sub.expr sub e; iter_loc sub lid
-    | Pexp_setfield (e1, lid, e2) ->
+    | Pexp_setfield (_box, e1, lid, e2) ->
         sub.expr sub e1; iter_loc sub lid;
         sub.expr sub e2
     | Pexp_array (_mut, el) -> List.iter (sub.expr sub) el
@@ -525,7 +525,7 @@ module E = struct
       sub.modes sub m
     | Pexp_send (e, _s) -> sub.expr sub e
     | Pexp_new lid -> iter_loc sub lid
-    | Pexp_setvar (s, e) ->
+    | Pexp_setvar (_box, s, e) ->
         iter_loc sub s; sub.expr sub e
     | Pexp_override sel ->
         List.iter (iter_tuple (iter_loc sub) (sub.expr sub)) sel

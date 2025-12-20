@@ -609,8 +609,8 @@ and expression i ppf x =
       line i ppf "Texp_unboxed_field\n";
       expression i ppf e;
       longident i ppf li;
-  | Texp_setfield (e1, am, li, _, e2) ->
-      line i ppf "Texp_setfield\n";
+  | Texp_setfield (b, e1, am, li, _, e2) ->
+      line i ppf "Texp_setfield %a\n" fmt_boxing b;
       locality_mode i ppf am;
       expression i ppf e1;
       longident i ppf li;
@@ -667,11 +667,11 @@ and expression i ppf x =
       line i ppf "Texp_send \"%a\"\n" fmt_ident s;
       expression i ppf e
   | Texp_new (li, _, _, _) -> line i ppf "Texp_new %a\n" fmt_path li;
-  | Texp_setinstvar (_, s, _, e) ->
-      line i ppf "Texp_setinstvar %a\n" fmt_path s;
+  | Texp_setinstvar (b, _, s, _, e) ->
+      line i ppf "Texp_setinstvar %a %a\n" fmt_boxing b fmt_path s;
       expression i ppf e;
-  | Texp_setmutvar (lid, _, e) ->
-      line i ppf "Texp_setmutvar %a\n" fmt_ident lid.txt;
+  | Texp_setmutvar (b, lid, _, e) ->
+      line i ppf "Texp_setmutvar %a %a\n" fmt_boxing b fmt_ident lid.txt;
       expression i ppf e;
   | Texp_override (_, l) ->
       line i ppf "Texp_override\n";

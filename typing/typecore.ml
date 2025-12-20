@@ -6652,7 +6652,7 @@ and type_expect_
         exp_type = ty_arg;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-  | Pexp_setfield(srecord, lid, snewval) ->
+  | Pexp_setfield(box, srecord, lid, snewval) ->
       let (record, _, rmode, label, expected_type) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
@@ -6678,12 +6678,12 @@ and type_expect_
       in
       unify_exp env record ty_record;
       rue {
-        exp_desc = Texp_setfield(record,
+        exp_desc = Texp_setfield(box, record,
           Locality.disallow_right (regional_to_local
             (Value.proj_comonadic Areality rmode)),
           label_loc, label, newval);
         exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unit;
+        exp_type = instance (type_unboxable_unit box);
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_array(mut, sargl) ->
@@ -7022,7 +7022,7 @@ and type_expect_
               exp_attributes = sexp.pexp_attributes;
               exp_env = env }
         end
-  | Pexp_setvar (lab, snewval) ->
+  | Pexp_setvar (box, lab, snewval) ->
       let desc =
         match Env.lookup_settable_variable ~loc lab.txt env with
         | Instance_variable (path, Mutable, cl_num,ty) ->
@@ -7034,7 +7034,7 @@ and type_expect_
                 (Longident.Lident ("self-" ^ cl_num))
                 env
             in
-            Texp_setinstvar(path_self, path, lab, newval)
+            Texp_setinstvar(box, path_self, path, lab, newval)
         | Instance_variable (_,Immutable,_,_) ->
             raise(Error(loc, env, Instance_variable_not_mutable lab.txt))
         | Mutable_variable (id, mode, ty, sort) ->
@@ -7043,12 +7043,12 @@ and type_expect_
                 snewval (mk_expected (instance ty))
             in
             let lid = {txt = id; loc} in
-            Texp_setmutvar(lid, sort, newval)
+            Texp_setmutvar(box, lid, sort, newval)
       in
       rue {
         exp_desc = desc;
         exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unit;
+        exp_type = instance (type_unboxable_unit box);
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_override lst ->

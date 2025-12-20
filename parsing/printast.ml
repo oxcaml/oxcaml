@@ -390,8 +390,8 @@ and expression i ppf x =
       line i ppf "Pexp_unboxed_field\n";
       expression i ppf e;
       longident_loc i ppf li;
-  | Pexp_setfield (e1, li, e2) ->
-      line i ppf "Pexp_setfield\n";
+  | Pexp_setfield (box, e1, li, e2) ->
+      line i ppf "Pexp_setfield %a\n" fmt_boxing box;
       expression i ppf e1;
       longident_loc i ppf li;
       expression i ppf e2;
@@ -435,8 +435,8 @@ and expression i ppf x =
       line i ppf "Pexp_send \"%s\"\n" s.txt;
       expression i ppf e;
   | Pexp_new (li) -> line i ppf "Pexp_new %a\n" fmt_longident_loc li;
-  | Pexp_setvar (s, e) ->
-      line i ppf "Pexp_setvar %a\n" fmt_string_loc s;
+  | Pexp_setvar (box, s, e) ->
+      line i ppf "Pexp_setvar %a %a\n" fmt_boxing box fmt_string_loc s;
       expression i ppf e;
   | Pexp_override (l) ->
       line i ppf "Pexp_override\n";

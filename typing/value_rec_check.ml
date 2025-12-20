@@ -872,7 +872,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression ifso;
         option expression ifnot;
       ]
-    | Texp_setfield (e1, _, _, _, e2) ->
+    | Texp_setfield (_, e1, _, _, _, e2) ->
       (*
         G1 |- e1: m[Dereference]
         G2 |- e2: m[Dereference]
@@ -929,7 +929,7 @@ let rec expression : Typedtree.expression -> term_judg =
       expression e << Dereference
     | Texp_unboxed_field (e, _, _, _, _) ->
       expression e << Dereference
-    | Texp_setinstvar (pth,_,_,e) ->
+    | Texp_setinstvar (_, pth,_,_,e) ->
       (*
         G |- e: m[Dereference]
         ----------------------
@@ -939,7 +939,7 @@ let rec expression : Typedtree.expression -> term_judg =
         path pth << Dereference;
         expression e << Dereference;
       ]
-    | Texp_setmutvar (_id,_sort,e) ->
+    | Texp_setmutvar (_, _id,_sort,e) ->
       (*
         G |- e: m[Dereference]
         ----------------------

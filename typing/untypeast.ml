@@ -635,8 +635,8 @@ let expression sub exp =
         Pexp_field (sub.expr sub exp, map_loc sub lid)
     | Texp_unboxed_field (exp, _, lid, _label, _) ->
         Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_setfield (exp1, _, lid, _label, exp2) ->
-        Pexp_setfield (sub.expr sub exp1, map_loc sub lid,
+    | Texp_setfield (box, exp1, _, lid, _label, exp2) ->
+        Pexp_setfield (box, sub.expr sub exp1, map_loc sub lid,
           sub.expr sub exp2)
     | Texp_array (amut, _, list, _) ->
         Pexp_array (mutable_ amut, List.map (sub.expr sub) list)
@@ -671,12 +671,12 @@ let expression sub exp =
     | Texp_mutvar id ->
       Pexp_ident ({loc = sub.location sub id.loc;
                    txt = lident_of_path (Pident id.txt)})
-    | Texp_setinstvar (_, _path, lid, exp) ->
-        Pexp_setvar (map_loc sub lid, sub.expr sub exp)
-    | Texp_setmutvar(lid, _sort, exp) ->
+    | Texp_setinstvar (box, _, _path, lid, exp) ->
+        Pexp_setvar (box, map_loc sub lid, sub.expr sub exp)
+    | Texp_setmutvar(box, lid, _sort, exp) ->
         let lid = {loc = sub.location sub lid.loc;
                    txt = Ident.name lid.txt} in
-        Pexp_setvar (lid, sub.expr sub exp)
+        Pexp_setvar (box, lid, sub.expr sub exp)
     | Texp_override (_, list) ->
         Pexp_override (List.map (fun (_path, lid, exp) ->
               (map_loc sub lid, sub.expr sub exp)

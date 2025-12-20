@@ -1054,6 +1054,7 @@ let maybe_pmod_constraint mode expr =
 %token LESS                   "<"
 %token LESSLBRACKET           "<["
 %token LESSMINUS              "<-"
+%token HASHLESSMINUS          "#<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
 %token LOCAL                  "local_"
@@ -1151,14 +1152,14 @@ The precedences must be listed from low to high.
 
 %nonassoc IN
 %nonassoc below_SEMI
-%nonassoc SEMI                          /* below EQUAL ({lbl=...; lbl=...}) */
+%nonassoc SEMI HASHSEMI                 /* below EQUAL ({lbl=...; lbl=...}) */
 %nonassoc LET FOR                       /* above SEMI ( ...; let ... in ...) */
 %nonassoc below_WITH
 %nonassoc FUNCTION WITH                 /* below BAR  (match ... with ...) */
 %nonassoc AND             /* above WITH (module rec A: SIG with ... and ...) */
 %nonassoc THEN                          /* below ELSE (if ... then ...) */
 %nonassoc ELSE                          /* (if ... then ... else ...) */
-%nonassoc LESSMINUS                     /* below COLONEQUAL (lbl <- x := e) */
+%nonassoc LESSMINUS HASHLESSMINUS       /* below COLONEQUAL (lbl <- x := e) */
 %right    COLONEQUAL                    /* expr (e := e := e) */
 %nonassoc AS
 %left     BAR                           /* pattern (p|p|p) */
@@ -1194,7 +1195,7 @@ The precedences must be listed from low to high.
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
           NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
-          HASHFALSE HASHTRUE HASHSEMI
+          HASHFALSE HASHTRUE
 
 /* Entry points */
 
@@ -2859,9 +2860,13 @@ fun_expr:
       { mkexp_cons ~loc:$sloc $loc($2)
           (ghexp ~loc:$sloc (Pexp_tuple[None, $1;None, $3])) }
   | mkrhs(label) LESSMINUS expr
-      { mkexp ~loc:$sloc (Pexp_setvar($1, $3)) }
+      { mkexp ~loc:$sloc (Pexp_setvar(Boxed, $1, $3)) }
+  | mkrhs(label) HASHLESSMINUS expr
+      { mkexp ~loc:$sloc (Pexp_setvar(Unboxed, $1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
-      { mkexp ~loc:$sloc (Pexp_setfield($1, $3, $5)) }
+      { mkexp ~loc:$sloc (Pexp_setfield(Boxed, $1, $3, $5)) }
+  | simple_expr DOT mkrhs(label_longident) HASHLESSMINUS expr
+      { mkexp ~loc:$sloc (Pexp_setfield(Unboxed, $1, $3, $5)) }
   | indexop_expr(DOT, seq_expr, LESSMINUS v=expr {Some v})
     { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
   | indexop_expr(qualified_dotop, expr_semi_list, LESSMINUS v=expr {Some v})

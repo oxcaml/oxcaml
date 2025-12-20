@@ -546,8 +546,9 @@ let expr sub x =
         Texp_field (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr)
     | Texp_unboxed_field (exp, sort, lid, ld, uu) ->
         Texp_unboxed_field (sub.expr sub exp, sort, map_loc sub lid, ld, uu)
-    | Texp_setfield (exp1, am, lid, ld, exp2) ->
+    | Texp_setfield (box, exp1, am, lid, ld, exp2) ->
         Texp_setfield (
+          box,
           sub.expr sub exp1,
           am,
           map_loc sub lid,
@@ -609,15 +610,16 @@ let expr sub x =
           map_loc sub id
         )
     | Texp_mutvar id -> Texp_mutvar (map_loc sub id)
-    | Texp_setinstvar (path1, path2, id, exp) ->
+    | Texp_setinstvar (box, path1, path2, id, exp) ->
         Texp_setinstvar (
+          box,
           path1,
           path2,
           map_loc sub id,
           sub.expr sub exp
         )
-    | Texp_setmutvar (id, sort, exp) ->
-        Texp_setmutvar (map_loc sub id, sort, sub.expr sub exp)
+    | Texp_setmutvar (box, id, sort, exp) ->
+        Texp_setmutvar (box, map_loc sub id, sort, sub.expr sub exp)
     | Texp_override (path, list) ->
         Texp_override (
           path,

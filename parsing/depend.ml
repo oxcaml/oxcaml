@@ -265,7 +265,7 @@ let rec add_expr bv exp =
       List.iter (fun (lbl, e) -> add bv lbl; add_expr bv e) lblel;
       add_opt add_expr bv opte
   | Pexp_field(e, fld) | Pexp_unboxed_field(e, fld) -> add_expr bv e; add bv fld
-  | Pexp_setfield(e1, fld, e2) -> add_expr bv e1; add bv fld; add_expr bv e2
+  | Pexp_setfield(_, e1, fld, e2) -> add_expr bv e1; add bv fld; add_expr bv e2
   | Pexp_array (_, el) -> List.iter (add_expr bv) el
   | Pexp_idx (ba, uas) ->
     add_block_access bv ba;
@@ -285,7 +285,7 @@ let rec add_expr bv exp =
       Option.iter (add_type bv) ty2
   | Pexp_send(e, _m) -> add_expr bv e
   | Pexp_new li -> add bv li
-  | Pexp_setvar(_v, e) -> add_expr bv e
+  | Pexp_setvar(_b, _v, e) -> add_expr bv e
   | Pexp_override sel -> List.iter (fun (_s, e) -> add_expr bv e) sel
   | Pexp_letmodule(id, m, e) ->
       let b = add_module_binding bv m in

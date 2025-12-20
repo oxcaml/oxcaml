@@ -2374,7 +2374,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   | Texp_unboxed_field (_, _, _, _, _) ->
     let value, uf = check_uniqueness_exp_as_value ienv exp in
     UF.seq uf (Value.mark_maybe_unique value)
-  | Texp_setfield (rcd, _, _, _, arg) ->
+  | Texp_setfield (_, rcd, _, _, _, arg) ->
     (* Ideally, we should treat this as creating a new alias of [arg], and
        further usages of the field should be directed at the alias, instead of
        the old value. However, this would require some big changes to the
@@ -2458,8 +2458,9 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   | Texp_new _ -> UF.unused
   | Texp_instvar _ -> UF.unused
   | Texp_mutvar _ -> UF.unused
-  | Texp_setinstvar (_, _, _, e) -> check_uniqueness_exp ~overwrite:None ienv e
-  | Texp_setmutvar (_, _, e) -> check_uniqueness_exp ~overwrite:None ienv e
+  | Texp_setinstvar (_, _, _, _, e) ->
+    check_uniqueness_exp ~overwrite:None ienv e
+  | Texp_setmutvar (_, _, _, e) -> check_uniqueness_exp ~overwrite:None ienv e
   | Texp_override (_, ls) ->
     UF.pars
       (List.map

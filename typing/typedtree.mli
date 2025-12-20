@@ -472,7 +472,7 @@ and expression_desc =
       expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
         unique_use
   | Texp_setfield of
-      expression * Mode.Locality.l * Longident.t loc *
+      boxing * expression * Mode.Locality.l * Longident.t loc *
       Types.label_description * expression
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
@@ -503,8 +503,8 @@ and expression_desc =
       Path.t * Longident.t loc * Types.class_declaration * apply_position
   | Texp_instvar of Path.t * Path.t * string loc
   | Texp_mutvar of Ident.t loc
-  | Texp_setinstvar of Path.t * Path.t * string loc * expression
-  | Texp_setmutvar of Ident.t loc * Jkind.sort * expression
+  | Texp_setinstvar of boxing * Path.t * Path.t * string loc * expression
+  | Texp_setmutvar of boxing * Ident.t loc * Jkind.sort * expression
   | Texp_override of Path.t * (Ident.t * string loc * expression) list
   | Texp_letmodule of
       Ident.t option * string option loc * Types.module_presence * module_expr *

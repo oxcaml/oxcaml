@@ -578,8 +578,8 @@ module E = struct
         field ~loc ~attrs (sub.expr sub e) (map_loc sub lid)
     | Pexp_unboxed_field (e, lid) ->
         unboxed_field ~loc ~attrs (sub.expr sub e) (map_loc sub lid)
-    | Pexp_setfield (e1, lid, e2) ->
-        setfield ~loc ~attrs (sub.expr sub e1) (map_loc sub lid)
+    | Pexp_setfield (box, e1, lid, e2) ->
+        setfield ~loc ~attrs box (sub.expr sub e1) (map_loc sub lid)
           (sub.expr sub e2)
     | Pexp_array (mut, el) -> array ~loc ~attrs mut (List.map (sub.expr sub) el)
     | Pexp_idx (ba, uas) ->
@@ -603,8 +603,8 @@ module E = struct
     | Pexp_send (e, s) ->
         send ~loc ~attrs (sub.expr sub e) (map_loc sub s)
     | Pexp_new lid -> new_ ~loc ~attrs (map_loc sub lid)
-    | Pexp_setvar (s, e) ->
-        setinstvar ~loc ~attrs (map_loc sub s) (sub.expr sub e)
+    | Pexp_setvar (box, s, e) ->
+        setinstvar ~loc ~attrs box (map_loc sub s) (sub.expr sub e)
     | Pexp_override sel ->
         override ~loc ~attrs
           (List.map (map_tuple (map_loc sub) (sub.expr sub)) sel)

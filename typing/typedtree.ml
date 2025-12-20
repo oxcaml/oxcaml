@@ -265,7 +265,8 @@ and expression_desc =
       expression * Jkind.sort * Longident.t loc * unboxed_label_description *
         unique_use
   | Texp_setfield of
-      expression * Mode.Locality.l * Longident.t loc * label_description * expression
+      boxing * expression * Mode.Locality.l * Longident.t loc *
+        label_description * expression
   | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
@@ -294,8 +295,8 @@ and expression_desc =
       Path.t * Longident.t loc * Types.class_declaration * apply_position
   | Texp_instvar of Path.t * Path.t * string loc
   | Texp_mutvar of Ident.t loc
-  | Texp_setinstvar of Path.t * Path.t * string loc * expression
-  | Texp_setmutvar of Ident.t loc * Jkind.sort * expression
+  | Texp_setinstvar of boxing * Path.t * Path.t * string loc * expression
+  | Texp_setmutvar of boxing * Ident.t loc * Jkind.sort * expression
   | Texp_override of Path.t * (Ident.t * string loc * expression) list
   | Texp_letmodule of
       Ident.t option * string option loc * Types.module_presence * module_expr *
@@ -1449,7 +1450,7 @@ let rec fold_antiquote_exp f  acc exp =
       fold_antiquote_exp f acc exp
   | Texp_unboxed_field (exp, _, _, _, _) ->
       fold_antiquote_exp f acc exp
-  | Texp_setfield (exp1, _, _, _, exp2) ->
+  | Texp_setfield (_, exp1, _, _, _, exp2) ->
       let acc = fold_antiquote_exp f acc exp1 in
       fold_antiquote_exp f acc exp2
   | Texp_array (_, _, list, _) ->
@@ -1475,7 +1476,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_send (exp, _, _) -> fold_antiquote_exp f acc exp
   | Texp_new (_, _, _, _) -> acc
   | Texp_instvar (_, _, _) -> acc
-  | Texp_setinstvar (_, _, _, exp) -> fold_antiquote_exp f acc exp
+  | Texp_setinstvar (_, _, _, _, exp) -> fold_antiquote_exp f acc exp
   | Texp_override (_, list) ->
       List.fold_left (fun acc (_, _, e) -> fold_antiquote_exp f acc e) acc list
   | Texp_letmodule (_, _, _, _, exp) -> fold_antiquote_exp f acc exp
@@ -1501,7 +1502,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_hole _ -> acc
   | Texp_letmutable (_, exp) -> fold_antiquote_exp f acc exp
   | Texp_mutvar _ -> acc
-  | Texp_setmutvar (_, _, exp) -> fold_antiquote_exp f acc exp
+  | Texp_setmutvar (_, _, _, exp) -> fold_antiquote_exp f acc exp
   | Texp_atomic_loc (exp, _, _, _, _) -> fold_antiquote_exp f acc exp
   | Texp_idx (_, _) -> acc
   | Texp_quotation exp ->

@@ -179,8 +179,8 @@ module Exp:
                 -> expression option -> expression
     val field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
     val unboxed_field: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
-    val setfield: ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
-                  -> expression
+    val setfield: ?loc:loc -> ?attrs:attrs -> boxing -> expression -> lid
+                  -> expression -> expression
     val array: ?loc:loc -> ?attrs:attrs -> mutable_flag -> expression list ->
       expression
     val idx : ?loc:loc -> ?attrs:attrs -> block_access -> unboxed_access list
@@ -199,7 +199,8 @@ module Exp:
                      -> mode with_loc list -> expression
     val send: ?loc:loc -> ?attrs:attrs -> expression -> str -> expression
     val new_: ?loc:loc -> ?attrs:attrs -> lid -> expression
-    val setinstvar: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
+    val setinstvar: ?loc:loc -> ?attrs:attrs -> boxing -> str -> expression
+                    -> expression
     val override: ?loc:loc -> ?attrs:attrs -> (str * expression) list
                   -> expression
     val letmodule: ?loc:loc -> ?attrs:attrs -> str_opt -> module_expr
