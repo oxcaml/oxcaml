@@ -1021,6 +1021,7 @@ let maybe_pmod_constraint mode expr =
 %token HASHFOR                "#for"
 %token HASHWHILE              "#while"
 %token HASHWHEN               "#when"
+%token HASHLESSMINUS          "#<-"
 %token IF                     "if"
 %token IN                     "in"
 %token INCLUDE                "include"
@@ -1054,7 +1055,6 @@ let maybe_pmod_constraint mode expr =
 %token LESS                   "<"
 %token LESSLBRACKET           "<["
 %token LESSMINUS              "<-"
-%token HASHLESSMINUS          "#<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
 %token LOCAL                  "local_"
