@@ -1,6 +1,6 @@
 (* TEST
  {
-   flags = "-extension comprehensions";
+   flags = "-extension comprehensions -strict-sequence";
    expect;
  }
 *)
@@ -22,26 +22,26 @@ val f :
 let f ~head ~tail = head #()#; tail #()
 
 [%%expect{|
-val f : head:(unit# -> 'a) -> tail:(unit# -> 'b) -> 'b = <fun>
+val f : head:(unit# -> unit#) -> tail:(unit# -> 'a) -> 'a = <fun>
 |}]
 
 let f ~do_ = #while #true do do_ #() done
 
 [%%expect{|
-val f : do_:(unit# -> 'a) -> 'b = <fun>
+val f : do_:(unit# -> unit#) -> 'a = <fun>
 |}]
 
 let f ~while_ ~do_ = #while while_ #() do do_ #() done
 
 [%%expect{|
-val f : while_:(unit# -> bool#) -> do_:(unit# -> 'a) -> unit# = <fun>
+val f : while_:(unit# -> bool#) -> do_:(unit# -> unit#) -> unit# = <fun>
 |}]
 
 let f ~from_ ~to_ ~do_ = #for _ = from_ #() to to_ #() do do_ #() done
 
 [%%expect{|
 val f :
-  from_:(unit# -> int) -> to_:(unit# -> int) -> do_:(unit# -> 'a) -> unit =
+  from_:(unit# -> int) -> to_:(unit# -> int) -> do_:(unit# -> unit#) -> unit =
   <fun>
 |}]
 
@@ -108,7 +108,12 @@ Error: This expression has type "unit" but an expression was expected of type
 let f () = ()#; #()
 
 [%%expect{|
-val f : unit -> unit# = <fun>
+Line 1, characters 11-13:
+1 | let f () = ()#; #()
+               ^^
+Error: This expression has type "unit" but an expression was expected of type
+         "unit#"
+       because it is in the left-hand side of an unboxed sequence
 |}]
 
 let f () = #while true do #() done
@@ -131,13 +136,23 @@ Error: This expression has type "bool" but an expression was expected of type
 let f () = #while #true do () done
 
 [%%expect{|
-val f : unit -> 'a = <fun>
+Line 1, characters 27-29:
+1 | let f () = #while #true do () done
+                               ^^
+Error: This expression has type "unit" but an expression was expected of type
+         "unit#"
+       because it is in the body of an unboxed while-loop
 |}]
 
 let f () = #for _ = 0 to 0 do () done
 
 [%%expect{|
-val f : unit -> unit = <fun>
+Line 1, characters 30-32:
+1 | let f () = #for _ = 0 to 0 do () done
+                                  ^^
+Error: This expression has type "unit" but an expression was expected of type
+         "unit#"
+       because it is in the body of an unboxed for-loop
 |}]
 
 let f () = #assert true
@@ -173,7 +188,6 @@ Error: This expression has type "bool" but an expression was expected of type
          "bool#"
        because it is in an unboxed when-guard
 |}]
-
 
 let f () = [: () for _ = 0 to 0 #when true :]
 

@@ -33,20 +33,20 @@ type comprehension_type =
    indices to be of type int, and the body to be of type unit.
 *)
 type type_forcing_context =
-  | If_conditional
-  | If_no_else_branch
-  | While_loop_conditional
-  | While_loop_body
+  | If_conditional of boxing
+  | If_no_else_branch of boxing
+  | While_loop_conditional of boxing
+  | While_loop_body of boxing
   | For_loop_start_index
   | For_loop_stop_index
-  | For_loop_body
-  | Assert_condition
-  | Sequence_left_hand_side
-  | When_guard
+  | For_loop_body of boxing
+  | Assert_condition of boxing
+  | Sequence_left_hand_side of boxing
+  | When_guard of boxing
   | Comprehension_in_iterator of comprehension_type
   | Comprehension_for_start
   | Comprehension_for_stop
-  | Comprehension_when
+  | Comprehension_when of boxing
   | Error_message_attr of string
 
 (* The combination of a type and a "type forcing context". The intent is that it

@@ -34,20 +34,20 @@ type comprehension_type =
 module Style = Misc.Style
 
 type type_forcing_context =
-  | If_conditional
-  | If_no_else_branch
-  | While_loop_conditional
-  | While_loop_body
+  | If_conditional of boxing
+  | If_no_else_branch of boxing
+  | While_loop_conditional of boxing
+  | While_loop_body of boxing
   | For_loop_start_index
   | For_loop_stop_index
-  | For_loop_body
-  | Assert_condition
-  | Sequence_left_hand_side
-  | When_guard
+  | For_loop_body of boxing
+  | Assert_condition of boxing
+  | Sequence_left_hand_side of boxing
+  | When_guard of boxing
   | Comprehension_in_iterator of comprehension_type
   | Comprehension_for_start
   | Comprehension_for_stop
-  | Comprehension_when
+  | Comprehension_when of boxing
   | Error_message_attr of string
 
 type type_expected = {
@@ -6816,13 +6816,14 @@ and type_expect_
       check_dynamic (loc, Expression) Branching expected_mode;
       let cond =
         type_expect env mode_max scond
-          (mk_expected ~explanation:If_conditional (type_unboxable_bool box))
+          (mk_expected ~explanation:(If_conditional box)
+             (type_unboxable_bool box))
       in
       begin match sifnot with
         None ->
           let ifso =
             type_expect env expected_mode sifso
-              (mk_expected ~explanation:If_no_else_branch
+              (mk_expected ~explanation:(If_no_else_branch box)
                  (type_unboxable_unit box)) in
           rue {
             exp_desc = Texp_ifthenelse(box, cond, ifso, None);
@@ -6848,7 +6849,7 @@ and type_expect_
       end
   | Pexp_sequence(box, sexp1, sexp2) ->
       let exp1, sort1 =
-        type_statement ~box ~explanation:Sequence_left_hand_side env sexp1
+        type_statement ~box ~explanation:(Sequence_left_hand_side box) env sexp1
       in
       let exp2 = type_expect env expected_mode sexp2 ty_expected_explained in
       re {
@@ -6866,7 +6867,7 @@ and type_expect_
       let mode = mode_region Value.max in
       let wh_cond =
         type_expect cond_env mode scond
-          (mk_expected ~explanation:While_loop_conditional
+          (mk_expected ~explanation:(While_loop_conditional box)
              (type_unboxable_bool box))
       in
       let body_env = Env.add_region_lock env in
@@ -6878,7 +6879,7 @@ and type_expect_
         | _ -> instance (type_unboxable_unit box)
       in
       let wh_body, wh_body_sort =
-        type_statement ~box ~explanation:While_loop_body
+        type_statement ~box ~explanation:(While_loop_body box)
           ~position body_env sbody
       in
       rue {
@@ -6908,14 +6909,15 @@ and type_expect_
       let new_env = Env.add_region_lock new_env in
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
       let for_body, for_body_sort =
-        type_statement ~box ~explanation:For_loop_body ~position new_env sbody
+        type_statement ~box ~explanation:(For_loop_body box) ~position new_env
+          sbody
       in
       rue {
         exp_desc = Texp_for {for_box = box; for_id; for_debug_uid = for_uid;
                              for_pat = param; for_from; for_to; for_dir = dir;
                              for_body; for_body_sort };
         exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unit;
+        exp_type = instance (type_unboxable_unit box);
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_constraint (sarg, None, modes) ->
@@ -7163,7 +7165,8 @@ and type_expect_
   | Pexp_assert (b, e) ->
       let cond =
         type_expect env mode_max e
-          (mk_expected ~explanation:Assert_condition (type_unboxable_bool b))
+          (mk_expected ~explanation:(Assert_condition b)
+             (type_unboxable_bool b))
       in
       let exp_type =
         match cond.exp_desc with
@@ -9943,7 +9946,7 @@ and type_cases
             Some
               (box,
                type_expect ext_env mode_max scond
-                 (mk_expected ~explanation:When_guard
+                 (mk_expected ~explanation:(When_guard box)
                     (type_unboxable_bool box)))
         in
         let exp =
@@ -10827,7 +10830,7 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
           env
           mode_max
           cond
-          (mk_expected ~explanation:Comprehension_when
+          (mk_expected ~explanation:(Comprehension_when box)
              (type_unboxable_bool box))
       in
       env, Texp_comp_when (box, tcond)
@@ -11169,26 +11172,42 @@ let report_pattern_type_clash_hints pat diff =
 let report_type_expected_explanation expl ppf =
   let because expl_str = fprintf ppf "@ because it is in %s" expl_str in
   match expl with
-  | If_conditional ->
+  | If_conditional Boxed ->
       because "the condition of an if-statement"
-  | If_no_else_branch ->
+  | If_conditional Unboxed ->
+      because "the condition of an unboxed if-statement"
+  | If_no_else_branch Boxed ->
       because "the result of a conditional with no else branch"
-  | While_loop_conditional ->
+  | If_no_else_branch Unboxed ->
+      because "the result of an unboxed conditional with no else branch"
+  | While_loop_conditional Boxed ->
       because "the condition of a while-loop"
-  | While_loop_body ->
+  | While_loop_conditional Unboxed ->
+      because "the condition of an unboxed while-loop"
+  | While_loop_body Boxed ->
       because "the body of a while-loop"
+  | While_loop_body Unboxed ->
+      because "the body of an unboxed while-loop"
   | For_loop_start_index ->
       because "a for-loop start index"
   | For_loop_stop_index ->
       because "a for-loop stop index"
-  | For_loop_body ->
+  | For_loop_body Boxed ->
       because "the body of a for-loop"
-  | Assert_condition ->
+  | For_loop_body Unboxed ->
+      because "the body of an unboxed for-loop"
+  | Assert_condition Boxed ->
       because "the condition of an assertion"
-  | Sequence_left_hand_side ->
+  | Assert_condition Unboxed ->
+      because "the condition of an unboxed assertion"
+  | Sequence_left_hand_side Boxed ->
       because "the left-hand side of a sequence"
-  | When_guard ->
+  | Sequence_left_hand_side Unboxed ->
+      because "the left-hand side of an unboxed sequence"
+  | When_guard Boxed ->
       because "a when-guard"
+  | When_guard Unboxed ->
+      because "an unboxed when-guard"
   | Comprehension_in_iterator comp_ty ->
       let a_comp_ty =
         match comp_ty with
@@ -11201,8 +11220,10 @@ let report_type_expected_explanation expl ppf =
       because "a range-based for iterator start index in a comprehension"
   | Comprehension_for_stop ->
       because "a range-based for iterator stop index in a comprehension"
-  | Comprehension_when ->
+  | Comprehension_when Boxed ->
       because "a when-clause in a comprehension"
+  | Comprehension_when Unboxed ->
+      because "an unboxed when-clause in a comprehension"
   | Error_message_attr msg ->
       fprintf ppf "@\n@[%s@]" msg
 

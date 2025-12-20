@@ -52,7 +52,7 @@ let is_sequence e = match e.exp_desc with Texp_sequence _ -> true | _ -> false
 
 let break_sequence e =
   match view_texp e.exp_desc with
-  | Texp_sequence (e1, e2, _) -> (e1, e2)
+  | Texp_sequence (_, e1, e2, _) -> (e1, e2)
   | _ -> failwith "Argument is not a sequence"
 
 let remove_dummy_mapper should_remove =
@@ -62,7 +62,7 @@ let remove_dummy_mapper should_remove =
       (fun mapper e ->
         Tast_mapper.default.expr mapper
           (match view_texp e.exp_desc with
-          | Texp_sequence (e1, e2, _) ->
+          | Texp_sequence (_, e1, e2, _) ->
               if is_dummy e2 && should_remove () then e1 else e
           | _ -> e));
   }
@@ -75,7 +75,7 @@ let minimize should_remove map cur_name =
         (fun mapper e ->
           Tast_mapper.default.expr mapper
             (match view_texp e.exp_desc with
-            | Texp_sequence (e1, e2, _) ->
+            | Texp_sequence (_, e1, e2, _) ->
                 if (Removeunit.is_unit e1 || is_dummy e1) && should_remove ()
                 then e2
                   (* else if is_sequence e1 then
@@ -87,14 +87,14 @@ let minimize should_remove map cur_name =
                 else e
                   (*
                      {e with exp_desc = Texp_sequence(e1, Layouts.Layout.value, e2) } *)
-            | O (Texp_ifthenelse (e1, e2, Some e3)) ->
+            | O (Texp_ifthenelse (b, e1, e2, Some e3)) ->
                 if
                   Reduceexpr.is_simplified e1
                   && (Removeunit.is_unit e2 || Removeunit.is_unit e3)
                   && should_remove ()
                 then
                   if Removeunit.is_unit e2 then e3
-                  else { e with exp_desc = Texp_ifthenelse (e1, e2, None) }
+                  else { e with exp_desc = Texp_ifthenelse (b, e1, e2, None) }
                 else e
             | Texp_apply (f, ael, id) ->
                 if is_dummy f then

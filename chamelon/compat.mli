@@ -96,6 +96,7 @@ val mkTexp_function :
   ?id:texp_function_identifier -> texp_function -> expression_desc
 
 val mkTexp_sequence :
+  ?box:Asttypes.boxing ->
   ?id:texp_sequence_identifier -> expression * expression -> expression_desc
 
 val mkTexp_match :
@@ -103,7 +104,9 @@ val mkTexp_match :
   expression * computation case list * partial ->
   expression_desc
 
-val mkTexp_assert : expression -> Location.t -> expression_desc
+val mkTexp_assert :
+  ?box:Asttypes.boxing -> expression -> Location.t -> expression_desc
+
 val mkTtyp_any : core_type_desc
 val mkTtyp_var : string -> core_type_desc
 val is_type_name_used : core_type_desc -> string -> bool
@@ -123,7 +126,8 @@ type matched_expression_desc =
       * texp_construct_identifier
   | Texp_tuple of expression list * texp_tuple_identifier
   | Texp_function of texp_function * texp_function_identifier
-  | Texp_sequence of expression * expression * texp_sequence_identifier
+  | Texp_sequence of
+      Asttypes.boxing * expression * expression * texp_sequence_identifier
   | Texp_match of
       expression * computation case list * partial * texp_match_identifier
   | O of expression_desc
