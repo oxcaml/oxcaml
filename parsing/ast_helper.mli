@@ -120,6 +120,7 @@ module Pat:
     val constant: ?loc:loc -> ?attrs:attrs -> constant -> pattern
     val interval: ?loc:loc -> ?attrs:attrs -> constant -> constant -> pattern
     val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> pattern
+    val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> pattern
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * pattern) list ->
       closed_flag -> pattern
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
@@ -164,6 +165,7 @@ module Exp:
                 -> expression
     val try_: ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
     val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> expression
+    val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> expression
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * expression) list -> expression
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
                        -> (string option * expression) list -> expression

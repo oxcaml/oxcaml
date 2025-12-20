@@ -278,6 +278,7 @@ and pattern_desc =
            Other forms of interval are recognized by the parser
            but rejected by the type-checker. *)
   | Ppat_unboxed_unit (** [#()] *)
+  | Ppat_unboxed_bool of bool (** [#false] or [#true] *)
   | Ppat_tuple of (string option * pattern) list * Asttypes.closed_flag
       (** [Ppat_tuple(pl, Closed)] represents
           - [(P1, ..., Pn)]       when [pl] is [(None, P1);...;(None, Pn)]
@@ -415,6 +416,7 @@ and expression_desc =
   | Pexp_try of expression * case list
       (** [try E0 with P1 -> E1 | ... | Pn -> En] *)
   | Pexp_unboxed_unit (** [#()] *)
+  | Pexp_unboxed_bool of bool (** [#false] or [#true] *)
   | Pexp_tuple of (string option * expression) list
       (** [Pexp_tuple(el)] represents
           - [(E1, ..., En)]

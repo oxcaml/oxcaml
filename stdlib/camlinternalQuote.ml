@@ -1226,6 +1226,7 @@ module Ast = struct
     | PatAlias of pattern * Var.Value.t
     | PatConstant of constant
     | PatUnboxedUnit
+    | PatUnboxedBool of bool
     | PatTuple of (tuple_label * pattern) list
     | PatUnboxedTuple of (tuple_label * pattern) list
     | PatConstruct of constr * pattern option
@@ -1303,6 +1304,7 @@ module Ast = struct
     | Stack of expression
     | Exclave of expression
     | Unboxed_unit
+    | Unboxed_bool of bool
     | Unboxed_tuple of (tuple_label * expression) list
     | Unboxed_record_product of
         (record_field * expression) list * expression option
@@ -1443,6 +1445,10 @@ module Ast = struct
     | UnboxedInt64 n -> pp fmt "#%LdL" n
     | UnboxedNativeint n -> pp fmt "#%ndn" n
 
+  and print_bool fmt = function
+    | false -> pp fmt "false"
+    | true -> pp fmt "true"
+
   and print_constr env fmt = function
     | CBasic s -> pp fmt "%s" s
     | CIdent id -> print_raw_ident_constructor env fmt id
@@ -1459,8 +1465,8 @@ module Ast = struct
   and print_pat_with_parens env fmt pat =
     match pat with
     | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedUnit
-    | PatUnboxedTuple _ | PatVariant (_, Some _) | PatRecord _
-    | PatUnboxedRecord _ | PatArray _ ->
+    | PatUnboxedBool _ | PatUnboxedTuple _ | PatVariant (_, Some _)
+    | PatRecord _ | PatUnboxedRecord _ | PatArray _ ->
       print_pat env fmt pat
     | _ -> pp fmt "(@[%a@])" (print_pat env) pat
 
@@ -1472,6 +1478,7 @@ module Ast = struct
       pp fmt "%a@ as@ %a" (print_pat env) pat (Var.Value.print env) v
     | PatConstant c -> print_const fmt c
     | PatUnboxedUnit -> pp fmt "#()"
+    | PatUnboxedBool b -> pp fmt "#%a" print_bool b
     | PatTuple ts -> print_tuple (print_pat env) fmt ts
     | PatUnboxedTuple ts -> pp fmt "#%a" (print_tuple (print_pat env)) ts
     | PatConstruct (ident, pat_opt) -> (
@@ -1528,7 +1535,7 @@ module Ast = struct
     | Variant (_, None)
     | Record (_, None)
     | Field _ | Array _ | Send _ | Unreachable | Src_pos | Unboxed_unit
-    | Unboxed_tuple _ | Unboxed_record_product (_, None)
+    | Unboxed_bool _ | Unboxed_tuple _ | Unboxed_record_product (_, None)
     | List_comprehension _ | Array_comprehension _ | Quote _ ->
       (print_exp env) fmt exp
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
@@ -1900,6 +1907,7 @@ module Ast = struct
     | Extension_constructor name ->
       pp fmt "@[[%%extension_constructor@ %a]@]" Name.print name
     | Unboxed_unit -> pp fmt "#()"
+    | Unboxed_bool b -> pp fmt "#%a" print_bool b
     | Unboxed_tuple ts ->
       pp fmt "#";
       print_tuple (print_exp env) fmt ts
@@ -2099,6 +2107,8 @@ module Pat = struct
   let constant const = return (Ast.PatConstant const)
 
   let unboxed_unit = return Ast.PatUnboxedUnit
+
+  let unboxed_bool b = return (Ast.PatUnboxedBool b)
 
   let tuple ts =
     let ps =
@@ -2757,6 +2767,8 @@ module Exp_desc = struct
     Ast.Array_comprehension compr
 
   let unboxed_unit = return Ast.Unboxed_unit
+
+  let unboxed_bool b = return (Ast.Unboxed_bool b)
 
   let unboxed_tuple fs =
     let entries =

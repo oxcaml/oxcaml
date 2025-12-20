@@ -139,6 +139,7 @@ and path_float64x8 = Pident ident_float64x8
 
 let path_unboxed_float = Path.unboxed_version path_float
 and path_unboxed_unit = Path.unboxed_version path_unit
+and path_unboxed_bool = Path.unboxed_version path_bool
 and path_unboxed_float32 = Path.unboxed_version path_float32
 and path_unboxed_nativeint = Path.unboxed_version path_nativeint
 and path_unboxed_char = Path.unboxed_version path_char
@@ -197,6 +198,7 @@ and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
 and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
 
 and type_unboxed_unit = newgenty (Tconstr(path_unboxed_unit, [], ref Mnil))
+and type_unboxed_bool = newgenty (Tconstr(path_unboxed_bool, [], ref Mnil))
 and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
 and type_unboxed_nativeint =
@@ -557,6 +559,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type ident_bool
        ~kind:(variant [ cstr ident_false []; cstr ident_true []])
        ~jkind:Jkind.Const.Builtin.immediate
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_bool
   |> add_type ident_char ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int8
   |> add_type ident_exn ~kind:Type_open ~jkind:Jkind.Const.Builtin.exn

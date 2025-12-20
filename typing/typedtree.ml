@@ -158,6 +158,7 @@ and 'k pattern_desc =
       * Mode.Value.l * Types.type_expr -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
+  | Tpat_unboxed_bool : bool -> value pattern_desc
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
   | Tpat_unboxed_tuple :
       (string option * value general_pattern * Jkind.sort) list ->
@@ -236,6 +237,7 @@ and expression_desc =
   | Texp_match of expression * Jkind.sort * computation case list * partial
   | Texp_try of expression * value case list
   | Texp_unboxed_unit
+  | Texp_unboxed_bool of bool
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
@@ -1009,6 +1011,7 @@ let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   function
   | Tpat_alias _ -> Value
   | Tpat_unboxed_unit -> Value
+  | Tpat_unboxed_bool _ -> Value
   | Tpat_tuple _ -> Value
   | Tpat_unboxed_tuple _ -> Value
   | Tpat_construct _ -> Value
@@ -1054,7 +1057,8 @@ let shallow_iter_pattern_desc
   | Tpat_any
   | Tpat_var _
   | Tpat_constant _ 
-  | Tpat_unboxed_unit -> ()
+  | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _ -> ()
   | Tpat_value p -> f.f p
   | Tpat_exception p -> f.f p
   | Tpat_or(p1, p2, _) -> f.f p1; f.f p2
@@ -1086,6 +1090,7 @@ let shallow_map_pattern_desc
   | Tpat_var _
   | Tpat_constant _
   | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _
   | Tpat_any
   | Tpat_variant (_,None,_) -> d
   | Tpat_value p -> Tpat_value (f.f p)
@@ -1193,7 +1198,8 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
       | Tpat_lazy p | Tpat_exception p -> loop f p
-      | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit -> ()
+      | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _ ->
+        ()
   in
   loop f pat
 
@@ -1395,7 +1401,8 @@ let mode_without_locks_exn = function
 
 let rec fold_antiquote_exp f  acc exp =
   match exp.exp_desc with
-  | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit -> acc
+  | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _ ->
+      acc
   | Texp_let (_, vbs, exp) ->
       let acc = fold_antiquote_value_bindings f acc vbs in
       fold_antiquote_exp f acc exp
