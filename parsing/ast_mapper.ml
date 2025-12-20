@@ -557,6 +557,7 @@ module E = struct
     | Pexp_match (e, pel) ->
         match_ ~loc ~attrs (sub.expr sub e) (sub.cases sub pel)
     | Pexp_try (e, pel) -> try_ ~loc ~attrs (sub.expr sub e) (sub.cases sub pel)
+    | Pexp_unboxed_unit -> unboxed_unit ~loc ~attrs ()
     | Pexp_tuple el ->
         tuple ~loc ~attrs (map_ltexp sub el)
     | Pexp_unboxed_tuple el ->
@@ -663,6 +664,7 @@ module P = struct
     | Ppat_constant c -> constant ~loc ~attrs (sub.constant sub c)
     | Ppat_interval (c1, c2) ->
         interval ~loc ~attrs (sub.constant sub c1) (sub.constant sub c2)
+    | Ppat_unboxed_unit -> unboxed_unit ~loc ~attrs ()
     | Ppat_tuple (pl, c) -> tuple ~loc ~attrs (map_ltpat sub pl) c
     | Ppat_unboxed_tuple (pl, c) ->
         unboxed_tuple ~loc ~attrs (map_ltpat sub pl) c

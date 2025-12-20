@@ -306,7 +306,8 @@ let pat
   let pat_desc : k pattern_desc =
     match x.pat_desc with
     | Tpat_any
-    | Tpat_constant _ -> x.pat_desc
+    | Tpat_constant _
+    | Tpat_unboxed_unit -> x.pat_desc
     | Tpat_var (id, s, uid, sort, m) ->
       Tpat_var (id, map_loc sub s, uid, sort, m)
     | Tpat_tuple l ->
@@ -513,6 +514,7 @@ let expr sub x =
           sub.expr sub exp,
           List.map (sub.case sub) cases
         )
+    | Texp_unboxed_unit -> Texp_unboxed_unit
     | Texp_tuple (list, am) ->
         Texp_tuple (List.map (fun (label, e) -> label, sub.expr sub e) list, am)
     | Texp_unboxed_tuple list ->

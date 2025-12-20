@@ -257,6 +257,7 @@ let pat
   | Tpat_any  -> ()
   | Tpat_var (_, s, _, _, _) -> iter_loc sub s
   | Tpat_constant _ -> ()
+  | Tpat_unboxed_unit -> ()
   | Tpat_tuple l -> List.iter (fun (_, p) -> sub.pat sub p) l
   | Tpat_unboxed_tuple l -> List.iter (fun (_, p, _) -> sub.pat sub p) l
   | Tpat_construct (lid, _, l, vto) ->
@@ -368,6 +369,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_try (exp, cases) ->
       sub.expr sub exp;
       List.iter (sub.case sub) cases
+  | Texp_unboxed_unit -> ()
   | Texp_tuple (list, _) -> List.iter (fun (_,e) -> sub.expr sub e) list
   | Texp_unboxed_tuple list -> List.iter (fun (_,e,_) -> sub.expr sub e) list
   | Texp_construct (lid, _, args, _) ->

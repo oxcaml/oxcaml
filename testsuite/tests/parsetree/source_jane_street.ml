@@ -1616,3 +1616,12 @@ val triangle_10 : int = 55
 (* quotations syntax *)
 
 (* Test will only be added once quotations work end-to-end. *)
+
+(*************************)
+(* unboxed unit literals *)
+
+let f #() = #()
+
+[%%expect{|
+val f : unit# -> unit# = <fun>
+|}]
