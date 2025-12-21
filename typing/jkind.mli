@@ -102,8 +102,6 @@ module Layout : sig
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
-    val get_sort : t -> Sort.Const.t option
-
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
@@ -266,6 +264,8 @@ module Builtin : sig
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
+
+  val scannable : why:History.scannable_creation_reason -> 'd Types.jkind
 
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind

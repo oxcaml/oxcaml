@@ -648,7 +648,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   | Outval_record_mixed_block shape ->
                       let fld =
                         match shape.(pos) with
-                        | Scannable -> `Continue (O.field obj pos)
+                        | Scannable _ -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
                         | Float32 | Bits8 | Bits16 | Untagged_immediate
