@@ -26,13 +26,11 @@ external weird_flarr_len : ('a : any separable). 'a array -> int
 val weird_flarr_len' : ('a : value maybe_null). 'a array -> int = <fun>
 |}]
 
-(* CR zeisbach: fix this! *)
 external product_edge_case : ('a : any mod separable). #('a * 'a) array -> int = "%identity"
 let product_edge_case x = product_edge_case x
 [%%expect{|
 external product_edge_case : ('a : any separable). #('a * 'a) array -> int
   = "%identity"
->> Fatal error: sort_to_scannable_product_element_kind called with non-representable layout
-Uncaught exception: Misc.Fatal_error
-
+val product_edge_case : ('a : value maybe_null). #('a * 'a) array -> int =
+  <fun>
 |}]

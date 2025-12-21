@@ -104,6 +104,12 @@ let maybe_pointer_type env ty =
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
+let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
+  | Any _ -> false
+  | Base _ -> true
+  | Product sorts ->
+    List.for_all layout_is_representable sorts
+
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
    layouts in the typedtree (see [Sort] comment in [jkind_intf.ml]).
@@ -115,8 +121,10 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
    for nullable jkinds.*)
 let type_representable_layout ~why env loc ty =
   let jkind = Ctype.type_jkind env ty in
-  match Jkind.get_layout_defaulting_to_scannable jkind with
-  | Any _ ->
+  let layout = Jkind.get_layout_defaulting_to_scannable jkind in
+  if layout_is_representable layout then
+    layout
+  else
     (* Surprisingly, it is possible to reach this branch; for example, when
        translating [f] in the following example:
 
@@ -140,7 +148,6 @@ let type_representable_layout ~why env loc ty =
       | Some _ -> layout)
     (* CR layouts: It seems as if this is unreachable (see ticket above). *)
     | Error err -> raise (Error (loc, Not_a_sort (ty, err))))
-  | layout -> layout
 
 (* [classification]s are used for two things: things in arrays, and things in
    lazys. In the former case, we need detailed information about unboxed
