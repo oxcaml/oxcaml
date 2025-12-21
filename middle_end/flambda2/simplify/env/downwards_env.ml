@@ -157,9 +157,9 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
     cost_of_lifting_continuations_out_of_current_one
 
-let define_continuations t conts =
+let define_continuations ~is_wrapper t conts =
   let replay_history =
-    Replay_history.define_continuations conts t.replay_history
+    Replay_history.define_continuations ~is_wrapper conts t.replay_history
   in
   { t with replay_history }
 
