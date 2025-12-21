@@ -452,6 +452,41 @@ Error: This expression has type "a or_null"
        Note: The layout of immediate is value non_pointer.
 |}]
 
+module M : sig
+  type t : immediate_or_null
+end = struct
+  type t = int or_null
+end
+[%%expect{|
+module M : sig type t : immediate_or_null end
+|}]
+
+(* CR layouts-scannable: This test should pass! *)
+module M : sig
+  type t : immediate_or_null & float64
+end = struct
+  type t = #(int or_null * float#)
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #(int or_null * float#)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #(int or_null * float#) end
+       is not included in
+         sig type t : value_or_null non_pointer & float64 end
+       Type declarations do not match:
+         type t = #(int or_null * float#)
+       is not included in
+         type t : value_or_null non_pointer & float64
+       The layout of the first is value maybe_separable maybe_null & float64
+         because it is an unboxed tuple.
+       But the layout of the first must be a sublayout of
+           value non_pointer maybe_null & float64
+         because of the definition of t at line 2, characters 2-38.
+|}]
 
 (* modules and module inclusion *)
 
@@ -616,4 +651,63 @@ end = struct
 end
 [%%expect{|
 module M : sig type t : value non_float end
+|}]
+
+(* Mixed records and mutual recursion edge cases *)
+
+module Equal_layout : sig
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end = struct
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end
+[%%expect{|
+module Equal_layout :
+  sig type t : value non_pointer type s type r = { r : #(t * s); } end
+|}]
+
+module Less_layout : sig
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end = struct
+  type t : value non_pointer
+  type s : value non_pointer
+  type r = { r : #(t * s) }
+end
+[%%expect{|
+module Less_layout :
+  sig type t : value non_pointer type s type r = { r : #(t * s); } end
+|}]
+
+module Not_le_layout : sig
+  type r = { r : #(t * s) }
+  and t : value non_pointer
+  and s
+end = struct
+  type r = { r : #(t * s) }
+  and t
+  and s
+end
+[%%expect{|
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type r = { r : #(t * s) }
+7 |   and t
+8 |   and s
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type r = { r : #(t * s); } and t and s end
+       is not included in
+         sig type r = { r : #(t * s); } and t : value non_pointer and s end
+       Type declarations do not match:
+         type r = { r : #(t * s); }
+       is not included in
+         type r = { r : #(t * s); }
+       Their internal representations differ:
+       This is likely caused by a layout mismatch in a later definition.
 |}]

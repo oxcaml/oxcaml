@@ -112,6 +112,14 @@ module Separability = struct
     | Maybe_separable -> "maybe_separable"
 
   let print ppf t = Format.fprintf ppf "%s" (to_string t)
+
+  let upper_bound_if_is_always_gc_ignorable () =
+    (* We check that we're compiling to (64-bit) native code before counting
+        Non_pointer64 types as gc_ignorable, because bytecode is intended to be
+        platform independent. *)
+    if !Clflags.native_code && Sys.word_size = 64
+    then Non_pointer64
+    else Non_pointer
 end
 
 module Axis = struct
