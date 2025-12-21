@@ -3121,8 +3121,8 @@ module Debug_printers = struct
       History.immediate_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
 
-  let scannable_creation_reason ppf :
-      History.scannable_creation_reason -> _ = function
+  let scannable_creation_reason ppf : History.scannable_creation_reason -> _ =
+    function
     | Dummy_jkind -> fprintf ppf "Dummy_jkind"
 
   let value_or_null_creation_reason ppf :
@@ -3198,8 +3198,7 @@ module Debug_printers = struct
       fprintf ppf "Immediate_or_null_creation %a"
         immediate_or_null_creation_reason immediate
     | Scannable_creation scannable ->
-      fprintf ppf "Scannable_creation %a"
-        scannable_creation_reason scannable
+      fprintf ppf "Scannable_creation %a" scannable_creation_reason scannable
     | Value_or_null_creation value ->
       fprintf ppf "Value_or_null_creation %a" value_or_null_creation_reason
         value
