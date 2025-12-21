@@ -475,10 +475,7 @@ let iterator ~transl_exp ~scopes ~loc :
         (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable iter_arr_exp)
     in
     let iter_arr_kind =
-      (* CR layouts v4: [~elt_sort:None] here is not ideal and
-         should be fixed. To do that, we will need to store a sort
-         on [Texp_comp_in]. *)
-      Typeopt.array_type_kind ~elt_sort:None ~elt_ty:(Some pattern.pat_type)
+      Typeopt.array_type_kind ~elt_ty:(Some pattern.pat_type)
         iter_arr_exp.exp_env iter_arr_exp.exp_loc iter_arr_exp.exp_type
     in
     let iter_arr_mut =

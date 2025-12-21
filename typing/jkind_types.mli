@@ -113,6 +113,8 @@ module Scannable_axes : sig
   val value_axes : t
 
   val equal : t -> t -> bool
+
+  val less_or_equal : t -> t -> Misc.Le_result.t
 end
 
 module Layout : sig
