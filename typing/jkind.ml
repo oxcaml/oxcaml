@@ -70,12 +70,6 @@ end
 module Scannable_axes = struct
   include Jkind_types.Scannable_axes
 
-  let less_or_equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Misc.Le_result.combine
-      (Nullability.less_or_equal n1 n2)
-      (Separability.less_or_equal s1 s2)
-
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
   let meet { nullability = n1; separability = s1 }
@@ -2926,6 +2920,12 @@ module Format_history = struct
       fprintf ppf "it is the primitive immediate_or_null type %s"
         (Ident.name id)
 
+  let format_scannable_creation_reason ppf :
+      History.scannable_creation_reason -> _ = function
+    | Dummy_jkind ->
+      format_with_notify_js ppf
+        "it's assigned a dummy kind that should have been overwritten"
+
   let format_value_or_null_creation_reason ppf ~layout_or_kind :
       History.value_or_null_creation_reason -> _ = function
     | Primitive id ->
@@ -3039,6 +3039,8 @@ module Format_history = struct
       format_immediate_creation_reason ppf immediate
     | Immediate_or_null_creation immediate ->
       format_immediate_or_null_creation_reason ppf immediate
+    | Scannable_creation scannable ->
+      format_scannable_creation_reason ppf scannable
     | Void_creation _ -> .
     | Value_or_null_creation value ->
       format_value_or_null_creation_reason ppf value ~layout_or_kind
@@ -3945,6 +3947,10 @@ module Debug_printers = struct
       History.immediate_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
 
+  let scannable_creation_reason ppf : History.scannable_creation_reason -> _ =
+    function
+    | Dummy_jkind -> fprintf ppf "Dummy_jkind"
+
   let value_or_null_creation_reason ppf :
       History.value_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
@@ -4017,6 +4023,8 @@ module Debug_printers = struct
     | Immediate_or_null_creation immediate ->
       fprintf ppf "Immediate_or_null_creation %a"
         immediate_or_null_creation_reason immediate
+    | Scannable_creation scannable ->
+      fprintf ppf "Scannable_creation %a" scannable_creation_reason scannable
     | Value_or_null_creation value ->
       fprintf ppf "Value_or_null_creation %a" value_or_null_creation_reason
         value
