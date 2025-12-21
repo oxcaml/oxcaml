@@ -128,12 +128,12 @@ The abbreviations defined in the language are as follows:
     choice), we default kinds to be `value`. This defaulting action is described
     in further detail in the sections below.
 
-* `immediate = value mod everything non_null non_float`
+* `immediate = value non_pointer mod everything non_float`
 
     This is the kind of `int` and types like it (including enumerations and
     `bool`). It is the OxCaml equivalent of OCaml's `[@@immediate]` attribute.
 
-* `immediate_or_null = value_or_null mod everything`
+* `immediate_or_null = value non_pointer maybe_null mod everything`
 
     This is the kind of `int or_null` and similar types.
 
