@@ -1500,7 +1500,8 @@ let assemble_line b loc ins =
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->
-      X86_gas.generate_asm Out_channel.stderr [ins];
+      let dll = Oxcaml_utils.Doubly_linked_list.make_single ins in
+      X86_gas.generate_asm Out_channel.stderr dll;
       Misc.fatal_errorf "x86_binary_emitter: unsupported instruction"
   with e ->
     Printf.eprintf "Exception %s:\n%!" (Printexc.to_string e);
