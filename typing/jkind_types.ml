@@ -668,6 +668,12 @@ module Scannable_axes = struct
   let equal { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
     Nullability.equal n1 n2 && Separability.equal s1 s2
+
+  let less_or_equal { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    Misc.Le_result.combine
+      (Nullability.less_or_equal n1 n2)
+      (Separability.less_or_equal s1 s2)
 end
 
 module Layout = struct
@@ -694,6 +700,14 @@ module Layout = struct
       | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | (Base _ | Any _ | Product _), _ -> false
+
+    let rec get_sort : t -> Sort.Const.t option = function
+      | Any _ -> None
+      | Base (b, _) -> Some (Base b)
+      | Product ts ->
+        Option.map
+          (fun x -> Sort.Const.Product x)
+          (Misc.Stdlib.List.map_option get_sort ts)
 
     module Static = struct
       let scannable_non_null_non_pointer =

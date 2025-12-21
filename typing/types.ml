@@ -384,7 +384,7 @@ and type_origin =
   | Existential of string
 
 and mixed_block_element =
-  | Scannable
+  | Scannable of Jkind_types.Scannable_axes.t
   | Float_boxed
   | Float64
   | Float32
@@ -752,7 +752,7 @@ let compare_tag t1 t2 =
 
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Scannable, Scannable
+  | Scannable sa1, Scannable sa2 -> Jkind_types.Scannable_axes.equal sa1 sa2
   | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16
@@ -762,14 +762,19 @@ let rec equal_mixed_block_element e1 e2 =
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Scannable | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+  | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
     | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Scannable, Scannable | Float_boxed, Float_boxed
+  | Scannable sa1, Scannable sa2 -> (
+    match Jkind_types.Scannable_axes.less_or_equal sa1 sa2 with
+    | Less -> -1
+    | Equal -> 0
+    | Not_le -> 1)
+  | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
@@ -778,8 +783,8 @@ let rec compare_mixed_block_element e1 e2 =
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
-  | Scannable, _ -> -1
-  | _, Scannable -> 1
+  | Scannable _, _ -> -1
+  | _, Scannable _ -> 1
   | Float_boxed, _ -> -1
   | _, Float_boxed -> 1
   | Float64, _ -> -1
@@ -855,6 +860,34 @@ let equal_record_representation r1 r2 = match r1, r2 with
 let equal_record_unboxed_product_representation r1 r2 = match r1, r2 with
   | Record_unboxed_product, Record_unboxed_product -> true
 
+(* Returns [Less] when [e1] and [e2] are equal up to the stored scannable axes
+   on a [Scannable], which can be [Less]. *)
+let rec mixed_block_element_less_or_equal e1 e2 =
+  match e1, e2 with
+  | Scannable sa1, Scannable sa2 ->
+    Jkind_types.Scannable_axes.less_or_equal sa1 sa2
+  | Float_boxed, Float_boxed
+  | Float64, Float64 | Float32, Float32
+  | Word, Word | Untagged_immediate, Untagged_immediate
+  | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Void, Void
+    -> Misc.Le_result.Equal
+  | Product es1, Product es2 -> mixed_product_shape_less_or_equal es1 es2
+  | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+    | Product _ | Void ), _
+    -> Misc.Le_result.Not_le
+
+and mixed_product_shape_less_or_equal s1 s2 =
+  if Array.length s1 <> Array.length s2
+  then Misc.Le_result.Not_le
+  else
+    Misc.Stdlib.Array.fold_left2
+      (fun acc e1 e2 ->
+        Misc.Le_result.combine acc (mixed_block_element_less_or_equal e1 e2))
+      Misc.Le_result.Equal s1 s2
+
 let may_equal_constr c1 c2 =
   c1.cstr_arity = c2.cstr_arity
   && (match c1.cstr_tag,c2.cstr_tag with
@@ -897,9 +930,14 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
 
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
-  | Base Scannable -> Scannable
+  (* CR layouts-scannable: since sorts do not store scannable axis information,
+     we are forced to default to max. It would be good to store the scannable
+     axis information, but doing so takes a sizable refactor. See the comment
+     on [Sort] in [jkind_intf.ml] *)
+  | Base Scannable -> Scannable Jkind_types.Scannable_axes.max
   | Base Bits8 -> Bits8
   | Base Bits16 -> Bits16
   | Base Bits32 -> Bits32
@@ -972,7 +1010,7 @@ let bound_value_identifiers_and_sorts sigs =
   List.filter_map signature_item_representation sigs
 
 let rec mixed_block_element_to_string = function
-  | Scannable -> "Scannable"
+  | Scannable _ -> "Scannable"
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
   | Float64 -> "Float64"
@@ -993,7 +1031,7 @@ let rec mixed_block_element_to_string = function
   | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
-  | Scannable -> "value"
+  | Scannable _ -> "scannable"
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"
