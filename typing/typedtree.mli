@@ -504,6 +504,10 @@ and expression_desc =
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
+  (* CR layouts-scannable: The sort here is no longer used. Instead, a layout is
+     computed, since it has scannable axes. This should either be removed
+     (perhaps alongside some other sorts being kept around) or replaced with a
+     (representable) layout. *)
   | Texp_array_comprehension of Types.mutability * Jkind.sort * comprehension
   | Texp_ifthenelse of expression * expression * expression option
   | Texp_sequence of expression * Jkind.sort * expression
