@@ -145,3 +145,13 @@ let () = f 1
 type t = {x: int; y:int}
 let f x = {x; y = x/0}.x
 let () = try ignore (f 1); assert false with Division_by_zero -> ()
+
+(* Make sure compile-time untagging for unsigned division is done correctly *)
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
+external unsigned_div : int -> int -> int = "%int_unsigned_div"
+
+let _ =
+  assert (unsigned_div (-100) (-100) = 1)
+  assert (unsigned_div (id (-100)) (-100) = 1)
+  assert (unsigned_div (-100) (id (-100)) = 1)
+  assert (unsigned_div (id (-100)) (id (-100)) = 1)
