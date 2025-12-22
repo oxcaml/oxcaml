@@ -133,6 +133,12 @@ module GP_reg_name = struct
     | SP -> "sp"
 end
 
+module System_reg = struct
+  type t = CNTVCT_EL0
+
+  let name t = match t with CNTVCT_EL0 -> "CNTVCT_EL0"
+end
+
 (* Register representation *)
 module Reg_name = struct
   type t =
@@ -412,6 +418,8 @@ module Instruction_name = struct
     | STP
     | RET
     | YIELD
+    | MRS
+    | CRC32
     (* neon *)
     | MOV
     | MOVI
@@ -551,6 +559,8 @@ module Instruction_name = struct
     | STP -> "stp"
     | RET -> "ret"
     | YIELD -> "yield"
+    | MRS -> "mrs"
+    | CRC32 -> "crc32cx"
     (* neon *)
     | MOV -> "mov"
     | MOVI -> "movi"
@@ -763,6 +773,7 @@ module Operand = struct
     | Imm_float of float
     | Imm_nativeint of nativeint
     | Reg of Reg.t
+    | System_reg of System_reg.t
     | Extend of Extend.t
     | Shift of Shift.t
     | Sym of Symbol.t
@@ -776,6 +787,7 @@ module Operand = struct
     | Imm_float f -> Format.fprintf ppf "#%.7f" f
     | Imm_nativeint n -> Format.fprintf ppf "#%s" (Nativeint.to_string n)
     | Reg r -> Format.fprintf ppf "%s" (Reg.name r)
+    | System_reg r -> Format.fprintf ppf "%s" (System_reg.name r)
     | Extend e -> Extend.print ppf e
     | Shift s -> Shift.print ppf s
     | Sym s -> Symbol.print ppf s
@@ -995,6 +1007,8 @@ module DSL = struct
   let wzr = Operand.Reg Reg.wzr
 
   let reg_op reg = Operand.Reg reg
+
+  let system_reg_op reg = Operand.System_reg reg
 
   let imm n = Operand.Imm n
 

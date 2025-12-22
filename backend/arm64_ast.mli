@@ -41,6 +41,10 @@ module GP_reg_name : sig
     | SP
 end
 
+module System_reg : sig
+  type t = CNTVCT_EL0
+end
+
 (* Register representation *)
 module Reg_name : sig
   type t =
@@ -242,6 +246,8 @@ module Instruction_name : sig
     | STP
     | RET
     | YIELD
+    | MRS
+    | CRC32
     (* neon *)
     | MOV
     | MOVI
@@ -314,6 +320,8 @@ end
 
 module DSL : sig
   val reg_op : Reg.t -> Operand.t
+
+  val system_reg_op : System_reg.t -> Operand.t
 
   val imm : int -> Operand.t
 
