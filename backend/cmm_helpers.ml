@@ -1006,9 +1006,7 @@ let untag_int i dbg =
     lsr_const c (n + 1) dbg
   | c -> asr_const c 1 dbg
 
-let unsigned_untag_int i dbg =
-  (* CR jrayman: should this be optimized? *)
-  lsr_const i 1 dbg
+let unsigned_untag_int i dbg = lsr_const i 1 dbg
 
 let mk_not dbg cmm =
   match cmm with
