@@ -891,8 +891,10 @@ and comp_binary_scalar_intrinsic :
         | _ -> prim Subint)
         |> sign_extend taggable
       | Mul -> prim Mulint |> sign_extend taggable
-      | Div (Safe | Unsafe) -> prim Divint |> sign_extend taggable
-      | Mod (Safe | Unsafe) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Signed) -> prim Divint |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Signed) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Unsigned) -> failwith "CR jrayman"
+      | Mod ((Safe | Unsafe), Unsigned) -> failwith "CR jrayman"
       | And -> prim Andint
       | Or -> prim Orint
       | Xor -> prim Xorint)
@@ -906,8 +908,10 @@ and comp_binary_scalar_intrinsic :
       | Add -> c "add"
       | Sub -> c "sub"
       | Mul -> c "mul"
-      | Div (Safe | Unsafe) -> c "div"
-      | Mod (Safe | Unsafe) -> c "mod"
+      | Div ((Safe | Unsafe), Signed) -> c "div"
+      | Mod ((Safe | Unsafe), Signed) -> c "mod"
+      | Div ((Safe | Unsafe), Unsigned) -> failwith "CR jrayman"
+      | Mod ((Safe | Unsafe), Unsigned) -> failwith "CR jrayman"
       | And -> c "and"
       | Or -> c "or"
       | Xor -> c "xor"))
