@@ -149,8 +149,8 @@ let fmt_index_kind f = function
 let fmt_type_inspection f = function
   | Label_disambiguation ->
     fprintf f "Label_disambiguation"
-  | Polymorphic_parameter ->
-    fprintf f "Polymorphic_parameter"
+  | Polymorphic_parameter _ ->
+    fprintf f "Polymorphic_parameter _"
 
 let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
