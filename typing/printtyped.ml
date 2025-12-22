@@ -440,8 +440,8 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
   | Tpat_inspected_type Label_disambiguation ->
      line i ppf "Tpat_inspected_type Label_disambiguation\n";
      attributes i ppf attrs;
-  | Tpat_inspected_type Polymorphic_parameter ->
-     line i ppf "Tpat_inspected_type Polymorphic_parameter\n";
+  | Tpat_inspected_type (Polymorphic_parameter (Param _)) ->
+      line i ppf "Tpat_inspected_type (Polymorphic_parameter (Param _))\n";
      attributes i ppf attrs;
 
 and function_body i ppf (body : function_body) =
@@ -489,9 +489,11 @@ and expression_extra i ppf x attrs =
       attributes i ppf attrs;
       alloc_const_option_mode i ppf m
   | Texp_inspected_type Label_disambiguation ->
-     line i ppf "Tpat_inspected_type Label_disambiguation\n";
-  | Texp_inspected_type Polymorphic_parameter ->
-     line i ppf "Tpat_inspected_type Polymorphic_parameter\n";
+      line i ppf "Texp_inspected_type Label_disambiguation\n";
+  | Texp_inspected_type (Polymorphic_parameter (Method (met, _ty))) ->
+      line i ppf "Texp_inspected_type (Polymorphic_parameter (Method %s _))\n" met.txt;
+  | Texp_inspected_type (Polymorphic_parameter (Arrow _params)) ->
+      line i ppf "Texp_inspected_type (Polymorphic_parameter Arrow _)\n"
 
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m
