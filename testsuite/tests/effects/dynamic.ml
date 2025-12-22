@@ -5,43 +5,7 @@
    { native; }
 *)
 
-(* Tests the runtime support for dynamic bindings. Dynamic.t isn't yet implemented in the
-   OxCaml stdlib, only the runtime support for it, so testing that requires faking a bit
-   more infrastructure here in the test case. *)
-
-module Dynamic : sig
-  type 'a t
-
-  val make : 'a -> 'a t
-  val get : 'a t -> 'a
-
-  val with_temporarily : 'a t -> 'a -> f: (unit -> 'b) -> 'b
-
-end = struct
-  type last_fiber : immediate
-  type (-'a, +'b) cont
-  type 'a t
-
-  external reperform :
-    'a Effect.t -> ('a, 'b) cont -> last_fiber -> 'b = "%reperform"
-
-  external with_stack_bind :
-    ('a -> 'b) ->
-    (exn -> 'b) ->
-    ('c Effect.t -> ('c, 'b) cont -> last_fiber -> 'b) ->
-    'd t ->
-    'd ->
-    ('e -> 'a) ->
-    'e ->
-    'b = "%with_stack_bind"
-
-  external make : 'a -> 'a t = "caml_dynamic_make"
-  external get : 'a t -> 'a = "caml_dynamic_get"
-
-  let with_temporarily d v ~f =
-    let effc eff k last_fiber = reperform eff k last_fiber in
-    with_stack_bind (fun x -> x) (fun e -> raise e) effc d v f ()
-end
+(* Tests the runtime support for dynamic bindings. *)
 
 type _ Effect.t += E : unit -> unit Effect.t
 
