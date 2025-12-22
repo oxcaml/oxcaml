@@ -441,3 +441,24 @@ module F = F @@ stateless nonportable
 module M = M
 val foo : unit -> unit = <fun>
 |}]
+
+(* CR-someday zqian: this should be allowed *)
+(* CR-soon zqian: the error message should refer to [M.f] as the violation. *)
+module F (M : S @ local) : S @ global = struct include M end
+[%%expect{|
+Line 1, characters 47-56:
+1 | module F (M : S @ local) : S @ global = struct include M end
+                                                   ^^^^^^^^^
+Error: This is "local", but expected to be "global" because it is inside a structure.
+|}]
+
+(* some higher order functor *)
+module F(G : S -> S @ portable) = struct
+  module H : S -> S @ portable
+    = functor (X : S) -> struct include G(X) end
+end
+[%%expect{|
+module F :
+  functor (G : S -> S @ portable) -> sig module H : S -> S @ portable end @@
+  stateless
+|}]
