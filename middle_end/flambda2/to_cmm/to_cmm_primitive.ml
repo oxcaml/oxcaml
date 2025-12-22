@@ -921,7 +921,8 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
        below about [C.low_bits] in the [Div] and [Mod] cases. *)
   in
   let unsigned_wrap f =
-    (* CR jrayman *)
+    (* Since all operands are sign-extended, unsigned operators must have the
+       same width as their inputs. *)
     wrap (C.Scalar_type.Integral.with_signedness kind ~signedness:Unsigned) f
   in
   match kind with
