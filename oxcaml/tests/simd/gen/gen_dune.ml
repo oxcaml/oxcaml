@@ -40,6 +40,25 @@ let compile ~enabled_if ~extra_flags name =
  (foreign_archives stubs))
 |}
 
+let compile_with_unix ~enabled_if ~extra_flags name =
+  let subst = function
+    | "name" -> name
+    | "enabled_if" -> enabled_if
+    | "extra_flags" -> extra_flags
+    | _ -> assert false
+  in
+  rule ~subst
+    {|
+(executable
+ (name ${name})
+ (modules ${name})
+ ${enabled_if}
+ (ocamlopt_flags
+  (:standard -extension simd_beta ${extra_flags}))
+ (libraries unix simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+|}
+
 let run ~enabled_if name =
   let subst = function
     | "enabled_if" -> enabled_if
@@ -123,6 +142,20 @@ let print_test ?extra_flag (name, enabled_if) =
       new_name, flag
   in
   compile ~enabled_if ~extra_flags name;
+  run ~enabled_if name;
+  diff_output ~enabled_if name;
+  ()
+
+let print_test_with_unix ?extra_flag (name, enabled_if) =
+  let name, extra_flags =
+    match extra_flag with
+    | None -> name, ""
+    | Some flag ->
+      let new_name = name ^ mangle flag in
+      copy_file ~enabled_if name new_name;
+      new_name, flag
+  in
+  compile_with_unix ~enabled_if ~extra_flags name;
   run ~enabled_if name;
   diff_output ~enabled_if name;
   ()
@@ -227,4 +260,12 @@ let () =
     List.map (fun (name, _) -> name, enabled_if_main_amd64_not_macos) tests
   in
   List.iter (print_test ~extra_flag:"-internal-assembler") tests;
+  (* Tests that need Unix library (for preemption) *)
+  let unix_tests = ["preemption256", enabled_if_main_amd64_not_macos] in
+  List.iter print_test_with_unix unix_tests;
+  List.iter (print_test_with_unix ~extra_flag:"-nodynlink") unix_tests;
+  let unix_tests =
+    List.map (fun (name, _) -> name, enabled_if_main_amd64_not_macos) unix_tests
+  in
+  List.iter (print_test_with_unix ~extra_flag:"-internal-assembler") unix_tests;
   ()

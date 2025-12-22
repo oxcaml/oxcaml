@@ -12,6 +12,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+external register_named_value : string -> 'a -> unit
+  = "caml_register_named_value"
+
 type 'a t = ..
 external perform : 'a t -> 'a = "%perform"
 exception Out_of_fibers = Out_of_fibers
@@ -37,6 +40,9 @@ let _ = Callback.Safe.register_exception "Effect.Unhandled"
           (Unhandled Should_not_see_this__)
 let _ = Callback.Safe.register_exception "Effect.Continuation_already_resumed"
           Continuation_already_resumed
+
+type _ t += Preemption : unit t
+let () = register_named_value "Effect.Preemption" Preemption
 
 (* A paused fiber, awaiting an 'a, which terminates with an 'x,
    equipped with a handler that produces a 'b *)

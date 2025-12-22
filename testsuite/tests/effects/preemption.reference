@@ -1,0 +1,82 @@
+Test 1: Basic preemption
+  Basic preemption: PASSED
+Test 2: Delayed resume with live values
+  Delayed resume: PASSED
+Test 3: Nested computation with preemption
+  Nested computation: PASSED
+Test 4: Multiple preemptions
+  Multiple preemptions: PASSED
+Test 5: Preemption with allocations
+  Preemption with allocations: PASSED
+Test 6: Many live registers
+  Many live registers: PASSED
+Test 7: Register values survive GC
+  Register values survive GC: PASSED
+Test 8: GC with deep recursion
+  GC with deep recursion: PASSED
+Test 9: Repeated preemptions with GC
+  Repeated preemptions with GC: PASSED
+Test 10: Massive allocation during preemption
+  Massive allocation: PASSED
+Test 11: Large structures in registers
+  Large structures: PASSED
+Test 12: Weak references
+  Weak references: PASSED
+Test 13: Nested effect handlers
+  Nested handlers: PASSED
+Test 14: Lazy values
+  Lazy values: PASSED
+Test 15: Extreme recursion depth
+  Extreme recursion depth: PASSED
+Test 16: Exception handling across preemption
+  Exception handling: PASSED
+Test 17: Finalizer in preemption handler
+  Finalizer in handler: PASSED
+Test 18: Exception in preemption handler
+  Exception in handler: PASSED
+Test 19: Multiple effects with preemption
+  Multiple effects: PASSED
+Test 20: Deep effect nesting with preemption
+  Deep effect nesting: PASSED
+Test 21: Float arrays during preemption
+  Float arrays: PASSED
+Test 22: String operations during preemption
+  String operations: PASSED
+Test 23: Format strings during preemption
+  Format strings: PASSED
+Test 24: Polymorphic variants during preemption
+  Polymorphic variants: PASSED
+Test 25: Rapid repeated preemptions
+  Rapid preemptions: PASSED
+Test 26: Large array initialization
+  Large array init: PASSED
+Test 27: Bytes operations during preemption
+  Bytes operations: PASSED
+Test 28: Nested try blocks with preemption
+  Nested try blocks: PASSED
+Test 29: Sequences during preemption
+  Sequences: PASSED
+Test 30: Mixed allocation sizes
+  Mixed allocations: PASSED
+Test 31: Hash tables with preemption
+  Hash tables: PASSED
+Test 32: Recursive tree structures
+  Recursive trees: PASSED
+Test 33: Array.sort during preemption
+  Array.sort: PASSED
+Test 34: Nested closures with preemption
+  Nested closures: PASSED
+Test 35: Complex pattern matching
+  Pattern matching: PASSED
+Test 36: Nested Options and Results
+  Options and Results: PASSED
+Test 37: Reference indirection
+  Reference indirection: PASSED
+Test 38: List operations with preemption
+  List operations: PASSED
+Test 39: Huge single allocation
+  Huge allocation: PASSED
+Test 40: Mutation-heavy code
+  Mutation heavy: PASSED
+
+All preemption tests PASSED!
