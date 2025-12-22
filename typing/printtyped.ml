@@ -440,8 +440,8 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
   | Tpat_inspected_type Label_disambiguation ->
      line i ppf "Tpat_inspected_type Label_disambiguation\n";
      attributes i ppf attrs;
-  | Tpat_inspected_type Polymorphic_application ->
-     line i ppf "Tpat_inspected_type Polymorphic_application\n";
+  | Tpat_inspected_type Polymorphic_parameter ->
+     line i ppf "Tpat_inspected_type Polymorphic_parameter\n";
      attributes i ppf attrs;
 
 and function_body i ppf (body : function_body) =
@@ -490,8 +490,8 @@ and expression_extra i ppf x attrs =
       alloc_const_option_mode i ppf m
   | Texp_inspected_type Label_disambiguation ->
      line i ppf "Tpat_inspected_type Label_disambiguation\n";
-  | Texp_inspected_type Polymorphic_application ->
-     line i ppf "Tpat_inspected_type Polymorphic_application\n";
+  | Texp_inspected_type Polymorphic_parameter ->
+     line i ppf "Tpat_inspected_type Polymorphic_parameter\n";
 
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m
