@@ -1,0 +1,108 @@
+Stdlib.ignore
+  ((fun x -> x)
+     (fun rcd -> ((rcd.Poly_types.f 42), (rcd.Poly_types.f "abc")))
+  : Poly_types.tr1)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun obj ->
+        (((obj : < f : 'a. 'a -> 'a; .. >)#f 42),
+         ((obj : < f : 'a__1. 'a__1 -> 'a__1; .. >)#f "abc")))
+  : Poly_types.to1)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun obj ->
+        (((obj : < f : 'a 'b. 'a -> 'b -> 'a; .. >)#f 42 false),
+         ((obj : < f : 'a__1 'b__1. 'a__1 -> 'b__1 -> 'a__1; .. >)#f "abc" 0)))
+  : Poly_types.to2)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun obj ->
+        (((obj : < f : 'a. 'a -> _ -> [ `Foo of < foo : 'a; .. > ] * _; ..
+            >)#f 42 0),
+         ((obj : <
+            f : 'a__1. 'a__1 -> _ -> [ `Foo of < foo : 'a__1; .. > ] * _; ..
+            >)#f "abc" 1)))
+  : Poly_types.to3)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun obj ->
+        (((obj : < f : 'a. 'a -> 'a; .. >)#f 42),
+         ((obj : < f : 'a__1. 'a__1 -> 'a__1; .. >)#f true)))
+  : Poly_types.to4)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun obj ->
+        (((obj : < f : 'a. 'a -> _ -> 'a; .. >)#f
+            ((obj : < f : 'a__1. 'a__1 -> _ -> 'a__1; .. >)#f 42 obj) 
+            obj),
+         ((obj : < f : 'a__2. 'a__2 -> _ -> 'a__2; .. >)#f "abc" obj)))
+  : Poly_types.tr)
+
+Stdlib.ignore
+  ((fun x -> x) (fun (f : 'a. 'a -> 'a) -> ((f 42), (f "abc"))) :
+  Poly_types.t1)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (f : 'a 'b. 'a -> 'b -> 'a) -> ((f 42 false), (f "abc" 0)))
+  : Poly_types.t2)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (f : 'a. 'a -> _ -> [ `Foo of < foo : 'a; .. > ] * _) ->
+        ((f 42 0), (f "abc" 1)))
+  : Poly_types.t3)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (f : 'a. 'a -> _ -> [ `Foo of 'a ] * _) -> ((f 42 0), (f "abc" 1)))
+  : Poly_types.t3')
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (f : 'a. 'a -> (module Poly_types.T with type t = 'a)) ->
+        ((f 42), (f "abc")))
+  : Poly_types.t3''')
+
+Stdlib.ignore
+  ((fun x -> x) (fun (f : 'a. < x : 'a; .. > -> 'a) -> (42, "abc")) :
+  ('a__1. < x : 'a__1; .. > -> 'a__1) -> (int) * (string))
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (f : 'a 'b. [< `Bar of 'b | `Foo of 'a & 'b ] -> [> `Foo of 'a |
+        `Baz ]) -> ())
+  :
+  ('a__1 'b__1. [< `Foo of 'a__1 & 'b__1 | 'b__1 Poly_types.tbar ] -> [> `Foo
+   of 'a__1 | `Baz ])
+  -> unit)
+
+Stdlib.ignore
+  ((fun x -> x) (fun (f : 'a. 'a -> 'a) -> ((f 42), (f true))) :
+  Poly_types.t4)
+
+Stdlib.ignore
+  ((fun x -> x) (fun f -> (f : ('a. 'a -> 'a) -> _) (fun x__1 -> x__1)) :
+  Poly_types.te1)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun f -> (f : ('a 'b. 'a -> 'b -> 'a) -> _) (fun x__1 y -> x__1))
+  : Poly_types.te2)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun f ->
+        (f : ('a. 'a -> _ -> [ `Foo of 'a ] * _) -> _)
+          (fun x__1 -> Stdlib.Sys.opaque_identity (fun y -> ((`Foo x__1), y))))
+  : Poly_types.te3')
+
+Stdlib.ignore
+  ((fun x -> x) (fun f -> (f : ('a. 'a -> 'a) -> _) (fun x__1 -> x__1)) :
+  Poly_types.te4)
+

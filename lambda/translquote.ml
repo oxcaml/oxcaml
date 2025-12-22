@@ -2595,6 +2595,108 @@ let rec quote_module_path loc = function
     fatal_errorf "Translquote [at %a]: no support for Papply in quoting modules"
       Location.print_loc (to_location loc)
 
+(* Approximate the [core_type] for type annotation from a given [type_expr].
+   Used for annotating polymorphic applications with higher-rank types. *)
+let type_for_annotation ~env ~loc typ =
+  let unwrap_univar ty =
+    match get_desc ty with
+    | Tunivar { name = Some name; jkind } -> Some (name, jkind.annotation)
+    | Tunivar { name = None; jkind = _ } -> None
+    | _ ->
+      fatal_errorf
+        "Translquote [at %a]:@ A named universal type variable@ was expected \
+         to appear@ within this type"
+        Location.print_loc_in_lowercase loc
+  in
+  let aliasable ty =
+    match get_desc ty with Tvar _ | Tunivar _ -> false | _ -> true
+  in
+  let rec go aliased ty =
+    let ctyp_desc =
+      if aliasable ty && List.memq ty aliased
+      then Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation)
+      else
+        let go = go (ty :: aliased) in
+        match get_desc ty with
+        | Tvar { name = _; jkind } | Tof_kind jkind ->
+          Ttyp_var (None, jkind.annotation)
+        | Tunivar _ ->
+          let name, jkind_annotation = unwrap_univar ty |> Option.get in
+          Ttyp_var (Some name, jkind_annotation)
+        | Tarrow ((arg_label, _, _), ty, ty', _) ->
+          Ttyp_arrow (arg_label, go ty, go ty')
+        | Tpoly (ty, tyl) -> (
+          let cty = go ty in
+          match List.filter_map unwrap_univar tyl with
+          | [] -> cty.ctyp_desc
+          | _ :: _ as ctyl -> Ttyp_poly (ctyl, go ty))
+        | Ttuple tyl -> Ttyp_tuple (List.map (fun (l, ty') -> l, go ty') tyl)
+        | Tunboxed_tuple tyl ->
+          Ttyp_unboxed_tuple (List.map (fun (l, ty') -> l, go ty') tyl)
+        | Tconstr (p, tyl, _) ->
+          Ttyp_constr
+            (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
+        | Tobject (fields, _) ->
+          let Printtyp.{ fields; open_row } =
+            Printtyp.tree_of_typobject_repr fields
+          in
+          let fields =
+            List.map
+              (fun (label, ty') ->
+                { of_desc = OTtag (mkloc label loc, go ty');
+                  of_loc = loc;
+                  of_attributes = []
+                })
+              fields
+          in
+          Ttyp_object (fields, if open_row then Open else Closed)
+        | Tvariant row ->
+          let Printtyp.
+                { fields; name = _; closed; present = _; all_present = _; tags }
+              =
+            Printtyp.tree_of_typvariant_repr row
+          in
+          let fields =
+            List.map
+              (fun (l, p, tyl) ->
+                { rf_desc = Ttag (mkloc l loc, p, List.map go tyl);
+                  rf_loc = loc;
+                  rf_attributes = []
+                })
+              fields
+          in
+          Ttyp_variant (fields, (if closed then Closed else Open), tags)
+        | Tquote ty -> Ttyp_quote (go ty)
+        | Tsplice _ ->
+          fatal_errorf
+            "Translquote [at %a]:@ Explicitly quantified type variables@ \
+             cannot be spliced@ within quoted higher-rank function types"
+            Location.print_loc_in_lowercase loc
+        | Tpackage (pack_path, pack_fields) ->
+          Ttyp_package
+            { pack_path;
+              pack_fields =
+                List.map
+                  (fun (lident, ty) -> mkloc lident loc, go ty)
+                  pack_fields;
+              pack_type = Mty_ident pack_path;
+              pack_txt = mkloc (Untypeast.lident_of_path pack_path) loc
+            }
+        | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
+          fatal_errorf
+            "Translquote [at %a]:@ Unexpected type expression@ in a quoted \
+             higher-rank function type"
+            Location.print_loc_in_lowercase loc
+    in
+    { ctyp_desc;
+      ctyp_type = ty;
+      ctyp_env = env;
+      ctyp_loc = loc;
+      ctyp_attributes = []
+    }
+  in
+  go [] typ
+
 let rec quote_computation_pattern ~scopes p =
   let loc = of_location ~scopes p.pat_loc in
   match p.pat_desc with
@@ -2606,7 +2708,7 @@ let rec quote_computation_pattern ~scopes p =
     let pat2 = quote_computation_pattern ~scopes pat2 in
     Pat.or_ loc pat1 pat2 |> Pat.wrap
 
-and quote_pat_extra ~scopes loc pat_lam extra =
+and quote_pat_extra ~env ~scopes loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
   | Tpat_constraint ty ->
@@ -2622,7 +2724,11 @@ and quote_pat_extra ~scopes loc pat_lam extra =
     pat_lam
     |> maybe_constrain_pat_with_type loc
          (type_constraint_of_ambiguity loc ambiguity)
-  | Tpat_inspected_type Polymorphic_parameter -> pat_lam
+  | Tpat_inspected_type (Polymorphic_parameter (Param ty)) ->
+    Pat.constraint_ loc pat_lam
+      (type_for_annotation ~env ~loc:(to_location loc) ty
+      |> quote_core_type ~scopes)
+    |> Pat.wrap
 
 and quote_value_pattern ~scopes p =
   let env = p.pat_env and loc = of_location ~scopes p.pat_loc in
@@ -2716,7 +2822,7 @@ and quote_value_pattern ~scopes p =
       Pat.lazy_ loc pat
   in
   List.fold_right
-    (fun extra p -> quote_pat_extra ~scopes loc p extra)
+    (fun extra p -> quote_pat_extra ~env ~scopes loc p extra)
     p.pat_extra (Pat.wrap pat_quoted)
 
 and quote_core_type ~scopes ty =
@@ -2763,8 +2869,8 @@ and quote_core_type ~scopes ty =
           if of_attributes <> []
           then
             fatal_errorf
-              "Translquote [at %a]: attributes are not supported on fields in \
-               object types"
+              "Translquote [at %a]:@ attributes are not supported@ on fields \
+               in object types@ inside quotations"
               Location.print_loc_in_lowercase loc;
           match of_desc with
           | OTtag (name, ty) ->
@@ -3178,7 +3284,7 @@ and quote_comprehension ~scopes ~transl stage loc { comp_body; comp_clauses } =
   List.iter remove_comprehension_idents comp_clauses;
   comprehension
 
-and quote_expression_extra ~scopes _stage extra lambda =
+and quote_expression_extra ~env ~scopes _stage extra lambda =
   let extra, loc, _ = extra in
   let loc = of_location ~scopes loc in
   match extra with
@@ -3207,7 +3313,56 @@ and quote_expression_extra ~scopes _stage extra lambda =
     lambda
     |> maybe_constrain_exp_desc_with_type loc
          (type_constraint_of_ambiguity loc ambiguity)
-  | Texp_inspected_type Polymorphic_parameter -> lambda
+  | Texp_inspected_type (Polymorphic_parameter poly_param) ->
+    (* unused dummy for [core_type.ctyp_type] *)
+    let newvar () = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
+    (* wildcard annotation *)
+    let newcorevar () =
+      { ctyp_desc = Ttyp_var (None, None);
+        ctyp_type = newvar ();
+        ctyp_env = env;
+        ctyp_loc = to_location loc;
+        ctyp_attributes = []
+      }
+    in
+    let cty =
+      match poly_param with
+      | Method (met, ty) ->
+        let met_cty = type_for_annotation ~env ~loc:(to_location loc) ty in
+        let met_field =
+          { of_desc = OTtag (met, met_cty);
+            of_loc = to_location loc;
+            of_attributes = []
+          }
+        in
+        { ctyp_desc = Ttyp_object ([met_field], Open);
+          ctyp_type = newvar ();
+          ctyp_env = env;
+          ctyp_loc = to_location loc;
+          ctyp_attributes = []
+        }
+      | Arrow params ->
+        List.fold_right
+          (fun (arg_lbl, sch) spine ->
+            { ctyp_desc =
+                Ttyp_arrow
+                  ( arg_lbl,
+                    (match sch with
+                    | Some sch ->
+                      type_for_annotation ~env ~loc:(to_location loc) sch
+                    | None -> newcorevar ()),
+                    spine );
+              ctyp_type = newvar ();
+              ctyp_env = env;
+              ctyp_loc = to_location loc;
+              ctyp_attributes = []
+            })
+          params (newcorevar ())
+    in
+    Exp_desc.constraint_ loc (mk_exp_noattr loc lambda)
+      (Type_constraint.constraint_ loc (quote_core_type ~scopes cty)
+      |> Type_constraint.wrap)
+    |> Exp_desc.wrap
 
 and update_env_with_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3219,7 +3374,7 @@ and update_env_with_extra ~loc extra =
       Location.print_loc (to_location loc)
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
-  | Texp_inspected_type Polymorphic_parameter -> ()
+  | Texp_inspected_type (Polymorphic_parameter _) -> ()
 
 and update_env_without_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3231,7 +3386,7 @@ and update_env_without_extra ~loc extra =
       Location.print_loc (to_location loc)
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
-  | Texp_inspected_type Polymorphic_parameter -> ()
+  | Texp_inspected_type (Polymorphic_parameter _) -> ()
 
 and quote_expression_desc ~scopes ~transl stage e =
   let env = e.exp_env in
@@ -3583,7 +3738,7 @@ and quote_expression_desc ~scopes ~transl stage e =
   in
   List.iter (update_env_without_extra ~loc) e.exp_extra;
   List.fold_right
-    (quote_expression_extra ~scopes stage)
+    (quote_expression_extra ~env ~scopes stage)
     e.exp_extra (Exp_desc.wrap body)
 
 and quote_expression ~scopes ~transl stage e =

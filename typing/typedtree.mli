@@ -143,7 +143,19 @@ type label_ambiguity =
 
 type _ type_inspection =
   | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
-  | Polymorphic_parameter : [< `pat | `exp ] type_inspection
+  | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
+
+and _ poly_param =
+  | Param : Types.type_expr -> [ `pat ] poly_param
+  (** [Param t] is used when introducing a polymorphic parameter
+      with type scheme [t] *)
+  | Arrow : (Types.arg_label * Types.type_expr option) list ->
+            [ `exp ] poly_param
+  (** [Arrow params] is used when eliminating a polymorphic parameter,
+      with [params] including type schemes for polymorphic parameters *)
+  | Method : string loc * Types.type_expr -> [ `exp ] poly_param
+  (** [Method (m, t)] is used when applying a polymorphic method [m]
+      with type scheme [t] *)
 
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data

@@ -1575,9 +1575,7 @@ module Ast = struct
     if with_or then pp fmt "@ |@ ";
     match rf with
     | Vinherit ty -> print_core_type env fmt ty
-    | Vtag (_, false, []) ->
-      () (* fatal_error "Invalid polymorphic variant type" *)
-    | Vtag (variant, true, []) -> pp fmt "%a" Variant.print variant
+    | Vtag (variant, _, []) -> pp fmt "%a" Variant.print variant
     | Vtag (variant, true, tys) ->
       pp fmt "%a@ of" Variant.print variant;
       List.iter
@@ -1597,7 +1595,8 @@ module Ast = struct
 
   and print_core_type_with_arrow env fmt ty =
     match ty with
-    | TypeArrow _ | TypePoly _ -> pp fmt "(@[%a@])" (print_core_type env) ty
+    | TypeArrow _ | TypePoly (_::_, _) ->
+      pp fmt "(@[%a@])" (print_core_type env) ty
     | _ -> print_core_type env fmt ty
 
   and print_core_type_with_parens env fmt ty =
@@ -2292,7 +2291,8 @@ module Object_type = struct
   type t = Ast.object_field list With_free_vars.t * Ast.object_closed_flag
 
   let of_object_fields_list object_fields object_closed_flag =
-    With_free_vars.all object_fields, Object_closed_flag.to_ast_object_closed_flag object_closed_flag
+    With_free_vars.all object_fields,
+    Object_closed_flag.to_ast_object_closed_flag object_closed_flag
 end
 
 
