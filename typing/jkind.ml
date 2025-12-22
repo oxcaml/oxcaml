@@ -1056,9 +1056,9 @@ end
 (* CR layouts v2.8: This should sometimes be for type schemes, not types
    (which print weak variables like ['_a] correctly), but this works better
    for the common case. When we re-do printing, fix. Internal ticket 4435. *)
-let outcometree_of_type = ref (fun _ -> assert false)
+let outcometrees_of_types = ref (fun _ -> assert false)
 
-let set_outcometree_of_type p = outcometree_of_type := p
+let set_outcometrees_of_types p = outcometrees_of_types := p
 
 let outcometree_of_modalities = ref (fun _ _ -> assert false)
 
@@ -1169,16 +1169,27 @@ module Const = struct
         get_modal_bounds ~base:base.jkind.mod_bounds actual.mod_bounds
       in
       let printable_with_bounds =
-        List.map
-          (fun (type_expr, type_info) ->
-            let axes_ignored_by_modalities =
-              With_bounds.Type_info.axes_ignored_by_modalities
-                ~mod_bounds:actual.mod_bounds ~type_info
-            in
-            ( !outcometree_of_type type_expr,
-              !outcometree_of_modalities Types.Immutable
-                (modality_to_ignore_axes axes_ignored_by_modalities) ))
-          (With_bounds.to_list actual.with_bounds)
+        (* This match statement is a bit of a hack. When printing type
+           variables, this function is called if we need to print a jkind
+           annotation. But outcometrees_of_types resets the printing env, which
+           shouldn't be done in the middle of printing a type / signature.
+           Fortunately, only r-kinds can appear in a jkind annotation, so if we
+           don't call outcometrees_of_types on an empty list here, we avoid the
+           issue. *)
+        match With_bounds.to_list actual.with_bounds with
+        | [] -> []
+        | with_bounds ->
+          let otys = !outcometrees_of_types (List.map fst with_bounds) in
+          List.map2
+            (fun (_, type_info) out_type ->
+              let axes_ignored_by_modalities =
+                With_bounds.Type_info.axes_ignored_by_modalities
+                  ~mod_bounds:actual.mod_bounds ~type_info
+              in
+              ( out_type,
+                !outcometree_of_modalities Types.Immutable
+                  (modality_to_ignore_axes axes_ignored_by_modalities) ))
+            with_bounds otys
       in
       match matching_layouts, modal_bounds with
       | true, Some modal_bounds ->
@@ -2404,8 +2415,9 @@ module Violation = struct
                             (ty, ({ relevant_axes } : With_bounds_type_info.t))
                           ->
                             match Axis_set.mem relevant_axes axis with
-                            | true -> Some (!outcometree_of_type ty)
+                            | true -> Some (!outcometrees_of_types [ty])
                             | false -> None)
+                     |> List.flatten
                  in
                  let ojkind =
                    List.fold_left

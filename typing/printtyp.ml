@@ -1807,9 +1807,9 @@ let tree_of_type_scheme ty =
 
 let () =
   Env.print_type_expr := type_expr;
-  Jkind.set_outcometree_of_type (fun ty ->
-    prepare_for_printing [ty];
-    tree_of_typexp Type ty);
+  Jkind.set_outcometrees_of_types (fun tys ->
+    prepare_for_printing tys;
+    List.map (tree_of_typexp Type) tys);
   Jkind.set_outcometree_of_modalities tree_of_modalities;
   Jkind.set_print_type_expr type_expr;
   Jkind.set_raw_type_expr raw_type_expr
