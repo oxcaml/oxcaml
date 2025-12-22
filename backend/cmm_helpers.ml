@@ -1191,9 +1191,10 @@ let[@inline] get_const = function
 
     However, if division crashes on overflow, we will insert a runtime check for a divisor
     of -1, and fall back to [if_divisor_is_minus_one]. *)
-let make_safe_divmod operator ~if_divisor_is_negative_one
+let make_safe_divmod operator ~if_divisor_is_negative_one ~signed
     ?(dividend_cannot_be_min_int = false) c1 c2 ~dbg =
-  if dividend_cannot_be_min_int || not Arch.division_crashes_on_overflow
+  if dividend_cannot_be_min_int || (not signed)
+     || not Arch.division_crashes_on_overflow
   then Cop (operator, [c1; c2], dbg)
   else
     bind "divisor" c2 (fun c2 ->
@@ -1212,18 +1213,18 @@ let divide_by_zero dividend ~dbg =
   bind "dividend" dividend (fun _ ->
       raise_symbol dbg "caml_exn_Division_by_zero")
 
-let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
+let div_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
   let if_divisor_is_negative_one ~dividend ~dbg = neg_int dividend dbg in
   match get_const c1, get_const c2 with
   | _, Some 0n -> divide_by_zero c1 ~dbg
   | _, Some 1n -> c1
   | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.div n1 n2)
-  | _, Some -1n -> if_divisor_is_negative_one ~dividend:c1 ~dbg
+  | _, Some -1n when signed -> if_divisor_is_negative_one ~dividend:c1 ~dbg
   | _, Some divisor ->
     if divisor = Nativeint.min_int
     then
-      (* integer division by min_int always returns 0 unless the dividend is
-         also min_int, in which case it's 1. *)
+      (* integer division (signed or unsigned) by min_int always returns 0
+         unless the dividend is also min_int, in which case it's 1. *)
       Cifthenelse
         ( Cop (Ccmpi Ceq, [c1; Cconst_natint (divisor, dbg)], dbg),
           dbg,
@@ -1233,6 +1234,8 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
           dbg )
     else if is_power_of_2_or_zero divisor
     then
+      (* CR jrayman: unsigned? *)
+
       (* [divisor] must be positive be here since we already handled zero and
          min_int (the only negative power of 2) *)
       let l = Misc.log2_nativeint divisor in
@@ -1285,9 +1288,11 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
           add_int q sign_bit dbg)
   | _, _ ->
     make_safe_divmod ?dividend_cannot_be_min_int ~if_divisor_is_negative_one
-      Cdivi c1 c2 ~dbg
+      ~signed
+      (Cdivi { signed })
+      c1 c2 ~dbg
 
-let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
+let mod_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
   let if_divisor_is_positive_or_negative_one ~dividend ~dbg =
     bind "dividend" dividend (fun _ -> Cconst_int (0, dbg))
   in
@@ -1313,6 +1318,7 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
               dbg ))
     else if is_power_of_2_or_zero n
     then
+      (* CR jrayman: unsigned? *)
       (* [divisor] must be positive be here since we already handled zero and
          min_int (the only negative power of 2). *)
       let l = Misc.log2_nativeint n in
@@ -1336,10 +1342,11 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
           sub_int c1 t dbg)
     else
       bind "dividend" c1 (fun c1 ->
-          sub_int c1 (mul_int (div_int c1 c2 dbg) c2 dbg) dbg)
+          sub_int c1 (mul_int (div_int ~signed c1 c2 dbg) c2 dbg) dbg)
   | _, _ ->
     make_safe_divmod ?dividend_cannot_be_min_int
-      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one Cmodi
+      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one ~signed
+      (Cmodi { signed })
       c1 c2 ~dbg
 
 (* Bool *)
@@ -4078,25 +4085,25 @@ let mul_int_caml arg1 arg2 dbg =
     incr_int (mul_int (untag_int c1 dbg) (decr_int c2 dbg) dbg) dbg
   | c1, c2 -> incr_int (mul_int (decr_int c1 dbg) (untag_int c2 dbg) dbg) dbg
 
-let div_int_caml arg1 arg2 dbg =
+let div_int_caml ~signed arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
     (* Since caml integers are tagged, we know that they when they're untagged,
        they can't be [Nativeint.min_int] *)
     true
   in
   tag_int
-    (div_int ~dividend_cannot_be_min_int (untag_int arg1 dbg)
+    (div_int ~dividend_cannot_be_min_int ~signed (untag_int arg1 dbg)
        (untag_int arg2 dbg) dbg)
     dbg
 
-let mod_int_caml arg1 arg2 dbg =
+let mod_int_caml ~signed arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
     (* Since caml integers are tagged, we know that they when they're untagged,
        they can't be [Nativeint.min_int] *)
     true
   in
   tag_int
-    (mod_int ~dividend_cannot_be_min_int (untag_int arg1 dbg)
+    (mod_int ~dividend_cannot_be_min_int ~signed (untag_int arg1 dbg)
        (untag_int arg2 dbg) dbg)
     dbg
 
@@ -4805,8 +4812,8 @@ let cmm_arith_size (e : Cmm.expression) =
   let rec cmm_arith_size0 (e : Cmm.expression) =
     match e with
     | Cop
-        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor
-          | Clsl | Clsr | Casr ),
+        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
+          | Cxor | Clsl | Clsr | Casr ),
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)

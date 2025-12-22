@@ -145,6 +145,7 @@ let print_instr b = function
   | DEC arg -> i1 b "dec" arg
   | HLT -> assert false
   | IDIV arg -> i1 b "idiv" arg
+  | DIV arg -> i1 b "div" arg
   | IMUL (arg, None) -> i1 b "imul" arg
   | IMUL (arg1, Some arg2) -> i2 b "imul" arg1 arg2
   | MUL arg -> i1 b "mul" arg

@@ -92,7 +92,11 @@ module type S = sig
 
   val mod_ : t -> t -> t
 
+  val mod_unsigned : t -> t -> t
+
   val div : t -> t -> t
+
+  val div_unsigned : t -> t -> t
 
   val and_ : t -> t -> t
 
@@ -219,7 +223,11 @@ module Make (I : S) : S with type t = I.t = struct
   (* No sign-extension: the result is always in the correct range *)
   let mod_ = I.mod_
 
+  let mod_unsigned = I.mod_unsigned
+
   let div x y = sign_extend (I.div x y)
+
+  let div_unsigned x y = I.div_unsigned x y
 
   let and_ = I.and_
 

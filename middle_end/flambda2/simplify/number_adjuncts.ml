@@ -127,6 +127,10 @@ module type Int_number_kind = sig
 
     val xor : t -> t -> t
 
+    val div_unsigned : t -> t -> t option
+
+    val mod_unsigned : t -> t -> t option
+
     val shift_left : t -> Target_ocaml_int.t -> t
 
     val shift_right : t -> Target_ocaml_int.t -> t
@@ -205,19 +209,20 @@ module For_tagged_immediates : Int_number_kind = struct
     let compare_unsigned t1 t2 =
       compare_unsigned_generic t1 t2 ~compare ~strictly_negative
 
-    let div t1 t2 =
+    let checked_div ~f t1 t2 =
       assert (
         Target_system.Machine_width.equal (machine_width t1) (machine_width t2));
       if Target_ocaml_int.equal t2 (Target_ocaml_int.zero (machine_width t1))
       then None
-      else Some (div t1 t2)
+      else Some (f t1 t2)
 
-    let mod_ t1 t2 =
-      assert (
-        Target_system.Machine_width.equal (machine_width t1) (machine_width t2));
-      if Target_ocaml_int.equal t2 (Target_ocaml_int.zero (machine_width t1))
-      then None
-      else Some (mod_ t1 t2)
+    let div = checked_div ~f:div
+
+    let div_unsigned = checked_div ~f:div_unsigned
+
+    let mod_ = checked_div ~f:mod_
+
+    let mod_unsigned = checked_div ~f:mod_unsigned
 
     (* Note this doesn't say 31 and 63! See the comments on the shift operations
        e.g. [lsl] in stdlib.mli. *)
@@ -295,19 +300,20 @@ module For_naked_immediates : Int_number_kind = struct
     let compare_unsigned t1 t2 =
       compare_unsigned_generic t1 t2 ~compare ~strictly_negative
 
-    let div t1 t2 =
+    let checked_div ~f t1 t2 =
       assert (
         Target_system.Machine_width.equal (machine_width t1) (machine_width t2));
       if Target_ocaml_int.equal t2 (Target_ocaml_int.zero (machine_width t1))
       then None
-      else Some (div t1 t2)
+      else Some (f t1 t2)
 
-    let mod_ t1 t2 =
-      assert (
-        Target_system.Machine_width.equal (machine_width t1) (machine_width t2));
-      if Target_ocaml_int.equal t2 (Target_ocaml_int.zero (machine_width t1))
-      then None
-      else Some (mod_ t1 t2)
+    let div = checked_div ~f:div
+
+    let div_unsigned = checked_div ~f:div_unsigned
+
+    let mod_ = checked_div ~f:mod_
+
+    let mod_unsigned = checked_div ~f:mod_unsigned
 
     let integer_bit_width = if Target_system.is_32_bit () then 31 else 63
 
@@ -518,7 +524,12 @@ module For_int8s : Int_number_kind = struct
 
     let div x y = of_int (Int.div (to_int x) (to_int y))
 
+    let div_unsigned x y = of_int (Int.div (to_int x) (to_int y))
+    (* CR jrayman *)
+
     let rem x y = of_int (Int.rem (to_int x) (to_int y))
+
+    let rem_unsigned x y = of_int (Int.rem (to_int x) (to_int y))
 
     let logand x y = of_int (Int.logand (to_int x) (to_int y))
 
@@ -539,9 +550,16 @@ module For_int8s : Int_number_kind = struct
 
     let and_ = logand
 
-    let div t1 t2 = if equal t2 (of_int 0) then None else Some (div t1 t2)
+    let checked_div ~f t1 t2 =
+      if equal t2 (of_int 0) then None else Some (f t1 t2)
 
-    let mod_ t1 t2 = if equal t2 (of_int 0) then None else Some (rem t1 t2)
+    let div = checked_div ~f:div
+
+    let div_unsigned = checked_div ~f:div_unsigned
+
+    let mod_ = checked_div ~f:rem
+
+    let mod_unsigned = checked_div ~f:rem_unsigned
 
     let shift_left t shift =
       with_shift shift (of_int 0)
@@ -628,7 +646,12 @@ module For_int16s : Int_number_kind = struct
 
     let div x y = of_int (Int.div (to_int x) (to_int y))
 
+    let div_unsigned x y = of_int (Int.div (to_int x) (to_int y))
+
     let rem x y = of_int (Int.rem (to_int x) (to_int y))
+
+    let rem_unsigned x y = of_int (Int.rem (to_int x) (to_int y))
+    (* CR jrayman *)
 
     let logand x y = of_int (Int.logand (to_int x) (to_int y))
 
@@ -649,9 +672,16 @@ module For_int16s : Int_number_kind = struct
 
     let and_ = logand
 
-    let div t1 t2 = if equal t2 Int16.zero then None else Some (div t1 t2)
+    let checked_div ~f t1 t2 =
+      if equal t2 Int16.zero then None else Some (f t1 t2)
 
-    let mod_ t1 t2 = if equal t2 Int16.zero then None else Some (rem t1 t2)
+    let div = checked_div ~f:div
+
+    let div_unsigned = checked_div ~f:div_unsigned
+
+    let mod_ = checked_div ~f:rem
+
+    let mod_unsigned = checked_div ~f:rem_unsigned
 
     let shift_left t shift =
       with_shift shift Int16.zero
@@ -738,9 +768,16 @@ module For_int32s : Boxable_int_number_kind = struct
 
     let and_ = logand
 
-    let div t1 t2 = if equal t2 (of_int 0) then None else Some (div t1 t2)
+    let checked_div ~f t1 t2 =
+      if equal t2 (of_int 0) then None else Some (f t1 t2)
 
-    let mod_ t1 t2 = if equal t2 (of_int 0) then None else Some (rem t1 t2)
+    let div = checked_div ~f:div
+
+    let div_unsigned = checked_div ~f:unsigned_div
+
+    let mod_ = checked_div ~f:rem
+
+    let mod_unsigned = checked_div ~f:unsigned_rem
 
     let shift_left t shift =
       with_shift shift (of_int 0)
@@ -820,9 +857,16 @@ module For_int64s : Boxable_int_number_kind = struct
 
     let and_ = logand
 
-    let div t1 t2 = if equal t2 Int64.zero then None else Some (div t1 t2)
+    let checked_div ~f t1 t2 =
+      if equal t2 Int64.zero then None else Some (f t1 t2)
 
-    let mod_ t1 t2 = if equal t2 Int64.zero then None else Some (rem t1 t2)
+    let div = checked_div ~f:div
+
+    let div_unsigned = checked_div ~f:unsigned_div
+
+    let mod_ = checked_div ~f:rem
+
+    let mod_unsigned = checked_div ~f:unsigned_rem
 
     let shift_left t shift =
       with_shift shift Int64.zero
@@ -898,9 +942,16 @@ module For_nativeints : Boxable_int_number_kind = struct
 
     let and_ = logand
 
-    let div t1 t2 = if equal t2 (zero_like t1) then None else Some (div t1 t2)
+    let checked_div ~f t1 t2 =
+      if equal t2 (zero_like t1) then None else Some (f t1 t2)
 
-    let mod_ t1 t2 = if equal t2 (zero_like t1) then None else Some (rem t1 t2)
+    let div = checked_div ~f:div
+
+    let div_unsigned = checked_div ~f:unsigned_div
+
+    let mod_ = checked_div ~f:rem
+
+    let mod_unsigned = checked_div ~f:unsigned_rem
 
     let integer_bit_width = if Target_system.is_32_bit () then 32 else 64
 
