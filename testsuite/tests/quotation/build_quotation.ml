@@ -833,9 +833,10 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[(int -> int) * (int -> int)]> expr =
 <[
-  let rec foo = (fun (x : int) -> if (x < 0) then (bar x) else 0 : int)
-  and bar = (fun (x__1 : int) -> if (x__1 > 0) then (foo x__1) else 0 : int)
-  in (foo, bar)
+  let rec foo = (fun (x : int) -> (if (x < 0) then (bar x) else 0 : int))
+  and bar =
+  (fun (x__1 : int) -> (if (x__1 > 0) then (foo x__1) else 0 : int)) in
+  (foo, bar)
 ]>
 |}];;
 
