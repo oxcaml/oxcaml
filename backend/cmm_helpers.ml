@@ -1007,12 +1007,8 @@ let untag_int i dbg =
   | c -> asr_const c 1 dbg
 
 let unsigned_untag_int i dbg =
-  match i with
-  | Cconst_int (n, _) -> Cconst_int (n lsr 1, dbg)
-  | Cop (Cor, [Cop (Clsr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
-    when n > 0 && is_defined_shift (n + 1) ->
-    lsr_const c (n + 1) dbg
-  | c -> lsr_const c 1 dbg
+  (* CR jrayman: should this be optimized? *)
+  lsr_const i 1 dbg
 
 let mk_not dbg cmm =
   match cmm with
