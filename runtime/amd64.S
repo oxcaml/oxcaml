@@ -530,9 +530,19 @@ G(caml_system__code_begin):
 /* Allocation */
 /******************************************************************************/
 
+/* CR aspsmith: these need to be valid tagged ints for now. probably
+   scan_stack_frames should learn about this instead. */
+#define GC_REGS_NO 1
+#define GC_REGS_XMM 3
+#define GC_REGS_YMM 5
+#define GC_REGS_ZMM 7
+
+#define Gc_regs_kind 13*8
+
 /* Loading and saving SIMD registers XMM/YMM/ZMM */
 
-#define SIMD_REGS_OFFSET (13*8) /* gc_regs_bucket starts with 13 int64 regs */
+#define SIMD_REGS_OFFSET (14*8)
+    /* gc_regs_bucket starts with 13 int64 regs, then the simd kind */
 
 #define SAVE_NO_REGS
 #define RESTORE_NO_REGS
@@ -579,6 +589,7 @@ G(caml_system__code_begin):
         movq    %r10,        10*8(%r15);               \
              /* %r11 is at   11*8(%r15); */            \
         movq    %rbp,        12*8(%r15);               \
+        movq    $GC_REGS_##simd, Gc_regs_kind(%r15);   \
         SAVE_ ## simd ## _REGS
 
 /* Undo SAVE_ALL_REGS. Expects gc_regs bucket in %r15 */
@@ -710,23 +721,47 @@ Make_call_realloc_stack(_avx512, ZMM)
         ENTER_FUNCTION;                              \
 LBL(caml_call_gc ## suffix):                         \
         SAVE_ALL_REGS(simd);                         \
-        movq    %r15, Caml_state(gc_regs);           \
-        TSAN_ENTER_FUNCTION(0);                      \
-        SWITCH_OCAML_TO_C;                           \
-        C_call (GCALL(caml_garbage_collection));     \
-        SWITCH_C_TO_OCAML;                           \
-        TSAN_EXIT_FUNCTION;                          \
-        movq    Caml_state(gc_regs), %r15;           \
-        RESTORE_ALL_REGS(simd);                      \
         LEAVE_FUNCTION;                              \
-        ret;                                         \
-    CFI_ENDPROC                 ;                    \
+        jmp G(caml_do_call_gc);                      \
+    CFI_ENDPROC;                                     \
     ENDFUNCTION(G(caml_call_gc ## suffix))
 
 Make_call_gc(, NO)
 Make_call_gc(_sse, XMM)
 Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
+
+FUNCTION(G(caml_do_call_gc))
+CFI_STARTPROC
+        ENTER_FUNCTION
+        movq    %r15, Caml_state(gc_regs)
+        TSAN_ENTER_FUNCTION(0)
+        SWITCH_OCAML_TO_C
+        C_call (GCALL(caml_garbage_collection))
+        SWITCH_C_TO_OCAML
+        TSAN_EXIT_FUNCTION
+        movq    Caml_state(gc_regs), %r15
+        movq    Gc_regs_kind(%r15), %r11
+        cmpq    $GC_REGS_NO, %r11
+        jne     1f
+        RESTORE_ALL_REGS(NO)
+        LEAVE_FUNCTION
+        ret
+1:      cmpq    $GC_REGS_XMM, %r11
+        jne     2f
+        RESTORE_ALL_REGS(XMM)
+        LEAVE_FUNCTION
+        ret
+2:      cmpq    $GC_REGS_YMM, %r11
+        jne      3f
+        RESTORE_ALL_REGS(YMM)
+        LEAVE_FUNCTION
+        ret
+3:      RESTORE_ALL_REGS(ZMM)
+        LEAVE_FUNCTION
+        ret
+CFI_ENDPROC
+ENDFUNCTION(G(caml_do_call_gc))
 
 FUNCTION(G(caml_raise_stack_overflow_nat))
 CFI_STARTPROC
