@@ -304,7 +304,13 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
          `block_known_values`, except for the guard and whether one or two
          blocks are involved. *)
       let new_successor =
-        if is_after_regalloc
+        (* The graph may become irreducible if the successor block is the header
+           block of a loop. Indeed, if we shortcircuit that block, it means we
+           are jumping "inside" the loop directly, which in turn means the loop
+           is no longer natural. This is acceptable if we are past the last use
+           of the loop information. *)
+        if !Oxcaml_flags.cfg_value_propagation
+           && is_after_regalloc && cfg.allowed_to_be_irreducible
         then
           let known_values = collect_known_values block.body in
           evaluate_terminator known_values successor_block.terminator
