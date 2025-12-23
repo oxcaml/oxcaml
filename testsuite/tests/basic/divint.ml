@@ -154,13 +154,13 @@ external nativeint_unsigned_div : nativeint -> nativeint -> nativeint
   = "%nativeint_unsigned_div"
 
 let _ =
-  assert (unsigned_div (-100) (-100) = 1)
-  assert (unsigned_div (id (-100)) (-100) = 1)
-  assert (unsigned_div (-100) (id (-100)) = 1)
+  assert (unsigned_div (-100) (-100) = 1);
+  assert (unsigned_div (id (-100)) (-100) = 1);
+  assert (unsigned_div (-100) (id (-100)) = 1);
   assert (unsigned_div (id (-100)) (id (-100)) = 1)
 
 let _ =
-  assert (nativeint_unsigned_div (-100n) (-100n) = 1)
-  assert (nativeint_unsigned_div (id (-100n)) (-100n) = 1)
-  assert (nativeint_unsigned_div (-100n) (id (-100n)) = 1)
-  assert (nativeint_unsigned_div (id (-100n)) (id (-100n)) = 1)
+  assert (nativeint_unsigned_div (-100n) (-100n) = 1n);
+  assert (nativeint_unsigned_div (id (-100n)) (-100n) = 1n);
+  assert (nativeint_unsigned_div (-100n) (id (-100n)) = 1n);
+  assert (nativeint_unsigned_div (id (-100n)) (id (-100n)) = 1n)
