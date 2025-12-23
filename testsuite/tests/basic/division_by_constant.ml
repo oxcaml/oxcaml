@@ -44,36 +44,39 @@ let[@inline never] check_result ~dividend ~divisor ~quotient ~remainder =
 
 let[@inline never] check_result_unsigned
                      ~dividend ~divisor ~quotient ~remainder =
-  let mul_overflows a b =
+  let fma_overflows a b c =
     let exception Overflow in
     try
-      let checked_add a b =
-        let c = add a b in
-        if unsigned_compare c a < 0 then raise Overflow else c
+      let checked_add x y =
+        let z = add x y in
+        if unsigned_compare z x < 0 then raise Overflow else z
       in
-      let prev_step = ref 0n in
+      (* Calculate [x*y] using only checked addition.
+         (like binary exponentiation) *)
+      let total = ref 0n in
       let mask = ref 0x8000_0000_0000_0000n in
       for _ = 0 to 63 do
-        let doubled = checked_add !prev_step !prev_step in
-        prev_step :=
+        let doubled = checked_add !total !total in
+        total :=
           if logand !mask b = 0n
           then doubled
           else checked_add doubled a;
         mask := shift_right_logical !mask 1
       done;
-      assert (!prev_step = mul a b);
+      assert (!total = mul a b);
+      let _ = checked_add !total c in
       false
     with
     | Overflow -> true
   in
-  assert (mul_overflows 0x5678_0000_0000n 0x1234_0000n);
-  assert (mul_overflows 0x1_0001_0001_0002n 0xFFFFn);
+  assert (fma_overflows 0x5678_0000_0000n 0x1234_0000n 0n);
+  assert (fma_overflows 0x1_0001_0001_0002n 0xFFFFn 0n);
+  assert (fma_overflows 0x1_0001_0001_0001n 0xFFFFn 1n);
   let identity = dividend = add (mul quotient divisor) remainder in
   let magnitude = unsigned_compare remainder divisor < 0 in
   let no_overflow =
-    (* [quotient * divisor + remainder] should not result in an overflow *)
-    not (mul_overflows quotient divisor) &&
-    unsigned_compare (sub (-1n) remainder) (mul quotient divisor) >= 0
+    (* [quotient * divisor + remainder] should not overflow *)
+    not (fma_overflows quotient divisor remainder)
   in
   if not (identity && magnitude && no_overflow) then (
     Printf.fprintf
