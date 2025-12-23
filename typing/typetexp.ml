@@ -661,12 +661,13 @@ let get_type_param_name styp =
 let rec extract_params styp =
   match styp.ptyp_desc with
   | Ptyp_arrow (l, a, r, ma, mr) ->
-      let arg_mode = Typemode.transl_alloc_mode ma in
+      let _, arg_mode = Typemode.transl_alloc_mode ma in
+      let _, ret_mode = Typemode.transl_alloc_mode mr in
       let params, ret, ret_mode =
         match r.ptyp_desc with
         | Ptyp_arrow _ when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
           extract_params r
-        | _ -> [], r, Typemode.transl_alloc_mode mr
+        | _ -> [], r, ret_mode
       in
       (l, arg_mode, a) :: params, ret, ret_mode
   | _ -> assert false
