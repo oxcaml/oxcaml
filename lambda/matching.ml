@@ -4231,7 +4231,6 @@ let rec map_return f = function
     Llet (str, k, id, duid, l1, map_return f l2)
   | Lmutlet (k, id, duid, l1, l2) ->
     Lmutlet (k, id, duid, l1, map_return f l2)
-  | Ldelayedletrec (l1, l2) -> Ldelayedletrec (l1, map_return f l2)
   | Lletrec (l1, l2) -> Lletrec (l1, map_return f l2)
   | Lifthenelse (lcond, lthen, lelse, k) ->
       Lifthenelse (lcond, map_return f lthen, map_return f lelse, k)
@@ -4267,6 +4266,7 @@ let rec map_return f = function
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
+  | Ldelayed (Dletrec (l1, l2)) -> Ldelayed (Dletrec (l1, map_return f l2))
 
 (* The 'opt' reference indicates if the optimization is worthy.
 

@@ -126,11 +126,11 @@ let close_phrase lam =
   ) (free_variables lam) lam
 
 let close_slambda_phrase slam =
-  if not (Slambdaeval.is_slambda_trivial slam) then
-    failwith "Opttoploop doesn't support layout polymorphism.";
-  match slam with
-  | Lambda.SLquote lam -> Lambda.SLquote (close_phrase lam)
-  | _ -> assert false
+  let lam = match (Slambdaeval.trivial_slambda slam) with
+  | Some lam -> lam
+  | None -> Slambda.raise (Unsupported "the toplevel")
+  in
+  Lambda.SLquote (close_phrase lam)
 
 (* Return the value referred to by a path *)
 

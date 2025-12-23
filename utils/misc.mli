@@ -36,10 +36,6 @@ val splices_should_not_exist_after_eval : unit -> _
   (** Raise a [Fatal_error] explaining that a slambda splice shouldn't exist in
       lambda code after slambda eval has happened. *)
 
-val unsimplified_delayedletrec : unit -> _
-  (** Raise a [Fatal_error] explaining that the Ldelayedletrec should have
-      already been removed by [Simplif.simplify_letrec] *)
-
 exception Fatal_error
 
 (** {1 Exceptions and finalization} *)

@@ -388,16 +388,15 @@ let reorder_rec_bindings bindings =
   let id = Array.of_list (List.map (fun (id,_,_,_) -> id) bindings)
   and loc = Array.of_list (List.map (fun (_,loc,_,_) -> loc) bindings)
   and init = Array.of_list (List.map (fun (_,_,init,_) -> init) bindings)
-  and rhs = Array.of_list (List.map (fun (_,_,_,rhs) -> rhs) bindings) in
-  let fv = Array.map
-    (fun rhs ->
-      (* CR layout poly: This [free_variables] call means that recursive modules
-        can't contain slambda, we should fix that. *)
-      if not (Slambdaeval.is_slambda_trivial (SLquote rhs)) then
-        Misc.fatal_error
-          "Recursive modules cannot currently contain layout polymorphism";
-      Lambda.free_variables rhs)
-    rhs in
+  and rhs = Array.of_list
+    (List.map (fun (_,loc,_,rhs) ->
+      (* CR layout poly: The following [free_variables] call means that
+         recursive modules can't contain slambda, we should fix that. *)
+      if Option.is_none (Slambdaeval.trivial_slambda (SLquote rhs)) then
+        Slambda.raise ~loc (Unsupported "recursive modules");
+      rhs)
+    bindings) in
+  let fv = Array.map (fun rhs -> Lambda.free_variables rhs) rhs in
   let num_bindings = Array.length id in
   let status = Array.make num_bindings Undefined in
   let res = ref [] in
@@ -859,7 +858,7 @@ and transl_structure ~scopes loc
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
           in
-          Ldelayedletrec (class_bindings, body), repr
+          Ldelayed (Dletrec (class_bindings, body)), repr
       | Tstr_include incl ->
           let ids_with_sorts =
             bound_value_identifiers_and_sorts incl.incl_type
@@ -1249,7 +1248,7 @@ let transl_toplevel_item ~scopes item =
       let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
       List.iter set_toplevel_unique_name ids;
       let body = make_sequence toploop_setvalue_id ids in
-      Ldelayedletrec (class_bindings, body)
+      Ldelayed (Dletrec (class_bindings, body))
   | Tstr_include incl ->
       let ids = bound_value_identifiers incl.incl_type in
       let loc = of_location ~scopes incl.incl_loc in

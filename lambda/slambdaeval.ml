@@ -59,7 +59,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lfunction func -> assert_function_contains_no_splices func
   | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
-  | Ldelayedletrec (_, _) | Lletrec (_, _) -> ()
+  | Lletrec (_, _) -> ()
   | Lprim (prim, _, _) -> assert_primitive_contains_no_splices prim
   | Lswitch (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lstringswitch (_, _, _, _, layout) ->
@@ -78,18 +78,19 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ -> raise Found_a_splice
+  | Ldelayed (Dletrec (_, _)) -> ());
   Lambda.iter_head_constructor assert_no_splices lam
 
 (* Check that slambda is trivial (a quote and contains no splices) *)
-let is_slambda_trivial (slam : Lambda.slambda) =
+let trivial_slambda (slam : Lambda.slambda) =
   match slam with
   | SLquote lam -> (
     try
       assert_no_splices lam;
-      true
-    with Found_a_splice -> false)
-  | _ -> false
+      Some lam
+    with Found_a_splice -> None)
+  | _ -> None
 
 (* Introduce dependencies on modules referenced only by "external". *)
 
@@ -126,11 +127,11 @@ let required_globals ~flambda body =
   required
 
 let do_eval ({ Slambda.code = slam } as p) =
-  if (not Language_extension.(is_enabled Layout_poly))
-     && not (is_slambda_trivial slam)
-  then
+  (match Language_extension.(is_enabled Layout_poly), trivial_slambda slam with
+  | false, None ->
     Misc.fatal_error
-      "Encountered non-trivial slambda but layout_poly extension is disabled";
+      "Encountered non-trivial slambda but layout_poly extension is disabled"
+  | _ -> ());
   let lam =
     match slam with
     | SLquote lam -> lam

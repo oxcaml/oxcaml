@@ -134,14 +134,6 @@ let compute_static_size lam =
       compute_expression_size env body
     | Lmutlet(_, _, _, _, body) ->
       compute_expression_size env body
-    | Ldelayedletrec (bindings, body) ->
-      let env =
-        List.fold_left (fun env_acc (id, _duid, _rec_kind, rhs) ->
-            Ident.Map.add id (Lazy_backtrack.create { lambda = rhs; env })
-              env_acc)
-          env bindings
-      in
-      compute_expression_size env body
     | Lletrec (bindings, body) ->
       let env =
         List.fold_left (fun env_acc { id; def } ->
@@ -190,9 +182,9 @@ let compute_static_size lam =
          the latter meaning that [Value_rec_check] should have forbidden that case.
       *)
       assert false
-    | Lsplice _ ->
-      (* CR layout poly: Fix this (and split_static_function below). *)
-      Misc.fatal_error "letrec: layout poly not supported"
+    | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+    | Ldelayed (Dletrec _ as delayed) ->
+      Lambda.fail_with_delayed_constructor delayed
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -566,15 +558,6 @@ let rec split_static_function lfun block_var local_idents lam :
       split_static_function lfun block_var (Ident.Set.add var local_idents) body
     in
     Lmutlet (vkind, var, debug_uid, def, body)
-  | Ldelayedletrec (bindings, body) ->
-    let local_idents =
-      List.fold_left (fun ids (id, _, _, _) -> Ident.Set.add id ids)
-        local_idents bindings
-    in
-    let+ body =
-      split_static_function lfun block_var local_idents body
-    in
-    Ldelayedletrec (bindings, body)
   | Lletrec (bindings, body) ->
     let local_idents =
       List.fold_left (fun ids { id } -> Ident.Set.add id ids)
@@ -705,8 +688,9 @@ let rec split_static_function lfun block_var local_idents lam :
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
-  | Lsplice _ ->
-    Misc.fatal_error "letrec: layout poly not supported"
+  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Ldelayed (Dletrec _ as delayed) ->
+    Lambda.fail_with_delayed_constructor delayed
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =

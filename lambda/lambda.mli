@@ -806,10 +806,6 @@ type lambda =
   | Lfunction of lfunction
   | Llet of let_kind * layout * Ident.t * debug_uid * lambda * lambda
   | Lmutlet of layout * Ident.t * debug_uid * lambda * lambda
-  | Ldelayedletrec of
-      (Ident.t * debug_uid * Value_rec_types.recursive_binding_kind * lambda)
-      list
-      * lambda
   | Lletrec of rec_binding list * lambda
   | Lprim of primitive * lambda list * scoped_location
   | Lswitch of lambda * lambda_switch * scoped_location * layout
@@ -850,6 +846,15 @@ type lambda =
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
   | Lsplice of lambda_splice
+  | Ldelayed of delayed
+    (** A construct that can only be transformed after slambdaeval (during
+        simplif), use [fail_with_delayed_constructor] to assert that it doesn't
+        exist after that point.  *)
+
+and delayed =
+  | Dletrec of
+    (Ident.t * debug_uid * Value_rec_types.recursive_binding_kind * lambda) list
+    * lambda
 
 and slambda =
   | SLquote of lambda
@@ -957,6 +962,10 @@ and lambda_event_kind =
   | Lev_pseudo
 
 and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
+
+(** Fails with a fatal error indicating that delayed lambda constructors aren't
+    expected at that point in compilation. *)
+val fail_with_delayed_constructor : delayed -> 'a
 
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)

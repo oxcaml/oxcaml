@@ -713,7 +713,6 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
    *   CC.close_let acc ccenv id User_visible value_kind (Simple value) ~body
    * in
    * cps_non_tail_simple acc env ccenv defining_expr k k_exn *)
-  | Ldelayedletrec _ -> Misc.unsimplified_delayedletrec ()
   | Lletrec (bindings, body) ->
     let function_declarations = cps_function_bindings env bindings in
     let body acc ccenv = cps acc env ccenv body k k_exn in
@@ -1184,6 +1183,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Ldelayed delayed -> Lambda.fail_with_delayed_constructor delayed
 
 and cps_non_tail_simple :
     Acc.t ->
@@ -1680,8 +1680,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Ldelayedletrec _ -> Misc.unsimplified_delayedletrec ()
-        | Lsplice _ -> Misc.splices_should_not_exist_after_eval ())
+        | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+        | Ldelayed delayed -> Lambda.fail_with_delayed_constructor delayed)
       ([], wrappers) cases
   in
   cps_non_tail_var "scrutinee" acc env ccenv scrutinee

@@ -1233,27 +1233,6 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(let@ @[<hv 1>(";
       let expr = letbody ~sp:false expr in
       fprintf ppf ")@]@ %a)@]" lam expr
-  | Ldelayedletrec(bindings, body) ->
-      let pp_rec_kind ppf rec_kind =
-        match (rec_kind : Value_rec_types.recursive_binding_kind) with
-        | Static -> fprintf ppf "static"
-        | Dynamic -> fprintf ppf "dynamic"
-      in
-      let pp_bindings ppf bindings =
-        let spc = ref false in
-        List.iter
-          (fun (id, duid, rec_kind, rhs) ->
-            if !spc then fprintf ppf "@ " else spc := true;
-            fprintf ppf "@[<2>%a%a %a =@ %a@]"
-              Ident.print id
-              debug_uid duid
-              pp_rec_kind rec_kind
-              lam rhs)
-          bindings in
-      fprintf ppf
-        "@[<2>(delayedletrec@ (@[<hv 1>%a@])@ %a)@]"
-        pp_bindings bindings
-        lam body
   | Lletrec(id_arg_list, body) ->
       let bindings ppf id_arg_list =
         let spc = ref false in
@@ -1391,6 +1370,31 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice { splice_loc = _;  slambda } ->
       fprintf ppf "$(%a)" slam slambda
+  | Ldelayed delayed ->
+      fprintf ppf "@[<2>(delayed@ %a)@]" ldelayed delayed
+
+and ldelayed ppf = function
+  | Dletrec(bindings, body) ->
+      let pp_rec_kind ppf rec_kind =
+        match (rec_kind : Value_rec_types.recursive_binding_kind) with
+        | Static -> fprintf ppf "static"
+        | Dynamic -> fprintf ppf "dynamic"
+      in
+      let pp_bindings ppf bindings =
+        let spc = ref false in
+        List.iter
+          (fun (id, duid, rec_kind, rhs) ->
+            if !spc then fprintf ppf "@ " else spc := true;
+            fprintf ppf "@[<2>%a%a %a =@ %a@]"
+              Ident.print id
+              debug_uid duid
+              pp_rec_kind rec_kind
+              lam rhs)
+          bindings in
+      fprintf ppf
+        "@[<2>letrec@ (@[<hv 1>%a@])@ %a@]"
+        pp_bindings bindings
+        lam body
 
 and slam ppf = function
   | SLquote lambda -> fprintf ppf "⟪ %a ⟫" lam lambda

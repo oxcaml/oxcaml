@@ -219,6 +219,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   in
   match (exp : Lambda.lambda) with
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Ldelayed delayed -> Lambda.fail_with_delayed_constructor delayed
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
   | Lapply { ap_func; ap_args; ap_region_close } ->
@@ -243,7 +244,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   | Llet (_, _k, id, _duid, arg, body) | Lmutlet (_k, id, _duid, arg, body) ->
     (* We are intentionally dropping the [debug_uid] identifiers here. *)
     Let { id; arg = comp_expr arg; body = comp_expr body }
-  | Ldelayedletrec _ -> Misc.unsimplified_delayedletrec ()
   | Lletrec (decl, body) ->
     Letrec
       { decls = List.map comp_rec_binding decl;
