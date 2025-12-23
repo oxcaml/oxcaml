@@ -1378,9 +1378,17 @@ module Jkind0 = struct
       let void =
         { jkind =
             mk_jkind (Base Void) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "void"
+        }
+
+      let void_internal =
+        { jkind =
+            mk_jkind (Base Void) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "void_internal"
         }
 
       let void_mod_everything =
@@ -1464,11 +1472,23 @@ module Jkind0 = struct
       let float64 =
         { jkind =
             mk_jkind (Base Float64) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           (* [separability] is intentionally [Non_float]:
              only boxed floats are relevant for separability. *)
           name = "float64"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let float64_internal =
+        { jkind =
+            mk_jkind (Base Float64) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          (* [separability] is intentionally [Non_float]:
+             only boxed floats are relevant for separability. *)
+          name = "float64_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1488,11 +1508,23 @@ module Jkind0 = struct
       let float32 =
         { jkind =
             mk_jkind (Base Float32) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           (* [separability] is intentionally [Non_float]:
              only boxed floats are relevant for separability. *)
           name = "float32"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let float32_internal =
+        { jkind =
+            mk_jkind (Base Float32) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          (* [separability] is intentionally [Non_float]:
+             only boxed floats are relevant for separability. *)
+          name = "float32_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1512,9 +1544,19 @@ module Jkind0 = struct
       let word =
         { jkind =
             mk_jkind (Base Word) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "word"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let word_internal =
+        { jkind =
+            mk_jkind (Base Word) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "word_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1530,12 +1572,20 @@ module Jkind0 = struct
       let untagged_immediate =
         { jkind =
             mk_jkind (Base Untagged_immediate) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "untagged_immediate"
         }
 
-      let kind_of_untagged_immediate =
+      let untagged_immediate_internal =
+        { jkind =
+            mk_jkind (Base Untagged_immediate) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "untagged_immediate_internal"
+        }
+
+      let kind_of_untagged_int =
         { jkind =
             mk_jkind (Base Untagged_immediate)
               ~crossing:cross_all_except_staticity
@@ -1549,9 +1599,19 @@ module Jkind0 = struct
       let bits8 =
         { jkind =
             mk_jkind (Base Bits8) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits8"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let bits8_internal =
+        { jkind =
+            mk_jkind (Base Bits8) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits8_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1569,9 +1629,19 @@ module Jkind0 = struct
       let bits16 =
         { jkind =
             mk_jkind (Base Bits16) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits16"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let bits16_internal =
+        { jkind =
+            mk_jkind (Base Bits16) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits16_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1589,9 +1659,19 @@ module Jkind0 = struct
       let bits32 =
         { jkind =
             mk_jkind (Base Bits32) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits32"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let bits32_internal =
+        { jkind =
+            mk_jkind (Base Bits32) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits32_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1609,9 +1689,19 @@ module Jkind0 = struct
       let bits64 =
         { jkind =
             mk_jkind (Base Bits64) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits64"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let bits64_internal =
+        { jkind =
+            mk_jkind (Base Bits64) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits64_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1637,9 +1727,19 @@ module Jkind0 = struct
       let vec128 =
         { jkind =
             mk_jkind (Base Vec128) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "vec128"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let vec128_internal =
+        { jkind =
+            mk_jkind (Base Vec128) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "vec128_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1647,9 +1747,19 @@ module Jkind0 = struct
       let vec256 =
         { jkind =
             mk_jkind (Base Vec256) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "vec256"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let vec256_internal =
+        { jkind =
+            mk_jkind (Base Vec256) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "vec256_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1657,9 +1767,19 @@ module Jkind0 = struct
       let vec512 =
         { jkind =
             mk_jkind (Base Vec512) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "vec512"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let vec512_internal =
+        { jkind =
+            mk_jkind (Base Vec512) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "vec512_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1702,30 +1822,44 @@ module Jkind0 = struct
           sync_data;
           mutable_data;
           void;
+          void_internal;
           void_mod_everything;
           immediate;
           immediate_or_null;
           immediate64;
           immediate64_or_null;
           float64;
+          float64_internal;
           kind_of_unboxed_float;
+          untagged_immediate;
+          untagged_immediate_internal;
+          kind_of_untagged_int;
           float32;
+          float32_internal;
           kind_of_unboxed_float32;
           word;
+          word_internal;
           kind_of_unboxed_nativeint;
           bits8;
+          bits8_internal;
           kind_of_unboxed_int8;
           bits16;
+          bits16_internal;
           kind_of_unboxed_int16;
           bits32;
+          bits32_internal;
           kind_of_unboxed_int32;
           bits64;
+          bits64_internal;
           kind_of_unboxed_int64;
           vec128;
+          vec128_internal;
           kind_of_unboxed_128bit_vectors;
           vec256;
+          vec256_internal;
           kind_of_unboxed_256bit_vectors;
           vec512;
+          vec512_internal;
           kind_of_unboxed_512bit_vectors ]
 
       let of_attribute : Builtin_attributes.jkind_attribute -> t = function
