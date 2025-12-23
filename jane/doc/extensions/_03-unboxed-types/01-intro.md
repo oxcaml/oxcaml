@@ -19,16 +19,7 @@ Every type is now classified by a *layout*, much like how every expression is cl
 by a *type*. The type system knows about a collection of fixed *base* layouts:
 
 * `value` is the layout occupied by almost every OCaml type. Every type you have ever
-  conceived of before reading this description is a `value`.
-* `immediate` is a sublayout of `value`, describing those values that are represented
-  without a pointer. That is, `int : immediate`, as well as `private` and `[@@unboxed]`
-  wrappers around `int`.  `immediate` is a sublayout of `value`, and so you can use an
-  `immediate` type wherever a `value` is expected, without any explicit conversion
-  necessary. Types declared with `[@@immediate]` have layout `immediate`.
-* `immediate64` is a variant of `immediate` that is like `immediate` on 64-bit platforms
-  and like `value` on all other platforms (like JavaScript). In the sublayout relation,
-  `immediate < immediate64 < value`. Types declared with `[@@immediate64]` have layout
-  `immediate64`.
+  conceived of before reading this description is a `value`. There are also finer classifications within `value`: see "Value layouts" below.
 * `float64` is the layout of the `float#` unboxed float type.
 * `float32` is the layout of the `float32#` unboxed 32-bit float type.
 * `bits32` is the layout of the `int32#` unboxed int32 type.
@@ -38,22 +29,69 @@ by a *type*. The type system knows about a collection of fixed *base* layouts:
 * `any` is a layout that is the superlayout of all other layouts.  It doesn't correspond
   to a specific runtime representation. More information [below](#the-any-layout).
 
-* `value_or_null` is a superlayout of `value` including normal OCaml values
-  and null pointers. Unless `-extension-universe alpha` is set, it is displayed
-  as `value` and can't be used in jkind annotations.
-
-* `any_non_null` is a sublayout of `any` forbidding null pointers. Unless
-  `-extension-universe alpha` is set, it is displayed as `any`.
-  Additionally, `any` jkind annotations are interpreted as `any_non_null` for
-  backwards compatibility for definitions using arrays.
-
 The type system also supports one *composite* layout: unboxed products:
 * `l1 & l2 & ... & lk` is the layout of unboxed products where the first element
   of the product has layout `l1`, the second has layout `l2`, and so on.
 
-Over time, we'll be adding more layouts here.
+## Value layouts
 
-## Layout annotation
+The `value` layout describes the representation of "vanilla" OCaml values. In OxCaml, we introduce finer distinctions within `value`, such as that some values are `non_pointer` and can thus get more efficient code generation; we also *broaden* the set of representations that the GC can handle, such as with `value maybe_null`, which contains all values in legacy OCaml plus the `NULL` pointer.
+
+The most general of the `value`-like layouts is `scannable`, whose only requirement of its elements is that they can be scanned by the GC.
+We call the sublayouts of `scannable` the "value layouts" (choosing to emphasize the more familiar layout, `value`, instead of the top of the lattice, `scannable`.)
+
+All value layouts can be written as modifications of each other; for example, `value` is `scannable non_null separable`. Below, we describe the two axes that modify value layouts, also known as the "scannable axes": nullability and separability.
+
+### Nullability
+
+The nullability axis records whether `NULL` (the machine word 0) is a possible
+value of a type, and is used to support the non-allocating option `'a or_null`
+type. The axis has two possible values, with `non_null < maybe_null`. A type may
+be `non_null` if none of its values are `NULL`.
+
+The kind of values with `NULL` added as a possibility is written
+`value_or_null`, which is equivalent to `value maybe_null maybe_separable`.
+
+Types that don't have `NULL` as a possible value are
+compatible with `or_null`, a non-allocating option type that is built into
+OxCaml.  Its definition is:
+```ocaml
+type ('a : value) or_null : value_or_null =
+  | Null
+  | This of 'a
+```
+
+### Separability
+
+The separability axis records whether a type can contain pointers, or can have float or non-float values, where a float value is a pointer to an allocated block tagged with `Double_tag` (which is what `float` values look like).
+This axis has five possible values, with `non_pointer < non_pointer64 < non_float < separable < maybe_separable`.
+- A type is `non_pointer` if none of its values are pointers (i.e., the bottom bit is tagged or the value is NULL).
+- A type is `non_pointer64` if none of its values are pointers, when compiled to native code for 64-bit systems.
+- A type is `non_float` if none of its values are floats.
+- A type is `separable` if either all or none of its values are floats. Separability is used to track types for which it is safe
+to apply the float array optimization.
+
+The `value_or_null` layout is considered `maybe_separable`, since `float or_null` has both float
+and non-float elements. However, all types in vanilla OCaml are `separable`.
+
+### Using scannable axes
+
+Scannable axes written after a value layout overwrite the previous value of the axis. They can also be written after non-value layouts, but have no effect, e.g. `float64 = float64 non_null = float64 maybe_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout. For example, `float64` and `value` are both sublayouts of `any non_null`, but not `value maybe_null`.
+
+### Relationship between `immediate` and value layouts
+
+In a previous design of OxCaml, `immediate` was a sublayout of `value`. It is still a *subkind* of `value`, but now conveys more kind information than just the layout:
+`immediate` has layout `value non_pointer`, and additionally crosses all modal axes.
+
+Types with kind `immediate` include `int`, as well as `private` and `[@@unboxed]`
+  wrappers around `int`.  As `immediate` is a subkind of `value`, you can use an
+  `immediate` type wherever a `value` is expected, without any explicit conversion
+  necessary. Types declared with `[@@immediate]` have layout `immediate`.
+
+`immediate64` has layout `value non_pointer64`, which indicates that it is only guaranteed to not be a pointer on 64-bit platforms, but not on other platforms (like JavaScript). Types declared with `[@@immediate64]` have layout
+  `immediate64`.
+
+## Layout annotations
 
 You can annotate type variables of type declarations with a layout, like this:
 
