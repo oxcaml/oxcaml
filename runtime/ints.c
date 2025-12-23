@@ -285,7 +285,6 @@ CAMLprim value caml_int32_div(value v1, value v2)
 
 CAMLprim value caml_int32_unsigned_div(value v1, value v2)
 {
-  // CR jrayman: should I be more careful about casting signed to unsigned?
   uint32_t dividend = Int32_val(v1);
   uint32_t divisor = Int32_val(v2);
   if (divisor == 0) caml_raise_zero_divide();
