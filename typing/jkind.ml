@@ -1161,13 +1161,16 @@ module Const = struct
         get_modal_bounds ~base:base.jkind.mod_bounds actual.mod_bounds
       in
       let printable_with_bounds =
-        (* This match statement is a bit of a hack. When printing type
-           variables, this function is called if we need to print a jkind
-           annotation. But outcometrees_of_types resets the printing env, which
-           shouldn't be done in the middle of printing a type / signature.
-           Fortunately, only r-kinds can appear in a jkind annotation, so if we
-           don't call outcometrees_of_types on an empty list here, we avoid the
-           issue. *)
+        (* This match statement is a bit of a hack. One usage of this function
+           is to print jkind annotations on type variables while printing a
+           type/signature. But outcometrees_of_types resets the printing
+           environment, which shouldn't be done mid-printing. Fortunately, only
+           r-kinds appear in a jkind annotation on a variable, meaning the list
+           is always empty in this problematic case. Thus, if we don't call
+           outcometrees_of_types when the list is empty, we'll be okay. We
+           should fix this by being more deliberate about reseting the printing
+           environment and preparing types for printing.
+           Internal ticket 6133. *)
         match With_bounds.to_list actual.with_bounds with
         | [] -> []
         | with_bounds ->
