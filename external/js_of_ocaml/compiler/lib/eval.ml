@@ -306,7 +306,6 @@ let eval_prim x =
       | "caml_int64_and", _ -> int64_binop l Int64.logand
       | "caml_int64_or", _ -> int64_binop l Int64.logor
       | "caml_int64_xor", _ -> int64_binop l Int64.logxor
-        (* CR jrayman *)
       | "caml_int64_div", [ _; Int64 i ] when not (Int64.equal i 0L) ->
           int64_binop l Int64.div
       | "caml_int64_mod", [ _; Int64 i ] when not (Int64.equal i 0L) ->
