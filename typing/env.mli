@@ -219,8 +219,8 @@ type no_open_quotations_context =
   | Open_qt
 
 type none_in_quotations_context =
-  | Constructor_ctx
-  | Label_ctx
+  | Constructor
+  | Label
 
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
@@ -257,7 +257,7 @@ type lookup_error =
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | Unbound_in_stage of
-      none_in_quotations_context * Longident.t * Location.t * int
+      none_in_quotations_context * Longident.t * Location.t * stage * stage
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a

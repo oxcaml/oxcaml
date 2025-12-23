@@ -201,6 +201,7 @@ Line 3, characters 2-3:
 Error: Constructor "A" used at Line 3, characters 2-3
        cannot be used in this context;
        "A" is not defined inside a quotation (<[ ... ]>).
+Hint: Constructor "A" appears outside any quotations.
 |}];;
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
