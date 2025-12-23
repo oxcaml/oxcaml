@@ -266,9 +266,10 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
   | Call_no_return _ | Call _ | Prim _ ->
     None
 
-let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool) :
-    bool =
-  if !Oxcaml_flags.cfg_value_propagation && is_after_regalloc
+let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool)
+    ~(allowed_to_be_irreducible : bool) : bool =
+  if !Oxcaml_flags.cfg_value_propagation
+     && is_after_regalloc && allowed_to_be_irreducible
   then (
     let known_values = collect_known_values block.body in
     match evaluate_terminator known_values block.terminator with
@@ -355,9 +356,14 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       let l = Label.Set.min_elt labels in
       block.terminator <- { block.terminator with desc = Always l };
       false)
-    else block_known_values block ~is_after_regalloc
+    else
+      block_known_values block ~is_after_regalloc
+        ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
   | Switch labels ->
-    let shortcircuit = block_known_values block ~is_after_regalloc in
+    let shortcircuit =
+      block_known_values block ~is_after_regalloc
+        ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
+    in
     if shortcircuit
     then true
     else (
