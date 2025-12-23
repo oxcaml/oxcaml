@@ -52,6 +52,8 @@ module Maybe_naked = struct
       | Value m -> M.to_string m
       | Naked m -> M.to_string m ^ "#"
 
+    let pp ppf t = Format.pp_print_string ppf (to_string t)
+
     let ignore_locality = map ~f:ignore_locality
 
     let all = List.concat_map (fun m -> [Value m; Naked m]) M.all
