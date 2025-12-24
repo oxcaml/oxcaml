@@ -428,6 +428,10 @@ let exp_extra sub (extra, loc, attrs) sexp =
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
         Pexp_constraint (sexp, None, Typemode.untransl_mode_annots modes)
+    | Texp_inspected_type _ ->
+        (* Type inspections are unnecessary in a Parsetree,
+           as type inference reproduces them *)
+        sexp.pexp_desc
   in
   Exp.mk ~loc ~attrs desc
 
@@ -542,6 +546,7 @@ let expression sub exp =
                 | Some (Texp_mode _) (* CR zqian: [Texp_mode] should be possible here *)
                 | Some (Texp_poly _ | Texp_newtype _)
                 | Some Texp_stack
+                | Some (Texp_inspected_type _)
                 | None -> None
               in
               let constraint_ =

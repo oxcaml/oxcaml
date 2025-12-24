@@ -833,9 +833,10 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[(int -> int) * (int -> int)]> expr =
 <[
-  let rec foo = (fun (x : int) -> if (x < 0) then (bar x) else 0 : int)
-  and bar = (fun (x__1 : int) -> if (x__1 > 0) then (foo x__1) else 0 : int)
-  in (foo, bar)
+  let rec foo = (fun (x : int) -> (if (x < 0) then (bar x) else 0 : int))
+  and bar =
+  (fun (x__1 : int) -> (if (x__1 > 0) then (foo x__1) else 0 : int)) in
+  (foo, bar)
 ]>
 |}];;
 
@@ -843,4 +844,27 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[$('a) -> int option -> int]> expr =
 <[fun x -> function | None -> 0 | Some (x__1) -> x__1]>
+|}];;
+
+<[ fun f x -> (f [@inlined]) x [@nontail] ]>
+[%%expect {|
+- : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
+<[fun f x -> ((f [@inlined]) x [@nontail])]>
+|}];;
+
+<[ fun x -> [ x ; x + 1 ] ]>
+[%%expect {|
+- : <[int -> int list]> expr = <[fun x -> [x; x + 1]]>
+|}];;
+
+(* Constraints must be parenthesised in tuple and list elements *)
+
+<[ fun x -> ((x : int), (x + 1 : int)) ]>
+[%%expect {|
+- : <[int -> int * int]> expr = <[fun x -> ((x : int), (x + 1 : int))]>
+|}];;
+
+<[ fun x -> [(x : int); (x + 1 : int)] ]>
+[%%expect {|
+- : <[int -> int list]> expr = <[fun x -> [(x : int); (x + 1 : int)]]>
 |}];;
