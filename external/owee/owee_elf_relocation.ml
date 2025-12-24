@@ -72,6 +72,11 @@ let r_type_of_info r_info = Int64.logand r_info 0xFFFFFFFFL
 
 let iter_rela_entries ~rela_body ~f =
   let size = Owee_buf.size rela_body in
+  if size mod rela_entry_size <> 0
+  then
+    Owee_buf.invalid_format
+      (Printf.sprintf "RELA section size %d is not a multiple of entry size %d"
+         size rela_entry_size);
   let num_entries = size / rela_entry_size in
   for i = 0 to num_entries - 1 do
     let entry_offset = i * rela_entry_size in
