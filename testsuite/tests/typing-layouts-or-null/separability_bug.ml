@@ -10,7 +10,7 @@ end
 
 [%%expect{|
 type t = int or_null
-module type S = sig type t : any mod separable end
+module type S = sig type t : any separable end
 |}]
 
 
@@ -27,9 +27,9 @@ Error: In this "with" constraint, the new definition of "t"
        Type declarations do not match:
          type t = t
        is not included in
-         type t : any mod separable
-       The kind of the first is value_or_null mod everything
+         type t : any separable
+       The layout of the first is value maybe_separable
          because it is the primitive type or_null.
-       But the kind of the first must be a subkind of any mod separable
+       But the layout of the first must be a sublayout of any separable
          because of the definition of t at line 4, characters 2-28.
 |}]

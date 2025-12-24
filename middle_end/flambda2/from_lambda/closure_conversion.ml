@@ -552,7 +552,7 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
   | Base base -> (
     match base with
     | Void -> []
-    | Value ->
+    | Scannable ->
       [{ kind = K.value; arg_transformer = None; return_transformer = None }]
     | Float64 ->
       [ { kind = K.naked_float;

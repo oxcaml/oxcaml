@@ -274,7 +274,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Print_as of string (* can't print *)
 
     let print_sort : Jkind.Sort.Const.t -> _ = function
-      | Base Value -> Print_as_value
+      | Base Scannable -> Print_as_value
       | Base Void -> Print_as "<void>"
       | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
               Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
@@ -648,7 +648,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   | Outval_record_mixed_block shape ->
                       let fld =
                         match shape.(pos) with
-                        | Value -> `Continue (O.field obj pos)
+                        | Scannable -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
                         | Float32 | Bits8 | Bits16 | Untagged_immediate

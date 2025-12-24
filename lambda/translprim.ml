@@ -193,7 +193,7 @@ let extern_repr_of_native_repr:
   poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Lambda.extern_repr
   = fun ~poly_sort r -> match r, poly_sort with
   | Repr_poly, Some s ->
-    Same_as_ocaml_repr (Jkind.Sort.default_to_value_and_get s)
+    Same_as_ocaml_repr (Jkind.Sort.default_to_scannable_and_get s)
   | Repr_poly, None -> Misc.fatal_error "Unexpected Repr_poly"
   | Same_as_ocaml_repr s, _ -> Same_as_ocaml_repr s
   | Unboxed_float f, _ -> Unboxed_float f
@@ -205,7 +205,7 @@ let sort_of_native_repr ~poly_sort repr =
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
       Unboxed_vector _) ->
-    Jkind.Sort.Const.Base Value
+    Jkind.Sort.Const.Base Scannable
 
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =
@@ -1479,7 +1479,7 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
   match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
   | Error _ -> None
   | Ok sort ->
-    let sort = Jkind.Sort.default_to_value_and_get sort in
+    let sort = Jkind.Sort.default_to_scannable_and_get sort in
     let layout = Typeopt.layout env error_loc sort ty in
     match layout with
     | Punboxed_float Unboxed_float32 -> Some Ppp_unboxed_float32
@@ -2158,7 +2158,7 @@ let check_primitive_arity loc p =
   in
   (* By a similar assumption, the sort shouldn't change the arity.  So it's ok
      to lie here. *)
-  let sort = Some (Jkind.Sort.of_base Value) in
+  let sort = Some (Jkind.Sort.of_base Scannable) in
   let prim =
     lookup_primitive loc ~poly_mode:mode ~poly_sort:sort Rc_normal p
   in

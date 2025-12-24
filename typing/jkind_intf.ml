@@ -23,7 +23,7 @@ module type Sort = sig
   (** These are the constant sorts -- fully determined and without variables *)
   type base =
     | Void  (** No run time representation at all *)
-    | Value  (** Standard ocaml value representation *)
+    | Scannable  (** Standard ocaml value representation *)
     | Untagged_immediate
         (** Untagged 31- or 63-bit immediates, but without the tag bit, so they
             must never be visible to the GC *)
@@ -52,7 +52,7 @@ module type Sort = sig
 
     val all_void : t -> bool
 
-    val value : t
+    val scannable : t
 
     val void : t
 
@@ -126,7 +126,8 @@ module type Sort = sig
 
     val for_module : t
 
-    val for_predef_value : t (* Predefined value types, e.g. int and string *)
+    (** Predefined scannable types, e.g. [int] and [string] *)
+    val for_predef_scannable : t
 
     val for_tuple : t
 
@@ -165,7 +166,7 @@ module type Sort = sig
 
   val void : t
 
-  val value : t
+  val scannable : t
 
   val float64 : t
 
@@ -196,9 +197,9 @@ module type Sort = sig
       variable is unfilled. *)
   val is_void_defaulting : t -> bool
 
-  (** [default_to_value_and_get] extracts the sort as a `const`. If it's a
-      variable, it is set to [value] first. *)
-  val default_to_value_and_get : t -> Const.t
+  (** [default_to_scannable_and_get] extracts the sort as a `const`. If it's a
+      variable, it is set to [scannable] first. *)
+  val default_to_scannable_and_get : t -> Const.t
 
   (* CR layouts v12: Default this to void. *)
 
