@@ -41,11 +41,12 @@ exception Error of error
 (** Pretty-print a measurement error. *)
 val report_error : Format.formatter -> error -> unit
 
-(** The origin of a file, used to determine partition placement. *)
+(** The origin of a file, used to determine partition placement.
+
+    Note: Passthrough files (C stubs from -cclib, runtime libraries) are
+    separated before measuring and don't use this type. *)
 type file_origin =
   | OCaml  (** OCaml-compiled code (.o from .cmx, .a from .cmxa) *)
-  | C_stub  (** C stub libraries (from -cclib or lib_ccobjs) *)
-  | Runtime  (** Runtime library (libasmrun) *)
   | Startup  (** Startup object file *)
   | Cached_genfns  (** Cached generic functions *)
 
@@ -75,13 +76,9 @@ end
 
     - .a: archive file, all .o members analyzed and summed
 
-    - .cmx: finds associated .o file (same basename)
-
-    - .cmxa: finds associated .a file, plus any lib_ccobjs
-
     Files are tracked to avoid double-counting when the same file appears
-    multiple times or is referenced transitively. Returns an empty entry for
-    files with unrecognized extensions.
+    multiple times. Returns an empty entry for files with unrecognized
+    extensions.
 
     Each file is paired with its origin, which determines partition
     placement. *)

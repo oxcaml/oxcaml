@@ -54,32 +54,12 @@ let bytes_of_gb gb = Int64.of_float (gb *. 1024. *. 1024. *. 1024.)
 let default_partition_size =
   bytes_of_gb Clflags.dissector_partition_size_default
 
-type result =
-  { partitions : Partition.t list;
-    passthrough_files : string list
-  }
-
-let partitions r = r.partitions
-
-let passthrough_files r = r.passthrough_files
-
-(* Check if a file should be passed directly to the final linker without partial
-   linking. C stub files (from -cclib or lib_ccobjs in .cmxa) and runtime
-   libraries are passed through directly. *)
-let is_passthrough entry =
-  match MOF.File_size.origin entry with
-  | C_stub | Runtime -> true
-  | OCaml | Startup | Cached_genfns -> false
-
 (* Check if a file must go into the Main partition based on its origin. Startup
    and cached generic functions must be in Main to avoid complications with
    cross-partition references. *)
 let must_be_in_main entry =
   match MOF.File_size.origin entry with
   | OCaml -> false
-  | C_stub | Runtime ->
-    (* C_stub and Runtime files are passthrough, not partitioned *)
-    false
   | Startup | Cached_genfns -> true
 
 let log fmt =
@@ -89,20 +69,12 @@ let log fmt =
 
 let partition_files ~threshold file_sizes =
   log "partition_files: input has %d file(s)" (List.length file_sizes);
-  (* First, separate passthrough files (C_stub and Runtime) that shouldn't be
-     partially linked. These will be passed directly to the final linker. *)
-  let passthrough_files, linkable_files =
-    List.partition is_passthrough file_sizes
-  in
-  log "  passthrough (C_stub/Runtime): %d, linkable: %d"
-    (List.length passthrough_files)
-    (List.length linkable_files);
   (* Separate files that must go into Main partition: - Files with probes (to
      keep probes together) - Startup and cached genfns (by origin) *)
   let main_files, partitionable_files =
     List.partition
       (fun entry -> MOF.File_size.has_probes entry || must_be_in_main entry)
-      linkable_files
+      file_sizes
   in
   log "  main_files: %d, partitionable: %d" (List.length main_files)
     (List.length partitionable_files);
@@ -171,10 +143,4 @@ let partition_files ~threshold file_sizes =
   in
   log "  created %d partition(s) from %d file_list(s)" (List.length partitions)
     (List.length file_lists);
-  (* Return both partitions and passthrough files. Passthrough files are
-     returned as just their filenames since they don't need further processing -
-     they go directly to the final linker. *)
-  let passthrough_filenames =
-    List.map MOF.File_size.filename passthrough_files
-  in
-  { partitions; passthrough_files = passthrough_filenames }
+  partitions
