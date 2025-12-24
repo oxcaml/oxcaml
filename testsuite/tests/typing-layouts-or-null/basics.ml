@@ -10,7 +10,7 @@ type t_bits64 : bits64
 
 [%%expect{|
 type t_any : any
-type t_any_mod_separable : any mod separable
+type t_any_mod_separable : any separable
 type t_value_or_null : value_or_null
 type t_value
 type t_bits64 : bits64
@@ -26,7 +26,7 @@ Line 1, characters 6-31:
 Error: This pattern matches values of type "t_any_mod_separable"
        but a pattern was expected which matches values of type
          "('a : '_representable_layout_1)"
-       The layout of t_any_mod_separable is any
+       The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable
          because we must know concretely how to pass a function argument.
@@ -39,7 +39,7 @@ Line 1, characters 11-34:
 1 | type t = { x : t_any_mod_separable }
                ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Record element types must have a representable layout.
-       The layout of t_any_mod_separable is any
+       The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable
          because it is the type of record field x.
@@ -54,7 +54,7 @@ Line 2, characters 10-29:
 2 |   val x : t_any_mod_separable
               ^^^^^^^^^^^^^^^^^^^
 Error: The type of a module-level value must have a representable layout.
-       The layout of type t_any_mod_separable is any
+       The layout of type t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of type t_any_mod_separable must be representable
          because it's the type of something in a signature.
@@ -80,7 +80,7 @@ Line 2, characters 13-19:
                  ^^^^^^
 Error: This expression has type "t_any_mod_separable"
        but an expression was expected of type "('a : '_representable_layout_2)"
-       The layout of t_any_mod_separable is any
+       The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable
          because we must know concretely how to return a function result.
@@ -132,7 +132,7 @@ type ('a : bits64) id_bits64 = 'a
 
 [%%expect{|
 type ('a : any) id_any = 'a
-type ('a : any mod separable) id_any_mod_separable = 'a
+type ('a : any separable) id_any_mod_separable = 'a
 type ('a : value_or_null) id_value_or_null = 'a
 type 'a id_value = 'a
 type ('a : bits64) id_bits64 = 'a
@@ -150,7 +150,7 @@ module M (X : sig type t : any mod separable end) : sig type t : any end = X
 
 [%%expect{|
 module M :
-  functor (X : sig type t : any mod separable end) -> sig type t : any end
+  functor (X : sig type t : any separable end) -> sig type t : any end
 |}]
 
 (* [any] is not a sublayout of [any mod separable] *)
@@ -161,10 +161,10 @@ type t = t_any id_any_mod_separable
 Line 1, characters 9-14:
 1 | type t = t_any id_any_mod_separable
              ^^^^^
-Error: This type "t_any" should be an instance of type "('a : any mod separable)"
-       The kind of t_any is any
+Error: This type "t_any" should be an instance of type "('a : any separable)"
+       The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
-       But the kind of t_any must be a subkind of any mod separable
+       But the layout of t_any must be a sublayout of any separable
          because of the definition of id_any_mod_separable at line 2, characters 0-55.
 |}]
 
@@ -178,14 +178,14 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t = X.t end
        is not included in
-         sig type t : any mod separable end
+         sig type t : any separable end
        Type declarations do not match:
          type t = X.t
        is not included in
-         type t : any mod separable
-       The kind of the first is any
+         type t : any separable
+       The layout of the first is any
          because of the definition of t at line 1, characters 18-30.
-       But the kind of the first must be a subkind of any mod separable
+       But the layout of the first must be a sublayout of any separable
          because of the definition of t at line 1, characters 42-68.
 |}]
 
@@ -212,9 +212,9 @@ Line 1, characters 9-24:
 1 | type t = t_value_or_null id_value
              ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type "('a : value)"
-       The kind of t_value_or_null is value_or_null
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 3, characters 0-36.
-       But the kind of t_value_or_null must be a subkind of value
+       But the layout of t_value_or_null must be a sublayout of value
          because of the definition of id_value at line 4, characters 0-31.
 |}]
 
@@ -230,9 +230,9 @@ Error: Signature mismatch:
        is not included in
          sig type t end
        Type declarations do not match: type t = X.t is not included in type t
-       The kind of the first is value_or_null
+       The layout of the first is value maybe_separable
          because of the definition of t at line 1, characters 18-40.
-       But the kind of the first must be a subkind of value
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 1, characters 52-66.
 |}]
 
@@ -247,7 +247,7 @@ type t = t_value id_any_mod_separable
 module M (X : sig type t : value end) : sig type t : any mod separable end = X
 
 [%%expect{|
-module M : functor (X : sig type t end) -> sig type t : any mod separable end
+module M : functor (X : sig type t end) -> sig type t : any separable end
 |}]
 
 (* [value_or_null] is not a sublayout of [any mod separable] *)
@@ -259,10 +259,10 @@ Line 1, characters 9-24:
 1 | type t = t_value_or_null id_any_mod_separable
              ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type
-         "('a : any mod separable)"
-       The kind of t_value_or_null is value_or_null
+         "('a : any separable)"
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 3, characters 0-36.
-       But the kind of t_value_or_null must be a subkind of any mod separable
+       But the layout of t_value_or_null must be a sublayout of any separable
          because of the definition of id_any_mod_separable at line 2, characters 0-55.
 |}]
 
@@ -276,14 +276,14 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t = X.t end
        is not included in
-         sig type t : any mod separable end
+         sig type t : any separable end
        Type declarations do not match:
          type t = X.t
        is not included in
-         type t : any mod separable
-       The kind of the first is value_or_null
+         type t : any separable
+       The layout of the first is value maybe_separable
          because of the definition of t at line 1, characters 18-40.
-       But the kind of the first must be a subkind of any mod separable
+       But the layout of the first must be a sublayout of any separable
          because of the definition of t at line 1, characters 52-78.
 |}]
 
@@ -314,7 +314,7 @@ module M (X : sig type t : bits64 end) : sig type t : any mod separable end = X
 
 [%%expect{|
 module M :
-  functor (X : sig type t : bits64 end) -> sig type t : any mod separable end
+  functor (X : sig type t : bits64 end) -> sig type t : any separable end
 |}]
 
 (* [any mod separable] is not a sublayout of [value] *)
@@ -327,9 +327,9 @@ Line 1, characters 9-28:
              ^^^^^^^^^^^^^^^^^^^
 Error: This type "t_any_mod_separable" should be an instance of type
          "('a : value)"
-       The layout of t_any_mod_separable is any
+       The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of value
+       But the layout of t_any_mod_separable must be a value layout
          because of the definition of id_value at line 4, characters 0-31.
 |}]
 
@@ -345,9 +345,9 @@ Error: Signature mismatch:
        is not included in
          sig type t end
        Type declarations do not match: type t = X.t is not included in type t
-       The layout of the first is any
+       The layout of the first is any separable
          because of the definition of t at line 1, characters 18-44.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a value layout
          because of the definition of t at line 1, characters 56-70.
 |}]
 
@@ -361,9 +361,9 @@ Line 1, characters 9-28:
              ^^^^^^^^^^^^^^^^^^^
 Error: This type "t_any_mod_separable" should be an instance of type
          "('a : value_or_null)"
-       The layout of t_any_mod_separable is any
+       The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of value
+       But the layout of t_any_mod_separable must be a value layout
          because of the definition of id_value_or_null at line 3, characters 0-47.
 |}]
 
@@ -382,9 +382,9 @@ Error: Signature mismatch:
          type t = X.t
        is not included in
          type t : value_or_null
-       The layout of the first is any
+       The layout of the first is any separable
          because of the definition of t at line 1, characters 18-44.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a value layout
          because of the definition of t at line 1, characters 56-78.
 |}]
 
@@ -398,7 +398,7 @@ Line 1, characters 9-28:
              ^^^^^^^^^^^^^^^^^^^
 Error: This type "t_any_mod_separable" should be an instance of type
          "('a : bits64)"
-       The layout of t_any_mod_separable is any
+       The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be a sublayout of bits64
          because of the definition of id_bits64 at line 5, characters 0-33.
@@ -419,7 +419,7 @@ Error: Signature mismatch:
          type t = X.t
        is not included in
          type t : bits64
-       The layout of the first is any
+       The layout of the first is any separable
          because of the definition of t at line 1, characters 18-44.
        But the layout of the first must be a sublayout of bits64
          because of the definition of t at line 1, characters 56-71.
@@ -446,9 +446,9 @@ Line 1, characters 19-34:
 1 | type should_fail = t_value_or_null t1
                        ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type "('a : value)"
-       The kind of t_value_or_null is value_or_null
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 3, characters 0-36.
-       But the kind of t_value_or_null must be a subkind of value
+       But the layout of t_value_or_null must be a sublayout of value
          because of the definition of t1 at line 3, characters 0-71.
 |}]
 
@@ -460,9 +460,9 @@ Line 1, characters 19-38:
                        ^^^^^^^^^^^^^^^^^^^
 Error: This type "t_any_mod_separable" should be an instance of type
          "('a : value)"
-       The layout of t_any_mod_separable is any
+       The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of value
+       But the layout of t_any_mod_separable must be a value layout
          because of the definition of t1 at line 3, characters 0-71.
 |}]
 

@@ -3,9 +3,6 @@
  expect;
 *)
 
-(* CR layouts-scannable: These tests should test out the built-ins once they
-   get updated to be appropriately non_pointer *)
-
 (* type declarations *)
 
 type t : value non_pointer
@@ -18,47 +15,47 @@ type t : immutable_data non_pointer
 type t : immutable_data non_pointer
 |}]
 
-type ('a : any non_pointer, 'b : any maybe_pointer, 'c : any) t;;
+type ('a : any non_pointer, 'b : any maybe_separable, 'c : any) t;;
 [%%expect{|
 type ('a : any non_pointer, 'b : any, 'c : any) t
 |}]
 
-type t : value non_pointer & value maybe_pointer & float64
+type t : value non_pointer & value maybe_separable & float64
 [%%expect{|
-type t : value non_pointer & value & float64
+type t : value non_pointer & value maybe_separable & float64
 |}]
 
 (* Checking non_pointer annotations, based on [typing-layouts-or-null/separability.ml]
-   and [typing-jkind-bounds/annots.ml]. *)
-(* CR layouts-scannable: Once separability is a scannable axis, move these! *)
+   and [typing-jkind-bounds/annots.ml]. Since separability is now a scannable axis,
+   these different files are actually testing very similar code paths. *)
 
 (* Annotation on type parameters: *)
 
-type t_maybeptr : any maybe_pointer
+type t_maybeptr : any maybe_separable
 type t_nonptr : any non_pointer
 [%%expect{|
 type t_maybeptr : any
 type t_nonptr : any non_pointer
 |}]
 
-type t_maybeptr_val : value maybe_pointer
+type t_maybeptr_val : value maybe_separable
 type t_nonptr_val : value non_pointer
 [%%expect{|
-type t_maybeptr_val
+type t_maybeptr_val : value maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
-type ('a : any maybe_pointer) accepts_maybeptr
+type ('a : any maybe_separable) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 [%%expect{|
 type ('a : any) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 |}]
 
-type ('a : value maybe_pointer) accepts_maybeptr_val
+type ('a : value maybe_separable) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 [%%expect{|
-type 'a accepts_maybeptr_val
+type ('a : value maybe_separable) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 |}]
 
@@ -81,7 +78,7 @@ Line 1, characters 13-23:
 Error: This type "t_maybeptr" should be an instance of type
          "('a : any non_pointer)"
        The layout of t_maybeptr is any
-         because of the definition of t_maybeptr at line 1, characters 0-35.
+         because of the definition of t_maybeptr at line 1, characters 0-37.
        But the layout of t_maybeptr must be a sublayout of any non_pointer
          because of the definition of accepts_nonptr at line 2, characters 0-42.
 |}]
@@ -97,10 +94,9 @@ Line 1, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer)"
-       The layout of t_maybeptr_val is value
-         because of the definition of t_maybeptr_val at line 1, characters 0-41.
-       But the layout of t_maybeptr_val must be a sublayout of
-           value non_pointer
+       The layout of t_maybeptr_val is value maybe_separable
+         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+       But the layout of t_maybeptr_val must be a sublayout of immediate
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
 |}]
 type succeeds = t_nonptr_val accepts_nonptr_val
@@ -119,7 +115,7 @@ Error: This type "t_nonptr" should be an instance of type
          "('a : value non_pointer)"
        The layout of t_nonptr is any non_pointer
          because of the definition of t_nonptr at line 2, characters 0-31.
-       But the layout of t_nonptr must be a sublayout of value non_pointer
+       But the layout of t_nonptr must be a value layout
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
 |}]
 
@@ -131,6 +127,27 @@ type succeeds = float# accepts_maybeptr
 type succeeds = float# accepts_nonptr
 |}]
 
+(* [int] is in fact [non_pointer], since it is an [immediate] *)
+type succeeds = int accepts_nonptr
+type succeeds = int accepts_nonptr_val
+[%%expect{|
+type succeeds = int accepts_nonptr
+type succeeds = int accepts_nonptr_val
+|}]
+
+type fails = string accepts_nonptr_val
+[%%expect{|
+Line 1, characters 13-19:
+1 | type fails = string accepts_nonptr_val
+                 ^^^^^^
+Error: This type "string" should be an instance of type
+         "('a : value non_pointer)"
+       The layout of string is value non_float
+         because it is the primitive type string.
+       But the layout of string must be a sublayout of immediate
+         because of the definition of accepts_nonptr_val at line 2, characters 0-48.
+|}]
+
 type succeeds = #(t_nonptr * t_maybeptr) accepts_maybeptr
 type succeeds = #(t_nonptr * t_maybeptr) accepts_nonptr
 type succeeds = #(t_nonptr_val * t_nonptr) accepts_nonptr
@@ -142,59 +159,40 @@ type succeeds = #(t_nonptr_val * t_nonptr) accepts_nonptr
 type succeeds = #(t_maybeptr_val * t_maybeptr) accepts_nonptr
 |}]
 
-(* CR layouts-scannable: There are versions of these tests that use [immediate]
-   instead of [value non_pointer]. Once [immediate] means that, these will be
-   redundant and can probably be removed *)
-type 'a t = 'a accepts_nonptr
-type ('a : value) t = 'a accepts_nonptr
+type succeeds = t_nonptr array
+type succeeds = t_nonptr_val array
+type fails = t_maybeptr_val array
 [%%expect{|
-type ('a : value non_pointer) t = 'a accepts_nonptr
-type ('a : value non_pointer) t = 'a accepts_nonptr
+type succeeds = t_nonptr array
+type succeeds = t_nonptr_val array
+Line 3, characters 13-27:
+3 | type fails = t_maybeptr_val array
+                 ^^^^^^^^^^^^^^
+Error: This type "t_maybeptr_val" should be an instance of type
+         "('a : any separable)"
+       The layout of t_maybeptr_val is value maybe_separable
+         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+       But the layout of t_maybeptr_val must be a sublayout of any separable
+         because it's the type argument to the array type.
 |}]
-
-let f : ('a : value non_pointer) accepts_nonptr -> ('a : value) accepts_nonptr = fun x -> x
-let f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-[%%expect{|
-val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
-  <fun>
-val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
-  <fun>
-Line 3, characters 8-60:
-3 | let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind value.
-       But it was inferred to have kind value non_pointer
-         because of the definition of accepts_nonptr at line 2, characters 0-42.
-|}]
-
-let f : (_ : value) accepts_nonptr -> unit = fun _ -> ()
-let g : (_ : value non_pointer) accepts_nonptr -> unit = fun _ -> ()
-[%%expect{|
-val f : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
-val g : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
-|}]
-
-let f : (_ : value non_pointer) -> (_ : value) = fun _ -> assert false
-let g : (_ : value) -> (_ : value non_pointer) = fun _ -> assert false
-[%%expect{|
-val f : ('a : value non_pointer) 'b. 'a -> 'b = <fun>
-val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
-|}]
-
-(* CR layouts-separability: Once [immediate] means [scannable non_pointer],
-   add tests for this behavior! *)
 
 (* unboxed records *)
+
+type t_maybeptr_val : value maybe_separable
+type t_nonptr_val : value non_pointer
+[%%expect{|
+type t_maybeptr_val : value maybe_separable
+type t_nonptr_val : value non_pointer
+|}]
 
 type fails : value non_pointer = #{ a : t_maybeptr_val }
 [%%expect{|
 Line 1, characters 0-56:
 1 | type fails : value non_pointer = #{ a : t_maybeptr_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "fails" is value
+Error: The layout of type "fails" is value maybe_separable
          because it is an unboxed record.
-       But the layout of type "fails" must be a sublayout of value non_pointer
+       But the layout of type "fails" must be a sublayout of immediate
          because of the annotation on the declaration of the type fails.
 |}]
 type succeeds : value non_pointer = #{ a : t_nonptr_val }
@@ -209,7 +207,7 @@ type succeeds = #{ a : t_nonptr_val; b : t_nonptr_val; }
 
 (* Annotation on types in functions *)
 
-let f (a : (_ : any non_pointer)) (b : (_ : any maybe_pointer)) =
+let f (a : (_ : any non_pointer)) (b : (_ : any maybe_separable)) =
   let _unify_them = [ a; b ] in
   ()
 [%%expect{|
@@ -223,7 +221,7 @@ let f x =
 val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
 |}]
 
-let f (type a : value maybe_pointer) (x : a) =
+let f (type a : value maybe_separable) (x : a) =
   let require_np (y : (_ : value non_pointer)) = () in
   require_np y
 [%%expect{|
@@ -233,7 +231,7 @@ Line 3, characters 13-14:
 Error: Unbound value "y"
 |}]
 
-let f (type a : float64 maybe_pointer) (x : a) =
+let f (type a : float64 maybe_separable) (x : a) =
   let g (x : (_ : float64 non_pointer)) = () in
   g x
 [%%expect{|
@@ -241,7 +239,7 @@ val f : ('a : float64). 'a -> unit = <fun>
 |}]
 
 let f (type a : value non_pointer) (x : a) =
-  (* here, y is value maybe_pointer *)
+  (* here, y is value maybe_separable *)
   let g y = () in
   g x
 [%%expect{|
@@ -249,7 +247,7 @@ val f : ('a : value non_pointer). 'a -> unit = <fun>
 |}]
 
 let f (t : (_ : value non_pointer & value)) =
-  (* here, x is value maybe_pointer *)
+  (* here, x is value maybe_separable *)
   let g (type a : value non_pointer) (x : a) = () in
   let #(np, v) = t in
   g np
@@ -288,7 +286,7 @@ Error: This expression has type "a2" but an expression was expected of type
          "('a : value non_pointer)"
        The layout of a2 is value
          because of the annotation on the abstract type declaration for a2.
-       But the layout of a2 must be a sublayout of value non_pointer
+       But the layout of a2 must be a sublayout of immediate
          because of the definition of cant_promote_snd at line 4, characters 23-64.
 |}]
 
@@ -298,6 +296,45 @@ let f () =
 [%%expect{|
 val f : unit -> unit = <fun>
 |}]
+
+(* or_null interaction: *)
+
+let f (type a : immediate) (x : a) =
+  let g (type b : immediate_or_null) (y : b) = () in
+  g (This x : a or_null)
+[%%expect{|
+val f : ('a : immediate). 'a -> unit = <fun>
+|}]
+
+let f (x : 'a or_null) =
+  let g (type b : immediate) (y : b) = () in
+  match x with
+  | This y -> g y
+  | Null -> ()
+[%%expect{|
+val f : ('a : immediate). 'a or_null -> unit = <fun>
+|}]
+
+let outer (type a : value non_float) (nf : a or_null) =
+  let f (x : 'a or_null) =
+    let g (type b : value non_pointer) (y : b) = () in
+    match x with
+    | This y -> g y
+    | Null -> ()
+  in
+  f nf
+[%%expect{|
+Line 8, characters 4-6:
+8 |   f nf
+        ^^
+Error: This expression has type "a or_null"
+       but an expression was expected of type "'a or_null"
+       The layout of a is value non_float
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be a sublayout of immediate
+         because of the definition of g at line 3, characters 10-51.
+|}]
+
 
 (* modules and module inclusion *)
 
@@ -327,7 +364,7 @@ Error: Signature mismatch:
 module M1 : sig
   type ('a : value non_pointer) t : value
 end = struct
-  type ('a : value maybe_pointer) t = t_nonptr_val
+  type ('a : value maybe_separable) t = t_nonptr_val
 end
 [%%expect{|
 module M1 : sig type ('a : value non_pointer) t end
@@ -355,7 +392,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is value
          because of the definition of t at line 2, characters 2-29.
-       But the layout of 'a must be a sublayout of value non_pointer
+       But the layout of 'a must be a sublayout of immediate
          because of the definition of t at line 4, characters 2-39.
 |}]
 
@@ -378,9 +415,9 @@ Error: Signature mismatch:
          type 'a t = t_maybeptr_val
        is not included in
          type ('a : value non_pointer) t : value non_pointer
-       The layout of the first is value
-         because of the definition of t_maybeptr_val at line 1, characters 0-41.
-       But the layout of the first must be a sublayout of value non_pointer
+       The layout of the first is value maybe_separable
+         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+       But the layout of the first must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-53.
 |}]
 
@@ -389,4 +426,80 @@ let id' x = id x
 [%%expect{|
 external id : ('a : any non_pointer). 'a -> 'a = "%identity" [@@layout_poly]
 val id' : ('a : value_or_null non_pointer). 'a -> 'a = <fun>
+|}]
+
+(* legacy syntax for specifying scannable axes via mod bounds *)
+
+module M : sig
+  type t : value non_float
+end = struct
+  type t : value mod non_float
+end
+[%%expect{|
+module M : sig type t : value non_float end
+|}]
+
+(* This test demonstrates a change in behavior now that the mod bound syntax
+   gets parsed into scannable axes: before, mod bounds could only make non-modal
+   axes lower (so [mod separable] would be a no-op, since [immediate] already
+   meant [non_float]). But these now (currently, at least) override the
+   existing scannable axes! *)
+
+(* CR layouts-scannable: as we deprecate the old syntax, this small collection
+   of tests should be removed. *)
+module M : sig
+  type t : value non_float
+end = struct
+  type t : immediate mod separable
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : immediate mod separable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : immediate separable end
+       is not included in
+         sig type t : value non_float end
+       Type declarations do not match:
+         type t : immediate separable
+       is not included in
+         type t : value non_float
+       The layout of the first is value
+         because of the definition of t at line 4, characters 2-34.
+       But the layout of the first must be a sublayout of value non_float
+         because of the definition of t at line 2, characters 2-26.
+|}]
+
+(* CR zeisbach: mod syntax actually applys on individual components of a
+   product, which might be another change from the existing behavior??
+   but when i tested it, it looked like the existing behavior did this,
+   at least for non-modal axes. but it also seemed to throw some away. *)
+
+module M : sig
+  type t : value non_float & value non_float
+end = struct
+  type t : (value mod non_float) & (value mod non_float)
+end
+[%%expect{|
+module M : sig type t : value non_float & value non_float end
+|}]
+
+module M : sig
+  type t : (value & value) mod non_float
+end = struct
+  type t : (value mod non_float) & value
+end
+[%%expect{|
+module M : sig type t : value & value end
+|}]
+
+module M : sig
+  type t : value non_float
+end = struct
+  type t : value mod separable mod non_float
+end
+[%%expect{|
+module M : sig type t : value non_float end
 |}]

@@ -37,7 +37,7 @@ Line 1, characters 9-14:
 Error: This type "int8#" should be an instance of type "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -49,7 +49,7 @@ Line 1, characters 11-16:
 Error: This type "int8#" should be an instance of type "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -61,7 +61,7 @@ Line 1, characters 14-19:
 Error: This type "int8#" should be an instance of type "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -73,7 +73,7 @@ Line 1, characters 13-18:
 Error: This type "int8#" should be an instance of type "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -95,7 +95,7 @@ Line 1, characters 9-14:
 Error: This type "int8#" should be an instance of type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -107,7 +107,7 @@ Line 1, characters 11-16:
 Error: This type "int8#" should be an instance of type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -119,7 +119,7 @@ Line 1, characters 14-19:
 Error: This type "int8#" should be an instance of type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -131,7 +131,7 @@ Line 1, characters 13-18:
 Error: This type "int8#" should be an instance of type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -146,7 +146,7 @@ Line 1, characters 9-14:
 Error: This type "int8#" should be an instance of type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -158,7 +158,7 @@ Line 1, characters 11-16:
 Error: This type "int8#" should be an instance of type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -170,7 +170,7 @@ Line 1, characters 14-19:
 Error: This type "int8#" should be an instance of type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -182,7 +182,7 @@ Line 1, characters 13-18:
 Error: This type "int8#" should be an instance of type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of value
+       But the layout of int8# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
