@@ -25,12 +25,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* Reader for Unix ar archive files (.a static libraries).
-
-   Supports both: - System V/GNU format (Linux): uses "/" for symbol table, "//"
-   for string table, and "/N" references for long filenames - BSD format
-   (macOS): uses "__.SYMDEF" for symbol table and "#1/N" prefix with inline long
-   filenames *)
+(* See owee_archive.mli for documentation. *)
 
 [@@@ocaml.warning "+a-4-9-30-40-41-42"]
 
@@ -57,6 +52,8 @@ type member =
     mode : int
   }
 
+type member_header = member
+
 (* Parse a decimal integer from a fixed-width ASCII field, ignoring trailing
    spaces. Returns 0 if the field is empty or all spaces. *)
 let parse_decimal_field s =
@@ -82,47 +79,45 @@ let parse_octal_field s =
 let read_magic cursor =
   ensure cursor archive_magic_size "Archive too small for magic number";
   let magic = Read.fixed_string cursor archive_magic_size in
-  if magic <> archive_magic
+  if not (String.equal magic archive_magic)
   then invalid_format "Not an ar archive (missing \"!<arch>\\n\" magic number)"
 
 (* Check if a name indicates a BSD-style symbol table *)
 let is_bsd_symtab name =
-  let name = String.trim name in
-  String.length name >= 8 && String.sub name 0 8 = "__.SYMDE"
+  String.starts_with ~prefix:"__.SYMDE" (String.trim name)
 
 (* Check if a name indicates a System V symbol table *)
-let is_sysv_symtab name = String.trim name = "/"
+let is_sysv_symtab name = String.equal (String.trim name) "/"
 
 (* Check if a name indicates a System V string table *)
-let is_sysv_strtab name = String.trim name = "//"
+let is_sysv_strtab name = String.equal (String.trim name) "//"
 
-(* Check if a name uses BSD extended format "#1/N" *)
-let parse_bsd_extended_name ar_name =
+(* Parse an extended name format that uses a prefix followed by a number.
+   Used for both BSD "#1/N" and System V "/N" formats. *)
+let parse_extended_name ~prefix ar_name =
   let trimmed = String.trim ar_name in
-  if String.length trimmed >= 3
-     && trimmed.[0] = '#'
-     && trimmed.[1] = '1'
-     && trimmed.[2] = '/'
+  if String.starts_with ~prefix trimmed
   then
-    let len_str = String.sub trimmed 3 (String.length trimmed - 3) in
-    match int_of_string_opt (String.trim len_str) with
-    | Some len -> Some len
-    | None -> None
+    let prefix_len = String.length prefix in
+    let num_str = String.sub trimmed prefix_len (String.length trimmed - prefix_len) in
+    int_of_string_opt (String.trim num_str)
   else None
 
+(* Check if a name uses BSD extended format "#1/N" *)
+let parse_bsd_extended_name ar_name = parse_extended_name ~prefix:"#1/" ar_name
+
 (* Check if a name uses System V extended format "/N" (offset into string
-   table) *)
+   table). Note: we can't use parse_extended_name here because "/" alone is the
+   symbol table and "//" is the string table, so we need to check for a digit. *)
 let parse_sysv_extended_name ar_name =
   let trimmed = String.trim ar_name in
   if String.length trimmed >= 2
-     && trimmed.[0] = '/'
+     && Char.equal trimmed.[0] '/'
      && trimmed.[1] >= '0'
      && trimmed.[1] <= '9'
   then
     let offset_str = String.sub trimmed 1 (String.length trimmed - 1) in
-    match int_of_string_opt (String.trim offset_str) with
-    | Some offset -> Some offset
-    | None -> None
+    int_of_string_opt (String.trim offset_str)
   else None
 
 (* Read a string from the System V string table at the given offset. Strings are
@@ -163,7 +158,7 @@ let read_member_header buf cursor ~string_table =
       let ar_mode = Read.fixed_string cursor 8 in
       let ar_size = Read.fixed_string cursor 10 in
       let ar_fmag = Read.fixed_string cursor 2 in
-      if ar_fmag <> header_terminator
+      if not (String.equal ar_fmag header_terminator)
       then
         invalid_format
           (Printf.sprintf "Invalid header terminator at offset %d" header_start);
@@ -202,9 +197,8 @@ let read_member_header buf cursor ~string_table =
             let trimmed = String.trim ar_name in
             let name =
               (* Strip trailing '/' if present (System V style) *)
-              let len = String.length trimmed in
-              if len > 0 && trimmed.[len - 1] = '/'
-              then String.sub trimmed 0 (len - 1)
+              if String.ends_with ~suffix:"/" trimmed
+              then String.sub trimmed 0 (String.length trimmed - 1)
               else trimmed
             in
             name, after_header, total_size)

@@ -709,6 +709,14 @@ let remove_dir dirname =
   with Sys_error _msg ->
     ()
 
+let remove_dir_contents dirname =
+  try
+    Array.iter
+      (fun entry -> remove_file (Filename.concat dirname entry))
+      (Sys.readdir dirname);
+    remove_dir dirname
+  with Sys_error _ -> ()
+
 (* Expand a -I option: if it starts with +, make it relative to the standard
    library directory *)
 
