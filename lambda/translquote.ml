@@ -2358,7 +2358,9 @@ let constrain_pat_with_type loc typ pat =
   Pat.constraint_ loc pat typ |> Pat.wrap
 
 let maybe_constrain_pat_with_type loc typ exp =
-  match typ with Some typ -> constrain_pat_with_type loc typ exp | None -> exp
+  match typ with
+  | Some typ -> constrain_pat_with_type loc typ exp
+  | None -> exp
 
 type case_binding =
   | Non_binding of Pat.t * Exp.t
