@@ -284,9 +284,9 @@ let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
         | Some sym_name -> (
           (* Check if this relocation type/symbol should be rewritten *)
           let rewrite_to =
-            if Int64.equal entry.r_type Rela.r_x86_64_plt32
+            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
             then String.Tbl.find_opt plt_rewrite_map sym_name
-            else if Int64.equal entry.r_type Rela.r_x86_64_rex_gotpcrelx
+            else if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
             then String.Tbl.find_opt got_rewrite_map sym_name
             else None
           in
@@ -296,14 +296,14 @@ let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
             | Some idx ->
               log_verbose "  rewrite reloc at 0x%Lx: %s %s -> PC32 to %s"
                 entry.r_offset
-                (Rela.reloc_type_name entry.r_type)
+                (Rela.Reloc_type.name entry.r_type)
                 sym_name new_sym_name;
-              { entry with r_sym = idx; r_type = Rela.r_x86_64_pc32 }
+              { entry with r_sym = idx; r_type = Rela.Reloc_type.pc32 }
             | None ->
               log_verbose
                 "  rewrite reloc at 0x%Lx: %s -> %s NOT FOUND in symtab"
                 entry.r_offset
-                (Rela.reloc_type_name entry.r_type)
+                (Rela.Reloc_type.name entry.r_type)
                 new_sym_name;
               entry)
           | None -> entry)

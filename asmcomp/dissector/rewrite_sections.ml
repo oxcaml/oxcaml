@@ -64,9 +64,9 @@ let write_synthetic_symbol ~cursor ~strtab ~name ~section_index ~offset ~size
   Rela.write_sym_entry ~cursor
     { st_name = Strtab.add strtab name;
       st_info =
-        Rela.make_st_info ~binding:Rela.Stb.global
-          ~typ:(if is_func then Rela.Stt.func else Rela.Stt.notype);
-      st_other = Rela.Stv.hidden;
+        Rela.make_st_info ~binding:Rela.Symbol_binding.global
+          ~typ:(if is_func then Rela.Symbol_type.func else Rela.Symbol_type.notype);
+      st_other = Rela.Symbol_visibility.(to_int hidden);
       st_shndx;
       st_value = Int64.of_int offset;
       st_size = Int64.of_int size
@@ -122,7 +122,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     (fun r ->
       write_rela ~cursor ~symbol_to_index:(FRP.symbol_to_index plan)
         ~r_offset:(Igot.Relocation.offset r) ~symbol:(Igot.Relocation.symbol r)
-        ~r_type:Rela.r_x86_64_64 ~r_addend:(Igot.Relocation.addend r))
+        ~r_type:Rela.Reloc_type.r64 ~r_addend:(Igot.Relocation.addend r))
     (Igot.relocations igot);
   Buf.Write.fixed_bytes
     (Buf.cursor output_buf ~at:(int64_to_int (SL.offset iplt_layout)))
@@ -135,7 +135,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     (fun r ->
       write_rela ~cursor ~symbol_to_index:(FRP.symbol_to_index plan)
         ~r_offset:(Iplt.Relocation.offset r) ~symbol:(Iplt.Relocation.symbol r)
-        ~r_type:Rela.r_x86_64_pc32 ~r_addend:(Iplt.Relocation.addend r))
+        ~r_type:Rela.Reloc_type.pc32 ~r_addend:(Iplt.Relocation.addend r))
     (Iplt.relocations iplt);
   let cursor =
     Buf.cursor output_buf ~at:(int64_to_int (SL.offset symtab_layout))
