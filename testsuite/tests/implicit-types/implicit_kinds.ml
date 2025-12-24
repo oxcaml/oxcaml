@@ -563,10 +563,11 @@ Line 4, characters 23-31:
                            ^^^^^^^^
 Error: The type constraints are not consistent.
        Type "('w : word)" is not compatible with type "int"
-       The layout of int is immediate
+       The layout of int is value non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of word
          because of the annotation on the implicit kind of type variables named w.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Possible constraints. *)
