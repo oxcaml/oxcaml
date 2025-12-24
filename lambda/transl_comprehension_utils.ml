@@ -129,7 +129,7 @@ module Lambda_utils = struct
 
       let ( * ) = binop (Integral (size, Mul))
 
-      let ( / ) = binop (Integral (size, Div Unsafe))
+      let ( / ) = binop (Integral (size, Div (Unsafe, Signed)))
 
       let ( = ) = binop (Icmp (size, Ceq))
 

@@ -488,7 +488,7 @@ module Instruction_name = struct
     | ADD -> "add"
     | SUB -> "sub"
     | MUL -> "mul"
-    | DIV -> "div"
+    | DIV -> "udiv"
     | AND -> "and"
     | ORR -> "orr"
     | EOR -> "eor"
