@@ -1804,3 +1804,454 @@ run 3:
   user 669.77
   sys  118.51
 
+
+=== 2025-12-23T05:27:43Z ===
+desc: test run
+toolchain_profile: main
+
+run 1:
+Error: Invalid build directory: _build/self
+The build directory must be an absolute path or a sub-directory of the root
+of the workspace.
+real 0.01
+user 0.00
+sys 0.00
+
+=== 2025-12-23T05:27:53Z ===
+desc: test run
+toolchain_profile: main
+
+run 1:
++ cd /Users/julesjacobs/git/oxcaml
++ PATH='/Users/julesjacobs/git/oxcaml/_build/install/main/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/var/folders/17/k8k18qbj7x5g9bj8plv8_ng80000gn/T/.tmp7EcZiQ:/Users/julesjacobs/.antigravity/antigravity/bin:/opt/homebrew/opt/rustup/bin:/Users/julesjacobs/.opam/4.14.2/bin:/Users/julesjacobs/.cargo/bin:/Users/julesjacobs/Library/Application Support/Coursier/bin:/Users/julesjacobs/.cursor/extensions/openai.chatgpt-0.5.56-universal/bin/macos-aarch64:/Users/julesjacobs/Library/Application Support/Coursier/bin'
++ OCAMLLIB=/Users/julesjacobs/git/oxcaml/_build/install/main/lib/ocaml
++ /usr/bin/time -p dune build --root=. --build-dir=_build/self @install
+Error: Invalid build directory: _build/self
+The build directory must be an absolute path or a sub-directory of the root
+of the workspace.
+real 0.00
+user 0.00
+sys 0.00
+
+=== 2025-12-23T05:28:15Z ===
+desc: test run
+toolchain_profile: main
+
+run 1:
+Error: Multiple rules generated for
+/Users/julesjacobs/git/oxcaml/_build/self/default/oxcaml/tests/simd/utils256.ml:
+- oxcaml/tests/simd/dune:57
+- oxcaml/tests/simd/dune:12
+File "lambda/dune", lines 15-21, characters 0-323:
+15 | (rule
+16 |  (targets runtimedef.ml)
+17 |  (mode    fallback)
+18 |  (deps    (:fail (file ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/fail.h))
+19 |           (:prim (file ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/primitives)))
+20 |  (action  (with-stdout-to %{targets}
+21 |             (run ./generate_runtimedef.sh %{fail} %{prim}))))
+Error: No rule found for runtime-dir-env-var-not-set/primitives
+File "utils/dune", lines 40-54, characters 0-445:
+40 | (rule
+41 |  (targets domainstate.mli)
+42 |  (mode fallback)
+....
+52 |    %{targets}
+53 |    (bash
+54 |     "`grep '^CPP=' %{conf} | cut -d'=' -f2` -I ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml %{c}"))))
+Error: No rule found for runtime-dir-env-var-not-set/caml/domain_state.tbl
+File "bytecomp/dune", lines 15-20, characters 0-228:
+15 | (rule
+16 |  (targets opcodes.ml)
+17 |  (mode    fallback)
+18 |  (deps    (:instr (file ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/instruct.h)))
+19 |  (action
+20 |   (bash "%{dep:../tools/make_opcodes.exe} -opcodes < %{instr} > %{targets}")))
+Error: No rule found for runtime-dir-env-var-not-set/caml/instruct.h
+File "lambda/dune", lines 15-21, characters 0-323:
+15 | (rule
+16 |  (targets runtimedef.ml)
+17 |  (mode    fallback)
+18 |  (deps    (:fail (file ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/fail.h))
+19 |           (:prim (file ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/primitives)))
+20 |  (action  (with-stdout-to %{targets}
+21 |             (run ./generate_runtimedef.sh %{fail} %{prim}))))
+Error: No rule found for runtime-dir-env-var-not-set/caml/fail.h
+File "command line", line 1:
+Error: Unbound module "Stdlib"
+File "/workspace_root/command line", line 1:
+Error: Unbound module "Stdlib"
+real 3.47
+user 6.01
+sys 5.77
+
+=== 2025-12-23T05:28:45Z ===
+desc: test run
+toolchain_profile: main
+
+run 1:
+Error: Multiple rules generated for
+/Users/julesjacobs/git/oxcaml/_build/self/default/oxcaml/tests/simd/utils256.ml:
+- oxcaml/tests/simd/dune:57
+- oxcaml/tests/simd/dune:12
+File "/workspace_root/command line", line 1:
+Error: Unbound module "Stdlib"
+File "command line", line 1:
+Error: Unbound module "Stdlib"
+real 2.90
+user 6.06
+sys 5.72
+
+=== 2025-12-23T05:29:34Z ===
+desc: test run
+toolchain_profile: main
+
+run 1:
+Error: Multiple rules generated for
+/Users/julesjacobs/git/oxcaml/_build/self/main/oxcaml/tests/simd/utils256.ml:
+- oxcaml/tests/simd/dune:57
+- oxcaml/tests/simd/dune:12
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 137.49
+user 559.16
+sys 74.13
+
+=== 2025-12-23T05:32:57Z ===
+desc: test run
+toolchain_profile: main
+
+run 1:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 140.42
+user 563.71
+sys 77.31
+
+run 2:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 144.13
+user 604.72
+sys 80.84
+
+run 3:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 134.16
+user 548.57
+sys 71.84
+
+=== 2025-12-23T05:40:08Z ===
+desc: test run
+toolchain_profile: main
+dune_profile: dev
+
+run 1:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 135.70
+user 553.85
+sys 74.28
+
+run 2:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 134.63
+user 542.53
+sys 71.29
+
+=== 2025-12-23T05:47:16Z ===
+desc: ikinds=false
+toolchain_profile: main
+dune_profile: dev
+
+run 1:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 138.79
+user 568.74
+sys 71.00
+
+run 2:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 136.98
+user 568.16
+sys 71.21
+
+run 3:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 133.64
+user 554.62
+sys 67.79
+
+
+=== 2025-12-23T07:13:02Z ===
+desc: ikinds=true
+toolchain_profile: main
+dune_profile: dev
+
+run 1:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 127.59
+user 530.84
+sys 70.29
+
+run 2:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 127.81
+user 532.42
+sys 69.16
+
+run 3:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 129.98
+user 538.08
+sys 71.32
+
+
+=== 2025-12-23T07:56:08Z ===
+desc: ikinds=false
+toolchain_profile: main
+dune_profile: dev
+
+run 1:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 135.40
+user 562.52
+sys 69.78
+
+run 2:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 135.27
+user 567.59
+sys 70.54
+
+run 3:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 135.02
+user 564.25
+sys 70.04
+
+
+=== 2025-12-23T18:22:18Z ===
+desc: ikinds=true
+toolchain_profile: main
+dune_profile: dev
+
+run 1:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 130.53
+user 540.60
+sys 71.73
+
+run 2:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 130.55
+user 541.18
+sys 72.69
+
+run 3:
+  CC closure.o
+  CC error.o
+  CC lalr.o
+  CC lr0.o
+  CC main.o
+  CC mkpar.o
+  CC output.o
+  CC reader.o
+  CC skeleton.o
+  CC symtab.o
+  CC verbose.o
+  CC warshall.o
+real 131.31
+user 543.64
+sys 73.26
+
+
+=== 2025-12-24T15:29:41Z ===
+desc: ikinds=false
+toolchain_profile: main
+dune_profile: dev
+
+run 1:
