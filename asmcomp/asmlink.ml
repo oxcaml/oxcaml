@@ -220,24 +220,49 @@ let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
       link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
         ~ppf_dump)
 
-let call_linker file_list_rev startup_file output_name =
+let call_linker ?dissector_args file_list_rev startup_file output_name =
   let main_dll =
     !Clflags.output_c_object && Filename.check_suffix output_name Config.ext_dll
   and main_obj_runtime = !Clflags.output_complete_object in
-  let file_list_rev =
-    if !Oxcaml_flags.use_cached_generic_functions
-    then !Oxcaml_flags.cached_generic_functions_path :: file_list_rev
-    else file_list_rev
-  in
-  let files = startup_file :: List.rev file_list_rev in
   let files, c_lib =
-    if (not !Clflags.output_c_object) || main_dll || main_obj_runtime
-    then
-      ( files @ List.rev !Clflags.ccobjs @ runtime_lib (),
+    match dissector_args with
+    | Some args ->
+      (* Dissector mode: partition files contain everything (startup,
+         ml_objfiles, ccobjs, runtime_lib). Don't add them again. Add linker
+         script flag. However, linker flags (starting with -l) need to be passed
+         through as they can't be baked into partition files. *)
+      Clflags.all_ccopts
+        := Build_linker_args.linker_script_flag args :: !Clflags.all_ccopts;
+      let c_lib =
         if !Clflags.nopervasives || (main_obj_runtime && not main_dll)
         then ""
-        else Config.native_c_libraries )
-    else files, ""
+        else Config.native_c_libraries
+      in
+      (* Filter ccobjs to only include linker flags (starting with -l) *)
+      let linker_flags =
+        List.filter
+          (fun s -> String.starts_with ~prefix:"-l" s)
+          (List.rev !Clflags.ccobjs)
+      in
+      Build_linker_args.object_files args @ linker_flags, c_lib
+    | None ->
+      (* Normal mode: combine startup + ml_objfiles + ccobjs + runtime_lib *)
+      let file_list_rev =
+        if !Oxcaml_flags.use_cached_generic_functions
+        then !Oxcaml_flags.cached_generic_functions_path :: file_list_rev
+        else file_list_rev
+      in
+      let files = startup_file :: List.rev file_list_rev in
+      let files, c_lib =
+        if (not !Clflags.output_c_object) || main_dll || main_obj_runtime
+        then
+          ( files @ List.rev !Clflags.ccobjs @ runtime_lib (),
+            if !Clflags.nopervasives || (main_obj_runtime && not main_dll)
+            then ""
+            else Config.native_c_libraries )
+        else files, ""
+      in
+      files, c_lib
   in
   let mode =
     if main_dll
@@ -365,9 +390,47 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
             ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
             units_tolink cached_genfns_imports));
   Emitaux.reduce_heap_size ~reset:(fun () -> ());
+  (* Dissector pass: partitions all object files and rewrites them *)
+  let dissector_args, dissector_temp_dir =
+    if !Clflags.dissector
+    then (
+      let cached_genfns =
+        if !Oxcaml_flags.use_cached_generic_functions
+        then Some !Oxcaml_flags.cached_generic_functions_path
+        else None
+      in
+      let temp_dir = mk_temp_dir "camldissector" "" in
+      let result =
+        Profile.record_call "dissector" (fun () ->
+            Dissector.run ~unix ~temp_dir ~ml_objfiles ~startup_obj
+              ~ccobjs:(List.rev !Clflags.ccobjs) ~runtime_libs:(runtime_lib ())
+              ~cached_genfns)
+      in
+      let linker_args = Build_linker_args.build result in
+      (* Print partition file paths if requested *)
+      if !Clflags.ddissector_partitions
+      then (
+        Printf.eprintf "Dissector partition files (in %s):\n" temp_dir;
+        List.iter
+          (fun file -> Printf.eprintf "  %s\n" file)
+          (Build_linker_args.object_files linker_args);
+        Printf.eprintf "  %s\n%!" (Build_linker_args.linker_script linker_args));
+      Some linker_args, Some temp_dir)
+    else None, None
+  in
+  let cleanup_dissector_temp_dir () =
+    match dissector_temp_dir with
+    | None -> ()
+    | Some dir ->
+      if !Clflags.ddissector_partitions
+      then () (* Keep partition files for debugging *)
+      else Misc.remove_dir_contents dir
+  in
   Misc.try_finally
-    (fun () -> call_linker ml_objfiles startup_obj output_name)
-    ~always:(fun () -> remove_file startup_obj)
+    (fun () -> call_linker ?dissector_args ml_objfiles startup_obj output_name)
+    ~always:(fun () ->
+      remove_file startup_obj;
+      cleanup_dissector_temp_dir ())
 
 let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
     ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
