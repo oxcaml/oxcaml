@@ -121,9 +121,24 @@ type texp_field_boxing =
 
 val aliased_many_use : unique_use
 
+(** [label_ambiguity] specifies the result of type-driven label disambiguation.
+    Disambiguation occurs when the same label (record field or variant case)
+    occurs in many types, when performing operations like variant construction
+    or record access, but also when specifying record and variant patterns.
+
+    Where disambiguation was necessary (i.e. the label was ambiguous),
+    the disambiguated path and arity of the resolved type constructor
+    is preserved so that we can insert a type annotation.
+
+    The arity specifies the appropriate number of wildcard type arguments,
+    e.g. [{ path: result; arity: 2 } --> (_, _) result]. *)
+type label_ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
 type _ type_inspection =
-  | Label_disambiguation : [< `pat | `exp ] type_inspection
-  | Polymorphic_parameter : [< `pat | `exp ] type_inspection
+  | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
+  | Polymorphic_parameter : [<  `pat | `exp ] type_inspection
 
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
