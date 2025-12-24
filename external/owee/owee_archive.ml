@@ -54,26 +54,23 @@ type member =
 
 type member_header = member
 
-(* Parse a decimal integer from a fixed-width ASCII field, ignoring trailing
-   spaces. Returns 0 if the field is empty or all spaces. *)
-let parse_decimal_field s =
+(* Parse an integer from a fixed-width ASCII field, ignoring trailing spaces.
+   Returns 0 if the field is empty or all spaces. The [convert] function
+   transforms the trimmed string before parsing (e.g., adding "0o" for octal). *)
+let parse_int_field ~convert ~field_type s =
   let s = String.trim s in
   if String.length s = 0
   then 0
   else
-    match int_of_string_opt s with
+    match int_of_string_opt (convert s) with
     | Some n -> n
-    | None -> invalid_format ("Invalid decimal field: " ^ s)
+    | None -> invalid_format ("Invalid " ^ field_type ^ " field: " ^ s)
 
-(* Parse an octal integer from a fixed-width ASCII field. *)
+let parse_decimal_field s =
+  parse_int_field ~convert:Fun.id ~field_type:"decimal" s
+
 let parse_octal_field s =
-  let s = String.trim s in
-  if String.length s = 0
-  then 0
-  else
-    match int_of_string_opt ("0o" ^ s) with
-    | Some n -> n
-    | None -> invalid_format ("Invalid octal field: " ^ s)
+  parse_int_field ~convert:(fun s -> "0o" ^ s) ~field_type:"octal" s
 
 (* Read the archive magic number and validate it. *)
 let read_magic cursor =
