@@ -196,11 +196,12 @@ Line 2, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "t_immediate64" should be an instance of type
          "('a : value_or_null non_pointer)"
-       The layout of t_immediate64 is immediate64
+       The layout of t_immediate64 is value non_pointer64
          because of the definition of t_immediate64 at line 3, characters 0-32.
        But the layout of t_immediate64 must be a sublayout of
            value non_pointer maybe_null
          because of the definition of accepts_nonptr_val_maybe_null at line 1, characters 0-70.
+       Note: The layout of immediate64 is value non_pointer64.
 |}]
 type fails = t_immediate64_or_null accepts_nonptr_val_maybe_null
 [%%expect{|
