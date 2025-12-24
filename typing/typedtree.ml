@@ -128,12 +128,12 @@ let aliased_many_use =
   ( Mode.Uniqueness.disallow_left Mode.Uniqueness.aliased,
     Mode.Linearity.disallow_right Mode.Linearity.many )
 
-type ambiguity =
+type label_ambiguity =
   | Ambiguous of { path: Path.t; arity : int }
   | Unambiguous
 
 type _ type_inspection =
-  | Label_disambiguation : ambiguity -> [< `pat | `exp ] type_inspection
+  | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
   | Polymorphic_parameter : [< `pat | `exp ] type_inspection
 
 type pattern = value general_pattern

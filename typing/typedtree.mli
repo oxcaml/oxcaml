@@ -124,12 +124,12 @@ val aliased_many_use : unique_use
 (** Whether this construction required type-driven label disambiguation.
     If so, the disambiguated path and arity of the underlying type constructor
     is preserved for inserting an explicit annotation. *)
-type ambiguity =
+type label_ambiguity =
   | Ambiguous of { path: Path.t; arity : int }
   | Unambiguous
 
 type _ type_inspection =
-  | Label_disambiguation : ambiguity -> [< `pat | `exp ] type_inspection
+  | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
   | Polymorphic_parameter : [<  `pat | `exp ] type_inspection
 
 type pattern = value general_pattern

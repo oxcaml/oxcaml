@@ -2334,7 +2334,7 @@ end) = struct
         usage lid env
         expected_type
         candidates_in_scope
-        : t * ambiguity =
+        : t * label_ambiguity =
     let lbl = match expected_type with
     | None ->
         (* no expected type => no disambiguation *)
@@ -2405,7 +2405,7 @@ end) = struct
         end
     in
     (* warn only on nominal labels *)
-    let (ambiguity : ambiguity) =
+    let ambiguity =
       match check_disambiguated_name lbl candidates_in_scope with
       | true ->
         if in_env lbl then
@@ -2491,7 +2491,7 @@ let label_disambiguate
       : (rep candidates -> (rep candidates, rep candidates) result) option)
     (record_form : rep record_form) usage lid env expected_type
     (scope : (rep candidates, _) result)
-  : rep gen_label_description * ambiguity =
+  : rep gen_label_description * label_ambiguity =
   match record_form with
   | Legacy ->
     Label.disambiguate ?warn ?filter usage lid env expected_type scope
@@ -8430,7 +8430,7 @@ and type_function
 
 and type_label_access
   : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * 'rep gen_label_description * _ * ambiguity
+    _ * _ * _ * 'rep gen_label_description * _ * _
   = fun record_form env srecord usage lid ->
   let mode = Value.newvar () in
   let record_jkind, record_sort =
