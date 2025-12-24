@@ -447,7 +447,7 @@ let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
     let rec loop i =
       if i >= Array.length sections
       then None
-      else if sections.(i).Elf.sh_type = sh_type
+      else if Elf.Section_type.(equal (of_u32 sections.(i).Elf.sh_type) sh_type)
       then Some i
       else loop (i + 1)
     in

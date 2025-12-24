@@ -43,45 +43,68 @@ type section = {
 
 (** ELF section header types (sh_type field). *)
 module Section_type : sig
-  val sht_null : u32
+  type t
+
+  val equal : t -> t -> bool
+  (** Test equality of section types. *)
+
+  val to_u32 : t -> u32
+  (** Convert to the raw ELF section type value. *)
+
+  val of_u32 : u32 -> t
+  (** Create from a raw ELF section type value. *)
+
+  val sht_null : t
   (** Inactive section header. *)
 
-  val sht_progbits : u32
+  val sht_progbits : t
   (** Program-defined data. *)
 
-  val sht_symtab : u32
+  val sht_symtab : t
   (** Symbol table. *)
 
-  val sht_strtab : u32
+  val sht_strtab : t
   (** String table. *)
 
-  val sht_rela : u32
+  val sht_rela : t
   (** Relocation entries with addends. *)
 
-  val sht_symtab_shndx : u32
+  val sht_symtab_shndx : t
   (** Extended section indices for symbols (when section count >= SHN_LORESERVE). *)
 end
 
 (** ELF section header flags (sh_flags field). *)
 module Section_flags : sig
-  (** Section attribute flags. These can be combined with [Int64.logor]. *)
+  type t
 
-  val shf_write : u64
+  val to_u64 : t -> u64
+  (** Convert to the raw ELF flags value. *)
+
+  val of_u64 : u64 -> t
+  (** Create from a raw ELF flags value. *)
+
+  val empty : t
+  (** No flags set. *)
+
+  val ( + ) : t -> t -> t
+  (** Combine two flag sets. *)
+
+  val shf_write : t
   (** Section contains writable data. *)
 
-  val shf_alloc : u64
+  val shf_alloc : t
   (** Section occupies memory during process execution. *)
 
-  val shf_execinstr : u64
+  val shf_execinstr : t
   (** Section contains executable machine instructions. *)
 
-  val shf_info_link : u64
+  val shf_info_link : t
   (** sh_info field contains a section header table index. *)
 
-  val is_set : u64 -> flag:u64 -> bool
+  val is_set : t -> flag:t -> bool
   (** [is_set flags ~flag] returns true if [flag] is set in [flags]. *)
 
-  val is_alloc : u64 -> bool
+  val is_alloc : t -> bool
   (** [is_alloc flags] returns true if the section occupies memory during
       execution (i.e., [shf_alloc] is set). *)
 end

@@ -149,6 +149,12 @@ type section = {
 }
 
 module Section_type = struct
+  type t = int
+
+  let equal = Int.equal
+  let to_u32 t = t
+  let of_u32 t = t
+
   let sht_null = 0
   let sht_progbits = 1
   let sht_symtab = 2
@@ -158,6 +164,14 @@ module Section_type = struct
 end
 
 module Section_flags = struct
+  type t = int64
+
+  let to_u64 t = t
+  let of_u64 t = t
+
+  let empty = 0L
+  let ( + ) = Int64.logor
+
   let shf_write = 0x1L
   let shf_alloc = 0x2L
   let shf_execinstr = 0x4L
