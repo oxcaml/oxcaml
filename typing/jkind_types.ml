@@ -665,11 +665,6 @@ module Scannable_axes = struct
 
   let value_axes = { nullability = Non_null; separability = Separable }
 
-  let immediate_axes = { nullability = Non_null; separability = Non_pointer }
-
-  let immediate64_axes =
-    { nullability = Non_null; separability = Non_pointer64 }
-
   let equal { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
     Nullability.equal n1 n2 && Separability.equal s1 s2

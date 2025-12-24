@@ -453,11 +453,12 @@ and r = {x:int; y:bool}
 Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r#" is immediate & immediate
+Error: The layout of type "r#" is value non_pointer & value non_pointer
          because it is an unboxed record.
        But the layout of type "r#" must be a sublayout of
            value maybe_separable maybe_null & float64
          because it is an unboxed record.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* CR layouts-scannable: improve this error message *)
@@ -468,11 +469,12 @@ and q = r#
 Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r#" is immediate & immediate
+Error: The layout of type "r#" is value non_pointer & value non_pointer
          because it is an unboxed record.
        But the layout of type "r#" must be a sublayout of
            value maybe_separable maybe_null & float64
          because it is an unboxed record.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 module rec M : sig
