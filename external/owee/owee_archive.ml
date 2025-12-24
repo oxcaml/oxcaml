@@ -190,7 +190,10 @@ let read_member_header buf cursor ~string_table =
             let name =
               match string_table with
               | None ->
-                invalid_format "Extended filename but no string table found"
+                invalid_format
+                  (Printf.sprintf
+                     "Extended filename at offset %d but no string table found"
+                     header_start)
               | Some strtab -> read_sysv_string_table_entry strtab offset
             in
             name, after_header, total_size
