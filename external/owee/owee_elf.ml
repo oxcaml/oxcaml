@@ -263,9 +263,15 @@ let shn_loreserve = 0xFF00
 (* Resolve extended section numbering. Returns (actual_shnum, actual_shstrndx).
    If e_shnum is 0, the actual count is in sh_size of section header 0.
    If e_shstrndx >= SHN_LORESERVE, the actual string table index is in
-   sh_link of section header 0. *)
+   sh_link of section header 0.
+   Note: if e_shoff = 0, there is no section header table at all (common in
+   stripped binaries), so we return (0, 0). *)
 let resolve_extended_numbering header t =
-  if header.e_shnum = 0 || header.e_shstrndx >= shn_loreserve then
+  if header.e_shoff = 0L
+  then (* No section header table *)
+    0, 0
+  else if header.e_shnum = 0 || header.e_shstrndx >= shn_loreserve
+  then
     let section0 = read_section header t 0 in
     let actual_shnum =
       if header.e_shnum = 0 then Int64.to_int section0.sh_size
@@ -276,16 +282,18 @@ let resolve_extended_numbering header t =
       else header.e_shstrndx
     in
     actual_shnum, actual_shstrndx
-  else
-    header.e_shnum, header.e_shstrndx
+  else header.e_shnum, header.e_shstrndx
 
 let read_sections header t =
   let e_shnum, e_shstrndx = resolve_extended_numbering header t in
-  let sections = Array.init e_shnum (read_section header t) in
-  let shstrndx = sections.(e_shstrndx) in
-  Array.map
-    (fun s -> {s with sh_name_str = read_section_name shstrndx t s})
-    sections
+  if e_shnum = 0
+  then [||]
+  else
+    let sections = Array.init e_shnum (read_section header t) in
+    let shstrndx = sections.(e_shstrndx) in
+    Array.map
+      (fun s -> { s with sh_name_str = read_section_name shstrndx t s })
+      sections
 
 let write_sections header t sections =
   (* Handle extended section numbering when writing. The header passed in
