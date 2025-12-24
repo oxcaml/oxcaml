@@ -103,7 +103,13 @@ for ((i=0; i<MEMBER_COUNT; i++)); do
     ' "$SECTIONS_FILE"
     echo ""
   else
-    echo "  (not ELF: No ELF magic number)"
+    # Read first 4 bytes to match Owee's error message format
+    MAGIC_BYTES=$(od -An -tx1 -N4 "$TMPFILE" | tr -d ' \n')
+    BYTE0=$(echo "$MAGIC_BYTES" | cut -c1-2)
+    BYTE1=$(echo "$MAGIC_BYTES" | cut -c3-4)
+    BYTE2=$(echo "$MAGIC_BYTES" | cut -c5-6)
+    BYTE3=$(echo "$MAGIC_BYTES" | cut -c7-8)
+    echo "  (not ELF: No ELF magic number (found $BYTE0 $BYTE1 $BYTE2 $BYTE3))"
     echo ""
   fi
   rm -f "$TMPFILE" "$SECTIONS_FILE"
