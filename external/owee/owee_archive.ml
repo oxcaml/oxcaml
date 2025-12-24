@@ -42,9 +42,9 @@ let header_terminator = "`\n"
 
 type t = Owee_buf.t
 
-(* Archive member header fields. The ar format stores these as fixed-width
-   ASCII strings: name (16), date (12), uid (6), gid (6), mode (8), size (10).
-   The numeric fields are decimal except mode which is octal. The maximum values
+(* Archive member header fields. The ar format stores these as fixed-width ASCII
+   strings: name (16), date (12), uid (6), gid (6), mode (8), size (10). The
+   numeric fields are decimal except mode which is octal. The maximum values
    that fit in these fields (e.g., 999999 for uid/gid) fit in OCaml's int type
    on both 32-bit and 64-bit platforms. *)
 type member =
@@ -61,7 +61,8 @@ type member_header = member
 
 (* Parse an integer from a fixed-width ASCII field, ignoring trailing spaces.
    Returns 0 if the field is empty or all spaces. The [convert] function
-   transforms the trimmed string before parsing (e.g., adding "0o" for octal). *)
+   transforms the trimmed string before parsing (e.g., adding "0o" for
+   octal). *)
 let parse_int_field ~convert ~field_type s =
   let s = String.trim s in
   if String.length s = 0
@@ -94,14 +95,16 @@ let is_sysv_symtab name = String.equal (String.trim name) "/"
 (* Check if a name indicates a System V string table *)
 let is_sysv_strtab name = String.equal (String.trim name) "//"
 
-(* Parse an extended name format that uses a prefix followed by a number.
-   Used for both BSD "#1/N" and System V "/N" formats. *)
+(* Parse an extended name format that uses a prefix followed by a number. Used
+   for both BSD "#1/N" and System V "/N" formats. *)
 let parse_extended_name ~prefix ar_name =
   let trimmed = String.trim ar_name in
   if String.starts_with ~prefix trimmed
   then
     let prefix_len = String.length prefix in
-    let num_str = String.sub trimmed prefix_len (String.length trimmed - prefix_len) in
+    let num_str =
+      String.sub trimmed prefix_len (String.length trimmed - prefix_len)
+    in
     int_of_string_opt (String.trim num_str)
   else None
 
@@ -110,7 +113,8 @@ let parse_bsd_extended_name ar_name = parse_extended_name ~prefix:"#1/" ar_name
 
 (* Check if a name uses System V extended format "/N" (offset into string
    table). Note: we can't use parse_extended_name here because "/" alone is the
-   symbol table and "//" is the string table, so we need to check for a digit. *)
+   symbol table and "//" is the string table, so we need to check for a
+   digit. *)
 let parse_sysv_extended_name ar_name =
   let trimmed = String.trim ar_name in
   if String.length trimmed >= 2
