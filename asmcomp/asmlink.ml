@@ -421,16 +421,10 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
   let cleanup_dissector_temp_dir () =
     match dissector_temp_dir with
     | None -> ()
-    | Some dir -> (
+    | Some dir ->
       if !Clflags.ddissector_partitions
       then () (* Keep partition files for debugging *)
-      else
-        try
-          Array.iter
-            (fun entry -> remove_file (Filename.concat dir entry))
-            (Sys.readdir dir);
-          remove_dir dir
-        with Sys_error _ -> ())
+      else Misc.remove_dir_contents dir
   in
   Misc.try_finally
     (fun () -> call_linker ?dissector_args ml_objfiles startup_obj output_name)

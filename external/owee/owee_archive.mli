@@ -59,6 +59,9 @@ type member = private
     mode : int  (** File permission bits (octal). *)
   }
 
+(** Alias for [member] for clarity when referring to header metadata. *)
+type member_header = member
+
 (** [read buf] reads an ar archive from the given buffer. Returns the
     archive handle and a list of members. The buffer should contain
     the entire archive (e.g., via memory mapping).

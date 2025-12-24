@@ -66,10 +66,7 @@ let () =
               if String.length name > 15 then String.sub name 0 15 else name
             in
             (* Only report non-empty sections with common names *)
-            if section.sh_size > 0L
-               && String.length name > 0
-               && (name.[0] = '.'
-                  || String.sub name 0 (min 4 (String.length name)) = ".rel")
+            if section.sh_size > 0L && String.starts_with ~prefix:"." name
             then Printf.printf "  %s: size=%Ld\n" name section.sh_size)
           sections;
         print_newline ()
