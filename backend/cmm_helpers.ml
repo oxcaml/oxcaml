@@ -5484,9 +5484,6 @@ module Scalar_type = struct
         (bit_width t)
 
     let nativeint = create_exn ~bit_width:arch_bits ~signedness:Signed
-
-    let unsigned_nativeint =
-      create_exn ~bit_width:arch_bits ~signedness:Unsigned
   end
 
   (** An {!Integer.t} but with the additional stipulation that its container must
@@ -5500,9 +5497,6 @@ module Scalar_type = struct
 
     let immediate =
       create_exn ~bit_width_including_tag_bit:arch_bits ~signedness:Signed
-
-    let unsigned_immediate =
-      create_exn ~bit_width_including_tag_bit:arch_bits ~signedness:Unsigned
 
     let[@inline] bit_width_including_tag_bit t = bit_width t
 
@@ -5529,8 +5523,6 @@ module Scalar_type = struct
       | Tagged of Tagged_integer.t
 
     let nativeint = Untagged Integer.nativeint
-
-    let unsigned_nativeint = Untagged Integer.unsigned_nativeint
 
     let[@inline] untagged_or_identity = function
       | Untagged t -> t

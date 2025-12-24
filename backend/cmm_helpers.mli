@@ -1630,8 +1630,6 @@ module Scalar_type : sig
 
     val nativeint : t
 
-    val unsigned_nativeint : t
-
     val create_exn : bit_width:int -> signedness:Signedness.t -> t
 
     val bit_width : t -> int
@@ -1645,8 +1643,6 @@ module Scalar_type : sig
     type t [@@immediate]
 
     val immediate : t
-
-    val unsigned_immediate : t
 
     val create_exn :
       bit_width_including_tag_bit:int -> signedness:Signedness.t -> t
@@ -1666,8 +1662,6 @@ module Scalar_type : sig
       | Tagged of Tagged_integer.t
 
     val nativeint : t
-
-    val unsigned_nativeint : t
 
     (** Gets the integer resulting from untagging the integeral iff it is tagged.
 
