@@ -1045,14 +1045,17 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%atomic_lxor_field" -> Atomic(Lxor, Field, Immediate)
     | "%atomic_lxor_loc" -> Atomic(Lxor, Loc, Immediate)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
-    | "%runstack" ->
-      if runtime5 then Primitive (Prunstack, 3) else Unsupported Prunstack
+    | "%with_stack" ->
+      if runtime5 then Primitive (Pwith_stack, 5) else Unsupported Pwith_stack
+    | "%with_stack_bind" ->
+      if runtime5 then Primitive (Pwith_stack_bind, 7)
+      else Unsupported Pwith_stack_bind
     | "%reperform" ->
       if runtime5 then Primitive (Preperform, 3) else Unsupported Preperform
     | "%perform" ->
       if runtime5 then Primitive (Pperform, 1) else Unsupported Pperform
     | "%resume" ->
-      if runtime5 then Primitive (Presume, 4) else Unsupported Presume
+      if runtime5 then Primitive (Presume, 3) else Unsupported Presume
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%poll" -> Primitive (Ppoll, 1)
@@ -2336,7 +2339,7 @@ let lambda_primitive_needs_event_after = function
   | Punboxed_nativeint_array_set_vec _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
-  | Prunstack | Pperform | Preperform | Presume
+  | Pwith_stack | Pwith_stack_bind | Pperform | Preperform | Presume
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)

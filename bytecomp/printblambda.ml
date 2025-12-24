@@ -210,7 +210,8 @@ let rec blambda ppf = function
       match op with
       | Perform -> "perform"
       | Reperform -> "reperform"
-      | Runstack -> "runstack"
+      | With_stack -> "with_stack"
+      | With_stack_bind -> "with_stack_bind"
       | Resume -> "resume"
     in
     fprintf ppf "@[<2>(%s@ %a)@]" op
