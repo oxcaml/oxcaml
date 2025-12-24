@@ -2592,15 +2592,18 @@ let disambiguate_sort_lid_a_list
             amb
     | _ -> ()
   end;
-  (* At this point we are sure all disambiguations are consistent,
-     so we collapse them *)
-  let ambiguity, lbl_a_list =
-    List.fold_left_map
-      (fun amb (lid,(lbl, amb'),a) ->
-        match amb' with
-        | Unambiguous -> amb, (lid, lbl, a)
-        | Ambiguous _ as amb -> amb, (lid, lbl, a))
-      Unambiguous lbl_a_list
+  (* At this point we are sure disambiguations for each label are consistent,
+     so we select an arbitrary one *)
+  let ambiguity =
+    List.find_map
+      (fun (_, (_, amb), _) ->
+        match amb with
+        | Unambiguous -> None
+        | Ambiguous _ as amb -> Some amb)
+      lbl_a_list
+    |> Option.value ~default:Unambiguous
+  and lbl_a_list =
+    List.map (fun (lid, (lbl, _), a) -> lid, lbl, a) lbl_a_list
   in
   (if !w_scope <> [] then
     let record_form = record_form_to_string record_form in
