@@ -4,15 +4,19 @@ open Owee_buf
 
 let read_magic t =
   ensure t 4 "Magic number truncated";
-  let {buffer; position} = t in
+  let { buffer; position } = t in
   let valid =
-    buffer.{position + 0} = 0x7f &&
-    buffer.{position + 1} = Char.code 'E' &&
-    buffer.{position + 2} = Char.code 'L' &&
-    buffer.{position + 3} = Char.code 'F'
+    buffer.{position + 0} = 0x7f
+    && buffer.{position + 1} = Char.code 'E'
+    && buffer.{position + 2} = Char.code 'L'
+    && buffer.{position + 3} = Char.code 'F'
   in
-  if not valid then
-    invalid_format "No ELF magic number";
+  if not valid
+  then
+    invalid_format
+      (Printf.sprintf "No ELF magic number (found %02x %02x %02x %02x)"
+         buffer.{position + 0} buffer.{position + 1} buffer.{position + 2}
+         buffer.{position + 3});
   advance t 4
 
 let write_magic t =
@@ -246,9 +250,13 @@ let write_section header t n section =
 
 let read_section_name shstrndx t shdr =
   let n = shdr.sh_name in
-  seek t ((Int64.to_int shstrndx.sh_offset) + n);
-  match Read.zero_string t ~maxlen:((Int64.to_int shstrndx.sh_size) - n) () with
-  | None -> invalid_format "Unterminated section name"
+  let offset = Int64.to_int shstrndx.sh_offset + n in
+  seek t offset;
+  match Read.zero_string t ~maxlen:(Int64.to_int shstrndx.sh_size - n) () with
+  | None ->
+    invalid_format
+      (Printf.sprintf "Unterminated section name at offset %d (sh_name=%d)"
+         offset n)
   | Some s -> s
 
 let write_section_name shstrndx t shdr name =
