@@ -42,6 +42,11 @@ let header_terminator = "`\n"
 
 type t = Owee_buf.t
 
+(* Archive member header fields. The ar format stores these as fixed-width
+   ASCII strings: name (16), date (12), uid (6), gid (6), mode (8), size (10).
+   The numeric fields are decimal except mode which is octal. The maximum values
+   that fit in these fields (e.g., 999999 for uid/gid) fit in OCaml's int type
+   on both 32-bit and 64-bit platforms. *)
 type member =
   { name : string;
     size : int;
