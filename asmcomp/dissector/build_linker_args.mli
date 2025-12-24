@@ -27,24 +27,25 @@
 
 (** Build linker arguments from dissector results.
 
-    After the dissector runs, most original object files (.o, .a) have been
-    partitioned and partially linked into partition object files. C stub files
-    (ccobjs) are passed through directly without partial linking because they
-    may have sections like .gcc_except_table that don't work well with ld -r.
+    After the dissector runs, OCaml object files have been partitioned and
+    partially linked into partition object files. Passthrough files (C stubs
+    and runtime libraries) are passed directly without partial linking because
+    they may have sections like .gcc_except_table that don't work well with
+    ld -r.
 
     The original linker invocation combines:
 
     - startup_obj (the startup code)
 
-    - ml_objfiles (OCaml .o files derived from .cmx/.cmxa)
+    - ml_objfiles (OCaml .o/.a files derived from .cmx/.cmxa)
 
     - ccobjs (C object files from -cclib, including lib_ccobjs from .cmxa)
 
     - runtime_libs (runtime library files)
 
     After dissector processing:
-    - startup_obj, ml_objfiles, and runtime_libs are baked into partitions
-    - ccobjs are passed through directly (not partially linked)
+    - startup_obj and ml_objfiles are baked into partitions
+    - ccobjs and runtime_libs are passed through directly (not partially linked)
 
     The caller must NOT add ccobjs or runtime_libs again when using dissector
     output - they are already included in object_files. *)
@@ -53,9 +54,9 @@
 type t
 
 (** Returns the object files for the final linker. This includes:
-    - Rewritten partition .o files (containing startup_obj, ml_objfiles,
-      and runtime_libs that were partially linked)
-    - Passthrough files (ccobjs - C stub files that bypass partial linking)
+    - Rewritten partition .o files (containing startup_obj and ml_objfiles
+      that were partially linked)
+    - Passthrough files (ccobjs and runtime_libs that bypass partial linking)
 
     The caller should pass these files to the linker and NOT add ccobjs or
     runtime_libs separately. *)
