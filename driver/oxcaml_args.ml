@@ -389,7 +389,7 @@ let mk_dissector_partition_size f =
   ( "-dissector-partition-size",
     Arg.Float f,
     Printf.sprintf
-      "<size> Set the partition size threshold in gigabytes for the dissector \
+      "<size>  Set the partition size threshold in gigabytes for the dissector \
        pass (default: %g)"
       Clflags.dissector_partition_size_default )
 
