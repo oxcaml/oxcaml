@@ -730,10 +730,11 @@ Line 3, characters 83-89:
                                                                                        ^^^^^^
 Error: The type constraints are not consistent.
        Type "('b : value & value & float64)" is not compatible with type "b"
-       The layout of b is immediate & value maybe_separable & float64
+       The layout of b is value non_pointer & value maybe_separable & float64
          because of the definition of b at line 1, characters 0-51.
        But the layout of b must be a sublayout of value & value & float64
          because of the annotation on 'b in the declaration of the type fails.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type c = #( float * float or_null * float# )
