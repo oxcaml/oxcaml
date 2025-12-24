@@ -122,9 +122,9 @@ type texp_field_boxing =
 val aliased_many_use : unique_use
 
 (** [label_ambiguity] specifies the result of type-driven label disambiguation.
-    Disambiguation occurs when the same label (record field or variant case) occurs
-    in many types, e.g. for variant construction or record access, but also
-    record and variant patterns.
+    Disambiguation occurs when the same label (record field or variant case)
+    occurs in many types, when performing operations like variant construction
+    or record access, but also when specifying record and variant patterns.
 
     Where disambiguation was necessary (i.e. the label was ambiguous),
     the disambiguated path and arity of the resolved type constructor
