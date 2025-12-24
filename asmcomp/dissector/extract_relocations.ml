@@ -106,7 +106,8 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
             symbol_name entry.r_offset
         | _ -> ()
       else if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-              || Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
+              || Rela.Reloc_type.equal entry.r_type
+                   Rela.Reloc_type.rex_gotpcrelx
       then
         (* Only process relocations for undefined symbols *)
         match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with

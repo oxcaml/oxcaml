@@ -61,7 +61,8 @@ let analyze_elf_buf buf =
     Array.fold_left
       (fun (acc_size, acc_probes) (section : Compiler_owee.Owee_elf.section) ->
         let new_size =
-          if Compiler_owee.Owee_elf.Section_flags.(is_alloc (of_u64 section.sh_flags))
+          if Compiler_owee.Owee_elf.Section_flags.(
+               is_alloc (of_u64 section.sh_flags))
           then Int64.add acc_size section.sh_size
           else acc_size
         in

@@ -118,7 +118,7 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   let files_to_measure =
     List.map (fun f -> f, MOF.OCaml) ml_objfiles
     @ [startup_obj, MOF.Startup]
-    @ (match cached_genfns with None -> [] | Some f -> [f, MOF.Cached_genfns])
+    @ match cached_genfns with None -> [] | Some f -> [f, MOF.Cached_genfns]
   in
   let passthrough_files = ccobjs @ runtime_libs in
   (* Measure file sizes for partitioning *)

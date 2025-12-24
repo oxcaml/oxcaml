@@ -286,7 +286,8 @@ let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
           let rewrite_to =
             if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
             then String.Tbl.find_opt plt_rewrite_map sym_name
-            else if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
+            else if Rela.Reloc_type.equal entry.r_type
+                      Rela.Reloc_type.rex_gotpcrelx
             then String.Tbl.find_opt got_rewrite_map sym_name
             else None
           in

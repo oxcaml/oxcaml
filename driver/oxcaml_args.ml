@@ -2244,8 +2244,8 @@ module Extra_params = struct
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
     | "dissector" -> set' Clflags.dissector
-    | "dissector-partition-size" ->
-        (match float_of_string_opt v with
+    | "dissector-partition-size" -> (
+        match float_of_string_opt v with
         | Some f ->
             Clflags.dissector_partition_size := Some f;
             true

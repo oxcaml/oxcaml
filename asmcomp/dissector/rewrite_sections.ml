@@ -65,7 +65,8 @@ let write_synthetic_symbol ~cursor ~strtab ~name ~section_index ~offset ~size
     { st_name = Strtab.add strtab name;
       st_info =
         Rela.make_st_info ~binding:Rela.Symbol_binding.global
-          ~typ:(if is_func then Rela.Symbol_type.func else Rela.Symbol_type.notype);
+          ~typ:
+            (if is_func then Rela.Symbol_type.func else Rela.Symbol_type.notype);
       st_other = Rela.Symbol_visibility.(to_int hidden);
       st_shndx;
       st_value = Int64.of_int offset;
