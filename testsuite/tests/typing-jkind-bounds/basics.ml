@@ -288,8 +288,14 @@ type d : immediate64 = c
 [%%expect{|
 type a : immediate64
 type b = a
-type c : immediate64
-type d = c
+type c : immediate64 non_pointer64
+Line 4, characters 0-24:
+4 | type d : immediate64 = c
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "c" is immediate64
+         because of the definition of c at line 3, characters 0-94.
+       But the layout of type "c" must be a sublayout of immediate
+         because of the definition of d at line 4, characters 0-24.
 |}]
 
 type a : float64 = float#
