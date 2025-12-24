@@ -2243,6 +2243,22 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "dissector" -> set' Clflags.dissector
+    | "dissector-partition-size" ->
+        (match float_of_string_opt v with
+        | Some f ->
+            Clflags.dissector_partition_size := Some f;
+            true
+        | None ->
+            raise
+              (Arg.Bad (Printf.sprintf "Expected float for %s, got %S" name v)))
+    | "ddissector" -> set' Clflags.ddissector
+    | "ddissector-sizes" -> set' Clflags.ddissector_sizes
+    | "ddissector-verbose" -> set' Clflags.ddissector_verbose
+    | "ddissector-partitions" -> set' Clflags.ddissector_partitions
+    | "ddissector-inputs" ->
+        Clflags.ddissector_inputs := Some v;
+        true
     | _ -> false
 end
 
