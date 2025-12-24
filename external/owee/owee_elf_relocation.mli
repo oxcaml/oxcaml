@@ -51,11 +51,36 @@ val shn_xindex : int
 
 (** {1 x86-64 Relocation Types} *)
 
-val r_x86_64_plt32 : int64
-(** R_X86_64_PLT32 relocation type. *)
+(** Abstract type representing an x86-64 relocation type. *)
+module Reloc_type : sig
+  type t
 
-val r_x86_64_rex_gotpcrelx : int64
-(** R_X86_64_REX_GOTPCRELX relocation type. *)
+  val equal : t -> t -> bool
+  (** Test equality of relocation types. *)
+
+  val to_int64 : t -> int64
+  (** Convert to the raw ELF relocation type value. *)
+
+  val of_int64 : int64 -> t
+  (** Create from a raw ELF relocation type value. *)
+
+  val plt32 : t
+  (** R_X86_64_PLT32 relocation type. *)
+
+  val rex_gotpcrelx : t
+  (** R_X86_64_REX_GOTPCRELX relocation type. *)
+
+  val r64 : t
+  (** R_X86_64_64 relocation type (64-bit absolute). *)
+
+  val pc32 : t
+  (** R_X86_64_PC32 relocation type (32-bit PC-relative). *)
+
+  val name : t -> string
+  (** [name t] returns a human-readable name for the relocation type.
+      Known types are returned as short names like "PLT32",
+      unknown types are returned as "type=N". *)
+end
 
 (** {1 RELA Entry Parsing} *)
 
@@ -65,7 +90,7 @@ type rela_entry =
     (** Offset within the section being relocated. *)
     r_sym : int;
     (** Symbol table index. *)
-    r_type : int64;
+    r_type : Reloc_type.t;
     (** Relocation type. *)
     r_addend : int64
     (** Addend for the relocation. *)
@@ -91,19 +116,6 @@ val read_symbol_name :
     A value of [shn_undef] (0) indicates an undefined symbol. *)
 val read_symbol_shndx : symtab_body:Owee_buf.t -> sym_index:int -> int option
 
-(** {1 Additional Relocation Types} *)
-
-val r_x86_64_64 : int64
-(** R_X86_64_64 relocation type (64-bit absolute). *)
-
-val r_x86_64_pc32 : int64
-(** R_X86_64_PC32 relocation type (32-bit PC-relative). *)
-
-(** [reloc_type_name r_type] returns a human-readable name for the
-    relocation type. Known types are returned as short names like "PLT32",
-    unknown types are returned as "type=N". *)
-val reloc_type_name : int64 -> string
-
 (** {1 Entry Sizes} *)
 
 val rela_entry_size : int
@@ -121,32 +133,47 @@ val write_rela_entry : cursor:Owee_buf.cursor -> rela_entry -> unit
 (** {1 Symbol Table Writing} *)
 
 (** Symbol binding attributes for st_info. *)
-module Stb : sig
-  val local : int
-  val global : int
-  val weak : int
+module Symbol_binding : sig
+  type t
+
+  val to_int : t -> int
+  (** Convert to the raw ELF binding value. *)
+
+  val local : t
+  val global : t
+  val weak : t
 end
 
 (** Symbol type attributes for st_info. *)
-module Stt : sig
-  val notype : int
-  val object_ : int
-  val func : int
-  val section : int
-  val file : int
+module Symbol_type : sig
+  type t
+
+  val to_int : t -> int
+  (** Convert to the raw ELF symbol type value. *)
+
+  val notype : t
+  val object_ : t
+  val func : t
+  val section : t
+  val file : t
 end
 
 (** Symbol visibility attributes for st_other. *)
-module Stv : sig
-  val default : int
-  val internal : int
-  val hidden : int
-  val protected : int
+module Symbol_visibility : sig
+  type t
+
+  val to_int : t -> int
+  (** Convert to the raw ELF visibility value. *)
+
+  val default : t
+  val internal : t
+  val hidden : t
+  val protected : t
 end
 
 (** [make_st_info ~binding ~typ] creates the st_info byte from binding and
     type attributes. *)
-val make_st_info : binding:int -> typ:int -> int
+val make_st_info : binding:Symbol_binding.t -> typ:Symbol_type.t -> int
 
 (** A symbol table entry to write. *)
 type sym_entry =

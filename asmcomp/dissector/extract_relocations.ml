@@ -86,7 +86,7 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
   let convert_to_got = ref [] in
   Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
       (* Check for PC32 relocations to undefined symbols - these are an error *)
-      if Int64.equal entry.r_type Rela.r_x86_64_pc32
+      if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
       then
         match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
         | Some shndx when shndx = Rela.shn_undef ->
@@ -105,18 +105,18 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
              (i.e., with dynamic linking support enabled)."
             symbol_name entry.r_offset
         | _ -> ()
-      else if Int64.equal entry.r_type Rela.r_x86_64_plt32
-              || Int64.equal entry.r_type Rela.r_x86_64_rex_gotpcrelx
+      else if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
+              || Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
       then
         (* Only process relocations for undefined symbols *)
         match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
         | None ->
           log_verbose "  reloc %s at 0x%Lx: no symbol shndx"
-            (Rela.reloc_type_name entry.r_type)
+            (Rela.Reloc_type.name entry.r_type)
             entry.r_offset
         | Some shndx when shndx <> Rela.shn_undef ->
           log_verbose "  reloc %s at 0x%Lx: symbol defined (shndx=%d), skipping"
-            (Rela.reloc_type_name entry.r_type)
+            (Rela.Reloc_type.name entry.r_type)
             entry.r_offset shndx
         | Some _ -> (
           match
@@ -125,16 +125,16 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
           with
           | None ->
             log_verbose "  reloc %s at 0x%Lx: no symbol name"
-              (Rela.reloc_type_name entry.r_type)
+              (Rela.Reloc_type.name entry.r_type)
               entry.r_offset
           | Some symbol_name ->
             log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"
-              (Rela.reloc_type_name entry.r_type)
+              (Rela.Reloc_type.name entry.r_type)
               entry.r_offset symbol_name;
             let reloc_entry =
               { Relocation_entry.symbol_name; offset = entry.r_offset }
             in
-            if Int64.equal entry.r_type Rela.r_x86_64_plt32
+            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
             then convert_to_plt := reloc_entry :: !convert_to_plt
             else convert_to_got := reloc_entry :: !convert_to_got));
   { convert_to_plt = List.rev !convert_to_plt;

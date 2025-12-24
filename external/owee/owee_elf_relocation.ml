@@ -30,17 +30,25 @@ let sht_rela = 4
 let sht_symtab = 2
 
 (* x86-64 relocation types *)
-let r_x86_64_plt32 = 4L
-let r_x86_64_rex_gotpcrelx = 42L
-let r_x86_64_64 = 1L
-let r_x86_64_pc32 = 2L
+module Reloc_type = struct
+  type t = int64
 
-let reloc_type_name r_type =
-  if Int64.equal r_type r_x86_64_plt32 then "PLT32"
-  else if Int64.equal r_type r_x86_64_rex_gotpcrelx then "REX_GOTPCRELX"
-  else if Int64.equal r_type r_x86_64_pc32 then "PC32"
-  else if Int64.equal r_type r_x86_64_64 then "64"
-  else Printf.sprintf "type=%Ld" r_type
+  let equal = Int64.equal
+  let to_int64 t = t
+  let of_int64 t = t
+
+  let plt32 = 4L
+  let rex_gotpcrelx = 42L
+  let r64 = 1L
+  let pc32 = 2L
+
+  let name t =
+    if Int64.equal t plt32 then "PLT32"
+    else if Int64.equal t rex_gotpcrelx then "REX_GOTPCRELX"
+    else if Int64.equal t pc32 then "PC32"
+    else if Int64.equal t r64 then "64"
+    else Printf.sprintf "type=%Ld" t
+end
 
 (* Size of an Elf64_Rela entry in bytes *)
 let rela_entry_size = 24
@@ -60,7 +68,7 @@ let shn_xindex = 0xffff
 type rela_entry =
   { r_offset : int64;
     r_sym : int;
-    r_type : int64;
+    r_type : Reloc_type.t;
     r_addend : int64
   }
 
@@ -127,7 +135,7 @@ let read_symbol_shndx ~symtab_body ~sym_index =
 
 (* Construct r_info from symbol index and relocation type *)
 let make_r_info ~sym ~typ =
-  Int64.logor (Int64.shift_left (Int64.of_int sym) 32) typ
+  Int64.logor (Int64.shift_left (Int64.of_int sym) 32) (Reloc_type.to_int64 typ)
 
 let write_rela_entry ~cursor entry =
   Owee_buf.Write.u64 cursor entry.r_offset;
@@ -135,14 +143,22 @@ let write_rela_entry ~cursor entry =
   Owee_buf.Write.u64 cursor entry.r_addend
 
 (* Symbol binding attributes *)
-module Stb = struct
+module Symbol_binding = struct
+  type t = int
+
+  let to_int t = t
+
   let local = 0
   let global = 1
   let weak = 2
 end
 
 (* Symbol type attributes *)
-module Stt = struct
+module Symbol_type = struct
+  type t = int
+
+  let to_int t = t
+
   let notype = 0
   let object_ = 1
   let func = 2
@@ -151,14 +167,19 @@ module Stt = struct
 end
 
 (* Symbol visibility attributes (stored in st_other) *)
-module Stv = struct
+module Symbol_visibility = struct
+  type t = int
+
+  let to_int t = t
+
   let default = 0
   let internal = 1
   let hidden = 2
   let protected = 3
 end
 
-let make_st_info ~binding ~typ = (binding lsl 4) lor typ
+let make_st_info ~binding ~typ =
+  (Symbol_binding.to_int binding lsl 4) lor Symbol_type.to_int typ
 
 type sym_entry =
   { st_name : int;
