@@ -20,7 +20,7 @@ type ('a : any non_pointer, 'b : any maybe_separable, 'c : any) t;;
 type ('a : any non_pointer, 'b : any, 'c : any) t
 |}]
 
-type t : value non_pointer & value maybe_separable & float64
+type t : value non_pointer & scannable non_null & float64
 [%%expect{|
 type t : value non_pointer & value maybe_separable & float64
 |}]
@@ -38,7 +38,7 @@ type t_maybeptr : any
 type t_nonptr : any non_pointer
 |}]
 
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : scannable non_null
 type t_nonptr_val : value non_pointer
 [%%expect{|
 type t_maybeptr_val : value maybe_separable
@@ -52,7 +52,7 @@ type ('a : any) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 |}]
 
-type ('a : value maybe_separable) accepts_maybeptr_val
+type ('a : scannable non_null) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 [%%expect{|
 type ('a : value maybe_separable) accepts_maybeptr_val
@@ -95,7 +95,7 @@ Line 1, characters 13-27:
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer)"
        The layout of t_maybeptr_val is value maybe_separable
-         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+         because of the definition of t_maybeptr_val at line 1, characters 0-40.
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
@@ -165,14 +165,14 @@ Line 1, characters 13-27:
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer64)"
        The layout of t_maybeptr_val is value maybe_separable
-         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+         because of the definition of t_maybeptr_val at line 1, characters 0-40.
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer64
          because of the definition of accepts_nonptr64_val at line 1, characters 0-52.
        Note: The layout of immediate64 is value non_pointer64.
 |}]
 
-type ('a : value non_pointer64 maybe_null) accepts_nonptr64_val_maybe_null
+type ('a : scannable non_pointer64) accepts_nonptr64_val_maybe_null
 
 type t_immediate64 : immediate64
 type t_immediate64_or_null : immediate64_or_null
@@ -180,27 +180,38 @@ type t_immediate64_or_null : immediate64_or_null
 type succeeds = t_immediate64 accepts_nonptr64_val_maybe_null
 type succeeds = t_immediate64_or_null accepts_nonptr64_val_maybe_null
 [%%expect{|
-type ('a : value_or_null non_pointer64) accepts_nonptr64_val_maybe_null
+type ('a : value non_pointer64) accepts_nonptr64_val_maybe_null
 type t_immediate64 : immediate64
 type t_immediate64_or_null : immediate64_or_null
 type succeeds = t_immediate64 accepts_nonptr64_val_maybe_null
-type succeeds = t_immediate64_or_null accepts_nonptr64_val_maybe_null
+Line 7, characters 16-37:
+7 | type succeeds = t_immediate64_or_null accepts_nonptr64_val_maybe_null
+                    ^^^^^^^^^^^^^^^^^^^^^
+Error: This type "t_immediate64_or_null" should be an instance of type
+         "('a : value non_pointer64)"
+       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
+         because of the definition of t_immediate64_or_null at line 4, characters 0-48.
+       But the layout of t_immediate64_or_null must be a sublayout of
+           value non_pointer64
+         because of the definition of accepts_nonptr64_val_maybe_null at line 1, characters 0-74.
+       Note: The layout of immediate64 is value non_pointer64.
 |}]
 
-type ('a : value non_pointer maybe_null) accepts_nonptr_val_maybe_null
+type ('a : scannable non_pointer) accepts_nonptr_val_maybe_null
 type fails = t_immediate64 accepts_nonptr_val_maybe_null
 [%%expect{|
-type ('a : value_or_null non_pointer) accepts_nonptr_val_maybe_null
+type ('a : value non_pointer) accepts_nonptr_val_maybe_null
 Line 2, characters 13-26:
 2 | type fails = t_immediate64 accepts_nonptr_val_maybe_null
                  ^^^^^^^^^^^^^
 Error: This type "t_immediate64" should be an instance of type
-         "('a : value_or_null non_pointer)"
+         "('a : value non_pointer)"
        The layout of t_immediate64 is value non_pointer64
          because of the definition of t_immediate64 at line 3, characters 0-32.
        But the layout of t_immediate64 must be a sublayout of
-           value non_pointer maybe_null
+           value non_pointer
          because of the definition of accepts_nonptr_val_maybe_null at line 1, characters 0-70.
+       Note: The layout of immediate is value non_pointer.
        Note: The layout of immediate64 is value non_pointer64.
 |}]
 type fails = t_immediate64_or_null accepts_nonptr_val_maybe_null
@@ -209,12 +220,13 @@ Line 1, characters 13-34:
 1 | type fails = t_immediate64_or_null accepts_nonptr_val_maybe_null
                  ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
-         "('a : value_or_null non_pointer)"
+         "('a : value non_pointer)"
        The layout of t_immediate64_or_null is value non_pointer64 maybe_null
          because of the definition of t_immediate64_or_null at line 4, characters 0-48.
        But the layout of t_immediate64_or_null must be a sublayout of
-           value non_pointer maybe_null
+           value non_pointer
          because of the definition of accepts_nonptr_val_maybe_null at line 1, characters 0-70.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* when the layout is not value, the scannable axes should not be relevant *)
@@ -285,14 +297,14 @@ Line 3, characters 13-27:
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : any separable)"
        The layout of t_maybeptr_val is value maybe_separable
-         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+         because of the definition of t_maybeptr_val at line 1, characters 0-40.
        But the layout of t_maybeptr_val must be a sublayout of any separable
          because it's the type argument to the array type.
 |}]
 
 (* unboxed records *)
 
-type t_maybeptr_val : value maybe_separable
+type t_maybeptr_val : scannable non_null
 type t_nonptr_val : value non_pointer
 [%%expect{|
 type t_maybeptr_val : value maybe_separable
@@ -336,7 +348,7 @@ let f x =
 val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
 |}]
 
-let f (type a : value maybe_separable) (x : a) =
+let f (type a : scannable non_null) (x : a) =
   let require_np (y : (_ : value non_pointer)) = () in
   require_np y
 [%%expect{|
@@ -354,7 +366,7 @@ val f : ('a : float64). 'a -> unit = <fun>
 |}]
 
 let f (type a : value non_pointer) (x : a) =
-  (* here, y is value maybe_separable *)
+  (* here, y is scannable non_null *)
   let g y = () in
   g x
 [%%expect{|
@@ -362,7 +374,7 @@ val f : ('a : value non_pointer). 'a -> unit = <fun>
 |}]
 
 let f (t : (_ : value non_pointer & value)) =
-  (* here, x is value maybe_separable *)
+  (* here, x is scannable non_null *)
   let g (type a : value non_pointer) (x : a) = () in
   let #(np, v) = t in
   g np
@@ -498,7 +510,7 @@ Error: Signature mismatch:
 module M1 : sig
   type ('a : value non_pointer) t : value
 end = struct
-  type ('a : value maybe_separable) t = t_nonptr_val
+  type ('a : scannable non_null) t = t_nonptr_val
 end
 [%%expect{|
 module M1 : sig type ('a : value non_pointer) t end
@@ -551,7 +563,7 @@ Error: Signature mismatch:
        is not included in
          type ('a : value non_pointer) t : value non_pointer
        The layout of the first is value maybe_separable
-         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+         because of the definition of t_maybeptr_val at line 1, characters 0-40.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-53.
        Note: The layout of immediate is value non_pointer.
@@ -589,23 +601,7 @@ end = struct
   type t : immediate mod separable
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t : immediate mod separable
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : immediate separable end
-       is not included in
-         sig type t : value non_float end
-       Type declarations do not match:
-         type t : immediate separable
-       is not included in
-         type t : value non_float
-       The layout of the first is value
-         because of the definition of t at line 4, characters 2-34.
-       But the layout of the first must be a sublayout of value non_float
-         because of the definition of t at line 2, characters 2-26.
+module M : sig type t : value non_float end
 |}]
 
 module M : sig

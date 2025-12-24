@@ -1401,30 +1401,38 @@ module Const = struct
     | None -> t
     | Some { txt = new_nullability; loc } ->
       (match Layout.Const.get_root_scannable_axes t.layout with
-      | None -> ()
+      | None -> t
       | Some { nullability; separability = _ } ->
-        if new_nullability = nullability
-        then
-          Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
-      let new_layout =
-        Layout.Const.set_root_nullability t.layout new_nullability
-      in
-      { t with layout = new_layout }
+        let result_nullability = Nullability.meet nullability new_nullability in
+        if Nullability.equal result_nullability nullability
+        then begin
+          Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev);
+          t
+        end
+        else
+          let new_layout =
+            Layout.Const.set_root_nullability t.layout result_nullability
+          in
+          { t with layout = new_layout })
 
   let set_separability ~abbrev (sep : Separability.t Location.loc option) t =
     match sep with
     | None -> t
     | Some { txt = new_separability; loc } ->
       (match Layout.Const.get_root_scannable_axes t.layout with
-      | None -> ()
+      | None -> t
       | Some { nullability = _; separability } ->
-        if new_separability = separability
-        then
-          Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
-      let new_layout =
-        Layout.Const.set_root_separability t.layout new_separability
-      in
-      { t with layout = new_layout }
+        let result_separability = Separability.meet separability new_separability in
+        if Separability.equal result_separability separability
+        then begin
+          Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev);
+          t
+        end
+        else
+          let new_layout =
+            Layout.Const.set_root_separability t.layout result_separability
+          in
+          { t with layout = new_layout })
 
   let jkind_of_product_annotations (type l r) (jkinds : (l * r) t list) =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)

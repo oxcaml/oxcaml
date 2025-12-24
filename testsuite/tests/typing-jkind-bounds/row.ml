@@ -318,15 +318,22 @@ type 'a t1 = 'a constraint 'a = [< `A of string | `B of int ]
 Line 2, characters 0-57:
 2 | type 'a t2 : immediate non_float with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of
-           immediate non_float with [< `A of string | `B of int ] t1
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
+       Note: The layout of immediate is value non_pointer.
 |}]
 type t3 : immediate non_float with [ `A of string] t1 = C of string  (* should be accepted *)
 [%%expect{|
-type t3 = C of string
+Line 1, characters 0-67:
+1 | type t3 : immediate non_float with [ `A of string] t1 = C of string  (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t3" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "t3" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type t3.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type 'a t1 = [> `A of string | `B of int ] as 'a
@@ -336,15 +343,22 @@ type 'a t1 = 'a constraint 'a = [> `A of string | `B of int ]
 Line 2, characters 0-57:
 2 | type 'a t2 : immediate non_float with 'a t1 = C of string  (* should be rejected *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of
-           immediate non_float with [> `A of string | `B of int ] t1
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
+       Note: The layout of immediate is value non_pointer.
 |}]
 type t3 : immediate non_float with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
 [%%expect{|
-type t3 = C of string
+Line 1, characters 0-85:
+1 | type t3 : immediate non_float with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t3" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "t3" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type t3.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 module type S = sig
@@ -360,11 +374,11 @@ module M1 : S
 Line 7, characters 0-53:
 7 | type t2 : immediate non_float with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of
-           immediate non_float with M1.t
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 module M2 : S with type t = [ `A of string ] = struct
@@ -373,7 +387,14 @@ end
 type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
 [%%expect{|
 module M2 : sig type t = [ `A of string ] end
-type t3 = C of string
+Line 4, characters 0-53:
+4 | type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t3" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "t3" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type t3.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type (_, _) eq = Refl : ('a, 'a) eq
@@ -388,11 +409,11 @@ type (_, _) eq = Refl : ('a, 'a) eq
 Line 6, characters 4-57:
 6 |     type t4 : immediate non_float with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t4" is immutable_data
+Error: The layout of type "t4" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t4" must be a subkind of
-           immediate non_float with M1.t
+       But the layout of type "t4" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t4.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 module type S = sig
@@ -408,11 +429,11 @@ module M1 : S
 Line 7, characters 0-53:
 7 | type t2 : immediate non_float with M1.t = C of string  (* should be rejected *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of
-           immediate non_float with M1.t
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 module M2 : S with type t = [ `A of string | `B of int ] = struct
@@ -421,7 +442,14 @@ end
 type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
 [%%expect{|
 module M2 : sig type t = [ `A of string | `B of int ] end
-type t3 = C of string
+Line 4, characters 0-53:
+4 | type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t3" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "t3" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type t3.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let sneaky (x : (M1.t, [ `A of string | `B of int ]) eq) = match x with
@@ -432,11 +460,11 @@ let sneaky (x : (M1.t, [ `A of string | `B of int ]) eq) = match x with
 Line 3, characters 4-57:
 3 |     type t4 : immediate non_float with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t4" is immutable_data
+Error: The layout of type "t4" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t4" must be a subkind of
-           immediate non_float with M1.t
+       But the layout of type "t4" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t4.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type json : immutable_data =

@@ -1707,7 +1707,24 @@ end = struct
   type t : value mod non_float
 end
 [%%expect{|
-module M : sig type t : value non_float end
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : value mod non_float
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : value non_float end
+       is not included in
+         sig type t : value non_pointer end
+       Type declarations do not match:
+         type t : value non_float
+       is not included in
+         type t : value non_pointer
+       The layout of the first is value non_float
+         because of the definition of t at line 4, characters 2-30.
+       But the layout of the first must be a sublayout of value non_pointer
+         because of the definition of t at line 2, characters 2-46.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (**************************)

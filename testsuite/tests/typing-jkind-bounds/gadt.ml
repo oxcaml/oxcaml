@@ -298,12 +298,12 @@ type 'a abstract : value mod portable
 Lines 2-3, characters 0-70:
 2 | type existential_abstract : immediate non_float =
 3 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is
-           immutable_data with (type : value mod portable) abstract
+Error: The layout of type "existential_abstract" is value non_float
          because it's a boxed variant type.
-       But the kind of type "existential_abstract" must be a subkind of
-           immediate non_float
+       But the layout of type "existential_abstract" must be a sublayout of
+           value non_pointer
          because of the annotation on the declaration of the type existential_abstract.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
@@ -493,11 +493,12 @@ type show_me_the_kind : immediate non_float = (int ref, int ref) box2
 Line 1, characters 0-69:
 1 | type show_me_the_kind : immediate non_float = (int ref, int ref) box2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "(int ref, int ref) box2" is mutable_data
+Error: The layout of type "(int ref, int ref) box2" is value non_float
          because of the definition of box2 at line 1, characters 0-45.
-       But the kind of type "(int ref, int ref) box2" must be a subkind of
-           immediate non_float
+       But the layout of type "(int ref, int ref) box2" must be a sublayout of
+           value non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-69.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Demonstrate that this is only a printing issue *)
@@ -507,10 +508,11 @@ type _ box : immediate non_float = Box : 'a -> 'a box
 Line 1, characters 0-53:
 1 | type _ box : immediate non_float = Box : 'a -> 'a box
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "box" is immutable_data with _
+Error: The layout of type "box" is value non_float
          because it's a boxed variant type.
-       But the kind of type "box" must be a subkind of immediate non_float
+       But the layout of type "box" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type box.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Only the first type parameter matters *)
@@ -548,10 +550,11 @@ type 'a t constraint 'a = 'b option
 Lines 2-3, characters 0-21:
 2 | type 'c t2 : immediate non_float =
 3 |   | K : 'd t -> 'd t2
-Error: The kind of type "t2" is immutable_data with (type : value) option t
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immediate non_float
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Existential row variables *)
@@ -566,12 +569,12 @@ type show_me_the_kind : immediate non_float = exist_row1
 Line 1, characters 0-56:
 1 | type show_me_the_kind : immediate non_float = exist_row1
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row1" is
-           immutable_data with [< `A | `B of int ref ]
+Error: The layout of type "exist_row1" is value non_float
          because of the definition of exist_row1 at line 1, characters 0-67.
-       But the kind of type "exist_row1" must be a subkind of
-           immediate non_float
+       But the layout of type "exist_row1" must be a sublayout of
+           value non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-56.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let foo (x : exist_row1 @ nonportable) = use_portable x
@@ -601,12 +604,12 @@ type show_me_the_kind : immediate non_float = exist_row2
 Line 1, characters 0-56:
 1 | type show_me_the_kind : immediate non_float = exist_row2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row2" is
-           immutable_data with [> `A | `B of int ref ]
+Error: The layout of type "exist_row2" is value non_float
          because of the definition of exist_row2 at line 1, characters 0-67.
-       But the kind of type "exist_row2" must be a subkind of
-           immediate non_float
+       But the layout of type "exist_row2" must be a sublayout of
+           value non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-56.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let foo (x : exist_row2 @ nonportable) = use_portable x
@@ -636,12 +639,12 @@ type 'a show_me_the_kind : immediate non_float = 'a option exist_row3
 Line 1, characters 0-69:
 1 | type 'a show_me_the_kind : immediate non_float = 'a option exist_row3
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a option exist_row3" is
-           immutable_data with [> `A | `B of int ref ]
+Error: The layout of type "'a option exist_row3" is value non_float
          because of the definition of exist_row3 at line 1, characters 0-80.
-       But the kind of type "'a option exist_row3" must be a subkind of
-           immediate non_float
+       But the layout of type "'a option exist_row3" must be a sublayout of
+           value non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-69.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontended x

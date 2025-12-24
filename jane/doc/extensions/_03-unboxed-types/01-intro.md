@@ -50,7 +50,7 @@ type. The axis has two possible values, with `non_null < maybe_null`. A type may
 be `non_null` if none of its values are `NULL`.
 
 The kind of values with `NULL` added as a possibility is written
-`value_or_null`, which is equivalent to `value maybe_null maybe_separable`.
+`value_or_null`, which is equivalent to `scannable separable maybe_separable`.
 
 Types that don't have `NULL` as a possible value are
 compatible with `or_null`, a non-allocating option type that is built into
