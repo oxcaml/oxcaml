@@ -78,7 +78,7 @@ end
 
     @param unix First-class Unix module for file operations
     @param temp_dir Directory for temporary and output files
-    @param ml_objfiles The OCaml object files (.o, .a, .cmx, .cmxa)
+    @param ml_objfiles The OCaml object files (.o, .a derived from .cmx, .cmxa)
     @param startup_obj The startup object file
     @param ccobjs Extra C object files from -cclib (Clflags.ccobjs)
     @param runtime_libs Runtime libraries (from runtime_lib ())

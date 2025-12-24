@@ -46,15 +46,11 @@ let () =
 
 type file_origin =
   | OCaml
-  | C_stub
-  | Runtime
   | Startup
   | Cached_genfns
 
 let string_of_origin = function
   | OCaml -> "OCaml"
-  | C_stub -> "C_stub"
-  | Runtime -> "Runtime"
   | Startup -> "Startup"
   | Cached_genfns -> "Cached_genfns"
 
@@ -76,16 +72,6 @@ let analyze_elf_buf buf =
       (0L, false) sections
   in
   size, has_probes
-
-(* Read a .cmxa file and return its library_infos *)
-let read_cmxa filename : Cmx_format.library_infos =
-  let chan = open_in_bin filename in
-  let _magic =
-    really_input_string chan (String.length Config.cmxa_magic_number)
-  in
-  let cmxa : Cmx_format.library_infos = input_value chan in
-  close_in chan;
-  cmxa
 
 (* Check if a string is a linker option (starts with '-') rather than a file *)
 let is_linker_option s = String.length s > 0 && String.get s 0 = '-'
@@ -163,14 +149,12 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
       in
       size, has_probes, List.rev member_names
   in
-  (* Track which files we've already analyzed to avoid double-counting from
-     transitive dependencies (e.g., lib_ccobjs in .cmxa files) *)
+  (* Track which files we've already analyzed to avoid double-counting *)
   let analyzed = String.Tbl.create 256 in
   (* Analyze a single file based on its extension, return list of file_size
-     records. For .cmxa files, this may include both the .a file and any
-     lib_ccobjs that haven't been analyzed yet. Linker options (starting with
-     '-') are ignored. The origin is propagated to the resulting entries. *)
-  let rec analyze_one ~indent (filename, origin) =
+     records. Linker options (starting with '-') are ignored. The origin is
+     propagated to the resulting entries. *)
+  let analyze_one ~indent (filename, origin) =
     if is_linker_option filename
     then (
       log "%sInput: %s (%s) [linker option, skipped]\n" indent filename
@@ -198,51 +182,6 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
           has_probes;
         log "%s  Members: %s\n" indent (String.concat ", " member_names);
         [{ File_size.filename; size; has_probes; origin }])
-      else if Filename.check_suffix filename ".cmx"
-      then (
-        let obj_file = Filename.chop_suffix filename ".cmx" ^ ".o" in
-        log "%sInput: %s (%s)\n" indent filename (string_of_origin origin);
-        if String.Tbl.mem analyzed obj_file
-        then (
-          log "%s  -> %s [already analyzed, skipped]\n" indent obj_file;
-          [])
-        else (
-          String.Tbl.add analyzed obj_file ();
-          let size, has_probes = analyze_object_file obj_file in
-          log "%s  -> %s (%Ld bytes, has_probes=%b)\n" indent obj_file size
-            has_probes;
-          [{ File_size.filename; size; has_probes; origin }]))
-      else if Filename.check_suffix filename ".cmxa"
-      then (
-        log "%sInput: %s (%s)\n" indent filename (string_of_origin origin);
-        let archive_file = Filename.chop_suffix filename ".cmxa" ^ ".a" in
-        let archive_entry =
-          if String.Tbl.mem analyzed archive_file
-          then (
-            log "%s  -> %s [already analyzed, skipped]\n" indent archive_file;
-            [])
-          else (
-            String.Tbl.add analyzed archive_file ();
-            let size, has_probes, member_names =
-              analyze_archive_file archive_file
-            in
-            log "%s  -> %s (%Ld bytes, has_probes=%b)\n" indent archive_file
-              size has_probes;
-            log "%s  Members: %s\n" indent (String.concat ", " member_names);
-            [{ File_size.filename; size; has_probes; origin }])
-        in
-        let cmxa = read_cmxa filename in
-        (* lib_ccobjs from .cmxa files are C stub libraries *)
-        let ccobjs_entries =
-          if cmxa.lib_ccobjs = []
-          then []
-          else (
-            log "%s  lib_ccobjs:\n" indent;
-            List.concat_map
-              (fun f -> analyze_one ~indent:(indent ^ "    ") (f, C_stub))
-              cmxa.lib_ccobjs)
-        in
-        archive_entry @ ccobjs_entries)
       else (
         log "%sInput: %s (%s) [unknown extension, skipped]\n" indent filename
           (string_of_origin origin);

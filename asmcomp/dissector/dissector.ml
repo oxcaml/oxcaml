@@ -113,17 +113,17 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   | Windows _ | MacOS_like | FreeBSD | NetBSD | OpenBSD | Generic_BSD | Solaris
   | Dragonfly | GNU | BeOS | Unknown ->
     Misc.fatal_error "The dissector pass is only supported on Linux targets");
-  (* Collect all files to analyze, tagging each with its origin *)
-  let files =
+  (* Collect files to analyze for partitioning. C stubs and runtime libraries
+     are passthrough (passed directly to final linker, not partially linked). *)
+  let files_to_measure =
     List.map (fun f -> f, MOF.OCaml) ml_objfiles
     @ [startup_obj, MOF.Startup]
-    @ List.map (fun f -> f, MOF.C_stub) ccobjs
-    @ List.map (fun f -> f, MOF.Runtime) runtime_libs
-    @ match cached_genfns with None -> [] | Some f -> [f, MOF.Cached_genfns]
+    @ (match cached_genfns with None -> [] | Some f -> [f, MOF.Cached_genfns])
   in
-  (* Measure file sizes *)
+  let passthrough_files = ccobjs @ runtime_libs in
+  (* Measure file sizes for partitioning *)
   let file_sizes =
-    try MOF.measure_files unix ~files
+    try MOF.measure_files unix ~files:files_to_measure
     with MOF.Error err -> raise (Error (Measure_error err))
   in
   (* Dump sizes if requested *)
@@ -135,14 +135,10 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
     | None -> Partition_object_files.default_partition_size
   in
   (* Partition files *)
-  let partition_result =
+  let partitions =
     try Partition_object_files.partition_files ~threshold file_sizes
     with Partition_object_files.Error err ->
       raise (Error (Partition_error err))
-  in
-  let partitions = Partition_object_files.partitions partition_result in
-  let passthrough_files =
-    Partition_object_files.passthrough_files partition_result
   in
   let total =
     List.fold_left
