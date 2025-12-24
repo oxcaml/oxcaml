@@ -2566,6 +2566,7 @@ and quote_core_type ty =
     Type.package loc mod_type with_types |> Type.wrap
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ty) |> Type.wrap
   | Ttyp_splice _ -> Type.var loc None |> Type.wrap
+  | Ttyp_repr _ -> fatal_error "Translquote: Ttyp_repr not implemented."
   | Ttyp_open _ -> fatal_error "Still not implemented."
   | Ttyp_of_kind _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> Type.wrap Type.call_pos
