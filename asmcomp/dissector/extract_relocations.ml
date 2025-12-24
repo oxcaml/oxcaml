@@ -156,7 +156,8 @@ let find_sections_with_prefix sections prefix =
 (* Find the symbol table section *)
 let find_symtab_section sections =
   Array.find_opt
-    (fun (section : Elf.section) -> section.sh_type = Rela.sht_symtab)
+    (fun (section : Elf.section) ->
+      Elf.Section_type.(equal (of_u32 section.sh_type) sht_symtab))
     sections
 
 (* Internal version that adds to an accumulator *)

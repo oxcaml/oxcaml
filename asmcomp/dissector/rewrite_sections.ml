@@ -270,8 +270,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     Elf.make_progbits_section
       ~sh_name:(FRP.igot_name_offset plan)
       ~sh_name_str:(FRP.igot_name_str plan)
-      ~sh_flags:
-        (Int64.logor Elf.Section_flags.shf_write Elf.Section_flags.shf_alloc)
+      ~sh_flags:Elf.Section_flags.(to_u64 (shf_write + shf_alloc))
       ~sh_offset:(SL.offset igot_layout) ~sh_size:(SL.size igot_layout)
       ~sh_addralign:16L
   in
@@ -286,8 +285,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     Elf.make_progbits_section
       ~sh_name:(FRP.iplt_name_offset plan)
       ~sh_name_str:(FRP.iplt_name_str plan)
-      ~sh_flags:
-        (Int64.logor Elf.Section_flags.shf_execinstr Elf.Section_flags.shf_alloc)
+      ~sh_flags:Elf.Section_flags.(to_u64 (shf_execinstr + shf_alloc))
       ~sh_offset:(SL.offset iplt_layout) ~sh_size:(SL.size iplt_layout)
       ~sh_addralign:16L
   in
@@ -359,7 +357,8 @@ let rewrite unix ~input_file ~output_file ~partition_kind ~igot_and_iplt
   let symtab_section =
     match
       Array.find_opt
-        (fun (s : Elf.section) -> s.sh_type = Elf.Section_type.sht_symtab)
+        (fun (s : Elf.section) ->
+          Elf.Section_type.(equal (of_u32 s.sh_type) sht_symtab))
         sections
     with
     | Some s -> s
