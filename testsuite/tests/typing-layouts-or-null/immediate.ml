@@ -180,13 +180,7 @@ Error: This type "t_immediate64_or_null" should be an instance of type
        The layout of t_immediate64_or_null is value non_pointer64 maybe_null
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
        But the layout of t_immediate64_or_null must be a sublayout of
-<<<<<<< HEAD
-           immediate
-||||||| parent of f58759a4fd (Improve error messages for layouts containing `value non_pointer` (#5128))
-           immediate64
-=======
            value non_pointer64
->>>>>>> f58759a4fd (Improve error messages for layouts containing `value non_pointer` (#5128))
          because of the definition of accept_immediate64 at line 1, characters 0-42.
        Note: The layout of immediate64 is value non_pointer64.
 |}]

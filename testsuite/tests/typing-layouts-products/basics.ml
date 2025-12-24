@@ -1703,17 +1703,9 @@ Line 2, characters 31-50:
 2 | let _ = Array.init 3 (fun _ -> #{ i1 = 1; i2 = 2 })
                                    ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "array_init_record"
-<<<<<<< HEAD
        but an expression was expected of type "('a : value maybe_null)"
-       The layout of array_init_record is immediate & immediate
-||||||| parent of f58759a4fd (Improve error messages for layouts containing `value non_pointer` (#5128))
-       but an expression was expected of type "('a : value)"
-       The layout of array_init_record is immediate & immediate
-=======
-       but an expression was expected of type "('a : value)"
        The layout of array_init_record is
            value non_pointer & value non_pointer
->>>>>>> f58759a4fd (Improve error messages for layouts containing `value non_pointer` (#5128))
          because of the definition of array_init_record at line 1, characters 0-48.
        But the layout of array_init_record must be a value layout.
        Note: The layout of immediate is value non_pointer.
