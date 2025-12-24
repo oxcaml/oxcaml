@@ -259,9 +259,9 @@ let read buf =
           string_table := Some (Bigarray.Array1.sub buf data_offset size);
         advance first_pass_cursor size;
         (* Only continue searching if we haven't found it and we're still in the
-           special entries at the start *)
-        if !string_table = None
-           && (is_sysv_symtab ar_name || is_sysv_strtab ar_name)
+           special entries at the start. Note: if is_sysv_strtab was true, we
+           already set string_table above, so !string_table = None is false. *)
+        if Option.is_none !string_table && is_sysv_symtab ar_name
         then find_string_table ()))
   in
   find_string_table ();
