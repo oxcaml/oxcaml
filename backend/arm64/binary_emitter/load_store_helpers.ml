@@ -247,7 +247,7 @@ let encode_load_store_gp_sized :
         | PAGE_OFF | LOWER_TWELVE ->
           (* Use LDST64 relocation for 64-bit load/store instructions. The
              immediate encoding differs from ADD: it's scaled by 8. *)
-          if size = 0b11
+          if size = 0b11 (* XXX should this ever be an "ADD" one? *)
           then R_AARCH64_LDST64_ABS_LO12_NC sym.name
           else R_AARCH64_ADD_ABS_LO12_NC sym.name
       in
