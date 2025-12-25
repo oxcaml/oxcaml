@@ -910,63 +910,40 @@ let is_offset_in_range ~size_in_bytes n =
      in
      n lsr shift < 0x1000
 
-let emit_ldr_sp_offset ~dst ~offset =
-  if is_offset_in_range ~size_in_bytes:8 offset
-  then DSL.ins I.LDR [| dst; DSL.emit_mem_sp_offset offset |]
+let emit_load_store_sp_offset ~instr ~operand ~offset ~size_in_bytes =
+  if is_offset_in_range ~size_in_bytes offset
+  then DSL.ins instr [| operand; DSL.emit_mem_sp_offset offset |]
   else (
     emit_intconst reg_tmp1 (Nativeint.of_int offset);
     DSL.ins I.ADD [| DSL.emit_reg reg_tmp1; DSL.sp; DSL.emit_reg reg_tmp1 |];
-    DSL.ins I.LDR [| dst; DSL.emit_mem reg_tmp1 |])
+    DSL.ins instr [| operand; DSL.emit_mem reg_tmp1 |])
+
+let emit_load_store_stack ~instr ~operand ~size_in_bytes (r : Reg.t) =
+  match r.loc with
+  | Stack (Domainstate _) -> DSL.ins instr [| operand; DSL.emit_stack r |]
+  | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
+    let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
+    emit_load_store_sp_offset ~instr ~operand ~offset:ofs ~size_in_bytes
+  | Reg _ | Unknown ->
+    fatal_error "emit_load_store_stack: invalid register location"
+
+let emit_ldr_sp_offset ~dst ~offset =
+  emit_load_store_sp_offset ~instr:I.LDR ~operand:dst ~offset ~size_in_bytes:8
 
 let emit_str_sp_offset ~src ~offset =
-  if is_offset_in_range ~size_in_bytes:8 offset
-  then DSL.ins I.STR [| src; DSL.emit_mem_sp_offset offset |]
-  else (
-    emit_intconst reg_tmp1 (Nativeint.of_int offset);
-    DSL.ins I.ADD [| DSL.emit_reg reg_tmp1; DSL.sp; DSL.emit_reg reg_tmp1 |];
-    DSL.ins I.STR [| src; DSL.emit_mem reg_tmp1 |])
+  emit_load_store_sp_offset ~instr:I.STR ~operand:src ~offset ~size_in_bytes:8
 
 let emit_ldr_stack ~dst (r : Reg.t) =
-  match r.loc with
-  | Stack (Domainstate _) -> DSL.ins I.LDR [| dst; DSL.emit_stack r |]
-  | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
-    let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
-    emit_ldr_sp_offset ~dst ~offset:ofs
-  | Reg _ | Unknown -> fatal_error "emit_ldr_stack"
+  emit_load_store_stack ~instr:I.LDR ~operand:dst ~size_in_bytes:8 r
 
 let emit_str_stack ~src (r : Reg.t) =
-  match r.loc with
-  | Stack (Domainstate _) -> DSL.ins I.STR [| src; DSL.emit_stack r |]
-  | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
-    let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
-    emit_str_sp_offset ~src ~offset:ofs
-  | Reg _ | Unknown -> fatal_error "emit_str_stack"
+  emit_load_store_stack ~instr:I.STR ~operand:src ~size_in_bytes:8 r
 
 let emit_ldr_w_stack ~dst (r : Reg.t) =
-  match r.loc with
-  | Stack (Domainstate _) -> DSL.ins I.LDR [| dst; DSL.emit_stack r |]
-  | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
-    let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
-    if is_offset_in_range ~size_in_bytes:4 ofs
-    then DSL.ins I.LDR [| dst; DSL.emit_mem_sp_offset ofs |]
-    else (
-      emit_intconst reg_tmp1 (Nativeint.of_int ofs);
-      DSL.ins I.ADD [| DSL.emit_reg reg_tmp1; DSL.sp; DSL.emit_reg reg_tmp1 |];
-      DSL.ins I.LDR [| dst; DSL.emit_mem reg_tmp1 |])
-  | Reg _ | Unknown -> fatal_error "emit_ldr_w_stack"
+  emit_load_store_stack ~instr:I.LDR ~operand:dst ~size_in_bytes:4 r
 
 let emit_str_w_stack ~src (r : Reg.t) =
-  match r.loc with
-  | Stack (Domainstate _) -> DSL.ins I.STR [| src; DSL.emit_stack r |]
-  | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
-    let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
-    if is_offset_in_range ~size_in_bytes:4 ofs
-    then DSL.ins I.STR [| src; DSL.emit_mem_sp_offset ofs |]
-    else (
-      emit_intconst reg_tmp1 (Nativeint.of_int ofs);
-      DSL.ins I.ADD [| DSL.emit_reg reg_tmp1; DSL.sp; DSL.emit_reg reg_tmp1 |];
-      DSL.ins I.STR [| src; DSL.emit_mem reg_tmp1 |])
-  | Reg _ | Unknown -> fatal_error "emit_str_w_stack"
+  emit_load_store_stack ~instr:I.STR ~operand:src ~size_in_bytes:4 r
 
 (* Adjust sp (up or down) by the given byte amount *)
 
