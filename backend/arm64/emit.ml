@@ -978,6 +978,7 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
       (DSL.v16b_v16b_v16b i)
   | Cmp_s32 (LT | LE) | Cmp_s64 (LT | LE) | Cmp_s16 (LT | LE) | Cmp_s8 (LT | LE)
     ->
+    (* XXX out of date message *)
     Misc.fatal_error "Cmp_s LT/LE should be transformed in Emit"
   (* Lane operations - insert from GP register *)
   | Setq_lane_s8 { lane } ->
