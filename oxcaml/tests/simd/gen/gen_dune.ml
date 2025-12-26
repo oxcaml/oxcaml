@@ -254,17 +254,32 @@ let () =
   in
   List.iter (print_test ~extra_flag:"-internal-assembler") tests;
   (* Binary emitter comparison for ARM64 SIMD tests.
-     We test a subset of files that run on ARM64 (enabled_if_main). *)
+     We test all files that run on ARM64 (enabled_if_main). *)
   let arm64_binary_emitter_tests =
     [ "basic";
+      "basic_u";
+      "let_mutable";
+      "let_mutable_u";
+      "mixed_modules";
+      "ops_float32x4";
+      "ops_float32x4_u";
       "ops_float64x2";
+      "ops_float64x2_u";
       "ops_int64x2";
+      "ops_int64x2_u";
       "ops_int32x4";
+      "ops_int32x4_u";
       "ops_int16x8";
+      "ops_int16x8_u";
       "ops_int8x16";
+      "ops_int8x16_u";
       "ops";
+      "ops_u";
       "arrays";
+      "arrays_u";
+      "scalar_ops";
       "consts";
+      "consts_u";
       "callback";
       "test_callee_save_neon_regs" ]
   in

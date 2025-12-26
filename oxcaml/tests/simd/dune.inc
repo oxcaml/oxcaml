@@ -7154,11 +7154,95 @@
       (and (= %{context_name} "main")
            (= %{architecture} "arm64")))
  (deps
+  basic_u.exe
+  (glob_files .basic_u.eobjs/native/basic_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .basic_u.eobjs/native/basic_u .basic_u.eobjs/native/basic_u.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  let_mutable.exe
+  (glob_files .let_mutable.eobjs/native/let_mutable.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .let_mutable.eobjs/native/let_mutable .let_mutable.eobjs/native/let_mutable.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  let_mutable_u.exe
+  (glob_files .let_mutable_u.eobjs/native/let_mutable_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .let_mutable_u.eobjs/native/let_mutable_u .let_mutable_u.eobjs/native/let_mutable_u.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  mixed_modules.exe
+  (glob_files .mixed_modules.eobjs/native/mixed_modules.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .mixed_modules.eobjs/native/mixed_modules .mixed_modules.eobjs/native/mixed_modules.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_float32x4.exe
+  (glob_files .ops_float32x4.eobjs/native/ops_float32x4.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .ops_float32x4.eobjs/native/ops_float32x4 .ops_float32x4.eobjs/native/ops_float32x4.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_float32x4_u.exe
+  (glob_files .ops_float32x4_u.eobjs/native/ops_float32x4_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .ops_float32x4_u.eobjs/native/ops_float32x4_u .ops_float32x4_u.eobjs/native/ops_float32x4_u.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
   ops_float64x2.exe
   (glob_files .ops_float64x2.eobjs/native/ops_float64x2.binary-sections/*)
   compare_sections.sh)
  (action
   (run bash compare_sections.sh .ops_float64x2.eobjs/native/ops_float64x2 .ops_float64x2.eobjs/native/ops_float64x2.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_float64x2_u.exe
+  (glob_files .ops_float64x2_u.eobjs/native/ops_float64x2_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .ops_float64x2_u.eobjs/native/ops_float64x2_u .ops_float64x2_u.eobjs/native/ops_float64x2_u.o)))
 
 (rule
  (alias runtest)
@@ -7178,11 +7262,35 @@
       (and (= %{context_name} "main")
            (= %{architecture} "arm64")))
  (deps
+  ops_int64x2_u.exe
+  (glob_files .ops_int64x2_u.eobjs/native/ops_int64x2_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .ops_int64x2_u.eobjs/native/ops_int64x2_u .ops_int64x2_u.eobjs/native/ops_int64x2_u.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
   ops_int32x4.exe
   (glob_files .ops_int32x4.eobjs/native/ops_int32x4.binary-sections/*)
   compare_sections.sh)
  (action
   (run bash compare_sections.sh .ops_int32x4.eobjs/native/ops_int32x4 .ops_int32x4.eobjs/native/ops_int32x4.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_int32x4_u.exe
+  (glob_files .ops_int32x4_u.eobjs/native/ops_int32x4_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .ops_int32x4_u.eobjs/native/ops_int32x4_u .ops_int32x4_u.eobjs/native/ops_int32x4_u.o)))
 
 (rule
  (alias runtest)
@@ -7202,11 +7310,35 @@
       (and (= %{context_name} "main")
            (= %{architecture} "arm64")))
  (deps
+  ops_int16x8_u.exe
+  (glob_files .ops_int16x8_u.eobjs/native/ops_int16x8_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .ops_int16x8_u.eobjs/native/ops_int16x8_u .ops_int16x8_u.eobjs/native/ops_int16x8_u.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
   ops_int8x16.exe
   (glob_files .ops_int8x16.eobjs/native/ops_int8x16.binary-sections/*)
   compare_sections.sh)
  (action
   (run bash compare_sections.sh .ops_int8x16.eobjs/native/ops_int8x16 .ops_int8x16.eobjs/native/ops_int8x16.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_int8x16_u.exe
+  (glob_files .ops_int8x16_u.eobjs/native/ops_int8x16_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .ops_int8x16_u.eobjs/native/ops_int8x16_u .ops_int8x16_u.eobjs/native/ops_int8x16_u.o)))
 
 (rule
  (alias runtest)
@@ -7226,6 +7358,18 @@
       (and (= %{context_name} "main")
            (= %{architecture} "arm64")))
  (deps
+  ops_u.exe
+  (glob_files .ops_u.eobjs/native/ops_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .ops_u.eobjs/native/ops_u .ops_u.eobjs/native/ops_u.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
   arrays.exe
   (glob_files .arrays.eobjs/native/arrays.binary-sections/*)
   compare_sections.sh)
@@ -7238,11 +7382,47 @@
       (and (= %{context_name} "main")
            (= %{architecture} "arm64")))
  (deps
+  arrays_u.exe
+  (glob_files .arrays_u.eobjs/native/arrays_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .arrays_u.eobjs/native/arrays_u .arrays_u.eobjs/native/arrays_u.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  scalar_ops.exe
+  (glob_files .scalar_ops.eobjs/native/scalar_ops.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .scalar_ops.eobjs/native/scalar_ops .scalar_ops.eobjs/native/scalar_ops.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
   consts.exe
   (glob_files .consts.eobjs/native/consts.binary-sections/*)
   compare_sections.sh)
  (action
   (run bash compare_sections.sh .consts.eobjs/native/consts .consts.eobjs/native/consts.o)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  consts_u.exe
+  (glob_files .consts_u.eobjs/native/consts_u.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .consts_u.eobjs/native/consts_u .consts_u.eobjs/native/consts_u.o)))
 
 (rule
  (alias runtest)
