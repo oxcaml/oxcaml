@@ -75,8 +75,9 @@ let eval_constant state ~all_sections const =
 
 (* Handle cross-section (Label - This) + offset pattern. This occurs in
    frametable entries where a DATA section location references a TEXT section
-   label (return address). We emit a PREL32_PAIR relocation using existing
-   global symbols (matching assembler behaviour). *)
+   label (return address), or when DATA references read-only data sections like
+   .rodata.cst8. We emit a PREL32_PAIR relocation using existing global symbols
+   (matching assembler behaviour). *)
 let is_cross_section_relative_reference state ~all_sections ~current_section c =
   match extract_label_this_offset c with
   | None -> None
@@ -98,16 +99,10 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
              supported"
             (Asm_section.to_string current_section)
             (Asm_section.to_string label_section)
-        else if not (Asm_section.equal label_section Asm_section.Text)
-        then
-          Misc.fatal_errorf
-            "Cross-section (Label - This) from DATA to non-TEXT section %s not \
-             supported"
-            (Asm_section.to_string label_section)
         else
-          (* Cross-section: TEXT label referenced from DATA. The linker
-             computes: plus_sym - minus_sym + addend So: addend = (target -
-             plus_sym) - (current - minus_sym) *)
+          (* Cross-section: label in another section referenced from DATA.
+             The linker computes: plus_sym - minus_sym + addend
+             So: addend = (target - plus_sym) - (current - minus_sym) *)
           let current_pos = SS.offset_in_bytes state in
           (* Find nearest symbol in DATA for SUBTRACTOR *)
           match SS.find_nearest_symbol_before state current_pos with
@@ -115,19 +110,21 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
             Misc.fatal_error
               "No symbol in DATA section for cross-section relocation"
           | Some (minus_symbol, minus_sym_offset) -> (
-            (* Find nearest symbol in TEXT for UNSIGNED *)
-            let text_state =
-              All_section_states.find_exn all_sections Asm_section.Text
+            (* Find nearest symbol in target section for UNSIGNED *)
+            let target_state =
+              All_section_states.find_exn all_sections label_section
             in
-            (* Get target label offset in TEXT *)
-            match SS.find_label_offset_in_bytes text_state label_name with
+            (* Get target label offset in target section *)
+            match SS.find_label_offset_in_bytes target_state label_name with
             | None ->
-              Misc.fatal_errorf "Label %s not found in TEXT section" label_name
+              Misc.fatal_errorf "Label %s not found in %s section" label_name
+                (Asm_section.to_string label_section)
             | Some target_offset -> (
-              match SS.find_nearest_symbol_before text_state target_offset with
+              match SS.find_nearest_symbol_before target_state target_offset with
               | None ->
-                Misc.fatal_error
-                  "No symbol in TEXT section for cross-section relocation"
+                Misc.fatal_errorf
+                  "No symbol in %s section for cross-section relocation"
+                  (Asm_section.to_string label_section)
               | Some (plus_symbol, plus_sym_offset) ->
                 let addend =
                   Int64.add offset_upper
@@ -139,7 +136,11 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
                   ~symbol_name:plus_symbol
                   ~reloc_kind:
                     (R_AARCH64_PREL32_PAIR { plus_symbol; minus_symbol });
-                Some addend)))))
+                (* On Linux ELF (RELA format), the addend is stored in the
+                   relocation entry, so emit 0 in the data. On macOS (Mach-O),
+                   the addend must be in the data. *)
+                let macosx = String.equal Config.system "macosx" in
+                Some (if macosx then addend else 0L))))))
 
 (* Handle absolute symbol reference. For .8byte symbol in JIT mode, we must emit
    a relocation so the JIT can patch it with the actual address. For non-JIT

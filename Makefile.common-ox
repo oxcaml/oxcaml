@@ -460,6 +460,12 @@ runtest-upstream-binary-emitter: install_for_test
 compare-binary-emitter:
 	oxcaml/tests/backend/binary_emitter/arm64/compare_all_sections.sh _runtest/testsuite
 
+# Compare binary emitter output against assembler output from dune tests (simd, etc).
+# Run this after: OCAMLPARAM='_,save-binary-sections=1' make runtest
+.PHONY: compare-binary-emitter-dune
+compare-binary-emitter-dune:
+	oxcaml/tests/backend/binary_emitter/arm64/compare_all_sections.sh _build/main
+
 # Compile a single testsuite file with the boot compiler and compare binary emitter
 # output against assembler output. Fast iteration for fixing encoding bugs.
 # Usage: make compare-one TEST=tests/basic/localfunction.ml

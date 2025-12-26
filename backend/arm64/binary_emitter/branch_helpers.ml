@@ -28,31 +28,47 @@
 open Arm64_ast.Ast
 
 (* Helper to compute a 26-bit PC-relative offset for B/BL instructions. If the
-   symbol is undefined, creates a relocation and returns 0. *)
+   symbol is undefined, creates a relocation and returns 0.
+
+   On Linux ELF (not macOS), we also emit relocations for global symbols even
+   when they're defined in the same file. This matches the system assembler's
+   behavior which uses RELA relocations with zero in the instruction for all
+   global symbol references, allowing for symbol interposition at link time. *)
 let compute_branch_imm26 state ~instr_name ~reloc_kind (sym : _ Symbol.t) =
   let symbol_name = sym.name in
-  match
-    Section_state.find_symbol_or_label_offset_in_bytes state symbol_name
-  with
-  | None ->
-    (* Symbol is undefined - create a relocation and use 0 as placeholder *)
+  let is_global_symbol =
+    Option.is_some (Section_state.find_symbol_offset_in_bytes state symbol_name)
+  in
+  (* On Linux ELF, emit relocations for global symbols to match assembler *)
+  let macosx = String.equal Config.system "macosx" in
+  if (not macosx) && is_global_symbol
+  then (
     Section_state.add_relocation_at_current_offset state ~symbol_name
       ~reloc_kind:(reloc_kind symbol_name);
-    0
-  | Some target_offset ->
-    let pc_relative_offset =
-      target_offset - Section_state.offset_in_bytes state
-    in
-    if pc_relative_offset mod 4 <> 0
-    then
-      Misc.fatal_errorf "%s offset %d to symbol '%s' must be 4-byte aligned"
-        instr_name pc_relative_offset symbol_name;
-    let imm26 = pc_relative_offset / 4 in
-    if imm26 < -0x2000000 || imm26 > 0x1FFFFFF
-    then
-      Misc.fatal_errorf "%s offset %d to symbol '%s' out of range (max ±128MB)"
-        instr_name pc_relative_offset symbol_name;
-    imm26
+    0)
+  else
+    match
+      Section_state.find_symbol_or_label_offset_in_bytes state symbol_name
+    with
+    | None ->
+      (* Symbol is undefined - create a relocation and use 0 as placeholder *)
+      Section_state.add_relocation_at_current_offset state ~symbol_name
+        ~reloc_kind:(reloc_kind symbol_name);
+      0
+    | Some target_offset ->
+      let pc_relative_offset =
+        target_offset - Section_state.offset_in_bytes state
+      in
+      if pc_relative_offset mod 4 <> 0
+      then
+        Misc.fatal_errorf "%s offset %d to symbol '%s' must be 4-byte aligned"
+          instr_name pc_relative_offset symbol_name;
+      let imm26 = pc_relative_offset / 4 in
+      if imm26 < -0x2000000 || imm26 > 0x1FFFFFF
+      then
+        Misc.fatal_errorf "%s offset %d to symbol '%s' out of range (max ±128MB)"
+          instr_name pc_relative_offset symbol_name;
+      imm26
 
 (* Helper to compute a 19-bit PC-relative offset for CBZ/CBNZ instructions *)
 let compute_branch_imm19 state ~instr_name (sym : _ Symbol.t) =
