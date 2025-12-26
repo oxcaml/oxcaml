@@ -7135,3 +7135,322 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected ops_int8x32_u_internal_assembler.out)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets basic.binary-emitter.o (dir basic.binary-emitter.binary-sections))
+ (deps
+  (:src basic.ml)
+  .basic.eobjs/byte/basic.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .basic.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o basic.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  basic.binary-emitter.o
+  (glob_files basic.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh basic.binary-emitter basic.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets ops_float64x2.binary-emitter.o (dir ops_float64x2.binary-emitter.binary-sections))
+ (deps
+  (:src ops_float64x2.ml)
+  .ops_float64x2.eobjs/byte/ops_float64x2.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .ops_float64x2.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o ops_float64x2.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_float64x2.binary-emitter.o
+  (glob_files ops_float64x2.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh ops_float64x2.binary-emitter ops_float64x2.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets ops_int64x2.binary-emitter.o (dir ops_int64x2.binary-emitter.binary-sections))
+ (deps
+  (:src ops_int64x2.ml)
+  .ops_int64x2.eobjs/byte/ops_int64x2.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .ops_int64x2.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o ops_int64x2.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_int64x2.binary-emitter.o
+  (glob_files ops_int64x2.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh ops_int64x2.binary-emitter ops_int64x2.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets ops_int32x4.binary-emitter.o (dir ops_int32x4.binary-emitter.binary-sections))
+ (deps
+  (:src ops_int32x4.ml)
+  .ops_int32x4.eobjs/byte/ops_int32x4.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .ops_int32x4.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o ops_int32x4.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_int32x4.binary-emitter.o
+  (glob_files ops_int32x4.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh ops_int32x4.binary-emitter ops_int32x4.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets ops_int16x8.binary-emitter.o (dir ops_int16x8.binary-emitter.binary-sections))
+ (deps
+  (:src ops_int16x8.ml)
+  .ops_int16x8.eobjs/byte/ops_int16x8.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .ops_int16x8.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o ops_int16x8.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_int16x8.binary-emitter.o
+  (glob_files ops_int16x8.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh ops_int16x8.binary-emitter ops_int16x8.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets ops_int8x16.binary-emitter.o (dir ops_int8x16.binary-emitter.binary-sections))
+ (deps
+  (:src ops_int8x16.ml)
+  .ops_int8x16.eobjs/byte/ops_int8x16.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .ops_int8x16.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o ops_int8x16.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops_int8x16.binary-emitter.o
+  (glob_files ops_int8x16.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh ops_int8x16.binary-emitter ops_int8x16.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets ops.binary-emitter.o (dir ops.binary-emitter.binary-sections))
+ (deps
+  (:src ops.ml)
+  .ops.eobjs/byte/ops.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .ops.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o ops.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  ops.binary-emitter.o
+  (glob_files ops.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh ops.binary-emitter ops.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets arrays.binary-emitter.o (dir arrays.binary-emitter.binary-sections))
+ (deps
+  (:src arrays.ml)
+  .arrays.eobjs/byte/arrays.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .arrays.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o arrays.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  arrays.binary-emitter.o
+  (glob_files arrays.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh arrays.binary-emitter arrays.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets consts.binary-emitter.o (dir consts.binary-emitter.binary-sections))
+ (deps
+  (:src consts.ml)
+  .consts.eobjs/byte/consts.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .consts.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o consts.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  consts.binary-emitter.o
+  (glob_files consts.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh consts.binary-emitter consts.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets callback.binary-emitter.o (dir callback.binary-emitter.binary-sections))
+ (deps
+  (:src callback.ml)
+  .callback.eobjs/byte/callback.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .callback.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o callback.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  callback.binary-emitter.o
+  (glob_files callback.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh callback.binary-emitter callback.binary-emitter.o)))
+
+(rule
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (targets test_callee_save_neon_regs.binary-emitter.o (dir test_callee_save_neon_regs.binary-emitter.binary-sections))
+ (deps
+  (:src test_callee_save_neon_regs.ml)
+  .test_callee_save_neon_regs.eobjs/byte/test_callee_save_neon_regs.cmi
+  (alias simd_test_builtins_lib))
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta
+       -I .test_callee_save_neon_regs.eobjs/byte
+       -I .simd_test_builtins.objs/byte
+       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
+       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
+       -c -save-binary-sections -o test_callee_save_neon_regs.binary-emitter.o %{src})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))
+ (deps
+  test_callee_save_neon_regs.binary-emitter.o
+  (glob_files test_callee_save_neon_regs.binary-emitter.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh test_callee_save_neon_regs.binary-emitter test_callee_save_neon_regs.binary-emitter.o)))

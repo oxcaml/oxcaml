@@ -53,6 +53,12 @@
   builtins
   builtins_u))
 
+; Alias for binary emitter comparison rules to depend on the library
+(alias
+ (name simd_test_builtins_lib)
+ (deps
+  (glob_files .simd_test_builtins.objs/byte/*.cmi)))
+
 (copy_files#
  (files "%{env:ARCH=amd64}/*.{ml,c}"))
 
