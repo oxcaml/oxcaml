@@ -23,3 +23,27 @@
   compare_sections.sh)
  (action
   (run bash compare_sections.sh test_basic)))
+
+; SIMD test - exercises NEON vector instructions
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "arm64")))
+ (targets test_simd.o test_simd.s (dir test_simd.binary-sections))
+ (deps test_simd.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -extension simd_beta -c -S -save-binary-sections %{deps})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "arm64")))
+ (deps
+  test_simd.o
+  (glob_files test_simd.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh test_simd)))
