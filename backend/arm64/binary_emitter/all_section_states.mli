@@ -49,3 +49,9 @@ val fold :
 val find_in_any_section : t -> string -> (int * Asm_section.t) option
 
 val reset_offsets : t -> unit
+
+module D = Asm_targets.Asm_directives
+
+val add_direct_assignment : t -> string -> D.Directive.Constant.t -> unit
+
+val find_direct_assignment : t -> string -> D.Directive.Constant.t option

@@ -42,34 +42,40 @@ let extract_label_this_offset (cst : C.t) =
   | Sub (Named_thing name, This) -> Some (name, 0L)
   | _ -> None
 
-let eval_constant state ~all_sections const =
+let rec eval_constant state ~all_sections const =
   (* For same-section relative expressions like (Label - This), the offset
      within the section is all that matters. Cross-section references are
      detected and handled via relocations before this function is called. *)
   let this () = Int64.of_int (SS.offset_in_bytes state) in
   let lookup name =
-    (* When generating PIC code (dlcode=true), global symbols should not be
-       resolved as they may be interposed at runtime. We must emit zeros and let
-       the linker handle them via relocations. Note: global symbols appear both
-       in the symbol table (via Global directive) AND in the label table (via
-       the New_label for the : definition). So we check if the name is a
-       declared global symbol first. *)
-    let is_global_symbol =
-      Option.is_some (SS.find_symbol_offset_in_bytes state name)
-    in
-    if !Clflags.dlcode && is_global_symbol
-    then None
-    else
-      (* First try current section, then fall back to global lookup. *)
-      match SS.find_label_offset_in_bytes state name with
-      | Some offset -> Some (Int64.of_int offset)
-      | None -> (
-        match SS.find_symbol_offset_in_bytes state name with
+    (* First check if this is a direct assignment (e.g., temp0 from .set) *)
+    match All_section_states.find_direct_assignment all_sections name with
+    | Some expr ->
+      (* Recursively evaluate the assigned expression *)
+      eval_constant state ~all_sections expr
+    | None ->
+      (* When generating PIC code (dlcode=true), global symbols should not be
+         resolved as they may be interposed at runtime. We must emit zeros and
+         let the linker handle them via relocations. Note: global symbols appear
+         both in the symbol table (via Global directive) AND in the label table
+         (via the New_label for the : definition). So we check if the name is a
+         declared global symbol first. *)
+      let is_global_symbol =
+        Option.is_some (SS.find_symbol_offset_in_bytes state name)
+      in
+      if !Clflags.dlcode && is_global_symbol
+      then None
+      else
+        (* First try current section, then fall back to global lookup. *)
+        match SS.find_label_offset_in_bytes state name with
         | Some offset -> Some (Int64.of_int offset)
         | None -> (
-          match All_section_states.find_in_any_section all_sections name with
-          | Some (offset, _section) -> Some (Int64.of_int offset)
-          | None -> None))
+          match SS.find_symbol_offset_in_bytes state name with
+          | Some offset -> Some (Int64.of_int offset)
+          | None -> (
+            match All_section_states.find_in_any_section all_sections name with
+            | Some (offset, _section) -> Some (Int64.of_int offset)
+            | None -> None))
   in
   C.eval ~this ~lookup const
 

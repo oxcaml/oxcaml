@@ -28,13 +28,19 @@
 (* Collection of section states for all sections in an assembly unit. *)
 
 module Asm_section = Asm_targets.Asm_section
+module D = Asm_targets.Asm_directives
 
 type t =
   { sections : Section_state.t Asm_section.Tbl.t;
-    for_jit : bool
+    for_jit : bool;
+    direct_assignments : (string, D.Directive.Constant.t) Hashtbl.t
   }
 
-let create ~for_jit = { sections = Asm_section.Tbl.create 10; for_jit }
+let create ~for_jit =
+  { sections = Asm_section.Tbl.create 10;
+    for_jit;
+    direct_assignments = Hashtbl.create 16
+  }
 
 let for_jit t = t.for_jit
 
@@ -76,3 +82,10 @@ let reset_offsets t =
   Asm_section.Tbl.iter
     (fun _section state -> Section_state.set_offset_in_bytes state 0)
     t.sections
+
+(* Direct assignments (e.g., .set temp0, L100 - L101) *)
+let add_direct_assignment t name expr =
+  Hashtbl.replace t.direct_assignments name expr
+
+let find_direct_assignment t name =
+  Hashtbl.find_opt t.direct_assignments name
