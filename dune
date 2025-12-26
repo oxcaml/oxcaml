@@ -532,6 +532,7 @@
   ;; asmcomp/
   asmgen
   asmlink
+  binary_emitter_verify
   cm_bundle
   linkenv
   optlink

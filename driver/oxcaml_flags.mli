@@ -109,6 +109,8 @@ val internal_assembler : bool ref
 
 val save_binary_sections : bool ref
 
+val verify_binary_emitter : bool ref
+
 val gc_timings : bool ref
 
 val use_cached_generic_functions : bool ref
