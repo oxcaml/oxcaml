@@ -584,7 +584,8 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
    types and [Tpoly]s *)
 type unwrapped_type_expr =
   { ty : type_expr
-  ; modality : Mode.Modality.Const.t }
+  ; modality : Mode.Modality.Const.t
+  ; or_null : type_declaration option }
 
 val get_unboxed_type_representation :
   Env.t ->
