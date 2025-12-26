@@ -33,7 +33,9 @@
  (libraries jit ocamlcommon)
  ; CR mshinwell: Enable metaprogramming on arm64.  Needs the binary emitter
  (enabled_if
-  (= %{architecture} "amd64"))
+  (or
+   (= %{architecture} "amd64")
+   (= %{architecture} "arm64")))
  (flags
   (:standard
    -strict-sequence
@@ -51,7 +53,9 @@
 
 (install
  (enabled_if
-  (= %{architecture} "amd64"))
+  (or
+   (= %{architecture} "amd64")
+   (= %{architecture} "arm64")))
  (files
   (.camlinternaleval.objs/native/camlinternaleval.cmx
    as

@@ -38,6 +38,7 @@ type cpu_type = [
   | `X86
   | `X86_64
   | `ARM
+  | `ARM64
   | `POWERPC
   | `POWERPC64
   | unknown
@@ -47,6 +48,7 @@ let cpu_type = function
   | 0x00000007 -> `X86
   | 0x01000007 -> `X86_64
   | 0x0000000c -> `ARM
+  | 0x0100000c -> `ARM64
   | 0x00000012 -> `POWERPC
   | 0x01000012 -> `POWERPC64
   | n          -> `Unknown n
@@ -305,6 +307,17 @@ type reloc_type = [
   | `PPC_RELOC_HA16_SECTDIFF
   | `PPC_RELOC_JBSR
   | `PPC_RELOC_LO14_SECTDIFF
+  | `ARM64_RELOC_UNSIGNED
+  | `ARM64_RELOC_SUBTRACTOR
+  | `ARM64_RELOC_BRANCH26
+  | `ARM64_RELOC_PAGE21
+  | `ARM64_RELOC_PAGEOFF12
+  | `ARM64_RELOC_GOT_LOAD_PAGE21
+  | `ARM64_RELOC_GOT_LOAD_PAGEOFF12
+  | `ARM64_RELOC_POINTER_TO_GOT
+  | `ARM64_RELOC_TLVP_LOAD_PAGE21
+  | `ARM64_RELOC_TLVP_LOAD_PAGEOFF12
+  | `ARM64_RELOC_ADDEND
   | unknown
 ]
 
@@ -355,6 +368,17 @@ let reloc_type cpu_type n = match cpu_type, n with
   | `POWERPC64 , 13   -> `PPC_RELOC_JBSR
   | `POWERPC64 , 14   -> `PPC_RELOC_LO14_SECTDIFF
   | `POWERPC64 , 15   -> `PPC_RELOC_LOCAL_SECTDIFF
+  | `ARM64     , 00   -> `ARM64_RELOC_UNSIGNED
+  | `ARM64     , 01   -> `ARM64_RELOC_SUBTRACTOR
+  | `ARM64     , 02   -> `ARM64_RELOC_BRANCH26
+  | `ARM64     , 03   -> `ARM64_RELOC_PAGE21
+  | `ARM64     , 04   -> `ARM64_RELOC_PAGEOFF12
+  | `ARM64     , 05   -> `ARM64_RELOC_GOT_LOAD_PAGE21
+  | `ARM64     , 06   -> `ARM64_RELOC_GOT_LOAD_PAGEOFF12
+  | `ARM64     , 07   -> `ARM64_RELOC_POINTER_TO_GOT
+  | `ARM64     , 08   -> `ARM64_RELOC_TLVP_LOAD_PAGE21
+  | `ARM64     , 09   -> `ARM64_RELOC_TLVP_LOAD_PAGEOFF12
+  | `ARM64     , 10   -> `ARM64_RELOC_ADDEND
   | _         , n     -> `Unknown n
 
 type relocation_info = {
@@ -372,7 +396,8 @@ type relocation_info = {
   ri_type      : reloc_type;
 }
 
-let bits ofs sz n = (n lsl (32 - ofs - sz)) lsr (32 - sz)
+(* Extract sz bits starting at bit position ofs from n *)
+let bits ofs sz n = (n lsr ofs) land ((1 lsl sz) - 1)
 
 let read_relocation_info _t header ri_address value = {
   ri_address;
@@ -1178,10 +1203,6 @@ let read_symbol_table header buf t =
   let nsyms   = Read.u32 t in
   let stroff  = Read.u32 t in
   let strsize = Read.u32 t in
-  Printf.eprintf "symoff: %d, nsyms: %d, stroff: %d, strsize: %d\n"
-    symoff nsyms stroff strsize;
-  Printf.eprintf "buffer size: %d\n%!"
-    (Bigarray.Array1.dim buf);
   let strsect = sub (cursor buf ~at:stroff) strsize in
   let f =
     if is64bit header then Read.u64

@@ -174,8 +174,7 @@ let emit_probe_semaphores ~add_def_symbol =
     Emitaux.emit_stapsdt_base_section ();
     D.switch_to_section Probes
   | true -> D.switch_to_section Probes);
-  D.align ~fill_x86_bin_emitter:Zero
-    ~bytes:(if Target_system.is_macos () then 8 else 2);
+  D.align ~fill:Zero ~bytes:(if Target_system.is_macos () then 8 else 2);
   String.Map.iter
     (fun _ (label, label_sym, enabled_at_init) ->
       (* Unresolved weak symbols have a zero value regardless of the following

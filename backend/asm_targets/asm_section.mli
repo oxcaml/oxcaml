@@ -57,6 +57,8 @@ type t =
 
 val to_string : t -> string
 
+val of_names : string list -> t option
+
 type section_details = private
   { names : string list;
     flags : string option;
@@ -80,6 +82,10 @@ val print : Format.formatter -> t -> unit
 val compare : t -> t -> int
 
 val equal : t -> t -> bool
+
+val hash : t -> int
+
+module Tbl : Hashtbl.S with type key = t
 
 (** Whether the section holds code. *)
 val section_is_text : t -> bool

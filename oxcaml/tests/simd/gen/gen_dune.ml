@@ -6,6 +6,11 @@ let enabled_if_main_amd64_not_macos =
            (= %{architecture} "amd64")
            (<> %{system} macosx)))|}
 
+let enabled_if_main_arm64 =
+  {|(enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "arm64")))|}
+
 let impl name = name ^ ".ml"
 
 let output name = name ^ ".out"
@@ -35,7 +40,7 @@ let compile ~enabled_if ~extra_flags name =
  (modules ${name})
  ${enabled_if}
  (ocamlopt_flags
-  (:standard -extension simd_beta ${extra_flags}))
+  (:standard -extension simd_beta -save-binary-sections ${extra_flags}))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 |}
@@ -112,6 +117,27 @@ let mangle flag =
   (* convert dashes to underscores *)
   let dash_to_underscore c = match c with '-' -> '_' | c -> c in
   String.map dash_to_underscore flag
+
+(* Binary emitter comparison for ARM64: compare the binary-sections produced
+   by the existing executable compilation against the assembler's .o file. *)
+let binary_emitter_compare name =
+  let subst = function
+    | "name" -> name
+    | "enabled_if" -> enabled_if_main_arm64
+    | _ -> assert false
+  in
+  rule ~subst
+    {|
+(rule
+ (alias runtest)
+ ${enabled_if}
+ (deps
+  ${name}.exe
+  (glob_files .${name}.eobjs/native/${name}.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh .${name}.eobjs/native/${name} .${name}.eobjs/native/${name}.o)))
+|}
 
 let print_test ?extra_flag (name, enabled_if) =
   let name, extra_flags =
@@ -227,4 +253,35 @@ let () =
     List.map (fun (name, _) -> name, enabled_if_main_amd64_not_macos) tests
   in
   List.iter (print_test ~extra_flag:"-internal-assembler") tests;
+  (* Binary emitter comparison for ARM64 SIMD tests.
+     We test all files that run on ARM64 (enabled_if_main). *)
+  let arm64_binary_emitter_tests =
+    [ "basic";
+      "basic_u";
+      "let_mutable";
+      "let_mutable_u";
+      "mixed_modules";
+      "ops_float32x4";
+      "ops_float32x4_u";
+      "ops_float64x2";
+      "ops_float64x2_u";
+      "ops_int64x2";
+      "ops_int64x2_u";
+      "ops_int32x4";
+      "ops_int32x4_u";
+      "ops_int16x8";
+      "ops_int16x8_u";
+      "ops_int8x16";
+      "ops_int8x16_u";
+      "ops";
+      "ops_u";
+      "arrays";
+      "arrays_u";
+      "scalar_ops";
+      "consts";
+      "consts_u";
+      "callback";
+      "test_callee_save_neon_regs" ]
+  in
+  List.iter binary_emitter_compare arm64_binary_emitter_tests;
   ()
