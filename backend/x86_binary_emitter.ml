@@ -1650,6 +1650,9 @@ module For_jit = struct
       let sym, _ = parse_label label in
       sym
 
+    (* x86 doesn't have paired relocations, so this just returns a singleton *)
+    let target_symbols r = [target_symbol r]
+
     let is_got_reloc (r : Reloc.t) =
       let label = match r.Reloc.kind with
         | Kind.REL32 (label, _)

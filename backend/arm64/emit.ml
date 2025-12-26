@@ -3059,9 +3059,12 @@ let end_assembly () =
             in
             List.iter
               (fun reloc ->
-                Printf.fprintf oc "%d %s\n"
-                  (R.offset_from_section_beginning reloc)
-                  (R.target_symbol reloc))
+                (* For paired relocations (SUBTRACTOR + UNSIGNED), write both
+                   symbols as separate lines at the same offset. *)
+                let offset = R.offset_from_section_beginning reloc in
+                List.iter
+                  (fun sym -> Printf.fprintf oc "%d %s\n" offset sym)
+                  (R.target_symbols reloc))
               relocs;
             close_out oc)
         sections);

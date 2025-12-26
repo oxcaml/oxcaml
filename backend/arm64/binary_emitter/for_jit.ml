@@ -59,6 +59,24 @@ module Relocation = struct
     | R_AARCH64_PREL32_PAIR { plus_symbol; _ } ->
       plus_symbol (* Return the plus symbol as the primary target *)
 
+  (* For paired relocations (SUBTRACTOR + UNSIGNED), returns both symbols.
+     Returns [plus_symbol; minus_symbol] for pairs, [symbol] otherwise. *)
+  let target_symbols (r : Relocation.t) : string list =
+    match r.kind with
+    | R_AARCH64_ADR_PREL_LO21 sym
+    | R_AARCH64_ADR_PREL_PG_HI21 sym
+    | R_AARCH64_ADR_GOT_PAGE sym
+    | R_AARCH64_LD64_GOT_LO12_NC sym
+    | R_AARCH64_ADD_ABS_LO12_NC sym
+    | R_AARCH64_LDST64_ABS_LO12_NC sym
+    | R_AARCH64_CALL26 sym
+    | R_AARCH64_JUMP26 sym
+    | R_AARCH64_ABS64 sym ->
+      [sym]
+    | R_AARCH64_PREL32_PAIR { plus_symbol; minus_symbol } ->
+      (* Return both: UNSIGNED uses plus_symbol, SUBTRACTOR uses minus_symbol *)
+      [plus_symbol; minus_symbol]
+
   let is_got_reloc (r : Relocation.t) =
     match r.kind with
     | R_AARCH64_ADR_GOT_PAGE _ | R_AARCH64_LD64_GOT_LO12_NC _ -> true
