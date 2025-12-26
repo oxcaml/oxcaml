@@ -627,6 +627,12 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
             Format.eprintf
               "Binary emitter verified: text=%d data=%d bytes@."
               text_size data_size
+        | Mismatch (Missing_binary_sections_dir _) ->
+          (* Binary sections dir missing - binary emitter didn't run
+             (e.g., -stop-after linearization). Skip verification. *)
+          if !Clflags.verbose then
+            Format.eprintf
+              "Binary emitter verification skipped (no binary sections)@."
         | Mismatch _ | Object_file_error _ as result ->
           Binary_emitter_verify.print_result Format.err_formatter result;
           raise (Error (Binary_emitter_mismatch obj_filename))
