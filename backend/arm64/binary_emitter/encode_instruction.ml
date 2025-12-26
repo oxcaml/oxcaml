@@ -452,10 +452,11 @@ let encode_instruction :
         (Reg { reg_name = Neon (Vector vec); index = rd }, Reg { index = rn; _ }),
       FCVTL_vector ) ->
     (* FCVTL converts from narrower to wider FP (e.g., V2S->V2D) U=0,
-       opcode=10111, size encodes source element size (0=32-bit->64-bit) *)
+       opcode=10111, sz bit encodes SOURCE element size:
+       sz=0: half -> single, sz=1: single -> double *)
     let size =
       match vec with
-      | V2D -> 0 (* 32-bit source -> 64-bit dest *)
+      | V2D -> 1 (* sz=1: 32-bit source (single) -> 64-bit dest (double) *)
       | V8B | V16B | V4H | V8H | V2S | V4S | V1D ->
         Misc.fatal_error "FCVTL_vector: unsupported destination type"
     in
@@ -466,10 +467,11 @@ let encode_instruction :
         (Reg { reg_name = Neon (Vector vec); index = rd }, Reg { index = rn; _ }),
       FCVTN_vector ) ->
     (* FCVTN converts from wider to narrower FP (e.g., V2D->V2S) U=0,
-       opcode=10110, size encodes destination element size *)
+       opcode=10110, sz bit encodes SOURCE element size:
+       sz=0: single -> half, sz=1: double -> single *)
     let size =
       match vec with
-      | V2S -> 0 (* 64-bit source -> 32-bit dest *)
+      | V2S -> 1 (* sz=1: 64-bit source (double) -> 32-bit dest (single) *)
       | V8B | V16B | V4H | V8H | V4S | V1D | V2D ->
         Misc.fatal_error "FCVTN_vector: unsupported destination type"
     in
@@ -817,8 +819,8 @@ let encode_instruction :
         (Neon_reg_name.Lane_index.Src_and_dest.src_index lanes)
     in
     let imm5 = Simd_helpers.simd_copy_imm5 vec dest_idx in
-    (* INS (element): Q=1, op=1, imm4 encodes source index *)
-    let imm4 = src_idx in
+    (* INS (element): Q=1, op=1, imm4 encodes source index in size-dependent way *)
+    let imm4 = Simd_helpers.simd_ins_element_imm4 vec src_idx in
     Simd_helpers.encode_simd_copy ~q:1 ~op:1 ~imm5 ~imm4 ~rn ~rd
   | Pair (Reg ({ reg_name = GP _; _ } as rd), Mem (Reg rn)), LDAR ->
     Load_store_helpers.encode_load_acquire ~rd ~rn

@@ -35,6 +35,8 @@ val vector_q_fp_sz : (_, _) Neon_reg_name.Vector.t -> int * int
 
 val simd_copy_imm5 : ('v, 's) Neon_reg_name.Vector.t -> int -> int
 
+val simd_ins_element_imm4 : ('v, 's) Neon_reg_name.Vector.t -> int -> int
+
 val encode_simd_copy :
   q:int -> op:int -> imm5:int -> imm4:int -> rn:int -> rd:int -> int32
 
