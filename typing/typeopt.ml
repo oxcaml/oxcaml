@@ -42,10 +42,16 @@ exception Error of Location.t * error
    and [@@unboxed] types. The returned type will be therefore be none of these
    cases (except in case of missing cmis).
 
+   Note that we look through types even if they include a modality, so the
+   crossing behavior of the scraped typed is conservative.
+
    If we fail to fully scrape the type due to missing a missing cmi file, we
    return the original, rather than a partially expanded one.  The original may
    have cached jkind information that is more accurate than can be computed
    from its expanded form. *)
+(* CR external-mode: Don't disregard modalities when using [scrape_ty] to reason
+   about the runtime properties of a type - in particular, in
+   [maybe_pointer_ty], when checking whether a type crosses externality. *)
 let scrape_ty env ty =
   let ty =
     match get_desc ty with
@@ -59,7 +65,11 @@ let scrape_ty env ty =
       begin match get_desc ty' with
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
-          | Some _ -> (Ctype.get_unboxed_type_approximation env ty').ty
+          | Some _ -> begin
+            match (Ctype.get_unboxed_type_approximation env ty') with
+            | { ty; or_null = None; modality = _ } ->
+              ty
+            | _ -> ty' end
           | None -> ty'
           | exception Not_found -> ty (* missing cmi file *)
           end
