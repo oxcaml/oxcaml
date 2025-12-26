@@ -50,7 +50,7 @@ let cached_generic_functions unix ~ppf_dump ~id output_name genfns =
     let startup = output_name ^ ext_asm in
     Profile.record_call "compile_unit" (fun () ->
       let obj_filename = output_name ^ ext_obj in
-      Asmgen.compile_unit ~output_prefix:output_name
+      Asmgen.compile_unit unix ~output_prefix:output_name
         ~asm_filename:startup ~keep_asm:false
         ~obj_filename
         ~may_reduce_heap:true
