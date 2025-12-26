@@ -40,7 +40,7 @@ let compile ~enabled_if ~extra_flags name =
  (modules ${name})
  ${enabled_if}
  (ocamlopt_flags
-  (:standard -extension simd_beta ${extra_flags}))
+  (:standard -extension simd_beta -save-binary-sections ${extra_flags}))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 |}
@@ -118,33 +118,8 @@ let mangle flag =
   let dash_to_underscore c = match c with '-' -> '_' | c -> c in
   String.map dash_to_underscore flag
 
-(* Binary emitter comparison for ARM64: compile with -save-binary-sections
-   and compare against the system assembler output.
-   We depend on the executable being built, which gives us access to the .cmi file. *)
-let binary_emitter_compile name =
-  let subst = function
-    | "name" -> name
-    | "enabled_if" -> enabled_if_main_arm64
-    | _ -> assert false
-  in
-  rule ~subst
-    {|
-(rule
- ${enabled_if}
- (targets ${name}.binary-emitter.o (dir ${name}.binary-emitter.binary-sections))
- (deps
-  (:src ${name}.ml)
-  .${name}.eobjs/byte/${name}.cmi
-  (alias simd_test_builtins_lib))
- (action
-  (run %{bin:ocamlopt.opt} -extension simd_beta
-       -I .${name}.eobjs/byte
-       -I .simd_test_builtins.objs/byte
-       -I %{project_root}/otherlibs/stdlib_stable/.stdlib_stable.objs/byte
-       -I %{project_root}/otherlibs/stdlib_upstream_compatible/.stdlib_upstream_compatible.objs/byte
-       -c -save-binary-sections -o ${name}.binary-emitter.o %{src})))
-|}
-
+(* Binary emitter comparison for ARM64: compare the binary-sections produced
+   by the existing executable compilation against the assembler's .o file. *)
 let binary_emitter_compare name =
   let subst = function
     | "name" -> name
@@ -157,11 +132,11 @@ let binary_emitter_compare name =
  (alias runtest)
  ${enabled_if}
  (deps
-  ${name}.binary-emitter.o
-  (glob_files ${name}.binary-emitter.binary-sections/*)
+  ${name}.exe
+  (glob_files .${name}.eobjs/native/${name}.binary-sections/*)
   compare_sections.sh)
  (action
-  (run bash compare_sections.sh ${name}.binary-emitter ${name}.binary-emitter.o)))
+  (run bash compare_sections.sh .${name}.eobjs/native/${name} .${name}.eobjs/native/${name}.o)))
 |}
 
 let print_test ?extra_flag (name, enabled_if) =
@@ -293,6 +268,5 @@ let () =
       "callback";
       "test_callee_save_neon_regs" ]
   in
-  List.iter (fun name -> binary_emitter_compile name; binary_emitter_compare name)
-    arm64_binary_emitter_tests;
+  List.iter binary_emitter_compare arm64_binary_emitter_tests;
   ()
