@@ -49,7 +49,7 @@ programs_byte := \
   ocamlmktop ocamlcmt dumpobj ocamlobjinfo \
   primreq stripdebug cmpbyt
 install_files += $(filter $(installed_tools), $(programs_byte))
-programs_opt := $(programs_byte:%=%.opt)
+programs_opt := $(programs_byte:%=%.opt) listprims.opt
 
 .PHONY: all allopt opt.opt # allopt and opt.opt are synonyms
 all: $(programs_byte)
@@ -284,6 +284,11 @@ CMPBYT=$(ROOTDIR)/compilerlibs/ocamlcommon.cma \
 
 cmpbyt$(EXE): $(CMPBYT)
 cmpbyt.opt$(EXE): $(call byte2native, $(CMPBYT))
+
+LISTPRIMS=$(ROOTDIR)/compilerlibs/ocamlcommon.cma \
+          listprims.cmo
+
+listprims.opt$(EXE): $(call byte2native, $(LISTPRIMS))
 
 caml_tex_files := \
   $(ROOTDIR)/compilerlibs/ocamlcommon.cma \
