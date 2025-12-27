@@ -269,7 +269,7 @@ Error: Signature mismatch:
          type t = string or_null
        is not included in
          type t : immediate64_or_null
-       The layout of the first is value maybe_separable maybe_null
+       The layout of the first is value non_float maybe_null
          because it is the primitive type or_null.
        But the layout of the first must be a sublayout of
            value non_pointer maybe_null

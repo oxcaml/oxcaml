@@ -20,19 +20,7 @@ module type S = sig type t : any separable end
 module type S' = S with type t = t
 
 [%%expect{|
-Line 1, characters 17-34:
-1 | module type S' = S with type t = t
-                     ^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "t"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type t = t
-       is not included in
-         type t : any separable
-       The layout of the first is value maybe_separable maybe_null
-         because it is the primitive type or_null.
-       But the layout of the first must be a sublayout of any separable
-         because of the definition of t at line 4, characters 2-28.
+module type S' = sig type t = t end
 |}]
 
 
@@ -42,37 +30,12 @@ end = struct
   type t = #(int or_null * string)
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = #(int or_null * string)
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #(int or_null * string) end
-       is not included in
-         sig type t : value_or_null non_pointer & value end
-       Type declarations do not match:
-         type t = #(int or_null * string)
-       is not included in
-         type t : value_or_null non_pointer & value
-       The layout of the first is
-           value maybe_separable maybe_null & value non_float
-         because it is an unboxed tuple.
-       But the layout of the first must be a sublayout of
-           value non_pointer maybe_null & value
-         because of the definition of t at line 2, characters 2-36.
+module M : sig type t : value_or_null non_pointer & value end
 |}]
 
 type t : immediate_or_null = #{ i : int or_null }
 [%%expect{|
-Line 1, characters 0-49:
-1 | type t : immediate_or_null = #{ i : int or_null }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value maybe_separable maybe_null
-         because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of
-           value non_pointer maybe_null
-         because of the annotation on the declaration of the type t.
+type t = #{ i : int or_null; }
 |}]
 
 type 'a t : value_or_null mod global  = #{ i : 'a or_null @@ global }
