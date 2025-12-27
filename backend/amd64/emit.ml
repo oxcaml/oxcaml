@@ -241,7 +241,7 @@ let mem__imp s =
 let label_name lbl =
   if is_macosx system || is_win64 system then "L" ^ lbl else ".L" ^ lbl
 
-let rel_plt (s : Cmm.symbol) =
+let rel (s : Cmm.symbol) rewrite =
   match (s.sym_global : Cmm.is_global) with
   | Local -> sym (label_name (emit_symbol s.sym_name))
   | Global ->
@@ -249,7 +249,11 @@ let rel_plt (s : Cmm.symbol) =
     then mem__imp s.sym_name
     else
       let s = emit_symbol s.sym_name in
-      sym (if use_plt then s ^ "@PLT" else s)
+      rewrite s
+
+let rel_plt s = rel s (fun s -> sym (if use_plt then s ^ "@PLT" else s))
+
+let rel_gotpcrel s = rel s (fun s -> mem64_rip QWORD (s ^ "@GOTPCREL"))
 
 let emit_call s = I.call (rel_plt s)
 
@@ -2705,19 +2709,19 @@ let begin_assembly unix =
   | `Symbol sym -> D.define_symbol_label ~section:Text sym
   | `Label lbl -> D.define_label lbl);
   D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc"));
+  I.jmp (rel_gotpcrel (Cmm.global_symbol "caml_call_gc"));
   D.cfi_endproc ();
   (match emit_cmm_symbol call_gc_local_sym_avx with
   | `Symbol sym -> D.define_symbol_label ~section:Text sym
   | `Label lbl -> D.define_label lbl);
   D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc_avx"));
+  I.jmp (rel_gotpcrel (Cmm.global_symbol "caml_call_gc_avx"));
   D.cfi_endproc ();
   (match emit_cmm_symbol call_gc_local_sym_avx512 with
   | `Symbol sym -> D.define_symbol_label ~section:Text sym
   | `Label lbl -> D.define_label lbl);
   D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc_avx512"));
+  I.jmp (rel_gotpcrel (Cmm.global_symbol "caml_call_gc_avx512"));
   D.cfi_endproc ();
   ()
 
