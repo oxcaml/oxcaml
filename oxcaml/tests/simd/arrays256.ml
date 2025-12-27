@@ -4,6 +4,8 @@ open! Stdlib_stable
 [@@@ocaml.warning "-unused-value-declaration"]
 [@@@ocaml.warning "-unused-module"]
 
+(* CR jrayman *)
+
 external int8x32_of_int64s : int64 -> int64 -> int64 -> int64 -> int8x32 = "" "vec256_of_int64s" [@@noalloc] [@@unboxed]
 external int8x32_first_int64 : int8x32 -> int64 = "" "vec256_first_int64" [@@noalloc] [@@unboxed]
 external int8x32_second_int64 : int8x32 -> int64 = "" "vec256_second_int64" [@@noalloc] [@@unboxed]
