@@ -161,6 +161,36 @@ val make_ignorable_app :
   <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external make_ignorable_by_inspection :
+  ('a : bits64 & bits64). int -> 'a -> 'a array = "%makearray_dynamic"
+let make_ignorable_by_inspection_app x = make_ignorable_by_inspection x
+[%%expect{|
+external make_ignorable_by_inspection :
+  ('a : bits64 & bits64). int -> 'a -> 'a array = "%makearray_dynamic"
+val make_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). int -> 'a -> 'a array = <fun>
+|}]
+
+external make_not_ignorable_by_inspection :
+  ('a : value & bits64). int -> 'a -> 'a array = "%makearray_dynamic"
+let make_not_ignorable_by_inspection_app x = make_not_ignorable_by_inspection x
+[%%expect{|
+external make_not_ignorable_by_inspection :
+  ('a : value & bits64). int -> 'a -> 'a array = "%makearray_dynamic"
+Line 3, characters 45-77:
+3 | let make_not_ignorable_by_inspection_app x = make_not_ignorable_by_inspection x
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external make_bad : int -> #(string * float#) -> #(string * float#) array =
   "%makearray_dynamic"
 let make_bad_app x = make_bad x
@@ -201,6 +231,26 @@ Line 3, characters 36-59:
                                         ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external make_scannable_with_vec :
+  int -> #(string * int32x4#) -> #(string * int32x4#) array = "%makearray_dynamic"
+let make_scannable_with_vec_app x = make_scannable_with_vec x
+[%%expect{|
+external make_scannable_with_vec :
+  int -> #(string * int32x4#) -> #(string * int32x4#) array
+  = "%makearray_dynamic"
+Line 3, characters 36-59:
+3 | let make_scannable_with_vec_app x = make_scannable_with_vec x
+                                        ^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (************************)
@@ -252,6 +302,36 @@ external len_ignorable : #(float# * int * int64# * bool) array -> int
 val len_ignorable_app : #(float# * int * int64# * bool) array -> int = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external len_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int = "%array_length"
+let len_ignorable_by_inspection_app x = len_ignorable_by_inspection x
+[%%expect{|
+external len_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int = "%array_length"
+val len_ignorable_by_inspection_app : ('a : bits64 & bits64). 'a array -> int =
+  <fun>
+|}]
+
+external len_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int = "%array_length"
+let len_not_ignorable_by_inspection_app x = len_not_ignorable_by_inspection x
+[%%expect{|
+external len_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int = "%array_length"
+Line 3, characters 44-77:
+3 | let len_not_ignorable_by_inspection_app x = len_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external len_bad : #(string * float#) array -> int = "%array_length"
 let len_bad_app x = len_bad x
 [%%expect{|
@@ -290,6 +370,25 @@ Line 3, characters 35-59:
                                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external len_scannable_with_vec :
+  #(string * int32x4#) array -> int = "%array_length"
+let len_scannable_with_vec_app x = len_scannable_with_vec x
+[%%expect{|
+external len_scannable_with_vec : #(string * int32x4#) array -> int
+  = "%array_length"
+Line 3, characters 35-59:
+3 | let len_scannable_with_vec_app x = len_scannable_with_vec x
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (********************)
@@ -352,6 +451,36 @@ val get_ignorable_app :
   int -> #(float# * int * int64# * bool) = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a = "%array_safe_get"
+let get_ignorable_by_inspection_app x = get_ignorable_by_inspection x
+[%%expect{|
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a = "%array_safe_get"
+val get_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int -> 'a = <fun>
+|}]
+
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a = "%array_safe_get"
+let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+[%%expect{|
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a = "%array_safe_get"
+Line 3, characters 44-75:
+3 | let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external get_bad : #(string * float#) array -> int -> #(string * float#) =
   "%array_safe_get"
 let get_bad_app a i = get_bad a i
@@ -392,6 +521,26 @@ Line 3, characters 37-63:
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#) = "%array_safe_get"
+let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+[%%expect{|
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#)
+  = "%array_safe_get"
+Line 3, characters 37-63:
+3 | let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (********************)
@@ -453,6 +602,36 @@ val set_ignorable_app :
   int -> #(float# * int * int64# * bool) -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a -> unit = "%array_safe_set"
+let set_ignorable_by_inspection_app x = set_ignorable_by_inspection x
+[%%expect{|
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a -> unit = "%array_safe_set"
+val set_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int -> 'a -> unit = <fun>
+|}]
+
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a -> unit = "%array_safe_set"
+let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+[%%expect{|
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a -> unit = "%array_safe_set"
+Line 3, characters 44-75:
+3 | let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external set_bad :
   #(string * float#) array -> int -> #(string * float#) -> unit =
   "%array_safe_set"
@@ -497,6 +676,27 @@ Line 4, characters 39-73:
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#) -> unit =
+  "%array_safe_set"
+let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+[%%expect{|
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#) -> unit
+  = "%array_safe_set"
+Line 4, characters 39-75:
+4 | let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (**********************)
@@ -559,6 +759,36 @@ val get_ignorable_app :
   int -> #(float# * int * int64# * bool) = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a = "%array_unsafe_get"
+let get_ignorable_by_inspection_app x = get_ignorable_by_inspection x
+[%%expect{|
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a = "%array_unsafe_get"
+val get_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int -> 'a = <fun>
+|}]
+
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a = "%array_unsafe_get"
+let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+[%%expect{|
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a = "%array_unsafe_get"
+Line 3, characters 44-75:
+3 | let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external get_bad : #(string * float#) array -> int -> #(string * float#) =
   "%array_unsafe_get"
 let get_bad_app a i = get_bad a i
@@ -600,6 +830,27 @@ Line 4, characters 37-63:
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#) =
+  "%array_unsafe_get"
+let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+[%%expect{|
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#)
+  = "%array_unsafe_get"
+Line 4, characters 37-63:
+4 | let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (**********************)
@@ -661,6 +912,36 @@ val set_ignorable_app :
   int -> #(float# * int * int64# * bool) -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a -> unit = "%array_unsafe_set"
+let set_ignorable_by_inspection_app x = set_ignorable_by_inspection x
+[%%expect{|
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a -> unit = "%array_unsafe_set"
+val set_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int -> 'a -> unit = <fun>
+|}]
+
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a -> unit = "%array_unsafe_set"
+let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+[%%expect{|
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a -> unit = "%array_unsafe_set"
+Line 3, characters 44-75:
+3 | let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external set_bad :
   #(string * float#) array -> int -> #(string * float#) -> unit =
   "%array_unsafe_set"
@@ -705,6 +986,27 @@ Line 4, characters 39-73:
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#) -> unit =
+  "%array_unsafe_set"
+let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+[%%expect{|
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#) -> unit
+  = "%array_unsafe_set"
+Line 4, characters 39-75:
+4 | let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (***************************************)
@@ -768,6 +1070,40 @@ val get_ignorable_app :
   int64# -> #(float# * int * int64# * bool) = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a =
+  "%array_safe_get_indexed_by_int64#"
+let get_ignorable_by_inspection_app x = get_ignorable_by_inspection x
+[%%expect{|
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a
+  = "%array_safe_get_indexed_by_int64#"
+val get_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a = <fun>
+|}]
+
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int64# -> 'a =
+  "%array_safe_get_indexed_by_int64#"
+let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+[%%expect{|
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int64# -> 'a
+  = "%array_safe_get_indexed_by_int64#"
+Line 4, characters 44-75:
+4 | let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external get_bad : #(string * float#) array -> int64# -> #(string * float#) =
   "%array_safe_get_indexed_by_int64#"
 let get_bad_app a i = get_bad a i
@@ -810,6 +1146,27 @@ Line 4, characters 37-63:
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int64# -> #(string * int32x4#) =
+  "%array_safe_get_indexed_by_int64#"
+let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+[%%expect{|
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int64# -> #(string * int32x4#)
+  = "%array_safe_get_indexed_by_int64#"
+Line 4, characters 37-63:
+4 | let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (***************************************)
@@ -874,6 +1231,40 @@ val set_ignorable_app :
   int64# -> #(float# * int * int64# * bool) -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a -> unit =
+  "%array_safe_set_indexed_by_int64#"
+let set_ignorable_by_inspection_app x = set_ignorable_by_inspection x
+[%%expect{|
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a -> unit
+  = "%array_safe_set_indexed_by_int64#"
+val set_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a -> unit = <fun>
+|}]
+
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int64# -> 'a -> unit =
+  "%array_safe_set_indexed_by_int64#"
+let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+[%%expect{|
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int64# -> 'a -> unit
+  = "%array_safe_set_indexed_by_int64#"
+Line 4, characters 44-75:
+4 | let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external set_bad :
   #(string * float#) array -> int64# -> #(string * float#) -> unit =
   "%array_safe_set_indexed_by_int64#"
@@ -918,6 +1309,27 @@ Line 4, characters 39-73:
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int64# -> #(string * int32x4#) -> unit =
+  "%array_safe_set_indexed_by_int64#"
+let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+[%%expect{|
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int64# -> #(string * int32x4#) -> unit
+  = "%array_safe_set_indexed_by_int64#"
+Line 4, characters 39-75:
+4 | let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (*****************************************)
@@ -981,6 +1393,40 @@ val get_ignorable_app :
   int64# -> #(float# * int * int64# * bool) = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a =
+  "%array_unsafe_get_indexed_by_int64#"
+let get_ignorable_by_inspection_app x = get_ignorable_by_inspection x
+[%%expect{|
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a
+  = "%array_unsafe_get_indexed_by_int64#"
+val get_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a = <fun>
+|}]
+
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int64# -> 'a =
+  "%array_unsafe_get_indexed_by_int64#"
+let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+[%%expect{|
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int64# -> 'a
+  = "%array_unsafe_get_indexed_by_int64#"
+Line 4, characters 44-75:
+4 | let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external get_bad : #(string * float#) array -> int64# -> #(string * float#) =
   "%array_unsafe_get_indexed_by_int64#"
 let get_bad_app a i = get_bad a i
@@ -1023,6 +1469,27 @@ Line 4, characters 37-63:
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int64# -> #(string * int32x4#) =
+  "%array_unsafe_get_indexed_by_int64#"
+let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+[%%expect{|
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int64# -> #(string * int32x4#)
+  = "%array_unsafe_get_indexed_by_int64#"
+Line 4, characters 37-63:
+4 | let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (*****************************************)
@@ -1086,6 +1553,40 @@ val set_ignorable_app :
   int64# -> #(float# * int * int64# * bool) -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a -> unit =
+  "%array_unsafe_set_indexed_by_int64#"
+let set_ignorable_by_inspection_app x = set_ignorable_by_inspection x
+[%%expect{|
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a -> unit
+  = "%array_unsafe_set_indexed_by_int64#"
+val set_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int64# -> 'a -> unit = <fun>
+|}]
+
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int64# -> 'a -> unit =
+  "%array_unsafe_set_indexed_by_int64#"
+let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+[%%expect{|
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int64# -> 'a -> unit
+  = "%array_unsafe_set_indexed_by_int64#"
+Line 4, characters 44-75:
+4 | let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external set_bad :
   #(string * float#) array -> int64# -> #(string * float#) -> unit =
   "%array_unsafe_set_indexed_by_int64#"
@@ -1130,6 +1631,27 @@ Line 4, characters 39-73:
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int64# -> #(string * int32x4#) -> unit =
+  "%array_unsafe_set_indexed_by_int64#"
+let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+[%%expect{|
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int64# -> #(string * int32x4#) -> unit
+  = "%array_unsafe_set_indexed_by_int64#"
+Line 4, characters 39-75:
+4 | let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (***************************************)
@@ -1193,6 +1715,40 @@ val get_ignorable_app :
   int32# -> #(float# * int * int64# * bool) = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a =
+  "%array_safe_get_indexed_by_int32#"
+let get_ignorable_by_inspection_app x = get_ignorable_by_inspection x
+[%%expect{|
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a
+  = "%array_safe_get_indexed_by_int32#"
+val get_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a = <fun>
+|}]
+
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int32# -> 'a =
+  "%array_safe_get_indexed_by_int32#"
+let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+[%%expect{|
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int32# -> 'a
+  = "%array_safe_get_indexed_by_int32#"
+Line 4, characters 44-75:
+4 | let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external get_bad : #(string * float#) array -> int32# -> #(string * float#) =
   "%array_safe_get_indexed_by_int32#"
 let get_bad_app a i = get_bad a i
@@ -1235,6 +1791,27 @@ Line 4, characters 37-63:
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int32# -> #(string * int32x4#) =
+  "%array_safe_get_indexed_by_int32#"
+let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+[%%expect{|
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int32# -> #(string * int32x4#)
+  = "%array_safe_get_indexed_by_int32#"
+Line 4, characters 37-63:
+4 | let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (***************************************)
@@ -1299,6 +1876,40 @@ val set_ignorable_app :
   int32# -> #(float# * int * int64# * bool) -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a -> unit =
+  "%array_safe_set_indexed_by_int32#"
+let set_ignorable_by_inspection_app x = set_ignorable_by_inspection x
+[%%expect{|
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a -> unit
+  = "%array_safe_set_indexed_by_int32#"
+val set_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a -> unit = <fun>
+|}]
+
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int32# -> 'a -> unit =
+  "%array_safe_set_indexed_by_int32#"
+let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+[%%expect{|
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int32# -> 'a -> unit
+  = "%array_safe_set_indexed_by_int32#"
+Line 4, characters 44-75:
+4 | let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external set_bad :
   #(string * float#) array -> int32# -> #(string * float#) -> unit =
   "%array_safe_set_indexed_by_int32#"
@@ -1343,6 +1954,27 @@ Line 4, characters 39-73:
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int32# -> #(string * int32x4#) -> unit =
+  "%array_safe_set_indexed_by_int32#"
+let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+[%%expect{|
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int32# -> #(string * int32x4#) -> unit
+  = "%array_safe_set_indexed_by_int32#"
+Line 4, characters 39-75:
+4 | let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (*****************************************)
@@ -1406,6 +2038,40 @@ val get_ignorable_app :
   int32# -> #(float# * int * int64# * bool) = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a =
+  "%array_unsafe_get_indexed_by_int32#"
+let get_ignorable_by_inspection_app x = get_ignorable_by_inspection x
+[%%expect{|
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a
+  = "%array_unsafe_get_indexed_by_int32#"
+val get_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a = <fun>
+|}]
+
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int32# -> 'a =
+  "%array_unsafe_get_indexed_by_int32#"
+let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+[%%expect{|
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int32# -> 'a
+  = "%array_unsafe_get_indexed_by_int32#"
+Line 4, characters 44-75:
+4 | let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external get_bad : #(string * float#) array -> int32# -> #(string * float#) =
   "%array_unsafe_get_indexed_by_int32#"
 let get_bad_app a i = get_bad a i
@@ -1448,6 +2114,27 @@ Line 4, characters 37-63:
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int32# -> #(string * int32x4#) =
+  "%array_unsafe_get_indexed_by_int32#"
+let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+[%%expect{|
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> int32# -> #(string * int32x4#)
+  = "%array_unsafe_get_indexed_by_int32#"
+Line 4, characters 37-63:
+4 | let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (*****************************************)
@@ -1512,6 +2199,40 @@ val set_ignorable_app :
   int32# -> #(float# * int * int64# * bool) -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a -> unit =
+  "%array_unsafe_set_indexed_by_int32#"
+let set_ignorable_by_inspection_app x = set_ignorable_by_inspection x
+[%%expect{|
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a -> unit
+  = "%array_unsafe_set_indexed_by_int32#"
+val set_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int32# -> 'a -> unit = <fun>
+|}]
+
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int32# -> 'a -> unit =
+  "%array_unsafe_set_indexed_by_int32#"
+let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+[%%expect{|
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int32# -> 'a -> unit
+  = "%array_unsafe_set_indexed_by_int32#"
+Line 4, characters 44-75:
+4 | let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external set_bad :
   #(string * float#) array -> int32# -> #(string * float#) -> unit =
   "%array_unsafe_set_indexed_by_int32#"
@@ -1556,6 +2277,27 @@ Line 4, characters 39-73:
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int32# -> #(string * int32x4#) -> unit =
+  "%array_unsafe_set_indexed_by_int32#"
+let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+[%%expect{|
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> int32# -> #(string * int32x4#) -> unit
+  = "%array_unsafe_set_indexed_by_int32#"
+Line 4, characters 39-75:
+4 | let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (*******************************************)
@@ -1621,6 +2363,40 @@ val get_ignorable_app :
   nativeint# -> #(float# * int * int64# * bool) = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a =
+  "%array_safe_get_indexed_by_nativeint#"
+let get_ignorable_by_inspection_app x = get_ignorable_by_inspection x
+[%%expect{|
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a
+  = "%array_safe_get_indexed_by_nativeint#"
+val get_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a = <fun>
+|}]
+
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> nativeint# -> 'a =
+  "%array_safe_get_indexed_by_nativeint#"
+let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+[%%expect{|
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> nativeint# -> 'a
+  = "%array_safe_get_indexed_by_nativeint#"
+Line 4, characters 44-75:
+4 | let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external get_bad :
   #(string * float#) array -> nativeint# -> #(string * float#) =
   "%array_safe_get_indexed_by_nativeint#"
@@ -1665,6 +2441,27 @@ Line 4, characters 37-63:
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> nativeint# -> #(string * int32x4#) =
+  "%array_safe_get_indexed_by_nativeint#"
+let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+[%%expect{|
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> nativeint# -> #(string * int32x4#)
+  = "%array_safe_get_indexed_by_nativeint#"
+Line 4, characters 37-63:
+4 | let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (*******************************************)
@@ -1731,6 +2528,40 @@ val set_ignorable_app :
   nativeint# -> #(float# * int * int64# * bool) -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a -> unit =
+  "%array_safe_set_indexed_by_nativeint#"
+let set_ignorable_by_inspection_app x = set_ignorable_by_inspection x
+[%%expect{|
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a -> unit
+  = "%array_safe_set_indexed_by_nativeint#"
+val set_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a -> unit = <fun>
+|}]
+
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> nativeint# -> 'a -> unit =
+  "%array_safe_set_indexed_by_nativeint#"
+let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+[%%expect{|
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> nativeint# -> 'a -> unit
+  = "%array_safe_set_indexed_by_nativeint#"
+Line 4, characters 44-75:
+4 | let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external set_bad :
   #(string * float#) array -> nativeint# -> #(string * float#) -> unit =
   "%array_safe_set_indexed_by_nativeint#"
@@ -1775,6 +2606,27 @@ Line 4, characters 39-73:
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> nativeint# -> #(string * int32x4#) -> unit =
+  "%array_safe_set_indexed_by_nativeint#"
+let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+[%%expect{|
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> nativeint# -> #(string * int32x4#) -> unit
+  = "%array_safe_set_indexed_by_nativeint#"
+Line 4, characters 39-75:
+4 | let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (*********************************************)
@@ -1840,6 +2692,40 @@ val get_ignorable_app :
   nativeint# -> #(float# * int * int64# * bool) = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a =
+  "%array_unsafe_get_indexed_by_nativeint#"
+let get_ignorable_by_inspection_app x = get_ignorable_by_inspection x
+[%%expect{|
+external get_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a
+  = "%array_unsafe_get_indexed_by_nativeint#"
+val get_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a = <fun>
+|}]
+
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> nativeint# -> 'a =
+  "%array_unsafe_get_indexed_by_nativeint#"
+let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+[%%expect{|
+external get_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> nativeint# -> 'a
+  = "%array_unsafe_get_indexed_by_nativeint#"
+Line 4, characters 44-75:
+4 | let get_not_ignorable_by_inspection_app x = get_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external get_bad :
   #(string * float#) array -> nativeint# -> #(string * float#) =
   "%array_unsafe_get_indexed_by_nativeint#"
@@ -1884,6 +2770,27 @@ Line 4, characters 37-63:
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> nativeint# -> #(string * int32x4#) =
+  "%array_unsafe_get_indexed_by_nativeint#"
+let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+[%%expect{|
+external get_scannable_with_vec :
+  #(string * int32x4#) array -> nativeint# -> #(string * int32x4#)
+  = "%array_unsafe_get_indexed_by_nativeint#"
+Line 4, characters 37-63:
+4 | let get_scannable_with_vec_app x i = get_scannable_with_vec x i
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (*********************************************)
@@ -1950,6 +2857,40 @@ val set_ignorable_app :
   nativeint# -> #(float# * int * int64# * bool) -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a -> unit =
+  "%array_unsafe_set_indexed_by_nativeint#"
+let set_ignorable_by_inspection_app x = set_ignorable_by_inspection x
+[%%expect{|
+external set_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a -> unit
+  = "%array_unsafe_set_indexed_by_nativeint#"
+val set_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> nativeint# -> 'a -> unit = <fun>
+|}]
+
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> nativeint# -> 'a -> unit =
+  "%array_unsafe_set_indexed_by_nativeint#"
+let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+[%%expect{|
+external set_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> nativeint# -> 'a -> unit
+  = "%array_unsafe_set_indexed_by_nativeint#"
+Line 4, characters 44-75:
+4 | let set_not_ignorable_by_inspection_app x = set_not_ignorable_by_inspection x
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external set_bad :
   #(string * float#) array -> nativeint# -> #(string * float#) -> unit =
   "%array_unsafe_set_indexed_by_nativeint#"
@@ -1994,6 +2935,27 @@ Line 4, characters 39-73:
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> nativeint# -> #(string * int32x4#) -> unit =
+  "%array_unsafe_set_indexed_by_nativeint#"
+let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+[%%expect{|
+external set_scannable_with_vec :
+  #(string * int32x4#) array -> nativeint# -> #(string * int32x4#) -> unit
+  = "%array_unsafe_set_indexed_by_nativeint#"
+Line 4, characters 39-75:
+4 | let set_scannable_with_vec_app x i v = set_scannable_with_vec x i #("a", v)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (**********************)
@@ -2059,6 +3021,41 @@ val blit_ignorable_app :
   int -> #(float# * int * int64# * bool) array -> int -> int -> unit = <fun>
 |}]
 
+(* We also allow products of ignorable sorts even if not [mod external_]. *)
+external blit_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a array -> int -> int -> unit =
+  "%arrayblit"
+let blit_ignorable_by_inspection_app x = blit_ignorable_by_inspection x
+[%%expect{|
+external blit_ignorable_by_inspection :
+  ('a : bits64 & bits64). 'a array -> int -> 'a array -> int -> int -> unit
+  = "%arrayblit"
+val blit_ignorable_by_inspection_app :
+  ('a : bits64 & bits64). 'a array -> int -> 'a array -> int -> int -> unit =
+  <fun>
+|}]
+
+external blit_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a array -> int -> int -> unit =
+  "%arrayblit"
+let blit_not_ignorable_by_inspection_app x = blit_not_ignorable_by_inspection x
+[%%expect{|
+external blit_not_ignorable_by_inspection :
+  ('a : value & bits64). 'a array -> int -> 'a array -> int -> int -> unit
+  = "%arrayblit"
+Line 4, characters 45-77:
+4 | let blit_not_ignorable_by_inspection_app x = blit_not_ignorable_by_inspection x
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is 'a, which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout bits64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
+|}]
+
 external blit_bad :
   #(string * float#) array -> int -> #(string * float#) array
   -> int -> int -> unit =
@@ -2105,6 +3102,28 @@ Line 5, characters 36-69:
                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
+|}]
+
+external blit_scannable_with_vec :
+  #(string * int32x4#) array -> int -> #(string * int32x4#) array
+  -> int -> int -> unit =
+  "%arrayblit"
+let blit_scannable_with_vec_app x = blit_scannable_with_vec x 0 x 2 3
+[%%expect{|
+external blit_scannable_with_vec :
+  #(string * int32x4#) array ->
+  int -> #(string * int32x4#) array -> int -> int -> unit = "%arrayblit"
+Line 5, characters 36-69:
+5 | let blit_scannable_with_vec_app x = blit_scannable_with_vec x 0 x 2 3
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * int32x4#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout vec128.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (************************************************)
