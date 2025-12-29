@@ -2414,6 +2414,18 @@ let mk_is_abstract env p =
 let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
 
+let apply_layout_wrapping_l ~unwrapped_ty:{ ty = _; or_null; modality = _ }
+      jkind =
+  match or_null with
+  | Some _ ->
+    (* The layout on ['a or_null] is imprecise - it's always [scannable]. But
+        when ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
+        ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
+        here we recompute the layout based on the inner jkind. *)
+    Jkind.apply_or_null_l jkind |> Result.get_ok |> Jkind.extract_layout
+  | None ->
+    Jkind.extract_layout jkind
+
 let apply_jkind_wrapping_l ~env ~level ~unwrapped_ty:{ ty; or_null; modality }
       jkind =
   begin
@@ -2424,12 +2436,8 @@ let apply_jkind_wrapping_l ~env ~level ~unwrapped_ty:{ ty; or_null; modality }
       let instance_jkind =
         jkind_subst env level decl.type_params [ty] decl.type_jkind
       in
-      (* The layout on ['a or_null] is imprecise - it's always [scannable]. But
-         when ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
-         ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
-         here we recompute the layout based on the inner jkind. *)
       let layout =
-        Jkind.apply_or_null_l jkind |> Result.get_ok |> Jkind.extract_layout
+        apply_layout_wrapping_l ~unwrapped_ty:{ ty; modality; or_null } jkind
       in
       Jkind.set_layout instance_jkind layout
     | None -> jkind
@@ -2472,8 +2480,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
           let layout =
             estimate_type_jkind ~expand_component ~ignore_mod_bounds env
               unwrapped_ty.ty
-            |> apply_jkind_wrapping_l ~env ~level:(get_level ty) ~unwrapped_ty
-            |> Jkind.extract_layout
+            |> apply_layout_wrapping_l ~unwrapped_ty
           in
           (unwrapped_ty.ty, unwrapped_ty.modality), layout)
         ltys
