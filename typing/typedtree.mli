@@ -127,8 +127,8 @@ val aliased_many_use : unique_use
     or record access, but also when specifying record and variant patterns.
 
     Where disambiguation was necessary (i.e. the label was ambiguous),
-    the disambiguated path and arity of the resolved type constructor
-    is preserved so that we can insert a type annotation.
+    the disambiguated path and arity (number of parameters) of the resolved
+    type constructor is preserved so that we can insert a type annotation.
 
     The [arity] is necessary to insert the right number of wildcards in the
     type constructor's argument list, e.g.: [{ path = result; arity = 2 }]
