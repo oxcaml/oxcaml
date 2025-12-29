@@ -2447,6 +2447,10 @@ let apply_jkind_wrapping_l ~env ~level ~unwrapped_ty:{ ty; or_null; modality }
 let apply_jkind_wrapping_r ~unwrapped_ty:{ ty = _; modality; or_null } jkind =
   begin
     if Option.is_some or_null then
+      (* The testsuite passes if we replace the body of this [then] with
+         [assert false]. But we don't have a principled reason why (one likely
+         exists by thinking sufficiently hard about the sole callsite in
+         [constrain_type_jkind].) *)
       match Jkind.apply_or_null_r jkind with
       | Ok jkind -> jkind
       | Error () ->
