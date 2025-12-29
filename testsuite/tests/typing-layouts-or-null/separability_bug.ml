@@ -76,3 +76,18 @@ type ('a : value_or_null) portended = { a : 'a; } [@@unboxed]
 val peek : ('a : value maybe_separable) 'b. 'a portended or_null -> 'b =
   <fun>
 |}]
+
+
+type t : scannable & scannable = #(int or_null or_null * int)
+[%%expect{|
+Line 1, characters 35-46:
+1 | type t : scannable & scannable = #(int or_null or_null * int)
+                                       ^^^^^^^^^^^
+Error: This type "int or_null" should be an instance of type
+         "('a : value maybe_separable)"
+       The layout of int or_null is value maybe_separable maybe_null
+         because it is the primitive type or_null.
+       But the layout of int or_null must be a sublayout of
+           value maybe_separable
+         because the type argument of or_null has layout value.
+|}]
