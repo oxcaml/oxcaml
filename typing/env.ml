@@ -149,7 +149,7 @@ type stage_lock =
 
 type nonstage_lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
-                          Mode.Value.Comonadic.Const.t
+      Mode.Value.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
