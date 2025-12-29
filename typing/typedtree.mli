@@ -131,7 +131,7 @@ val aliased_many_use : unique_use
     is preserved so that we can insert a type annotation.
 
     The [arity] is necessary to insert the right number of wildcards in the
-    type constructor's argument list, e.g.: [{ path: result; arity: 2 }]
+    type constructor's argument list, e.g.: [{ path = result; arity = 2 }]
     results in the annotation [(_, _) result]. *)
 type label_ambiguity =
   | Ambiguous of { path: Path.t; arity : int }
