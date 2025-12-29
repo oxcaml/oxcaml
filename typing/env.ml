@@ -147,17 +147,24 @@ type stage_lock =
   | Quotation_lock
   | Splice_lock
 
-type lock =
+type nonstage_lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
-      Mode.Value.Comonadic.Const.t
+                          Mode.Value.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
+
+type lock =
+  | Nonstage_lock of nonstage_lock
   | Stage_lock of stage_lock
 
 let is_stage_lock = function
-  | Stage_lock stage_lock -> Some stage_lock
+  | Stage_lock lock -> Some lock
+  | _ -> None
+
+let is_nonstage_lock = function
+  | Nonstage_lock lock -> Some lock
   | _ -> None
 
 type locks = lock list
@@ -2865,42 +2872,48 @@ let enter_cltype ~scope name desc env =
 let enter_module ~scope ?arg s presence mty ?mode env =
   enter_module_declaration ~scope ?arg s presence (md mty) ?mode env
 
-let add_lock lock env =
-  let (types, modtypes, labels, unboxed_labels) =
-    match is_stage_lock lock with
-    | Some stage_lock -> (IdTbl.add_lock stage_lock env.types,
-                          IdTbl.add_lock stage_lock env.modtypes,
-                          TycompTbl.add_lock stage_lock env.labels,
-                          TycompTbl.add_lock stage_lock env.unboxed_labels)
-    | None -> (env.types, env.modtypes, env.labels, env.unboxed_labels)
-  in
+let add_stage_lock lock env =
+  { env with
+    values = IdTbl.add_lock (Stage_lock lock) env.values;
+    types = IdTbl.add_lock lock env.types;
+    modules = IdTbl.add_lock (Stage_lock lock) env.modules;
+    modtypes = IdTbl.add_lock lock env.modtypes;
+    classes = IdTbl.add_lock (Stage_lock lock) env.classes;
+    constrs = TycompTbl.add_lock (Stage_lock lock) env.constrs;
+    labels = TycompTbl.add_lock lock env.labels;
+    unboxed_labels = TycompTbl.add_lock lock env.unboxed_labels;
+  }
+
+let add_nonstage_lock lock env =
+  let lock = Nonstage_lock lock in
   { env with
     values = IdTbl.add_lock lock env.values;
-    types = types;
     modules = IdTbl.add_lock lock env.modules;
-    modtypes = modtypes;
     classes = IdTbl.add_lock lock env.classes;
     constrs = TycompTbl.add_lock lock env.constrs;
-    labels = labels;
-    unboxed_labels = unboxed_labels;
   }
+
+let add_lock lock env =
+  match lock with
+  | Stage_lock lock -> add_stage_lock lock env
+  | Nonstage_lock lock -> add_nonstage_lock lock env
 
 let add_const_closure_lock ?(ghost = false) closure_context comonadic env =
   let lock = Const_closure_lock (ghost, closure_context, comonadic) in
-  add_lock lock env
+  add_nonstage_lock lock env
 
 let add_closure_lock closure_context comonadic env =
   let lock = Closure_lock
     (closure_context,
      Mode.Value.Comonadic.disallow_left comonadic)
   in
-  add_lock lock env
+  add_nonstage_lock lock env
 
-let add_region_lock env = add_lock Region_lock env
+let add_region_lock env = add_nonstage_lock Region_lock env
 
-let add_exclave_lock env = add_lock Exclave_lock env
+let add_exclave_lock env = add_nonstage_lock Exclave_lock env
 
-let add_unboxed_lock env = add_lock Unboxed_lock env
+let add_unboxed_lock env = add_nonstage_lock Unboxed_lock env
 
 let enter_quotation env =
   add_lock (Stage_lock Quotation_lock) {env with stage = env.stage + 1}
@@ -3507,7 +3520,7 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
 
     [ty] is optional as the function works on modules and classes as well, for
     which [ty] should be [None]. *)
-let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
+let walk_nonstage_locks ~errors ~env ~loc ~item ~lid mode ty locks =
   List.fold_left
     (fun vmode lock ->
       match lock with
@@ -3521,7 +3534,6 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc ~lid ty;
           vmode
-      | Stage_lock _ -> vmode
     ) mode locks
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
@@ -3555,19 +3567,21 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
       | Const_closure_lock (true, _, _) ->
           mode
-      | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
+      | Const_closure_lock (false, pp, _)
+      | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
-      | Unboxed_lock | Stage_lock _ -> mode
+      | Unboxed_lock -> mode
     ) mode locks
 
 let lookup_ident_value ~errors ~use ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) ->
+      let nonstage_locks = List.filter_map is_nonstage_lock locks in
       begin match vda with
       | {vda_description={val_kind=Val_mut (m0, _); _}; _} ->
           m0
-          |> walk_locks_for_mutable_mode ~errors ~loc ~env locks
+          |> walk_locks_for_mutable_mode ~errors ~loc ~env nonstage_locks
           |> ignore
       | _ -> () end;
       check_cross_quotation errors loc vda.vda_description.val_loc env path
@@ -4193,9 +4207,11 @@ let lookup_class ~errors ~use ~loc lid env =
     | Ldot(l, s) -> lookup_dot_class ~errors ~use ~loc l s env
     | Lapply _ -> assert false
   in
+  let nonstage_locks = List.filter_map is_nonstage_lock locks in
   let vmode =
     if use then
-      walk_locks ~errors ~loc ~env ~item:Class ~lid clda_mode None locks
+      walk_nonstage_locks ~errors ~loc ~env ~item:Class ~lid clda_mode None
+        nonstage_locks
     else
       clda_mode
   in
@@ -4334,7 +4350,8 @@ let find_cltype_index id env = find_index_tbl id env.cltypes
 (* Ordinary lookup functions *)
 
 let walk_locks ~env ~loc lid ~item ty (mode, locks) =
-  walk_locks ~errors:true ~loc ~env ~item ~lid mode ty locks
+  let nonstage_locks = List.filter_map is_nonstage_lock locks in
+  walk_nonstage_locks ~errors:true ~loc ~env ~item ~lid mode ty nonstage_locks
 
 let lookup_module_path ?(use=true) ~loc ~load lid env =
   lookup_module_path ~errors:true ~use ~loc ~load lid env
@@ -4396,6 +4413,7 @@ type settable_variable =
 let lookup_settable_variable ?(use=true) ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) -> begin
+      let nonstage_locks = List.filter_map is_nonstage_lock locks in
       let desc = vda.vda_description in
       match desc.val_kind, path with
       | Val_ivar(mut, cl_num), _ ->
@@ -4406,7 +4424,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           let val_type = Subst.Lazy.force_type_expr desc.val_type in
           let mode =
             m0
-            |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
+            |> walk_locks_for_mutable_mode ~errors:true ~loc ~env nonstage_locks
             |> Mode.Modality.Const.apply
                 Typemode.let_mutable_modalities
           in
