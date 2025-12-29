@@ -27,3 +27,18 @@ Stdlib.ignore
   ((fun x -> x) (function | (#{A.foo = foo; _} : A.urcd) -> foo) : A.urcd ->
   int)
 
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : _ A.rcd1) : _ A.rcd1)
+
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _) A.rcd2) : (
+  _, _) A.rcd2)
+
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _) A.rcd2) : (
+  _, _) A.rcd2)
+
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _, _) A.rcd3) :
+  (_, _, _) A.rcd3)
+

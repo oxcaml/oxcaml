@@ -45,6 +45,7 @@ let () =
   test <[ ignore (((fun x -> x) $r) : rcd -> int) ]>
 ;;
 
+
 (* Variants *)
 
 (* Constructor *)
@@ -60,6 +61,7 @@ let () =
   let (v : <[vrt -> int]> expr) = <[function Foo -> 0 | Bar -> 1 ]> in
   test <[ ignore ((fun x -> x) $v : vrt -> int) ]>
 ;;
+
 
 (* Unboxed records *)
 
@@ -82,4 +84,35 @@ let () =
   let open A in
   let (r : <[urcd -> int]> expr) = <[function #{ foo; _ } -> foo]> in
   test <[ ignore (((fun x -> x) $r) : urcd -> int) ]>
+;;
+
+
+(* Parameterised type constructors *)
+
+(* Unary *)
+let () =
+  let open A in
+  let (r : <[_ rcd1]> expr) = <[{ foo = 123; bar = "abc"}]> in
+  test <[ ignore (((fun x -> x) $r) : _ rcd1) ]>
+;;
+
+(* Binary *)
+let () =
+  let open A in
+  let (r : <[(_, _) rcd2]> expr) = <[{ foo = 123; bar = "abc"}]> in
+  test <[ ignore (((fun x -> x) $r) : (_, _) rcd2) ]>
+;;
+
+(* Binary - short-hand wildcard *)
+let () =
+  let open A in
+  let (r : <[_ rcd2]> expr) = <[{ foo = 123; bar = "abc"}]> in
+  test <[ ignore (((fun x -> x) $r) : _ rcd2) ]>
+;;
+
+(* Ternary *)
+let () =
+  let open A in
+  let (r : <[(_, _, _) rcd3]> expr) = <[{ foo = 123; bar = "abc"}]> in
+  test <[ ignore (((fun x -> x) $r) : (_, _, _) rcd3) ]>
 ;;
