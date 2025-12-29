@@ -2426,20 +2426,17 @@ let apply_layout_wrapping_l ~unwrapped_ty:{ ty = _; or_null; modality = _ }
   | None ->
     Jkind.extract_layout jkind
 
-let apply_jkind_wrapping_l ~env ~level ~unwrapped_ty:{ ty; or_null; modality }
+let apply_jkind_wrapping_l ~env:_ ~level:_ ~unwrapped_ty:{ ty; or_null; modality }
       jkind =
   begin
     match or_null with
-    | Some decl ->
+    | Some _decl ->
       (* We get the mode crossing behavior of the wrapped jkind from the
           declaration of the [or_null]-like type. *)
-      let instance_jkind =
-        jkind_subst env level decl.type_params [ty] decl.type_jkind
-      in
       let layout =
         apply_layout_wrapping_l ~unwrapped_ty:{ ty; modality; or_null } jkind
       in
-      Jkind.set_layout instance_jkind layout
+      Jkind.set_layout jkind layout
     | None -> jkind
   end
   |> Jkind.apply_modality_l modality
