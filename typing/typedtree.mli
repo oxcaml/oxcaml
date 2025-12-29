@@ -130,8 +130,9 @@ val aliased_many_use : unique_use
     the disambiguated path and arity of the resolved type constructor
     is preserved so that we can insert a type annotation.
 
-    The arity specifies the appropriate number of wildcard type arguments,
-    e.g. [{ path: result; arity: 2 } --> (_, _) result]. *)
+    The [arity] is necessary to insert the right number of wildcards in the
+    type constructor's argument list, e.g.: [{ path: result; arity: 2 }]
+    results in the annotation [(_, _) result]. *)
 type label_ambiguity =
   | Ambiguous of { path: Path.t; arity : int }
   | Unambiguous
