@@ -2414,7 +2414,8 @@ let mk_is_abstract env p =
 let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
 
-let rewrap_jkind_l ~env ~level ~unwrapped_ty:{ ty; or_null; modality } jkind =
+let apply_jkind_wrapping_l ~env ~level ~unwrapped_ty:{ ty; or_null; modality }
+      jkind =
   begin
     match or_null with
     | Some decl ->
@@ -2435,10 +2436,13 @@ let rewrap_jkind_l ~env ~level ~unwrapped_ty:{ ty; or_null; modality } jkind =
   end
   |> Jkind.apply_modality_l modality
 
-let rewrap_jkind_r ~unwrapped_ty:{ ty = _; modality; or_null } jkind =
+let apply_jkind_wrapping_r ~unwrapped_ty:{ ty = _; modality; or_null } jkind =
   begin
     if Option.is_some or_null then
-      Jkind.apply_or_null_r jkind |> Result.get_ok
+      match Jkind.apply_or_null_r jkind with
+      | Ok jkind -> jkind
+      | Error () ->
+        Misc.fatal_error "Ctype.apply_jkind_wrapping_r: nested or_nulls"
     else
       jkind
   end
@@ -2458,21 +2462,23 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
-     let components = List.map (fun (_lbl, ty) -> expand_component ty) ltys in
-     (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
-        just to throw most of it away will go away once we get [layout_of].
-        Internal ticket 2912. *)
-     let layouts =
-       List.map (fun unwrapped_ty ->
-          estimate_type_jkind ~expand_component ~ignore_mod_bounds env
-            unwrapped_ty.ty
-          |> rewrap_jkind_l ~env ~level:(get_level ty) ~unwrapped_ty
-          |> Jkind.extract_layout)
-         components
-     in
-     let tys_modalities =
-       List.map (fun { ty; modality; or_null = _ } -> ty, modality) components
-     in
+    let tys_modalities, layouts =
+      List.map
+        (fun (_lbl, ty) ->
+          let unwrapped_ty = expand_component ty in
+          (* CR layouts v2.8: This pretty ridiculous use of
+             [estimate_type_jkind] just to throw most of it away will go away
+             once we get [layout_of]. Internal ticket 2912. *)
+          let layout =
+            estimate_type_jkind ~expand_component ~ignore_mod_bounds env
+              unwrapped_ty.ty
+            |> apply_jkind_wrapping_l ~env ~level:(get_level ty) ~unwrapped_ty
+            |> Jkind.extract_layout
+          in
+          (unwrapped_ty.ty, unwrapped_ty.modality), layout)
+        ltys
+      |> List.split
+    in
      Jkind.Builtin.product ~why:Unboxed_tuple tys_modalities layouts
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
@@ -2525,7 +2531,7 @@ let estimate_type_jkind_unwrapped
       level ~expand_component env ~unwrapped_ty =
   estimate_type_jkind ~expand_component ~ignore_mod_bounds:false env
     unwrapped_ty.ty
-  |> rewrap_jkind_l ~env ~level ~unwrapped_ty
+  |> apply_jkind_wrapping_l ~env ~level ~unwrapped_ty
 
 let type_jkind env ty =
   let unwrapped_ty = get_unboxed_type_approximation env ty in
@@ -2672,7 +2678,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                let results =
                  Misc.Stdlib.List.map3
                    (fun unwrapped_ty ty's_jkind jkind ->
-                      let jkind = rewrap_jkind_r jkind ~unwrapped_ty in
+                      let jkind = apply_jkind_wrapping_r jkind ~unwrapped_ty in
                       loop ~fuel ~expanded:false unwrapped_ty.ty ty's_jkind
                         jkind)
                    unwrapped_tys ty's_jkinds jkinds
