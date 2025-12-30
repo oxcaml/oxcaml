@@ -28,7 +28,7 @@ module Rigid_name = struct
       match a, b with
       | Atom a1, Atom a2 ->
         let h = Path.compare a1.constr a2.constr in
-        if h <> 0 then h else Int.compare a1.arg_index a2.arg_index
+        if h != 0 then h else Int.compare a1.arg_index a2.arg_index
       | Param x, Param y -> Int.compare x y
       | Atom _, Param _ -> -1
       | Param _, Atom _ -> 1
