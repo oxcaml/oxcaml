@@ -206,7 +206,7 @@ jobs:
       - name: Set up Opam
         uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: oxcaml-ci-deps.5.2.0
+          ocaml-compiler: oxcaml-ci-deps.5.2.0-with-ocamlformat.0.28.1
           opam-repositories: |
             local: file://${{ github.workspace }}/tools/ci/local-opam
             default: https://github.com/ocaml/opam-repository.git
