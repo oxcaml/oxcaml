@@ -1,4 +1,4 @@
-type t
+type t = private int
 
 (** Lattice operations expected by the solver. *)
 val bot : t

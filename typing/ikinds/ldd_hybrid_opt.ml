@@ -53,6 +53,8 @@ module Make (V : ORDERED) = struct
   (* --------- node helpers --------- *)
   let[@inline] is_leaf (n : node) : bool = Obj.is_int n
 
+  let _assert_axis_lattice_is_int (x : Axis_lattice.t) = (x :> int)
+
   module Unsafe = struct
     let[@inline] leaf_value (n : node) : Axis_lattice.t = Obj.obj n
 
