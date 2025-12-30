@@ -1,10 +1,10 @@
 module Int = Stdlib_stable.Int
 
 module type Smallint = sig
-  (** Signed {m n}-bit tagged integer values.
+  (** Signed [n]-bit tagged integer values.
 
-    These integers are {m n} bits wide and use two's complement representation.
-    All operations are taken modulo {m 2^n}. They do not fail on overflow. *)
+    These integers are [n] bits wide and use two's complement representation.
+    All operations are taken modulo [2^n]. They do not fail on overflow. *)
 
   (** {1:ints n-bit Integers} *)
 
