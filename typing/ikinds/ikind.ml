@@ -2,12 +2,12 @@
 (* Types shared by ikind algorithms                                        *)
 (*-------------------------------------------------------------------------*)
 
-module RigidName = struct
+module Rigid_name = struct
   (* Rigid names are the variables that may occur in ikind formulas. *)
 
   type t =
     | Atom of
-        { constr : constr;
+        { constr : Path.t;
           (* arg_index = 0 refers to the base contribution,
              subsequent refer to the coefficients of the i-th argument. *)
           arg_index : int
@@ -19,8 +19,6 @@ module RigidName = struct
        This is used when we couldn't compute a precise ikind, e.g. for a
        polymorphic variant with conjunctive type -- `Constr of (a & b & ...) *)
     | Unknown of int
-
-  and constr = Path.t
 
   (* Ordering on rigid names used in the LDD to order the nodes. *)
   let compare a b =
@@ -57,57 +55,11 @@ module RigidName = struct
 end
 
 module Ldd = struct
-  module Base = Ldd.Make (RigidName)
+  module Name = Rigid_name
 
   type lat = Axis_lattice.t
 
-  type constr = RigidName.constr
+  type constr = Path.t
 
-  type node = Base.node
-
-  type var = Base.var
-
-  module Name = RigidName
-
-  let bot = Base.bot
-
-  let const = Base.const
-
-  let rigid = Base.rigid
-
-  let new_var = Base.new_var
-
-  let var = Base.var
-
-  let join = Base.join
-
-  let meet = Base.meet
-
-  let sub_subsets = Base.sub_subsets
-
-  let solve_lfp = Base.solve_lfp
-
-  let enqueue_lfp = Base.enqueue_lfp
-
-  let enqueue_gfp = Base.enqueue_gfp
-
-  let solve_pending = Base.solve_pending
-
-  let decompose_linear = Base.decompose_linear
-
-  let leq = Base.leq
-
-  let leq_with_reason = Base.leq_with_reason
-
-  let round_up = Base.round_up
-
-  let is_const = Base.is_const
-
-  let map_rigid = Base.map_rigid
-
-  let clear_memos = Base.clear_memos
-
-  let pp = Base.pp
-
-  let pp_debug = Base.pp_debug
+  include Ldd.Make (Rigid_name)
 end

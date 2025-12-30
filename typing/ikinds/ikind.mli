@@ -2,13 +2,13 @@
 (* Types shared by ikind algorithms                                        *)
 (*-------------------------------------------------------------------------*)
 
-module RigidName : sig
+module Rigid_name : sig
   (* Rigid names are the variables that may occur in ikind formulas. *)
 
   (* CR jujacobs: see if we can make this type abstract. *)
   type t =
     | Atom of
-        { constr : constr;
+        { constr : Path.t;
           (* arg_index = 0 refers to the base contribution,
              subsequent refer to the coefficients of the i-th argument. *)
           arg_index : int
@@ -21,14 +21,12 @@ module RigidName : sig
        polymorphic variant with conjunctive type -- `Constr of (a & b & ...) *)
     | Unknown of int
 
-  and constr = Path.t
-
   (* Ordering on rigid names used in the LDD to order the nodes. *)
   val compare : t -> t -> int
 
   val to_string : t -> string
 
-  val atomic : constr -> int -> t
+  val atomic : Path.t -> int -> t
 
   val param : int -> t
 
@@ -38,14 +36,14 @@ end
 module Ldd : sig
   type lat = Axis_lattice.t
 
-  type constr = RigidName.constr
+  type constr = Path.t
 
   type node
 
   type var
 
   module Name : sig
-    include module type of RigidName
+    include module type of Rigid_name
   end
 
   val bot : node
@@ -56,7 +54,7 @@ module Ldd : sig
 
   val new_var : unit -> var
 
-  val var : var -> node
+  val mk_var : var -> node
 
   val join : node -> node -> node
 
@@ -72,19 +70,20 @@ module Ldd : sig
 
   val solve_pending : unit -> unit
 
-  val decompose_linear : universe:var list -> node -> node * node list
+  val decompose_into_linear_terms :
+    universe:var list -> node -> node * node list
 
   val leq : node -> node -> bool
 
-  val leq_with_reason : node -> node -> int list option
+  (* Empty list means [a ⊑ b] succeeds.
+     Non-empty list is the witness axes where it fails. *)
+  val leq_with_reason : node -> node -> int list
 
   val round_up : node -> lat
 
   val is_const : node -> bool
 
   val map_rigid : (Name.t -> node) -> node -> node
-
-  val clear_memos : unit -> unit
 
   val pp : node -> string
 

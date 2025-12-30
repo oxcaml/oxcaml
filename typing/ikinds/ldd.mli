@@ -22,7 +22,7 @@ module Make (V : ORDERED) : sig
 
   val new_var : unit -> var
 
-  val var : var -> node
+  val mk_var : var -> node
 
   (* Boolean algebra over nodes *)
   val join : node -> node -> node
@@ -41,21 +41,21 @@ module Make (V : ORDERED) : sig
   val solve_pending : unit -> unit
 
   (* Linear decomposition/composition helpers *)
-  val decompose_linear : universe:var list -> node -> node * node list
+  val decompose_into_linear_terms :
+    universe:var list -> node -> node * node list
 
   val leq : node -> node -> bool
 
   (* If [a ⊑ b] fails, return witness axis indices where they differ. *)
-  val leq_with_reason : node -> node -> int list option
+  (* Empty list means [a ⊑ b] succeeds.
+     Non-empty list is the witness axes where it fails. *)
+  val leq_with_reason : node -> node -> int list
 
   val round_up : node -> Axis_lattice.t
 
   val is_const : node -> bool
 
   val map_rigid : (V.t -> node) -> node -> node
-
-  (* Clear all memo tables *)
-  val clear_memos : unit -> unit
 
   (* Pretty printers and checks *)
   val pp : node -> string

@@ -1,8 +1,11 @@
 (* This forces ikinds globally on. *)
 Clflags.ikinds := true;
+(* CR jujacobs: set this to false before merging. *)
+
 (* Global feature toggles for the ikinds experiment.
    These are intended to be easy to flip while iterating on
    performance or correctness. *)
+(* CR jujacobs: remove toggles in the final version. *)
 Types.ikind_debug := false
 
 let enable_crossing = true
@@ -84,10 +87,8 @@ module JK = struct
       constr_to_coeffs : (poly * poly array) ConstrTbl.t
     }
 
-  (* Start a new solver context.
-     LDD memo tables are global; clearing them keeps solves independent. *)
+  (* Start a new solver context. *)
   let create ~(mode : mode) (env : env) : ctx =
-    Ldd.clear_memos ();
     { env;
       mode;
       ty_to_kind = TyTbl.create 0;
@@ -98,7 +99,7 @@ module JK = struct
 
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : kind =
     match ctx.mode with
-    | Normal -> Ldd.var (Ldd.rigid name)
+    | Normal -> Ldd.mk_var (Ldd.rigid name)
     | Round_up -> Ldd.const Axis_lattice.top
 
   (* A rigid variable corresponding to a type parameter [t]. *)
@@ -123,7 +124,7 @@ module JK = struct
       if type_may_be_circular t
       then (
         let v = Ldd.new_var () in
-        let placeholder = Ldd.var v in
+        let placeholder = Ldd.mk_var v in
         TyTbl.add ctx.ty_to_kind t placeholder;
         let rhs = ctx.env.kind_of ctx t in
         Ldd.solve_lfp v rhs;
@@ -149,8 +150,8 @@ module JK = struct
         let coeff_vars =
           Array.init (Array.length coeffs) (fun _ -> Ldd.new_var ())
         in
-        let base_node = Ldd.var base_var in
-        let coeff_nodes = Array.map Ldd.var coeff_vars in
+        let base_node = Ldd.mk_var base_var in
+        let coeff_nodes = Array.map Ldd.mk_var coeff_vars in
         ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
         (* Replace rigid atoms that refer to other constructors with the
            corresponding cached placeholders.  Atoms that refer back to
@@ -180,8 +181,8 @@ module JK = struct
         let coeff_vars =
           Array.init (List.length args) (fun _ -> Ldd.new_var ())
         in
-        let base_node = Ldd.var base_var in
-        let coeff_nodes = Array.map Ldd.var coeff_vars in
+        let base_node = Ldd.mk_var base_var in
+        let coeff_nodes = Array.map Ldd.mk_var coeff_vars in
         ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
         let rigid_vars =
           List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) args
@@ -189,7 +190,7 @@ module JK = struct
         (* Treat parameters as rigid vars while computing [kind'] so that
            the result is linear in those vars. *)
         List.iter2
-          (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.var var))
+          (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.mk_var var))
           args rigid_vars;
         (* Compute body kind *)
         (* CR jujacobs: still compute the kind in Right mode to keep
@@ -197,7 +198,9 @@ module JK = struct
         let kind' = body ctx in
         (* Decompose [kind'] into a base and one coefficient
            per parameter. *)
-        let base', coeffs' = Ldd.decompose_linear ~universe:rigid_vars kind' in
+        let base', coeffs' =
+          Ldd.decompose_into_linear_terms ~universe:rigid_vars kind'
+        in
         let coeffs' = Array.of_list coeffs' in
         if Array.length coeff_vars <> Array.length coeffs'
         then
@@ -256,8 +259,7 @@ module JK = struct
     Ldd.solve_pending ();
     base, coeffs
 
-  let leq_with_reason (k1 : kind) (k2 : kind) : int list option =
-    Ldd.solve_pending ();
+  let leq_with_reason (k1 : kind) (k2 : kind) : int list =
     Ldd.leq_with_reason k1 k2
 
   let round_up (k : kind) : lat = Ldd.round_up k
@@ -415,7 +417,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     (* Fallback for unknown constructors: treat them as abstract,
        non-recursive values. *)
     let unknown = Ikind.Ldd.Name.fresh_unknown () in
-    let kind : JK.ckind = fun _ctx -> Ldd.var (Ldd.rigid unknown) in
+    let kind : JK.ckind = fun _ctx -> Ldd.mk_var (Ldd.rigid unknown) in
     JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
     (* Here we can switch to using the cached ikind or not. *)
@@ -675,7 +677,9 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
     let rigid_vars =
       List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
     in
-    let base, coeffs = Ldd.decompose_linear ~universe:rigid_vars poly in
+    let base, coeffs =
+      Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
+    in
     let coeffs = Array.of_list coeffs in
     let payload = Types.constructor_ikind_create ~base ~coeffs in
     if !Types.ikind_debug
@@ -729,7 +733,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
         else ctx
       in
       let sub_poly = ckind_of_jkind_l sub_ctx sub in
-      Ldd.solve_pending ();
+      let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
       (if !Types.ikind_debug
       then
         let origin_suffix =
@@ -744,10 +748,9 @@ let sub_jkind_l ?allow_any_crossing ?origin
            super_poly=%s@."
           origin_suffix Jkind.format sub Jkind.format super (Ldd.pp sub_poly)
           (Ldd.pp super_poly));
-      let ik_leq = Ldd.leq_with_reason sub_poly super_poly in
-      match ik_leq with
-      | None -> Ok ()
-      | Some violating_axes ->
+      match violating_axes with
+      | [] -> Ok ()
+      | _ ->
         let () =
           if !Types.ikind_debug
           then
@@ -786,8 +789,8 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     match
       JK.leq_with_reason (ckind_of_jkind_l ctx sub) (ckind_of_jkind_r super)
     with
-    | None -> true
-    | Some _ -> false
+    | [] -> true
+    | _ -> false
 
 (* CR jujacobs: this is really slow when enabled. Fix performance. *)
 let crossing_of_jkind ~(context : Jkind.jkind_context)
@@ -829,8 +832,8 @@ let sub_or_intersect ?origin:_origin
       (* Layouts already checked above. Remaining failure reasons are
          per-axis disagreements. *)
       match JK.leq_with_reason sub_poly super_poly with
-      | None -> Jkind.Sub
-      | Some violating_axes ->
+      | [] -> Jkind.Sub
+      | violating_axes ->
         let axis_reasons =
           List.map
             (fun axis ->
@@ -910,8 +913,10 @@ let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t) :
   let open Ldd in
   let n = match Path.Map.find_opt p arity with None -> 0 | Some m -> m in
   (* Identity polynomial: base and coeffs are just fresh rigid atoms. *)
-  let base = var (rigid (Name.atomic p 0)) in
-  let coeffs = Array.init n (fun i -> var (rigid (Name.atomic p (i + 1)))) in
+  let base = mk_var (rigid (Name.atomic p 0)) in
+  let coeffs =
+    Array.init n (fun i -> mk_var (rigid (Name.atomic p (i + 1))))
+  in
   JK.Poly (base, coeffs)
 
 let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
@@ -928,14 +933,19 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
   in
-  let base, coeffs = Ldd.decompose_linear ~universe:rigid_vars poly in
+  let base, coeffs =
+    Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
+  in
   base, Array.of_list coeffs
 
+type lookup_result =
+  | Lookup_identity
+  | Lookup_path of Path.t
+  | Lookup_type_fun of Types.type_expr list * Types.type_expr
+
 let substitute_decl_ikind_with_lookup
-    ~(lookup :
-       Path.t ->
-       [`Path of Path.t | `Type_fun of Types.type_expr list * Types.type_expr]
-       option) (entry : Types.type_ikind) : Types.type_ikind =
+    ~(lookup : Path.t -> lookup_result)
+    (entry : Types.type_ikind) : Types.type_ikind =
   match entry with
   | Types.No_constructor_ikind _ -> entry
   | Types.Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
@@ -950,29 +960,27 @@ let substitute_decl_ikind_with_lookup
       Ldd.map_rigid (map_name expanding) poly
     and map_name (expanding : Path.Set.t) (name : Ldd.Name.t) : Ldd.node =
       match name with
-      | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
-      | Ldd.Name.Unknown _ -> Ldd.var (Ldd.rigid name)
+      | Ldd.Name.Param _ -> Ldd.mk_var (Ldd.rigid name)
+      | Ldd.Name.Unknown _ -> Ldd.mk_var (Ldd.rigid name)
       | Ldd.Name.Atom { constr = p; arg_index } -> (
         match lookup p with
-        | None -> Ldd.var (Ldd.rigid name)
-        | Some (`Path q) -> Ldd.var (Ldd.rigid (Ldd.Name.atomic q arg_index))
-        | Some (`Type_fun _ as tf) ->
+        | Lookup_identity -> Ldd.mk_var (Ldd.rigid name)
+        | Lookup_path q -> Ldd.mk_var (Ldd.rigid (Ldd.Name.atomic q arg_index))
+        | Lookup_type_fun (params, body) ->
           (* Inline a type function by evaluating it in an identity
              environment.  The [expanding] set prevents infinite
              unfolding of recursive type functions. *)
           if Path.Set.mem p expanding
-          then Ldd.var (Ldd.rigid name)
+          then Ldd.mk_var (Ldd.rigid name)
           else
             let base_raw, coeffs_raw =
-              match tf with
-              | `Type_fun (params, body) -> (
-                (* Memoized by [p] to avoid recomputation *)
-                match Hashtbl.find_opt memo p with
-                | Some v -> v
-                | None ->
-                  let v = poly_of_type_function_in_identity_env ~params ~body in
-                  Hashtbl.add memo p v;
-                  v)
+              (* Memoized by [p] to avoid recomputation *)
+              match Hashtbl.find_opt memo p with
+              | Some v -> v
+              | None ->
+                let v = poly_of_type_function_in_identity_env ~params ~body in
+                Hashtbl.add memo p v;
+                v
             in
             let expanding = Path.Set.add p expanding in
             let base = map_poly expanding base_raw in
@@ -984,7 +992,7 @@ let substitute_decl_ikind_with_lookup
             else
               (* Fallback: if coefficient missing, keep original
                  atom. *)
-              Ldd.var (Ldd.rigid name))
+              Ldd.mk_var (Ldd.rigid name))
     in
     let base' = map_poly Path.Set.empty payload.base in
     let coeffs' = Array.map (map_poly Path.Set.empty) payload.coeffs in
