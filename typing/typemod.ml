@@ -897,10 +897,8 @@ module Merge = struct
               type_kind = Type_abstract Definition;
               type_jkind =
                 Jkind.Builtin.value ~why:(Unknown "merge_constraint");
-              type_ikind = Types.ikind_reset "merge constraint temporary";
-              (* CR jujacobs: check if we can keep the ikind up to date here
-                 Temporary decl for with-constraint checking. *)
-              type_private = Private;
+              type_ikind = Types.ikinds_todo "merge constraint temporary";
+                            type_private = Private;
               type_manifest = None;
               type_variance =
                 List.map
@@ -1141,10 +1139,10 @@ module Merge = struct
           check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
           let reason = "package constraint removal" in
           let tdecl =
-            { tdecl with type_manifest = None;
-                         (* CR jujacobs: check if we can keep the ikind up to date here
-                            Removing the temporary manifest after constraint translation. *)
-                         type_ikind = Types.ikind_reset reason }
+            { tdecl with
+              type_manifest = None;
+              type_ikind = Types.ikinds_todo reason
+            }
           in
           let path = Pident id in
           return ~ghosts ~replace_by:(Some(Sig_type(id, tdecl, rs, priv))) path
@@ -2754,9 +2752,10 @@ let rec package_constraints_sig env loc sg constrs =
           in
           Sig_type
             ( id,
-              { td with type_manifest = Some ty;
-                       (* CR jujacobs: check if we can keep the ikind up to date here *)
-                       type_ikind = Types.ikind_reset reason },
+              { td with
+                type_manifest = Some ty;
+                type_ikind = Types.ikinds_todo reason
+              },
               rs,
               priv )
       | Sig_module (id, pres, md, rs, priv) ->

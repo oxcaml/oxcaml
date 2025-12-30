@@ -102,19 +102,19 @@ and strengthen_lazy_sig' ~aliasable sg p =
               let reason =
                 Format.asprintf "strengthen abstract path=%a" Path.print path
               in
-              { decl with type_private = Public;
-                          type_manifest = manif;
-                          (* CR jujacobs: check if we can keep the ikind up to date here
-                             Strengthening adds a manifest referencing the strengthened path. *)
-                          type_ikind = Types.ikind_reset reason }
+              { decl with
+                type_private = Public;
+                type_manifest = manif;
+                type_ikind = Types.ikinds_todo reason
+              }
             end else begin
               let reason =
                 Format.asprintf "strengthen manifest path=%a" Path.print path
               in
-              { decl with type_manifest = manif;
-                          (* CR jujacobs: check if we can keep the ikind up to date here
-                             Strengthening adds a manifest referencing the strengthened path. *)
-                          type_ikind = Types.ikind_reset reason }
+              { decl with
+                type_manifest = manif;
+                type_ikind = Types.ikinds_todo reason
+              }
             end
       in
       let path = Pdot(p, Ident.name id) in
@@ -589,20 +589,20 @@ let enrich_typedecl env p id decl =
                       Format.asprintf "enrich unboxed path=%a"
                         Path.print (Path.unboxed_version p)
                     in
-                    { d with type_manifest = Some orig_ty_unboxed;
-                             (* CR jujacobs: check if we can keep the ikind up to date here
-                                Enriching copies the signature's unboxed manifest. *)
-                             type_ikind = Types.ikind_reset reason })
+                    { d with
+                      type_manifest = Some orig_ty_unboxed;
+                      type_ikind = Types.ikinds_todo reason
+                    })
                   decl.type_unboxed_version
               in
               let reason =
                 Format.asprintf "enrich manifest path=%a" Path.print p
               in
-              { decl with type_manifest = Some orig_ty;
-                         type_unboxed_version;
-                         (* CR jujacobs: check if we can keep the ikind up to date here
-                            Enriching copies the signature manifest. *)
-                         type_ikind = Types.ikind_reset reason }
+              { decl with
+                type_manifest = Some orig_ty;
+                type_unboxed_version;
+                type_ikind = Types.ikinds_todo reason
+              }
         end
 
 let rec enrich_modtype env p mty =

@@ -74,10 +74,10 @@ which mode we are in.
 
 **Phase 5: Preserve ikinds more broadly**
 
-- Reduce `Types.ikind_reset` cases where substitution/renaming can preserve the
+- Reduce `Types.ikinds_todo` cases where substitution/renaming can preserve the
   cached constructor ikind (use `substitute_decl_ikind_with_lookup`).
 - Consider keeping ikinds for unboxed-version aliases where safe.
-- Inventory: current `Types.ikind_reset` sites (and preservation strategy)
+- Inventory: current `Types.ikinds_todo` sites (and preservation strategy)
   - `typing/typedecl.ml:313` `transl_declaration initial unboxed`
     - Jkind: initial `type_jkind` chosen for placeholder decl.
     - Preserve: no prior ikind; compute/store ikind once decl is final.

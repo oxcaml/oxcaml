@@ -372,7 +372,7 @@ let mk_add_type add_type =
           type_kind;
           type_jkind = Jkind.mark_best type_jkind;
           type_ikind =
-            Types.ikind_reset
+            Types.ikinds_todo
               (Format.asprintf "predef unboxed %s" (Ident.name type_ident));
           type_loc = Location.none;
           type_private = Asttypes.Public;
@@ -393,7 +393,7 @@ let mk_add_type add_type =
       type_kind = kind;
       type_jkind = Jkind.mark_best jkind;
       type_ikind =
-        Types.ikind_reset
+        Types.ikinds_todo
           (Format.asprintf "predef %s" (Ident.name type_ident));
       type_loc = Location.none;
       type_private = Asttypes.Public;
@@ -433,7 +433,7 @@ let mk_add_type1 add_type type_ident
       type_kind = kind param;
       type_jkind = Jkind.mark_best (jkind param);
       type_ikind =
-        Types.ikind_reset
+        Types.ikinds_todo
           (Format.asprintf "predef %s" (Ident.name type_ident));
       type_loc = Location.none;
       type_private = Asttypes.Public;
@@ -460,7 +460,7 @@ let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
       type_kind = Type_abstract Definition;
       type_jkind = Jkind.mark_best (jkind);
       type_ikind =
-        Types.ikind_reset
+        Types.ikinds_todo
           (Format.asprintf "predef %s" (Ident.name type_ident));
       type_loc = Location.none;
       type_private = Asttypes.Public;

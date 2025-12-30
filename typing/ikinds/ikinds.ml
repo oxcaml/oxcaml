@@ -265,7 +265,7 @@ module JK = struct
   let round_up (k : kind) : lat = Ldd.round_up k
 end
 
-let ikind_reset : string -> Types.type_ikind = Types.ikind_reset
+let ikinds_todo : string -> Types.type_ikind = Types.ikinds_todo
 
 (* Converting surface jkinds to solver ckinds. *)
 let ckind_of_jkind (ctx : JK.ctx) (j : ('l * 'r) Types.jkind) : JK.kind =
@@ -649,7 +649,7 @@ let type_declaration_ikind ~(context : Jkind.jkind_context) ~(path : Path.t) :
 let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.type_ikind =
   if not !Clflags.ikinds
-  then Types.ikind_reset "ikinds disabled"
+  then Types.ikinds_todo "ikinds disabled"
   else
     let ikind = type_declaration_ikind ~context ~path in
     let payload = ikind in
@@ -671,7 +671,7 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
     ~(params : Types.type_expr list) (type_jkind : Types.jkind_l) :
     Types.type_ikind =
   if not !Clflags.ikinds
-  then Types.ikind_reset "ikinds disabled"
+  then Types.ikinds_todo "ikinds disabled"
   else
     let poly = normalize ~context type_jkind in
     let rigid_vars =
@@ -949,8 +949,9 @@ let substitute_decl_ikind_with_lookup
   match entry with
   | Types.No_constructor_ikind _ -> entry
   | Types.Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
-    Types.ikind_reset "ikind substitution reset"
-  | Types.Constructor_ikind payload ->
+    Types.ikinds_todo "ikind substitution reset"
+  | Types.Constructor_ikind packed ->
+    let payload = packed in
     let memo : (Path.t, JK.poly * JK.poly array) Hashtbl.t =
       Hashtbl.create 17
     in

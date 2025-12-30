@@ -410,7 +410,7 @@ and jkind_r = (disallowed * allowed) jkind  (* the jkind expected of a type *)
 and jkind_lr = (allowed * allowed) jkind    (* the jkind of a variable *)
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
 
-val ikind_reset : string -> type_ikind
+val ikinds_todo : string -> type_ikind
 
 val ikind_debug : bool ref
 
