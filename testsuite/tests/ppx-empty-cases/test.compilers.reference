@@ -1,39 +1,39 @@
 (let
-  (empty_cases_returning_string/276 =
-     (function {nlocal = 0} param/278?
+  (empty_cases_returning_string/287 =
+     (function {nlocal = 0} param/289?
        (raise
          (makeblock 0 (getpredef Match_failure/49!!) [0: "test.ml" 28 50])))
-   empty_cases_returning_float64/279 =
-     (function {nlocal = 0} param/281? : unboxed_float
+   empty_cases_returning_float64/290 =
+     (function {nlocal = 0} param/292? : unboxed_float
        (raise
          (makeblock 0 (getpredef Match_failure/49!!) [0: "test.ml" 29 50])))
-   empty_cases_accepting_string/282 =
-     (function {nlocal = 0} param/284?
+   empty_cases_accepting_string/293 =
+     (function {nlocal = 0} param/295?
        (raise
          (makeblock 0 (getpredef Match_failure/49!!) [0: "test.ml" 30 50])))
-   empty_cases_accepting_float64/285 =
-     (function {nlocal = 0} param/287[float]
+   empty_cases_accepting_float64/296 =
+     (function {nlocal = 0} param/298[float]
        (raise
          (makeblock 0 (getpredef Match_failure/49!!) [0: "test.ml" 31 50])))
-   non_empty_cases_returning_string/288 =
-     (function {nlocal = 0} param/290
+   non_empty_cases_returning_string/299 =
+     (function {nlocal = 0} param/301
        (raise
          (makeblock 0 (getpredef Assert_failure/60!!) [0: "test.ml" 32 68])))
-   non_empty_cases_returning_float64/291 =
-     (function {nlocal = 0} param/293 : unboxed_float
+   non_empty_cases_returning_float64/302 =
+     (function {nlocal = 0} param/304 : unboxed_float
        (raise
          (makeblock 0 (getpredef Assert_failure/60!!) [0: "test.ml" 33 68])))
-   non_empty_cases_accepting_string/294 =
-     (function {nlocal = 0} param/296
+   non_empty_cases_accepting_string/305 =
+     (function {nlocal = 0} param/307
        (raise
          (makeblock 0 (getpredef Assert_failure/60!!) [0: "test.ml" 34 68])))
-   non_empty_cases_accepting_float64/297 =
-     (function {nlocal = 0} param/299[float]
+   non_empty_cases_accepting_float64/308 =
+     (function {nlocal = 0} param/310[float]
        (raise
          (makeblock 0 (getpredef Assert_failure/60!!) [0: "test.ml" 35 68]))))
-  (makeblock 0 empty_cases_returning_string/276
-    empty_cases_returning_float64/279 empty_cases_accepting_string/282
-    empty_cases_accepting_float64/285 non_empty_cases_returning_string/288
-    non_empty_cases_returning_float64/291
-    non_empty_cases_accepting_string/294
-    non_empty_cases_accepting_float64/297))
+  (makeblock 0 empty_cases_returning_string/287
+    empty_cases_returning_float64/290 empty_cases_accepting_string/293
+    empty_cases_accepting_float64/296 non_empty_cases_returning_string/299
+    non_empty_cases_returning_float64/302
+    non_empty_cases_accepting_string/305
+    non_empty_cases_accepting_float64/308))

@@ -100,6 +100,7 @@ module type Compiler_options = sig
   val _binannot : unit -> unit
   val _binannot_cms : unit -> unit
   val _shape_format : string -> unit
+  val _type_to_shape_max_depth : string -> unit
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -247,6 +248,8 @@ module type Optcommon_options = sig
   val _dcse : unit -> unit
   val _dlinear :  unit -> unit
   val _dstartup :  unit -> unit
+  val _restrict_to_upstream_dwarf : unit -> unit
+  val _no_restrict_to_upstream_dwarf : unit -> unit
 end
 
 module type Optcomp_options = sig
@@ -271,7 +274,6 @@ module type Optcomp_options = sig
   val _gdwarf_config_shape_eval_depth : string -> unit
   val _gdwarf_config_max_cms_files_per_unit : string -> unit
   val _gdwarf_config_max_cms_files_per_variable : string -> unit
-  val _gdwarf_config_max_type_to_shape_depth : string -> unit
   val _gdwarf_config_max_shape_reduce_steps_per_variable : string -> unit
   val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
   val _gdwarf_config_shape_reduce_fuel : string -> unit
