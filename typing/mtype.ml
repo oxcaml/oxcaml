@@ -103,18 +103,18 @@ and strengthen_lazy_sig' ~aliasable sg p =
                 Format.asprintf "strengthen abstract path=%a" Path.print path
               in
               { decl with type_private = Public;
-                         type_manifest = manif;
-                         (* CR jujacobs: check if we can keep the ikind up to date here
-                            Strengthening adds a manifest referencing the strengthened path. *)
-                         type_ikind = Types.ikind_reset reason }
+                          type_manifest = manif;
+                          (* CR jujacobs: check if we can keep the ikind up to date here
+                             Strengthening adds a manifest referencing the strengthened path. *)
+                          type_ikind = Types.ikind_reset reason }
             end else begin
               let reason =
                 Format.asprintf "strengthen manifest path=%a" Path.print path
               in
               { decl with type_manifest = manif;
-                         (* CR jujacobs: check if we can keep the ikind up to date here
-                            Strengthening adds a manifest referencing the strengthened path. *)
-                         type_ikind = Types.ikind_reset reason }
+                          (* CR jujacobs: check if we can keep the ikind up to date here
+                             Strengthening adds a manifest referencing the strengthened path. *)
+                          type_ikind = Types.ikind_reset reason }
             end
       in
       let path = Pdot(p, Ident.name id) in
