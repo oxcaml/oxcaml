@@ -1403,6 +1403,8 @@ and Type : sig
 
   val quote : Location.t -> t -> t'
 
+  val splice : Location.t -> t -> t'
+
   val call_pos : t'
 end = struct
   type s = lambda
@@ -1446,6 +1448,8 @@ end = struct
          (List.map (fun (frag, ty) -> pair (extract frag, extract ty)) a2))
 
   let quote loc a1 = apply1 "Type" "quote" loc (extract a1)
+
+  let splice loc a1 = apply1 "Type" "splice" loc (extract a1)
 
   let call_pos = use "Type" "call_pos"
 end
@@ -2796,7 +2800,7 @@ and quote_core_type ty =
     in
     Type.package loc mod_type with_types |> Type.wrap
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ty) |> Type.wrap
-  | Ttyp_splice _ -> Type.var loc None |> Type.wrap
+  | Ttyp_splice ty -> Type.splice loc (quote_core_type ty) |> Type.wrap
   | Ttyp_open _ -> fatal_error "Still not implemented."
   | Ttyp_of_kind _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> Type.wrap Type.call_pos

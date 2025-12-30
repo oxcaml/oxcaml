@@ -1216,6 +1216,7 @@ module Ast = struct
     | TypePoly of Var.Type_var.t list * core_type
     | TypePackage of package_type
     | TypeQuote of core_type
+    | TypeSplice of core_type
     | TypeCallPos
 
   and object_field =
@@ -1685,6 +1686,8 @@ module Ast = struct
       pp fmt "@]"
     | TypeQuote core_type ->
       pp fmt "@[<2><[@,%a@,]>@]" (print_core_type env) core_type
+    | TypeSplice core_type ->
+      pp fmt "@[<2>$(@,%a@,)@]" (print_core_type env) core_type
     | TypeCallPos -> pp fmt "call_pos"
 
   and print_arg_lab fmt = function
@@ -2364,6 +2367,9 @@ module Type = struct
 
   let quote t =
     let+ t = t in Ast.TypeQuote t
+
+  let splice t =
+    let+ t = t in Ast.TypeSplice t
 
   let call_pos = With_free_vars.return Ast.TypeCallPos
 end
