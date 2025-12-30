@@ -286,32 +286,39 @@ if test "$flambda" = "true"; then
   confoptions="$confoptions --enable-flambda --enable-flambda-invariants"
 fi
 
-eval ./configure "$CCOMP" $build $host --prefix='$instdir' $confoptions
+main_build() {
+  eval ./configure "$CCOMP" $build $host --prefix='$instdir' $confoptions
 
-grep -q '^NATIVE_COMPILER=false' Makefile.config && make_native=false
+  grep -q '^NATIVE_COMPILER=false' Makefile.config && make_native=false
 
-if test "$flambda" = "true" && test "$make_native" = "false"; then
-  echo "No need to test flambda in a bytecode-only system; skipping the test."
-  exit 0
-fi
-
-if $bootstrap; then
-  $make $jobs --warn-undefined-variables core
-  $make $jobs --warn-undefined-variables bootstrap
-  if $make_native; then
-    $make $jobs --warn-undefined-variables opt.opt
+  if test "$flambda" = "true" && test "$make_native" = "false"; then
+    echo "No need to test flambda in a bytecode-only system; skipping the test."
+    exit 0
   fi
-else
-  $make $jobs --warn-undefined-variables
-fi
 
+  if $bootstrap; then
+    $make $jobs --warn-undefined-variables core
+    $make $jobs --warn-undefined-variables bootstrap
+    if $make_native; then
+      $make $jobs --warn-undefined-variables opt.opt
+    fi
+  else
+    $make $jobs --warn-undefined-variables
+  fi
 
-if $make_native && $check_make_alldepend; then
-  $make --warn-undefined-variables alldepend
-fi
+  if $make_native && $check_make_alldepend; then
+    $make --warn-undefined-variables alldepend
+  fi
 
-$make --warn-undefined-variables install
-rm -rf "$instdir"
+  $make --warn-undefined-variables install
+  rm -rf "$instdir"
+}
+
+# PATH, but without any homebrew additions (tests vanilla macOS in the build,
+# while still allowing full utilities later in the testsuite)
+CLEAN_PATH=$(echo "$PATH" | tr ':' '\n' | grep -vF '/homebrew/' | paste -sd: -)
+
+PATH="$CLEAN_PATH" main_build
 
 cd testsuite
 if test -n "$jobs" && test -x /usr/bin/parallel
