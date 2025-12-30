@@ -176,7 +176,7 @@ module Identifier : sig
 
     val lexing_position : t
 
-    val code : t
+    val expr : t
 
     val unboxed_float : t
 

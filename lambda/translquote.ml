@@ -676,7 +676,7 @@ module Identifier : sig
 
     val lexing_position : t'
 
-    val code : t'
+    val expr : t'
 
     val unboxed_float : t'
 
@@ -872,7 +872,7 @@ end = struct
 
     let lexing_position = use "Identifier.Type" "lexing_position"
 
-    let code = use "Identifier.Type" "code"
+    let expr = use "Identifier.Type" "expr"
 
     let unboxed_float = use "Identifier.Type" "unboxed_float"
 
@@ -2336,7 +2336,7 @@ let type_for_path loc = function
         | "extension_constructor" -> Identifier.Type.extension_constructor
         | "floatarray" -> Identifier.Type.floatarray
         | "lexing_position" -> Identifier.Type.lexing_position
-        | "expr" -> Identifier.Type.code
+        | "expr" -> Identifier.Type.expr
         | "float#" -> Identifier.Type.unboxed_float
         | "nativeint#" -> Identifier.Type.unboxed_nativeint
         | "int32#" -> Identifier.Type.unboxed_int32
