@@ -8,8 +8,6 @@ printslambda.ml
 printslambda.mli
 slambda.ml
 slambda.mli
-slambda0.ml
-slambda0.mli
 slambdaeval.ml
 slambdaeval.mli
 transl_array_comprehension.ml
