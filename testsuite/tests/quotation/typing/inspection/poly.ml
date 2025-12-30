@@ -71,15 +71,27 @@ let () =
   test <[ ignore (((fun x -> x) $f) : t2) ]>
 ;;
 
-(* Structured polymorphic spine: arrows, tuples, objects and variants *)
+(* Structured polymorphic spine *)
+(* arrows, tuples, objects and polymorphic variants *)
 let () =
   let (f : <[t3]> expr) = <[fun f -> (f 42 0, f "abc" 1)]> in
   test <[ ignore (((fun x -> x) $f) : t3) ]>
 ;;
-
+(* polymorphic variants *)
 let () =
   let (f : <[t3']> expr) = <[fun f -> (f 42 0, f "abc" 1)]> in
   test <[ ignore (((fun x -> x) $f) : t3') ]>
+;;
+(* quotes and splices *)
+(* FIXME: Something goes wrong with the printed syntax here,
+   but it works when copy+pasted?? *)
+let () =
+  let (f : <[t3'']> expr) =
+    <[fun f -> (
+      f () (fun x -> <[$x + 1]>),
+      f () (fun x -> <[Int.to_string $x]>))]>
+  in
+  test ~eval:false <[ ignore (((fun x -> x) $f) : t3'') ]>
 ;;
 
 (* Parameter polymorphic in a jkind-annotated variable *)

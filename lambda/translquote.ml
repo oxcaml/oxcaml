@@ -2477,90 +2477,90 @@ let construct_spine ~env ~loc typ =
     match get_desc ty with Tvar _ | Tunivar _ -> false | _ -> true
   in
   let aliased = ref [] in
-  let rec construct_spine ty =
+  let with_alias ty f =
+    let aliased' = !aliased in
+    aliased := ty :: aliased';
+    let ret = f () in
+    aliased := aliased';
+    ret
+  in
+  let rec go ty =
     if aliasable ty && List.memq ty !aliased
     then mk (Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation)) ty
-    else (
-      aliased := ty :: !aliased;
-      let mk desc = mk desc ty in
-      match get_desc ty with
-      | Tvar { name = _; jkind } | Tof_kind jkind ->
-        mk (Ttyp_var (None, jkind.annotation))
-      | Tunivar _ ->
-        let name, jkind_annotation = unwrap_univar ty in
-        mk (Ttyp_var (Some name, jkind_annotation))
-      | Tarrow ((arg_label, _, _), ty, ty', _) ->
-        mk (Ttyp_arrow (arg_label, construct_spine ty, construct_spine ty'))
-      | Tpoly (ty, tyl) ->
-        if tyl <> []
-        then mk (Ttyp_poly (List.map unwrap_univar tyl, construct_spine ty))
-        else construct_spine ty
-      | Ttuple tyl ->
-        mk (Ttyp_tuple (List.map (fun (l, ty') -> l, construct_spine ty') tyl))
-      | Tunboxed_tuple tyl ->
-        mk
-          (Ttyp_unboxed_tuple
-             (List.map (fun (l, ty') -> l, construct_spine ty') tyl))
-      | Tconstr (p, tyl, _) ->
-        mk
-          (Ttyp_constr
-             ( p,
-               mkloc (Untypeast.lident_of_path p) loc,
-               List.map construct_spine tyl ))
-      (* objects *)
-      (* TESTME - more complex object types *)
-      | Tobject (fields, _) ->
-        let fields =
-          let rec go ty =
-            match get_desc ty with
-            | Tfield (label, _, field, fields) ->
-              OTtag (mkloc label loc, construct_spine field) :: go fields
-            | Tnil | Tvar _ | Tunivar _ | Tconstr _ -> []
-            | _ -> assert false
-          in
-          go fields
-        in
-        mk
-          (Ttyp_object
-             ( List.map
-                 (fun of_desc -> { of_desc; of_loc = loc; of_attributes = [] })
-                 fields,
-               Closed ))
-      (* polymorphic variants *)
-      (* TESTME - more complex structures *)
-      | Tvariant row_desc ->
-        let fields = row_fields row_desc in
-        mk
-          (Ttyp_variant
-             ( List.filter_map
-                 (fun (label, field) ->
-                   let label = mkloc label loc in
-                   match row_field_repr field with
-                   | Rpresent None -> Some (Ttag (label, true, []))
-                   | Rpresent (Some ty) ->
-                     Some (Ttag (label, false, [construct_spine ty]))
-                   | Reither (cst, tyl, _matched) ->
-                     Some (Ttag (label, cst, List.map construct_spine tyl))
-                   | Rabsent -> None)
-                 fields
-               |> List.map (fun rf_desc ->
-                      { rf_desc; rf_loc = loc; rf_attributes = [] }),
-               Closed,
-               None ))
-      (* TESTME *)
-      | Tquote ty -> mk (Ttyp_quote (construct_spine ty))
-      (* TESTME *)
-      | Tsplice ty -> mk (Ttyp_splice (construct_spine ty))
-      (* TESTME *)
-      | Tpackage _ ->
-        (* where to get a (pack_type : module_type) from? what about pack_txt? *)
-        (* move to [Translquote] and avoid constructing module_type *)
-        mk (Ttyp_var (None, None))
-      | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
-        (* fatal error in [Translquote] *)
-        assert false)
+    else
+      with_alias ty (fun () ->
+          let mk desc = mk desc ty in
+          match get_desc ty with
+          | Tvar { name = _; jkind } | Tof_kind jkind ->
+            mk (Ttyp_var (None, jkind.annotation))
+          | Tunivar _ ->
+            let name, jkind_annotation = unwrap_univar ty in
+            mk (Ttyp_var (Some name, jkind_annotation))
+          | Tarrow ((arg_label, _, _), ty, ty', _) ->
+            mk (Ttyp_arrow (arg_label, go ty, go ty'))
+          | Tpoly (ty, tyl) ->
+            if tyl <> []
+            then mk (Ttyp_poly (List.map unwrap_univar tyl, go ty))
+            else go ty
+          | Ttuple tyl ->
+            mk (Ttyp_tuple (List.map (fun (l, ty') -> l, go ty') tyl))
+          | Tunboxed_tuple tyl ->
+            mk (Ttyp_unboxed_tuple (List.map (fun (l, ty') -> l, go ty') tyl))
+          | Tconstr (p, tyl, _) ->
+            mk
+              (Ttyp_constr
+                 (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl))
+          (* objects *)
+          (* TESTME - more complex object types *)
+          | Tobject (fields, _) ->
+            let rec go_fields ty =
+              match get_desc ty with
+              | Tfield (label, _, field, fields) ->
+                OTtag (mkloc label loc, go field) :: go_fields fields
+              | Tnil | Tvar _ | Tunivar _ | Tconstr _ -> []
+              | _ -> assert false
+            in
+            mk
+              (Ttyp_object
+                 ( List.map
+                     (fun of_desc ->
+                       { of_desc; of_loc = loc; of_attributes = [] })
+                     (go_fields fields),
+                   Closed ))
+          (* polymorphic variants *)
+          (* TESTME - more complex structures *)
+          | Tvariant row_desc ->
+            let fields = row_fields row_desc in
+            mk
+              (Ttyp_variant
+                 ( List.filter_map
+                     (fun (label, field) ->
+                       let label = mkloc label loc in
+                       match row_field_repr field with
+                       | Rpresent None -> Some (Ttag (label, true, []))
+                       | Rpresent (Some ty) ->
+                         Some (Ttag (label, false, [go ty]))
+                       | Reither (cst, tyl, _matched) ->
+                         Some (Ttag (label, cst, List.map go tyl))
+                       | Rabsent -> None)
+                     fields
+                   |> List.map (fun rf_desc ->
+                          { rf_desc; rf_loc = loc; rf_attributes = [] }),
+                   Closed,
+                   None ))
+          | Tquote ty -> mk (Ttyp_quote (go ty))
+          | Tsplice ty -> mk (Ttyp_splice (go ty))
+          (* TESTME *)
+          | Tpackage _ ->
+            (* where to get a (pack_type : module_type) from? what about pack_txt? *)
+            (* move to [Translquote] and avoid constructing module_type *)
+            mk (Ttyp_var (None, None))
+          | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
+            (* fatal error in [Translquote] *)
+            assert false)
   in
-  construct_spine typ
+  let ttyp = go typ in
+  ttyp
 
 let rec quote_computation_pattern p =
   let loc = p.pat_loc in

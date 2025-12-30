@@ -1,3 +1,5 @@
+#syntax quotations on
+
 type rcd1 = { f : 'a. 'a -> 'a }
 type tr1 = rcd1 -> int * string
 
@@ -30,6 +32,10 @@ type t3 =
 type t3' =
   ('a. 'a -> int -> [ `Foo of 'a ] * int) ->
   ([ `Foo of int ] * int) * ([ `Foo of string ] * int)
+
+type t3'' =
+  ('a 'b. unit -> ('a expr -> 'b expr) -> <[unit -> $('a) -> $('b)]> expr) ->
+  <[unit -> int -> int]> expr * <[unit -> int -> string]> expr
 
 type t4 = (('a : immediate). 'a -> 'a) -> int * bool
 
