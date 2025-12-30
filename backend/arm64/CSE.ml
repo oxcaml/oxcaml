@@ -43,7 +43,11 @@ let class_of_operation (op : Operation.t)
       | Ibswap _
       | Imove32
       | Isignext _ -> Op_pure
+      | Iread_system_reg CNTVCT_EL0 ->
+        (* conservatively, don't CSE across system register accesses. *)
+        Op_other
       | Isimd op -> of_simd_class (Simd.class_of_operation op)
+      | Icrc32 -> Op_pure
       | Illvm_intrinsic intr ->
         Misc.fatal_errorf "CSE: Unexpected llvm_intrinsic %s: \
                            not using LLVM backend"

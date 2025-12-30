@@ -667,7 +667,8 @@ let select_operation_sse42 ~dbg:_ op args =
   else
     match op with
     | "caml_sse42_int64x2_cmpgt" -> sse_or_avx pcmpgtq vpcmpgtq_X_X_Xm128 args
-    | "caml_sse42_int64_crc" | "caml_sse42_int_untagged_crc" ->
+    | "caml_int64_crc32" | "caml_sse42_int64_crc"
+    | "caml_sse42_int_untagged_crc" ->
       sse_or_avx crc32_r64_r64m64 crc32_r64_r64m64 args
     | "caml_sse42_vec128_cmpestrm" ->
       let i, args = extract_constant args ~max:127 op in

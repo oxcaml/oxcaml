@@ -50,6 +50,7 @@
 (executables
  (names test_arch)
  (modules test_arch)
+ (foreign_stubs (language c) (names perfmon_stubs))
  (enabled_if
    (= %{context_name} "main")))
 
@@ -84,3 +85,56 @@
   (progn
    (diff test_arch.arm64.expected test_arch.out))))
 
+; Test crc
+(executables
+ (names test_crc)
+ (modules test_crc)
+ (foreign_stubs (language c) (names crc_stubs)
+   (flags
+   (:standard
+   (:include flags.sexp)))
+   )
+ (enabled_if
+   (= %{context_name} "main")))
+
+(rule
+ (enabled_if
+   (= %{context_name} "main"))
+ (targets test_crc.out)
+ (deps test_crc.exe)
+ (action
+  (progn
+   (with-outputs-to
+    %{targets}
+    (run ./test_crc.exe)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (= %{context_name} "main"))
+ (action
+  (progn
+   (diff test_crc.expected test_crc.out))))
+
+
+(rule
+ (targets flags.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags.sexp
+   (echo "-mavx2"))))
+
+(rule
+ (targets flags.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags.sexp
+   (echo "(-march=armv8-a+crc)"))))
