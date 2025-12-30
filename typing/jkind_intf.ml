@@ -269,6 +269,7 @@ module History = struct
     | Existential_unpack : string -> (allowed * allowed) annotation_context
     | Univar : string -> (allowed * allowed) annotation_context
     | Type_variable : string -> (allowed * allowed) annotation_context
+    | Implicit_jkind : string -> (allowed * allowed) annotation_context
     | Type_wildcard : Location.t -> (allowed * allowed) annotation_context
     | Type_of_kind : Location.t -> (allowed * allowed) annotation_context
     | With_error_message :
