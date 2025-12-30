@@ -427,7 +427,7 @@ let () =
     ~exp_err:
       ">> Fatal error: Register allocation changed existing instruction no. 23 \
        into a register allocation specific instruction"
-  (*= CR xclerc for xclerc: same as above (polymorphic commpare on values
+  (*= CR xclerc for xclerc: same as above (polymorphic compare on values
       with cycles).
       let () =
      check "Regalloc added non-regalloc specific instr"
@@ -445,7 +445,7 @@ let () =
          ">> Fatal error: Register allocation added non-regalloc specific \
           instruction no. 26"
   *)
-  (*= CR xclerc for xclerc: same as above (polymorphic commpare on values
+  (*= CR xclerc for xclerc: same as above (polymorphic compare on values
      with cycles).
      let () =
        check "Regalloc added a 'goto' and a block"
