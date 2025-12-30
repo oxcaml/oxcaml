@@ -12,13 +12,14 @@ module Rigid_name = struct
              subsequent refer to the coefficients of the i-th argument. *)
           arg_index : int
         }
-    (* Param only occurs in the formula for a type constructor,
-       refers to the i-th parameter. *)
     | Param of int
-    (* An unknown quantity with a given id. Used to model not-best in ikinds.
-       This is used when we couldn't compute a precise ikind, e.g. for a
-       polymorphic variant with conjunctive type -- `Constr of (a & b & ...) *)
+        (** Only occurs in formulas for type constructors. Refers to the i-th
+            parameter, where i is the id of that type variable. *)
     | Unknown of int
+        (** An unknown quantity with a given id. Used to model not-best in
+            ikinds. This is used when we couldn't compute a precise ikind,
+            e.g. for a polymorphic variant with conjunctive type --
+            `Constr of (a & b & ...) *)
 
   (* Ordering on rigid names used in the LDD to order the nodes. *)
   let compare a b =
