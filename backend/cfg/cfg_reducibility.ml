@@ -47,21 +47,19 @@ let rec has_cycle : Label.Set.t -> Label.Set.t Label.Tbl.t -> bool =
 
     The current/naive implementation of cycle detection is a variant of Kahn's
     algorithm:
-    {ul
-     {- we start with a set of blocks/labels to sort equal to the set of all
+
+     - we start with a set of blocks/labels to sort equal to the set of all
         blocks;
-     }
-     {- we compute a table giving for each block the set of its predecessors
+
+     - we compute a table giving for each block the set of its predecessors
         (ignoring back edges);
-     }
-     {- we look for cycles by:
-        - computing the set of blocks with no predecessors;
-        - remove these blocks from the table of predecessors;
-        - until all blocks have been sorted (in which case there is no cycle),
-          or we have no blocks with no predecessors (in which case there is a
-          cycle).
-     }
-    } *)
+
+     - we look for cycles by: (a) computing the set of blocks with no
+       predecessors, (b) removing these blocks from the table of predecessors,
+       and (c) repeating until all blocks have been sorted (in which case there
+       is no cycle), or we have no blocks with no predecessors (in which case
+       there is a cycle).
+    *)
 let is_cfg_with_infos_reducible cfg_with_infos =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
   let doms = Cfg_with_infos.dominators cfg_with_infos in

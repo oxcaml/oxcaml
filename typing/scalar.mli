@@ -19,17 +19,13 @@
     Overview: This module provides a comprehensive type system for scalar values in OCaml.
 
     Type Hierarchy:
-    {ul
-     {- Scalar.t
-        {ul
-         {- Integral: Integer types
-            - Taggable (fits in word_size-1 bits): Int8, Int16, Int
-            - Boxable (requires boxing): Int32, Int64, Nativeint
-         }
-         {- Floating: Float32, Float64 }
-        }
-     }
-    }
+    {v
+     - Scalar.t
+       - Integral: Integer types
+         - Taggable (fits in word_size-1 bits): Int8, Int16, Int
+         - Boxable (requires boxing): Int32, Int64, Nativeint
+       - Floating: Float32, Float64
+    v}
 
     Representation Forms:
     - Value: Tagged (small integers) or boxed representation
