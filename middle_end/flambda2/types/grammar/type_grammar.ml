@@ -166,8 +166,7 @@ and head_of_kind_region = unit
  * representing { x | at_least \subset x /\ x \subset at_most }
  *)
 and 'lattice row_like_index_domain =
-  | Known of 'lattice
-      (** [Known x] represents the singleton set: [{ x }] *)
+  | Known of 'lattice  (** [Known x] represents the singleton set: [{ x }] *)
   | At_least of 'lattice
       (** [At_least x] represents the set [{ y | x \subset y }] *)
 
