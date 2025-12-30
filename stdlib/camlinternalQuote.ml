@@ -1032,7 +1032,7 @@ module Identifier = struct
 
     let lexing_position = TBuiltin "lexing_position" |> mk
 
-    let code = TBuiltin "code" |> mk
+    let expr = TBuiltin "expr" |> mk
 
     let unboxed_float = TBuiltin "float#" |> mk
 
