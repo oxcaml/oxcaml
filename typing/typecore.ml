@@ -6366,11 +6366,10 @@ and type_expect_
       let funct =
         match List.exists (fun (_, _, sch) -> Option.is_some sch) args with
         | true ->
-          let params = List.map (fun (lbl, _, sch) -> (lbl, sch)) args in {
-            funct with
-            exp_extra = (
-              Texp_inspected_type (Polymorphic_parameter (Arrow params)), loc, [])
-              :: funct.exp_extra }
+          let params = List.map (fun (lbl, _, sch) -> (lbl, sch)) args in
+          let ti = Polymorphic_parameter (Arrow params) in
+          { funct with
+            exp_extra = (Texp_inspected_type ti, loc, []) :: funct.exp_extra }
         | false -> funct
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
@@ -9052,9 +9051,11 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
         if vars = [] then begin
           let ty_arg0' = tpoly_get_mono ty_arg0 in
           if wrapped_in_some then begin
-            type_option_some env expected_mode sarg ty_arg' ty_arg0', None
+            type_option_some
+              env expected_mode sarg ty_arg' ty_arg0', None
           end else begin
-            type_argument ~overwrite:No_overwrite env expected_mode sarg ty_arg' ty_arg0', None
+            type_argument ~overwrite:No_overwrite
+              env expected_mode sarg ty_arg' ty_arg0', None
           end
         end else begin
           let sch =
@@ -9063,7 +9064,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
                !Clflags.principal && get_level ty_arg < Btype.generic_level
             then
               Location.prerr_warning app_loc
-                  (Warnings.Not_principal "applying a higher-rank function here");
+                (Warnings.Not_principal "applying a higher-rank function here");
             if really_poly
             then Some (Ctype.instance ~partial:true ty_arg)
             else None
@@ -9082,7 +9083,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
               let vars0, ty_arg0' = instance_poly_fixed vars0 ty_arg0' in
               List.iter2 (fun ty ty' -> unify_var env ty ty') vars vars0;
               let arg =
-                type_argument ~overwrite:No_overwrite env expected_mode sarg ty_arg' ty_arg0'
+                type_argument ~overwrite:No_overwrite
+                  env expected_mode sarg ty_arg' ty_arg0'
               in
               arg, ty_arg, vars
             end
@@ -9133,7 +9135,8 @@ and type_application env app_loc expected_mode position_and_mode
       in
       let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
       check_partial_application ~statement:false exp;
-      ([Nolabel, Arg (exp, arg_sort), None], ty_ret, ret_mode, position_and_mode)
+      ([Nolabel, Arg (exp, arg_sort), None],
+       ty_ret, ret_mode, position_and_mode)
   | _ ->
     (* See Note [Type-checking applications] for an overview *)
       let ty = funct.exp_type in

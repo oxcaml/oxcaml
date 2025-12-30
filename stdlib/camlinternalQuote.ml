@@ -2242,7 +2242,8 @@ module Object_type = struct
   type t = Ast.object_field list With_free_vars.t * Ast.object_closed_flag
 
   let of_object_fields_list object_fields object_closed_flag =
-    With_free_vars.all object_fields, Object_closed_flag.to_ast_object_closed_flag object_closed_flag
+    With_free_vars.all object_fields,
+    Object_closed_flag.to_ast_object_closed_flag object_closed_flag
 end
 
 
