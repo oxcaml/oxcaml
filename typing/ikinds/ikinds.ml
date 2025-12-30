@@ -950,8 +950,7 @@ let substitute_decl_ikind_with_lookup
   | Types.No_constructor_ikind _ -> entry
   | Types.Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
     Types.ikind_reset "ikind substitution reset"
-  | Types.Constructor_ikind packed ->
-    let payload = packed in
+  | Types.Constructor_ikind payload ->
     let memo : (Path.t, JK.poly * JK.poly array) Hashtbl.t =
       Hashtbl.create 17
     in
