@@ -56,6 +56,7 @@ let typ_int128 = [| Int; Int |]
 
 (** [machtype_component]s are partially ordered as follows:
 
+    {v
       Addr     Float32     Float     Vec128     Vec256     Vec512   Valx2
        ^
        |
@@ -63,6 +64,7 @@ let typ_int128 = [| Int; Int |]
        ^
        |
       Int
+    v}
 
   In particular, [Addr] must be above [Val], to ensure that if there is
   a join point between a code path yielding [Addr] and one yielding [Val]

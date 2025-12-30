@@ -13,19 +13,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** {Continuation Lifting Status}
+(** {1 Continuation Lifting Status}
 
     Continuation lifting is done in simplify on the way down. Considering
-    a term of the form: *)
+    a term of the form:
 
-(** * let_cont k x =
-    *   let_cont k' y =
-    *     ...
-    *   in
-    *   ..
-    * in
-    * ..
-    *)
+    {[
+    let_cont k x =
+      let_cont k' y =
+        ...
+      in
+      ..
+    in
+    ..
+    ]} *)
 
 (** The decision to lift continuations (e.g. k') out of another (e.g. k),
     is made once Simplify has reached the bottom of the handler of k **but**

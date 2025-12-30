@@ -45,7 +45,7 @@ val ten : Target_system.Machine_width.t -> t
 (** The OCaml integer 0xff. *)
 val hex_ff : Target_system.Machine_width.t -> t
 
-(** The set {-1, 0, 1}. *)
+(** The set \{-1, 0, 1\}. *)
 val zero_one_and_minus_one : Target_system.Machine_width.t -> Set.t
 
 (** Boolean values. *)

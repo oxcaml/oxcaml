@@ -89,16 +89,21 @@ val merge : t -> from_apply_expr:t -> t
 
     For example in:
 
+{[
     let[@inline] f x = (Sys.opaque_identity x) + 1
     let[@inline] g x = 2 * f x
     let foo x = g x - f x
+]}
 
     we have the following in [f]:
 
+{v
     Paddint/44N = ((+ Popaque/43N 1) example.ml:1,19--46)
+v}
 
     and the following in [g]:
 
+{v
     Paddint/61N =
      ((+ Popaque/60N 1)
       example.ml:2,23--26;  <-- this is a position in the current function
@@ -106,9 +111,11 @@ val merge : t -> from_apply_expr:t -> t
          ^
          \-- this is a position in the first (outermost) inlined frame
     Pmulint/62N = (( * 2 Paddint/61N) example.ml:2,19--26)
+v}
 
     and the following in [foo]:
 
+{v
     Paddint/80N =
      ((+ Popaque/79N 1)
       example.ml:3,18--21;
@@ -126,6 +133,7 @@ val merge : t -> from_apply_expr:t -> t
      (( * 2 Paddint/90N)
       example.ml:3,12--15;
       example.ml:2,19--26[83388650][FS=camlExample.g_1_4_code])
+v}
 
     Note that in [foo] the two instances of the addition have different uids.
     Moreover, even though in [g] the addition and multiplication have
@@ -137,11 +145,14 @@ val merge : t -> from_apply_expr:t -> t
     consider the following extension of the above example, where a call
     site is revealed by inlining:
 
+{[
     let[@inline] bar f x = f x
     let baz x = bar foo x
+]}
 
     The term marked as "addition A" above now looks like this:
 
+{v
     Paddint/144N =
      ((+ Popaque/143N 1)
       example.ml:6,12--21;
@@ -149,6 +160,7 @@ val merge : t -> from_apply_expr:t -> t
       example.ml:3,12--15[777401542][FS=camlExample.foo_2_7_code];
       example.ml:2,23--26[777401542][FS=camlExample.g_1_6_code];
       example.ml:1,19--46[777401542][FS=camlExample.f_0_5_code])
+v}
 
     The uid 88799133 corresponds to the instance of inlining that revealed
     the call to [foo] inside [bar]; and the uid 777401542 corresponds to

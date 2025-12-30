@@ -34,27 +34,34 @@ let rec has_cycle : Label.Set.t -> Label.Set.t Label.Tbl.t -> bool =
       has_cycle not_sorted predecessors)
 
 (** A way to check whether a CFG is reducible is to:
-  1. compute the dominators;
-  2. identify the back edges (i.e. edges such that the destination dominates
-     the source);
-  3. create a copy of the CFG without the back edges;
-  4. if that copy has a cycle, then the original CFG is irreducible,
-     otherwise it is reducible.
+    + compute the dominators;
+    + identify the back edges (i.e. edges such that the destination dominates
+      the source);
+    + create a copy of the CFG without the back edges;
+    + if that copy has a cycle, then the original CFG is irreducible, otherwise
+      it is reducible.
 
-  Since a `Cfg_with_infos.t` value already has the dominator information, we
-  simply implement cycle detection with a tweaked implementation which ignores
-  back edges.
-  
-  The current/naive implementation of cycle detection is a variant of Kahn's
-  algorithm:
-  - we start with a set of blocks/labels to sort equal to the set of all blocks;
-  - we compute a table giving for each block the set of its predecessors
-    (ignoring back edges);
-  - we look for cycles by:
-    . computing the set of blocks with no predecessors;
-    . remove these blocks from the table of predecessors;
-    . until all blocks have been sorted (in which case there is no cycle), or
-      we have no blocks with no predecessors (in which case there is a cycle). *)
+    Since a [Cfg_with_infos.t] value already has the dominator information, we
+    simply implement cycle detection with a tweaked implementation which ignores
+    back edges.
+
+    The current/naive implementation of cycle detection is a variant of Kahn's
+    algorithm:
+    {ul
+     {- we start with a set of blocks/labels to sort equal to the set of all
+        blocks;
+     }
+     {- we compute a table giving for each block the set of its predecessors
+        (ignoring back edges);
+     }
+     {- we look for cycles by:
+        - computing the set of blocks with no predecessors;
+        - remove these blocks from the table of predecessors;
+        - until all blocks have been sorted (in which case there is no cycle),
+          or we have no blocks with no predecessors (in which case there is a
+          cycle).
+     }
+    } *)
 let is_cfg_with_infos_reducible cfg_with_infos =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
   let doms = Cfg_with_infos.dominators cfg_with_infos in

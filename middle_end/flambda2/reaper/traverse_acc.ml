@@ -214,7 +214,7 @@ let add_set_of_closures_dep let_bound_name_of_the_closure closure_code_id
        }
        :: t.set_of_closures_dep
 
-(* Encoding of sets of closures and apply
+(*= Encoding of sets of closures and apply
  *
  * Let us consider, for now, a set of closures that is only directly called.
  * Assume that it has a value slot x, two function slots f and g, with

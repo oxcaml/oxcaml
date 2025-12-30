@@ -1518,7 +1518,7 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
         Name_in_target_env.Map.add name ty types_in_target_env, t)
     equations_to_join (types_in_target_env, t)
 
-(** {2:n-way-join} Cut and n-way join *)
+(** {2:n-way-join Cut and n-way join} *)
 
 let get_canonical_simple_if_exists ~bindings ~joined_envs simples =
   match get_canonical_in_target_env ~bindings ~joined_envs simples with
@@ -1838,7 +1838,7 @@ let n_way_join_simples t kind simples : _ Or_bottom.t * t =
     ( Ok (canonical_in_target_env : Simple_in_target_env.t :> Simple.t),
       { t with bindings } )
 
-(** {2:extensions} Join of extensions *)
+(** {2:extensions Join of extensions} *)
 
 let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
   let joined_envs_and_extensions =

@@ -255,7 +255,7 @@ module Datalog : sig
         cases will raise an error.
 
         It is, however, possible to iterate on the query
-        [[edge [x; y]; edge [y; x]] using the [[y; x]] binding order: we
+        [[edge [x; y]; edge [y; x]]] using the [[y; x]] binding order: we
         can use the [edge [y; x]] instance to bind the variables for [y] and [x]
         in this order, then check if [(x, y)] is in the [edge] relation for
         each [(y, x)] pair that we find. In this case, the occurrences of [y] and

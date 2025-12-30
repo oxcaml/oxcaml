@@ -75,7 +75,7 @@ module Lambda_utils : sig
     val unboxed_nativeint : Targetint.t -> lambda
 
     (** Lambda string literals; these require a location, and are constructed as
-        "quoted strings", not {fancy|delimited strings|fancy}. *)
+        "quoted strings", not [{fancy|delimited strings|fancy}]. *)
     val string : loc:Location.t -> string -> lambda
   end
 

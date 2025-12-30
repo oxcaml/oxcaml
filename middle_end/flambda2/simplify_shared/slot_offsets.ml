@@ -1026,10 +1026,10 @@ end = struct
           if function_slot_is_used ~used_function_slots f
           then assign_slot_offset state slot
           else
-            assign_slot_offset state slot
             (* CR chambart/gbury: we currently do not track the used function
                slots precisely enough in simplify/data_flow *)
-            (* else mark_slot_as_removed state slot *))
+            (* else mark_slot_as_removed state slot *)
+            assign_slot_offset state slot)
       function_slots_to_assign
 
   let assign_unboxed_slot_offsets ~used_unboxed_slots state =

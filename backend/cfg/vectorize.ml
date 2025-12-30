@@ -447,155 +447,168 @@ end
    within a basic block can replace reorder or replace instructions that are not
    consecutive, as long as the transformation preserves dependencies. *)
 
-(**
-   Construct an overapproximation of transitive dependencies between instructions, and
-   use this information to identify instructions that can run in parallel and can be
-   reordered.
+(** Construct an overapproximation of transitive dependencies between
+    instructions, and use this information to identify instructions that can run
+    in parallel and can be reordered.
 
-   Approach:
-   =========
+    {2 Approach}
 
-   Record a direct dependency from instruction [i] to [j] if one of the following
-   conditions holds:
+    Record a direct dependency from instruction [i] to [j] if one of the
+    following conditions holds:
 
-   (a) Dependency via registers: [i] may read from a register [r] a value that was
-   previously written to [r] by instruction [j].
+    - {b (a)} Dependency via registers: [i] may read from a register [r] a value
+      that was previously written to [r] by instruction [j].
+    - {b (b)} Dependency via memory: [i] may read to a memory location that [j]
+      may write to (RAW memory dependency).
+    - {b (c)} Ordering via memory: [i] and [j] may access the same memory
+      location, and one of the accesses is a "write" (this covers WAR and WAW
+      dependencies, as well as dependencies of reads and writes on allocation).
 
-   (b) Dependency via memory: [i] may read to a memory location that [j] may
-   write to (RAW memory dependency).
+    {2 Vectorizable computation}
 
-   (c) Ordering via memory: [i] and [j] may access the same memory location,
-   and one of the accesses is a "write" (this covers WAR and WAW dependencies,
-   as well as dependencies of reads and writes on allocation).
+    TODO add citation
 
-   Vectorizable computation
-   ========================
-   TODO add citation
+    The method for constructing vectorizable computations.
+    - {b Group}: a sequence of scalar instructions that are independent of each
+      other, and have an equivalent vector instruction. Most groups correspond
+      to one vector instruction, but sometimes a sequence of vector instructions
+      is needed, for example scalar addition of a register and a constant.
+    - {b Current heuristic} for identifying vectorizable instructions requires
+      that memory accesses of scalar instructions are adjacent and have the same
+      base address and addressing mode.
+    - {b Seed}: a group of store instructions.
+    - {b Vectorizable computation} is set of groups of scalar instructions that
+      can be replaced with equivalent vector instructions.
+    - {b Find vectorizable computations}: starting from a seed group, traverse
+      the dependencies backwards to construct groups for each of the arguments.
+      Stop at load instructions (and constant arguments).
+    - Use {b (a)} during the backward traversal to find scalar instruction need
+      to form a group.
+    - Use both {b (a)} and {b (b)} dependencies to determine whether scalar
+      instructions can run in parallel and therefore can form a group.
+    - Use {b (c)} to determine the placement of vector instructions for each
+      group in the block, relative to other instructions. Order constraints
+      detemine when scalar instructions can be executed.
+    - {b Key}: conservatively choose the position to the last scalar instruction
+      of the group to place the vector instructions for the group.
+    - Conservatively require that all ordering constraints from a scalar
+      instruction in a vectorizable computation is to instructions that appear
+      earlier in the block, before the first scalar instruction of the
+      computation.
+    - Conservatively require that nothing depends (via {b a,b,c}) on scalar
+      instructions in the computation.
 
-   The method for constructing vectorizable computations.
-   - Group: a sequence of scalar instructions that are independent of each other, and have
-   an equivalent vector instruction. Most groups correspond to one vector instruction,
-   but sometimes a sequence of vector instructions is needed, for example scalar addition
-   of a register and a constant.
-   - Current heuristic for identifying vectorizable instructions requires that memory
-   accesses of scalar instructions are adjacent and have the same base address and
-   addressing mode.
-   - Seed: a group of store instructions.
-   - Vectorizable computation is set of groups of scalar instructions that can be replaced
-   with equivalent vector instructions.
-   - Find vectorizable computations: starting from a seed group, traverse the dependencies
-   backwards to construct groups for each of the arguments. Stop at load instructions (and
-   constant arguments).
-   - Use (a) during the backward traversal to find scalar instruction need to form
-   a group.
-   - Use both (a) and (b) dependencies to determine whether scalar instructions can run in
-   parallel and therefore can form a group.
-   - Use (c) to determine the placement of vector instructions for each group in the
-   block, relative to other instructions. Order constraints detemine when scalar
-   instructions can be executed.
-   - Key: conservatively choose the position to the last scalar instruction of the group
-   to place the vector instructions for the group.
-   - Conservatively require that all ordering constraints from a scalar instruction in a
-   vectorizable computation is to instructions that appear earlier in the block,
-   before the first scalar instruction of the computation.
-   - Conservatively require that nothing depends (via a,b,c)
-   on scalar instructions in the computation.
+    {2 Heuristics}
 
-   Heuristics
-   ==========
-   Identify disjoint memory accesses to improve precision of memory dependency and
-   ordering overapproximation. Use the following observations:
+    Identify disjoint memory accesses to improve precision of memory dependency
+    and ordering overapproximation. Use the following observations:
 
-   (1) A freshly-allocated memory block is disjoint from all previously-allocated blocks.
+    {ol
+     {- {b (1)} A freshly-allocated memory block is disjoint from all
+        previously-allocated blocks.
 
-   A crude version of points-to analysis with allocation site abstraction is sufficient to
-   track this information.
+        A crude version of points-to analysis with allocation site abstraction
+        is sufficient to track this information.
+     }
+     {- {b (2)} Different offsets from the same base address.
 
-   (2) Different offsets from the same base address.
+        If both memory accesses use the same base address, and offsets from the
+        base address can statically be shown to refer to non-overlapping address
+        intervals.
 
-   If both memory accesses use the same base address, and offsets from the base address
-   can statically be shown to refer to non-overlapping address intervals.
+        Two memory accesses have the same base address if they use the same
+        register for the base address, and the register contains the same value,
+        i.e., there are no writes to this register between the two memory
+        accesses.
+     }
+     {- {b (3)} Two valid ocaml blocks are disjoint, except for closure blocks.
 
-   Two memory accesses have the same base address if they use the same register for the
-   base address, and the register contains the same value, i.e., there are no writes to
-   this register between the two memory accesses.
+        A register points to a valid ocaml block iff [Reg.typ] is [Val].
 
-   (3) Two valid ocaml blocks are disjoint, except for closure blocks.
+        For two different registers that point to valid ocaml blocks, one of the
+        following conditions holds:
+        {ul {li the registers point to the same block, or}
+            {li the registers point to disjoint blocks, or}
+            {li the registers point to closure blocks.}}
 
-   A register points to a valid ocaml block iff [Reg.typ] is [Val].
+        To rule out closure blocks, we use the following observation.
 
-   For two different registers that point to valid ocaml blocks, one of the following
-   conditions holds:
-    - the registers point to the same block, or
-    - the registers point to disjoint blocks, or
-    - the registers point to closure blocks.
+        Closures cannot be modified after initialization. All stores to closure
+        blocks emitted by the ocaml compiler are initializing stores. Therefore,
+        if a register that points to a valid ocaml block is used in an address
+        computation of a non-initializing store, then the block it points to is
+        not a closure block.
 
-   To rule out closure blocks, we use the following observation.
+        The type system guarantees that there is no pointer arithmetic between
+        valid ocaml blocks: an address computed as an offset from a register
+        that points to a valid ocaml block cannot point to a different valid
+        ocaml block, except for closure blocks.
 
-   Closures cannot be modified after initialization. All stores to closure blocks emitted
-   by the ocaml compiler are initializing stores.  Therefore, if a register that points to
-   a valid ocaml block is used in an address computation of a non-initializing store, then
-   the block it points to is not a closure block.
+        If two registers (a) point to valid ocaml blocks, (b) one of the blocks
+        is not a closure block, and (c) a memory access uses one of the
+        registers as base address, then a memory access that uses the other base
+        address is disjoint if the accesses refer to non-overlapping address
+        intervals (similarly to {b (2)}).
+     }
+    }
 
-   The type system guarantees that there is no pointer arithmetic between valid ocaml
-   blocks: an address computed as an offset from a register that points to a valid ocaml
-   block cannot point to a different valid ocaml block, except for closure blocks.
+    {2 Overview of the implementation}
 
-   If two registers (a) point to valid ocaml blocks, (b) one of the blocks is not a
-   closure block, and (c) a memory access uses one of the registers as base address,
-   then a memory access that uses the other base address is disjoint if the accesses
-   refer to non-overlapping address intervals (similarly to (2)).
+    - {b Partition}: represents a set of memory blocks that are disjoint from
+      memory blocks represented by other partitions. A memory block need not be
+      on the ocaml heap.
+    - {b Points-to graph}: for each partition, track the set of partitions it
+      may point to.
+    - {b Initial partition} [unknown] represents all other memory blocks,
+      previously allocated on the ocaml heap or elsewhere, and it may point to
+      itself.
+    - {b Fresh allocations}: Track that a partition represents exactly one ocaml
+      block. Such a partion is a result of an allocation instruction, and known
+      to be disjoint from all other partitions, and initially has no valid
+      pointers to or from other partitions.
+    - {b Aliases}: For each register, track the set of partitions it may point
+      to.
+    - {b Memory accesses}: For each instruction, identify the set of partitions
+      that the instruction may access for read or write.
+    - For each partition, track the set of instructions that may read from it or
+      write to it.
+    - For each instruction [i] that may write to partition [p], and each
+      instruction [j] that appears before [i] in the basic block and may access
+      the same partition [p] for read or write, if heuristic conditions {b (2)}
+      and {b (3)} above do not hold, then add a direct dependency from [i] to
+      [j]. Note that it will add dependency from Load to Store.
 
-   Overview of the implementation
-   ==============================
+    {2 Computing aliases and points-to graph}
 
-   - Partition: represents a set of memory blocks that are disjoint from memory blocks
-   represented by other partitions. A memory block need not be on the ocaml heap.
-   - Points-to graph: for each partition, track the set of partitions it may point to.
-   - Initial partition [unknown] represents all other memory blocks, previously allocated on
-   the ocaml heap or elsewhere, and it may point to itself.
-   - Fresh allocations: Track that a partition represents exactly one ocaml block. Such a
-   partion is a result of an allocation instruction, and known to be disjoint from all
-   other partitions, and initially has no valid pointers to or from other partitions.
-   - Aliases: For each register, track the set of partitions it may point to.
-   - Memory accesses: For each instruction, identify the set of partitions that the
-   instruction may access for read or write.
-   - For each partition, track the set of instructions that may read from it or write
-   to it.
-   - For each instruction [i] that may write to partition [p], and each instruction [j] that
-   appears before [i] in the basic block and may access the same partition [p] for read
-   or write, if heuristic conditions (2) and (3) above do not hold, then add a direct
-   dependency from [i] to [j]. Note that it will add dependency from Load to Store.
+    - Initially, all registers may point to [unknown] partition.
+    - If a register is clobbered, its partition is reset to empty, representing
+      the fact that it does not contain a valid pointer and it is illegal for
+      the program to access memory that this register may point to.
+    - If a register is assigned a static constant, its partition is reset to
+      [unknown], representing the fact that a constant may point to statically
+      allocated memory, but it is illegal to use it to access any partitions
+      freshly allocated on the OCaml heap.
+    - If a register is used as RHS of a store (i.e., the value to store), add
+      edges between the corresponding partitions: the partitions of the LHS of
+      the store (i.e., the address arguments of the store) may point to the
+      partitions of RHS.
+    - If register [r] is used as a LHS of a load (i.e., result of the load),
+      then after the load [r] may point to partition [p'] if [p] is an RHS of
+      this load (i.e., address arguments of the load) may point to, and [p] may
+      point to [p'].
+    - For all other assignments, propagate points-to information from arguments
+      to results.
+    - Edges between partitions can be added but not removed (i.e., no strong
+      update of the points-to graph). Strong updates of aliases within a basic
+      block are safe.
 
-   Computing aliases and points-to graph
-   =====================================
+    {2 Complexity}
 
-   - Initially, all registers may point to [unknown] partition.
-   - If a register is clobbered, its partition is reset to empty, representing the fact
-   that it does not contain a valid pointer and it is illegal for the program to access
-   memory that this register may point to.
-   - If a register is assigned a static constant, its partition is reset to [unknown],
-   representing the fact that a constant may point to statically allocated memory, but it
-   is illegal to use it to access any partitions freshly allocated on the OCaml heap.
-   - If a register is used as RHS of a store (i.e., the value to store), add edges
-   between the corresponding partitions: the partitions of the LHS of the store (i.e., the
-   address arguments of the store) may point to the partitions of RHS.
-   - If register [r] is used as a LHS of a load (i.e., result of the load), then after the
-   load [r] may point to partition [p'] if [p] is an RHS of this load (i.e., address
-   arguments of the load) may point to, and [p] may point to [p'].
-   - For all other assignments, propagate points-to information from arguments to results.
-   - Edges between partitions can be added but not removed (i.e., no strong update
-   of the points-to graph). Strong updates of aliases within a basic block are safe.
-
-   Complexity
-   ========
-   - The number of partitions is n+1 where n is the number of allocation instruction in
-   the block.
-   - Tracking of memory accesses of each partition is quadratic in [n] in the worst case,
-   but in practice should be much smaller.
-   - Single pass on the block's body to construct memory dependencies.
-
-*)
+    - The number of partitions is n+1 where n is the number of allocation
+      instruction in the block.
+    - Tracking of memory accesses of each partition is quadratic in [n] in the
+      worst case, but in practice should be much smaller.
+    - Single pass on the block's body to construct memory dependencies. *)
 module Dependencies : sig
   (** Dependencies between basic instructions within the same basic block *)
   type t

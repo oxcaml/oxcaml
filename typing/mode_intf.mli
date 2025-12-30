@@ -982,9 +982,9 @@ module type S = sig
           | Modality of 'a Modality.Monadic.Atom.t
               (** The mode crossing caused by a modality atom on an axis whose
       carrier type is ['a]. For a concrete example, consider:
-
+      {[
       type 'x r = { x : 'x @@ portable } [@@unboxed]
-
+      ]}
       The type ['x r] can cross the portability axis. This is represented as
       [Modality (Meet_with Portable) : Portability.Const.t t]. *)
         [@@unboxed]

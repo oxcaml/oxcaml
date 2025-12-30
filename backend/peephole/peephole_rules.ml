@@ -16,10 +16,10 @@ let delete_fst_if_redundant ~fst ~snd ~(fst_val : Cfg.basic Cfg.instruction)
   else None
 
 (** Logical condition for simplifying the following case:
-    {|
+    {v
     mov ..., x
     mov ..., x
-    |}
+    v}
 
     In this case, the first instruction should be removed *)
 
@@ -47,10 +47,10 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
   | _ -> None
 
 (** Logical condition for simplifying the following case:
-    {|
+    {v
     mov x, y
     mov y, x
-    |}
+    v}
 
     In this case, the second instruction should be removed *)
 
@@ -75,15 +75,15 @@ let remove_useless_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
   | _ -> None
 
 (** Logical condition for simplifying the following case:
-  {|
+  {v
     <op1> const1, r
     <op2> const2, r
-  |}
+  v}
 
   to:
-  {|
+  {v
     <op1> (const1 <op2> const2), r
-  |}
+  v}
 
     where
     const1 and const2 are immediate values, and

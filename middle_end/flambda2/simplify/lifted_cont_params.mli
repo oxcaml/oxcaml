@@ -67,7 +67,7 @@ val args :
 
 (** Returns the bound parameters for a given set of new params.
     The parameters returned by this function are in the same order as the
-    arguments returned by the {args} function. *)
+    arguments returned by the [args] function. *)
 val bound_parameters : t -> Bound_parameters.t
 
 (** Fold over all of the new parameters. The order in which the parameters are

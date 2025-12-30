@@ -1125,7 +1125,7 @@ let divimm_parameters d =
   in
   loop (size - 1) (udivmod min_int anc) (udivmod min_int ad)
 
-(* For d > 1, the result [(m, p)] of [divimm_parameters d] satisfies the following
+(*= For d > 1, the result [(m, p)] of [divimm_parameters d] satisfies the following
    inequality:
 
    2^(wordsize + p) < m * d <= 2^(wordsize + p) + 2^(p + 1) (i)

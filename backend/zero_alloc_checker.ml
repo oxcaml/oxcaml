@@ -1458,8 +1458,7 @@ module Annotation : sig
 
   val is_check_enabled : t option -> bool
 end = struct
-  (**
-   ***************************************************************************
+  (****************************************************************************
    *  [Strict] statically guarantees that all paths through the function satisfy
    *  all of the following conditions:
    *   - property holds on all primitive operations (e.g., no heap allocation)

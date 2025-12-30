@@ -13,24 +13,26 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** {Continuation Specialization Cost}
+(** {1 Continuation Specialization Cost}
 
     Continuation specialization is done in simplify on the way down.
-    Consider a term of the form: *)
+    Consider a term of the form:
 
-(** * let_cont k x =
-    *   let_cont k' y =
-    *     ...
-    *   in
-    *   ..
-    *   switch x with
-    *   | 0 -> k' 0
-    *   | 1 -> k' 1
-    * in
-    * ..
-    * switch .. with
-    * | 0 -> k 0
-    * | 1 -> k 1
+{[
+  let_cont k x =
+    let_cont k' y =
+      ...
+    in
+    ..
+    switch x with
+    | 0 -> k' 0
+    | 1 -> k' 1
+  in
+  ..
+  switch .. with
+  | 0 -> k 0
+  | 1 -> k 1
+]}
     *)
 
 (** The decision to specialize continuation k

@@ -1,7 +1,7 @@
 open Cfg_intf.S
 open Utils
 
-(** CR xclerc for xclerc: that test relies on the use of the polymorphic
+(*= CR xclerc for xclerc: that test relies on the use of the polymorphic
         comparison over CFG values, but that can no longer be used since instruction
         lists now contain circular values.
    let () =
@@ -427,7 +427,7 @@ let () =
     ~exp_err:
       ">> Fatal error: Register allocation changed existing instruction no. 23 \
        into a register allocation specific instruction"
-  (* CR xclerc for xclerc: same as above (polymorphic commpare on values
+  (*= CR xclerc for xclerc: same as above (polymorphic commpare on values
       with cycles).
       let () =
      check "Regalloc added non-regalloc specific instr"
@@ -445,7 +445,7 @@ let () =
          ">> Fatal error: Register allocation added non-regalloc specific \
           instruction no. 26"
   *)
-  (* CR xclerc for xclerc: same as above (polymorphic commpare on values
+  (*= CR xclerc for xclerc: same as above (polymorphic commpare on values
      with cycles).
      let () =
        check "Regalloc added a 'goto' and a block"

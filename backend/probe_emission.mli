@@ -65,6 +65,7 @@ val reset : unit -> unit
     - [name]: probe name
     - [enabled_at_init]: whether the probe is enabled at initialization
     - [dbg]: debug info for error reporting
+
     Raises Emitaux.Error (Inconsistent_probe_init ...) if the same probe
     is used with different enabled_at_init values. *)
 val find_or_add_semaphore : string -> bool option -> Debuginfo.t -> string

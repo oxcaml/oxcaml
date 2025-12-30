@@ -69,11 +69,12 @@ val div : t -> t -> t
     unsigned} integers. *)
 val unsigned_div : t -> t -> t
 
-(** Integer remainder. If [y] is not zero, the result * of [Targetint_32_64.rem
-    x y] satisfies the following properties: * [Targetint_32_64.zero <=
-    Nativeint.rem x y < Targetint_32_64.abs y] and * [x = Targetint_32_64.add
-    (Targetint_32_64.mul (Targetint_32_64.div x y) y) * (Targetint_32_64.rem x
-    y)]. * If [y = 0], [Targetint_32_64.rem x y] raises [Division_by_zero]. *)
+(** Integer remainder. If [y] is not zero, the result of [Targetint_32_64.rem
+    x y] satisfies the following properties:
+    - [Targetint_32_64.zero <= Nativeint.rem x y < Targetint_32_64.abs y] and
+    - [x = Targetint_32_64.add (Targetint_32_64.mul (Targetint_32_64.div x y) y)
+       * (Targetint_32_64.rem x y)].
+    - If [y = 0], [Targetint_32_64.rem x y] raises [Division_by_zero]. *)
 val rem : t -> t -> t
 
 (** Same as {!rem}, except that arguments and result are interpreted as {e

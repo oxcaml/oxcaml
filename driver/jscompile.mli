@@ -34,7 +34,7 @@ val instance :
   keep_symbol_tables:bool ->
   unit
 
-(** {2 Internal functions} **)
+(** {2 Internal functions} *)
 
 val to_jsir :
   Compile_common.info ->

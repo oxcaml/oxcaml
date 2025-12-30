@@ -79,21 +79,25 @@ end
     We reach the normal form of a type shape (e.g., during the emission of DWARF
     information) in two steps:
 
-      1. We execute [shape_reduce], which will substitute compilation units with
-         their shapes loaded from .cms files and then reduce away projections
-         [Proj] and functor applications. It will also, partially, deal with
-         instantiation of type variables. That is, [of_type_declaration] inserts
-         lambdas for non-recursive types with type arguments. These are reduced
-         away via [shape_reduce]. (For (mutually-)recursive types, the next step
-         handles the instantiation.)
-      2. After shape reduction, the type declaration can still contain recursive
-         or mutually-recursive declarations, which have not been unfolded. Since
-         we cannot directly emit these into DWARF, we then unfold recursive
-         declarations applied to type shape arguments into recursive types with
-         [unfold_and_evaluate]. For example,
-           [type 'a list = [] | :: of 'a * 'a list]
-         applied to [int] becomes the type shape
-           [Mu (Variant [] | :: of int * #0)].
+    {ol
+    {li We execute [shape_reduce], which will substitute compilation units with
+        their shapes loaded from .cms files and then reduce away projections
+        [Proj] and functor applications. It will also, partially, deal with
+        instantiation of type variables. That is, [of_type_declaration] inserts
+        lambdas for non-recursive types with type arguments. These are reduced
+        away via [shape_reduce]. (For (mutually-)recursive types, the next step
+        handles the instantiation.)}
+    {li After shape reduction, the type declaration can still contain recursive
+        or mutually-recursive declarations, which have not been unfolded. Since
+        we cannot directly emit these into DWARF, we then unfold recursive
+        declarations applied to type shape arguments into recursive types with
+        [unfold_and_evaluate]. For example,
+        {[type 'a list = [] | :: of 'a * 'a list]}
+        applied to [int] becomes the type shape
+        {v
+          Mu (Variant [] | :: of int * #0)
+        v}
+        .}}
   *)
 val unfold_and_evaluate :
   ?diagnostics:Evaluation_diagnostics.t -> Shape.t -> Shape.t

@@ -760,7 +760,7 @@ val emit_vec512_constant :
 val emit_float_array_constant :
   symbol -> float list -> data_item list -> data_item list
 
-(** {1} Helper functions and values used by Flambda 2. *)
+(** {1 Helper functions and values used by Flambda 2.} *)
 
 (* CR mshinwell: [dbg] should not be optional. *)
 

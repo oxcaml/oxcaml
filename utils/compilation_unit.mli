@@ -164,17 +164,17 @@ val is_parent : t -> child:t -> bool
 
     For example:
 
-    * [A.B.C] _can_ access [A.Q] because [A.Q] is a member of [A] and [A] is
+    - [A.B.C] _can_ access [A.Q] because [A.Q] is a member of [A] and [A] is
       an ancestor of [A.B.C]. In other words, [A.Q]'s prefix is [A] and [A] is a
       prefix of [A.B.C].
-    * [A.Q] _cannot_ access [A.B.C] because [A.B] is not a prefix of [A.Q].
-    * [A.Q] _can_ however access [A.B], because [A] _is_ a prefix of [A.Q].
-    * [A.Q] _can_ also access its own member, [A.Q.R], because [A.Q.R]'s prefix
+    - [A.Q] _cannot_ access [A.B.C] because [A.B] is not a prefix of [A.Q].
+    - [A.Q] _can_ however access [A.B], because [A] _is_ a prefix of [A.Q].
+    - [A.Q] _can_ also access its own member, [A.Q.R], because [A.Q.R]'s prefix
       is exactly [A.Q].
-    * [A.Q] _cannot_ access [A.Q.R.S], because [A.Q.R] is not a prefix of [A.Q].
-    * [A.Q] _can_ access [F], since [F]'s prefix is the empty path, which is
+    - [A.Q] _cannot_ access [A.Q.R.S], because [A.Q.R] is not a prefix of [A.Q].
+    - [A.Q] _can_ access [F], since [F]'s prefix is the empty path, which is
       trivially a prefix of [A.Q].
-    * [A.Q] _cannot_ access [F.G] (by criterion 1) or [A] (by criterion 2). *)
+    - [A.Q] _cannot_ access [F.G] (by criterion 1) or [A] (by criterion 2). *)
 val can_access_by_name : t -> accessed_by:t -> bool
 
 (** A clearer name for [can_access_by_name] when the .cmx file is what's of
@@ -246,10 +246,10 @@ val base_filename : t -> Misc.filepath
     arguments with nesting levels attached. Good for implementing horrible name
     mangling and little else. So:
 
-      * [Foo] ==> [[], "Foo", []]
-      * [Foo[X:Bar]] ==> [[], "Foo", [(0, "X", "Bar")]]
-      * [Foo[X:Bar][Y:Baz]] ==> [[], "Foo", [(0, "X", "Bar"); (0, "Y", "Baz")]]
-      * [Foo[X:Bar[Y:Baz]]] ==> [[], "Foo", [(0, "X", "Bar"); (1, "Y", "Baz")]]
+    - [Foo] ==> [[], "Foo", []]
+    - [Foo[X:Bar]] ==> [[], "Foo", [(0, "X", "Bar")]]
+    - [Foo[X:Bar][Y:Baz]] ==> [[], "Foo", [(0, "X", "Bar"); (0, "Y", "Baz")]]
+    - [Foo[X:Bar[Y:Baz]]] ==> [[], "Foo", [(0, "X", "Bar"); (1, "Y", "Baz")]]
 
     I believe it's possible to parse this form back to the usual nested form,
     which one should only want to do in order to prove the encoding is

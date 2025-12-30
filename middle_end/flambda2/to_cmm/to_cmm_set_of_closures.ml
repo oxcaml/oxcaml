@@ -693,7 +693,7 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
   let layout = layout_for_set_of_closures env set in
   let_static_set_of_closures0 env res closure_symbols layout set ~prev_updates
 
-(* Sets of closures with no value slots can be statically allocated. This
+(*= Sets of closures with no value slots can be statically allocated. This
    usually happens earlier (in Simplify, or Closure_conversion for classic mode)
    but the extra information that To_cmm has about unused closure variables
    enables certain extra cases to be caught. For example the following closure

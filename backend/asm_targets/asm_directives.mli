@@ -114,8 +114,10 @@ val string : ?comment:string -> string -> unit
 val cache_string : ?comment:string -> Asm_section.t -> string -> Asm_label.t
 
 (** Emit the sequence of:
+    {v
       label definition:
         <string><null terminator>
+    v}
     pairs as per previous calls to [cache_string] with appropriate directives
     to switch section interspersed.  This function clears the cache. *)
 val emit_cached_strings : unit -> unit
