@@ -11,7 +11,7 @@ module Make (V : ORDERED) : sig
 
   type var
 
-  (* Constructors *)
+  (** Constructors. *)
   val bot : node
 
   val top : node
@@ -24,14 +24,14 @@ module Make (V : ORDERED) : sig
 
   val mk_var : var -> node
 
-  (* Boolean algebra over nodes *)
+  (** Boolean algebra over nodes. *)
   val join : node -> node -> node
 
   val meet : node -> node -> node
 
   val sub_subsets : node -> node -> node
 
-  (* Solving interface *)
+  (** Solving interface. *)
   val solve_lfp : var -> node -> unit
 
   val enqueue_lfp : var -> node -> unit
@@ -40,15 +40,15 @@ module Make (V : ORDERED) : sig
 
   val solve_pending : unit -> unit
 
-  (* Linear decomposition/composition helpers *)
+  (** Linear decomposition/composition helpers. *)
   val decompose_into_linear_terms :
     universe:var list -> node -> node * node list
 
   val leq : node -> node -> bool
 
-  (* If [a ⊑ b] fails, return witness axis indices where they differ. *)
-  (* Empty list means [a ⊑ b] succeeds.
-     Non-empty list is the witness axes where it fails. *)
+  (** If [a ⊑ b] fails, return witness axis indices where they differ.
+      Empty list means [a ⊑ b] succeeds. Non-empty list is the witness axes
+      where it fails. *)
   val leq_with_reason : node -> node -> int list
 
   val round_up : node -> Axis_lattice.t
@@ -57,7 +57,7 @@ module Make (V : ORDERED) : sig
 
   val map_rigid : (V.t -> node) -> node -> node
 
-  (* Pretty printers and checks *)
+  (** Pretty printers and checks. *)
   val pp : node -> string
 
   val pp_debug : node -> string

@@ -3,7 +3,7 @@
 (*-------------------------------------------------------------------------*)
 
 module Rigid_name : sig
-  (* Rigid names are the variables that may occur in ikind formulas. *)
+  (** Rigid names are the variables that may occur in ikind formulas. *)
 
   (* CR jujacobs: see if we can make this type abstract. *)
   type t =
@@ -22,7 +22,7 @@ module Rigid_name : sig
             e.g. for a polymorphic variant with conjunctive type --
             `Constr of (a & b & ...) *)
 
-  (* Ordering on rigid names used in the LDD to order the nodes. *)
+  (** Ordering on rigid names used in the LDD to order the nodes. *)
   val compare : t -> t -> int
 
   val to_string : t -> string
@@ -76,8 +76,8 @@ module Ldd : sig
 
   val leq : node -> node -> bool
 
-  (* Empty list means [a ⊑ b] succeeds.
-     Non-empty list is the witness axes where it fails. *)
+  (** Empty list means [a ⊑ b] succeeds. Non-empty list is the witness axes
+      where it fails. *)
   val leq_with_reason : node -> node -> int list
 
   val round_up : node -> lat
