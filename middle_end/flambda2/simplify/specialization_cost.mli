@@ -18,7 +18,7 @@
     Continuation specialization is done in simplify on the way down.
     Consider a term of the form:
 
-{[
+{v
   let_cont k x =
     let_cont k' y =
       ...
@@ -32,7 +32,7 @@
   switch .. with
   | 0 -> k 0
   | 1 -> k 1
-]}
+v}
     *)
 
 (** The decision to specialize continuation k
