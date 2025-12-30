@@ -207,8 +207,8 @@ module type Sort = sig
       [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
 
-  (** To record changes to sorts, for use with
-      `Types.\{snapshot, backtrack\}` *)
+  (** To record changes to sorts, for use with [Types.snapshot] and
+      [Types.backtrack]. *)
   type change
 
   val undo_change : change -> unit

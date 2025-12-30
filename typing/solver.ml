@@ -380,7 +380,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (recursively). To handle cycles, [traversed] is the set of variables that
       we have already printed and will be skipped. An example of cycle:
 
-      Consider a lattice containing three elements A = \{0, 1, 2\} with the linear
+      Consider a lattice A containing three elements 0, 1, and 2 with the linear
       lattice structure: 0 < 1 < 2. Furthermore, we define a morphism
       {v
       f : A -> A

@@ -13,10 +13,10 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
-(** This module follows the structure of driver/main_args.ml\{i\}.
-    It provides a way to (a) share argument implementations between
-    different installable tools and (b) override default implementations
-    of arguments. *)
+(** This module follows the structure of driver/main_args.ml and
+    driver/main_args.mli. It provides a way to (a) share argument
+    implementations between different installable tools and (b) override
+    default implementations of arguments. *)
 
 (** Command line arguments required for flambda backend.  *)
 module type Oxcaml_options = sig
