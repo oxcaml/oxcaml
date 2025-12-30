@@ -286,22 +286,24 @@ let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
        prologue_labels
   then
     false
-    (*= Check that there are no prologues which might execute after another
-        prologue has already executed.
+    (* Check that there are no prologues which might execute after another
+       prologue has already executed.
 
-        This might happen when duplicating a prologue in the following CFG:
+       This might happen when duplicating a prologue in the following CFG:
 
-        * Block A: Condition with branch to Block B / C
-        * Block B: Contains an instruction requiring a prologue, with terminator
-          that jumps to Block C
-        * Block C: Return
+       - Block A: Condition with branch to Block B / C
 
-        If we duplicate the prologue to both B and C (which are both children of
-        A), the prologue will execute twice on the A->B->C path.
+       - Block B: Contains an instruction requiring a prologue, with terminator
+       that jumps to Block C
 
-        This check will also prevent us from having a
-        Prologue..Epilogue..Prologue..Epilogue structure. However, we probably
-        shouldn't emit such structures anyway. *)
+       - Block C: Return
+
+       If we duplicate the prologue to both B and C (which are both children of
+       A), the prologue will execute twice on the A->B->C path.
+
+       This check will also prevent us from having a
+       Prologue..Epilogue..Prologue..Epilogue structure. However, we probably
+       shouldn't emit such structures anyway. *)
   else if Label.Set.exists
             (fun prologue ->
               let descendants =
