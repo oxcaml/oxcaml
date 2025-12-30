@@ -133,7 +133,7 @@ module Inlining = struct
 
   let definition_inlining_decision inline cost_metrics =
     let inline_threshold = threshold () in
-    let code_size = Cost_metrics.size cost_metrics in
+    let code_size = Cost_metrics.total_size cost_metrics in
     match (inline : Inline_attribute.t) with
     | Never_inline ->
       Function_decl_inlining_decision_type.Never_inline_attribute

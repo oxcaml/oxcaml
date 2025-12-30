@@ -146,9 +146,9 @@ let inlining_does_decrease_code_size ~code_or_metadata cost_metrics =
     code_or_metadata
     |> Code_or_metadata.code_metadata
     |> Code_metadata.cost_metrics
-    |> Cost_metrics.size
+    |> Cost_metrics.total_size
   in
-  let inlined_code_size = Cost_metrics.size cost_metrics in
+  let inlined_code_size = Cost_metrics.total_size cost_metrics in
   not (Code_size.( <= ) original_code_size inlined_code_size)
 
 let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr

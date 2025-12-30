@@ -21,7 +21,9 @@
 
 type t =
   { size : Code_size.t;
-    removed : Removed_operations.t
+    nested_size : Code_size.t;
+    removed : Removed_operations.t;
+    nested_removed : Removed_operations.t
   }
 
 type code_characteristics =
@@ -29,17 +31,37 @@ type code_characteristics =
     params_arity : int
   }
 
-let zero = { size = Code_size.zero; removed = Removed_operations.zero }
+let zero =
+  { size = Code_size.zero;
+    nested_size = Code_size.zero;
+    removed = Removed_operations.zero;
+    nested_removed = Removed_operations.zero
+  }
 
 let size t = t.size
 
+let nested_size t = t.nested_size
+
+let total_size t = Code_size.( + ) t.size t.nested_size
+
 let removed t = t.removed
 
-let print ppf t =
-  Format.fprintf ppf "@[<hov 1>size: %a removed: {%a}@]" Code_size.print t.size
-    Removed_operations.print t.removed
+let nested_removed t = t.nested_removed
 
-let from_size size = { size; removed = Removed_operations.zero }
+let total_removed t = Removed_operations.( + ) t.removed t.nested_removed
+
+let print ppf { size; nested_size; removed; nested_removed } =
+  Format.fprintf ppf
+    "@[<hov 1>size: %a (%a nested) removed: {%a} ({%a} nested)@]"
+    Code_size.print size Code_size.print nested_size Removed_operations.print
+    removed Removed_operations.print nested_removed
+
+let from_size size =
+  { size;
+    nested_size = Code_size.zero;
+    removed = Removed_operations.zero;
+    nested_removed = Removed_operations.zero
+  }
 
 let notify_added ~code_size t =
   { t with size = Code_size.( + ) t.size code_size }
@@ -49,7 +71,9 @@ let notify_removed ~operation t =
 
 let ( + ) a b =
   { size = Code_size.( + ) a.size b.size;
-    removed = Removed_operations.( + ) a.removed b.removed
+    nested_size = Code_size.( + ) a.nested_size b.nested_size;
+    removed = Removed_operations.( + ) a.removed b.removed;
+    nested_removed = Removed_operations.( + ) a.nested_removed b.nested_removed
   }
 
 (* The metrics for a set of closures are the sum of the metrics for each closure
@@ -87,7 +111,11 @@ let set_of_closures ~find_code_characteristics set_of_closures =
   let alloc_size =
     Code_size.( + ) Code_size.alloc_size (Code_size.of_int num_words)
   in
-  cost_metrics + from_size alloc_size
+  { size = alloc_size;
+    nested_size = total_size cost_metrics;
+    removed = Removed_operations.zero;
+    nested_removed = total_removed cost_metrics
+  }
 
 let increase_due_to_let_expr ~is_phantom ~cost_metrics_of_defining_expr =
   if is_phantom then zero else cost_metrics_of_defining_expr
@@ -99,8 +127,21 @@ let increase_due_to_let_cont_recursive ~cost_metrics_of_handlers =
   cost_metrics_of_handlers
 
 let evaluate ~args (t : t) =
-  Code_size.evaluate ~args t.size -. Removed_operations.evaluate ~args t.removed
+  Code_size.evaluate ~args (total_size t)
+  -. Removed_operations.evaluate ~args (total_removed t)
 
-let equal { size = size1; removed = removed1 }
-    { size = size2; removed = removed2 } =
-  Code_size.equal size1 size2 && Removed_operations.equal removed1 removed2
+let equal
+    { size = size1;
+      nested_size = nested_size1;
+      removed = removed1;
+      nested_removed = nested_removed1
+    }
+    { size = size2;
+      nested_size = nested_size2;
+      removed = removed2;
+      nested_removed = nested_removed2
+    } =
+  Code_size.equal size1 size2
+  && Code_size.equal nested_size1 nested_size2
+  && Removed_operations.equal removed1 removed2
+  && Removed_operations.equal nested_removed1 nested_removed2
