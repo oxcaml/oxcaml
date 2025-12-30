@@ -18,7 +18,7 @@
     Continuation lifting is done in simplify on the way down. Considering
     a term of the form:
 
-    {[
+    {v
     let_cont k x =
       let_cont k' y =
         ...
@@ -26,7 +26,7 @@
       ..
     in
     ..
-    ]} *)
+    v} *)
 
 (** The decision to lift continuations (e.g. k') out of another (e.g. k),
     is made once Simplify has reached the bottom of the handler of k **but**
