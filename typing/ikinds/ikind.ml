@@ -2,9 +2,8 @@
 (* Types shared by ikind algorithms                                        *)
 (*-------------------------------------------------------------------------*)
 
+(* Rigid names are the variables that may occur in ikind formulas. *)
 module Rigid_name = struct
-  (* Rigid names are the variables that may occur in ikind formulas. *)
-
   type t =
     | Atom of
         { constr : Path.t;
@@ -21,7 +20,7 @@ module Rigid_name = struct
             e.g. for a polymorphic variant with conjunctive type --
             `Constr of (a & b & ...) *)
 
-  (* Ordering on rigid names used in the LDD to order the nodes. *)
+  (** Ordering on rigid names used in the LDD to order the nodes. *)
   let compare a b =
     if a == b
     then 0
