@@ -636,7 +636,6 @@ let rec type_declaration' copy_scope s decl =
       end;
     type_ikind = (
       (* Preserve constructor ikinds via [s.types] (path rename or identity-env inlined type functions), avoiding Env; ideally we'd use a real Env but we use this identity-env approach instead. *)
-      (* let rewrite_type = typexp copy_scope s decl.type_loc in *)
       let lookup (p : Path.t) =
         match Path.Map.find p s.types with
         | Path p' -> Ikinds.Lookup_path p'

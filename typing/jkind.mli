@@ -133,8 +133,6 @@ module With_bounds : sig
     ('l * 'r) Types.with_bounds ->
     (Types.type_expr * Types.With_bounds_type_info.t) Seq.t
 
-  val type_info_relevant_axes :
-    Types.With_bounds_type_info.t -> Jkind_axis.Axis_set.t
 end
 
 (** A [jkind] is a full description of the runtime representation of values

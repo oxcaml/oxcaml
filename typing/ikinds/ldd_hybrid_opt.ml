@@ -189,20 +189,19 @@ module Make (V : ORDERED) = struct
       else canonicalize ~hi ~lo:lb.lo
 
   and canonicalize_right_leaf ~(hi : node) ~(lo : node) : node =
+    let rec aux ~(hi : node) (leaf_l : Axis_lattice.t) : node =
+      if is_leaf hi
+      then leaf (Axis_lattice.co_sub (Unsafe.leaf_value hi) leaf_l)
+      else
+        let hb = Unsafe.node_block hi in
+        let lo' = aux ~hi:hb.lo leaf_l in
+        let hi' = aux ~hi:hb.hi leaf_l in
+        if hb.lo == lo' && hb.hi == hi' then hi else node_raw hb.v lo' hi'
+    in
     let leaf_val = Unsafe.leaf_value lo in
     if Axis_lattice.equal leaf_val Axis_lattice.bot
     then hi
-    else canonicalize_right_leaf_aux ~hi leaf_val
-
-  and canonicalize_right_leaf_aux ~(hi : node) (leaf_l : Axis_lattice.t) :
-      node =
-    if is_leaf hi
-    then leaf (Axis_lattice.co_sub (Unsafe.leaf_value hi) leaf_l)
-    else
-      let hb = Unsafe.node_block hi in
-      let lo' = canonicalize_right_leaf_aux ~hi:hb.lo leaf_l in
-      let hi' = canonicalize_right_leaf_aux ~hi:hb.hi leaf_l in
-      if hb.lo == lo' && hb.hi == hi' then hi else node_raw hb.v lo' hi'
+    else aux ~hi leaf_val
 
   (* Build a canonical node; ensures [hi] is disjoint from [lo]. *)
   let node (v : var) (lo : node) (hi : node) : node =
@@ -216,9 +215,13 @@ module Make (V : ORDERED) = struct
     if a == b
     then a
     else if is_leaf a
-    then join_with_leaf a b
+    then
+      let leaf_val = Unsafe.leaf_value a in
+      join_with_leaf leaf_val b
     else if is_leaf b
-    then join_with_leaf b a
+    then
+      let leaf_val = Unsafe.leaf_value b in
+      join_with_leaf leaf_val a
     else
       let na = Unsafe.node_block a in
       let nb = Unsafe.node_block b in
@@ -233,23 +236,22 @@ module Make (V : ORDERED) = struct
       then node_raw na.v (join na.lo b) (canonicalize ~hi:na.hi ~lo:b)
       else node_raw nb.v (join a nb.lo) (canonicalize ~hi:nb.hi ~lo:a)
 
-  and join_with_leaf (leaf_a : node) (other : node) =
-    let leaf_val = Unsafe.leaf_value leaf_a in
-    if Axis_lattice.equal leaf_val Axis_lattice.top
+  and join_with_leaf (leaf_a : Axis_lattice.t) (other : node) =
+    let rec aux (leaf_a : Axis_lattice.t) (other : node) =
+      if is_leaf other
+      then leaf (Axis_lattice.join leaf_a (Unsafe.leaf_value other))
+      else
+        let nb = Unsafe.node_block other in
+        let lo' = aux leaf_a nb.lo in
+        let hi' = canonicalize_right_leaf ~hi:nb.hi ~lo:(leaf leaf_a) in
+        if lo' == nb.lo && hi' == nb.hi then other else node_raw nb.v lo' hi'
+    in
+    if Axis_lattice.equal leaf_a Axis_lattice.top
     then top
     else if (* Fast path: [down0] summarizes the lo-chain in order. *)
-            Axis_lattice.leq leaf_val (down0 other)
+            Axis_lattice.leq leaf_a (down0 other)
     then other
-    else join_with_leaf_aux leaf_val other
-
-  and join_with_leaf_aux (leaf_a : Axis_lattice.t) (other : node) =
-    if is_leaf other
-    then leaf (Axis_lattice.join leaf_a (Unsafe.leaf_value other))
-    else
-      let nb = Unsafe.node_block other in
-      let lo' = join_with_leaf_aux leaf_a nb.lo in
-      let hi' = canonicalize_right_leaf_aux ~hi:nb.hi leaf_a in
-      if lo' == nb.lo && hi' == nb.hi then other else node_raw nb.v lo' hi'
+    else aux leaf_a other
 
   (* Variable-order merge: [cmp] decides which side can be descended. *)
   let rec meet (a : node) (b : node) =
@@ -273,21 +275,21 @@ module Make (V : ORDERED) = struct
       else node nb.v (meet a nb.lo) (meet a nb.hi)
 
   and meet_with_leaf (leaf_a : node) (other : node) =
+    let rec aux (leaf_a : Axis_lattice.t) (other : node) =
+      if is_leaf other
+      then leaf (Axis_lattice.meet leaf_a (Unsafe.leaf_value other))
+      else
+        let nb = Unsafe.node_block other in
+        let lo' = aux leaf_a nb.lo in
+        let hi' = aux leaf_a nb.hi in
+        if lo' == nb.lo && hi' == nb.hi then other else node nb.v lo' hi'
+    in
     let leaf_val = Unsafe.leaf_value leaf_a in
     if Axis_lattice.equal leaf_val Axis_lattice.top
     then other
     else if Axis_lattice.equal leaf_val Axis_lattice.bot
     then bot
-    else meet_with_leaf_aux leaf_val other
-
-  and meet_with_leaf_aux (leaf_a : Axis_lattice.t) (other : node) =
-    if is_leaf other
-    then leaf (Axis_lattice.meet leaf_a (Unsafe.leaf_value other))
-    else
-      let nb = Unsafe.node_block other in
-      let lo' = meet_with_leaf_aux leaf_a nb.lo in
-      let hi' = meet_with_leaf_aux leaf_a nb.hi in
-      if lo' == nb.lo && hi' == nb.hi then other else node nb.v lo' hi'
+    else aux leaf_val other
 
   (* --------- public constructors --------- *)
   let[@inline] const (c : Axis_lattice.t) = leaf c

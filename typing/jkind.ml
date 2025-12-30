@@ -736,10 +736,6 @@ module With_bounds = struct
     | No_with_bounds -> Seq.empty
     | With_bounds tys -> With_bounds_types.to_seq tys
 
-  let type_info_relevant_axes
-      ({ With_bounds_type_info.relevant_axes } : With_bounds_type_info.t) :
-      Axis_set.t =
-    relevant_axes
 end
 
 (******************************)
@@ -3902,7 +3898,7 @@ let sub_or_error ~type_equal ~context ~level t1 t2 =
       (Violation.of_ ~context
          (Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let require_le ~context sub super sub_result =
+let require_le_for_sub_jkind_l ~context sub super sub_result =
   Sub_result.require_le sub_result
   |> Result.map_error (fun reasons ->
          (* When we report an error, we want to show the best-normalized
@@ -3920,7 +3916,7 @@ let require_le ~context sub super sub_result =
 
 let sub_jkind_l_layout ~context ~level sub super =
   let open Misc.Stdlib.Monad.Result.Syntax in
-  let require_le = require_le ~context sub super in
+  let require_le = require_le_for_sub_jkind_l ~context sub super in
   let* () =
     (* Validate layouts *)
     require_le (Layout.sub ~level sub.jkind.layout super.jkind.layout)
@@ -3931,7 +3927,7 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
     super =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
-  let require_le = require_le ~context sub super in
+  let require_le = require_le_for_sub_jkind_l ~context sub super in
   let* () =
     (* Validate layouts *)
     sub_jkind_l_layout ~context ~level sub super

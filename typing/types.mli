@@ -149,16 +149,12 @@ type row_field
 type field_kind
 type commutable
 
-(* CR jujacobs: temporary hack to avoid dependency cycle *)
-type constructor_ikind = private
+type constructor_ikind =
   { base : Ikind.Ldd.node;
     coeffs : Ikind.Ldd.node array;
   }
-
-val constructor_ikind_create :
-  base:Ikind.Ldd.node ->
-  coeffs:Ikind.Ldd.node array ->
-  constructor_ikind
+(* Invariant: [coeffs] are in subtract-normal form, i.e.
+   [coeffs.(i)] is disjoint from [base]. *)
 
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind

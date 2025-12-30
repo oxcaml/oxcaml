@@ -267,6 +267,15 @@ end
 
 let ikinds_todo : string -> Types.type_ikind = Types.ikinds_todo
 
+let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
+  (* Keep coefficients disjoint from the base (subtract-normal form). *)
+  for i = 0 to Array.length coeffs - 1 do
+    let coeff = coeffs.(i) in
+    let coeff' = Ldd.sub_subsets coeff base in
+    if coeff != coeff' then coeffs.(i) <- coeff'
+  done;
+  ({ Types.base = base; coeffs } : Types.constructor_ikind)
+
 (* Converting surface jkinds to solver ckinds. *)
 let ckind_of_jkind (ctx : JK.ctx) (j : ('l * 'r) Types.jkind) : JK.kind =
   (* Base is the modality bounds stored on this jkind. *)
@@ -276,7 +285,7 @@ let ckind_of_jkind (ctx : JK.ctx) (j : ('l * 'r) Types.jkind) : JK.kind =
   Jkind.With_bounds.to_seq j.jkind.with_bounds
   |> Seq.fold_left
        (fun acc (ty, info) ->
-         let axes = Jkind.With_bounds.type_info_relevant_axes info in
+         let axes = info.Types.With_bounds_type_info.relevant_axes in
          let mask = Axis_lattice.of_axis_set axes in
          let kty = JK.kind ctx ty in
          Ldd.join acc (Ldd.meet (Ldd.const mask) kty))
@@ -644,7 +653,7 @@ let type_declaration_ikind ~(context : Jkind.jkind_context) ~(path : Path.t) :
     Types.constructor_ikind =
   let ctx = make_ctx ~context in
   let base, coeffs = JK.constr_kind_poly ctx path in
-  Types.constructor_ikind_create ~base ~coeffs
+  constructor_ikind ~base ~coeffs
 
 let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.type_ikind =
@@ -681,7 +690,7 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
       Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
     in
     let coeffs = Array.of_list coeffs in
-    let payload = Types.constructor_ikind_create ~base ~coeffs in
+    let payload = constructor_ikind ~base ~coeffs in
     if !Types.ikind_debug
     then
       Format.eprintf "[ikind] from jkind: base=%s; coeffs=[%s]@."
@@ -996,5 +1005,5 @@ let substitute_decl_ikind_with_lookup
     in
     let base' = map_poly Path.Set.empty payload.base in
     let coeffs' = Array.map (map_poly Path.Set.empty) payload.coeffs in
-    let payload = Types.constructor_ikind_create ~base:base' ~coeffs:coeffs' in
+    let payload = constructor_ikind ~base:base' ~coeffs:coeffs' in
     Types.Constructor_ikind payload
