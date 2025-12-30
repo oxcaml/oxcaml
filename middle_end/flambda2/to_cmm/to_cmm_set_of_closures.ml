@@ -699,13 +699,12 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
    enables certain extra cases to be caught. For example the following closure
    [g] is not lifted by Simplify, but can be in To_cmm:
 
- * let f () =
- *   let x = Sys.opaque_identity 0 in
- *   let y = true in
- *   let g () = if y then 1 else x in
- *   g
-
- *)
+   let f () =
+     let x = Sys.opaque_identity 0 in
+     let y = true in
+     let g () = if y then 1 else x in
+     g
+*)
 let lift_set_of_closures env res ~body ~bound_vars layout set
     ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)

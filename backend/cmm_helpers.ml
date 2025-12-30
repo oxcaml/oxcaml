@@ -1140,40 +1140,41 @@ let divimm_parameters d =
    exhaustively tested for values of d from 2 to 10^9 in the wordsize = 64
    case.
 
- * let add2 (xh, xl) (yh, yl) =
- *   let zl = add xl yl and zh = add xh yh in
- *   (if unsigned_compare zl xl < 0 then succ zh else zh), zl
- *
- * let shl2 (xh, xl) n =
- *   assert (0 < n && n < size + size);
- *   if n < size
- *   then
- *     logor (shift_left xh n) (shift_right_logical xl (size - n)),
- *       shift_left xl n
- *   else shift_left xl (n - size), 0n
- *
- * let mul2 x y =
- *   let halfsize = size / 2 in
- *   let halfmask = pred (shift_left 1n halfsize) in
- *   let xl = logand x halfmask and xh = shift_right_logical x halfsize in
- *   let yl = logand y halfmask and yh = shift_right_logical y halfsize in
- *   add2
- *     (mul xh yh, 0n)
- *     (add2
- *        (shl2 (0n, mul xl yh) halfsize)
- *        (add2 (shl2 (0n, mul xh yl) halfsize) (0n, mul xl yl)))
- *
- * let unsigned_compare2 (xh, xl) (yh, yl) =
- *   let c = unsigned_compare xh yh in
- *   if c = 0 then unsigned_compare xl yl else c
- *
- * let validate d m p =
- *   let md = mul2 m d in
- *   let one2 = 0n, 1n in
- *   let twoszp = shl2 one2 (size + p) in
- *   let twop1 = shl2 one2 (p + 1) in
- *   unsigned_compare2 twoszp md < 0 && unsigned_compare2 md (add2 twoszp twop1) <= 0
- *)
+   let add2 (xh, xl) (yh, yl) =
+     let zl = add xl yl and zh = add xh yh in
+     (if unsigned_compare zl xl < 0 then succ zh else zh), zl
+
+   let shl2 (xh, xl) n =
+     assert (0 < n && n < size + size);
+     if n < size
+     then
+       logor (shift_left xh n) (shift_right_logical xl (size - n)),
+         shift_left xl n
+     else shift_left xl (n - size), 0n
+
+   let mul2 x y =
+     let halfsize = size / 2 in
+     let halfmask = pred (shift_left 1n halfsize) in
+     let xl = logand x halfmask and xh = shift_right_logical x halfsize in
+     let yl = logand y halfmask and yh = shift_right_logical y halfsize in
+     add2
+       (mul xh yh, 0n)
+       (add2
+          (shl2 (0n, mul xl yh) halfsize)
+          (add2 (shl2 (0n, mul xh yl) halfsize) (0n, mul xl yl)))
+
+   let unsigned_compare2 (xh, xl) (yh, yl) =
+     let c = unsigned_compare xh yh in
+     if c = 0 then unsigned_compare xl yl else c
+
+   let validate d m p =
+     let md = mul2 m d in
+     let one2 = 0n, 1n in
+     let twoszp = shl2 one2 (size + p) in
+     let twop1 = shl2 one2 (p + 1) in
+     unsigned_compare2 twoszp md < 0
+     && unsigned_compare2 md (add2 twoszp twop1) <= 0
+*)
 
 let raise_symbol dbg symb =
   Cop
