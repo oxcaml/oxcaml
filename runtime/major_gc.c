@@ -2443,24 +2443,47 @@ static void mark_stack_prune(struct mark_stack* stk)
   stk->compressed_stack_iter = caml_addrmap_iterator(&stk->compressed_stack);
 }
 
-int caml_init_major_gc(caml_domain_state* d) {
+bool caml_alloc_major_gc(caml_domain_state* d)
+{
   d->mark_stack = caml_stat_alloc_noexc(sizeof(struct mark_stack));
   if(d->mark_stack == NULL) {
-    return -1;
+    goto fail_mark_stack;
   }
   d->mark_stack->stack =
     caml_stat_alloc_noexc(MARK_STACK_INIT_SIZE * sizeof(mark_entry));
   if(d->mark_stack->stack == NULL) {
-    caml_stat_free(d->mark_stack);
-    d->mark_stack = NULL;
-    return -1;
+    goto fail_mark_stack_stack;
   }
+  /* Finalisers. Fresh domains participate in updating finalisers. */
+  d->final_info = caml_alloc_final_info ();
+  if(d->final_info == NULL) {
+    goto fail_final_info;
+  }
+  d->ephe_info = caml_alloc_ephe_info();
+  if(d->ephe_info == NULL) {
+    goto fail_ephe_info;
+  }
+
   d->mark_stack->count = 0;
   d->mark_stack->size = MARK_STACK_INIT_SIZE;
   caml_addrmap_init(&d->mark_stack->compressed_stack);
   d->mark_stack->compressed_stack_iter =
                   caml_addrmap_iterator(&d->mark_stack->compressed_stack);
+  return true;
 
+fail_ephe_info:
+  caml_stat_free(d->final_info);
+fail_final_info:
+  caml_stat_free(d->mark_stack->stack);
+fail_mark_stack_stack:
+  caml_stat_free(d->mark_stack);
+  d->mark_stack = NULL;
+fail_mark_stack:
+  return false;
+}
+
+void caml_enroll_major_gc(caml_domain_state *d)
+{
   /* Fresh domains do not need to performing marking or sweeping. */
   if (caml_gc_phase == Phase_sweep_main) {
     d->sweeping_done = 1;
@@ -2472,29 +2495,12 @@ int caml_init_major_gc(caml_domain_state* d) {
     d->marking_done = 1;
   }
 
-  /* Finalisers. Fresh domains participate in updating finalisers. */
-  d->final_info = caml_alloc_final_info ();
-  if(d->final_info == NULL) {
-    caml_stat_free(d->mark_stack->stack);
-    caml_stat_free(d->mark_stack);
-    return -1;
-  }
-  d->ephe_info = caml_alloc_ephe_info();
-  if(d->ephe_info == NULL) {
-    caml_stat_free(d->final_info);
-    caml_stat_free(d->mark_stack->stack);
-    caml_stat_free(d->mark_stack);
-    d->final_info = NULL;
-    d->mark_stack = NULL;
-    return -1;
-  }
   (void)caml_atomic_counter_incr(&num_domains_to_final_update_first);
   (void)caml_atomic_counter_incr(&num_domains_to_final_update_last);
-
-  return 0;
 }
 
-void caml_teardown_major_gc(void) {
+void caml_teardown_major_gc(void)
+{
   caml_domain_state* d = Caml_state;
 
 /* At this point we have been removed from the STW participant set,
@@ -2505,6 +2511,21 @@ void caml_teardown_major_gc(void) {
      we are out of the STW participant set; the ring may be torn down
      concurrently. */
   update_major_slice_work (0, may_access_gc_phase, false);
+
+  struct caml_final_info *final_info = d->final_info;
+  CAMLassert(final_info->todo_head == NULL);
+  CAMLassert(final_info->first.size == 0);
+  CAMLassert(final_info->last.size == 0);
+  caml_stat_free(final_info);
+  d->final_info = NULL;
+
+  struct caml_ephe_info* ephe_info = d->ephe_info;
+  CAMLassert (ephe_info->must_sweep_ephe == 0);
+  CAMLassert (ephe_info->live == 0);
+  CAMLassert (ephe_info->todo == 0);
+  caml_stat_free(ephe_info);
+  d->ephe_info = NULL;
+
   CAMLassert(!caml_addrmap_iter_ok(&d->mark_stack->compressed_stack,
                                    d->mark_stack->compressed_stack_iter));
   caml_addrmap_clear(&d->mark_stack->compressed_stack);
