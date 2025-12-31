@@ -543,7 +543,7 @@ Line 1, characters 4-5:
         ^
 Error: Label "x" used at Line 1, characters 4-5 cannot be used in this context;
        "x" is not defined inside a quotation (<[ ... ]>).
-Hint: Label "x" appears outside any quotations.
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 type rcd_u = #{xu: int; yu: string};;
@@ -559,7 +559,7 @@ Line 1, characters 15-17:
 Error: Label "xu" used at Line 1, characters 15-17
        cannot be used in this context;
        "xu" is not defined inside a quotation (<[ ... ]>).
-Hint: Label "xu" appears outside any quotations.
+Hint: Label "xu" is defined outside any quotations.
 |}];;
 
 <[ fun r -> r.x ]>;;
@@ -570,7 +570,7 @@ Line 1, characters 14-15:
 Error: Label "x" used at Line 1, characters 14-15
        cannot be used in this context;
        "x" is not defined inside a quotation (<[ ... ]>).
-Hint: Label "x" appears outside any quotations.
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ fun {x; y} -> x ]>;;
@@ -580,7 +580,7 @@ Line 1, characters 8-9:
             ^
 Error: Label "x" used at Line 1, characters 8-9 cannot be used in this context;
        "x" is not defined inside a quotation (<[ ... ]>).
-Hint: Label "x" appears outside any quotations.
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;
