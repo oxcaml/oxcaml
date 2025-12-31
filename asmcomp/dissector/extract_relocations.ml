@@ -89,7 +89,7 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
       if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
       then
         match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
-        | Some shndx when shndx = Rela.shn_undef ->
+        | Some shndx when Rela.Section_index.is_undef shndx ->
           let symbol_name =
             match
               Rela.read_symbol_name ~symtab_body ~strtab_body
@@ -115,10 +115,11 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
           log_verbose "  reloc %s at 0x%Lx: no symbol shndx"
             (Rela.Reloc_type.name entry.r_type)
             entry.r_offset
-        | Some shndx when shndx <> Rela.shn_undef ->
+        | Some shndx when Rela.Section_index.is_defined shndx ->
           log_verbose "  reloc %s at 0x%Lx: symbol defined (shndx=%d), skipping"
             (Rela.Reloc_type.name entry.r_type)
-            entry.r_offset shndx
+            entry.r_offset
+            (Rela.Section_index.to_int shndx)
         | Some _ -> (
           match
             Rela.read_symbol_name ~symtab_body ~strtab_body

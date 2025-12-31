@@ -56,9 +56,10 @@ let write_symbol ~cursor ~strtab sym =
    actual index in the SYMTAB_SHNDX section. *)
 let write_synthetic_symbol ~cursor ~strtab ~name ~section_index ~offset ~size
     ~is_func =
+  let section_index' = Rela.Section_index.of_int section_index in
   let st_shndx =
-    if section_index >= Rela.shn_loreserve
-    then Rela.shn_xindex
+    if Rela.Section_index.needs_extended section_index'
+    then Rela.Section_index.(to_int xindex)
     else section_index
   in
   Rela.write_sym_entry ~cursor
@@ -202,7 +203,9 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     (* Write extended section indices for IGOT symbols *)
     let igot_idx = FRP.igot_idx plan in
     let igot_shndx_entry =
-      if igot_idx >= Rela.shn_loreserve then igot_idx else 0
+      if Rela.Section_index.(needs_extended (of_int igot_idx))
+      then igot_idx
+      else 0
     in
     List.iter
       (fun _ -> write_u32_le cursor igot_shndx_entry)
@@ -210,7 +213,9 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     (* Write extended section indices for IPLT symbols *)
     let iplt_idx = FRP.iplt_idx plan in
     let iplt_shndx_entry =
-      if iplt_idx >= Rela.shn_loreserve then iplt_idx else 0
+      if Rela.Section_index.(needs_extended (of_int iplt_idx))
+      then iplt_idx
+      else 0
     in
     List.iter
       (fun _ -> write_u32_le cursor iplt_shndx_entry)

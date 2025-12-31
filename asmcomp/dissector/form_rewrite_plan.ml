@@ -466,7 +466,8 @@ let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
   (* We need SYMTAB_SHNDX if the input has one, OR if our new section indices
      are >= SHN_LORESERVE (65280). *)
   let needs_symtab_shndx =
-    Option.is_some symtab_shndx_idx || igot_idx >= Rela.shn_loreserve
+    Option.is_some symtab_shndx_idx
+    || Rela.Section_index.(needs_extended (of_int igot_idx))
   in
   (* If we need SYMTAB_SHNDX but the input doesn't have it, we need to create a
      new section. *)

@@ -30,24 +30,37 @@
     This module provides support for reading RELA (relocations with addends)
     sections from ELF files. *)
 
-(** {1 Section Types} *)
+(** {1 Section Indices} *)
 
-val sht_rela : int
-(** Section type for RELA sections (relocations with addends). *)
+(** Abstract type for ELF section header indices (st_shndx field).
 
-val sht_symtab : int
-(** Section type for symbol table sections. *)
+    Section indices identify which section a symbol is defined in. Special
+    values indicate undefined symbols or that extended indexing is needed. *)
+module Section_index : sig
+  type t
 
-val shn_undef : int
-(** Special section index indicating an undefined symbol. *)
+  val of_int : int -> t
+  (** Create from a raw section index value. *)
 
-val shn_loreserve : int
-(** Start of reserved section indices (0xff00). Section indices >= this value
-    require extended section indices via SHT_SYMTAB_SHNDX. *)
+  val to_int : t -> int
+  (** Convert to the raw section index value. *)
 
-val shn_xindex : int
-(** Special section index (0xffff) indicating that the actual section index
-    is stored in the corresponding SHT_SYMTAB_SHNDX entry. *)
+  val undef : t
+  (** SHN_UNDEF (0): Symbol is undefined. *)
+
+  val xindex : t
+  (** SHN_XINDEX (0xffff): Actual index is in SHT_SYMTAB_SHNDX section. *)
+
+  val is_undef : t -> bool
+  (** [is_undef t] returns true if [t] is SHN_UNDEF. *)
+
+  val is_defined : t -> bool
+  (** [is_defined t] returns true if [t] is not SHN_UNDEF. *)
+
+  val needs_extended : t -> bool
+  (** [needs_extended t] returns true if [t] >= SHN_LORESERVE (0xff00),
+      meaning it requires the SHT_SYMTAB_SHNDX extended section index table. *)
+end
 
 (** {1 x86-64 Relocation Types} *)
 
@@ -113,8 +126,9 @@ val read_symbol_name :
     (st_shndx) of the symbol at the given index.
 
     Returns [None] if the index is out of bounds.
-    A value of [shn_undef] (0) indicates an undefined symbol. *)
-val read_symbol_shndx : symtab_body:Owee_buf.t -> sym_index:int -> int option
+    Use [Section_index.is_undef] to check for undefined symbols. *)
+val read_symbol_shndx :
+  symtab_body:Owee_buf.t -> sym_index:int -> Section_index.t option
 
 (** {1 Entry Sizes} *)
 

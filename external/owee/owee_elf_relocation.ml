@@ -25,9 +25,24 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* ELF section types *)
-let sht_rela = 4
-let sht_symtab = 2
+(* Section index constants *)
+let shn_undef = 0
+let shn_loreserve = 0xff00
+let shn_xindex = 0xffff
+
+module Section_index = struct
+  type t = int
+
+  let of_int t = t
+  let to_int t = t
+
+  let undef = shn_undef
+  let xindex = shn_xindex
+
+  let is_undef t = t = shn_undef
+  let is_defined t = t <> shn_undef
+  let needs_extended t = t >= shn_loreserve
+end
 
 (* x86-64 relocation types *)
 module Reloc_type = struct
@@ -55,15 +70,6 @@ let rela_entry_size = 24
 
 (* Size of an Elf64_Sym entry in bytes *)
 let sym_entry_size = 24
-
-(* Special section index for undefined symbols *)
-let shn_undef = 0
-
-(* Start of reserved section indices *)
-let shn_loreserve = 0xff00
-
-(* Section index stored in SHT_SYMTAB_SHNDX *)
-let shn_xindex = 0xffff
 
 type rela_entry =
   { r_offset : int64;
@@ -131,7 +137,7 @@ let read_symbol_shndx ~symtab_body ~sym_index =
   else
     (* st_shndx is at offset 6 within the symbol entry *)
     let cursor = Owee_buf.cursor symtab_body ~at:(sym_offset + 6) in
-    Some (Owee_buf.Read.u16 cursor)
+    Some (Section_index.of_int (Owee_buf.Read.u16 cursor))
 
 (* Construct r_info from symbol index and relocation type *)
 let make_r_info ~sym ~typ =
