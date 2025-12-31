@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 (** Intermediate GOT (Global Offset Table) for the dissector.
 
     The intermediate GOT provides local GOT entries that are within range of

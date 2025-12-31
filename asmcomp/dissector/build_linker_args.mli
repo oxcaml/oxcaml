@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 (** Build linker arguments from dissector results.
 
     After the dissector runs, OCaml object files have been partitioned and

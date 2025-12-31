@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 (** Partition types for the dissector.
 
     A partition groups object files together for partial linking. The first

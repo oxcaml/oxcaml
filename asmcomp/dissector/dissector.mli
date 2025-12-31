@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 (** Dissector pass for analyzing ELF object files.
 
     The dissector analyzes all object files involved in a link to compute the

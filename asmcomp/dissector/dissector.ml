@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 module MOF = Measure_object_files
 
 type error =

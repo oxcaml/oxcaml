@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 module Elf = Compiler_owee.Owee_elf
 module Rela = Compiler_owee.Owee_elf_relocation
 module Strtab = Compiler_owee.Owee_elf_string_table

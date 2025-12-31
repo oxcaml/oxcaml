@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 (** Build intermediate GOT and PLT sections from extracted relocations.
 
     This module constructs synthetic IGOT and IPLT sections that allow

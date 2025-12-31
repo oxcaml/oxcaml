@@ -383,7 +383,7 @@ let mk_dissector f =
   ( "-dissector",
     Arg.Unit f,
     " Enable the dissector pass (prevents relocation overflow when linking \
-     very large executables with the small code model)" )
+     very large executables with the small code model).  (Experimental)" )
 
 let mk_dissector_partition_size f =
   ( "-dissector-partition-size",

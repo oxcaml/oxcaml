@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 (** Rewrite ELF sections for the dissector.
 
     This module rewrites a partially-linked object file to add IGOT and IPLT

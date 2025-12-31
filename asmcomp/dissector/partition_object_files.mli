@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 (** Partitioning object files into size-limited buckets.
 
     This module partitions a list of files with their sizes into buckets,

@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file needs to be code reviewed *)
+
 (** Form a rewrite plan for ELF section rewriting.
 
     This module analyzes the input ELF file and builds a plan describing
