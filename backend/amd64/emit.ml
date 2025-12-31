@@ -2025,7 +2025,8 @@ let emit_instr ~first ~fallthrough i =
       movss xmm15 address
     | Single { reg = Float32 } -> store REAL4 arg movss
     | Double -> store REAL8 arg movsd)
-  | Lop (Specific (Istore_int (n, addr, is_modify))) ->
+  | Lop (Specific (Istore_int { const = n; addr; is_assignment = is_modify }))
+    ->
     let address = addressing addr QWORD i 0 in
     let src = nat n in
     let memory_access : Address_sanitizer.memory_access =

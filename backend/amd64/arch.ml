@@ -254,7 +254,8 @@ type float_width = Cmm.float_width
 (* Specific operations, including [Simd], must not raise. *)
 type specific_operation =
     Ilea of addressing_mode            (* "lea" gives scaled adds *)
-  | Istore_int of nativeint * addressing_mode * bool
+  | Istore_int of
+      { const : nativeint; addr : addressing_mode; is_assignment : bool }
                                        (* Store an integer constant *)
   | Ioffset_loc of int * addressing_mode
                                        (* Add a constant to a location *)
@@ -393,7 +394,7 @@ let floatartith_name (width : float_width) op =
 let print_specific_operation printreg op ppf arg =
   match op with
   | Ilea addr -> print_addressing printreg addr ppf arg
-  | Istore_int(n, addr, is_assign) ->
+  | Istore_int { const = n; addr; is_assignment = is_assign } ->
       fprintf ppf "[%a] := %nd %s"
          (print_addressing printreg addr) arg n
          (if is_assign then "(assign)" else "(init)")
@@ -440,7 +441,8 @@ let print_specific_operation printreg op ppf arg =
 let specific_operation_name : specific_operation -> string = fun op ->
   match op with
   | Ilea _ -> "lea"
-  | Istore_int (n,_addr,_is_assign) -> "store_int "^ (Nativeint.to_string n)
+  | Istore_int { const = n; addr = _; is_assignment = _ } ->
+    "store_int "^ (Nativeint.to_string n)
   | Ioffset_loc (n,_addr) -> "offset_loc "^(string_of_int n)
   | Ifloatarithmem (width, op, _addr) -> floatartith_name width op
   | Ibswap { bitwidth } ->
@@ -473,7 +475,7 @@ let operation_is_pure = function
   | Ifloatarithmem _  -> true
   | Irdtsc | Irdpmc
   | Ilfence | Isfence | Imfence
-  | Istore_int (_, _, _) | Ioffset_loc (_, _)
+  | Istore_int { const = _; addr = _; is_assignment = _ } | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
   | Ipackf32 -> true
   | Isimd op -> Simd.is_pure_operation op
@@ -490,7 +492,7 @@ let operation_allocates = function
   | Irdtsc | Irdpmc  | Ipackf32
   | Isimd _ | Isimd_mem _
   | Ilfence | Isfence | Imfence
-  | Istore_int (_, _, _) | Ioffset_loc (_, _)
+  | Istore_int { const = _; addr = _; is_assignment = _ } | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
   | Illvm_intrinsic _intr ->
       (* Used by the zero_alloc checker that runs before the Llvmize. *)
@@ -550,7 +552,8 @@ let equal_float_operation left right =
 let equal_specific_operation left right =
   match left, right with
   | Ilea x, Ilea y -> equal_addressing_mode x y
-  | Istore_int (x, x', x''), Istore_int (y, y', y'') ->
+  | ( Istore_int { const = x; addr = x'; is_assignment = x'' },
+      Istore_int { const = y; addr = y'; is_assignment = y'' } ) ->
     Nativeint.equal x y && equal_addressing_mode x' y' && Bool.equal x'' y''
   | Ioffset_loc (x, x'), Ioffset_loc (y, y') ->
     Int.equal x y && equal_addressing_mode x' y'
@@ -662,7 +665,8 @@ let addressing_offset_in_bytes
 let isomorphic_specific_operation op1 op2 =
   match op1, op2 with
   | Ilea a1, Ilea a2 -> equal_addressing_mode_without_displ a1 a2
-  | Istore_int (_n1, a1, is_assign1), Istore_int (_n2, a2, is_assign2) ->
+  | ( Istore_int { const = _; addr = a1; is_assignment = is_assign1 },
+      Istore_int { const = _; addr = a2; is_assignment = is_assign2 } ) ->
     equal_addressing_mode_without_displ a1 a2 && Bool.equal is_assign1 is_assign2
   | Ioffset_loc (_n1, a1), Ioffset_loc (_n2, a2) ->
     equal_addressing_mode_without_displ a1 a2

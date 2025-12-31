@@ -33,7 +33,8 @@ let class_of_operation (op : Operation.t)
   | Specific spec ->
     begin match spec with
     | Ilea _ | Isextend32 | Izextend32 -> Class Op_pure
-    | Istore_int(_, _, is_asg) -> Class (Op_store is_asg)
+    | Istore_int { const = _; addr = _; is_assignment = is_asg } ->
+      Class (Op_store is_asg)
     | Ioffset_loc(_, _) -> Class (Op_store true)
     | Ifloatarithmem _ -> Class (Op_load Mutable)
     | Ibswap _ -> Use_default

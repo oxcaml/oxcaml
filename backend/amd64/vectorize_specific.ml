@@ -12,7 +12,7 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
     Some (Memory_access.create ?first_memory_arg_index desc)
   in
   match op with
-  | Istore_int (_n, addressing_mode, is_assignment) ->
+  | Istore_int { const = _n; addr = addressing_mode; is_assignment } ->
     let desc =
       Memory_access.Write
         { width_in_bits = W64;
