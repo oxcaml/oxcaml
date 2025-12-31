@@ -3422,9 +3422,6 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   in
   match data with
   | Mod_local (mda, alias_locks) -> begin
-      (* let stage_locks, _nonstage_locks = partition_locks alias_locks in *)
-      (* check_cross_quotation
-       *   errors loc Location.none env path (Lident s) stage_locks; *)
       use_module ~use ~loc path mda;
       let _, mode = normalize_mda_mode mda in
       let locks = alias_locks @ locks in
