@@ -1,0 +1,741 @@
+; Dissector tests
+; These tests verify the dissector pass works correctly.
+; Large modules are generated on demand during build (not checked into git).
+
+; Build the generator executable
+(rule
+ (target generate_large_modules.exe)
+ (deps generate_large_modules.ml)
+ (action
+  (run %{bin:ocamlopt.opt} %{deps} -o %{target})))
+
+; Generate modules on demand
+(rule
+ (target gen_module_a.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe gen_module_a)))
+
+(rule
+ (target gen_module_b.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe gen_module_b)))
+
+(rule
+ (target gen_module_c.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe gen_module_c)))
+
+(rule
+ (target gen_main.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe gen_main)))
+
+(rule
+ (target mylib_a.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe mylib_a)))
+
+(rule
+ (target mylib_b.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe mylib_b)))
+
+(rule
+ (target cmxa_main.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe cmxa_main)))
+
+; Test 1: Basic test with default partition size (just verify dissector works)
+; The dissector is only supported on Linux
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target simple.exe)
+ (deps simple.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.01
+       %{deps} -o %{target})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target simple.output)
+ (deps simple.exe)
+ (action (with-outputs-to %{target} (run ./simple.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps simple.expected simple.output)
+ (action (diff simple.expected simple.output)))
+
+; Test 1b: Same as Test 1 but with -function-sections
+; Uses a separate source file to avoid race conditions with simple.exe
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target simple_funcsect.exe)
+ (deps simple_funcsect.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -function-sections -dissector -dissector-partition-size 0.01
+       %{deps} -o %{target})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target simple_funcsect.output)
+ (deps simple_funcsect.exe)
+ (action (with-outputs-to %{target} (run ./simple_funcsect.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps simple.expected simple_funcsect.output)
+ (action (diff simple.expected simple_funcsect.output)))
+
+; Test 2: Multi-partition test with generated modules
+; Uses 2MB partition size - each generated module compiles to ~3.6MB object file,
+; forcing them into separate partitions.
+
+; Compile generated modules
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (targets gen_module_a.cmi gen_module_a.cmx gen_module_a.o)
+ (deps gen_module_a.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -c %{deps})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (targets gen_module_b.cmi gen_module_b.cmx gen_module_b.o)
+ (deps gen_module_b.ml gen_module_a.cmi gen_module_a.cmx)
+ (action
+  (run %{bin:ocamlopt.opt} -c gen_module_b.ml)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (targets gen_module_c.cmi gen_module_c.cmx gen_module_c.o)
+ (deps gen_module_c.ml gen_module_a.cmi gen_module_a.cmx
+       gen_module_b.cmi gen_module_b.cmx)
+ (action
+  (run %{bin:ocamlopt.opt} -c gen_module_c.ml)))
+
+; Compile gen_main.ml (needed by multiple tests, so compile once to avoid races)
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (targets gen_main.cmi gen_main.cmx gen_main.o)
+ (deps gen_main.ml gen_module_a.cmi gen_module_a.cmx
+       gen_module_b.cmi gen_module_b.cmx
+       gen_module_c.cmi gen_module_c.cmx)
+ (action
+  (run %{bin:ocamlopt.opt} -c gen_main.ml)))
+
+; Link with dissector - 3MB partition size forces each ~4MB module into
+; its own partition, testing cross-partition OCaml calls
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cross_partition.exe)
+ (deps gen_module_a.cmx gen_module_a.o
+       gen_module_b.cmx gen_module_b.o
+       gen_module_c.cmx gen_module_c.o
+       gen_main.cmx gen_main.o)
+ (action
+  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.002
+       gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx
+       -o %{target})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cross_partition.output)
+ (deps cross_partition.exe)
+ (action (with-outputs-to %{target} (run ./cross_partition.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps cross_partition.expected cross_partition.output)
+ (action (diff cross_partition.expected cross_partition.output)))
+
+; Verify cross_partition.exe has multiple partitions
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps cross_partition.exe)
+ (action (progn
+  (with-stdout-to cross_partition_sections.txt (run readelf -S cross_partition.exe))
+  (bash "grep -q 'caml.p1' cross_partition_sections.txt || (echo 'ERROR: no multiple partitions'; exit 1)"))))
+
+; Test 2b: Same as Test 2 but with -function-sections
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cross_partition_fs.exe)
+ (deps gen_module_a.cmx gen_module_a.o
+       gen_module_b.cmx gen_module_b.o
+       gen_module_c.cmx gen_module_c.o
+       gen_main.cmx gen_main.o)
+ (action
+  (run %{bin:ocamlopt.opt} -function-sections -dissector -dissector-partition-size 0.002
+       gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx
+       -o %{target})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cross_partition_fs.output)
+ (deps cross_partition_fs.exe)
+ (action (with-outputs-to %{target} (run ./cross_partition_fs.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps cross_partition.expected cross_partition_fs.output)
+ (action (diff cross_partition.expected cross_partition_fs.output)))
+
+; Verify OCaml module symbols are in IGOT (cross-partition references)
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
+       gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
+ (action
+  (bash "
+     set -e
+     set +o pipefail
+     # Build with -ddissector-partitions and capture partition dir
+     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.002 -ddissector-partitions \
+       gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx \
+       -o cross_partition_igot.exe 2>&1)
+     PARTITION_DIR=$(echo \"$OUTPUT\" | grep 'Dissector partition files' | sed 's/.*in \\(.*\\)):/\\1/')
+
+     if [ -z \"$PARTITION_DIR\" ]; then
+       echo 'ERROR: Could not find partition directory in output'
+       echo \"Output was: $OUTPUT\"
+       exit 1
+     fi
+
+     # Find which partition contains each module (by looking for defined code_begin symbol)
+     PART_WITH_B=\"\"
+     PART_WITH_C=\"\"
+     echo 'Scanning partition files for module locations...'
+     for part in $PARTITION_DIR/partition*.o.rewritten; do
+       echo \"Checking $part:\"
+       nm \"$part\" 2>/dev/null | grep 'code_begin' | head -5
+       if nm \"$part\" 2>/dev/null | grep -q ' T camlGen_module_b__code_begin'; then
+         PART_WITH_B=\"$part\"
+         echo \"  -> Found Gen_module_b\"
+       fi
+       if nm \"$part\" 2>/dev/null | grep -q ' T camlGen_module_c__code_begin'; then
+         PART_WITH_C=\"$part\"
+         echo \"  -> Found Gen_module_c\"
+       fi
+     done
+
+     # Verify we found both partitions
+     if [ -z \"$PART_WITH_B\" ]; then
+       echo 'ERROR: Could not find partition containing Gen_module_b'
+       echo 'All partition nm output:'
+       for part in $PARTITION_DIR/partition*.o.rewritten; do
+         echo \"=== $part ===\"
+         nm \"$part\" 2>/dev/null | grep -E 'code_begin|camlGen_module' | head -20
+       done
+       exit 1
+     fi
+     if [ -z \"$PART_WITH_C\" ]; then
+       echo 'ERROR: Could not find partition containing Gen_module_c'
+       echo 'All partition nm output:'
+       for part in $PARTITION_DIR/partition*.o.rewritten; do
+         echo \"=== $part ===\"
+         nm \"$part\" 2>/dev/null | grep -E 'code_begin|camlGen_module' | head -20
+       done
+       exit 1
+     fi
+
+     # Verify B and C are in different partitions (essential for cross-partition testing)
+     if [ \"$PART_WITH_B\" = \"$PART_WITH_C\" ]; then
+       echo 'ERROR: Gen_module_b and Gen_module_c are in the same partition!'
+       echo \"Both are in: $PART_WITH_B\"
+       echo 'This means modules are not large enough to force separate partitions.'
+       echo 'Partition sizes:'
+       ls -la $PARTITION_DIR/partition*.o.rewritten
+       exit 1
+     fi
+
+     echo \"PART_WITH_B: $PART_WITH_B\"
+     echo \"PART_WITH_C: $PART_WITH_C\"
+
+     # Verify partition with module_b has IGOT ref to module_a
+     # (get_a_static_data returns Gen_module_a.static_data, forcing an IGOT entry)
+     IGOT_B=$(readelf -r \"$PART_WITH_B\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep 'camlGen_module_a' || true)
+     if [ -z \"$IGOT_B\" ]; then
+       echo 'ERROR: Partition with module_b does not have IGOT ref to module_a'
+       echo 'IGOT relocations in partition with module_b:'
+       readelf -r \"$PART_WITH_B\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | head -30
+       echo 'All relocations in partition with module_b:'
+       readelf -r \"$PART_WITH_B\" 2>/dev/null | head -50
+       echo 'Sections in partition with module_b:'
+       readelf -SW \"$PART_WITH_B\" 2>/dev/null | grep -E 'igot|data'
+       exit 1
+     fi
+     echo 'Partition B IGOT has refs to module_a'
+
+     # Verify partition with module_c has IGOT refs to both module_a AND module_b
+     # (get_a_static_data and get_b_static_data force IGOT entries)
+     IGOT_C_A=$(readelf -r \"$PART_WITH_C\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep 'camlGen_module_a' || true)
+     IGOT_C_B=$(readelf -r \"$PART_WITH_C\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep 'camlGen_module_b' || true)
+     if [ -z \"$IGOT_C_A\" ]; then
+       echo 'ERROR: Partition with module_c does not have IGOT ref to module_a'
+       echo 'IGOT relocations in partition with module_c:'
+       readelf -r \"$PART_WITH_C\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | head -30
+       echo 'All relocations in partition with module_c:'
+       readelf -r \"$PART_WITH_C\" 2>/dev/null | head -50
+       echo 'Sections in partition with module_c:'
+       readelf -SW \"$PART_WITH_C\" 2>/dev/null | grep -E 'igot|data'
+       exit 1
+     fi
+     if [ -z \"$IGOT_C_B\" ]; then
+       echo 'ERROR: Partition with module_c does not have IGOT ref to module_b'
+       echo 'IGOT relocations in partition with module_c:'
+       readelf -r \"$PART_WITH_C\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | head -30
+       echo 'All relocations in partition with module_c:'
+       readelf -r \"$PART_WITH_C\" 2>/dev/null | head -50
+       echo 'Sections in partition with module_c:'
+       readelf -SW \"$PART_WITH_C\" 2>/dev/null | grep -E 'igot|data'
+       exit 1
+     fi
+     echo 'Partition C IGOT has refs to module_a and module_b'
+     echo 'IGOT verification passed'
+   ")))
+
+; Verify IGOT relocations are all R_X86_64_64
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
+       gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
+ (action
+  (bash "
+     set -e
+     set +o pipefail
+     # Build with -ddissector-partitions and capture partition dir from stderr
+     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.002 -ddissector-partitions \
+       gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx \
+       -o igot_verify.exe 2>&1)
+     PARTITION_DIR=$(echo \"$OUTPUT\" | grep 'Dissector partition files' | sed 's/.*in \\(.*\\)):/\\1/')
+
+     if [ -z \"$PARTITION_DIR\" ]; then
+       echo 'ERROR: Could not find partition directory in output'
+       echo \"Output was: $OUTPUT\"
+       exit 1
+     fi
+
+     # Check that IGOT sections exist and verify relocations
+     echo 'Checking IGOT relocations in partition files...'
+     for part in $PARTITION_DIR/partition*.o.rewritten; do
+       echo \"Checking $part\"
+       if readelf -SW \"$part\" 2>/dev/null | grep -q 'data\\.igot'; then
+         # Count total IGOT relocs and R_X86_64_64 relocs
+         TOTAL=$(readelf -r \"$part\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep -c '^[0-9a-f]' || true)
+         R64=$(readelf -r \"$part\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep -c 'R_X86_64_64' || true)
+         echo \"  IGOT relocs: Total=$TOTAL, R_X86_64_64=$R64\"
+
+         if [ \"$TOTAL\" != \"$R64\" ]; then
+           echo \"ERROR: Not all IGOT relocations are R_X86_64_64 in $(basename $part)\"
+           echo \"Total: $TOTAL, R_X86_64_64: $R64\"
+           echo 'IGOT relocations:'
+           readelf -r \"$part\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | head -50
+           exit 1
+         fi
+       else
+         echo \"  No IGOT section\"
+       fi
+     done
+     echo 'IGOT relocation type verification passed'
+   ")))
+
+; Verify IPLT entries exist for cross-partition function calls
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
+       gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
+ (action
+  (bash "
+     set -e
+     set +o pipefail
+     # Build with -ddissector-partitions and capture partition dir
+     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.002 -ddissector-partitions \
+       gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx \
+       -o iplt_verify.exe 2>&1)
+     PARTITION_DIR=$(echo \"$OUTPUT\" | grep 'Dissector partition files' | sed 's/.*in \\(.*\\)):/\\1/')
+
+     if [ -z \"$PARTITION_DIR\" ]; then
+       echo 'ERROR: Could not find partition directory in output'
+       echo \"Output was: $OUTPUT\"
+       exit 1
+     fi
+
+     # Find partitions containing modules B and C
+     PART_WITH_B=\"\"
+     PART_WITH_C=\"\"
+     echo 'Scanning partition files for module locations...'
+     for part in $PARTITION_DIR/partition*.o.rewritten; do
+       echo \"Checking $part:\"
+       nm \"$part\" 2>/dev/null | grep 'code_begin' | head -5
+       if nm \"$part\" 2>/dev/null | grep -q ' T camlGen_module_b__code_begin'; then
+         PART_WITH_B=\"$part\"
+         echo \"  -> Found Gen_module_b\"
+       fi
+       if nm \"$part\" 2>/dev/null | grep -q ' T camlGen_module_c__code_begin'; then
+         PART_WITH_C=\"$part\"
+         echo \"  -> Found Gen_module_c\"
+       fi
+     done
+
+     # Verify we found both partitions
+     if [ -z \"$PART_WITH_B\" ]; then
+       echo 'ERROR: Could not find partition containing Gen_module_b'
+       echo 'All partition nm output:'
+       for part in $PARTITION_DIR/partition*.o.rewritten; do
+         echo \"=== $part ===\"
+         nm \"$part\" 2>/dev/null | grep -E 'code_begin|camlGen_module' | head -20
+       done
+       exit 1
+     fi
+     if [ -z \"$PART_WITH_C\" ]; then
+       echo 'ERROR: Could not find partition containing Gen_module_c'
+       echo 'All partition nm output:'
+       for part in $PARTITION_DIR/partition*.o.rewritten; do
+         echo \"=== $part ===\"
+         nm \"$part\" 2>/dev/null | grep -E 'code_begin|camlGen_module' | head -20
+       done
+       exit 1
+     fi
+
+     # Verify B and C are in different partitions (essential for cross-partition testing)
+     if [ \"$PART_WITH_B\" = \"$PART_WITH_C\" ]; then
+       echo 'ERROR: Gen_module_b and Gen_module_c are in the same partition!'
+       echo \"Both are in: $PART_WITH_B\"
+       echo 'This means modules are not large enough to force separate partitions.'
+       echo 'Partition sizes:'
+       ls -la $PARTITION_DIR/partition*.o.rewritten
+       exit 1
+     fi
+
+     echo \"PART_WITH_B: $PART_WITH_B\"
+     echo \"PART_WITH_C: $PART_WITH_C\"
+
+     # Verify partition with module_b has IPLT section (renamed to .caml.pN.text.iplt)
+     if ! readelf -SW \"$PART_WITH_B\" 2>/dev/null | grep -q 'text\\.iplt'; then
+       echo 'ERROR: Partition with module_b does not have IPLT section'
+       echo 'Sections in partition with module_b:'
+       readelf -SW \"$PART_WITH_B\" 2>/dev/null
+       exit 1
+     fi
+
+     # Verify partition with module_c has IPLT section (renamed to .caml.pN.text.iplt)
+     if ! readelf -SW \"$PART_WITH_C\" 2>/dev/null | grep -q 'text\\.iplt'; then
+       echo 'ERROR: Partition with module_c does not have IPLT section'
+       echo 'Sections in partition with module_c:'
+       readelf -SW \"$PART_WITH_C\" 2>/dev/null
+       exit 1
+     fi
+     echo 'IPLT verification passed'
+   ")))
+
+; Test 3: CMXA archive test
+; Tests linking with a .cmxa archive through the dissector
+
+; Compile library modules
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (targets mylib_a.cmi mylib_a.cmx mylib_a.o)
+ (deps mylib_a.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -c %{deps})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (targets mylib_b.cmi mylib_b.cmx mylib_b.o)
+ (deps mylib_b.ml mylib_a.cmi mylib_a.cmx)
+ (action
+  (run %{bin:ocamlopt.opt} -c mylib_b.ml)))
+
+; Create the .cmxa archive
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (targets mylib.cmxa mylib.a)
+ (deps mylib_a.cmx mylib_a.o mylib_b.cmx mylib_b.o)
+ (action
+  (run %{bin:ocamlopt.opt} -a mylib_a.cmx mylib_b.cmx -o mylib.cmxa)))
+
+; Link with dissector using the .cmxa archive
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cmxa_test.exe)
+ (deps mylib.cmxa mylib.a mylib_a.cmi mylib_b.cmi cmxa_main.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.004
+       mylib.cmxa cmxa_main.ml -o %{target})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cmxa_test.output)
+ (deps cmxa_test.exe)
+ (action (with-outputs-to %{target} (run ./cmxa_test.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps cmxa_test.expected cmxa_test.output)
+ (action (diff cmxa_test.expected cmxa_test.output)))
+
+; Verify cmxa_test.exe has multiple partitions
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps cmxa_test.exe)
+ (action (progn
+  (with-stdout-to cmxa_sections.txt (run readelf -S cmxa_test.exe))
+  (bash "grep -q 'caml.p1' cmxa_sections.txt || (echo 'ERROR: no multiple partitions'; exit 1)"))))
+
+; Test 4: Linker flags (-cclib) should not be treated as files
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cclib_test.exe)
+ (deps cclib_test.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.01
+       -cclib -lm -cclib -lm
+       %{deps} -o %{target})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cclib_test.output)
+ (deps cclib_test.exe)
+ (action
+  (with-outputs-to %{target}
+   (run ./cclib_test.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps cclib_test.output)
+ (action (bash "grep -q 'cclib test passed' cclib_test.output")))
+
+; Test 5: C stub passthrough - verify C stubs are NOT included in partition files
+
+; Compile C stub into object file
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cstub.o)
+ (deps cstub.c)
+ (action
+  (run gcc -c -I %{ocaml_where} -o %{target} %{deps})))
+
+; Create static library from C stub
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target libcstub.a)
+ (deps cstub.o)
+ (action
+  (run ar rcs %{target} %{deps})))
+
+; Build executable with C stub library via -cclib
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cstub_passthrough.exe)
+ (deps cstub_passthrough.ml libcstub.a)
+ (action
+  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.01
+       -cclib ./libcstub.a
+       cstub_passthrough.ml -o %{target})))
+
+; Verify the executable runs correctly
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (target cstub_passthrough.output)
+ (deps cstub_passthrough.exe)
+ (action
+  (with-outputs-to %{target}
+   (run ./cstub_passthrough.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps cstub_passthrough.output)
+ (action (bash "grep -q 'C stub passthrough test passed' cstub_passthrough.output")))
+
+; Verify C stub symbols are NOT in partition files (they should be passthrough)
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")
+       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+ (deps cstub_passthrough.ml libcstub.a)
+ (action
+  (bash "
+     set -e
+     set +o pipefail
+     # Build with -ddissector-partitions and capture partition dir
+     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.01 -ddissector-partitions \
+       -cclib ./libcstub.a \
+       cstub_passthrough.ml -o cstub_passthrough_verify.exe 2>&1)
+     PARTITION_DIR=$(echo \"$OUTPUT\" | grep 'Dissector partition files' | sed 's/.*in \\(.*\\)):/\\1/')
+
+     if [ -z \"$PARTITION_DIR\" ]; then
+       echo 'ERROR: Could not find partition directory in output'
+       echo \"Output was: $OUTPUT\"
+       exit 1
+     fi
+
+     # Check each partition file for the C stub symbol DEFINITION
+     for part in $PARTITION_DIR/partition*.o.rewritten; do
+       if nm \"$part\" 2>/dev/null | grep ' T caml_cstub_test_get_magic_number'; then
+         echo \"ERROR: Found C stub code in $(basename $part) - C stubs should NOT be in partition files!\"
+         exit 1
+       fi
+     done
+
+     # Verify the symbol IS in the final executable (to confirm it was linked)
+     if ! nm cstub_passthrough_verify.exe 2>/dev/null | grep -q 'caml_cstub_test_get_magic_number'; then
+       echo 'ERROR: C stub symbol not found in final executable'
+       exit 1
+     fi
+   ")))

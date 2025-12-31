@@ -439,6 +439,11 @@ val remove_dir: string -> unit
        (** Delete the given directory if it exists, is a directory, and is
            empty. Never raises an error. *)
 
+val remove_dir_contents: string -> unit
+       (** Delete all files in the given directory, then delete the directory
+           itself. Only handles flat directories (no subdirectories).
+           Never raises an error. *)
+
 val expand_directory: string -> string -> string
        (** [expand_directory alt file] eventually expands a [+] at the
            beginning of file into [alt] (an alternate root directory) *)
