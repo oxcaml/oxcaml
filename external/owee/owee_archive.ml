@@ -42,19 +42,38 @@ let header_terminator = "`\n"
 
 type t = Owee_buf.t
 
-(* Archive member header fields. The ar format stores these as fixed-width ASCII
-   strings: name (16), date (12), uid (6), gid (6), mode (8), size (10). The
-   numeric fields are decimal except mode which is octal. The maximum values
-   that fit in these fields (e.g., 999999 for uid/gid) fit in OCaml's int type
-   on both 32-bit and 64-bit platforms. *)
+(* Archive member header field sizes (in bytes). The ar format stores these as
+   fixed-width ASCII strings in this order. *)
+let ar_name_size = 16
+
+let ar_date_size = 12
+
+let ar_uid_size = 6
+
+let ar_gid_size = 6
+
+let ar_mode_size = 8
+
+let ar_size_size = 10
+
+let ar_fmag_size = 2
+
+(* Parsed archive member. Field order matches header field order: name, date
+   (mtime), uid, gid, mode, size. The fmag field is not stored (it's just the
+   header terminator "`\n"). data_offset is computed from the header position.
+
+   The numeric fields are decimal except mode which is octal. The maximum values
+   that fit in these fields (e.g., 999999 for 6-digit uid/gid) fit in OCaml's
+   31-bit int on 32-bit platforms (max 1,073,741,823), so this code works on
+   both 32-bit and 64-bit architectures. *)
 type member =
   { name : string;
-    size : int;
-    data_offset : int;
     mtime : int;
     uid : int;
     gid : int;
-    mode : int
+    mode : int;
+    size : int;
+    data_offset : int
   }
 
 type member_header = member
@@ -156,13 +175,13 @@ let read_member_header buf cursor ~string_table =
     else (
       ensure cursor header_size "Truncated member header";
       let header_start = cursor.position in
-      let ar_name = Read.fixed_string cursor 16 in
-      let ar_date = Read.fixed_string cursor 12 in
-      let ar_uid = Read.fixed_string cursor 6 in
-      let ar_gid = Read.fixed_string cursor 6 in
-      let ar_mode = Read.fixed_string cursor 8 in
-      let ar_size = Read.fixed_string cursor 10 in
-      let ar_fmag = Read.fixed_string cursor 2 in
+      let ar_name = Read.fixed_string cursor ar_name_size in
+      let ar_date = Read.fixed_string cursor ar_date_size in
+      let ar_uid = Read.fixed_string cursor ar_uid_size in
+      let ar_gid = Read.fixed_string cursor ar_gid_size in
+      let ar_mode = Read.fixed_string cursor ar_mode_size in
+      let ar_size = Read.fixed_string cursor ar_size_size in
+      let ar_fmag = Read.fixed_string cursor ar_fmag_size in
       if not (String.equal ar_fmag header_terminator)
       then invalid_formatf "Invalid header terminator at offset %d" header_start;
       let total_size = parse_decimal_field ar_size in
@@ -209,12 +228,12 @@ let read_member_header buf cursor ~string_table =
       advance cursor total_size;
       Some
         { name;
-          size;
-          data_offset;
           mtime = parse_decimal_field ar_date;
           uid = parse_decimal_field ar_uid;
           gid = parse_decimal_field ar_gid;
-          mode = parse_octal_field ar_mode
+          mode = parse_octal_field ar_mode;
+          size;
+          data_offset
         }))
 
 (* Check if a member is a special entry that should be skipped *)
@@ -238,13 +257,23 @@ let read buf =
       then ()
       else (
         ensure first_pass_cursor header_size "Truncated header in first pass";
-        let ar_name = Read.fixed_string first_pass_cursor 16 in
-        let (_ar_date : string) = Read.fixed_string first_pass_cursor 12 in
-        let (_ar_uid : string) = Read.fixed_string first_pass_cursor 6 in
-        let (_ar_gid : string) = Read.fixed_string first_pass_cursor 6 in
-        let (_ar_mode : string) = Read.fixed_string first_pass_cursor 8 in
-        let ar_size = Read.fixed_string first_pass_cursor 10 in
-        let (_ar_fmag : string) = Read.fixed_string first_pass_cursor 2 in
+        let ar_name = Read.fixed_string first_pass_cursor ar_name_size in
+        let (_ar_date : string) =
+          Read.fixed_string first_pass_cursor ar_date_size
+        in
+        let (_ar_uid : string) =
+          Read.fixed_string first_pass_cursor ar_uid_size
+        in
+        let (_ar_gid : string) =
+          Read.fixed_string first_pass_cursor ar_gid_size
+        in
+        let (_ar_mode : string) =
+          Read.fixed_string first_pass_cursor ar_mode_size
+        in
+        let ar_size = Read.fixed_string first_pass_cursor ar_size_size in
+        let (_ar_fmag : string) =
+          Read.fixed_string first_pass_cursor ar_fmag_size
+        in
         let size = parse_decimal_field ar_size in
         let data_offset = first_pass_cursor.position in
         if is_sysv_strtab ar_name

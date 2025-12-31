@@ -42,21 +42,22 @@
     loaded until accessed. *)
 type t
 
-(** Metadata about a single member (object file) within the archive. *)
+(** Metadata about a single member (object file) within the archive.
+    Field order matches the ar header format. *)
 type member = private
   { name : string;
         (** The filename of the member. Long filenames are resolved automatically
       (from the string table for System V/GNU, or inline for BSD). *)
-    size : int;
-        (** Size of the member content in bytes (not including the header). *)
-    data_offset : int;
-        (** Absolute offset within the archive buffer where member data begins.
-      This can be used with [Bigarray.Array1.sub] to access the data
-      without copying. *)
     mtime : int;  (** Modification time as seconds since the Unix epoch. *)
     uid : int;  (** User ID of the file owner. *)
     gid : int;  (** Group ID of the file owner. *)
-    mode : int  (** File permission bits (octal). *)
+    mode : int;  (** File permission bits (octal). *)
+    size : int;
+        (** Size of the member content in bytes (not including the header). *)
+    data_offset : int
+        (** Absolute offset within the archive buffer where member data begins.
+      This can be used with [Bigarray.Array1.sub] to access the data
+      without copying. *)
   }
 
 (** Alias for [member] for clarity when referring to header metadata. *)
