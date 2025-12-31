@@ -71,9 +71,7 @@ end
     file in [files].
 
     Handles the following file types based on extension:
-
     - .o: ELF object file, analyzed directly
-
     - .a: archive file, all .o members analyzed and summed
 
     Files are tracked to avoid double-counting when the same file appears

@@ -34,13 +34,9 @@
     ld -r.
 
     The original linker invocation combines:
-
     - startup_obj (the startup code)
-
     - ml_objfiles (OCaml .o/.a files derived from .cmx/.cmxa)
-
     - ccobjs (C object files from -cclib, including lib_ccobjs from .cmxa)
-
     - runtime_libs (runtime library files)
 
     After dissector processing:

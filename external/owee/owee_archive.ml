@@ -70,7 +70,7 @@ let parse_int_field ~convert ~field_type s =
   else
     match int_of_string_opt (convert s) with
     | Some n -> n
-    | None -> invalid_format ("Invalid " ^ field_type ^ " field: " ^ s)
+    | None -> invalid_formatf "Invalid %s field: %s" field_type s
 
 let parse_decimal_field s =
   parse_int_field ~convert:Fun.id ~field_type:"decimal" s
@@ -119,8 +119,7 @@ let parse_sysv_extended_name ar_name =
   let trimmed = String.trim ar_name in
   if String.length trimmed >= 2
      && Char.equal trimmed.[0] '/'
-     && trimmed.[1] >= '0'
-     && trimmed.[1] <= '9'
+     && match trimmed.[1] with '0' .. '9' -> true | _ -> false
   then
     let offset_str = String.sub trimmed 1 (String.length trimmed - 1) in
     int_of_string_opt (String.trim offset_str)
@@ -165,9 +164,7 @@ let read_member_header buf cursor ~string_table =
       let ar_size = Read.fixed_string cursor 10 in
       let ar_fmag = Read.fixed_string cursor 2 in
       if not (String.equal ar_fmag header_terminator)
-      then
-        invalid_format
-          (Printf.sprintf "Invalid header terminator at offset %d" header_start);
+      then invalid_formatf "Invalid header terminator at offset %d" header_start;
       let total_size = parse_decimal_field ar_size in
       let after_header = cursor.position in
       (* Determine the member name and actual data location/size *)
@@ -191,10 +188,9 @@ let read_member_header buf cursor ~string_table =
             let name =
               match string_table with
               | None ->
-                invalid_format
-                  (Printf.sprintf
-                     "Extended filename at offset %d but no string table found"
-                     header_start)
+                invalid_formatf
+                  "Extended filename at offset %d but no string table found"
+                  header_start
               | Some strtab -> read_sysv_string_table_entry strtab offset
             in
             name, after_header, total_size
@@ -243,17 +239,12 @@ let read buf =
       else (
         ensure first_pass_cursor header_size "Truncated header in first pass";
         let ar_name = Read.fixed_string first_pass_cursor 16 in
-        let _ = Read.fixed_string first_pass_cursor 12 in
-        (* date *)
-        let _ = Read.fixed_string first_pass_cursor 6 in
-        (* uid *)
-        let _ = Read.fixed_string first_pass_cursor 6 in
-        (* gid *)
-        let _ = Read.fixed_string first_pass_cursor 8 in
-        (* mode *)
+        let (_ar_date : string) = Read.fixed_string first_pass_cursor 12 in
+        let (_ar_uid : string) = Read.fixed_string first_pass_cursor 6 in
+        let (_ar_gid : string) = Read.fixed_string first_pass_cursor 6 in
+        let (_ar_mode : string) = Read.fixed_string first_pass_cursor 8 in
         let ar_size = Read.fixed_string first_pass_cursor 10 in
-        let _ = Read.fixed_string first_pass_cursor 2 in
-        (* fmag *)
+        let (_ar_fmag : string) = Read.fixed_string first_pass_cursor 2 in
         let size = parse_decimal_field ar_size in
         let data_offset = first_pass_cursor.position in
         if is_sysv_strtab ar_name

@@ -113,6 +113,10 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   | Windows _ | MacOS_like | FreeBSD | NetBSD | OpenBSD | Generic_BSD | Solaris
   | Dragonfly | GNU | BeOS | Unknown ->
     Misc.fatal_error "The dissector pass is only supported on Linux targets");
+  (* Check that we're running on a 64-bit architecture. The dissector parses
+     ELF64 files and uses int64 arithmetic extensively. *)
+  if Sys.word_size <> 64
+  then Misc.fatal_error "The dissector requires a 64-bit host architecture";
   (* Collect files to analyze for partitioning. C stubs and runtime libraries
      are passthrough (passed directly to final linker, not partially linked). *)
   let files_to_measure =
