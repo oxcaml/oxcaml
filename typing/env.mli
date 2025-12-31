@@ -29,7 +29,6 @@ type module_unbound_reason =
       { container : string option; unbound: string }
 
 type locks
-val locks_empty : locks
 
 type summary =
     Env_empty
@@ -202,6 +201,8 @@ type mode_with_locks = Mode.Value.l * locks
 (** Sometimes we get the locks for something, but either want to walk them later, or
 walk them for something else. The [Longident.t] and [Location.t] are only for error
 messages, and point to the variable for which we actually want to walk the locks. *)
+
+val locks_empty : locks
 
 val locks_is_empty : locks -> bool
 
