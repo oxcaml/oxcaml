@@ -1399,7 +1399,6 @@ struct
     mk_config_var F._config_var;
     mk_custom F._custom;
     mk_disable_all_extensions F._disable_all_extensions;
-    (* Enable ikinds via dedicated flag *)
     mk_ikinds F._ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_dllib F._dllib;
