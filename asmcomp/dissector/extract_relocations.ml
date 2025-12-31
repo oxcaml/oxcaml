@@ -76,10 +76,11 @@ let finalize acc =
    undefined symbols (st_shndx = SHN_UNDEF). Only undefined symbols need PLT/GOT
    entries since defined symbols can be resolved directly.
 
-   - PLT32: function calls, rewritten to use IPLT - REX_GOTPCRELX: GOT-relative
-   references, rewritten to use IGOT
+   - PLT32: function calls, rewritten to use IPLT
 
-   PC32 relocations to undefined symbols are an error - they occur when code is
+   - REX_GOTPCRELX: GOT-relative references, rewritten to use IGOT.
+
+   PC32 relocations to undefined symbols are an error. They occur when code is
    compiled with -nodynlink, which is incompatible with the dissector. *)
 let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
   let convert_to_plt = ref [] in
