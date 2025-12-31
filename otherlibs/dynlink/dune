@@ -647,6 +647,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice_conv.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_hybrid_opt.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikinds.cmo
@@ -752,6 +753,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice_conv.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_hybrid_opt.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikinds.cmx
