@@ -3084,12 +3084,11 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
 
 and type_module_path_aux ~alias ~hold_locks sttn env path
   (mode, locks) (lid : _ loc) smod =
-  let _stage_locks, nonstage_locks = Env.partition_locks locks in
   let mod_mode =
     if hold_locks then mode, Some (locks, lid.txt, lid.loc)
     else
       let vmode =
-        Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Module None (mode, nonstage_locks)
+        Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Module None (mode, locks)
       in
       vmode, None
   in

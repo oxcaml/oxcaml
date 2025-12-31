@@ -147,7 +147,7 @@ type stage_lock =
   | Quotation_lock
   | Splice_lock
 
-type nonstage_lock =
+type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
       Mode.Value.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
@@ -155,8 +155,8 @@ type nonstage_lock =
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
-type lock =
-  | Nonstage_lock of nonstage_lock
+type lock_or_stage =
+  | Nonstage_lock of lock
   | Stage_lock of stage_lock
 
 let partition_locks locks =
@@ -165,8 +165,6 @@ let partition_locks locks =
     locks
 
 type locks = lock list
-type stage_locks = stage_lock list
-type nonstage_locks = nonstage_lock list
 
 type summary =
     Env_empty
@@ -354,10 +352,8 @@ module TycompTbl =
 type empty = |
 
 type mode_with_locks = Mode.Value.l * locks
-type mode_with_nonstage_locks = Mode.Value.l * nonstage_locks
 
 let locks_empty = []
-let nonstage_locks_empty = []
 
 let locks_is_empty l = l = locks_empty
 
@@ -640,14 +636,14 @@ let in_signature_flag = 0x01
 type stage = int
 
 type t = {
-  values: (lock, value_entry, value_data) IdTbl.t;
-  constrs: (lock, constructor_data) TycompTbl.t;
+  values: (lock_or_stage, value_entry, value_data) IdTbl.t;
+  constrs: (lock_or_stage, constructor_data) TycompTbl.t;
   labels: (stage_lock, label_data) TycompTbl.t;
   unboxed_labels: (stage_lock, unboxed_label_description) TycompTbl.t;
   types: (stage_lock, type_data, type_data) IdTbl.t;
-  modules: (lock, module_entry, module_data) IdTbl.t;
+  modules: (lock_or_stage, module_entry, module_data) IdTbl.t;
   modtypes: (stage_lock, modtype_data, modtype_data) IdTbl.t;
-  classes: (lock, class_data, class_data) IdTbl.t;
+  classes: (lock_or_stage, class_data, class_data) IdTbl.t;
   cltypes: (empty, cltype_data, cltype_data) IdTbl.t;
   functor_args: unit Ident.tbl;
   summary: summary;
@@ -3275,6 +3271,16 @@ let check_cross_quotation report_errors loc_use loc_def env path lid
     may_lookup_error report_errors loc_use env
       (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
 
+let assert_does_not_cross_quotation loc_use loc_def path locks =
+  match does_not_cross_quotation path locks with
+  | Ok () -> ()
+  | Error _ ->
+      Misc.fatal_errorf
+        "Parameterised module %a defined at %a crosses quotation at %a."
+        Path.print path
+        Location.print_loc loc_def
+        Location.print_loc loc_use
+
 let report_module_unbound ~errors ~loc env reason =
   match reason with
   | Mod_unbound_illegal_recursion { container; unbound } ->
@@ -3406,10 +3412,10 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use s env.modules with
     | path, locks, data -> begin
-        let stage_locks, _nonstage_locks = partition_locks locks in
+        let stage_locks, nonstage_locks = partition_locks locks in
         check_cross_quotation
           errors loc Location.none env path (Lident s) stage_locks;
-        path, locks, data
+        path, nonstage_locks, data
     end
     | exception Not_found ->
         may_lookup_error errors loc env (Unbound_module (Lident s))
@@ -3572,7 +3578,7 @@ let lookup_ident_value ~errors ~use ~loc name env =
       check_cross_quotation errors loc vda.vda_description.val_loc env path
         (Lident name) stage_locks;
       use_value ~use ~loc path vda;
-      path, locks, vda
+      path, nonstage_locks, vda
   | Ok (_, _, Val_unbound reason) ->
       report_value_unbound ~errors ~loc env reason (Lident name)
   | Error _ ->
@@ -3838,28 +3844,24 @@ let lookup_dot_value ~errors ~use ~loc l s env =
       may_lookup_error errors loc env (Unbound_value (Ldot(l, s), No_hint))
 
 let lookup_dot_type ~errors ~use ~loc l s env =
-  let (p, (_, locks), comps) =
+  let (p, _, comps) =
     lookup_structure_components ~errors ~use ~loc l env
   in
   match NameMap.find s comps.comp_types with
   | tda ->
-      let stage_locks, _nonstage_locks = partition_locks locks in
       let path = Pdot(p, s) in
-      check_cross_quotation errors loc tda.tda_declaration.type_loc env path l stage_locks;
       use_type ~use ~loc path tda;
       (path, tda)
   | exception Not_found ->
       may_lookup_error errors loc env (Unbound_type (Ldot(l, s)))
 
 let lookup_dot_modtype ~errors ~use ~loc l s env =
-  let (p, (_, locks), comps) =
+  let (p, _, comps) =
     lookup_structure_components ~errors ~use ~loc l env
   in
   match NameMap.find s comps.comp_modtypes with
   | mta ->
-      let stage_locks, _nonstage_locks = partition_locks locks in
       let path = Pdot(p, s) in
-      check_cross_quotation errors loc mta.mtda_declaration.mtd_loc env path l stage_locks;
       use_modtype ~use ~loc path mta.mtda_declaration;
       (path, mta.mtda_declaration)
   | exception Not_found ->
@@ -3871,11 +3873,9 @@ let lookup_dot_class ~errors ~use ~loc l s env =
   in
   match NameMap.find s comps.comp_classes with
   | clda ->
-      let stage_locks, nonstage_locks = partition_locks locks in
       let path = Pdot(p, s) in
-      check_cross_quotation errors loc clda.clda_declaration.cty_loc env path l stage_locks;
       use_class ~use ~loc path clda;
-      (path, nonstage_locks, clda.clda_declaration)
+      (path, locks, clda.clda_declaration)
   | exception Not_found ->
       may_lookup_error errors loc env (Unbound_class (Ldot(l, s)))
 
@@ -3916,28 +3916,27 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
       | [] | exception Not_found ->
           may_lookup_error errors loc env (Unbound_constructor (Ldot(l, s)))
       | cstrs ->
-          let _stage_locks, nonstage_locks = partition_locks locks in
           List.map
             (fun cda ->
                let use_fun () = use_constructor ~use ~loc usage env cda in
-               ((cda.cda_description, nonstage_locks), use_fun))
+               ((cda.cda_description, locks), use_fun))
             cstrs
 
 (* Open a signature path *)
 
-let add_components slot root env0 comps locks =
-  let stage_locks, _nonstage_locks = partition_locks locks in
+let add_components slot root env0 comps (locks : locks) =
+  let locks' = List.map (fun lock -> Nonstage_lock lock) locks in
   let add_l w comps env0 =
-    TycompTbl.add_open slot w root comps stage_locks env0
+    TycompTbl.add_open slot w root comps ([] : stage_lock list) env0
   in
   let add_c w comps env0 =
-    TycompTbl.add_open slot w root comps locks env0
+    TycompTbl.add_open slot w root comps locks' env0
   in
   let add_v w comps env0 =
-    IdTbl.add_open slot w root comps locks env0
+    IdTbl.add_open slot w root comps locks' env0
   in
   let add_s w comps env0 =
-    IdTbl.add_open slot w root comps stage_locks env0
+    IdTbl.add_open slot w root comps ([] : stage_lock list) env0
   in
   let add w comps env0 =
     IdTbl.add_open slot w root comps ([] : empty list) env0
@@ -4116,19 +4115,21 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
      [lookup_module_path] on a module not found in the environment *)
   let locks = IdTbl.get_all_locks env.modules in
-  let path =
+  let path, loc_def =
     if !Clflags.transparent_modules && not load then
       let path, () =
         lookup_global_name_module_no_locks Don't_load ~errors ~use ~loc name env
       in
-      path
+      path, Location.none
     else
-      let path, (_ : module_data) =
+      let path, (mda : module_data) =
         lookup_global_name_module_no_locks Load ~errors ~use ~loc name env
       in
-      path
+      path, mda.mda_declaration.md_loc
   in
-  path, locks
+  let stage_locks, nonstage_locks = partition_locks locks in
+  assert_does_not_cross_quotation loc loc_def path stage_locks;
+  path, nonstage_locks
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
   check_value_name (Longident.last lid) loc;

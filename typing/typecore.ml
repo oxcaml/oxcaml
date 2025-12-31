@@ -2622,7 +2622,7 @@ let check_recordpat_labels loc lbl_pat_list closed record_form =
 (* Constructors *)
 
 module Constructor = NameChoice (struct
-  type t = constructor_description * Env.nonstage_locks
+  type t = constructor_description * Env.locks
   type usage = Env.constructor_usage
   let kind = Datatype_kind.Variant
   let get_name (cstr, _) = cstr.cstr_name
@@ -2641,7 +2641,7 @@ module Constructor = NameChoice (struct
               compare_type_path env
                 path (get_constr_type_path @@ get_type lbl) in
             let add_valid x acc =
-              let x = (x, Env.nonstage_locks_empty) in
+              let x = (x, Env.locks_empty) in
               if filter x then (x, ignore)::acc else acc in
             Env.fold_constructors add_valid None env []
         | _ -> []
@@ -7953,10 +7953,9 @@ and type_ident env ?(recarg=Rejected) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
-  let _stage_locks, nonstage_locks = Env.partition_locks locks in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
-      (mode, nonstage_locks)
+      (mode, locks)
   in
   (* We need to cross again, because the monadic fragment might have been
   weakened by the locks. Ideally, the first crossing only deals with comonadic,

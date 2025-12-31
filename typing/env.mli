@@ -29,10 +29,7 @@ type module_unbound_reason =
       { container : string option; unbound: string }
 
 type locks
-type stage_locks
-type nonstage_locks
-
-val partition_locks : locks -> stage_locks * nonstage_locks
+val locks_empty : locks
 
 type summary =
     Env_empty
@@ -201,13 +198,10 @@ type unbound_value_hint =
   | No_hint
   | Missing_rec of Location.t
 
-type mode_with_nonstage_locks = Mode.Value.l * nonstage_locks
 type mode_with_locks = Mode.Value.l * locks
 (** Sometimes we get the locks for something, but either want to walk them later, or
 walk them for something else. The [Longident.t] and [Location.t] are only for error
 messages, and point to the variable for which we actually want to walk the locks. *)
-
-val nonstage_locks_empty : nonstage_locks
 
 val locks_is_empty : locks -> bool
 
@@ -285,7 +279,7 @@ val lookup_error: Location.t -> t -> lookup_error -> 'a
     modules and classes as well, for which [ty] should be [None]. *)
 val walk_locks : env:t -> loc:Location.t -> Longident.t ->
   item:Mode.Hint.lock_item ->
-  type_expr option -> mode_with_nonstage_locks -> Mode.Value.l
+  type_expr option -> mode_with_locks -> Mode.Value.l
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
@@ -319,14 +313,14 @@ val lookup_module_instance_path:
 
 val lookup_constructor:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  constructor_description * nonstage_locks
+  constructor_description * locks
 val lookup_all_constructors:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  (((constructor_description * nonstage_locks) * (unit -> unit)) list,
+  (((constructor_description * locks) * (unit -> unit)) list,
    Location.t * t * lookup_error) result
 val lookup_all_constructors_from_type:
   ?use:bool -> loc:Location.t -> constructor_usage -> Path.t -> t ->
-  ((constructor_description * nonstage_locks) * (unit -> unit)) list
+  ((constructor_description * locks) * (unit -> unit)) list
 
 val lookup_label:
   ?use:bool -> record_form:'rcd record_form -> loc:Location.t -> label_usage -> Longident.t -> t ->
