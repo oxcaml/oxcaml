@@ -4,8 +4,6 @@
 
 (** Rigid names are the variables that may occur in ikind formulas. *)
 module Rigid_name : sig
-
-  (* CR jujacobs: see if we can make this type abstract. *)
   type unknown_id
 
   type t =

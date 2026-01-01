@@ -1514,8 +1514,10 @@ let narrow_to_manifest_jkind env loc path decl =
        up for a little while. Internal ticket 5115. *)
     begin match Jkind.try_allow_r decl.type_jkind with
     | None ->
-        (* Under -ikinds, or when [decl.type_jkind] cannot allow-right
-           (e.g. due to with-bounds/Best), route through Ikinds. *)
+        (* Under -ikinds we keep [decl.type_jkind] in left/Best form, so
+           [try_allow_r] returns [None] and we route through Ikinds. We also
+           fall back here when [decl.type_jkind] cannot allow-right
+           (e.g. due to with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
         (match
