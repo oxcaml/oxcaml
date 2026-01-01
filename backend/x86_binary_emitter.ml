@@ -1638,3 +1638,192 @@ let contents b =
 let relocations b = b.relocations
 
 let labels b = b.labels
+
+(* For_jit module implementing Binary_emitter_intf.S *)
+module For_jit = struct
+  (* Alias parent Relocation before shadowing it *)
+  module Reloc = Relocation
+  module Kind = Relocation.Kind
+
+  module Relocation = struct
+    type t = Reloc.t
+
+    let offset_from_section_beginning (r : Reloc.t) =
+      r.Reloc.offset_from_section_beginning
+
+    let size (r : Reloc.t) : Binary_emitter_intf.data_size =
+      match r.Reloc.kind with
+      | Kind.REL32 _ | Kind.DIR32 _ -> Binary_emitter_intf.B32
+      | Kind.DIR64 _ -> Binary_emitter_intf.B64
+
+    let parse_label label =
+      match String.split_on_char '@' label with
+      | [sym] -> sym, None
+      | [sym; suffix] -> sym, Some suffix
+      | _ -> label, None
+
+    let string_to_target name : Binary_emitter_intf.target =
+      Binary_emitter_intf.Symbol (Asm_symbol.create_global name)
+
+    let target_symbol (r : Reloc.t) : Binary_emitter_intf.target =
+      let label =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) ->
+          label
+      in
+      let sym, _ = parse_label label in
+      string_to_target sym
+
+    (* x86 doesn't have paired relocations, so this just returns a singleton *)
+    let target_symbols r = [target_symbol r]
+
+    (* x86 doesn't have paired relocations, so this just returns a singleton
+       with the addend from the relocation *)
+    let target_symbols_with_addends (r : Reloc.t) =
+      let label, addend =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, addend)
+        | Kind.DIR32 (label, addend)
+        | Kind.DIR64 (label, addend) ->
+          label, addend
+      in
+      let sym, _ = parse_label label in
+      [string_to_target sym, Int64.to_int addend]
+
+    let is_got_reloc (r : Reloc.t) =
+      let label =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) ->
+          label
+      in
+      let _, suffix = parse_label label in
+      match suffix with Some "GOTPCREL" -> true | _ -> false
+
+    let is_plt_reloc (r : Reloc.t) =
+      let label =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) ->
+          label
+      in
+      let _, suffix = parse_label label in
+      match suffix with Some "PLT" -> true | _ -> false
+
+    let print_target ppf (target : Binary_emitter_intf.target) =
+      match target with
+      | Binary_emitter_intf.Symbol sym -> Asm_symbol.print ppf sym
+      | Binary_emitter_intf.Label lbl -> Asm_label.print ppf lbl
+
+    let compute_value (r : Reloc.t) ~place_address ~lookup_target
+        ~read_instruction:_ =
+      let label, addend =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, addend)
+        | Kind.DIR32 (label, addend)
+        | Kind.DIR64 (label, addend) ->
+          label, addend
+      in
+      let sym, _ = parse_label label in
+      let target = string_to_target sym in
+      match lookup_target target with
+      | None ->
+        Error (Format.asprintf "Symbol not found: %a" print_target target)
+      | Some target_addr ->
+        let target_addr = Int64.add target_addr addend in
+        (match r.Reloc.kind with
+        | Kind.REL32 _ ->
+          (* Relative: compute offset from place to target *)
+          let rel_size = 4L in
+          (* REL32 is 4 bytes *)
+          let src_addr = Int64.add place_address rel_size in
+          Ok (Int64.sub target_addr src_addr)
+        | Kind.DIR32 _ | Kind.DIR64 _ ->
+          (* Absolute: just use the target address *)
+          Ok target_addr)
+  end
+
+  module Assembled_section = struct
+    type t = buffer
+
+    type relocation = Reloc.t
+
+    let size b = Buffer.length b.buf
+
+    let contents b = Bytes.to_string (contents_mut b)
+
+    let contents_mut = contents_mut
+
+    let relocations b = b.relocations
+
+    let find_symbol_offset b (sym : Asm_symbol.t) =
+      match String.Tbl.find_opt b.labels (Asm_symbol.encode sym) with
+      | Some s -> s.sy_pos
+      | None -> None
+
+    let find_label_offset b (lbl : Asm_label.t) =
+      match String.Tbl.find_opt b.labels (Asm_label.encode lbl) with
+      | Some s -> s.sy_pos
+      | None -> None
+
+    let iter_labels_and_symbols b ~f =
+      String.Tbl.iter
+        (fun name sym ->
+          match sym.sy_pos with
+          | Some offset ->
+            (* x86 uses strings internally; wrap as Symbol *)
+            let target = Relocation.string_to_target name in
+            f target ~offset
+          | None -> ())
+        b.labels
+
+    let add_patch b ~offset ~size:(sz : Binary_emitter_intf.data_size) ~data =
+      let sz =
+        match sz with
+        | Binary_emitter_intf.B8 -> B8
+        | Binary_emitter_intf.B16 -> B16
+        | Binary_emitter_intf.B32 -> B32
+        | Binary_emitter_intf.B64 -> B64
+      in
+      add_patch ~offset ~size:sz ~data b
+  end
+
+  module Plt = struct
+    (* x86-64 PLT entry: movabs r10, <address> ; 49 ba <8 bytes> jmp *r10 ; 41
+       ff e2 Total: 10 bytes *)
+    let movabs_r10_opcode = "\x49\xba"
+
+    let jmp_r10_instr = "\x41\xff\xe2"
+
+    let entry_size =
+      String.length movabs_r10_opcode + 8 + String.length jmp_r10_instr
+
+    let write_entry buf address =
+      Buffer.add_string buf movabs_r10_opcode;
+      for i = 0 to 7 do
+        let byte =
+          Int64.(to_int (logand (shift_right_logical address (i * 8)) 0xFFL))
+        in
+        Buffer.add_char buf (Char.chr byte)
+      done;
+      Buffer.add_string buf jmp_r10_instr
+  end
+
+  module Internal_assembler = struct
+    type assembled_section = Assembled_section.t
+
+    type hook = (string * assembled_section) list -> string -> unit
+
+    let current_hook : hook option ref = ref None
+
+    let register h = current_hook := Some h
+
+    let unregister () = current_hook := None
+
+    let get () = !current_hook
+  end
+end
