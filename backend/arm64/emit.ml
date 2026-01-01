@@ -308,7 +308,7 @@ end = struct
       (* see selection.ml *)
       let sym =
         Arm64_ast.Symbol.create ~reloc:LOWER_TWELVE ~offset:ofs
-          (S.encode (S.create s))
+          (S.encode (S.create_global s))
       in
       mem_symbol ~base:(translate_reg r) ~symbol:sym
 
@@ -740,7 +740,8 @@ type gc_call =
 let call_gc_sites = ref ([] : gc_call list)
 
 let emit_call_gc gc =
-  DSL.labeled_ins gc.gc_lbl I.BL [| DSL.emit_symbol (S.create "caml_call_gc") |];
+  DSL.labeled_ins gc.gc_lbl I.BL
+    [| DSL.emit_symbol (S.create_global "caml_call_gc") |];
   DSL.labeled_ins gc.gc_frame_lbl I.B [| DSL.emit_label gc.gc_return_lbl |]
 
 (* Record calls to local stack reallocation *)
@@ -762,7 +763,7 @@ let emit_debug_info ?discriminator dbg =
 let emit_local_realloc lr =
   D.define_label lr.lr_lbl;
   emit_debug_info lr.lr_dbg;
-  DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_call_local_realloc") |];
+  DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_call_local_realloc") |];
   DSL.ins I.B [| DSL.emit_label lr.lr_return_lbl |]
 
 (* Local stack reallocation *)
@@ -791,7 +792,8 @@ let emit_stack_realloc () =
          DSL.reg_x_30;
          DSL.mem_pre ~base:Arm64_ast.Reg.sp ~offset:(-16)
       |];
-    DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_call_realloc_stack") |];
+    DSL.ins I.BL
+      [| DSL.emit_symbol (S.create_global "caml_call_realloc_stack") |];
     DSL.ins I.LDP
       [| DSL.emit_reg reg_tmp1;
          DSL.reg_x_30;
@@ -1439,12 +1441,12 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
            :: !call_gc_sites)
     else (
       (match n with
-      | 16 -> DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_alloc1") |]
-      | 24 -> DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_alloc2") |]
-      | 32 -> DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_alloc3") |]
+      | 16 -> DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_alloc1") |]
+      | 24 -> DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_alloc2") |]
+      | 32 -> DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_alloc3") |]
       | _ ->
         emit_intconst reg_x8 (Nativeint.of_int n);
-        DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_allocN") |]);
+        DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_allocN") |]);
       DSL.labeled_ins lbl_frame I.ADD
         [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_alloc_ptr; DSL.imm 8 |])
 
@@ -1495,7 +1497,7 @@ let emit_named_text_section func_name =
     (* CR sspies: Clean this up and add proper support for function sections in
        the new asm directives. *)
     D.switch_to_section_raw
-      ~names:[".text.caml." ^ S.encode (S.create func_name)]
+      ~names:[".text.caml." ^ S.encode (S.create_global func_name)]
       ~flags:(Some "ax") ~args:["%progbits"] ~is_delayed:false;
     (* Warning: We set the internal section ref to Text here, because it
        currently does not supported named text sections. In the rest of this
@@ -1734,12 +1736,12 @@ let emit_instr i =
       let lbl = vec128_literal l in
       emit_load_literal i.res.(0) lbl)
   | Lop (Const_symbol s) ->
-    emit_load_symbol_addr i.res.(0) (S.create s.sym_name)
+    emit_load_symbol_addr i.res.(0) (S.create_global s.sym_name)
   | Lcall_op Lcall_ind ->
     DSL.ins I.BLR [| DSL.emit_reg i.arg.(0) |];
     record_frame i.live (Dbg_other i.dbg)
   | Lcall_op (Lcall_imm { func }) ->
-    DSL.ins I.BL [| DSL.emit_symbol (S.create func.sym_name) |];
+    DSL.ins I.BL [| DSL.emit_symbol (S.create_global func.sym_name) |];
     record_frame i.live (Dbg_other i.dbg)
   | Lcall_op Ltailcall_ind -> DSL.ins I.BR [| DSL.emit_reg i.arg.(0) |]
   | Lcall_op (Ltailcall_imm { func }) ->
@@ -1749,7 +1751,7 @@ let emit_instr i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point ->
         DSL.ins I.B [| DSL.emit_label tailrec_entry_point |]
-    else DSL.ins I.B [| DSL.emit_symbol (S.create func.sym_name) |]
+    else DSL.ins I.B [| DSL.emit_symbol (S.create_global func.sym_name) |]
   | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
     if Config.runtime5 && stack_ofs > 0
     then (
@@ -1759,13 +1761,14 @@ let emit_instr i =
            DSL.sp;
            DSL.imm (Misc.align stack_ofs 16)
         |];
-      emit_load_symbol_addr reg_x8 (S.create func);
-      DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_c_call_stack_args") |];
+      emit_load_symbol_addr reg_x8 (S.create_global func);
+      DSL.ins I.BL
+        [| DSL.emit_symbol (S.create_global "caml_c_call_stack_args") |];
       record_frame i.live (Dbg_other i.dbg))
     else if alloc
     then (
-      emit_load_symbol_addr reg_x8 (S.create func);
-      DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_c_call") |];
+      emit_load_symbol_addr reg_x8 (S.create_global func);
+      DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_c_call") |];
       record_frame i.live (Dbg_other i.dbg))
     else (
       (*= store ocaml stack in the frame pointer register
@@ -1783,7 +1786,7 @@ let emit_instr i =
           |];
         DSL.ins I.MOV [| DSL.sp; DSL.emit_reg reg_tmp1 |])
       else D.cfi_remember_state ();
-      DSL.ins I.BL [| DSL.emit_symbol (S.create func) |];
+      DSL.ins I.BL [| DSL.emit_symbol (S.create_global func) |];
       if Config.runtime5 then DSL.ins I.MOV [| DSL.sp; DSL.reg_x_29 |];
       D.cfi_restore_state ())
   | Lop (Stackoffset n) ->
@@ -1803,7 +1806,9 @@ let emit_instr i =
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
         DSL.ins I.ADRP
-          [| DSL.emit_reg reg_tmp1; DSL.emit_symbol ~offset:ofs (S.create s) |];
+          [| DSL.emit_reg reg_tmp1;
+             DSL.emit_symbol ~offset:ofs (S.create_global s)
+          |];
         reg_tmp1
     in
     match memory_chunk with
@@ -1858,7 +1863,7 @@ let emit_instr i =
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
-        let s = S.create s in
+        let s = S.create_global s in
         DSL.ins I.ADRP [| DSL.emit_reg reg_tmp1; DSL.emit_symbol ~offset s |];
         DSL.ins I.ADD
           [| DSL.emit_reg reg_tmp1;
@@ -1879,7 +1884,9 @@ let emit_instr i =
       | Ibased (s, ofs) ->
         assert (not !Clflags.dlcode);
         DSL.ins I.ADRP
-          [| DSL.emit_reg reg_tmp1; DSL.emit_symbol ~offset:ofs (S.create s) |];
+          [| DSL.emit_reg reg_tmp1;
+             DSL.emit_symbol ~offset:ofs (S.create_global s)
+          |];
         reg_tmp1
     in
     match size with
@@ -1914,7 +1921,7 @@ let emit_instr i =
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
-        let s = S.create s in
+        let s = S.create_global s in
         DSL.ins I.ADRP [| DSL.emit_reg reg_tmp1; DSL.emit_symbol ~offset s |];
         DSL.ins I.ADD
           [| DSL.emit_reg reg_tmp1;
@@ -2152,7 +2159,7 @@ let emit_instr i =
       Probe_emission.find_or_add_semaphore name enabled_at_init i.dbg
     in
     (* Load address of the semaphore symbol *)
-    emit_load_symbol_addr reg_tmp1 (S.create semaphore_sym);
+    emit_load_symbol_addr reg_tmp1 (S.create_global semaphore_sym);
     (* Load unsigned 2-byte integer value from offset 2 *)
     DSL.ins I.LDRH
       [| DSL.emit_reg_w i.res.(0); DSL.emit_addressing (Iindexed 2) reg_tmp1 |];
@@ -2340,12 +2347,13 @@ let emit_instr i =
   | Lraise k -> (
     match k with
     | Lambda.Raise_regular ->
-      DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_raise_exn") |];
+      DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_raise_exn") |];
       record_frame Reg.Set.empty (Dbg_raise i.dbg)
     | Lambda.Raise_reraise ->
       if Config.runtime5
-      then DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_reraise_exn") |]
-      else DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_raise_exn") |];
+      then
+        DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_reraise_exn") |]
+      else DSL.ins I.BL [| DSL.emit_symbol (S.create_global "caml_raise_exn") |];
       record_frame Reg.Set.empty (Dbg_raise i.dbg)
     | Lambda.Raise_notrace ->
       DSL.ins I.MOV [| DSL.sp; DSL.emit_reg reg_trap_ptr |];
@@ -2422,7 +2430,7 @@ let fundecl fundecl =
   prologue_required := fundecl.fun_prologue_required;
   contains_calls := fundecl.fun_contains_calls;
   emit_named_text_section !function_name;
-  let fun_sym = S.create fundecl.fun_name in
+  let fun_sym = S.create_global fundecl.fun_name in
   D.align ~fill_x86_bin_emitter:Nop ~bytes:8;
   D.global fun_sym;
   D.type_symbol ~ty:Function fun_sym;
@@ -2457,7 +2465,7 @@ let fundecl fundecl =
 let emit_item (d : Cmm.data_item) =
   match d with
   | Cdefine_symbol s ->
-    let sym = S.create s.sym_name in
+    let sym = S.create_global s.sym_name in
     if !Clflags.dlcode || Cmm.equal_is_global s.sym_global Cmm.Global
     then
       (* GOT relocations against non-global symbols don't seem to work properly:
@@ -2478,10 +2486,10 @@ let emit_item (d : Cmm.data_item) =
     D.float64_from_bits word0
   | Cvec256 _ | Cvec512 _ -> Misc.fatal_error "arm64: got 256/512 bit vector"
   | Csymbol_address s ->
-    let sym = S.create s.sym_name in
+    let sym = S.create_global s.sym_name in
     D.symbol sym
   | Csymbol_offset (s, o) ->
-    let sym = S.create s.sym_name in
+    let sym = S.create_global s.sym_name in
     D.symbol_plus_offset ~offset_in_bytes:(Targetint.of_int o) sym
   | Cstring s -> D.string s
   | Cskip n -> D.space ~bytes:n
@@ -2512,12 +2520,12 @@ let begin_assembly _unix =
   D.file ~file_num:None ~file_name:"";
   (* PR#7037 *)
   let data_begin = Cmm_helpers.make_symbol "data_begin" in
-  let data_begin_sym = S.create data_begin in
+  let data_begin_sym = S.create_global data_begin in
   D.data ();
   D.global data_begin_sym;
   D.define_symbol_label ~section:Data data_begin_sym;
   let code_begin = Cmm_helpers.make_symbol "code_begin" in
-  let code_begin_sym = S.create code_begin in
+  let code_begin_sym = S.create_global code_begin in
   emit_named_text_section code_begin;
   D.global code_begin_sym;
   D.define_symbol_label ~section:Text code_begin_sym;
@@ -2534,12 +2542,12 @@ let begin_assembly _unix =
 
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in
-  let code_end_sym = S.create code_end in
+  let code_end_sym = S.create_global code_end in
   emit_named_text_section code_end;
   D.global code_end_sym;
   D.define_symbol_label ~section:Text code_end_sym;
   let data_end = Cmm_helpers.make_symbol "data_end" in
-  let data_end_sym = S.create data_end in
+  let data_end_sym = S.create_global data_end in
   D.data ();
   D.int64 0L;
   (* PR#6329 *)
@@ -2549,7 +2557,7 @@ let end_assembly () =
   D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
   (* #7887 *)
   let frametable = Cmm_helpers.make_symbol "frametable" in
-  let frametable_sym = S.create frametable in
+  let frametable_sym = S.create_global frametable in
   D.global frametable_sym;
   D.define_symbol_label ~section:Data frametable_sym;
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)

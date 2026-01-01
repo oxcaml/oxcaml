@@ -196,7 +196,12 @@ let pop r =
 
 (* Symbols *)
 
-let emit_symbol s = S.encode (S.create s)
+(* Convert Cmm.is_global to Asm_symbol.visibility *)
+let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
+  | Cmm.Global -> S.Global
+  | Cmm.Local -> S.Local
+
+let emit_symbol s = S.encode (S.create_global s)
 
 (* Record symbols used and defined - at the end generate extern for those used
    but not defined *)
@@ -223,8 +228,8 @@ let get_imp_symbol s =
 
 let emit_imp_table ~section () =
   let f s imps =
-    D.define_symbol_label ~section (S.create imps);
-    D.symbol (S.create s)
+    D.define_symbol_label ~section (S.create_global imps);
+    D.symbol (S.create_global s)
   in
   D.data ();
   D.comment "relocation table start";
@@ -258,7 +263,9 @@ let emit_jump s = I.jmp (rel_plt s)
 let domain_field f = mem64 QWORD (Domainstate.idx_of_field f * 8) (Scalar R14)
 
 let emit_cmm_symbol (s : Cmm.symbol) =
-  let sym = S.create s.sym_name in
+  let sym =
+    S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
+  in
   match (s.sym_global : Cmm.is_global) with
   | Global -> `Symbol sym
   (* This label is special in that it is not of the form "Lnumber". Instead, we
@@ -979,7 +986,7 @@ let global_maybe_protected (sym : S.t) =
 (* CR sspies: The naming of these functions is confusing. *)
 let emit_global_label_for_symbol ~section lbl =
   add_def_symbol lbl;
-  let lbl = S.create lbl in
+  let lbl = S.create_global lbl in
   global_maybe_protected lbl;
   D.define_symbol_label ~section lbl
 
@@ -1103,7 +1110,7 @@ let tailrec_entry_point = ref None
 
 let probe_handler_wrapper_name probe_label =
   let w = Printf.sprintf "probe_wrapper_%s" (Label.to_string probe_label) in
-  Cmm_helpers.make_symbol w |> S.create
+  Cmm_helpers.make_symbol w |> S.create_global
 
 let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
   assert !frame_required;
@@ -2172,19 +2179,19 @@ let emit_instr ~first ~fallthrough i =
     I.neg r0
   | Lop (Floatop (Float64, Inegf)) ->
     sse_or_avx_dst xorpd vxorpd_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_negf_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_negf_mask))
       (res i 0)
   | Lop (Floatop (Float64, Iabsf)) ->
     sse_or_avx_dst andpd vandpd_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_absf_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_absf_mask))
       (res i 0)
   | Lop (Floatop (Float32, Inegf)) ->
     sse_or_avx_dst xorps vxorps_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_negf32_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_negf32_mask))
       (res i 0)
   | Lop (Floatop (Float32, Iabsf)) ->
     sse_or_avx_dst andps vandps_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_absf32_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_absf32_mask))
       (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
     instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
@@ -2521,7 +2528,7 @@ let fundecl fundecl =
   emit_function_or_basic_block_section_name ();
   D.align ~fill_x86_bin_emitter:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
-  let fundecl_sym = S.create fundecl.fun_name in
+  let fundecl_sym = S.create_global fundecl.fun_name in
   if is_macosx system
      && (not !Clflags.output_c_object)
      && is_generic_function fundecl.fun_name
@@ -2568,7 +2575,9 @@ let fundecl fundecl =
 (* CR sspies: Share the [emit_item] code with the Arm backend in emitaux. *)
 let emit_item : Cmm.data_item -> unit = function
   | Cdefine_symbol s -> (
-    let sym = S.create s.sym_name in
+    let sym =
+      S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
+    in
     match s.sym_global with
     | Local -> D.define_label (L.create_string_unchecked Data (S.encode sym))
     | Global ->
@@ -3028,7 +3037,7 @@ let end_assembly () =
           D.define_label lbl);
       efa_string = (fun s -> D.string (s ^ "\000"))
     };
-  let frametable_sym = S.create (Cmm_helpers.make_symbol "frametable") in
+  let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
   D.data ();
   Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol;
@@ -3040,7 +3049,8 @@ let end_assembly () =
     D.comment "External functions";
     String.Set.iter
       (fun s ->
-        if not (String.Set.mem s !symbols_defined) then D.extrn (S.create s))
+        if not (String.Set.mem s !symbols_defined)
+        then D.extrn (S.create_global s))
       !symbols_used;
     symbols_used := String.Set.empty;
     symbols_defined := String.Set.empty);
