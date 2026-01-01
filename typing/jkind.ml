@@ -1426,6 +1426,34 @@ module Const = struct
       in
       { t with layout = new_layout }
 
+  let meet_nullability (nul : Nullability.t Location.loc option) t =
+    match nul with
+    | None -> t
+    | Some { txt = new_nullability; loc = _ } -> (
+      match Layout.Const.get_root_scannable_axes t.layout with
+      | None -> t
+      | Some { nullability; separability = _ } ->
+        let result_nullability = Nullability.meet nullability new_nullability in
+        let new_layout =
+          Layout.Const.set_root_nullability t.layout result_nullability
+        in
+        { t with layout = new_layout })
+
+  let meet_separability (sep : Separability.t Location.loc option) t =
+    match sep with
+    | None -> t
+    | Some { txt = new_separability; loc = _ } -> (
+      match Layout.Const.get_root_scannable_axes t.layout with
+      | None -> t
+      | Some { nullability = _; separability } ->
+        let result_separability =
+          Separability.meet separability new_separability
+        in
+        let new_layout =
+          Layout.Const.set_root_separability t.layout result_separability
+        in
+        { t with layout = new_layout })
+
   let jkind_of_product_annotations (type l r) (jkinds : (l * r) t list) =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         ({ layout; mod_bounds; with_bounds } : (l * r) t) =
@@ -1539,12 +1567,8 @@ module Const = struct
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
       { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
-      (* CR layouts-scannable: The redundant kind modifier warning isn't enabled
-         currently, so the placeholder [~abbrev:""] is okay. If the warning is
-         enabled before the mod syntax for scannable axes is deprecated, then
-         [~abbrev] should be fixed. *)
-      |> set_nullability ~abbrev:"" nullability
-      |> set_separability ~abbrev:"" separability
+      |> meet_nullability nullability
+      |> meet_separability separability
     | Pjk_product ts ->
       let jkinds =
         List.map (of_user_written_annotation_unchecked_level context) ts
