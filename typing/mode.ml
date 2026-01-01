@@ -50,16 +50,13 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation_l loc
       | Contains_r (Comonadic, { containing; contained }) ->
-        ( contained,
-          Is_contained_by (Comonadic, { containing; container = fst pp }) )
+        contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_l (Monadic, { containing; contained }) ->
-        contained, Is_contained_by (Monadic, { containing; container = fst pp })
+        contained, Is_contained_by (Monadic, { containing; container = pp })
       | Is_contained_by (Comonadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_l (Comonadic, { containing; contained = pp }) )
+        container, Contains_l (Comonadic, { containing; contained = pp })
       | Is_contained_by (Monadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_r (Monadic, { containing; contained = pp }) )
+        container, Contains_r (Monadic, { containing; contained = pp })
 
     let right_adjoint : type r.
         Hint.pinpoint ->
@@ -76,16 +73,13 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation_r loc
       | Contains_l (Comonadic, { containing; contained }) ->
-        ( contained,
-          Is_contained_by (Comonadic, { containing; container = fst pp }) )
+        contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_r (Monadic, { containing; contained }) ->
-        contained, Is_contained_by (Monadic, { containing; container = fst pp })
+        contained, Is_contained_by (Monadic, { containing; container = pp })
       | Is_contained_by (Comonadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_r (Comonadic, { containing; contained = pp }) )
+        container, Contains_r (Comonadic, { containing; contained = pp })
       | Is_contained_by (Monadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_l (Monadic, { containing; contained = pp }) )
+        container, Contains_l (Monadic, { containing; contained = pp })
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
@@ -2075,6 +2069,7 @@ module Report = struct
           Fmt.dprintf "%t of %t"
             (print_article_noun ~definite:true ~capitalize Consonant "result")
             (print_article_noun ~definite ~capitalize:false Consonant "cases"))
+    | Pattern -> Some (print_article_noun Consonant "pattern")
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
@@ -2251,9 +2246,11 @@ module Report = struct
   let print_is_contained_by :
       fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =
    fun ~fixpoint { containing; container } ->
-    let maybe_modality, pp =
-      modality_if_relevant ~fixpoint (container, Expression)
-    in
+    let maybe_modality, pp = modality_if_relevant ~fixpoint container in
+    (* CR-someday zqian: Use the full [container] to improve the printing below.
+       E.g., insted of printing "the tuple at XXX", we can print "the tuple
+       pattern at XXX" or "the tuple expression at XXX". *)
+    let container = fst container in
     let pr =
       match containing with
       | Tuple ->

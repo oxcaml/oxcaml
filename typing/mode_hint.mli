@@ -14,8 +14,15 @@ type ident =
             point to [M]. This field would store [M.x]. *)
   }
 
-(** Description of pinpoints to accompany the location. The constructors are not
-    mutually exclusive - some might be more precise than others *)
+(** Pinpoint's description to accompany pinpoint's location. It's about the
+    syntax rather than the value. For example, we distinguish:
+    - between a module identifer and a module definition
+    - between a structure definition and a functor definition
+    - BUT NOT between two module identifiers where one is a functor and the
+      other is a structure.
+
+    The constructors are not mutually exclusive - some might be more precise
+    than others. *)
 type pinpoint_desc =
   | Unknown
   | Ident of ident  (** An identifier *)
@@ -24,11 +31,12 @@ type pinpoint_desc =
   | Lazy  (** A lazy expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
-  | Class  (** An class declaration *)
+  | Class  (** A class declaration *)
   | Object  (** An object declaration *)
-  | Loop  (** a loop *)
-  | Letop  (** let op *)
-  | Cases_result  (** the result of cases *)
+  | Loop  (** A loop *)
+  | Letop  (** A let op expression *)
+  | Cases_result  (** The result of cases *)
+  | Pattern  (** A pattern *)
 
 (** A pinpoint is a location in the source code, accompanied by additional
     description *)
@@ -106,7 +114,7 @@ type contains =
 
 type is_contained_by =
   { containing : containing;
-    container : Location.t
+    container : pinpoint
   }
 
 type allocation_desc =
