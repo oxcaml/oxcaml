@@ -13,7 +13,8 @@ type r = { mutable s : string; }
 Line 2, characters 31-32:
 2 | let foo (local_ s) = exclave_ {s}
                                    ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "s" (with some modality) of the record at Line 2, characters 30-33.
 |}]
 
 (* you can override those implied modalities *)
@@ -114,7 +115,8 @@ let foo (local_ s') = exclave_ {s'}
 Line 1, characters 32-34:
 1 | let foo (local_ s') = exclave_ {s'}
                                     ^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "s'" (with some modality) of the record at Line 1, characters 31-35.
 |}]
 
 (* mutable defaults to mutable(legacy = nonportable), so currently we can't construct a
@@ -146,7 +148,9 @@ let foo (r @ unique) = (r.s : _ @ unique)
 Line 1, characters 24-27:
 1 | let foo (r @ unique) = (r.s : _ @ unique)
                             ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "s" (with some modality) of the record at Line 1, characters 24-25.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 module M : sig

@@ -846,7 +846,9 @@ let mutable_field_aliased r =
 Line 2, characters 10-13:
 2 |   unique_ r.m
               ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 2, characters 10-11.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let tag_of_mutable_field r =
@@ -858,7 +860,9 @@ let tag_of_mutable_field r =
 Line 4, characters 15-18:
 4 |     overwrite_ r.m with OptionA s
                    ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 4, characters 15-16.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_seq r =
@@ -871,7 +875,9 @@ let mutating_tag_seq r =
 Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_seq_same r =
@@ -884,7 +890,9 @@ let mutating_tag_seq_same r =
 Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_seq_parent r =
@@ -899,7 +907,8 @@ Line 5, characters 15-20:
                    ^^^^^
 Error: This value is "aliased"
        because it is the field "x" of the record at Line 5, characters 15-18
-       which is "aliased".
+       which is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -912,7 +921,9 @@ let mutating_tag_par r =
 Line 4, characters 35-38:
 4 |     (r.m <- OptionB s), overwrite_ r.m with OptionA s
                                        ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 4, characters 35-36.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_par_parent r =
@@ -926,7 +937,8 @@ Line 4, characters 43-48:
                                                ^^^^^
 Error: This value is "aliased"
        because it is the field "x" of the record at Line 4, characters 43-46
-       which is "aliased".
+       which is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 4, characters 43-44.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -940,7 +952,9 @@ let mutating_tag_choice r =
 Line 5, characters 28-31:
 5 |             else overwrite_ r.m with OptionA s
                                 ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 5, characters 28-29.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_choice_parent r =
@@ -955,7 +969,8 @@ Line 5, characters 20-25:
                         ^^^^^
 Error: This value is "aliased"
        because it is the field "x" of the record at Line 5, characters 20-23
-       which is "aliased".
+       which is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 5, characters 20-21.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -969,7 +984,9 @@ let mutating_tag_choice_seq r =
 Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_choice_seq_parent r =
@@ -984,7 +1001,8 @@ Line 5, characters 15-20:
                    ^^^^^
 Error: This value is "aliased"
        because it is the field "x" of the record at Line 5, characters 15-18
-       which is "aliased".
+       which is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1003,7 +1021,9 @@ let mutating_tag_rematch r =
 Line 7, characters 17-20:
 7 |       overwrite_ r.m with OptionB s
                      ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "m" (with some modality) of the record at Line 7, characters 17-18.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (********************************)

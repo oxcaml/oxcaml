@@ -623,7 +623,8 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "x" (with some modality) of the record at Line 1, characters 46-54.
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
