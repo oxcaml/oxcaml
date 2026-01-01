@@ -41,34 +41,51 @@ let should_be_escaped = function
   | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '.' -> false
   | _c -> true
 
+type visibility =
+  | Global
+  | Local
+
 module Thing = struct
   type t =
     { name : string;
-      already_encoded : bool
+      already_encoded : bool;
+      visibility : visibility
     }
 
-  let compare { name = name1; already_encoded = already_encoded1 }
-      { name = name2; already_encoded = already_encoded2 } =
+  (* Compare and hash on name only - visibility doesn't affect identity *)
+  let compare { name = name1; already_encoded = already_encoded1; _ }
+      { name = name2; already_encoded = already_encoded2; _ } =
     let cmp = String.compare name1 name2 in
     if cmp = 0 then Bool.compare already_encoded1 already_encoded2 else cmp
 
   let equal t1 t2 = compare t1 t2 = 0
 
-  let hash = Hashtbl.hash
+  let hash t = Hashtbl.hash t.name
 
-  let output chan { name; already_encoded : _ } = Printf.fprintf chan "%s" name
+  let output chan { name; _ } = Printf.fprintf chan "%s" name
 
-  let print fmt { name; already_encoded : _ } = Format.pp_print_string fmt name
+  let print fmt { name; _ } = Format.pp_print_string fmt name
 end
 
 include Thing
 include Identifiable.Make (Thing)
 
-let create name = { name; already_encoded = false }
+let create ~visibility name = { name; already_encoded = false; visibility }
 
-let create_without_encoding name = { name; already_encoded = true }
+let create_global name = create ~visibility:Global name
 
-let to_raw_string { name; already_encoded : _ } = name
+let create_local name = create ~visibility:Local name
+
+let create_without_encoding ~visibility name =
+  { name; already_encoded = true; visibility }
+
+let to_raw_string { name; _ } = name
+
+let visibility t = t.visibility
+
+let is_global t = match t.visibility with Global -> true | Local -> false
+
+let is_local t = match t.visibility with Local -> true | Global -> false
 
 let escape name =
   let escaped_nb = ref 0 in
@@ -101,68 +118,84 @@ let encode { name; already_encoded } =
     to_escaped_string ~symbol_prefix name
 
 (* We predefine several common symbols that violate the standard escaping done
-   by [encode]. *)
+   by [encode]. All predefined symbols are global (runtime functions). *)
 module Predef = struct
-  let caml_call_gc = create_without_encoding "caml_call_gc"
+  let caml_call_gc = create_without_encoding ~visibility:Global "caml_call_gc"
 
-  let caml_call_gc_sse = create_without_encoding "caml_call_gc_sse"
+  let caml_call_gc_sse =
+    create_without_encoding ~visibility:Global "caml_call_gc_sse"
 
-  let caml_call_gc_avx = create_without_encoding "caml_call_gc_avx"
+  let caml_call_gc_avx =
+    create_without_encoding ~visibility:Global "caml_call_gc_avx"
 
-  let caml_call_gc_avx512 = create_without_encoding "caml_call_gc_avx512"
+  let caml_call_gc_avx512 =
+    create_without_encoding ~visibility:Global "caml_call_gc_avx512"
 
-  let caml_c_call = create_without_encoding "caml_c_call"
+  let caml_c_call = create_without_encoding ~visibility:Global "caml_c_call"
 
-  let caml_allocN = create_without_encoding "caml_allocN"
+  let caml_allocN = create_without_encoding ~visibility:Global "caml_allocN"
 
-  let caml_allocN_sse = create_without_encoding "caml_allocN_sse"
+  let caml_allocN_sse =
+    create_without_encoding ~visibility:Global "caml_allocN_sse"
 
-  let caml_allocN_avx = create_without_encoding "caml_allocN_avx"
+  let caml_allocN_avx =
+    create_without_encoding ~visibility:Global "caml_allocN_avx"
 
-  let caml_allocN_avx512 = create_without_encoding "caml_allocN_avx512"
+  let caml_allocN_avx512 =
+    create_without_encoding ~visibility:Global "caml_allocN_avx512"
 
-  let caml_alloc1 = create_without_encoding "caml_alloc1"
+  let caml_alloc1 = create_without_encoding ~visibility:Global "caml_alloc1"
 
-  let caml_alloc1_sse = create_without_encoding "caml_alloc1_sse"
+  let caml_alloc1_sse =
+    create_without_encoding ~visibility:Global "caml_alloc1_sse"
 
-  let caml_alloc1_avx = create_without_encoding "caml_alloc1_avx"
+  let caml_alloc1_avx =
+    create_without_encoding ~visibility:Global "caml_alloc1_avx"
 
-  let caml_alloc1_avx512 = create_without_encoding "caml_alloc1_avx512"
+  let caml_alloc1_avx512 =
+    create_without_encoding ~visibility:Global "caml_alloc1_avx512"
 
-  let caml_alloc2 = create_without_encoding "caml_alloc2"
+  let caml_alloc2 = create_without_encoding ~visibility:Global "caml_alloc2"
 
-  let caml_alloc2_sse = create_without_encoding "caml_alloc2_sse"
+  let caml_alloc2_sse =
+    create_without_encoding ~visibility:Global "caml_alloc2_sse"
 
-  let caml_alloc2_avx = create_without_encoding "caml_alloc2_avx"
+  let caml_alloc2_avx =
+    create_without_encoding ~visibility:Global "caml_alloc2_avx"
 
-  let caml_alloc2_avx512 = create_without_encoding "caml_alloc2_avx512"
+  let caml_alloc2_avx512 =
+    create_without_encoding ~visibility:Global "caml_alloc2_avx512"
 
-  let caml_alloc3 = create_without_encoding "caml_alloc3"
+  let caml_alloc3 = create_without_encoding ~visibility:Global "caml_alloc3"
 
-  let caml_alloc3_sse = create_without_encoding "caml_alloc3_sse"
+  let caml_alloc3_sse =
+    create_without_encoding ~visibility:Global "caml_alloc3_sse"
 
-  let caml_alloc3_avx = create_without_encoding "caml_alloc3_avx"
+  let caml_alloc3_avx =
+    create_without_encoding ~visibility:Global "caml_alloc3_avx"
 
-  let caml_alloc3_avx512 = create_without_encoding "caml_alloc3_avx512"
+  let caml_alloc3_avx512 =
+    create_without_encoding ~visibility:Global "caml_alloc3_avx512"
 
   let caml_ml_array_bound_error =
-    create_without_encoding "caml_ml_array_bound_error"
+    create_without_encoding ~visibility:Global "caml_ml_array_bound_error"
 
   let caml_ml_array_align_error =
-    create_without_encoding "caml_ml_array_align_error"
+    create_without_encoding ~visibility:Global "caml_ml_array_align_error"
 
-  let caml_raise_exn = create_without_encoding "caml_raise_exn"
+  let caml_raise_exn =
+    create_without_encoding ~visibility:Global "caml_raise_exn"
 
-  let stapsdt_base = create_without_encoding "_.stapsdt.base"
+  let stapsdt_base = create_without_encoding ~visibility:Global "_.stapsdt.base"
 
   let caml_probes_semaphore ~name =
-    create_without_encoding ("caml_probes_semaphore_" ^ name)
+    create_without_encoding ~visibility:Global ("caml_probes_semaphore_" ^ name)
 
-  let caml_negf_mask = create "caml_negf_mask"
+  let caml_negf_mask = create_global "caml_negf_mask"
 
-  let caml_absf_mask = create "caml_absf_mask"
+  let caml_absf_mask = create_global "caml_absf_mask"
 
-  let caml_negf32_mask = create "caml_negf32_mask"
+  let caml_negf32_mask = create_global "caml_negf32_mask"
 
-  let caml_absf32_mask = create "caml_absf32_mask"
+  let caml_absf32_mask = create_global "caml_absf32_mask"
 end

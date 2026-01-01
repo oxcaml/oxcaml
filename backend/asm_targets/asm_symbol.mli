@@ -27,16 +27,41 @@
 (* Returns true if the argument is a character that should be escaped *)
 val should_be_escaped : char -> bool
 
+(** Symbol visibility for linking. [Global] symbols are exported and can be
+    referenced from other compilation units. [Local] symbols are file-scope and
+    can only be referenced within the same file. *)
+type visibility =
+  | Global
+  | Local
+
 include Identifiable.S
 
-(** [create] creates a new symbol. By default, it is assumed that the symbol has
-    not been encoded. In some rare cases, the symbol is encoded elsewhere. In
-    these cases, set the flag [already_encoded] to [true]. *)
-val create : string -> t
+(** [create] creates a new symbol with the given visibility. *)
+val create : visibility:visibility -> string -> t
+
+(** [create_global] creates a global symbol. Shorthand for
+    [create ~visibility:Global]. *)
+val create_global : string -> t
+
+(** [create_local] creates a local symbol. Shorthand for
+    [create ~visibility:Local]. *)
+val create_local : string -> t
+
+(** [create_without_encoding] creates a symbol from an already-encoded string.
+    Use this when you have a string that already includes the symbol prefix
+    (e.g., "_camlFoo" on macOS). The string will be used as-is without further
+    encoding. *)
+val create_without_encoding : visibility:visibility -> string -> t
 
 val encode : t -> string
 
 val to_raw_string : t -> string
+
+val visibility : t -> visibility
+
+val is_global : t -> bool
+
+val is_local : t -> bool
 
 (** We predefine several non-user generated symbols. *)
 module Predef : sig
