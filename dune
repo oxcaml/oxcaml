@@ -250,7 +250,6 @@
   typemode
   jkind_axis
   ;; IKINDS
-  ldd_hybrid_opt
   ldd
   axis_lattice
   axis_lattice_conv

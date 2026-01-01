@@ -26,8 +26,7 @@ module Solver = struct
       The solver computes LDD polynomials of the form
         base ⊔ Σ_i (arg_i ⊓ coeff_i)
       where [base] is the intrinsic kind of a constructor and each [coeff_i]
-      describes the contribution coming from the i-th type argument.
-      Least fixed points are used to interpret recursive types. *)
+      describes the contribution coming from the i-th type argument. *)
 
   module Ldd = Ikind.Ldd
 
@@ -112,10 +111,9 @@ module Solver = struct
     | Types.Tobject _ -> true
     | _ -> false
 
-  (** Compute the kind for [t].
-      We only memoize types that can be cyclic (polymorphic variants),
-      keeping the per-constructor memoization in [constr_to_coeffs]. *)
+  (** Compute the kind for [t]. *)
   let kind (ctx : ctx) (t : Types.type_expr) : kind =
+    (* Memoize only potentially cyclic types; LFPs handle recursion. *)
     match TyTbl.find_opt ctx.ty_to_kind t with
     | Some k -> k
     | None ->
@@ -132,10 +130,9 @@ module Solver = struct
         TyTbl.add ctx.ty_to_kind t rhs;
         rhs
 
-  (** Fetch or compute the polynomial for constructor [c]. The returned nodes
-      are placeholders stored in [constr_to_coeffs] so that mutually recursive
-      constructors can refer to each other. *)
+  (** Fetch or compute the polynomial for constructor [c]. *)
   let rec constr_kind (ctx : ctx) (c : Path.t) : poly * poly array =
+    (* Return placeholder nodes stored in [constr_to_coeffs] for recursion. *)
     match ConstrTbl.find_opt ctx.constr_to_coeffs c with
     | Some base_and_coeffs -> base_and_coeffs
     | None -> (
@@ -958,6 +955,7 @@ type lookup_result =
 let substitute_decl_ikind_with_lookup
     ~(lookup : Path.t -> lookup_result)
     (entry : Types.type_ikind) : Types.type_ikind =
+  (* Inline type functions in an identity environment (no Env). *)
   match entry with
   | Types.No_constructor_ikind _ -> entry
   | Types.Constructor_ikind _ when reset_constructor_ikind_on_substitution ->

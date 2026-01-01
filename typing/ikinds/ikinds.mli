@@ -1,9 +1,18 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                  Jules Jacobs, Jane Street                             *)
+(*                                                                        *)
+(*   Copyright 2025 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
 val ikinds_todo : string -> Types.type_ikind
-
-val normalize : context:Jkind.jkind_context -> Types.jkind_l -> Ikind.Ldd.node
-
-val type_declaration_ikind :
-  context:Jkind.jkind_context -> path:Path.t -> Types.constructor_ikind
 
 val type_declaration_ikind_gated :
   context:Jkind.jkind_context -> path:Path.t -> Types.type_ikind
@@ -50,8 +59,7 @@ val sub_or_error :
 (** Substitution description for a constructor path.
     - [Lookup_identity] leaves the path unchanged.
     - [Lookup_path q] renames to [q].
-    - [Lookup_type_fun (params, body)] inlines a type function, evaluated
-      in an identity environment (no Env required). *)
+    - [Lookup_type_fun (params, body)] represents an inlined type function. *)
 type lookup_result =
   | Lookup_identity
   | Lookup_path of Path.t
