@@ -14,16 +14,30 @@
  *
  *)
 
+open Import
+
 type evaluation_outcome =
   | Result of Obj.t
   | Exception of exn
 
-val jit_load
-  :  phrase_name:string
-  -> Format.formatter
-  -> Lambda.program
-  -> evaluation_outcome
-(** Loads and runs the provided program *)
+(** Load and run assembled binary sections.
+    This is the main generic JIT entry point that works with any architecture. *)
+val jit_load :
+  (module Binary_emitter_intf.S
+     with type Assembled_section.t = 'a
+      and type Relocation.t = 'r) ->
+  phrase_name:string ->
+  outcome_ref:evaluation_outcome option ref ->
+  'a String.Map.t ->
+  unit
+
+(** Load and run a Lambda program. Automatically selects backend based on
+    architecture (x86 or arm64). *)
+val jit_load_program :
+  phrase_name:string ->
+  Format.formatter ->
+  Lambda.program ->
+  evaluation_outcome
 
 val jit_lookup_symbol : string -> Obj.t option
 
