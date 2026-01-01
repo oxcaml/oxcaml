@@ -35,7 +35,7 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
     (* XXX Not sure what to do in the cases below *)
     | [] | _ :: _ -> fun_name
   in
-  let start_sym = Asm_symbol.create fun_name in
+  let start_sym = Asm_symbol.create_global fun_name in
   let location_attributes =
     if Location.is_none loc
     then [DAH.create_artificial ()]

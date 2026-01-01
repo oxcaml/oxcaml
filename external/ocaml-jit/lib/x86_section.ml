@@ -49,9 +49,19 @@ module Map = struct
       in
       match l with
       | [] -> add_current ()
-      | Directive (Section {names = s_l; flags = s_opt; args = s_l'; _}) :: tl ->
+      | Directive (Section (section, first_occurrence)) :: tl ->
           let acc = add_current () in
-          let current_section = name s_l s_opt s_l' in
+          let first_occurrence =
+            match first_occurrence with
+            | `First_occurrence -> true
+            | `Not_first_occurrence -> false
+          in
+          let details =
+            Asm_targets.Asm_section.details section ~first_occurrence
+          in
+          let current_section =
+            name details.names details.flags details.args
+          in
           let current_instrs = [] in
           aux acc current_section current_instrs tl
       | (_ as instr) :: tl ->
@@ -59,8 +69,16 @@ module Map = struct
     in
     match l with
     | [] -> String.Map.empty
-    | Directive (Section {names = s_l; flags = s_opt; args = s_l'; _}) :: tl ->
-        let current_section = name s_l s_opt s_l' in
+    | Directive (Section (section, first_occurrence)) :: tl ->
+        let first_occurrence =
+          match first_occurrence with
+          | `First_occurrence -> true
+          | `Not_first_occurrence -> false
+        in
+        let details =
+          Asm_targets.Asm_section.details section ~first_occurrence
+        in
+        let current_section = name details.names details.flags details.args in
         let current_instrs = [] in
         aux String.Map.empty current_section current_instrs tl
     | _line :: _ -> failwithf "Invalid program, should start with section"
