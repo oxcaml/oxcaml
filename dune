@@ -205,7 +205,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
- ;; TYPING
+  ;; TYPING
   ident
   path
   jkind

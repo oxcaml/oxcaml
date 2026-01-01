@@ -898,7 +898,7 @@ module Merge = struct
               type_jkind =
                 Jkind.Builtin.value ~why:(Unknown "merge_constraint");
               type_ikind = Types.ikinds_todo "merge constraint temporary";
-                            type_private = Private;
+              type_private = Private;
               type_manifest = None;
               type_variance =
                 List.map

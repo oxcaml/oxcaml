@@ -636,19 +636,20 @@ let rec type_declaration' copy_scope s decl =
       end;
     type_ikind = (
       (* Preserve constructor ikinds via [s.types] (path rename or identity-env inlined type functions), avoiding Env; ideally we'd use a real Env but we use this identity-env approach instead. *)
-      let lookup (p : Path.t) =
+      let lookup (p : Path.t) : Ikinds.lookup_result =
+        let open Ikinds in
         match Path.Map.find p s.types with
-        | Path p' -> Ikinds.Lookup_path p'
+        | Path p' -> Lookup_path p'
         | Type_function { params; body } ->
             let body = apply_type_function params params body in
-            Ikinds.Lookup_type_fun (params, body)
+            Lookup_type_fun (params, body)
         | exception Not_found ->
             (* Mirror [type_path]: even without an explicit replacement, rename
                via module path rewriting if the path changes. *)
             let p' = type_path s p in
             if Path.compare p p' = 0
-            then Ikinds.Lookup_identity
-            else Ikinds.Lookup_path p'
+            then Lookup_identity
+            else Lookup_path p'
       in
       Ikinds.substitute_decl_ikind_with_lookup ~lookup decl.type_ikind
     );

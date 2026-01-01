@@ -153,8 +153,8 @@ type constructor_ikind =
   { base : Ikind.Ldd.node;
     coeffs : Ikind.Ldd.node array;
   }
-(* Invariant: [coeffs] are in subtract-normal form, i.e.
-   [coeffs.(i)] is disjoint from [base]. *)
+(** Invariant: [coeffs] are in subtract-normal form, i.e.
+    [coeffs.(i)] is disjoint from [base]. *)
 
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind

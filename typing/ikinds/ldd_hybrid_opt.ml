@@ -23,6 +23,7 @@ module Make (V : ORDERED) = struct
     { v : var;
       lo : node;
       hi : node;
+      (* Cached lattice contribution of the all-zero (lo) branch. *)
       down0 : Axis_lattice.t
     }
 
@@ -64,8 +65,6 @@ module Make (V : ORDERED) = struct
       (node_block n).down0
   end
 
-  (* [down0] caches the lattice contribution of the all-zero (lo) branch.
-     It lets us answer some queries without walking the entire [lo] chain. *)
   let[@inline] make_node (v : var) (lo : node) (hi : node) : node =
     let down0 =
       if is_leaf lo then Unsafe.leaf_value lo else Unsafe.node_down0 lo
@@ -147,7 +146,7 @@ module Make (V : ORDERED) = struct
           v)
   end
 
-  (* Subtract subsets hi - lo.
+  (* Subtract subsets hi - lo (co-Heyting subtraction).
      This preserves ordering and maintains the canonical form [hi = hi - lo]. *)
   (* Ordering fast path: if [lo] has a larger top var, it cannot appear
      under [hi], so we only recurse into [hi]'s subtrees. *)
@@ -302,10 +301,8 @@ module Make (V : ORDERED) = struct
 
   let new_var () = Var.make_var ()
 
-  (* --------- assignments (x ← ⊥ / ⊤) ---------
-     These are cofactors: assign the given variable to bottom/top and
-     simplify the diagram accordingly. *)
-  (* Ordering fast path: if [var] < node var, it cannot appear below. *)
+  (* --------- assignments (x ← ⊥ / ⊤) --------- *)
+  (** Assign variable to bottom [var := ⊥], simplifying the diagram. *)
   let rec assign_bot ~(var : var) (w : node) : node =
     if is_leaf w
     then w
@@ -313,7 +310,9 @@ module Make (V : ORDERED) = struct
       let n = Unsafe.node_block w in
       let cmp = compare_var var n.v in
       if cmp < 0
-      then w
+      then
+        (* Fast path: [var] < node var, so it cannot appear below. *)
+        w
       else if cmp = 0
       then n.lo
       else
@@ -321,7 +320,7 @@ module Make (V : ORDERED) = struct
         let hi' = assign_bot ~var n.hi in
         if lo' == n.lo && hi' == n.hi then w else node n.v lo' hi'
 
-  (* Ordering fast path: if [var] < node var, it cannot appear below. *)
+  (** Assign variable to top [var := ⊤], simplifying the diagram. *)
   let rec assign_top ~(var : var) (w : node) : node =
     if is_leaf w
     then w
@@ -329,7 +328,9 @@ module Make (V : ORDERED) = struct
       let n = Unsafe.node_block w in
       let cmp = compare_var var n.v in
       if cmp < 0
-      then w
+      then
+        (* Fast path: [var] < node var, so it cannot appear below. *)
+        w
       else if cmp = 0
       then join n.lo n.hi
       else
@@ -340,15 +341,16 @@ module Make (V : ORDERED) = struct
   (* --------- inline solved vars ---------
      Inline solved variables by replacing them with their solutions.
      We do not descend under rigid vars (ids above [rigid_var_start]). *)
-  (* Ordering fast path: rigid ids are above all non-rigids, so they
-     cannot appear under non-rigid nodes. *)
   let rec inline_solved_vars (w : node) : node =
     if is_leaf w
     then w
     else
       let n = Unsafe.node_block w in
       if n.v.id > Var.rigid_var_start
-      then w
+      then
+        (* Fast path: rigid ids are above all non-rigids, so they cannot
+           appear under non-rigid nodes. *)
+        w
       else
         let lo' = inline_solved_vars n.lo in
         let hi' = inline_solved_vars n.hi in

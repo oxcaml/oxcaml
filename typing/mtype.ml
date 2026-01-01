@@ -765,26 +765,26 @@ let collect_arg_paths mty =
   (* let rt = Ident.create "Root" in
      and prefix = ref (Path.Pident rt) in *)
   with_type_mark begin fun mark ->
-  let super = type_iterators mark in
-  let it_path p = paths := Path.Set.union (get_arg_paths p) !paths
-  and it_signature_item it si =
-    super.it_signature_item it si;
-    match si with
-    | Sig_module (id, _, {md_type=Mty_alias p}, _, _) ->
-        bindings := Ident.add id p !bindings
-    | Sig_module (id, _, {md_type=Mty_signature sg}, _, _) ->
-        List.iter
-          (function Sig_module (id', _, _, _, _) ->
-              subst :=
-                Path.Map.add (Pdot (Pident id, Ident.name id')) id' !subst
-            | _ -> ())
-          sg
-    | _ -> ()
-  in
-  let it = {super with it_path; it_signature_item} in
-  it.it_module_type it mty;
-  Path.Set.fold (fun p -> Ident.Set.union (collect_ids !subst !bindings p))
-    !paths Ident.Set.empty
+    let super = type_iterators mark in
+    let it_path p = paths := Path.Set.union (get_arg_paths p) !paths
+    and it_signature_item it si =
+      super.it_signature_item it si;
+      match si with
+      | Sig_module (id, _, {md_type=Mty_alias p}, _, _) ->
+          bindings := Ident.add id p !bindings
+      | Sig_module (id, _, {md_type=Mty_signature sg}, _, _) ->
+          List.iter
+            (function Sig_module (id', _, _, _, _) ->
+                subst :=
+                  Path.Map.add (Pdot (Pident id, Ident.name id')) id' !subst
+              | _ -> ())
+            sg
+      | _ -> ()
+    in
+    let it = {super with it_path; it_signature_item} in
+    it.it_module_type it mty;
+    Path.Set.fold (fun p -> Ident.Set.union (collect_ids !subst !bindings p))
+      !paths Ident.Set.empty
   end
 
 type remove_alias_from =
@@ -873,15 +873,15 @@ let scrape_for_type_of ~remove_aliases env mty =
 let lower_nongen nglev mty =
   let open Btype in
   with_type_mark begin fun mark ->
-  let super = type_iterators mark in
-  let it_do_type_expr it ty =
-    match get_desc ty with
-      Tvar _ ->
-        let level = get_level ty in
-        if level < generic_level && level > nglev then set_level ty nglev
-    | _ ->
-        super.it_do_type_expr it ty
-  in
-  let it = {super with it_do_type_expr} in
-  it.it_module_type it mty
+    let super = type_iterators mark in
+    let it_do_type_expr it ty =
+      match get_desc ty with
+        Tvar _ ->
+          let level = get_level ty in
+          if level < generic_level && level > nglev then set_level ty nglev
+      | _ ->
+          super.it_do_type_expr it ty
+    in
+    let it = {super with it_do_type_expr} in
+    it.it_module_type it mty
   end

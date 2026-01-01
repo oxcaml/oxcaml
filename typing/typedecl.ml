@@ -2887,14 +2887,13 @@ let normalize_decl_jkinds env decls =
             | Type_variant (cs, rep, _) ->
               Type_variant (cs, rep, umc)
           in
-          let decl = { decl with type_jkind; type_kind } in
           let type_ikind =
             Ikinds.type_declaration_ikind_of_jkind
               ~context:normalization_context
               ~params:decl.type_params
-              decl.type_jkind
+              type_jkind
           in
-          { decl with type_ikind }
+          { decl with type_jkind; type_kind; type_ikind }
         else decl
       | Error err ->
         raise(Error(decl.type_loc,

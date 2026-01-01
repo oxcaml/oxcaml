@@ -21,13 +21,13 @@ let reset_constructor_ikind_on_substitution = false
 module Ldd = Ikind.Ldd
 
 module JK = struct
-  (* A JKind/ikind solver specialized to [Ikind.Ldd] and [Types.type_expr].
+  (** A JKind/ikind solver specialized to [Ikind.Ldd] and [Types.type_expr].
 
-     The solver computes LDD polynomials of the form
-       base ⊔ Σ_i (arg_i ⊓ coeff_i)
-     where [base] is the intrinsic kind of a constructor and each [coeff_i]
-     describes the contribution coming from the i-th type argument.
-     Least fixed points are used to interpret recursive types. *)
+      The solver computes LDD polynomials of the form
+        base ⊔ Σ_i (arg_i ⊓ coeff_i)
+      where [base] is the intrinsic kind of a constructor and each [coeff_i]
+      describes the contribution coming from the i-th type argument.
+      Least fixed points are used to interpret recursive types. *)
 
   module Ldd = Ikind.Ldd
 
@@ -65,8 +65,12 @@ module JK = struct
     let hash x = Path.hash x
   end)
 
+  (** Kind function for constructors: computes a kind from a context. *)
   type ckind = ctx -> kind
 
+  (** Result of constructor lookup.
+      [Ty] describes a constructor declaration with arguments and a kind
+      function; [Poly] provides a cached polynomial form. *)
   and constr_decl =
     | Ty of
         { args : ty list;
@@ -87,8 +91,8 @@ module JK = struct
       constr_to_coeffs : (poly * poly array) ConstrTbl.t
     }
 
-  (* Start a new solver context. *)
-  let create ~(mode : mode) (env : env) : ctx =
+  (** Start a new solver context. *)
+  let create_ctx ~(mode : mode) (env : env) : ctx =
     { env;
       mode;
       ty_to_kind = TyTbl.create 0;
@@ -102,7 +106,7 @@ module JK = struct
     | Normal -> Ldd.mk_var (Ldd.rigid name)
     | Round_up -> Ldd.const Axis_lattice.top
 
-  (* A rigid variable corresponding to a type parameter [t]. *)
+  (** A rigid variable corresponding to a type parameter [t]. *)
   let rigid (ctx : ctx) (t : ty) : kind =
     let param = Types.get_id t in
     rigid_name ctx (Ldd.Name.param param)
@@ -114,10 +118,10 @@ module JK = struct
     | Types.Tobject _ -> true
     | _ -> false
 
-  (* Compute the kind for [t].
-     We only memoize types that can be cyclic (polymorphic variants), keeping
-     the per-constructor memoization in [constr_to_coeffs]. *)
-  let rec kind (ctx : ctx) (t : ty) : kind =
+  (** Compute the kind for [t].
+      We only memoize types that can be cyclic (polymorphic variants),
+      keeping the per-constructor memoization in [constr_to_coeffs]. *)
+  let kind (ctx : ctx) (t : ty) : kind =
     match TyTbl.find_opt ctx.ty_to_kind t with
     | Some k -> k
     | None ->
@@ -134,10 +138,10 @@ module JK = struct
         TyTbl.add ctx.ty_to_kind t rhs;
         rhs
 
-  (* Fetch or compute the polynomial for constructor [c].  The returned
-     nodes are placeholders stored in [constr_to_coeffs] so that mutually
-     recursive constructors can refer to each other. *)
-  and constr_kind (ctx : ctx) (c : constr) : poly * poly array =
+  (** Fetch or compute the polynomial for constructor [c]. The returned nodes
+      are placeholders stored in [constr_to_coeffs] so that mutually recursive
+      constructors can refer to each other. *)
+  let rec constr_kind (ctx : ctx) (c : constr) : poly * poly array =
     match ConstrTbl.find_opt ctx.constr_to_coeffs c with
     | Some base_and_coeffs -> base_and_coeffs
     | None -> (
@@ -639,7 +643,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
 (* Package the above into a full evaluation context. *)
 let make_ctx_with_mode ~(mode : JK.mode) ~(context : Jkind.jkind_context) :
     JK.ctx =
-  JK.create ~mode { kind_of; lookup = lookup_of_context ~context }
+  JK.create_ctx ~mode { kind_of; lookup = lookup_of_context ~context }
 
 let make_ctx ~(context : Jkind.jkind_context) : JK.ctx =
   make_ctx_with_mode ~mode:JK.Normal ~context
@@ -937,7 +941,7 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   let lookup p = identity_lookup_from_arity_map arity p in
   let kind_of_identity = kind_of in
   let env : JK.env = { kind_of = kind_of_identity; lookup } in
-  let ctx = JK.create ~mode:JK.Normal env in
+  let ctx = JK.create_ctx ~mode:JK.Normal env in
   let poly = JK.normalize (kind_of_identity ctx body) in
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params

@@ -2,20 +2,21 @@
 (* Types shared by ikind algorithms                                        *)
 (*-------------------------------------------------------------------------*)
 
+(** Rigid names are the variables that may occur in ikind formulas. *)
 module Rigid_name : sig
-  (** Rigid names are the variables that may occur in ikind formulas. *)
 
   (* CR jujacobs: see if we can make this type abstract. *)
   type t =
     | Atom of
         { constr : Path.t;
-          (* arg_index = 0 refers to the base contribution,
-             subsequent refer to the coefficients of the i-th argument. *)
           arg_index : int
+          (** [arg_index] = 0 refers to the base contribution, and subsequent
+              indices refer to the coefficients of the i-th argument. *)
         }
     | Param of int
-        (** Only occurs in formulas for type constructors. Refers to the i-th
-            parameter, where i is the id of that type variable. *)
+        (** [Param id] only occurs in formulas for type constructors. Refers to
+            a type-parameter of the constructor, where [id] is the id of the
+            type variable representing the parameter. *)
     | Unknown of int
         (** An unknown quantity with a given id. Used to model not-best in
             ikinds. This is used when we couldn't compute a precise ikind,

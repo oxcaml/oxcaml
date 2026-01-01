@@ -2,25 +2,15 @@
 (* Types shared by ikind algorithms                                        *)
 (*-------------------------------------------------------------------------*)
 
-(* Rigid names are the variables that may occur in ikind formulas. *)
 module Rigid_name = struct
   type t =
     | Atom of
         { constr : Path.t;
-          (* arg_index = 0 refers to the base contribution,
-             subsequent refer to the coefficients of the i-th argument. *)
           arg_index : int
         }
     | Param of int
-        (** Only occurs in formulas for type constructors. Refers to the i-th
-            parameter, where i is the id of that type variable. *)
     | Unknown of int
-        (** An unknown quantity with a given id. Used to model not-best in
-            ikinds. This is used when we couldn't compute a precise ikind,
-            e.g. for a polymorphic variant with conjunctive type --
-            `Constr of (a & b & ...) *)
 
-  (** Ordering on rigid names used in the LDD to order the nodes. *)
   let compare a b =
     if a == b
     then 0
