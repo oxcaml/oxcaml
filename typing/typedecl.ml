@@ -2140,17 +2140,21 @@ let rec update_decl_jkind env dpath decl =
         |> Jkind.mark_best
       in
       let reason = "update_decl_jkind open" in
-      { decl with type_jkind;
-                              type_ikind = Types.ikinds_todo reason }
+      { decl with
+        type_jkind;
+        type_ikind = Types.ikinds_todo reason
+      }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
       let reason = "update_decl_jkind record" in
-      { decl with type_kind = Type_record (lbls, rep, umc);
-              type_jkind;
-                            type_ikind = Types.ikinds_todo reason }
+      { decl with
+        type_kind = Type_record (lbls, rep, umc);
+        type_jkind;
+        type_ikind = Types.ikinds_todo reason
+      }
     (* CR layouts v3.0: handle this case in [update_variant_jkind] when
        [Variant_with_null] introduced.
 

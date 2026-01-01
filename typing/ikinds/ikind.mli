@@ -36,10 +36,6 @@ module Rigid_name : sig
 end
 
 module Ldd : sig
-  type lat = Axis_lattice.t
-
-  type constr = Path.t
-
   type node
 
   type var
@@ -50,13 +46,13 @@ module Ldd : sig
 
   val bot : node
 
-  val const : lat -> node
+  val const : Axis_lattice.t -> node
 
   val rigid : Name.t -> var
 
   val new_var : unit -> var
 
-  val mk_var : var -> node
+  val node_of_var : var -> node
 
   val join : node -> node -> node
 
@@ -72,16 +68,16 @@ module Ldd : sig
 
   val solve_pending : unit -> unit
 
+  (** [decompose_into_linear_terms ~universe n] returns a base term and a list
+      of linear coefficients, one per variable in [universe]. *)
   val decompose_into_linear_terms :
     universe:var list -> node -> node * node list
-
-  val leq : node -> node -> bool
 
   (** Empty list means [a ⊑ b] succeeds. Non-empty list is the witness axes
       where it fails. *)
   val leq_with_reason : node -> node -> int list
 
-  val round_up : node -> lat
+  val round_up : node -> Axis_lattice.t
 
   val is_const : node -> bool
 

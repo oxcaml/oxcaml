@@ -22,7 +22,7 @@ module Make (V : ORDERED) : sig
 
   val new_var : unit -> var
 
-  val mk_var : var -> node
+  val node_of_var : var -> node
 
   (** Boolean algebra over nodes. *)
   val join : node -> node -> node
@@ -40,11 +40,11 @@ module Make (V : ORDERED) : sig
 
   val solve_pending : unit -> unit
 
-  (** Linear decomposition/composition helpers. *)
+  (** Linear decomposition/composition helpers.
+      [decompose_into_linear_terms ~universe n] returns a base term and a list
+      of linear coefficients, one per variable in [universe]. *)
   val decompose_into_linear_terms :
     universe:var list -> node -> node * node list
-
-  val leq : node -> node -> bool
 
   (** If [a ⊑ b] fails, return witness axis indices where they differ.
       Empty list means [a ⊑ b] succeeds. Non-empty list is the witness axes

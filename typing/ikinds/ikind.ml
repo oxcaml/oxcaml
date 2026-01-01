@@ -47,9 +47,5 @@ end
 module Ldd = struct
   module Name = Rigid_name
 
-  type lat = Axis_lattice.t
-
-  type constr = Path.t
-
   include Ldd.Make (Rigid_name)
 end
