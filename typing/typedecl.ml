@@ -405,8 +405,11 @@ let update_type temp_env env id loc =
    be possible.
 *)
 let is_float env ty =
-  match get_desc (Ctype.get_unboxed_type_approximation env ty).ty with
-    Tconstr(p, _, _) -> Path.same p Predef.path_float
+  match Ctype.get_unboxed_type_approximation env ty with
+  | { ty; or_null = None; modality = _ } -> begin
+    match get_desc ty with
+    | Tconstr(p, _, _) -> Path.same p Predef.path_float
+    | _ -> false end
   | _ -> false
 
 (* Determine if a type definition defines a fixed type. (PW) *)
