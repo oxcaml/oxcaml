@@ -614,7 +614,6 @@
   x86_gas
   x86_masm
   x86_proc
-  arm64_ast
   zero_alloc_checker
   zero_alloc_info
   ;; backend/cfg
@@ -721,7 +720,8 @@
   compiler_owee
   gc_timings
   dwarf_low
-  dwarf_high))
+  dwarf_high
+  arm64_ast))
 
 (library
  (name oxcaml_common)
@@ -814,6 +814,7 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.a}
    %{dep:backend/asm_targets/asm_targets.a}
+   %{dep:backend/arm64/ast/arm64_ast.a}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
    %{dep:oxcaml_common.a}
@@ -853,6 +854,7 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cma}
    %{dep:backend/asm_targets/asm_targets.cma}
+   %{dep:backend/arm64/ast/arm64_ast.cma}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
    %{dep:oxcaml_common.cma}
@@ -892,6 +894,7 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cmxa}
    %{dep:backend/asm_targets/asm_targets.cmxa}
+   %{dep:backend/arm64/ast/arm64_ast.cmxa}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
    %{dep:oxcaml_common.cmxa}

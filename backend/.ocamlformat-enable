@@ -21,8 +21,8 @@ arm64/stack_check.ml
 arm64/stack_class.ml
 arm64/vectorize_specific.ml
 arm64/regalloc_stack_operands.ml
-arm64_ast.ml
-arm64_ast.mli
+arm64/ast/*.ml
+arm64/ast/*.mli
 asm_targets/**/*.ml
 asm_targets/**/*.mli
 branch_relaxation.ml
