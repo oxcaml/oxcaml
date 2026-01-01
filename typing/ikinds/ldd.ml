@@ -419,7 +419,7 @@ module Make (V : ORDERED) = struct
             join lo' (meet hi' d')
       | Rigid _ -> w
 
-  (** [sub_subsets a b] computes a - b. *)
+  (** [sub_subsets a b] computes co-Heyting subtraction (a - b) for LDDs. *)
   let sub_subsets (a : node) (b : node) =
     canonicalize ~hi:(inline_solved_vars a) ~lo:(inline_solved_vars b)
 
@@ -441,31 +441,17 @@ module Make (V : ORDERED) = struct
       let rhs_forced = inline_solved_vars rhs_raw in
       var.state <- Solved (assign_top ~var rhs_forced)
 
-  let lfp_queue = Stack.create ()
-
-  let gfp_queue = Stack.create ()
-
-  let enqueue_lfp (var : var) (rhs_raw : node) : unit =
-    (* Immediate solve for LFP, matching ldd.ml behavior *)
-    solve_lfp var rhs_raw
+  let gfp_queue : (var * node) list ref = ref []
 
   let enqueue_gfp (var : var) (rhs_raw : node) : unit =
-    Stack.push (var, rhs_raw) gfp_queue
-
-  let solve_pending_lfps () : unit =
-    while not (Stack.is_empty lfp_queue) do
-      let var, rhs_raw = Stack.pop lfp_queue in
-      solve_lfp var rhs_raw
-    done
+    gfp_queue := (var, rhs_raw) :: !gfp_queue
 
   let solve_pending_gfps () : unit =
-    while not (Stack.is_empty gfp_queue) do
-      let var, rhs_raw = Stack.pop gfp_queue in
-      solve_gfp var rhs_raw
-    done
+    let pending = !gfp_queue in
+    gfp_queue := [];
+    List.iter (fun (var, rhs_raw) -> solve_gfp var rhs_raw) pending
 
   let solve_pending () : unit =
-    solve_pending_lfps ();
     solve_pending_gfps ()
 
   (** Decompose into linear terms over [universe]. *)
@@ -581,13 +567,15 @@ module Make (V : ORDERED) = struct
 
   (* Empty list means [a ⊑ b] succeeds.
      Non-empty list is the witness axes where it fails. *)
-  let leq_with_reason (a : node) (b : node) : int list =
+  let leq_with_reason (a : node) (b : node) :
+      Jkind_axis.Axis.packed list =
     solve_pending ();
     let a = inline_solved_vars a in
     let b = inline_solved_vars b in
     let diff = sub_subsets a b in
     let witness = round_up' diff in
     Axis_lattice.non_bot_axes witness
+    |> List.map Axis_lattice.axis_number_to_axis_packed
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let rec aux (n : node) : node =

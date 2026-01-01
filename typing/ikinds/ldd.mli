@@ -48,8 +48,6 @@ module Make (V : ORDERED) : sig
   (** Solving interface. *)
   val solve_lfp : var -> node -> unit
 
-  val enqueue_lfp : var -> node -> unit
-
   val enqueue_gfp : var -> node -> unit
 
   val solve_pending : unit -> unit
@@ -60,10 +58,10 @@ module Make (V : ORDERED) : sig
   val decompose_into_linear_terms :
     universe:var list -> node -> node * node list
 
-  (** If [a ⊑ b] fails, return witness axis indices where they differ.
+  (** If [a ⊑ b] fails, return witness axes where they differ.
       Empty list means [a ⊑ b] succeeds. Non-empty list is the witness axes
       where it fails. *)
-  val leq_with_reason : node -> node -> int list
+  val leq_with_reason : node -> node -> Jkind_axis.Axis.packed list
 
   val round_up : node -> Axis_lattice.t
 

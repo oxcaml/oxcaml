@@ -12,8 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val ikinds_todo : string -> Types.type_ikind
-
 val type_declaration_ikind_gated :
   context:Jkind.jkind_context -> path:Path.t -> Types.type_ikind
 

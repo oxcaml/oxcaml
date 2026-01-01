@@ -6,18 +6,21 @@
 module Rigid_name : sig
 
   (* CR jujacobs: see if we can make this type abstract. *)
+  type unknown_id
+
   type t =
     | Atom of
         { constr : Path.t;
           arg_index : int
           (** [arg_index] = 0 refers to the base contribution, and subsequent
-              indices refer to the coefficients of the i-th argument. *)
+              indices refer to the coefficients of the i-th argument. This is
+              a positional index, not a type-variable id. *)
         }
     | Param of int
         (** [Param id] only occurs in formulas for type constructors. Refers to
-            a type-parameter of the constructor, where [id] is the id of the
-            type variable representing the parameter. *)
-    | Unknown of int
+            a type-parameter of the constructor, where [id] is the
+            [Types.get_id] of the type variable representing the parameter. *)
+    | Unknown of unknown_id
         (** An unknown quantity with a given id. Used to model not-best in
             ikinds. This is used when we couldn't compute a precise ikind,
             e.g. for a polymorphic variant with conjunctive type --
@@ -62,8 +65,6 @@ module Ldd : sig
 
   val solve_lfp : var -> node -> unit
 
-  val enqueue_lfp : var -> node -> unit
-
   val enqueue_gfp : var -> node -> unit
 
   val solve_pending : unit -> unit
@@ -75,7 +76,7 @@ module Ldd : sig
 
   (** Empty list means [a ⊑ b] succeeds. Non-empty list is the witness axes
       where it fails. *)
-  val leq_with_reason : node -> node -> int list
+  val leq_with_reason : node -> node -> Jkind_axis.Axis.packed list
 
   val round_up : node -> Axis_lattice.t
 

@@ -3,13 +3,15 @@
 (*-------------------------------------------------------------------------*)
 
 module Rigid_name = struct
+  type unknown_id = int
+
   type t =
     | Atom of
         { constr : Path.t;
           arg_index : int
         }
     | Param of int
-    | Unknown of int
+    | Unknown of unknown_id
 
   let compare a b =
     if a == b

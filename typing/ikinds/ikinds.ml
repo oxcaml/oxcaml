@@ -39,7 +39,9 @@ module Solver = struct
     | Round_up
 
   (* Hash tables avoiding polymorphic structural comparison on deep values.
-     We key types by their unique [Types.get_id] to keep lookups cheap. *)
+     We key types by their unique [Types.get_id] to keep lookups cheap. This
+     is similar to [Btype.TypeHash], but that table works over transient
+     nodes; here we need a table over [type_expr] values. *)
   module TyTbl = Hashtbl.Make (struct
     type t = Types.type_expr
 
@@ -50,6 +52,7 @@ module Solver = struct
 
   let constr_to_string (p : Path.t) : string = Format.asprintf "%a" Path.print p
 
+  (* Path does not expose a dedicated hash table module. *)
   module ConstrTbl = Hashtbl.Make (struct
     type t = Path.t
 
@@ -72,6 +75,8 @@ module Solver = struct
         }
     | Poly of poly * poly array
 
+  (* [kind_of] is parameterized so callers can use alternative environments
+     (e.g., identity environments when inlining type functions). *)
   and env =
     { kind_of : ctx -> Types.type_expr -> kind;
       lookup : Path.t -> constr_decl
@@ -254,13 +259,12 @@ module Solver = struct
     Ldd.solve_pending ();
     base, coeffs
 
-  let leq_with_reason (k1 : kind) (k2 : kind) : int list =
+  let leq_with_reason (k1 : kind) (k2 : kind) :
+      Jkind_axis.Axis.packed list =
     Ldd.leq_with_reason k1 k2
 
   let round_up (k : kind) : Axis_lattice.t = Ldd.round_up k
 end
-
-let ikinds_todo : string -> Types.type_ikind = Types.ikinds_todo
 
 let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
   (* Keep coefficients disjoint from the base (subtract-normal form). *)
@@ -765,7 +769,6 @@ let sub_jkind_l ?allow_any_crossing ?origin
           then
             let axes =
               violating_axes
-              |> List.map Axis_lattice.axis_number_to_axis_packed
               |> List.map (fun (Jkind_axis.Axis.Pack ax) ->
                      Jkind_axis.Axis.name ax)
               |> String.concat ", "
@@ -778,9 +781,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
            accepts an r-jkind. *)
         let axis_reasons =
           List.map
-            (fun axis ->
-              let axis_name = Axis_lattice.axis_number_to_axis_packed axis in
-              Jkind.Sub_failure_reason.Axis_disagreement axis_name)
+            (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis)
             violating_axes
         in
         Error
@@ -845,9 +846,7 @@ let sub_or_intersect ?origin:_origin
       | violating_axes ->
         let axis_reasons =
           List.map
-            (fun axis ->
-              Jkind.Sub_failure_reason.Axis_disagreement
-                (Axis_lattice.axis_number_to_axis_packed axis))
+            (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis)
             violating_axes
         in
         let reasons : Jkind.Sub_failure_reason.t Misc.Nonempty_list.t =
