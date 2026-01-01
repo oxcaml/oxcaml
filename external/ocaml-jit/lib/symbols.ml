@@ -55,23 +55,40 @@ let aggregate ~current ~new_symbols =
     then Some new_
     else failwithf "Multiple occurrences of the symbol %s" symbol_name)
 
-let from_binary_section { address; value = binary_section } =
-  let symbol_tbl = X86_binary_emitter.labels binary_section in
-  Misc.Stdlib.String.Tbl.fold
-    (fun name symbol acc ->
-      match (symbol.X86_binary_emitter.sy_pos, name) with
-      | None, _ -> failwithf "Symbol %s has no offset" name
-      | Some _, ("caml_absf_mask" | "caml_negf_mask" |
-                 "caml_absf32_mask" | "caml_negf32_mask") -> acc
-      | Some offset, _ ->
-          String.Map.add ~key:name ~data:(Address.add_int address offset) acc)
-    symbol_tbl
-    String.Map.empty
+let target_to_string (target : Binary_emitter_intf.target) =
+  match target with
+  | Label lbl -> Asm_targets.Asm_label.encode lbl
+  | Symbol sym -> Asm_targets.Asm_symbol.encode sym
+
+let from_binary_section (type a r)
+    (module E : Binary_emitter_intf.S
+      with type Assembled_section.t = a
+       and type Relocation.t = r)
+    { address; value = binary_section } =
+  let acc = ref String.Map.empty in
+  E.Assembled_section.iter_labels_and_symbols binary_section ~f:(fun target ~offset ->
+    let name = target_to_string target in
+    match name with
+    | "caml_absf_mask" | "caml_negf_mask"
+    | "caml_absf32_mask" | "caml_negf32_mask" -> ()
+    | _ ->
+      acc := String.Map.add ~key:name ~data:(Address.add_int address offset) !acc);
+  !acc
 
 let find t name =
   match String.Map.find_opt name t with
   | Some addr -> Some addr
-  | None -> Externals.dlsym name
+  | None ->
+    (* For external symbols (like caml_call_gc), strip the underscore prefix
+       on macOS before calling dlsym, since caml_globalsym expects unprefixed
+       names *)
+    let dlsym_name =
+      match Target_system.derived_system () with
+      | MacOS_like when String.length name > 0 && String.get name 0 = '_' ->
+        String.sub name 1 (String.length name - 1)
+      | _ -> name
+    in
+    Externals.dlsym dlsym_name
 
 let dprint t =
   Printf.printf "------ Symbols -----\n%!";

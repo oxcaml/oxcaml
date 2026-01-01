@@ -28,6 +28,9 @@ let is_asan_enabled = ref false
 (* CR gyorsh: refactor to use [Arch.Extension] like amd64 *)
 let feat_cssc = ref false
 
+(* Emit elf notes with trap handling information. *)
+let trap_notes = ref true
+
 (* Machine-specific command-line options *)
 
 let command_line_options = [
