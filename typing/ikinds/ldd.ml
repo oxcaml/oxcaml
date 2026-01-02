@@ -239,7 +239,7 @@ module Make (V : ORDERED) = struct
 
   (* --------- boolean algebra over nodes --------- *)
   let rec join (a : node) (b : node) =
-    (* Variable-order merge: [cmp] decides which side can be descended. *)
+    (* Variable-order merge: [order] decides which side can be descended. *)
     if a == b
     then a
     else if is_leaf a
@@ -290,7 +290,7 @@ module Make (V : ORDERED) = struct
     else aux leaf_value node
 
   let rec meet (a : node) (b : node) =
-    (* Variable-order merge: [cmp] decides which side can be descended. *)
+    (* Variable-order merge: [order] decides which side can be descended. *)
     if a == b
     then a
     else if is_leaf a
@@ -410,9 +410,9 @@ module Make (V : ORDERED) = struct
           let d' = node_of_var block.v in
           join lo' (meet hi' d')
 
-  (** [assign_bot_force ~var w] is equivalent to
+  (** [assign_bot_inline ~var w] is equivalent to
       [assign_bot ~var (inline_solved_vars w)]. *)
-  let rec assign_bot_force ~(var : var) (node : node) : node =
+  let rec assign_bot_inline ~(var : var) (node : node) : node =
     if var.id > Var.rigid_var_start
     then assign_bot ~var (inline_solved_vars node)
     else if is_leaf node
@@ -421,18 +421,18 @@ module Make (V : ORDERED) = struct
       let block = Unsafe.node_block node in
       match block.v.state with
       | Solved d ->
-        let lo' = assign_bot_force ~var block.lo in
-        let hi' = assign_bot_force ~var block.hi in
+        let lo' = assign_bot_inline ~var block.lo in
+        let hi' = assign_bot_inline ~var block.hi in
         let d_forced = inline_solved_vars d in
         block.v.state <- Solved d_forced;
         let d' = assign_bot ~var d_forced in
         join lo' (meet hi' d')
       | Unsolved ->
-        let lo' = assign_bot_force ~var block.lo in
+        let lo' = assign_bot_inline ~var block.lo in
         if compare_var block.v var = 0
         then lo'
         else
-          let hi' = assign_bot_force ~var block.hi in
+          let hi' = assign_bot_inline ~var block.hi in
           if lo' == block.lo && hi' == block.hi
           then node
           else
@@ -445,20 +445,34 @@ module Make (V : ORDERED) = struct
     canonicalize ~hi:(inline_solved_vars a) ~lo:(inline_solved_vars b)
 
 
-  (* --------- solve-on-install (no queues for LFP; GFP uses a stack)
-       --------- *)
   let solve_lfp (var : var) (rhs_raw : node) : unit =
+    (* Solve the least fixpoint equation var := rhs_raw. 
+       The rhs in general contains the var itself, and the
+       fixpoint solution is var := rhs_raw[var := bot].
+       We must also inline solved vars, because var itself
+       may occur in a solution of an earlier solved var.
+    *)
     match var.state with
     | Rigid _ -> invalid_arg "solve_lfp: rigid variable"
     | Solved _ -> invalid_arg "solve_lfp: solved variable"
     | Unsolved ->
-      var.state <- Solved (assign_bot_force ~var rhs_raw)
+      (* For efficiency, we use assign_bot_inline to 
+         simultaneously inline solved vars and assign bot. *)
+      var.state <- Solved (assign_bot_inline ~var rhs_raw)
 
   let solve_gfp (var : var) (rhs_raw : node) : unit =
+    (* Solve the greatest fixpoint equation var := rhs_raw. 
+       The rhs in general contains the var itself, and the
+       fixpoint solution is var := rhs_raw[var := top].
+       We must also inline solved vars, because var itself
+       may occur in a solution of an earlier solved var.
+    *)
     match var.state with
     | Rigid _ -> invalid_arg "solve_gfp: rigid variable"
     | Solved _ -> invalid_arg "solve_gfp: solved variable"
     | Unsolved ->
+      (* gfp's are less performance critical, so we use two 
+         separate steps to inline solved vars and assign top. *)
       let rhs_forced = inline_solved_vars rhs_raw in
       var.state <- Solved (assign_top ~var rhs_forced)
 

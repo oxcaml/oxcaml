@@ -1017,8 +1017,8 @@ and class_fields_second_pass cl_num sign met_env fields =
    somehow we've unified the self type of the object with the self type of a not
    yet finished class.
    When this happens, we cannot close the object type and must error. *)
-  and class_structure cl_num virt self_scope final val_env met_env loc
-    { pcstr_self = spat; pcstr_fields = str } =
+and class_structure cl_num virt self_scope final val_env met_env loc
+  { pcstr_self = spat; pcstr_fields = str } =
   (* Environment for substructures *)
   (* Classes and objects are treated very conservatively because the
       implementation is unclear. So just to be safe, we add locks here so that
@@ -1026,11 +1026,6 @@ and class_fields_second_pass cl_num sign met_env fields =
      - cannot refer to local or once variables in the
      environment
      - access to unique variables will be relaxed to shared *)
-  (* CR zqian: We should add [Env.add_sync_lock] which restricts
-  syncness/contention to legacy, but that lock would be a no-op. However, we
-  should be future-proof for potential axes who legacy is set otherwise. The
-  best is to call [Env.add_legacy_lock] (which can be defined by
-  [Env.add_closure_lock]) that covers all axes. *)
   let pp : Mode.Hint.pinpoint =
     match final with
     | Not_final -> (loc, Class)

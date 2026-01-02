@@ -20,13 +20,13 @@ let reset_constructor_ikind_on_substitution = false
 
 module Ldd = Ikind.Ldd
 
-module Solver = struct
-  (** A JKind/ikind solver specialized to [Ikind.Ldd] and [Types.type_expr].
+(** A JKind/ikind solver specialized to [Ikind.Ldd] and [Types.type_expr].
 
       The solver computes LDD polynomials of the form
         base ⊔ Σ_i (arg_i ⊓ coeff_i)
       where [base] is the intrinsic kind of a constructor and each [coeff_i]
       describes the contribution coming from the i-th type argument. *)
+module Solver = struct
 
   module Ldd = Ikind.Ldd
 
@@ -62,7 +62,10 @@ module Solver = struct
     let hash x = Path.hash x
   end)
 
-  (** Kind function for constructors: computes a kind from a context. *)
+  (** Kind function for constructors: computes a kind from a context.
+      This is used because many kinds don't make sense outside of a 
+      context, e.g., the kind of a type containing a constructor 
+      depends on the context telling us what its kind is. *)
   type ckind = ctx -> kind
 
   (** Result of constructor lookup.
