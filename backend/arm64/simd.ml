@@ -48,7 +48,7 @@ module Rounding_mode = struct
 end
 
 module Float_cond = struct
-  type t = Arm64_ast.Instruction_name.Float_cond.t =
+  type t = Arm64_ast.Float_cond.t =
     | EQ
     | GT
     | LE

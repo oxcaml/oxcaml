@@ -28,6 +28,12 @@ exception Error of error * Debuginfo.t
 let bad_immediate dbg fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg, dbg))) fmt
 
+(* Swap two arguments for commutative condition flipping *)
+let swap_args args =
+  match args with
+  | [a; b] -> [b; a]
+  | _ -> Misc.fatal_error "Expected exactly two arguments for swap_args"
+
 (* Assumes untagged int *)
 let[@ocaml.warning "-4"] extract_constant args name ~max dbg =
   match args with
@@ -224,13 +230,17 @@ let select_simd_instr op args dbg =
   | "caml_neon_float32x4_cmeq" -> Some (Cmp_f32 EQ, args)
   | "caml_neon_float32x4_cmge" -> Some (Cmp_f32 GE, args)
   | "caml_neon_float32x4_cmgt" -> Some (Cmp_f32 GT, args)
-  | "caml_neon_float32x4_cmle" -> Some (Cmp_f32 LE, args)
-  | "caml_neon_float32x4_cmlt" -> Some (Cmp_f32 LT, args)
+  (* FCMLE/FCMLT are not supported; use FCMGE/FCMGT with swapped operands. This
+     matches the weird semantics of amd64 "minss" even when the flag [FPCR.AH]
+     is not set. *)
+  | "caml_neon_float32x4_cmle" -> Some (Cmp_f32 GE, swap_args args)
+  | "caml_neon_float32x4_cmlt" -> Some (Cmp_f32 GT, swap_args args)
   | "caml_neon_float64x2_cmeq" -> Some (Cmp_f64 EQ, args)
   | "caml_neon_float64x2_cmge" -> Some (Cmp_f64 GE, args)
   | "caml_neon_float64x2_cmgt" -> Some (Cmp_f64 GT, args)
-  | "caml_neon_float64x2_cmle" -> Some (Cmp_f64 LE, args)
-  | "caml_neon_float64x2_cmlt" -> Some (Cmp_f64 LT, args)
+  (* FCMLE/FCMLT are not supported; use FCMGE/FCMGT with swapped operands *)
+  | "caml_neon_float64x2_cmle" -> Some (Cmp_f64 GE, swap_args args)
+  | "caml_neon_float64x2_cmlt" -> Some (Cmp_f64 GT, swap_args args)
   | "caml_neon_int32x4_cmpeqz" -> Some (Cmpz_s32 EQ, args)
   | "caml_neon_int32x4_cmpgez" -> Some (Cmpz_s32 GE, args)
   | "caml_neon_int32x4_cmpgtz" -> Some (Cmpz_s32 GT, args)
@@ -407,31 +417,38 @@ let select_operation_cfg op args dbg =
   select_simd_instr op args dbg
   |> Option.map (fun (op, args) -> Operation.Specific (Isimd op), args)
 
+(* Some SIMD operations require that arg.(0) and res.(0) be the same register.
+   This happens for operations that only partially modify the destination:
+
+   - Setq_lane_* : insert a scalar into a lane, preserving other lanes
+
+   - Copyq_laneq_s64 : copy a lane from arg.(1) into arg.(0)
+
+   - *_high_* : narrow high operations write to upper half, lower half from
+   arg.(0) *)
 let pseudoregs_for_operation (simd_op : Simd.operation) arg res =
-  match Simd_proc.register_behavior simd_op with
-  | Rs32x4_Rs32_to_First _ | Rs64x2_Rs64_to_First _ | Rs16x8_Rs16_to_First _
-  | Rs8x16_Rs8_to_First _ | Rs64x2_Rs64x2_to_First _ | Rs16x8_Rs32x4_to_First
-  | Rs8x16_Rs16x8_to_First | Rs32x4_Rs64x2_to_First ->
+  let needs_same_res_and_arg0 =
+    match[@ocaml.warning "-4"] simd_op with
+    (* Lane insert operations: insert from GP register into vector lane *)
+    | Setq_lane_s8 _ | Setq_lane_s16 _ | Setq_lane_s32 _ | Setq_lane_s64 _ ->
+      true
+    (* Copy lane to lane: copies from arg.(1) into arg.(0) *)
+    | Copyq_laneq_s64 _ -> true
+    (* Narrow high operations: write to upper half, preserve lower half from
+       arg.(0) *)
+    | Movn_high_s64 | Movn_high_s32 | Movn_high_s16 | Qmovn_high_s64
+    | Qmovn_high_s32 | Qmovn_high_s16 | Qmovn_high_u32 | Qmovn_high_u16 ->
+      true
+    | _ -> false
+  in
+  if needs_same_res_and_arg0
+  then (
     let arg = Array.copy arg in
     let res = Array.copy res in
     assert (not (Reg.is_preassigned arg.(0)));
     arg.(0) <- res.(0);
-    arg, res
-  | Rf32x2_Rf32x2_to_Rf32x2 | Rf32x4_Rf32x4_to_Rf32x4 | Rf64x2_Rf64x2_to_Rf64x2
-  | Rs64x2_Rs64x2_to_Rs64x2 | Rf32x4_Rf32x4_to_Rs32x4 | Rs32x4_to_Rs32x4
-  | Rs32x4_to_Rf32x4 | Rf32x4_to_Rf32x4 | Rf32x4_to_Rs32x4 | Rf32x2_to_Rf64x2
-  | Rf64x2_to_Rf32x2 | Rs8x16_to_Rs8x16 | Rs8x16_Rs8x16_to_Rs8x16
-  | Rs64x2_to_Rs64x2 | Rf64x2_to_Rs64x2 | Rf64x2_Rf64x2_to_Rs64x2
-  | Rs32x4_Rs32x4_to_Rs32x4 | Rf32_Rf32_to_Rf32 | Rf64_Rf64_to_Rf64
-  | Rf32_to_Rf32 | Rf64_to_Rf64 | Rf32_to_Rs64 | Rf64_to_Rs64 | Rs64x2_to_Rs64 _
-  | Rs32x4_to_Rs32 _ | Rs32x4lane_to_Rs32x4 _ | Rs64x2lane_to_Rs64x2 _
-  | Rf64x2_to_Rf64x2 | Rs64x2_to_Rf64x2 | Rs32x2_to_Rs64x2
-  | Rs16x8_Rs16x8_to_Rs16x8 | Rs16x8_to_Rs16x8 | Rs16x8_to_Rs16 _
-  | Rs16x8lane_to_Rs16x8 _ | Rs64x2_to_Rs32x2 | Rs8x16lane_to_Rs8x16 _
-  | Rs8x16_to_Rs8 _ | Rs32x4_to_Rs16x4 | Rs16x8_to_Rs8x8
-  | Rs16x8_Rs16x8_to_Rs32x4 | Rs16x4_Rs16x4_to_Rs32x4 | Rs16x4_to_Rs32x4
-  | Rs8x8_to_Rs16x8 ->
-    arg, res
+    arg, res)
+  else arg, res
 
 (* See `amd64/simd_selection.ml`. *)
 
