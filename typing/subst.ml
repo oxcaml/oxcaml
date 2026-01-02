@@ -145,8 +145,9 @@ end = struct
         const_jkind
         ~quality
         ~ran_out_of_fuel_during_normalize
-        ~annotation:(Some { pjkind_loc = Location.none;
-                            pjkind_desc = Pjk_abbreviation builtin.name })
+        ~annotation:(Some
+          { pjkind_loc = Location.none;
+            pjkind_desc = Pjk_abbreviation (Location.mknoloc builtin.name, [])})
         ~why:Jkind_intf.History.Imported)
 
   let best_builtins =

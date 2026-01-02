@@ -3948,9 +3948,8 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             partial (divide_constructor ~scopes)
             (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr partial)
             ctx pm
-      | Array (_, elt_sort, _) ->
-          let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-          let kind = Typeopt.array_pattern_kind pomega elt_sort in
+      | Array (_, _, _) ->
+          let kind = Typeopt.array_pattern_kind pomega in
           compile_test
             (compile_match ~scopes value_kind repr partial)
             partial (divide_array ~scopes kind)
@@ -4167,7 +4166,7 @@ let for_trywith ~scopes ~return_layout loc param pat_act_list =
      It is important to *not* include location information in
      the reraise (hence the [_noloc]) to avoid seeing this
      silent reraise in exception backtraces. *)
-  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_value
+  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_scannable
     ~arg_layout:layout_block ~return_layout loc ~failer:(Reraise_noloc param)
     None param pat_act_list Partial
 
