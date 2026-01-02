@@ -4749,6 +4749,16 @@ let rec approx_type env sty =
       then newvar (Jkind.Builtin.any ~why:Dummy_jkind)
       else begin
         let tyl = List.map (approx_type env) ctl in
+        (* Constrain argument types to match parameter jkinds. This ensures
+           that e.g. the argument to [or_null] is constrained to be non-null
+           even in approximation mode. *)
+        List.iter2
+          (fun ty param ->
+            match get_desc param with
+            | Tvar { jkind; _ } ->
+              ignore (constrain_type_jkind env ty (Jkind.disallow_left jkind))
+            | _ -> ())
+          tyl decl.type_params;
         newconstr path tyl
       end
   | _ -> approx_type_default ()
