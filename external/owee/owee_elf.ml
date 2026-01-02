@@ -576,3 +576,99 @@ let iter_symbols ~symtab_body ~strtab_body ~f =
     in
     f ~name ~st_info ~st_other ~st_shndx ~st_value ~st_size
   done
+
+(* Extract section body as a string *)
+let section_body_string buf section =
+  let body = section_body buf section in
+  let cursor = Owee_buf.cursor body in
+  let size = Owee_buf.size body in
+  Owee_buf.Read.fixed_string cursor size
+
+(* A resolved relocation with offset, symbol name, and addend *)
+type relocation = {
+  r_offset : int;
+  r_symbol : string;
+  r_addend : int64;
+}
+
+(* ELF64 RELA entry size: 24 bytes *)
+let rela_entry_size = 24
+
+(* ELF64 symbol entry size: 24 bytes *)
+let sym_entry_size = 24
+
+(* Extract symbol index from r_info (upper 32 bits) *)
+let sym_index_of_r_info r_info =
+  Int64.to_int (Int64.shift_right_logical r_info 32)
+
+(* Build a symbol name table from .symtab and .strtab sections. For section
+   symbols (STT_SECTION), the name is derived from the section header table.
+   Returns an array indexed by symbol index. *)
+let build_symbol_names buf sections =
+  match find_section sections ".symtab", find_section sections ".strtab" with
+  | Some symtab_sec, Some strtab_sec ->
+    let strtab_body = section_body buf strtab_sec in
+    let symtab_body = section_body buf symtab_sec in
+    let num_symbols = Owee_buf.size symtab_body / sym_entry_size in
+    let names = Array.make num_symbols "" in
+    for i = 0 to num_symbols - 1 do
+      let cursor = Owee_buf.cursor symtab_body ~at:(i * sym_entry_size) in
+      let st_name = Owee_buf.Read.u32 cursor in
+      let st_info = Owee_buf.Read.u8 cursor in
+      let _st_other = Owee_buf.Read.u8 cursor in
+      let st_shndx = Owee_buf.Read.u16 cursor in
+      let st_type = st_info land 0xf in
+      let name =
+        if st_type = 3 (* STT_SECTION *)
+        then
+          (* Section symbol: get name from section header table *)
+          if st_shndx > 0 && st_shndx < Array.length sections
+          then sections.(st_shndx).sh_name_str
+          else ""
+        else
+          (* Regular symbol: get name from string table *)
+          let name_cursor = Owee_buf.cursor strtab_body ~at:st_name in
+          match Owee_buf.Read.zero_string name_cursor () with
+          | Some s -> s
+          | None -> ""
+      in
+      names.(i) <- name
+    done;
+    Some names
+  | _ -> None
+
+(* Extract relocations from a RELA section *)
+let extract_rela_relocations buf sections ~rela_section_name =
+  let symbol_names = build_symbol_names buf sections in
+  match find_section sections rela_section_name with
+  | None -> []
+  | Some rela_sec ->
+    let rela_body = section_body buf rela_sec in
+    let num_entries = Owee_buf.size rela_body / rela_entry_size in
+    let relocs = ref [] in
+    for i = 0 to num_entries - 1 do
+      let cursor = Owee_buf.cursor rela_body ~at:(i * rela_entry_size) in
+      let r_offset = Owee_buf.Read.u64 cursor in
+      let r_info = Owee_buf.Read.u64 cursor in
+      let r_addend = Owee_buf.Read.u64 cursor in
+      let sym_idx = sym_index_of_r_info r_info in
+      let symbol_name =
+        match symbol_names with
+        | Some names when sym_idx < Array.length names -> names.(sym_idx)
+        | _ -> Printf.sprintf "sym_%d" sym_idx
+      in
+      (* Only include non-empty symbol names *)
+      if symbol_name <> "" then
+        relocs := {
+          r_offset = Int64.to_int r_offset;
+          r_symbol = symbol_name;
+          r_addend;
+        } :: !relocs
+    done;
+    (* Sort by offset *)
+    List.sort (fun a b -> compare a.r_offset b.r_offset) !relocs
+
+(* Extract relocations for a specific section by name *)
+let extract_section_relocations buf sections ~section_name =
+  extract_rela_relocations buf sections
+    ~rela_section_name:(".rela" ^ section_name)
