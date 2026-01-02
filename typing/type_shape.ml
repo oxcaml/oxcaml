@@ -432,9 +432,10 @@ module Type_decl_shape = struct
         let lys =
           List.map
             (fun { Shape.field_name = _; field_value = _, ly } ->
-              if not
-                   (Layout.equal ly (Layout.Base Value)
-                   || Layout.equal ly (Layout.Base Void))
+              if
+                not
+                  (Layout.equal ly (Layout.Base Value)
+                  || Layout.equal ly (Layout.Base Void))
               then
                 if !Clflags.dwarf_pedantic
                 then
@@ -796,7 +797,9 @@ let update_subst_with_id_arg_binder (subst_constr, subst_constr_mut) id args
   let new_list =
     (args, rec_binder)
     ::
-    (match Ident.Map.find_opt id subst_constr with Some t -> t | None -> [])
+    (match Ident.Map.find_opt id subst_constr with
+    | Some t -> t
+    | None -> [])
   in
   Ident.Map.add id new_list subst_constr, subst_constr_mut
 
@@ -848,17 +851,19 @@ let add_to_cache t res subst_type (subst_constr_mut, subst_constr) =
      - [subst_constr] is empty, meaning there are no recursive occurrences
        of a particular [Constr (id, args)] to be substituted with a recursive
        variable. *)
-  if Ident.Map.is_empty subst_type
-     && Ident.Map.is_empty subst_constr_mut
-     && Ident.Map.is_empty subst_constr
+  if
+    Ident.Map.is_empty subst_type
+    && Ident.Map.is_empty subst_constr_mut
+    && Ident.Map.is_empty subst_constr
   then Shape.Cache.add eval_cache t res
 
 let find_in_cache t subst_type (subst_constr_mut, subst_constr) =
   (* We perform the same emptiness check as in [add_to_cache] when looking up a
      value. *)
-  if Ident.Map.is_empty subst_type
-     && Ident.Map.is_empty subst_constr_mut
-     && Ident.Map.is_empty subst_constr
+  if
+    Ident.Map.is_empty subst_type
+    && Ident.Map.is_empty subst_constr_mut
+    && Ident.Map.is_empty subst_constr
   then Shape.Cache.find_opt eval_cache t
   else None
 

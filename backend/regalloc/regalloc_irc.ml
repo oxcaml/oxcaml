@@ -59,10 +59,11 @@ let build : State.t -> Cfg_with_infos.t -> unit =
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   Cfg_with_layout.iter_instructions cfg_with_layout
     ~instruction:(fun (instr : Instruction.t) ->
-      if is_move_instruction instr
-         && (not (Reg.is_stack instr.arg.(0)))
-         && (not (Reg.is_stack instr.res.(0)))
-         && Proc.types_are_compatible instr.arg.(0) instr.res.(0)
+      if
+        is_move_instruction instr
+        && (not (Reg.is_stack instr.arg.(0)))
+        && (not (Reg.is_stack instr.res.(0)))
+        && Proc.types_are_compatible instr.arg.(0) instr.res.(0)
       then (
         State.add_move_list state instr.arg.(0) instr;
         if not (Reg.same instr.arg.(0) instr.res.(0))
@@ -213,9 +214,10 @@ let coalesce : State.t -> unit =
     State.add_constrained_moves state m;
     add_work_list state u;
     add_work_list state v)
-  else if match State.is_precolored state u with
-          | true -> all_adjacent_are_ok state u v
-          | false -> conservative state u v
+  else if
+    match State.is_precolored state u with
+    | true -> all_adjacent_are_ok state u v
+    | false -> conservative state u v
   then (
     if debug then log "case #3/4";
     State.add_coalesced_moves state m;

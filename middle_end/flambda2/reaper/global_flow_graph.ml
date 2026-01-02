@@ -113,7 +113,7 @@ module Relations = struct
    * to_ = [...] from (use)
    * to_ = base.relation (accessor)
    * base = Make_block { from_ } (constructor)
-   * *)
+   *)
 
   let alias ~to_ ~from = Datalog.atom alias [to_; from]
 

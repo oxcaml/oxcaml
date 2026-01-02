@@ -27,9 +27,10 @@ let refine_decision_based_on_arg_types_at_uses ~pass ~rewrite_ids_seen
     Apply_cont_rewrite_id.Map.fold
       (fun rewrite_id (arg_at_use : Continuation_uses.arg_at_use)
            (decision, invalids) ->
-        if Apply_cont_rewrite_id.Set.mem rewrite_id rewrite_ids_seen
-           || Apply_cont_rewrite_id.Set.mem rewrite_id
-                rewrites_ids_known_as_invalid
+        if
+          Apply_cont_rewrite_id.Set.mem rewrite_id rewrite_ids_seen
+          || Apply_cont_rewrite_id.Set.mem rewrite_id
+               rewrites_ids_known_as_invalid
         then decision, invalids
         else
           let typing_env_at_use = arg_at_use.typing_env in

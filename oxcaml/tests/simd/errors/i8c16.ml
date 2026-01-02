@@ -20,6 +20,6 @@ external const16 :
   (int[@untagged]) ->
   (int[@untagged]) ->
   (t[@unboxed]) = "" "caml_int8x16_const16"
-  [@@noalloc] [@@builtin]
+[@@noalloc] [@@builtin]
 
 let _ = const16 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 (Sys.opaque_identity 1)

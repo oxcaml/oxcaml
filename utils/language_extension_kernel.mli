@@ -1,8 +1,8 @@
 (** Language extensions provided by the Jane Street version of the OCaml
-    compiler. These are the parts of [Language_extension] that are required
-    by [Profile_counters_functions]. Forward declaring these allow us to
-    avoid a mutual dependency between files in utils/ and parsing/. Such
-    a dependency prevents Merlin from compiling. *)
+    compiler. These are the parts of [Language_extension] that are required by
+    [Profile_counters_functions]. Forward declaring these allow us to avoid a
+    mutual dependency between files in utils/ and parsing/. Such a dependency
+    prevents Merlin from compiling. *)
 
 (* CR lstevenson: consider moving [Profile_counters_functions] to parsing/ so we
    can get rid of this file. *)

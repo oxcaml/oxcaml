@@ -448,7 +448,9 @@ let can_raise_terminator (i : terminator) =
     else
       (* Even if going via [caml_c_call], if there are no effects, the function
          cannot raise an exception. (Example: [caml_obj_dup].) *)
-      match effects with No_effects -> false | Arbitrary_effects -> true)
+      match effects with
+      | No_effects -> false
+      | Arbitrary_effects -> true)
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Tailcall_self _ ->
     false
@@ -655,23 +657,23 @@ let is_alloc_or_poll instr = is_alloc instr || is_poll instr
 let basic_block_contains_calls block =
   block.is_trap_handler
   || (match block.terminator.desc with
-     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-     | Int_test _ | Switch _ | Return ->
-       false
-     | Raise raise_kind -> (
-       match raise_kind with
-       | Lambda.Raise_notrace -> false
-       | Lambda.Raise_regular | Lambda.Raise_reraise ->
-         (* PR#6239 *)
-         (* caml_stash_backtrace; we #mark_call rather than #mark_c_tailcall to
+    | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+    | Int_test _ | Switch _ | Return ->
+      false
+    | Raise raise_kind -> (
+      match raise_kind with
+      | Lambda.Raise_notrace -> false
+      | Lambda.Raise_regular | Lambda.Raise_reraise ->
+        (* PR#6239 *)
+        (* caml_stash_backtrace; we #mark_call rather than #mark_c_tailcall to
             get a good stack backtrace *)
-         true)
-     | Tailcall_self _ -> false
-     | Tailcall_func _ -> false
-     | Call_no_return _ -> true
-     | Call _ -> true
-     | Prim { op = External _; _ } -> true
-     | Prim { op = Probe _; _ } -> true)
+        true)
+    | Tailcall_self _ -> false
+    | Tailcall_func _ -> false
+    | Call_no_return _ -> true
+    | Call _ -> true
+    | Prim { op = External _; _ } -> true
+    | Prim { op = Probe _; _ } -> true)
   || DLL.exists block.body ~f:is_alloc_or_poll
 
 let remove_trap_instructions t removed_trap_handlers =

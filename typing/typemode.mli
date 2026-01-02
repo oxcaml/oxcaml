@@ -1,6 +1,7 @@
 module Jkind = Btype.Jkind0
 
-(** Interpret mode syntax as mode annotation, where axes can be left unspecified *)
+(** Interpret mode syntax as mode annotation, where axes can be left unspecified
+*)
 val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t
 
 val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.modes
@@ -12,7 +13,7 @@ val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
     attributes on the field and insert mutable-implied modalities accordingly.
-    *)
+*)
 val transl_modalities :
   maturity:Language_extension.maturity ->
   Types.mutability ->
@@ -28,7 +29,7 @@ val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
 
 (** Un-interpret modalities back to parsetree. Takes the mutability and
     attributes on the field and remove mutable-implied modalities accordingly.
-    *)
+*)
 val untransl_modalities :
   Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
 

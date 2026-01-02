@@ -18,8 +18,8 @@ module type S = sig
   type variable
 
   module Unrolling_state : sig
-    (** The current state of unrolling. Can be set by an [unroll_to]
-        expression. *)
+    (** The current state of unrolling. Can be set by an [unroll_to] expression.
+    *)
     type t = private
       | Not_unrolling  (** Unrolling has not begun. *)
       | Unrolling of { remaining_depth : int }

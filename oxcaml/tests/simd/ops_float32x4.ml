@@ -9,11 +9,11 @@ include Builtins.Float32x4
    provide explicit const intrinsics. *)
 external low_of : float32 -> t
   = "caml_vec128_unreachable" "caml_float32x4_low_of_float32"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 external low_to : t -> float32
   = "caml_vec128_unreachable" "caml_float32x4_low_to_float32"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 let () =
   let v1 = low_of 1.s in

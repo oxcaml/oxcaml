@@ -108,11 +108,11 @@ let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
      frame_pointers only affects the output for amd64. *)
   Config.with_frame_pointers || block.is_trap_handler
   || DLL.exists block.Cfg.body ~f:(fun instr ->
-         match Instruction_requirements.basic instr with
-         | Requirements Requires_prologue -> true
-         | Prologue | Epilogue
-         | Requirements (No_requirements | Requires_no_prologue) ->
-           false)
+      match Instruction_requirements.basic instr with
+      | Requirements Requires_prologue -> true
+      | Prologue | Epilogue
+      | Requirements (No_requirements | Requires_no_prologue) ->
+        false)
   ||
   match Instruction_requirements.terminator block.terminator fun_name with
   | Requires_prologue -> true
@@ -279,11 +279,12 @@ let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
      [Pushtrap] or [Stackoffset] which shouldn't be allowed. This is because the
      prologue is added at the stack pointer, which would overlap with the
      handler pushed by a [Pushtrap]. *)
-  if Label.Set.exists
-       (fun label ->
-         let block = Cfg.get_block_exn cfg label in
-         Cfg_loop_infos.is_in_loop loop_infos label || block.stack_offset <> 0)
-       prologue_labels
+  if
+    Label.Set.exists
+      (fun label ->
+        let block = Cfg.get_block_exn cfg label in
+        Cfg_loop_infos.is_in_loop loop_infos label || block.stack_offset <> 0)
+      prologue_labels
   then
     false
     (* Check that there are no prologues which might execute after another
@@ -304,19 +305,18 @@ let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
        This check will also prevent us from having a
        Prologue..Epilogue..Prologue..Epilogue structure. However, we probably
        shouldn't emit such structures anyway. *)
-  else if Label.Set.exists
-            (fun prologue ->
-              let descendants =
-                descendants cfg (Cfg.get_block_exn cfg prologue)
-              in
-              let descendant_prologues =
-                Label.Set.inter prologue_labels descendants
-              in
-              let descendant_prologues =
-                Label.Set.remove prologue descendant_prologues
-              in
-              not (Label.Set.is_empty descendant_prologues))
-            prologue_labels
+  else if
+    Label.Set.exists
+      (fun prologue ->
+        let descendants = descendants cfg (Cfg.get_block_exn cfg prologue) in
+        let descendant_prologues =
+          Label.Set.inter prologue_labels descendants
+        in
+        let descendant_prologues =
+          Label.Set.remove prologue descendant_prologues
+        in
+        not (Label.Set.is_empty descendant_prologues))
+      prologue_labels
   then false
   else
     (* Check that the blocks requiring an epilogue are dominated by the prologue
@@ -380,14 +380,16 @@ let find_prologue_and_epilogues_shrink_wrapped
       in
       let child_prologue_blocks, child_epilogue_blocks =
         List.fold_left
-          (fun (child_prologues, child_epilogues) (all_prologues, all_epilogues) ->
+          (fun (child_prologues, child_epilogues) (all_prologues, all_epilogues)
+             ->
             ( Label.Set.union all_prologues child_prologues,
               Label.Set.union all_epilogues child_epilogues ))
           (Label.Set.empty, Label.Set.empty)
           children_prologue_block
       in
-      if can_place_prologues child_prologue_blocks cfg doms loop_infos
-           child_epilogue_blocks
+      if
+        can_place_prologues child_prologue_blocks cfg doms loop_infos
+          child_epilogue_blocks
       then child_prologue_blocks, child_epilogue_blocks
       else Label.Set.singleton tree.label, epilogue_blocks
   in
@@ -397,8 +399,9 @@ let find_prologue_and_epilogues_shrink_wrapped
      was computed before CFG simplification, which can remove calls if they are
      dead, making the prologue unnecessary). *)
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-       ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  if
+    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+      ~fun_num_stack_slots:cfg.fun_num_stack_slots
   then (
     let doms = Cfg_with_infos.dominators cfg_with_infos in
     (* note: the other entries in the forest are dead code *)
@@ -409,9 +412,9 @@ let find_prologue_and_epilogues_shrink_wrapped
     let prologue_blocks, epilogue_blocks =
       visit tree cfg doms loop_infos reachable_epilogues path_needs_prologue
     in
-    if not
-         (can_place_prologues prologue_blocks cfg doms loop_infos
-            epilogue_blocks)
+    if
+      not
+        (can_place_prologues prologue_blocks cfg doms loop_infos epilogue_blocks)
     then
       Misc.fatal_errorf
         "Cfg_prologue: can't place prologues and epilogues at selected blocks";
@@ -420,8 +423,9 @@ let find_prologue_and_epilogues_shrink_wrapped
 
 let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-       ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  if
+    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+      ~fun_num_stack_slots:cfg.fun_num_stack_slots
   then
     let epilogue_blocks =
       Cfg.fold_blocks cfg
@@ -645,8 +649,9 @@ let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
       Label.Tbl.iter
         (fun label state ->
           let block = Cfg.get_block_exn cfg label in
-          if block.is_trap_handler
-             && Validator.State_set.mem No_prologue_on_stack state
+          if
+            block.is_trap_handler
+            && Validator.State_set.mem No_prologue_on_stack state
           then
             Misc.fatal_errorf
               "Cfg_prologue: can reach trap handler with no prologue at block \

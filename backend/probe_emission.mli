@@ -38,10 +38,10 @@ type probe = private
         (** Probe site, recorded in .note.stapsdt section for enabling and
             disabling the probes *)
     probe_insn : Linear.instruction
-        (** For optimized probes, the Iprobe instruction, recorded at the
-            probe site and used for emitting the notes and the wrapper code
-            at the end of the compilation unit.  For non-optimized probes,
-            this will be a direct call instruction. *)
+        (** For optimized probes, the Iprobe instruction, recorded at the probe
+            site and used for emitting the notes and the wrapper code at the end
+            of the compilation unit. For non-optimized probes, this will be a
+            direct call instruction. *)
   }
 
 val get_probes : unit -> probe list
@@ -60,14 +60,14 @@ val add_probe :
 (** Reset the probe semaphore registry *)
 val reset : unit -> unit
 
-(** Find or add a semaphore for a probe name.
-    Returns the label string for the semaphore symbol.
+(** Find or add a semaphore for a probe name. Returns the label string for the
+    semaphore symbol.
     - [name]: probe name
     - [enabled_at_init]: whether the probe is enabled at initialization
     - [dbg]: debug info for error reporting
 
-    Raises Emitaux.Error (Inconsistent_probe_init ...) if the same probe
-    is used with different enabled_at_init values. *)
+    Raises Emitaux.Error (Inconsistent_probe_init ...) if the same probe is used
+    with different enabled_at_init values. *)
 val find_or_add_semaphore : string -> bool option -> Debuginfo.t -> string
 
 (** Emit probe notes and semaphores to the assembly output *)

@@ -71,80 +71,80 @@ let eqf32' lv l =
 
 external int64x2_of_int64s : int64 -> int64 -> int64x2
   = "caml_vec128_unreachable" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x2_low_int64 : int64x2 -> int64
   = "caml_vec128_unreachable" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x2_high_int64 : int64x2 -> int64
   = "caml_vec128_unreachable" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x4_of_int64s : int64 -> int64 -> int32x4
   = "caml_vec128_unreachable" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x4_low_int64 : int32x4 -> int64
   = "caml_vec128_unreachable" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x4_high_int64 : int32x4 -> int64
   = "caml_vec128_unreachable" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int16x8_of_int64s : int64 -> int64 -> int16x8
   = "caml_vec128_unreachable" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int16x8_low_int64 : int16x8 -> int64
   = "caml_vec128_unreachable" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int16x8_high_int64 : int16x8 -> int64
   = "caml_vec128_unreachable" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int8x16_of_int64s : int64 -> int64 -> int8x16
   = "caml_vec128_unreachable" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int8x16_low_int64 : int8x16 -> int64
   = "caml_vec128_unreachable" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int8x16_high_int64 : int8x16 -> int64
   = "caml_vec128_unreachable" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x4_of_int64s : int64 -> int64 -> float32x4
   = "caml_vec128_unreachable" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x4_low_int64 : float32x4 -> int64
   = "caml_vec128_unreachable" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x4_high_int64 : float32x4 -> int64
   = "caml_vec128_unreachable" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x2_of_int64s : int64 -> int64 -> float64x2
   = "caml_vec128_unreachable" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x2_low_int64 : float64x2 -> int64
   = "caml_vec128_unreachable" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x2_high_int64 : float64x2 -> int64
   = "caml_vec128_unreachable" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x4_extract :
   (float32x4[@unboxed]) -> (int[@untagged]) -> (int32[@unboxed])
   = "caml_vec128_unreachable" "test_simd_vec128_extract_ps"
-  [@@noalloc]
+[@@noalloc]
 
 let eq_float32x4 ~result ~expect =
   for i = 0 to 3 do
@@ -204,23 +204,23 @@ let () =
 module Vector_casts = struct
   external int64x2_of_int32x4 : int32x4 -> int64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x2_of_int16x8 : int16x8 -> int64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x2_of_int8x16 : int8x16 -> int64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x2_of_float32x4 : float32x4 -> int64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x2_of_float64x2 : float64x2 -> int64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     (failmsg := fun () -> Printf.printf "vector casts 1! ");
@@ -247,23 +247,23 @@ module Vector_casts = struct
 
   external int32x4_of_int64x2 : int64x2 -> int32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int32x4_of_int16x8 : int16x8 -> int32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int32x4_of_int8x16 : int8x16 -> int32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int32x4_of_float32x4 : float32x4 -> int32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int32x4_of_float64x2 : float64x2 -> int32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     (failmsg := fun () -> Printf.printf "vector casts 2! ");
@@ -290,23 +290,23 @@ module Vector_casts = struct
 
   external int16x8_of_int64x2 : int64x2 -> int16x8
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int16x8_of_int32x4 : int32x4 -> int16x8
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int16x8_of_int8x16 : int8x16 -> int16x8
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int16x8_of_float32x4 : float32x4 -> int16x8
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int16x8_of_float64x2 : float64x2 -> int16x8
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     (failmsg := fun () -> Printf.printf "vector casts 3! ");
@@ -333,23 +333,23 @@ module Vector_casts = struct
 
   external int8x16_of_int64x2 : int64x2 -> int8x16
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int8x16_of_int32x4 : int32x4 -> int8x16
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int8x16_of_int16x8 : int16x8 -> int8x16
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int8x16_of_float32x4 : float32x4 -> int8x16
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int8x16_of_float64x2 : float64x2 -> int8x16
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     (failmsg := fun () -> Printf.printf "vector casts 4! ");
@@ -376,23 +376,23 @@ module Vector_casts = struct
 
   external float32x4_of_int64x2 : int64x2 -> float32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float32x4_of_int32x4 : int32x4 -> float32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float32x4_of_int16x8 : int16x8 -> float32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float32x4_of_int8x16 : int8x16 -> float32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float32x4_of_float64x2 : float64x2 -> float32x4
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     (failmsg := fun () -> Printf.printf "vector casts 5! ");
@@ -419,23 +419,23 @@ module Vector_casts = struct
 
   external float64x2_of_int64x2 : int64x2 -> float64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float64x2_of_int32x4 : int32x4 -> float64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float64x2_of_int16x8 : int16x8 -> float64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float64x2_of_int8x16 : int8x16 -> float64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float64x2_of_float32x4 : float32x4 -> float64x2
     = "caml_vec128_unreachable" "caml_vec128_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     (failmsg := fun () -> Printf.printf "vector casts 6! ");
@@ -540,21 +540,21 @@ module Int32s = struct
   type t = int32
 
   external max_unsigned : t -> t -> t = "caml_vec128_unreachable" "uint32_max"
-    [@@noalloc] [@@unboxed]
+  [@@noalloc] [@@unboxed]
 
   external min_unsigned : t -> t -> t = "caml_vec128_unreachable" "uint32_min"
-    [@@noalloc] [@@unboxed]
+  [@@noalloc] [@@unboxed]
 
   external mul_low : t -> t -> t = "caml_vec128_unreachable" "int32_mul_low"
-    [@@noalloc] [@@unboxed]
+  [@@noalloc] [@@unboxed]
 
   external cvt_si16 : (t[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "int32_si16"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvt_su16 : (t[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "int32_su16"
-    [@@noalloc]
+  [@@noalloc]
 
   let to_int64 a b =
     let a = Int64.of_int32 a |> Int64.logand 0xffffffffL in
@@ -595,105 +595,105 @@ module Int16 = struct
   type t = int
 
   external abs : t -> t = "caml_vec128_unreachable" "int16_abs"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external add : t -> t -> t = "caml_vec128_unreachable" "int16_add"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external sub : t -> t -> t = "caml_vec128_unreachable" "int16_sub"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external adds : t -> t -> t = "caml_vec128_unreachable" "int16_adds"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external subs : t -> t -> t = "caml_vec128_unreachable" "int16_subs"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external mulsign : t -> t -> t = "caml_vec128_unreachable" "int16_mulsign"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external mul_round : t -> t -> t = "caml_vec128_unreachable" "int16_mul_round"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external addsu : t -> t -> t = "caml_vec128_unreachable" "int16_addsu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external subsu : t -> t -> t = "caml_vec128_unreachable" "int16_subsu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external min : t -> t -> t = "caml_vec128_unreachable" "int16_min"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external max : t -> t -> t = "caml_vec128_unreachable" "int16_max"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external minu : t -> t -> t = "caml_vec128_unreachable" "int16_minu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external maxu : t -> t -> t = "caml_vec128_unreachable" "int16_maxu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external cmpeq : t -> t -> t = "caml_vec128_unreachable" "int16_cmpeq"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external cmpgt : t -> t -> t = "caml_vec128_unreachable" "int16_cmpgt"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external avgu : t -> t -> t = "caml_vec128_unreachable" "int16_avgu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external shift_left : t -> int -> t
     = "caml_vec128_unreachable" "int16_shift_left"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external shift_right : t -> int -> t
     = "caml_vec128_unreachable" "int16_shift_right"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external shift_right_logical : t -> int -> t
     = "caml_vec128_unreachable" "int16_shift_right_logical"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external logand : t -> t -> t = "caml_vec128_unreachable" "int16_logand"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external mul_high : t -> t -> t = "caml_vec128_unreachable" "int16_mul_high"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external mul_high_unsigned : t -> t -> t
     = "caml_vec128_unreachable" "int16_mul_high_unsigned"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external mul_low : t -> t -> t = "caml_vec128_unreachable" "int16_mul_low"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external mul_i32 : (t[@untagged]) -> (t[@untagged]) -> (int32[@unboxed])
     = "caml_vec128_unreachable" "int16_mul_i32"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtsx_i32 : (t[@untagged]) -> (int32[@unboxed])
     = "caml_vec128_unreachable" "int16_sxi32"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtzx_i32 : (t[@untagged]) -> (int32[@unboxed])
     = "caml_vec128_unreachable" "int16_zxi32"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtsx_i64 : (t[@untagged]) -> (int64[@unboxed])
     = "caml_vec128_unreachable" "int16_sxi64"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtzx_i64 : (t[@untagged]) -> (int64[@unboxed])
     = "caml_vec128_unreachable" "int16_zxi64"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvt_si8 : (t[@untagged]) -> (int[@untagged])
     = "caml_vec128_unreachable" "int16_si8"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvt_su8 : (t[@untagged]) -> (int[@untagged])
     = "caml_vec128_unreachable" "int16_su8"
-    [@@noalloc]
+  [@@noalloc]
 
   let to_int64 a b c d =
     let a = Int64.of_int a |> Int64.logand 0xffffL in
@@ -741,79 +741,79 @@ module Int8 = struct
   type t = int
 
   external abs : t -> t = "caml_vec128_unreachable" "int8_abs"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external add : t -> t -> t = "caml_vec128_unreachable" "int8_add"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external sub : t -> t -> t = "caml_vec128_unreachable" "int8_sub"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external adds : t -> t -> t = "caml_vec128_unreachable" "int8_adds"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external subs : t -> t -> t = "caml_vec128_unreachable" "int8_subs"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external mulsign : t -> t -> t = "caml_vec128_unreachable" "int8_mulsign"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external addsu : t -> t -> t = "caml_vec128_unreachable" "int8_addsu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external subsu : t -> t -> t = "caml_vec128_unreachable" "int8_subsu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external min : t -> t -> t = "caml_vec128_unreachable" "int8_min"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external max : t -> t -> t = "caml_vec128_unreachable" "int8_max"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external minu : t -> t -> t = "caml_vec128_unreachable" "int8_minu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external maxu : t -> t -> t = "caml_vec128_unreachable" "int8_maxu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external cmpeq : t -> t -> t = "caml_vec128_unreachable" "int8_cmpeq"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external cmpgt : t -> t -> t = "caml_vec128_unreachable" "int8_cmpgt"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external mulu_i16 : t -> t -> t = "caml_vec128_unreachable" "int8_mulu_i16"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external avgu : t -> t -> t = "caml_vec128_unreachable" "int8_avgu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external diffu : t -> t -> t = "caml_vec128_unreachable" "int8_diffu"
-    [@@noalloc] [@@untagged]
+  [@@noalloc] [@@untagged]
 
   external cvtzx_i16 : (t[@untagged]) -> (Int16.t[@untagged])
     = "caml_vec128_unreachable" "int8_zxi16"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtsx_i16 : (t[@untagged]) -> (Int16.t[@untagged])
     = "caml_vec128_unreachable" "int8_sxi16"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtsx_i32 : (t[@untagged]) -> (int32[@unboxed])
     = "caml_vec128_unreachable" "int8_sxi32"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtzx_i32 : (t[@untagged]) -> (int32[@unboxed])
     = "caml_vec128_unreachable" "int8_zxi32"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtsx_i64 : (t[@untagged]) -> (int64[@unboxed])
     = "caml_vec128_unreachable" "int8_sxi64"
-    [@@noalloc]
+  [@@noalloc]
 
   external cvtzx_i64 : (t[@untagged]) -> (int64[@unboxed])
     = "caml_vec128_unreachable" "int8_zxi64"
-    [@@noalloc]
+  [@@noalloc]
 
   let to_int64 a b c d e f g h =
     let a = Int64.of_int a |> Int64.logand 0xffL in

@@ -329,8 +329,8 @@ module Attribute = struct
       | String_length : [< Class.exprloc | Class.Dwarf_4.loclistptr] t
       | Return_addr : [< Class.exprloc | Class.Dwarf_4.loclistptr] t
       | Start_scope : [< Class.constant | Class.Dwarf_4.rangelistptr] t
-      | Data_member_location
-          : [< Class.constant | Class.exprloc | Class.Dwarf_4.loclistptr] t
+      | Data_member_location :
+          [< Class.constant | Class.exprloc | Class.Dwarf_4.loclistptr] t
       | Frame_base : [< Class.exprloc | Class.Dwarf_4.loclistptr] t
       | Segment : [< Class.exprloc | Class.Dwarf_4.loclistptr] t
       | Static_link : [< Class.exprloc | Class.Dwarf_4.loclistptr] t
@@ -396,8 +396,8 @@ module Attribute = struct
     | Base_types : Class.reference t
     | Calling_convention : Class.constant t
     | Count : [< Class.constant | Class.exprloc | Class.reference] t
-    | Data_member_location
-        : [< Class.constant | Class.exprloc | Class.loclistsptr] t
+    | Data_member_location :
+        [< Class.constant | Class.exprloc | Class.loclistsptr] t
     | Decl_column : Class.constant t
     | Decl_file : Class.constant t
     | Decl_line : Class.constant t
@@ -427,8 +427,8 @@ module Attribute = struct
     | Use_UTF8 : Class.flag t
     | Extension : Class.reference t
     | Ranges : Class.rnglist t
-    | Trampoline
-        : [< Class.address | Class.flag | Class.reference | Class.string] t
+    | Trampoline :
+        [< Class.address | Class.flag | Class.reference | Class.string] t
     | Call_column : Class.constant t
     | Call_file : Class.constant t
     | Call_line : Class.constant t

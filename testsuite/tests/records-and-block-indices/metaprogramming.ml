@@ -442,8 +442,7 @@ module Path = struct
       (List.map t ~f:(function
         | Field s -> "." ^ s
         | Unboxed_field s -> ".#" ^ s
-        )
-        )
+        ))
 end
 
 module Type = struct
@@ -909,7 +908,8 @@ module Type_naming = struct
   let decls_code t =
     let decls =
       Type_structure_map.fold
-        (fun (ty_structure : Type_structure.t) ((id : int), (ty : Type.t)) acc ->
+        (fun (ty_structure : Type_structure.t) ((id : int), (ty : Type.t)) acc
+           ->
           let type_definition =
             match ty with
             | Record { name; fields; boxing } ->

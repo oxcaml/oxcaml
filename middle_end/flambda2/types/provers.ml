@@ -934,8 +934,8 @@ let[@inline always] meet_boxed_number_containing_simple
 
 let meet_boxed_float32_containing_simple =
   meet_boxed_number_containing_simple
-    ~contents_of_boxed_number:(fun (ty_value : TG.head_of_kind_value_non_null)
-                              ->
+    ~contents_of_boxed_number:(fun
+        (ty_value : TG.head_of_kind_value_non_null) ->
       match ty_value with
       | Boxed_float32 (ty, _) -> Some ty
       | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_int32 _
@@ -945,8 +945,8 @@ let meet_boxed_float32_containing_simple =
 
 let meet_boxed_float_containing_simple =
   meet_boxed_number_containing_simple
-    ~contents_of_boxed_number:(fun (ty_value : TG.head_of_kind_value_non_null)
-                              ->
+    ~contents_of_boxed_number:(fun
+        (ty_value : TG.head_of_kind_value_non_null) ->
       match ty_value with
       | Boxed_float (ty, _) -> Some ty
       | Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_int32 _
@@ -956,8 +956,8 @@ let meet_boxed_float_containing_simple =
 
 let meet_boxed_int32_containing_simple =
   meet_boxed_number_containing_simple
-    ~contents_of_boxed_number:(fun (ty_value : TG.head_of_kind_value_non_null)
-                              ->
+    ~contents_of_boxed_number:(fun
+        (ty_value : TG.head_of_kind_value_non_null) ->
       match ty_value with
       | Boxed_int32 (ty, _) -> Some ty
       | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
@@ -967,8 +967,8 @@ let meet_boxed_int32_containing_simple =
 
 let meet_boxed_int64_containing_simple =
   meet_boxed_number_containing_simple
-    ~contents_of_boxed_number:(fun (ty_value : TG.head_of_kind_value_non_null)
-                              ->
+    ~contents_of_boxed_number:(fun
+        (ty_value : TG.head_of_kind_value_non_null) ->
       match ty_value with
       | Boxed_int64 (ty, _) -> Some ty
       | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
@@ -978,8 +978,8 @@ let meet_boxed_int64_containing_simple =
 
 let meet_boxed_nativeint_containing_simple =
   meet_boxed_number_containing_simple
-    ~contents_of_boxed_number:(fun (ty_value : TG.head_of_kind_value_non_null)
-                              ->
+    ~contents_of_boxed_number:(fun
+        (ty_value : TG.head_of_kind_value_non_null) ->
       match ty_value with
       | Boxed_nativeint (ty, _) -> Some ty
       | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
@@ -989,8 +989,8 @@ let meet_boxed_nativeint_containing_simple =
 
 let meet_boxed_vec128_containing_simple =
   meet_boxed_number_containing_simple
-    ~contents_of_boxed_number:(fun (ty_value : TG.head_of_kind_value_non_null)
-                              ->
+    ~contents_of_boxed_number:(fun
+        (ty_value : TG.head_of_kind_value_non_null) ->
       match ty_value with
       | Boxed_vec128 (ty, _) -> Some ty
       | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
@@ -1000,8 +1000,8 @@ let meet_boxed_vec128_containing_simple =
 
 let meet_boxed_vec256_containing_simple =
   meet_boxed_number_containing_simple
-    ~contents_of_boxed_number:(fun (ty_value : TG.head_of_kind_value_non_null)
-                              ->
+    ~contents_of_boxed_number:(fun
+        (ty_value : TG.head_of_kind_value_non_null) ->
       match ty_value with
       | Boxed_vec256 (ty, _) -> Some ty
       | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
@@ -1011,8 +1011,8 @@ let meet_boxed_vec256_containing_simple =
 
 let meet_boxed_vec512_containing_simple =
   meet_boxed_number_containing_simple
-    ~contents_of_boxed_number:(fun (ty_value : TG.head_of_kind_value_non_null)
-                              ->
+    ~contents_of_boxed_number:(fun
+        (ty_value : TG.head_of_kind_value_non_null) ->
       match ty_value with
       | Boxed_vec512 (ty, _) -> Some ty
       | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
@@ -1044,9 +1044,10 @@ let meet_block_field_simple_value ~min_name_mode ~field_kind field_index env
         | Bottom -> Invalid
         | Unknown -> Unknown
         | Ok ty -> (
-          if (* It's more straightforward to check the kind of [ty] instead of
-                examining the row-like structure directly. *)
-             not (Flambda_kind.equal (TG.kind ty) field_kind)
+          if
+            (* It's more straightforward to check the kind of [ty] instead of
+               examining the row-like structure directly. *)
+            not (Flambda_kind.equal (TG.kind ty) field_kind)
           then Invalid
           else
             match TG.get_alias_exn ty with
@@ -1098,9 +1099,10 @@ let meet_project_value_slot_simple_value ~min_name_mode value_slot env
     match TG.Row_like_for_closures.get_env_var by_function_slot value_slot with
     | Unknown -> Unknown
     | Known ty -> (
-      if (* It's more straightforward to check the kind of [ty] instead of
-            examining the row-like structure directly. *)
-         not (Flambda_kind.equal (TG.kind ty) (Value_slot.kind value_slot))
+      if
+        (* It's more straightforward to check the kind of [ty] instead of
+           examining the row-like structure directly. *)
+        not (Flambda_kind.equal (TG.kind ty) (Value_slot.kind value_slot))
       then Invalid
       else
         match TG.get_alias_exn ty with
@@ -1381,9 +1383,10 @@ let prove_physical_equality env t1 t2 =
                 | None, _ | _, None -> Unknown
                 | ( Some (tag1, shape1, size1, _fields1, _alloc_mode1),
                     Some (tag2, shape2, size2, _fields2, _alloc_mode2) ) ->
-                  if Tag.equal tag1 tag2
-                     && Target_ocaml_int.equal size1 size2
-                     && K.Block_shape.equal shape1 shape2
+                  if
+                    Tag.equal tag1 tag2
+                    && Target_ocaml_int.equal size1 size2
+                    && K.Block_shape.equal shape1 shape2
                   then
                     (* CR vlaviron and chambart: We could add a special case for
                        extension constructors, to try to remove dead branches in

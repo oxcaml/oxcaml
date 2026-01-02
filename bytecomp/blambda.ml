@@ -12,20 +12,19 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** [blambda] is designed to be a lambda-like expression language where every primitive is
-    also a bytecode primitive. This allows us to separate the bytecode backend into two
-    stages:
+(** [blambda] is designed to be a lambda-like expression language where every
+    primitive is also a bytecode primitive. This allows us to separate the
+    bytecode backend into two stages:
 
-    First, Lambda -> Blambda: Preserves the expression structure, but compiles all complex
-    primitives down to ones with corresponding bytecode instructions. This will become
-    more important as we continue to add more primitives to Lambda which have no
-    corresponding bytecode instruction.
+    First, Lambda -> Blambda: Preserves the expression structure, but compiles
+    all complex primitives down to ones with corresponding bytecode
+    instructions. This will become more important as we continue to add more
+    primitives to Lambda which have no corresponding bytecode instruction.
 
-    Second, Blambda -> Instructions: Only has to deal with linearizing the Lambda-like
-    control flow. The comparatively fragile stack size maintenance and stack index
-    computations can remain in their own module which doesn't need to be modified every
-    time we change Lambda.
-*)
+    Second, Blambda -> Instructions: Only has to deal with linearizing the
+    Lambda-like control flow. The comparatively fragile stack size maintenance
+    and stack index computations can remain in their own module which doesn't
+    need to be modified every time we change Lambda. *)
 
 type constant = Lambda.constant
 
@@ -73,7 +72,8 @@ type method_kind =
   | Self
   | Public
 
-(** primitives that correspond to bytecode instructions that don't affect control flow *)
+(** primitives that correspond to bytecode instructions that don't affect
+    control flow *)
 type primitive =
   | Getglobal of Compilation_unit.t
   | Getpredef of Ident.t
@@ -124,8 +124,8 @@ and bfunction =
   { params : Ident.t list;
     body : blambda;
     free_variables : Ident.Set.t
-        (** if we ever intended to do optimizations/transformations on blambda, this would
-        be better as a function than a field *)
+        (** if we ever intended to do optimizations/transformations on blambda,
+            this would be better as a function than a field *)
   }
 
 and blambda =
@@ -145,8 +145,8 @@ and blambda =
   | Letrec of
       { decls : rec_binding list;
         free_variables_of_decls : Ident.Set.t;
-            (** if we ever intended to do optimizations/transformations on blambda, this
-            would be better as a function than a field *)
+            (** if we ever intended to do optimizations/transformations on
+                blambda, this would be better as a function than a field *)
         body : blambda
       }
   | Prim of primitive * blambda list
@@ -200,18 +200,22 @@ and blambda =
   | Sequor of blambda * blambda
   | Event of blambda * Lambda.lambda_event
   | Pseudo_event of blambda * Debuginfo.Scoped_location.t
-      (** Pseudo events are ignored by the debugger. They are only used for generating
-          backtraces.
+      (** Pseudo events are ignored by the debugger. They are only used for
+          generating backtraces.
 
-          We prefer adding this event here rather than in lambda generation because:
-          + There are many different situations where a Pmakeblock can be generated.
-          + We prefer inserting a pseudo event rather than an event after to prevent the
-          debugger to stop at every single allocation.
+          We prefer adding this event here rather than in lambda generation
+          because:
+          + There are many different situations where a Pmakeblock can be
+            generated.
+          + We prefer inserting a pseudo event rather than an event after to
+            prevent the debugger to stop at every single allocation.
 
-          Having [Event] and/or [Pseudo_event] make effective pattern-matching on blambda
-          hard. However, blambda is only meant to go immediately before the code
-          generator, so it shouldn't really be matched on anyway.
+          Having [Event] and/or [Pseudo_event] make effective pattern-matching
+          on blambda hard. However, blambda is only meant to go immediately
+          before the code generator, so it shouldn't really be matched on
+          anyway.
 
-          In the future, we could simplify things a bit and use a new [Lev_pseudo_after]
-          event kind in the [Event] constructor instead of Pseudo_event, to generate
-          during lambda to blambda conversion if [!Clflags.debug] is [true]. *)
+          In the future, we could simplify things a bit and use a new
+          [Lev_pseudo_after] event kind in the [Event] constructor instead of
+          Pseudo_event, to generate during lambda to blambda conversion if
+          [!Clflags.debug] is [true]. *)

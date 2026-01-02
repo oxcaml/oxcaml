@@ -111,11 +111,12 @@ module Eliminate_fallthrough_blocks : sig
 end = struct
   let is_fallthrough_block cfg_with_layout (block : C.basic_block) =
     let cfg = CL.cfg cfg_with_layout in
-    if Label.equal cfg.entry_label block.start
-       || block.is_trap_handler
-       || (not (DLL.is_empty block.body))
-       || (not (C.is_pure_terminator block.terminator.desc))
-       || C.can_raise_terminator block.terminator.desc
+    if
+      Label.equal cfg.entry_label block.start
+      || block.is_trap_handler
+      || (not (DLL.is_empty block.body))
+      || (not (C.is_pure_terminator block.terminator.desc))
+      || C.can_raise_terminator block.terminator.desc
     then None
     else
       let successors = C.successor_labels ~normal:true ~exn:false block in
@@ -243,11 +244,12 @@ end = struct
             let b2_label = Label.Set.choose b1_successors in
             let b2_block = Label.Tbl.find cfg.blocks b2_label in
             let b2_predecessors = Cfg.predecessor_labels b2_block in
-            if (not (Label.equal b1_label cfg.entry_label))
-               && (not (Label.equal b1_label b2_label))
-               && List.compare_length_with b2_predecessors 1 = 0
-               && Cfg.is_pure_terminator b1_block.terminator.desc
-               && not b1_block.can_raise
+            if
+              (not (Label.equal b1_label cfg.entry_label))
+              && (not (Label.equal b1_label b2_label))
+              && List.compare_length_with b2_predecessors 1 = 0
+              && Cfg.is_pure_terminator b1_block.terminator.desc
+              && not b1_block.can_raise
             then (
               assert (Label.equal b1_label (List.hd b2_predecessors));
               (* modify b1 *)

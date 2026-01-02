@@ -15,7 +15,8 @@
 (**************************************************************************)
 
 (** The identifiers (implicit and explicit function parameters, together with
-    return and exception continuations) bound at a lambda in the term language. *)
+    return and exception continuations) bound at a lambda in the term language.
+*)
 
 type t
 

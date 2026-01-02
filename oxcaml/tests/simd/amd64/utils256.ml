@@ -4,121 +4,121 @@ include Utils
 
 external int64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> int64x4
   = "" "vec256_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x8_of_int64s : int64 -> int64 -> int64 -> int64 -> int32x8
   = "" "vec256_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int16x16_of_int64s : int64 -> int64 -> int64 -> int64 -> int16x16
   = "" "vec256_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int8x32_of_int64s : int64 -> int64 -> int64 -> int64 -> int8x32
   = "" "vec256_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x8_of_int64s : int64 -> int64 -> int64 -> int64 -> float32x8
   = "" "vec256_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> float64x4
   = "" "vec256_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x4_first_int64 : int64x4 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x4_second_int64 : int64x4 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x4_third_int64 : int64x4 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x4_fourth_int64 : int64x4 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x8_first_int64 : int32x8 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x8_second_int64 : int32x8 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x8_third_int64 : int32x8 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x8_fourth_int64 : int32x8 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x8_first_int64 : float32x8 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x8_second_int64 : float32x8 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x8_third_int64 : float32x8 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x8_fourth_int64 : float32x8 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x4_first_int64 : float64x4 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x4_second_int64 : float64x4 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x4_third_int64 : float64x4 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x4_fourth_int64 : float64x4 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int16x16_first_int64 : int16x16 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int16x16_second_int64 : int16x16 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int16x16_third_int64 : int16x16 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int16x16_fourth_int64 : int16x16 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int8x32_first_int64 : int8x32 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int8x32_second_int64 : int8x32 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int8x32_third_int64 : int8x32 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int8x32_fourth_int64 : int8x32 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float32x8_of_float32x4s : float32x4 -> float32x4 -> float32x8
   = "" "vec256_of_vec128s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external float64x4_of_float64x2s : float64x2 -> float64x2 -> float64x4
   = "" "vec256_of_vec128s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int32x8_of_int32x4s : int32x4 -> int32x4 -> int32x8
   = "" "vec256_of_vec128s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external extract_128_f32 :
   (int[@untagged]) -> (float32x8[@unboxed]) -> (float32x4[@unboxed])
   = "caml_vec256_unreachable" "caml_avx_vec256_extract_128"
-  [@@noalloc] [@@builtin]
+[@@noalloc] [@@builtin]
 
 external extract_128_f64 :
   (int[@untagged]) -> (float64x4[@unboxed]) -> (float64x2[@unboxed])
   = "caml_vec256_unreachable" "caml_avx_vec256_extract_128"
-  [@@noalloc] [@@builtin]
+[@@noalloc] [@@builtin]
 
 let eq_float32x8 ~result ~expect =
   let result_low = extract_128_f32 0 result in
@@ -171,23 +171,23 @@ module Vector256_casts = struct
 
   external int64x4_of_int32x8 : int32x8 -> int64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x4_of_int16x16 : int16x16 -> int64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x4_of_int8x32 : int8x32 -> int64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x4_of_float32x8 : float32x8 -> int64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x4_of_float64x4 : float64x4 -> int64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     let _0 = int32x8_of_int64s 1L 2L 3L 4L in
@@ -213,23 +213,23 @@ module Vector256_casts = struct
 
   external int32x8_of_int64x4 : int64x4 -> int32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int32x8_of_int16x16 : int16x16 -> int32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int32x8_of_int8x32 : int8x32 -> int32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int32x8_of_float32x8 : float32x8 -> int32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int32x8_of_float64x4 : float64x4 -> int32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     let _0 = int64x4_of_int64s 1L 2L 3L 4L in
@@ -260,23 +260,23 @@ module Vector256_casts = struct
 
   external int16x16_of_int64x4 : int64x4 -> int16x16
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int16x16_of_int32x8 : int32x8 -> int16x16
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int16x16_of_int8x32 : int8x32 -> int16x16
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int16x16_of_float32x8 : float32x8 -> int16x16
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int16x16_of_float64x4 : float64x4 -> int16x16
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     let _0 = int64x4_of_int64s 1L 2L 3L 4L in
@@ -307,23 +307,23 @@ module Vector256_casts = struct
 
   external int8x32_of_int64x4 : int64x4 -> int8x32
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int8x32_of_int32x8 : int32x8 -> int8x32
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int8x32_of_int16x16 : int16x16 -> int8x32
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int8x32_of_float32x8 : float32x8 -> int8x32
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int8x32_of_float64x4 : float64x4 -> int8x32
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     let _0 = int64x4_of_int64s 1L 2L 3L 4L in
@@ -354,23 +354,23 @@ module Vector256_casts = struct
 
   external float32x8_of_int64x4 : int64x4 -> float32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float32x8_of_int32x8 : int32x8 -> float32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float32x8_of_int16x16 : int16x16 -> float32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float32x8_of_int8x32 : int8x32 -> float32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float32x8_of_float64x4 : float64x4 -> float32x8
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     let _0 = int64x4_of_int64s 1L 2L 3L 4L in
@@ -401,23 +401,23 @@ module Vector256_casts = struct
 
   external float64x4_of_int64x4 : int64x4 -> float64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float64x4_of_int32x8 : int32x8 -> float64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float64x4_of_int16x16 : int16x16 -> float64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float64x4_of_int8x32 : int8x32 -> float64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external float64x4_of_float32x8 : float32x8 -> float64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     let _0 = int64x4_of_int64s 1L 2L 3L 4L in
@@ -448,11 +448,11 @@ module Vector256_casts = struct
 
   external int64x4_of_int64x2 : int64x2 -> int64x4
     = "caml_vec256_unreachable" "caml_vec256_low_of_vec128"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   external int64x2_of_int64x4 : int64x4 -> int64x2
     = "caml_vec256_unreachable" "caml_vec256_low_to_vec128"
-    [@@noalloc] [@@unboxed] [@@builtin]
+  [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
     let _12 = int64x2_of_int64s 1L 2L in

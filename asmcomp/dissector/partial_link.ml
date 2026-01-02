@@ -43,7 +43,8 @@ let report_error ppf = function
     Format.fprintf ppf
       "@[<v>Dissector: partial link of partition %d failed with exit code %d@,\
        Files in partition:@,\
-      \  @[<v>%a@]@]" partition_index exit_code
+      \  @[<v>%a@]@]"
+      partition_index exit_code
       (Format.pp_print_list ~pp_sep:Format.pp_print_cut Format.pp_print_string)
       files
 
@@ -80,11 +81,11 @@ let link_one_partition ~temp_dir ~partition_index partition =
       in
       let exit_code = Ccomp.command cmd in
       (if exit_code <> 0
-      then
-        let files =
-          List.map MOF.File_size.filename (Partition.files partition)
-        in
-        raise (Error (Linker_error { partition_index; exit_code; files })));
+       then
+         let files =
+           List.map MOF.File_size.filename (Partition.files partition)
+         in
+         raise (Error (Linker_error { partition_index; exit_code; files })));
       Partition.Linked.create ~partition ~linked_object:output_file)
     ~always:(fun () -> Misc.remove_file response_file)
 
