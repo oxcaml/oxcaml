@@ -27,6 +27,7 @@ module String = Misc.Stdlib.String
 
 type error =
   | Assembler_error of string
+  | Binary_emitter_mismatch of string
   | Mismatched_for_pack of Compilation_unit.Prefix.t
   | Asm_generation of string * Emitaux.error
 
@@ -555,7 +556,7 @@ let compile_genfuns ~ppf_dump f =
     (Generic_fns.compile ~cache:false ~shared:true
        (Generic_fns.Tbl.of_fns (Compilenv.current_unit_infos ()).ui_generic_fns))
 
-let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
+let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     ~may_reduce_heap ~ppf_dump gen =
   reset ();
   let create_asm =
@@ -615,7 +616,32 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
         ~exceptionally:remove_asm_file;
       let assemble_result = Profile.record_call "assemble" assemble_file in
       if assemble_result <> 0 then raise (Error (Assembler_error asm_filename));
-      remove_asm_file ())
+      remove_asm_file ());
+  (* Verify binary emitter output if requested. This is done outside the
+     try_finally so that verification failures don't delete the object file,
+     making it easier to debug mismatches. *)
+  if !Oxcaml_flags.verify_binary_emitter
+  then
+    let binary_sections_dir = output_prefix ^ ".binary-sections" in
+    match
+      Binary_emitter_verify.compare unix ~obj_file:obj_filename
+        ~binary_sections_dir
+    with
+    | Match { text_size; data_size } ->
+      if !Clflags.verbose
+      then
+        Format.eprintf "Binary emitter verified: text=%d data=%d bytes@."
+          text_size data_size
+    | Mismatch (Missing_binary_sections_dir _) ->
+      (* Binary sections dir missing - binary emitter didn't run (e.g.,
+         -stop-after linearization). Skip verification. *)
+      if !Clflags.verbose
+      then
+        Format.eprintf
+          "Binary emitter verification skipped (no binary sections)@."
+    | (Mismatch _ | Object_file_error _) as result ->
+      Binary_emitter_verify.print_result Format.err_formatter result;
+      raise (Error (Binary_emitter_mismatch obj_filename))
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
   Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:false ~sourcefile;
@@ -656,7 +682,7 @@ let asm_filename output_prefix =
 
 let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
     ~ppf_dump (program : Lambda.program) =
-  compile_unit ~ppf_dump ~output_prefix:prefixname
+  compile_unit unix ~ppf_dump ~output_prefix:prefixname
     ~asm_filename:(asm_filename prefixname) ~keep_asm:!keep_asm_file
     ~obj_filename:(prefixname ^ ext_obj)
     ~may_reduce_heap:(Option.is_none toplevel) (fun () ->
@@ -689,7 +715,7 @@ let linear_gen_implementation ~ppf_dump unix filename =
   emit_end_assembly ~sourcefile ()
 
 let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
-  compile_unit ~ppf_dump ~may_reduce_heap:true ~output_prefix
+  compile_unit unix ~ppf_dump ~may_reduce_heap:true ~output_prefix
     ~asm_filename:(asm_filename output_prefix)
     ~keep_asm:!keep_asm_file ~obj_filename:(output_prefix ^ ext_obj) (fun () ->
       linear_gen_implementation ~ppf_dump unix progname)
@@ -700,6 +726,9 @@ let report_error ppf = function
   | Assembler_error file ->
     fprintf ppf "Assembler error, input left in file %a" Location.print_filename
       file
+  | Binary_emitter_mismatch file ->
+    fprintf ppf "Binary emitter verification failed for %a"
+      Location.print_filename file
   | Mismatched_for_pack saved ->
     let msg prefix =
       if Compilation_unit.Prefix.is_empty prefix

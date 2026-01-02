@@ -124,6 +124,8 @@ let opt_level = ref Default
 
 let internal_assembler = ref false
 
+let verify_binary_emitter = ref false
+
 let gc_timings = ref false
 
 let symbol_visibility_protected = ref false (* -symbol-visibility-protected*)

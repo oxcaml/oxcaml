@@ -536,6 +536,7 @@
   compilenv
   ;; asmcomp/
   asmgen
+  binary_emitter_verify
   asmlink
   cm_bundle
   linkenv
