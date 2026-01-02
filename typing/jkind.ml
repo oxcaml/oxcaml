@@ -2038,13 +2038,7 @@ let apply_or_null_l jkind =
       | Non_float | Non_pointer64 | Non_pointer -> jkind
     in
     Ok jkind
-  | Some { nullability = Maybe_null; separability = _ } -> Error ()
-  (* this function is only called (in [Ctype.ml]) in response to seeing a
-     [Stepped_or_null] when unboxing, which only comes from [Variant_with_null]
-     which in turn requires the type argument's layout be scannable.
-     Thus, hitting this case indicates a mistake has been made. *)
-  | None ->
-    Misc.fatal_error "or_null applied to a type without a scannable layout"
+  | Some { nullability = Maybe_null; separability = _ } | None -> Error ()
 
 let apply_or_null_r jkind =
   match get_root_scannable_axes jkind with
