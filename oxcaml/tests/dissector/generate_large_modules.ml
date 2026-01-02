@@ -37,15 +37,17 @@ let generate_functions prefix num =
     Printf.bprintf buf "let f%05d x = x + %d\n" i (prefix + i)
   done;
   Buffer.add_char buf '\n';
-  Buffer.add_string buf "let call_all x =\n";
+  (* Generate call_all by filling an array with all function results, then
+     summing. This avoids stack overflow from deeply nested expressions. *)
+  Printf.bprintf buf "let call_all x =\n";
+  Printf.bprintf buf "  let results = [|\n";
   for i = 0 to num - 1 do
-    if i = 0
-    then Printf.bprintf buf "  f%05d x" i
-    else if i mod 10 = 0
-    then Printf.bprintf buf " +\n  f%05d x" i
-    else Printf.bprintf buf " + f%05d x" i
+    if i > 0 then Buffer.add_string buf ";";
+    if i mod 10 = 0 then Buffer.add_string buf "\n    ";
+    Printf.bprintf buf "f%05d x" i
   done;
-  Buffer.add_string buf "\n\n";
+  Buffer.add_string buf "\n  |] in\n";
+  Buffer.add_string buf "  Array.fold_left (+) 0 results\n\n";
   Buffer.contents buf
 
 let generate_module_a () =
