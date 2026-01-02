@@ -48,3 +48,39 @@ type ('a : value_or_null) portended = { a : 'a; } [@@unboxed]
 val peek : ('a : value maybe_separable) 'b. 'a portended or_null -> 'b =
   <fun>
 |}]
+
+
+(* These are regression tests for an intermediate version of the bug fix that
+   assumed that the type parameter of [or_null] is always [non_null]
+   throughout typechecking. Although this is eventually enforced, it may be
+   momentarily untrue when typechecking recursive functions due to the use of
+   [type_approx]. *)
+let rec ok () : 'a or_null = Null
+[%%expect{|
+val ok : ('a : value maybe_separable). unit -> 'a or_null = <fun>
+|}]
+let rec bad () : float# or_null = Null
+[%%expect{|
+Line 1, characters 17-23:
+1 | let rec bad () : float# or_null = Null
+                     ^^^^^^
+Error: This type "float#" should be an instance of type
+         "('a : value maybe_separable)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because the type argument of or_null has layout value.
+|}]
+let rec bad () : 'a or_null or_null = Null
+[%%expect{|
+Line 1, characters 17-27:
+1 | let rec bad () : 'a or_null or_null = Null
+                     ^^^^^^^^^^
+Error: This type "'a or_null" should be an instance of type
+         "('b : value maybe_separable)"
+       The layout of 'a or_null is value maybe_separable maybe_null
+         because it is the primitive type or_null.
+       But the layout of 'a or_null must be a sublayout of
+           value maybe_separable
+         because the type argument of or_null has layout value.
+|}]
