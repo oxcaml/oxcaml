@@ -3508,7 +3508,7 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
 
     [ty] is optional as the function works on modules and classes as well, for
     which [ty] should be [None]. *)
-let walk_nonstage_locks ~errors ~env ~loc ~item ~lid mode ty locks =
+let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
   List.fold_left
     (fun vmode lock ->
       match lock with
@@ -4204,8 +4204,7 @@ let lookup_class ~errors ~use ~loc lid env =
   in
   let vmode =
     if use then
-      walk_nonstage_locks ~errors ~loc ~env ~item:Class ~lid clda_mode None
-        locks
+      walk_locks ~errors ~loc ~env ~item:Class ~lid clda_mode None locks
     else
       clda_mode
   in
@@ -4343,7 +4342,7 @@ let find_cltype_index id env = find_index_tbl id env.cltypes
 (* Ordinary lookup functions *)
 
 let walk_locks ~env ~loc lid ~item ty (mode, locks) =
-  walk_nonstage_locks ~errors:true ~loc ~env ~item ~lid mode ty locks
+  walk_locks ~errors:true ~loc ~env ~item ~lid mode ty locks
 
 let lookup_module_path ?(use=true) ~loc ~load lid env =
   lookup_module_path ~errors:true ~use ~loc ~load lid env
