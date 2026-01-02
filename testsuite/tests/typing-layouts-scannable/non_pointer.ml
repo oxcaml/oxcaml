@@ -591,6 +591,24 @@ module M : sig type t : value non_float end
 |}]
 
 module M : sig
+  type t : immediate
+end = struct
+  type t : value mod everything non_pointer
+end
+[%%expect{|
+module M : sig type t : immediate end
+|}]
+
+module M : sig
+  type t : immediate64
+end = struct
+  type t : value mod everything non_pointer64
+end
+[%%expect{|
+module M : sig type t : immediate64 end
+|}]
+
+module M : sig
   type t : value non_float & value non_float
 end = struct
   type t : (value mod non_float) & (value mod non_float)
