@@ -3413,8 +3413,8 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
     match find_name_module ~mark:use s env.modules with
     | path, locks, data -> begin
         let stage_locks, nonstage_locks = partition_locks locks in
-        check_cross_quotation
-          ~errors ~loc_use:loc ~loc_def:Location.none env path (Lident s) stage_locks;
+        check_cross_quotation ~errors ~loc_use:loc ~loc_def:Location.none env
+          path (Lident s) stage_locks;
         path, nonstage_locks, data
     end
     | exception Not_found ->
@@ -3572,8 +3572,8 @@ let lookup_ident_value ~errors ~use ~loc name env =
           |> walk_locks_for_mutable_mode ~errors ~loc ~env nonstage_locks
           |> ignore
       | _ -> () end;
-      check_cross_quotation ~errors ~loc_use:loc ~loc_def:vda.vda_description.val_loc env path
-        (Lident name) stage_locks;
+      check_cross_quotation ~errors ~loc_use:loc
+        ~loc_def:vda.vda_description.val_loc env path (Lident name) stage_locks;
       use_value ~use ~loc path vda;
       path, nonstage_locks, vda
   | Ok (_, _, Val_unbound reason) ->
@@ -3584,8 +3584,8 @@ let lookup_ident_value ~errors ~use ~loc name env =
 let lookup_ident_type ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.types with
   | Ok (path, locks, tda) ->
-      check_cross_quotation ~errors ~loc_use:loc ~loc_def:tda.tda_declaration.type_loc env
-        path (Lident s) locks;
+      check_cross_quotation ~errors ~loc_use:loc
+        ~loc_def:tda.tda_declaration.type_loc env path (Lident s) locks;
       use_type ~use ~loc path tda;
       path, tda
   | Error _ ->
@@ -3594,8 +3594,8 @@ let lookup_ident_type ~errors ~use ~loc s env =
 let lookup_ident_modtype ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.modtypes with
   | Ok (path, locks, data) ->
-      check_cross_quotation ~errors ~loc_use:loc ~loc_def:data.mtda_declaration.mtd_loc env
-        path (Lident s) locks;
+      check_cross_quotation ~errors ~loc_use:loc
+        ~loc_def:data.mtda_declaration.mtd_loc env path (Lident s) locks;
       use_modtype ~use ~loc path data.mtda_declaration;
       (path, data.mtda_declaration)
   | Error _ ->
@@ -3605,8 +3605,8 @@ let lookup_ident_class ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.classes with
   | Ok (path, locks, clda) ->
       let stage_locks, nonstage_locks = partition_locks locks in
-      check_cross_quotation ~errors ~loc_def:loc ~loc_use:clda.clda_declaration.cty_loc env
-        path (Lident s) stage_locks;
+      check_cross_quotation ~errors ~loc_def:loc
+        ~loc_use:clda.clda_declaration.cty_loc env path (Lident s) stage_locks;
       use_class ~use ~loc path clda;
       path, nonstage_locks, clda.clda_declaration
   | Error _ ->
@@ -4405,8 +4405,8 @@ let lookup_settable_variable ?(use=true) ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) -> begin
       let stage_locks, nonstage_locks = partition_locks locks in
-      check_cross_quotation ~errors:true ~loc_use:loc ~loc_def:vda.vda_description.val_loc env path
-        (Lident name) stage_locks;
+      check_cross_quotation ~errors:true ~loc_use:loc
+        ~loc_def:vda.vda_description.val_loc env path (Lident name) stage_locks;
       let desc = vda.vda_description in
       match desc.val_kind, path with
       | Val_ivar(mut, cl_num), _ ->
