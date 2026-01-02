@@ -20,7 +20,7 @@ let reset_constructor_ikind_on_substitution = false
 
 module Ldd = Ikind.Ldd
 
-(** A JKind/ikind solver specialized to [Ikind.Ldd] and [Types.type_expr].
+(** A kind solver specialized to [Ikind.Ldd] and [Types.type_expr].
 
       The solver computes LDD polynomials of the form
         base ⊔ Σ_i (arg_i ⊓ coeff_i)
@@ -79,12 +79,10 @@ module Solver = struct
         }
     | Poly of poly * poly array
 
-  (* [kind_of] is parameterized so callers can use alternative environments
-     (e.g., identity environments when inlining type functions). *)
-  and env =
-    { kind_of : ctx -> Types.type_expr -> kind;
-      lookup : Path.t -> constr_decl
-    }
+  (* The environment supplies constructor lookup so callers can use
+     alternative environments (e.g., identity environments when inlining
+     type functions). *)
+  and env = { lookup : Path.t -> constr_decl }
 
   and ctx =
     { env : env;
@@ -119,25 +117,6 @@ module Solver = struct
     | Types.Tconstr _ -> true
     | Types.Tobject _ -> true
     | _ -> false
-
-  (** Compute the kind for [t]. *)
-  let kind (ctx : ctx) (ty : Types.type_expr) : kind =
-    (* Memoize only potentially cyclic types; LFPs handle recursion. *)
-    match TyTbl.find_opt ctx.ty_to_kind ty with
-    | Some kind_poly -> kind_poly
-    | None ->
-      if type_may_be_circular ty
-      then (
-        let var = Ldd.new_var () in
-        let placeholder = Ldd.node_of_var var in
-        TyTbl.add ctx.ty_to_kind ty placeholder;
-        let kind_rhs = ctx.env.kind_of ctx ty in
-        Ldd.solve_lfp var kind_rhs;
-        placeholder)
-      else
-        let kind_rhs = ctx.env.kind_of ctx ty in
-        TyTbl.add ctx.ty_to_kind ty kind_rhs;
-        kind_rhs
 
   (** Fetch or compute the polynomial for constructor [c]. *)
   let rec constr_kind (ctx : ctx) (path : Path.t) : poly * poly array =
@@ -254,6 +233,152 @@ module Solver = struct
     in
     loop base arg_kinds 0
 
+  (* Converting surface jkinds to solver ckinds. *)
+  let ckind_of_jkind_with_kind
+      (kind_fn : ctx -> Types.type_expr -> kind) (ctx : ctx)
+      (jkind : ('l * 'r) Types.jkind) : kind =
+    (* Base is the modality bounds stored on this jkind. *)
+    let base =
+      Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
+    in
+    (* For each with-bound (ty, axes), contribute
+       modality(axes_mask, kind_of ty). *)
+    Jkind.With_bounds.to_seq jkind.jkind.with_bounds
+    |> Seq.fold_left
+         (fun acc (ty, bound_info) ->
+           let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
+           let mask = Axis_lattice.of_axis_set axes in
+           let ty_kind = kind_fn ctx ty in
+           Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
+         base
+
+  (* Guards against accidental infinite recursion when traversing types. *)
+  let kind_of_depth = ref 0
+
+  let kind_of_counter = ref 0
+
+  (** Compute the kind for [t]. *)
+  let rec kind (ctx : ctx) (ty : Types.type_expr) : kind =
+    (* Memoize only potentially cyclic types; LFPs handle recursion. *)
+    match TyTbl.find_opt ctx.ty_to_kind ty with
+    | Some kind_poly -> kind_poly
+    | None ->
+      if type_may_be_circular ty
+      then (
+        let var = Ldd.new_var () in
+        let placeholder = Ldd.node_of_var var in
+        TyTbl.add ctx.ty_to_kind ty placeholder;
+        let kind_rhs = kind_of ctx ty in
+        Ldd.solve_lfp var kind_rhs;
+        placeholder)
+      else
+        let kind_rhs = kind_of ctx ty in
+        TyTbl.add ctx.ty_to_kind ty kind_rhs;
+        kind_rhs
+
+  (* Compute the ikind polynomial for an arbitrary [type_expr].  This is the
+     semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD
+     form. *)
+  and kind_of (ctx : ctx) (ty : Types.type_expr) : kind =
+    incr kind_of_depth;
+    if !kind_of_depth > 500 then failwith "kind_of_depth too deep" else ();
+    incr kind_of_counter;
+    if !kind_of_counter > 100000000
+    then failwith "kind_of_counter too big"
+    else ();
+    let kind_poly =
+      (* [ty] is expected to be representative: no links/substs/fields/nil. *)
+      match Types.get_desc ty with
+      | Types.Tvar { name = _name; jkind }
+      | Types.Tunivar { name = _name; jkind } ->
+        (* TODO: allow general jkinds here (including with-bounds) *)
+        let jkind_l = Jkind.disallow_right jkind in
+        (* Keep a rigid param, but cap it by its annotated jkind. *)
+        Ldd.meet (rigid ctx ty)
+          (ckind_of_jkind_with_kind kind ctx jkind_l)
+      | Types.Tconstr (path, args, _abbrev_memo) ->
+        let arg_kinds = List.map (fun t -> kind ctx t) args in
+        constr ctx path arg_kinds
+      | Types.Ttuple elts ->
+        (* Boxed tuples: immutable_data base + per-element contributions
+           under id modality. *)
+        let base = Ldd.const Axis_lattice.immutable_data in
+        let mask = Ldd.const Axis_lattice.mask_shallow in
+        List.fold_left
+          (fun acc (_lbl, t) -> Ldd.join acc (Ldd.meet mask (kind ctx t)))
+          base elts
+      | Types.Tunboxed_tuple elts ->
+        (* Unboxed tuples: per-element contributions; shallow axes relevant
+           only for arity = 1. *)
+        let mask =
+          match elts with
+          | [_] -> Axis_lattice.top (* arity 1: include all axes *)
+          | _ -> Axis_lattice.mask_shallow (* arity > 1: exclude shallow axes *)
+        in
+        let mask = Ldd.const mask in
+        List.fold_left
+          (fun acc (_lbl, t) -> Ldd.join acc (Ldd.meet mask (kind ctx t)))
+          (Ldd.const Axis_lattice.bot)
+          elts
+      | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
+        (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
+        Ldd.const Axis_lattice.arrow
+      | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind_of"
+      | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind_of"
+      | Types.Tpoly (ty, _) -> kind ctx ty
+      | Types.Tof_kind jkind ->
+        ckind_of_jkind_with_kind kind ctx jkind
+      | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
+      | Types.Tfield _ ->
+        failwith "Tfield shouldn't appear in kind_of"
+        (* Ldd.const Axis_lattice.value *)
+      | Types.Tnil ->
+        failwith "Tnil shouldn't appear in kind_of"
+        (* Ldd.const Axis_lattice.value *)
+      | Types.Tquote _ | Types.Tsplice _ ->
+        (* Treat quoted/spliced types conservatively as boxed values. *)
+        Ldd.const Axis_lattice.value
+      | Types.Tvariant row ->
+        if Btype.tvariant_not_immediate row
+        then
+          if Btype.static_row row
+          then
+            (* Closed, boxed polymorphic variant: immutable_data base plus
+               per-constructor args. *)
+            let base = Ldd.const Axis_lattice.immutable_data in
+            let mask = Ldd.const Axis_lattice.mask_shallow in
+            Btype.fold_row
+              (fun acc ty ->
+                let ty_kind = kind ctx ty in
+                let contribution = Ldd.meet mask ty_kind in
+                Ldd.join acc contribution)
+              base row
+          else
+            (* Open row: conservative non-float value (boxed) intersected with
+               an unknown rigid so the solver treats it as an unknown
+               element. *)
+            let unknown = rigid_name ctx (Ldd.Name.fresh_unknown ()) in
+            Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
+        else
+          (* All-constant (immediate) polymorphic variant. *)
+          Ldd.const Axis_lattice.immediate
+      | Types.Tpackage _ -> Ldd.const Axis_lattice.nonfloat_value
+    in
+    decr kind_of_depth;
+    kind_poly
+
+  let ckind_of_jkind (ctx : ctx) (jkind : ('l * 'r) Types.jkind) : kind =
+    ckind_of_jkind_with_kind kind ctx jkind
+
+  let ckind_of_jkind_l (ctx : ctx) (j : Types.jkind_l) : kind =
+    ckind_of_jkind ctx j
+
+  let ckind_of_jkind_r (jkind : Types.jkind_r) : kind =
+    (* For r-jkinds used in sub checks, with-bounds are not present
+       on the right (see Jkind_desc.sub's precondition). So only the
+       base mod-bounds matter. *)
+    Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
+
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (kind_poly : kind) : poly =
     Ldd.solve_pending ();
@@ -282,124 +407,18 @@ let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
   done;
   ({ Types.base = base; coeffs } : Types.constructor_ikind)
 
-(* Converting surface jkinds to solver ckinds. *)
 let ckind_of_jkind (ctx : Solver.ctx) (jkind : ('l * 'r) Types.jkind) :
     Solver.kind =
-  (* Base is the modality bounds stored on this jkind. *)
-  let base =
-    Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
-  in
-  (* For each with-bound (ty, axes), contribute
-     modality(axes_mask, kind_of ty). *)
-  Jkind.With_bounds.to_seq jkind.jkind.with_bounds
-  |> Seq.fold_left
-       (fun acc (ty, bound_info) ->
-         let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-         let mask = Axis_lattice.of_axis_set axes in
-         let ty_kind = Solver.kind ctx ty in
-         Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
-       base
+  Solver.ckind_of_jkind ctx jkind
 
 let ckind_of_jkind_l (ctx : Solver.ctx) (j : Types.jkind_l) : Solver.kind =
-  ckind_of_jkind ctx j
+  Solver.ckind_of_jkind_l ctx j
 
 let ckind_of_jkind_r (jkind : Types.jkind_r) : Solver.kind =
-  (* For r-jkinds used in sub checks, with-bounds are not present
-     on the right (see Jkind_desc.sub's precondition). So only the
-     base mod-bounds matter. *)
-  Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
+  Solver.ckind_of_jkind_r jkind
 
-(* Guards against accidental infinite recursion when traversing types. *)
-let kind_of_depth = ref 0
-
-let kind_of_counter = ref 0
-
-(* Compute the ikind polynomial for an arbitrary [type_expr].  This is the
-   semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD form. *)
 let kind_of (ctx : Solver.ctx) (ty : Types.type_expr) : Solver.kind =
-  incr kind_of_depth;
-  if !kind_of_depth > 500 then failwith "kind_of_depth too deep" else ();
-  incr kind_of_counter;
-  if !kind_of_counter > 100000000
-  then failwith "kind_of_counter too big"
-  else ();
-  let kind_poly =
-    (* [ty] is expected to be representative: no links/substs/fields/nil. *)
-    match Types.get_desc ty with
-    | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
-      ->
-      (* TODO: allow general jkinds here (including with-bounds) *)
-      let jkind_l = Jkind.disallow_right jkind in
-      (* Keep a rigid param, but cap it by its annotated jkind. *)
-      Ldd.meet (Solver.rigid ctx ty) (ckind_of_jkind_l ctx jkind_l)
-    | Types.Tconstr (path, args, _abbrev_memo) ->
-      let arg_kinds = List.map (fun t -> Solver.kind ctx t) args in
-      Solver.constr ctx path arg_kinds
-    | Types.Ttuple elts ->
-      (* Boxed tuples: immutable_data base + per-element contributions
-         under id modality. *)
-      let base = Ldd.const Axis_lattice.immutable_data in
-      let mask = Ldd.const Axis_lattice.mask_shallow in
-      List.fold_left
-        (fun acc (_lbl, t) -> Ldd.join acc (Ldd.meet mask (Solver.kind ctx t)))
-        base elts
-    | Types.Tunboxed_tuple elts ->
-      (* Unboxed tuples: per-element contributions; shallow axes relevant
-         only for arity = 1. *)
-      let mask =
-        match elts with
-        | [_] -> Axis_lattice.top (* arity 1: include all axes *)
-        | _ -> Axis_lattice.mask_shallow (* arity > 1: exclude shallow axes *)
-      in
-      let mask = Ldd.const mask in
-      List.fold_left
-        (fun acc (_lbl, t) -> Ldd.join acc (Ldd.meet mask (Solver.kind ctx t)))
-        (Ldd.const Axis_lattice.bot)
-        elts
-    | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
-      (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
-      Ldd.const Axis_lattice.arrow
-    | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind_of"
-    | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind_of"
-    | Types.Tpoly (ty, _) -> Solver.kind ctx ty
-    | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
-    | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
-    | Types.Tfield _ ->
-      failwith "Tfield shouldn't appear in kind_of"
-      (* Ldd.const Axis_lattice.value *)
-    | Types.Tnil ->
-      failwith "Tnil shouldn't appear in kind_of"
-      (* Ldd.const Axis_lattice.value *)
-    | Types.Tquote _ | Types.Tsplice _ ->
-      (* Treat quoted/spliced types conservatively as boxed values. *)
-      Ldd.const Axis_lattice.value
-    | Types.Tvariant row ->
-      if Btype.tvariant_not_immediate row
-      then
-        if Btype.static_row row
-        then
-          (* Closed, boxed polymorphic variant: immutable_data base plus
-             per-constructor args. *)
-          let base = Ldd.const Axis_lattice.immutable_data in
-          let mask = Ldd.const Axis_lattice.mask_shallow in
-          Btype.fold_row
-            (fun acc ty ->
-              let ty_kind = Solver.kind ctx ty in
-              let contribution = Ldd.meet mask ty_kind in
-              Ldd.join acc contribution)
-            base row
-        else
-          (* Open row: conservative non-float value (boxed) intersected with an
-             unknown rigid so the solver treats it as an unknown element. *)
-          let unknown = Solver.rigid_name ctx (Ldd.Name.fresh_unknown ()) in
-          Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
-      else
-        (* All-constant (immediate) polymorphic variant. *)
-        Ldd.const Axis_lattice.immediate
-    | Types.Tpackage _ -> Ldd.const Axis_lattice.nonfloat_value
-  in
-  decr kind_of_depth;
-  kind_poly
+  Solver.kind_of ctx ty
 
 let has_mutable_label lbls =
   List.exists
@@ -652,7 +671,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
 (* Package the above into a full evaluation context. *)
 let make_ctx_with_mode ~(mode : Solver.mode) ~(context : Jkind.jkind_context) :
     Solver.ctx =
-  Solver.create_ctx ~mode { kind_of; lookup = lookup_of_context ~context }
+  Solver.create_ctx ~mode { lookup = lookup_of_context ~context }
 
 let make_ctx ~(context : Jkind.jkind_context) : Solver.ctx =
   make_ctx_with_mode ~mode:Solver.Normal ~context
@@ -943,10 +962,8 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
      atom. *)
   let arity = max_arity_in_type Path.Map.empty body in
   let lookup path = identity_lookup_from_arity_map arity path in
-  let kind_of_identity = kind_of in
-  let env : Solver.env = { kind_of = kind_of_identity; lookup } in
-  let ctx = Solver.create_ctx ~mode:Solver.Normal env in
-  let poly = Solver.normalize (kind_of_identity ctx body) in
+  let ctx = Solver.create_ctx ~mode:Solver.Normal { lookup } in
+  let poly = Solver.normalize (kind_of ctx body) in
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
   in
