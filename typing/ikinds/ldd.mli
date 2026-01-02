@@ -56,8 +56,7 @@ module Make (V : ORDERED) : sig
 
   val solve_pending : unit -> unit
 
-  (** Linear decomposition/composition helpers.
-      [decompose_into_linear_terms ~universe n] returns a base term and a list
+  (** [decompose_into_linear_terms ~universe n] returns a base term and a list
       of linear coefficients, one per variable in [universe]. *)
   val decompose_into_linear_terms :
     universe:var list -> node -> node * node list
