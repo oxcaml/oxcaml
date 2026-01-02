@@ -172,12 +172,11 @@ type align_padding =
   | Nop
   | Zero
 
-(** Leave as much space as is required to achieve the given alignment. On x86 in the
+(** Leave as much space as is required to achieve the given alignment. In the
     binary emitter, it is important what the space is filled with: in the text section,
     one would typically fill it with [nop] instructions and in the data section, one
-    would typically fill it with zeros. This is controlled by the parameter
-    [fill_x86_bin_emitter]. *)
-val align : fill_x86_bin_emitter:align_padding -> bytes:int -> unit
+    would typically fill it with zeros. This is controlled by the parameter [fill]. *)
+val align : fill:align_padding -> bytes:int -> unit
 
 (** Emit a directive giving the displacement between the given symbol and
     the current position.  This should only be used to state sizes of
@@ -352,19 +351,34 @@ module Directive : sig
       | Signed_int of Int64.t
       | Unsigned_int of Numbers.Uint64.t
       | This
-      | Named_thing of string
-          (** [Named_thing] covers symbols, labels and variables. (Name mangling
-          conventions have by now been applied to these entities.) *)
+      | Label of Asm_label.t
+      | Symbol of Asm_symbol.t
+      | Variable of string  (** For .set assignments (macOS only) *)
       | Add of t * t
       | Sub of t * t
+
+    (** Evaluate a constant expression to a 64-bit value.
+        @param this Called to get the current offset when [This] is encountered.
+        @param lookup_label Called to resolve Label values.
+        @param lookup_symbol Called to resolve Symbol values.
+        @param lookup_variable Called to resolve Variable values (for .set on macOS).
+        @return [Some value] if evaluation succeeds, [None] if a symbol cannot
+                be resolved. *)
+    val eval :
+      this:(unit -> int64) ->
+      lookup_label:(Asm_label.t -> int64 option) ->
+      lookup_symbol:(Asm_symbol.t -> int64 option) ->
+      lookup_variable:(string -> int64 option) ->
+      t ->
+      int64 option
   end
 
   module Constant_with_width : sig
     (** A constant together with a width indicating the number of bytes in
         the object file within which the constant is to fit.  Some validation
         is performed on values of type [t] to try to ensure that this is the
-        case, but it cannot be exhaustive, as the values of [This] and
-        [Named_thing] constructions are not known. *)
+        case, but it cannot be exhaustive, as the values of [This],
+        [Label], [Symbol], and [Variable] constructions are not known. *)
     type t
 
     val constant : t -> Constant.t
@@ -376,11 +390,17 @@ module Directive : sig
       | Sixty_four
 
     val width_in_bytes : t -> width_in_bytes
+
+    val width_in_bytes_int : width_in_bytes -> int
   end
 
   type thing_after_label = private
     | Code
     | Machine_width_data
+
+  type label_or_symbol = private
+    | Label of Asm_label.t
+    | Symbol of Asm_symbol.t
 
   type comment = private string
 
@@ -398,8 +418,8 @@ module Directive : sig
         { bytes : int;
               (** The number of bytes to align to. This will be taken log2 by the emitter on
           Arm and macOS platforms.*)
-          fill_x86_bin_emitter : align_padding
-              (** The [fill_x86_bin_emitter] flag controls whether the x86 binary emitter
+          fill : align_padding
+              (** The [fill] flag controls whether the binary emitter
                   emits NOP instructions or null bytes. *)
         }
     | Bytes of
@@ -427,38 +447,33 @@ module Directive : sig
         { file_num : int option;
           filename : string
         }
-    | Global of string
-    | Indirect_symbol of string
+    | Global of Asm_symbol.t
+    | Indirect_symbol of Asm_symbol.t
     | Loc of
         { file_num : int;
           line : int;
           col : int;
           discriminator : int option
         }
-    | New_label of string * thing_after_label
+    | New_label of label_or_symbol * thing_after_label
     | New_line
-    | Private_extern of string
-    | Section of
-        { names : string list;
-          flags : string option;
-          args : string list;
-          is_delayed : bool
-        }
-    | Size of string * Constant.t
+    | Private_extern of Asm_symbol.t
+    | Section of Asm_section.t * [`First_occurrence | `Not_first_occurrence]
+    | Size of Asm_symbol.t * Constant.t
     | Sleb128 of
         { constant : Constant.t;
           comment : string option
         }
     | Space of { bytes : int }
-    | Type of string * symbol_type
+    | Type of label_or_symbol * symbol_type
     | Uleb128 of
         { constant : Constant.t;
           comment : string option
         }
-    | Protected of string
-    | Hidden of string
-    | Weak of string
-    | External of string
+    | Protected of Asm_symbol.t
+    | Hidden of Asm_symbol.t
+    | Weak of Asm_symbol.t
+    | External of Asm_symbol.t
     | Reloc of
         { offset : Constant.t;
           name : reloc_type;
@@ -468,6 +483,19 @@ module Directive : sig
   (** Translate the given directive to textual form.  This produces output
       suitable for either gas or MASM as appropriate. *)
   val print : Buffer.t -> t -> unit
+
+  val increment_offset_in_bytes : t -> offset_in_bytes:int -> int
+
+  (** {1 Binary emission helpers} *)
+
+  (** Emit an unsigned LEB128 encoded value to a buffer. *)
+  val emit_uleb128 : Buffer.t -> int64 -> unit
+
+  (** Emit a signed LEB128 encoded value to a buffer. *)
+  val emit_sleb128 : Buffer.t -> int64 -> unit
+
+  (** Emit a little-endian integer value of the given width to a buffer. *)
+  val emit_int_le : Buffer.t -> width_bytes:int -> int64 -> unit
 end
 
 (** To be called by the emitter at the very start of code generation.

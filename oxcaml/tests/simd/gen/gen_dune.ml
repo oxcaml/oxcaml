@@ -35,7 +35,7 @@ let compile ~enabled_if ~extra_flags name =
  (modules ${name})
  ${enabled_if}
  (ocamlopt_flags
-  (:standard -extension simd_beta ${extra_flags}))
+  (:standard -extension simd_beta -save-binary-sections ${extra_flags}))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 |}
@@ -227,4 +227,6 @@ let () =
     List.map (fun (name, _) -> name, enabled_if_main_amd64_not_macos) tests
   in
   List.iter (print_test ~extra_flag:"-internal-assembler") tests;
+  (* Binary emitter verification for ARM64 is now done via
+     OCAMLPARAM='_,verify-binary-emitter=1' rather than compare_sections.sh *)
   ()
