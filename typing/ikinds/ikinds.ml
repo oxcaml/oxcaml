@@ -700,6 +700,13 @@ let type_declaration_ikind ~(context : Jkind.jkind_context) ~(path : Path.t) :
 
 let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.type_ikind =
+  (* This function gets called separately for each 
+    type definition of a mutually recursive group. This is
+    safe but computationally wasteful. In the future we might
+    want to give this function a list of paths and compute the
+    ikind for all of them at once. Alternatively, keep the cache
+    between calls to this function from the same mutually recursive
+    group. *)
   if not !Clflags.ikinds
   then Types.ikinds_todo "ikinds disabled"
   else
