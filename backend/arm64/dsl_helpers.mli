@@ -1,0 +1,187 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2024--2025 Jane Street Group LLC                              *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
+(** Helper functions that convert compiler [Reg.t] values to ARM64 operands.
+
+    This module provides the bridge between the compiler's register allocator
+    (which uses [Reg.t]) and the ARM64 AST (which uses integer register indices).
+*)
+
+module Ast = Arm64_ast.Ast
+
+(** {1 GP register operands} *)
+
+val reg_w : Reg.t -> [`Reg of [`GP of [`W]]] Ast.Operand.t
+
+val reg_x : Reg.t -> [`Reg of [`GP of [`X]]] Ast.Operand.t
+
+(** {1 Scalar FP/SIMD register operands} *)
+
+val reg_d : Reg.t -> [`Reg of [`Neon of [`Scalar of [`D]]]] Ast.Operand.t
+
+(** Like [reg_d] but accepts both Float and Float32 registers. Used for
+    reinterpret casts where we want to treat both as D registers. *)
+val reg_d_of_float_reg :
+  Reg.t -> [`Reg of [`Neon of [`Scalar of [`D]]]] Ast.Operand.t
+
+val reg_s : Reg.t -> [`Reg of [`Neon of [`Scalar of [`S]]]] Ast.Operand.t
+
+val reg_q_operand :
+  Reg.t -> [`Reg of [`Neon of [`Scalar of [`Q]]]] Ast.Operand.t
+
+(** {1 Vector register operands} *)
+
+val reg_v2s :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V2S] * [`S]]]] Ast.Operand.t
+
+val reg_v4s :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V4S] * [`S]]]] Ast.Operand.t
+
+val reg_v2d :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] Ast.Operand.t
+
+val reg_v16b :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]] Ast.Operand.t
+
+val reg_v8h :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V8H] * [`H]]]] Ast.Operand.t
+
+val reg_v8b :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V8B] * [`B]]]] Ast.Operand.t
+
+val reg_v4h :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V4H] * [`H]]]] Ast.Operand.t
+
+val reg_v2d_operand :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] Ast.Operand.t
+
+val reg_v16b_operand :
+  Reg.t -> [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]] Ast.Operand.t
+
+(** {1 Operand tuple helpers for SIMD instructions} *)
+
+val v4s_v4s_v4s :
+  Linear.instruction ->
+  [`Reg of [`Neon of [`Vector of [`V4S] * [`S]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V4S] * [`S]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V4S] * [`S]]]] Ast.Operand.t
+
+val v2d_v2d_v2d :
+  Linear.instruction ->
+  [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] Ast.Operand.t
+
+val v8h_v8h_v8h :
+  Linear.instruction ->
+  [`Reg of [`Neon of [`Vector of [`V8H] * [`H]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V8H] * [`H]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V8H] * [`H]]]] Ast.Operand.t
+
+val v16b_v16b_v16b :
+  Linear.instruction ->
+  [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]] Ast.Operand.t
+
+val v4s_v4s :
+  Linear.instruction ->
+  [`Reg of [`Neon of [`Vector of [`V4S] * [`S]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V4S] * [`S]]]] Ast.Operand.t
+
+val v2d_v2d :
+  Linear.instruction ->
+  [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] Ast.Operand.t
+
+val v8h_v8h :
+  Linear.instruction ->
+  [`Reg of [`Neon of [`Vector of [`V8H] * [`H]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V8H] * [`H]]]] Ast.Operand.t
+
+val v16b_v16b :
+  Linear.instruction ->
+  [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]] Ast.Operand.t
+  * [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]] Ast.Operand.t
+
+(** {1 Polymorphic scalar FP register helpers} *)
+
+type scalar_fp_regs_3 = private
+  | S_regs :
+      ([`Reg of [`Neon of [`Scalar of [`S]]]] Ast.Operand.t as 'a) * 'a * 'a
+      -> scalar_fp_regs_3
+  | D_regs :
+      ([`Reg of [`Neon of [`Scalar of [`D]]]] Ast.Operand.t as 'a) * 'a * 'a
+      -> scalar_fp_regs_3
+
+type scalar_fp_regs_4 = private
+  | S_regs :
+      ([`Reg of [`Neon of [`Scalar of [`S]]]] Ast.Operand.t as 'a)
+      * 'a
+      * 'a
+      * 'a
+      -> scalar_fp_regs_4
+  | D_regs :
+      ([`Reg of [`Neon of [`Scalar of [`D]]]] Ast.Operand.t as 'a)
+      * 'a
+      * 'a
+      * 'a
+      -> scalar_fp_regs_4
+
+val reg_fp_operand_3 : Reg.t -> Reg.t -> Reg.t -> scalar_fp_regs_3
+
+val reg_fp_operand_4 : Reg.t -> Reg.t -> Reg.t -> Reg.t -> scalar_fp_regs_4
+
+(** {1 Memory operands from Reg.t} *)
+
+val mem : Reg.t -> [`Mem of [> `Base_reg]] Ast.Operand.t
+
+val addressing :
+  Arch.addressing_mode ->
+  Reg.t ->
+  [`Mem of [> `Offset_imm | `Offset_unscaled | `Offset_sym]] Ast.Operand.t
+
+val stack :
+  stack_offset:int ref ->
+  contains_calls:bool ref ->
+  num_stack_slots:int Stack_class.Tbl.t ->
+  Reg.t ->
+  [`Mem of [> `Offset_imm | `Offset_unscaled]] Ast.Operand.t
+
+val mem_symbol_reg :
+  reloc:[`Twelve] Ast.Symbol.same_unit_or_reloc ->
+  ?offset:int ->
+  Reg.t ->
+  Asm_targets.Asm_symbol.t ->
+  [`Mem of [> `Offset_sym]] Ast.Operand.t
+
+val mem_label :
+  reloc:[`Twelve] Ast.Symbol.same_unit_or_reloc ->
+  ?offset:int ->
+  Reg.t ->
+  Asm_targets.Asm_label.t ->
+  [`Mem of [> `Offset_sym]] Ast.Operand.t

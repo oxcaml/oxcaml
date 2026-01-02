@@ -101,6 +101,14 @@ module Predef : sig
 
   val caml_raise_exn : t
 
+  val caml_reraise_exn : t
+
+  val caml_call_local_realloc : t
+
+  val caml_call_realloc_stack : t
+
+  val caml_c_call_stack_args : t
+
   val caml_negf_mask : t
 
   val caml_absf_mask : t

@@ -117,64 +117,59 @@ let encode { name; already_encoded } =
     let symbol_prefix = symbol_prefix () in
     to_escaped_string ~symbol_prefix name
 
-(* We predefine several common symbols that violate the standard escaping done
-   by [encode]. All predefined symbols are global (runtime functions). *)
+(* Predefined symbols for runtime functions. All are global. *)
 module Predef = struct
-  let caml_call_gc = create_without_encoding ~visibility:Global "caml_call_gc"
+  let caml_call_gc = create_global "caml_call_gc"
 
-  let caml_call_gc_avx =
-    create_without_encoding ~visibility:Global "caml_call_gc_avx"
+  let caml_call_gc_avx = create_global "caml_call_gc_avx"
 
-  let caml_call_gc_avx512 =
-    create_without_encoding ~visibility:Global "caml_call_gc_avx512"
+  let caml_call_gc_avx512 = create_global "caml_call_gc_avx512"
 
-  let caml_c_call = create_without_encoding ~visibility:Global "caml_c_call"
+  let caml_c_call = create_global "caml_c_call"
 
-  let caml_allocN = create_without_encoding ~visibility:Global "caml_allocN"
+  let caml_allocN = create_global "caml_allocN"
 
-  let caml_allocN_avx =
-    create_without_encoding ~visibility:Global "caml_allocN_avx"
+  let caml_allocN_avx = create_global "caml_allocN_avx"
 
-  let caml_allocN_avx512 =
-    create_without_encoding ~visibility:Global "caml_allocN_avx512"
+  let caml_allocN_avx512 = create_global "caml_allocN_avx512"
 
-  let caml_alloc1 = create_without_encoding ~visibility:Global "caml_alloc1"
+  let caml_alloc1 = create_global "caml_alloc1"
 
-  let caml_alloc1_avx =
-    create_without_encoding ~visibility:Global "caml_alloc1_avx"
+  let caml_alloc1_avx = create_global "caml_alloc1_avx"
 
-  let caml_alloc1_avx512 =
-    create_without_encoding ~visibility:Global "caml_alloc1_avx512"
+  let caml_alloc1_avx512 = create_global "caml_alloc1_avx512"
 
-  let caml_alloc2 = create_without_encoding ~visibility:Global "caml_alloc2"
+  let caml_alloc2 = create_global "caml_alloc2"
 
-  let caml_alloc2_avx =
-    create_without_encoding ~visibility:Global "caml_alloc2_avx"
+  let caml_alloc2_avx = create_global "caml_alloc2_avx"
 
-  let caml_alloc2_avx512 =
-    create_without_encoding ~visibility:Global "caml_alloc2_avx512"
+  let caml_alloc2_avx512 = create_global "caml_alloc2_avx512"
 
-  let caml_alloc3 = create_without_encoding ~visibility:Global "caml_alloc3"
+  let caml_alloc3 = create_global "caml_alloc3"
 
-  let caml_alloc3_avx =
-    create_without_encoding ~visibility:Global "caml_alloc3_avx"
+  let caml_alloc3_avx = create_global "caml_alloc3_avx"
 
-  let caml_alloc3_avx512 =
-    create_without_encoding ~visibility:Global "caml_alloc3_avx512"
+  let caml_alloc3_avx512 = create_global "caml_alloc3_avx512"
 
-  let caml_ml_array_bound_error =
-    create_without_encoding ~visibility:Global "caml_ml_array_bound_error"
+  let caml_ml_array_bound_error = create_global "caml_ml_array_bound_error"
 
-  let caml_ml_array_align_error =
-    create_without_encoding ~visibility:Global "caml_ml_array_align_error"
+  let caml_ml_array_align_error = create_global "caml_ml_array_align_error"
 
-  let caml_raise_exn =
-    create_without_encoding ~visibility:Global "caml_raise_exn"
+  let caml_raise_exn = create_global "caml_raise_exn"
 
+  let caml_reraise_exn = create_global "caml_reraise_exn"
+
+  let caml_call_local_realloc = create_global "caml_call_local_realloc"
+
+  let caml_call_realloc_stack = create_global "caml_call_realloc_stack"
+
+  let caml_c_call_stack_args = create_global "caml_c_call_stack_args"
+
+  (* stapsdt_base has a special format that shouldn't be prefixed *)
   let stapsdt_base = create_without_encoding ~visibility:Global "_.stapsdt.base"
 
   let caml_probes_semaphore ~name =
-    create_without_encoding ~visibility:Global ("caml_probes_semaphore_" ^ name)
+    create_global ("caml_probes_semaphore_" ^ name)
 
   let caml_negf_mask = create_global "caml_negf_mask"
 

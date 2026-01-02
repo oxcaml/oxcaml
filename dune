@@ -571,6 +571,7 @@
   cmm
   cmmgen_state
   CSE
+  dsl_helpers
   emit
   emitaux
   fdo_info
@@ -590,7 +591,6 @@
   probe_emission
   simd
   simd_selection
-  simd_proc
   amd64_simd_defs
   amd64_simd_instrs
   stack_check
