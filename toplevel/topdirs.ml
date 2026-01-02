@@ -572,6 +572,7 @@ let () =
   reg_show_prim "show_module"
     (fun env loc id lid ->
        let path, md, _ = Env.lookup_module ~loc lid env in
+       let md = ignore_md_modalities md in
        let id = match path with
          | Pident id -> id
          | _ -> id
@@ -584,6 +585,7 @@ let () =
          match md.md_type with
          | Mty_alias new_path ->
              let md = Env.find_module new_path env in
+             let md = ignore_md_modalities md in
              accum_aliases new_path md
                (if secretly_the_same_path env path new_path
                 then acc

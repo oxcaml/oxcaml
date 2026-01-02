@@ -1373,7 +1373,7 @@ let add_pattern_variables ?check ?check_as env pv =
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
          {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
-          val_attributes = pv_attributes; val_modalities = Modality.id;
+          val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
          } env
@@ -1410,7 +1410,7 @@ let add_module_variables env module_variables =
       in
       let md =
         { md_type = modl.mod_type; md_attributes = [];
-          md_modalities = Mode.Modality.id;
+          md_modalities = Mode.Modality.undefined;
           md_loc = mv_name.loc;
           md_uid = mv_uid; }
       in
@@ -3524,7 +3524,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_kind = Val_reg pv_sort
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
-            ; val_modalities = Modality.id
+            ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -3536,7 +3536,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_kind = Val_ivar (Immutable, cl_num)
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
-            ; val_modalities = Modality.id
+            ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -7095,7 +7095,7 @@ and type_expect_
               let md_shape = Shape.set_uid_if_none md_shape md_uid in
               let md =
                 { md_type = modl.mod_type; md_attributes = [];
-                  md_modalities = Modality.id;
+                  md_modalities = Modality.undefined;
                   md_loc = name.loc;
                   md_uid; }
               in
@@ -8939,7 +8939,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
           { val_type = ty; val_kind = Val_reg sort;
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
-            val_modalities = Modality.id;
+            val_modalities = Modality.undefined;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
           }

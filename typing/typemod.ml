@@ -1306,8 +1306,10 @@ let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
   We still don't support [pmd_modalities] on functors.
   *)
   match Mode.Modality.Const.is_id modalities with
-  | true -> mty, Mode.Modality.id
-  | false -> apply_modalities_module_type env modalities mty, Mode.Modality.id
+  | true -> mty, Mode.Modality.(Const.id |> of_const)
+  | false ->
+      apply_modalities_module_type env modalities mty,
+      Mode.Modality.(Const.id |> of_const)
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
@@ -1393,7 +1395,7 @@ let rec approx_modtype env smty =
 and approx_module_declaration env pmd =
   {
     Types.md_type = approx_modtype env pmd.pmd_type;
-    md_modalities = Mode.Modality.id;
+    md_modalities = Mode.Modality.(Const.id |> of_const);
     md_attributes = pmd.pmd_attributes;
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
@@ -1559,6 +1561,7 @@ and approx_constraint env body constr =
          (GPR#1626) *)
       let path, approx_md, _ =
         Env.lookup_module ~use:false ~loc:lid.loc lid.txt env in
+      let approx_md = ignore_md_modalities approx_md in
       let _,_,sg =
         Merge.merge_module ~approx:true ~destructive env
           lid.loc body id approx_md path false in
@@ -1928,7 +1931,7 @@ and transl_modtype_aux env smty =
               let id, newenv =
                 let arg_md =
                   { md_type = arg.mty_type;
-                    md_modalities = Mode.Modality.id;
+                    md_modalities = Mode.Modality.undefined;
                     md_attributes = [];
                     md_loc = param.loc;
                     md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -1970,6 +1973,7 @@ and transl_modtype_aux env smty =
       let path, md, _ =
         Env.lookup_module ~use:false ~loc:mod_id.loc mod_id.txt env
       in
+      let md = ignore_md_modalities md in
       let aliasable = not (Env.is_functor_arg path env) in
       try
         ignore
@@ -2004,6 +2008,7 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
     | Pwith_module (l, l')
     | Pwith_modsubst (l,l') ->
         let path, md, _ = Env.lookup_module ~loc l'.txt env in
+        let md = ignore_md_modalities md in
         let constr = if destructive then
             (Twith_modsubst (path, l'))
           else
@@ -2227,7 +2232,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
             md
           else
             { md_type = Mty_alias path;
-              md_modalities = Mode.Modality.id;
+              md_modalities = Mode.Modality.(Const.id |> of_const);
               md_attributes = pms.pms_attributes;
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2977,7 +2982,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
               let md_uid =  Uid.mk ~current_unit:(Env.get_unit_name ()) in
               let arg_md =
                 { md_type = mty.mty_type;
-                  md_modalities = Modality.id;
+                  md_modalities = Modality.undefined;
                   md_attributes = [];
                   md_loc = param.loc;
                   md_uid;
@@ -3490,10 +3495,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           Typedecl.transl_value_decl env ~modal:Str_primitive
             ~why:Structure_item loc sdesc
         in
-        assert
-          (desc.val_val.val_modalities
-           |> Modality.to_const_exn
-           |> Modality.Const.is_id);
+        assert (desc.val_val.val_modalities |> Modality.is_undefined);
         let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let val_val = {desc.val_val with val_modalities} in
         let desc = {desc with val_val} in
@@ -3666,7 +3668,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                    let mdecl =
                      {
                        md_type = mty.mty_type;
-                       md_modalities = Modality.id;
+                       md_modalities = Modality.undefined;
                        md_attributes = attrs;
                        md_loc = loc;
                        md_uid = uid;
@@ -4390,7 +4392,7 @@ let package_signatures units =
       let sg = Subst.signature Make_local subst sg in
       let md =
         { md_type=Mty_signature sg;
-          md_modalities=Modality.id;
+          md_modalities=Modality.(Const.id |> of_const);
           md_attributes=[];
           md_loc=Location.none;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
