@@ -2881,7 +2881,7 @@ let add_stage_lock lock env =
     unboxed_labels = TycompTbl.add_lock lock env.unboxed_labels;
   }
 
-let add_nonstage_lock lock env =
+let add_lock lock env =
   let lock = Nonstage_lock lock in
   { env with
     values = IdTbl.add_lock lock env.values;
@@ -2892,20 +2892,20 @@ let add_nonstage_lock lock env =
 
 let add_const_closure_lock ?(ghost = false) closure_context comonadic env =
   let lock = Const_closure_lock (ghost, closure_context, comonadic) in
-  add_nonstage_lock lock env
+  add_lock lock env
 
 let add_closure_lock closure_context comonadic env =
   let lock = Closure_lock
     (closure_context,
      Mode.Value.Comonadic.disallow_left comonadic)
   in
-  add_nonstage_lock lock env
+  add_lock lock env
 
-let add_region_lock env = add_nonstage_lock Region_lock env
+let add_region_lock env = add_lock Region_lock env
 
-let add_exclave_lock env = add_nonstage_lock Exclave_lock env
+let add_exclave_lock env = add_lock Exclave_lock env
 
-let add_unboxed_lock env = add_nonstage_lock Unboxed_lock env
+let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let enter_quotation env =
   add_stage_lock Quotation_lock {env with stage = env.stage + 1}
@@ -3263,15 +3263,15 @@ let does_not_cross_quotation path locks =
      | 0 -> Ok ()
      | n -> Result.Error n)
 
-let check_cross_quotation report_errors loc_use loc_def env path lid
+let check_cross_quotation ~errors ~loc_use ~loc_def env path lid
       locks =
   match does_not_cross_quotation path locks with
   | Ok () -> ()
   | Error n ->
-    may_lookup_error report_errors loc_use env
+    may_lookup_error errors loc_use env
       (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
 
-let assert_does_not_cross_quotation loc_use loc_def path locks =
+let assert_does_not_cross_quotation ~loc_use ~loc_def path locks =
   match does_not_cross_quotation path locks with
   | Ok () -> ()
   | Error _ ->
@@ -3414,7 +3414,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
     | path, locks, data -> begin
         let stage_locks, nonstage_locks = partition_locks locks in
         check_cross_quotation
-          errors loc Location.none env path (Lident s) stage_locks;
+          ~errors ~loc_use:loc ~loc_def:Location.none env path (Lident s) stage_locks;
         path, nonstage_locks, data
     end
     | exception Not_found ->
@@ -3572,7 +3572,7 @@ let lookup_ident_value ~errors ~use ~loc name env =
           |> walk_locks_for_mutable_mode ~errors ~loc ~env nonstage_locks
           |> ignore
       | _ -> () end;
-      check_cross_quotation errors loc vda.vda_description.val_loc env path
+      check_cross_quotation ~errors ~loc_use:loc ~loc_def:vda.vda_description.val_loc env path
         (Lident name) stage_locks;
       use_value ~use ~loc path vda;
       path, nonstage_locks, vda
@@ -3584,7 +3584,7 @@ let lookup_ident_value ~errors ~use ~loc name env =
 let lookup_ident_type ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.types with
   | Ok (path, locks, tda) ->
-      check_cross_quotation errors loc tda.tda_declaration.type_loc env
+      check_cross_quotation ~errors ~loc_use:loc ~loc_def:tda.tda_declaration.type_loc env
         path (Lident s) locks;
       use_type ~use ~loc path tda;
       path, tda
@@ -3594,7 +3594,7 @@ let lookup_ident_type ~errors ~use ~loc s env =
 let lookup_ident_modtype ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.modtypes with
   | Ok (path, locks, data) ->
-      check_cross_quotation errors loc data.mtda_declaration.mtd_loc env
+      check_cross_quotation ~errors ~loc_use:loc ~loc_def:data.mtda_declaration.mtd_loc env
         path (Lident s) locks;
       use_modtype ~use ~loc path data.mtda_declaration;
       (path, data.mtda_declaration)
@@ -3605,7 +3605,7 @@ let lookup_ident_class ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.classes with
   | Ok (path, locks, clda) ->
       let stage_locks, nonstage_locks = partition_locks locks in
-      check_cross_quotation errors loc clda.clda_declaration.cty_loc env
+      check_cross_quotation ~errors ~loc_def:loc ~loc_use:clda.clda_declaration.cty_loc env
         path (Lident s) stage_locks;
       use_class ~use ~loc path clda;
       path, nonstage_locks, clda.clda_declaration
@@ -4125,7 +4125,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
       path, mda.mda_declaration.md_loc
   in
   let stage_locks, nonstage_locks = partition_locks locks in
-  assert_does_not_cross_quotation loc loc_def path stage_locks;
+  assert_does_not_cross_quotation ~loc_use:loc ~loc_def path stage_locks;
   path, nonstage_locks
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
@@ -4406,7 +4406,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) -> begin
       let stage_locks, nonstage_locks = partition_locks locks in
-      check_cross_quotation true loc vda.vda_description.val_loc env path
+      check_cross_quotation ~errors:true ~loc_use:loc ~loc_def:vda.vda_description.val_loc env path
         (Lident name) stage_locks;
       let desc = vda.vda_description in
       match desc.val_kind, path with

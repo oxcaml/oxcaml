@@ -204,6 +204,19 @@ Error: Constructor "A" used at Line 3, characters 2-3
 Hint: Constructor "A" is defined outside any quotations.
 |}];;
 
+type t5 = int;;
+
+type s = <[t5#]>;;
+[%%expect {|
+type t5 = int
+Line 3, characters 11-14:
+3 | type s = <[t5#]>;;
+               ^^^
+Error: Identifier "t5" is used at Line 3, characters 11-14,
+       inside a quotation (<[ ... ]>);
+       it is introduced at Line 1, characters 0-13, outside any quotations.
+|}];;
+
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
 [%%expect {|
 - : <[$('a) -> $('b) -> $('a) * $('b)]> expr =

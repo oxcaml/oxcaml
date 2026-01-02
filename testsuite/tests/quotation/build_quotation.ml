@@ -760,6 +760,22 @@ Error: Opening modules is not supported inside quoted expressions,
        as seen at Line 1, characters 3-23.
 |}];;
 
+module M = struct
+  let foo = 42
+end;;
+
+<[ let open M in M.foo ]>
+;;
+[%%expect {|
+module M : sig val foo : int end
+Line 5, characters 3-22:
+5 | <[ let open M in M.foo ]>
+       ^^^^^^^^^^^^^^^^^^^
+Error: Opening modules is not supported inside quoted expressions,
+       as seen at Line 5, characters 3-22.
+|}]
+;;
+
 <[ fun x -> $ (<[ x ]>) ]>;;
 [%%expect {|
 - : <[$('a) -> $('a)]> expr = <[fun x -> x]>
