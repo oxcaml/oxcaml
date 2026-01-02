@@ -194,6 +194,7 @@ type error =
   | Not_an_object of type_expr * type_forcing_context option
   | Non_value_object of Jkind.Violation.t * type_forcing_context option
   | Non_value_let_rec of Jkind.Violation.t * type_expr
+  | Nested_or_null of type_expr
   | Undefined_method of type_expr * string * string list option
   | Undefined_self_method of string * string list
   | Virtual_class of Longident.t
@@ -5732,10 +5733,13 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
       (expected_mode : expected_mode) sexp ty_expected_explained =
   let previous_saved_types = Cmt_format.get_saved_types () in
   let exp =
-    Builtin_attributes.warning_scope sexp.pexp_attributes
-      (fun () ->
-         type_expect_ ?recarg ~overwrite env expected_mode sexp ty_expected_explained
-      )
+    try
+      Builtin_attributes.warning_scope sexp.pexp_attributes
+        (fun () ->
+           type_expect_ ?recarg ~overwrite env expected_mode sexp ty_expected_explained
+        )
+    with Ctype.Nested_or_null ty ->
+      raise (Error (sexp.pexp_loc, env, Nested_or_null ty))
   in
   Cmt_format.set_saved_types
     (Cmt_format.Partial_expression exp :: previous_saved_types);
@@ -10957,26 +10961,29 @@ let type_let existential_ctx env mutable_flag rec_flag spat_sexp_list =
 (* Typing of toplevel expressions *)
 
 let type_expression env jkind sexp =
-  let exp =
-    with_local_level begin fun () ->
-      Typetexp.TyVarEnv.reset ();
-      let expected = mk_expected (newvar jkind) in
-      type_expect env mode_legacy sexp expected
-    end
-    ~post:(may_lower_contravariant_then_generalize env)
-  in
-  let exp =
-    match sexp.pexp_desc with
-      Pexp_ident lid ->
-        let loc = sexp.pexp_loc in
-        (* Special case for keeping type variables when looking-up a variable *)
-        let (_path, desc, _) =
-          Env.lookup_value ~use:false ~loc lid.txt env
-        in
-        {exp with exp_type = desc.val_type}
-    | _ -> exp
-  in
-  maybe_check_uniqueness_exp exp; exp
+  try
+    let exp =
+      with_local_level begin fun () ->
+        Typetexp.TyVarEnv.reset ();
+        let expected = mk_expected (newvar jkind) in
+        type_expect env mode_legacy sexp expected
+      end
+      ~post:(may_lower_contravariant_then_generalize env)
+    in
+    let exp =
+      match sexp.pexp_desc with
+        Pexp_ident lid ->
+          let loc = sexp.pexp_loc in
+          (* Special case for keeping type variables when looking-up a variable *)
+          let (_path, desc, _) =
+            Env.lookup_value ~use:false ~loc lid.txt env
+          in
+          {exp with exp_type = desc.val_type}
+      | _ -> exp
+    in
+    maybe_check_uniqueness_exp exp; exp
+  with Ctype.Nested_or_null ty ->
+    raise (Error (sexp.pexp_loc, env, Nested_or_null ty))
 
 let type_representable_expression ~why env sexp =
   let jkind, sort =
@@ -11444,6 +11451,12 @@ let report_error ~loc env =
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            ~level:(Ctype.get_current_level ()) v)
         err)
+      ()
+  | Nested_or_null ty ->
+    Location.error_of_printer ~loc (fun ppf () ->
+      Printtyp.wrap_printing_env ~error:true env (fun () ->
+        fprintf ppf "Nested or_null detected for type@ %a"
+          Printtyp.type_expr ty))
       ()
   | Undefined_method (ty, me, valid_methods) ->
       Location.error_of_printer ~loc (fun ppf () ->

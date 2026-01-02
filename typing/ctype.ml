@@ -83,6 +83,8 @@ exception Subtype  of Subtype.error
 
 exception Escape of type_expr escape
 
+exception Nested_or_null of type_expr
+
 (* For local use: throw the appropriate exception.  Can be passed into local
    functions as a parameter *)
 type _ trace_exn =
@@ -2414,7 +2416,7 @@ let mk_is_abstract env p =
 let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
 
-let apply_layout_wrapping_l ~unwrapped_ty:{ ty = _; or_null; modality = _ }
+let apply_layout_wrapping_l ~unwrapped_ty:{ ty; or_null; modality = _ }
       jkind =
   match or_null with
   | Some _ ->
@@ -2422,7 +2424,10 @@ let apply_layout_wrapping_l ~unwrapped_ty:{ ty = _; or_null; modality = _ }
         when ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
         ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
         here we recompute the layout based on the inner jkind. *)
-    Jkind.apply_or_null_l jkind |> Result.get_ok |> Jkind.extract_layout
+    begin match Jkind.apply_or_null_l jkind with
+    | Ok jkind -> Jkind.extract_layout jkind
+    | Error () -> raise (Nested_or_null ty)
+    end
   | None ->
     Jkind.extract_layout jkind
 
