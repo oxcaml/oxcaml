@@ -265,10 +265,14 @@ module F () = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-Line 2, characters 9-12:
+Lines 1-3, characters 14-3:
+1 | ..............struct
 2 |     let (foo @ once) () = ()
-             ^^^
-Error: This is "once", but expected to be "many" because it is inside a "many" structure.
+3 | end
+Error: The module is "once"
+       because it contains the value "foo" defined as the expression at Line 2, characters 9-12
+       which is "once".
+       However, the module highlighted is expected to be "many".
 |}]
 
 module type Empty = sig end
@@ -384,12 +388,14 @@ module (F @ portable) () = struct
 end
 [%%expect{|
 val foo : unit -> unit = <fun>
-Line 4, characters 14-17:
+Lines 3-5, characters 22-3:
+3 | ......................() = struct
 4 |     let bar = foo
-                  ^^^
-Error: The value "foo" is "nonportable" but is expected to be "portable"
-       because it is used inside the functor at Lines 3-5, characters 22-3
-       which is expected to be "portable".
+5 | end
+Error: The module is "nonportable"
+       because it closes over the value "foo" at Line 4, characters 14-17
+       which is "nonportable".
+       However, the module highlighted is expected to be "portable".
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct

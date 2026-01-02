@@ -1692,7 +1692,13 @@ let undo_compress (changes, _old) =
         log
 
 let functor_param_mode = Mode.Alloc.legacy
-let functor_res_mode = Mode.Alloc.legacy
+let functor_res_mode =
+  let hint : _ Mode.Hint.const = Legacy Functor_return in
+  Mode.Alloc.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
 
 let ignore_md_modalities md =
   {md with md_modalities = Mode.Modality.(Const.id |> of_const)}
+
+let class_mode =
+  let hint : _ Mode.Hint.const = Legacy Class in
+  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)

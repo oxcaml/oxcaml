@@ -51,16 +51,13 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation_l loc
       | Contains_r (Comonadic, { containing; contained }) ->
-        ( contained,
-          Is_contained_by (Comonadic, { containing; container = fst pp }) )
+        contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_l (Monadic, { containing; contained }) ->
-        contained, Is_contained_by (Monadic, { containing; container = fst pp })
+        contained, Is_contained_by (Monadic, { containing; container = pp })
       | Is_contained_by (Comonadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_l (Comonadic, { containing; contained = pp }) )
+        container, Contains_l (Comonadic, { containing; contained = pp })
       | Is_contained_by (Monadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_r (Monadic, { containing; contained = pp }) )
+        container, Contains_r (Monadic, { containing; contained = pp })
 
     let right_adjoint :
         type r.
@@ -79,16 +76,13 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation_r loc
       | Contains_l (Comonadic, { containing; contained }) ->
-        ( contained,
-          Is_contained_by (Comonadic, { containing; container = fst pp }) )
+        contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_r (Monadic, { containing; contained }) ->
-        contained, Is_contained_by (Monadic, { containing; container = fst pp })
+        contained, Is_contained_by (Monadic, { containing; container = pp })
       | Is_contained_by (Comonadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_r (Comonadic, { containing; contained = pp }) )
+        container, Contains_r (Comonadic, { containing; contained = pp })
       | Is_contained_by (Monadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_l (Monadic, { containing; contained = pp }) )
+        container, Contains_l (Monadic, { containing; contained = pp })
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
@@ -190,7 +184,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         fun (type l r) (h : (allowed * r) t) : (l * r) t ->
          match h with
          | Unknown -> Unknown
-         | Class_legacy_comonadic -> Class_legacy_comonadic
+         | Legacy x -> Legacy x
          | Stack_expression -> Stack_expression
          | Mutable_read m -> Mutable_read m
          | Mutable_write m -> Mutable_write m
@@ -200,7 +194,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         fun (type l r) (h : (l * allowed) t) : (l * r) t ->
          match h with
          | Unknown -> Unknown
-         | Class_legacy_monadic -> Class_legacy_monadic
+         | Legacy x -> Legacy x
          | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
          | Tailcall_function -> Tailcall_function
          | Tailcall_argument -> Tailcall_argument
@@ -215,8 +209,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          match h with
          | Unknown -> Unknown
          | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-         | Class_legacy_comonadic -> Class_legacy_comonadic
-         | Class_legacy_monadic -> Class_legacy_monadic
+         | Legacy x -> Legacy x
          | Tailcall_function -> Tailcall_function
          | Tailcall_argument -> Tailcall_argument
          | Mutable_read m -> Mutable_read m
@@ -234,8 +227,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          match h with
          | Unknown -> Unknown
          | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-         | Class_legacy_comonadic -> Class_legacy_comonadic
-         | Class_legacy_monadic -> Class_legacy_monadic
+         | Legacy x -> Legacy x
          | Tailcall_function -> Tailcall_function
          | Tailcall_argument -> Tailcall_argument
          | Mutable_read m -> Mutable_read m
@@ -2058,6 +2050,12 @@ module Report = struct
     | Value -> print_article_noun Consonant "value"
     | Constructor -> print_article_noun Consonant "constructor"
 
+  let print_structure_item : structure_item -> _ =
+   fun (category, id) ~capitalize ->
+    dprintf "%t %a"
+      (print_lock_item ~definite:true ~capitalize category)
+      Misc.Style.inline_code (Ident.name id)
+
   let print_pinpoint_desc : pinpoint_desc -> _ = function
     | Unknown -> None
     | Ident { category; lid } ->
@@ -2082,6 +2080,16 @@ module Report = struct
           dprintf "%t of %t"
             (print_article_noun ~definite:true ~capitalize Consonant "result")
             (print_article_noun ~definite ~capitalize:false Consonant "cases"))
+    | Pattern -> Some (print_article_noun Consonant "pattern")
+    | Module -> Some (print_article_noun Consonant "module")
+    | Structure -> Some (print_article_noun Consonant "structure")
+    | Structure_item x ->
+      Some
+        (fun ~definite ~capitalize ->
+          dprintf "%t in %t"
+            (print_structure_item ~capitalize x)
+            (print_article_noun ~definite ~capitalize:false Consonant
+               "structure"))
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
@@ -2110,9 +2118,16 @@ module Report = struct
     | Application -> dprintf "function applications"
     | Try_with -> dprintf "try-with clauses"
 
+  let print_legacy = function
+    | Functor_return -> print_article_noun Consonant "functor return"
+    | Toplevel -> print_article_noun Consonant "top-level clause"
+    | Compilation_unit -> print_article_noun Consonant "compilation unit"
+    | Class -> print_article_noun Consonant "class"
+
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
   prints the const to explain the mode on the pinpoint. *)
-  let print_const (type l r) (_, pp_desc) ppf : (l * r) const -> unit = function
+  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
+      (l * r) const -> unit = function
     | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
     | Lazy_allocated_on_heap ->
       (match pp_desc with
@@ -2121,13 +2136,15 @@ module Report = struct
         pp_print_string ppf "lazy expressions always need"
       | _ -> pp_print_string ppf "it is a lazy expression and thus needs");
       pp_print_string ppf " to be allocated on the heap"
-    | Class_legacy_monadic | Class_legacy_comonadic ->
-      (match pp_desc with
-      | Ident { category = Class; _ } ->
+    | Legacy m -> (
+      match pp_desc, m with
+      | ( (Ident { category = Class; _ } | Class | Structure_item (Class, _)),
+          Class ) ->
         (* if we already said it's a class, we don't need to emphasize it again. *)
-        pp_print_string ppf "classes are always"
-      | _ -> pp_print_string ppf "it is a class and thus");
-      pp_print_string ppf " at the legacy modes"
+        pp_print_string ppf "classes are always at the legacy modes"
+      | _ ->
+        fprintf ppf "it is %t and thus always at the legacy modes"
+          (print_legacy m ~definite:false ~capitalize:false))
     | Tailcall_function ->
       pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
@@ -2149,7 +2166,9 @@ module Report = struct
       fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
     | Module_allocated_on_heap ->
       (match pp_desc with
-      | Ident { category = Module; _ } | Functor ->
+      | Ident { category = Module; _ }
+      | Functor | Module | Structure
+      | Structure_item (Module, _) ->
         (* if we already said it's a module, we don't need to emphasize it again. *)
         pp_print_string ppf "modules always need"
       | _ -> pp_print_string ppf "it is a module and thus needs");
@@ -2228,15 +2247,21 @@ module Report = struct
              | Constructor (s, moda) ->
                dprintf "contains (via constructor %a)%a %t"
                  Misc.Style.inline_code s maybe_modality moda print_pp
+             | Structure (x, moda) ->
+               dprintf "contains %t%a defined as %t"
+                 (print_structure_item ~capitalize:false x)
+                 maybe_modality moda print_pp
            in
            pr, contained)
 
   let print_is_contained_by :
       eq_mode:bool -> is_contained_by -> (formatter -> unit) * pinpoint =
    fun ~eq_mode { containing; container } ->
-    let maybe_modality, pp =
-      modality_or_source ~eq_mode (container, Expression)
-    in
+    let maybe_modality, pp = modality_or_source ~eq_mode container in
+    (* CR-someday zqian: Use the full [container] to improve the printing below.
+       E.g., insted of printing "the tuple at XXX", we can print "the tuple
+       pattern at XXX" or "the tuple expression at XXX". *)
+    let container = fst container in
     let pr =
       match containing with
       | Tuple ->
@@ -2251,6 +2276,10 @@ module Report = struct
         dprintf "is contained (via constructor %a)%a in the value at %a"
           Misc.Style.inline_code s maybe_modality moda Location.print_loc
           container
+      | Structure (x, moda) ->
+        dprintf "is %t%a in the structure at %a"
+          (print_structure_item ~capitalize:false x)
+          maybe_modality moda Location.print_loc container
     in
     pr, pp
 
