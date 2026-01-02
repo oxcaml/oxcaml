@@ -39,16 +39,10 @@ module Solver = struct
     | Round_up
 
   (* Hash tables avoiding polymorphic structural comparison on deep values.
-     We key types by their unique [Types.get_id] to keep lookups cheap. This
-     is similar to [Btype.TypeHash], but that table works over transient
-     nodes; here we need a table over [type_expr] values. *)
-  module TyTbl = Hashtbl.Make (struct
-    type t = Types.type_expr
-
-    let equal a b = Int.equal (Types.get_id a) (Types.get_id b)
-
-    let hash t = Hashtbl.hash (Types.get_id t)
-  end)
+     [Btype.TypeHash] keys by the representative of a [type_expr], so 
+     union-find aliases map to a single entry. This table is used to cache
+     repeated kind_of computations, as well as to make circular types work. *)
+  module TyTbl = Btype.TypeHash
 
   let constr_to_string (path : Path.t) : string =
     Format.asprintf "%a" Path.print path
