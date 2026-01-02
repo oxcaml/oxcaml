@@ -1317,7 +1317,8 @@ let foo (local_ mut) =
 Line 2, characters 12-15:
 2 |   let _ = { mut } in
                 ^^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is the field "mut" (with some modality) of the record at Line 2, characters 10-17.
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1327,7 +1328,8 @@ let foo () =
 Line 3, characters 12-15:
 3 |   let _ = { mut } in
                 ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "mut" (with some modality) of the record at Line 3, characters 10-17.
 |}]
 let foo (local_ gbl) =
   let _ = { gbl } in
@@ -1336,7 +1338,8 @@ let foo (local_ gbl) =
 Line 2, characters 12-15:
 2 |   let _ = { gbl } in
                 ^^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is the field "gbl" (with some modality) of the record at Line 2, characters 10-17.
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1346,7 +1349,8 @@ let foo () =
 Line 3, characters 12-15:
 3 |   let _ = { gbl } in
                 ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "gbl" (with some modality) of the record at Line 3, characters 10-17.
 |}]
 
 (* Implicit records version of the same test *)
@@ -1453,7 +1457,8 @@ let foo (local_ mut) =
 Line 2, characters 13-16:
 2 |   let _ = #{ mut } in
                  ^^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is the field "mut" (with some modality) of the record at Line 2, characters 10-18.
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1463,7 +1468,8 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ mut } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "mut" (with some modality) of the record at Line 3, characters 10-18.
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
@@ -1472,7 +1478,8 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is the field "gbl" (with some modality) of the record at Line 2, characters 10-18.
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1482,7 +1489,8 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "gbl" (with some modality) of the record at Line 3, characters 10-18.
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1522,7 +1530,8 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is the field "gbl" (with some modality) of the record at Line 2, characters 10-18.
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1532,7 +1541,8 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "gbl" (with some modality) of the record at Line 3, characters 10-18.
 |}]
 
 (* Global fields are preserved in module inclusion *)
@@ -2682,7 +2692,8 @@ let f (local_ x : string) = exclave_ [| x |]
 Line 1, characters 40-41:
 1 | let f (local_ x : string) = exclave_ [| x |]
                                             ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is an element (with some modality) of the array at Line 1, characters 37-44.
 |}]
 
 (* constructing local array from global elements is allowed *)

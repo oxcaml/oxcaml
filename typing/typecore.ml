@@ -540,36 +540,26 @@ let mode_morph f expected_mode =
   let tuple_modes = None in
   {expected_mode with mode; tuple_modes}
 
-let apply_is_contained_by ?is_contained_by mode =
-  let {monadic; comonadic} = mode in
-  let monadic =
-    let hint : _ Mode.Hint.morph =
-      match is_contained_by with
-      | None -> Unknown
-      | Some x -> Is_contained_by (Monadic, x)
-    in
-    Mode.Value.Monadic.apply_hint hint monadic
+(** Takes the mode of a container, a child's relation to it, and an optional
+    modality, returns the mode of the child. *)
+let apply_is_contained_by is_contained_by
+  ?(modalities = Modality.Const.id) mode =
+  let hint =
+    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
+      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
   in
-  let comonadic =
-    let hint : _ Mode.Hint.morph =
-      match is_contained_by with
-      | None -> Unknown
-      | Some x -> Is_contained_by (Comonadic, x)
-    in
-    Mode.Value.Comonadic.apply_hint hint comonadic
-  in
-  {monadic; comonadic}
+  Modality.Const.apply ~hint modalities mode
 
-let mode_modality ?is_contained_by modality expected_mode =
+(** Similiar to [apply_is_contained_by] but for [expected_mode]. *)
+let mode_is_contained_by is_contained_by ?modalities expected_mode =
   as_single_mode expected_mode
-  |> apply_is_contained_by ?is_contained_by
-  |> Modality.Const.apply modality
+  |> apply_is_contained_by is_contained_by ?modalities
   |> mode_default
 
-let actual_mode_modality ~is_contained_by modality mode =
-  mode
-  |> apply_is_contained_by ~is_contained_by
+let mode_modality modality expected_mode =
+  as_single_mode expected_mode
   |> Modality.Const.apply modality
+  |> mode_default
 
 (* used when entering a function;
 mode is the mode of the function region *)
@@ -1728,7 +1718,7 @@ let solve_Ppat_tuple ~refine ~alloc_mode loc env args expected_ty =
         { containing = Tuple;
           container = loc }
       in
-      let mode = apply_is_contained_by ~is_contained_by alloc_mode.mode in
+      let mode = apply_is_contained_by is_contained_by alloc_mode.mode in
       List.init arity (fun _ -> mode)
   in
   let ann =
@@ -1759,7 +1749,7 @@ let solve_Ppat_unboxed_tuple ~refine ~alloc_mode loc env args expected_ty =
         { containing = Tuple;
           container = loc }
       in
-      let mode = apply_is_contained_by ~is_contained_by alloc_mode.mode in
+      let mode = apply_is_contained_by is_contained_by alloc_mode.mode in
       List.init arity (fun _ -> mode)
   in
   let ann =
@@ -2844,10 +2834,10 @@ and type_pat_aux
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
       alloc_mode.mode;
     let is_contained_by : Mode.Hint.is_contained_by =
-      {containing = Array; container = loc}
+      {containing = Array Modality; container = loc}
     in
     let alloc_mode =
-      actual_mode_modality ~is_contained_by modalities alloc_mode.mode
+      apply_is_contained_by is_contained_by ~modalities alloc_mode.mode
     in
     let alloc_mode = simple_pat_mode alloc_mode in
     let pl =
@@ -2969,11 +2959,11 @@ and type_pat_aux
         check_project_mutability ~loc ~env:!!penv (Record_field label.lbl_name)
           label.lbl_mut alloc_mode.mode;
         let is_contained_by : Mode.Hint.is_contained_by =
-          { containing = Record label.lbl_name;
+          { containing = Record (label.lbl_name, Modality);
             container = loc }
         in
         let mode =
-          actual_mode_modality ~is_contained_by label.lbl_modalities
+          apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
             alloc_mode.mode
         in
         let alloc_mode = simple_pat_mode mode in
@@ -3228,14 +3218,15 @@ and type_pat_aux
           Submode_failed (e, Constructor lid.txt)))
       in
       let is_contained_by : Mode.Hint.is_contained_by =
-        { containing = Constructor constr.cstr_name; container = loc }
+        { containing = Constructor (constr.cstr_name, Modality);
+          container = loc }
       in
       let args =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
-              actual_mode_modality ~is_contained_by arg.ca_modalities
-                alloc_mode.mode
+              apply_is_contained_by is_contained_by
+                ~modalities:arg.ca_modalities alloc_mode.mode
              in
              let alloc_mode =
               Mode.Value.join [ alloc_mode; constructor_mode ]
@@ -5882,11 +5873,12 @@ and type_expect_
         check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
           ~modalities:label.lbl_modalities record_mode;
         let is_contained_by : Mode.Hint.is_contained_by =
-          { containing = Record label.lbl_name;
+          { containing = Record (label.lbl_name, Modality);
             container = loc }
         in
         let argument_mode =
-          mode_modality ~is_contained_by label.lbl_modalities record_mode
+          mode_is_contained_by is_contained_by ~modalities:label.lbl_modalities
+            record_mode
         in
         type_label_exp ~overwrite true env argument_mode loc ty_record x record_form
       in
@@ -5895,10 +5887,10 @@ and type_expect_
           (fun loc ty mode -> (* only change mode here, see type_label_exp *)
              List.map (fun (_, label, _) ->
                let mode =
-                actual_mode_modality
-                  ~is_contained_by:
-                    { containing = Record label.lbl_name; container = loc }
-                  label.lbl_modalities mode
+                apply_is_contained_by
+                  { containing = Record (label.lbl_name, Modality);
+                    container = loc }
+                  ~modalities:label.lbl_modalities mode
                in
                Overwrite_label(ty, mode))
                lbl_a_list)
@@ -5939,20 +5931,22 @@ and type_expect_
               check_project_mutability ~loc:extended_expr_loc ~env
                 (Record_field lbl.lbl_name) lbl.lbl_mut mode;
               let is_contained_by : Mode.Hint.is_contained_by =
-                { containing = Record lbl.lbl_name;
+                { containing = Record (lbl.lbl_name, Modality);
                   container = extended_expr_loc }
               in
               let mode =
-                actual_mode_modality ~is_contained_by lbl.lbl_modalities mode
+                apply_is_contained_by is_contained_by
+                  ~modalities:lbl.lbl_modalities mode
               in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
                 ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
               let is_contained_by : Mode.Hint.is_contained_by =
-                { containing = Record lbl.lbl_name;
+                { containing = Record (lbl.lbl_name, Modality);
                   container = record_loc }
               in
               let argument_mode =
-                mode_modality ~is_contained_by lbl.lbl_modalities record_mode
+                mode_is_contained_by is_contained_by
+                  ~modalities:lbl.lbl_modalities record_mode
               in
               submode ~loc:extended_expr_loc ~env mode argument_mode;
               Kept (ty_arg1, lbl.lbl_mut,
@@ -6514,11 +6508,12 @@ and type_expect_
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut rmode;
       let is_contained_by : Mode.Hint.is_contained_by =
-        { containing = Record label.lbl_name;
+        { containing = Record (label.lbl_name, Modality);
           container = record.exp_loc }
       in
       let mode =
-        actual_mode_modality ~is_contained_by label.lbl_modalities rmode
+        apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
+          rmode
       in
       let boxing : texp_field_boxing =
         let is_float_boxing =
@@ -6578,11 +6573,12 @@ and type_expect_
         fatal_error
           "Typecore.type_expect_: unboxed record labels are never mutable";
       let is_contained_by : Mode.Hint.is_contained_by =
-        { containing = Record label.lbl_name;
+        { containing = Record (label.lbl_name, Modality);
           container = record.exp_loc }
       in
       let mode =
-        actual_mode_modality ~is_contained_by label.lbl_modalities rmode
+        apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
+          rmode
       in
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
@@ -9165,9 +9161,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     register_allocation_value_mode ~loc expected_mode.mode
   in
   let argument_mode =
-    value_mode
-    |> apply_is_contained_by
-      ~is_contained_by:{containing = Tuple; container = loc}
+    value_mode |> apply_is_contained_by {containing = Tuple; container = loc}
   in
   (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
@@ -9235,8 +9229,7 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   assert (arity >= 2);
   let argument_mode =
     expected_mode.mode
-    |> apply_is_contained_by
-      ~is_contained_by:{containing = Tuple; container = loc}
+    |> apply_is_contained_by {containing = Tuple; container = loc}
   in
   (* elements must be representable *)
   let labels_types_and_sorts =
@@ -9418,9 +9411,10 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          let ty_args, _, _ = unify_as_construct ty in
          List.map (fun ty_arg ->
            let mode =
-            actual_mode_modality ~is_contained_by:
-              { containing = Constructor constr.cstr_name; container = loc }
-              ty_arg.Types.ca_modalities mode
+            apply_is_contained_by
+              { containing = Constructor (constr.cstr_name, Modality);
+                container = loc }
+              ~modalities:ty_arg.Types.ca_modalities mode
            in
            match recarg with
            | Required -> Overwriting(loc, ty_arg.Types.ca_type, mode)
@@ -9431,11 +9425,14 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   in
   let args =
     Misc.Stdlib.List.map3
-      (fun e ({Types.ca_type=ty; ca_modalities=gf; _},t0) overwrite ->
+      (fun e ({Types.ca_type=ty; ca_modalities=modalities; _},t0) overwrite ->
          let is_contained_by : Mode.Hint.is_contained_by =
-          { containing = Constructor constr.cstr_name; container = loc }
+          { containing = Constructor (constr.cstr_name, Modality);
+            container = loc }
          in
-         let argument_mode = mode_modality ~is_contained_by gf argument_mode in
+         let argument_mode =
+          mode_is_contained_by is_contained_by ~modalities argument_mode
+         in
          type_argument ~recarg ~overwrite env argument_mode e ty t0)
       sargs (List.combine ty_args ty_args0) overwrites
   in
@@ -10409,9 +10406,11 @@ and type_generic_array
   in
   let modalities = Typemode.transl_modalities ~maturity:Stable mutability [] in
   let is_contained_by : Mode.Hint.is_contained_by =
-    {containing = Array; container = loc}
+    {containing = Array Modality; container = loc}
   in
-  let argument_mode = mode_modality ~is_contained_by modalities array_mode in
+  let argument_mode =
+    mode_is_contained_by is_contained_by ~modalities array_mode
+  in
   let jkind, elt_sort =
     Jkind.for_array_element_sort ~level:(Ctype.get_current_level ())
   in

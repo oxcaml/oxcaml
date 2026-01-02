@@ -364,7 +364,9 @@ let (foo @ stateless) f =
 Line 3, characters 24-25:
 3 |     | ImmutableRef r -> r.contents <- 1
                             ^
-Error: This value is "immutable" but is expected to be "read_write"
+Error: This value is "immutable"
+       because it is contained (via constructor "ImmutableRef") (with some modality) in the value at Line 3, characters 6-20.
+       However, the highlighted expression is expected to be "read_write"
        because its mutable field "contents" is being written.
 |}]
 

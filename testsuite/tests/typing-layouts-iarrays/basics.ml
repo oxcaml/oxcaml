@@ -370,7 +370,8 @@ Line 3, characters 39-40:
                                            ^
 Error: This value is "local" but is expected to be "global"
        because it is an element of the tuple at Line 3, characters 37-45
-       which is expected to be "global".
+       which is expected to be "global"
+       because it is an element (with some modality) of the array at Line 3, characters 34-48.
 |}]
 
 (* Extracting local values from iarrays via pattern matching:

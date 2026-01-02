@@ -860,8 +860,15 @@ module type S = sig
       (** Test if the given modality is the identity modality. *)
       val is_id : t -> bool
 
+      (* CR-soon zqian: make the [hint] below mandatory *)
+
       (** Apply a modality on mode. *)
-      val apply : t -> ('l * 'r) Value.t -> ('l * 'r) Value.t
+      val apply :
+        ?hint:
+          (('l * 'r) neg Hint.morph, ('l * 'r) pos Hint.morph) monadic_comonadic ->
+        t ->
+        ('l * 'r) Value.t ->
+        ('l * 'r) Value.t
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t

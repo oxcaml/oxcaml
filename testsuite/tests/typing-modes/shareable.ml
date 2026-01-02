@@ -89,7 +89,9 @@ let get : 'a t -> 'a @ portable = fun t -> t.x
 Line 1, characters 43-46:
 1 | let get : 'a t -> 'a @ portable = fun t -> t.x
                                                ^^^
-Error: This value is "shareable" but is expected to be "portable".
+Error: This value is "shareable"
+       because it is the field "x" (with some modality) of the record at Line 1, characters 43-44.
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Crossing *)

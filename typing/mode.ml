@@ -2098,6 +2098,10 @@ module Report = struct
                (print_desc ~definite ~capitalize)
                Location.print_loc loc)
 
+  let is_known_pinpoint : pinpoint -> bool = function
+    | _, Unknown -> false
+    | _ -> true
+
   let print_mutable_part ppf = function
     | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s
     | Array_elements -> fprintf ppf "array elements"
@@ -2190,49 +2194,75 @@ module Report = struct
     | Float_projection ->
       dprintf "is a float-record projection (and thus an allocation)"
 
-  let print_contains : contains -> ((formatter -> unit) * pinpoint) option =
-   fun { containing; contained } ->
+  let modality_or_source ~eq_mode pp =
+    if eq_mode
+       (* if the modality doesn't change the bound, we omit the modality and
+          print the remaining chain. *)
+    then (fun _ppf Modality -> ()), pp
+    else
+      (* if the modality change the bound, we signal that. Moreover, since each
+         axis is total ordering, the modality is solely responsible for the
+         bound, and we omit the remaining chain. *)
+      (* CR-someday zqian: print the modality on the offending axis. *)
+      ( (fun ppf Modality -> fprintf ppf " (with some modality)"),
+        (Location.none, Unknown : pinpoint) )
+
+  let print_contains :
+      eq_mode:bool -> contains -> ((formatter -> unit) * pinpoint) option =
+   fun ~eq_mode { containing; contained } ->
     print_pinpoint contained
     |> Option.map (fun print_pp ->
            let print_pp = print_pp ~definite:true ~capitalize:false in
+           let maybe_modality, contained =
+             modality_or_source ~eq_mode contained
+           in
            let pr =
              match containing with
              | Tuple -> dprintf "is a tuple that contains %t" print_pp
-             | Record s ->
-               dprintf "is a record whose field %a is %t" Misc.Style.inline_code
-                 s print_pp
-             | Array -> dprintf "is an array that contains %t" print_pp
-             | Constructor s ->
-               dprintf "contains (via constructor %a) %t" Misc.Style.inline_code
-                 s print_pp
+             | Record (s, moda) ->
+               dprintf "is a record whose field %a%a is %t"
+                 Misc.Style.inline_code s maybe_modality moda print_pp
+             | Array moda ->
+               dprintf "is an array that contains%a %t" maybe_modality moda
+                 print_pp
+             | Constructor (s, moda) ->
+               dprintf "contains (via constructor %a)%a %t"
+                 Misc.Style.inline_code s maybe_modality moda print_pp
            in
            pr, contained)
 
-  let print_is_contained_by : is_contained_by -> (formatter -> unit) * pinpoint
-      =
-   fun { containing; container } ->
+  let print_is_contained_by :
+      eq_mode:bool -> is_contained_by -> (formatter -> unit) * pinpoint =
+   fun ~eq_mode { containing; container } ->
+    let maybe_modality, pp =
+      modality_or_source ~eq_mode (container, Expression)
+    in
     let pr =
       match containing with
       | Tuple ->
         dprintf "is an element of the tuple at %a" Location.print_loc container
-      | Record s ->
-        dprintf "is the field %a of the record at %a" Misc.Style.inline_code s
+      | Record (s, moda) ->
+        dprintf "is the field %a%a of the record at %a" Misc.Style.inline_code s
+          maybe_modality moda Location.print_loc container
+      | Array moda ->
+        dprintf "is an element%a of the array at %a" maybe_modality moda
           Location.print_loc container
-      | Array ->
-        dprintf "is an element of the array at %a" Location.print_loc container
-      | Constructor s ->
-        dprintf "is contained (via constructor %a) in the value at %a"
-          Misc.Style.inline_code s Location.print_loc container
+      | Constructor (s, moda) ->
+        dprintf "is contained (via constructor %a)%a in the value at %a"
+          Misc.Style.inline_code s maybe_modality moda Location.print_loc
+          container
     in
-    let pp = container, Expression in
     pr, pp
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and gives the source pinpoint. *)
   let print_morph :
       type l r.
-      pinpoint -> (l * r) morph -> ((formatter -> unit) * pinpoint) option =
-   fun pp -> function
+      eq_mode:bool ->
+      pinpoint ->
+      (l * r) morph ->
+      ((formatter -> unit) * pinpoint) option =
+   fun ~eq_mode pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Unknown | Unknown_non_rigid -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
@@ -2264,10 +2294,10 @@ module Report = struct
     | Crossing -> Some (dprintf "crosses with something", pp)
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
-    | Contains_l (_, contains) -> print_contains contains
-    | Contains_r (_, contains) -> print_contains contains
+    | Contains_l (_, contains) -> print_contains ~eq_mode contains
+    | Contains_r (_, contains) -> print_contains ~eq_mode contains
     | Is_contained_by (_, is_contained_by) ->
-      Some (print_is_contained_by is_contained_by)
+      Some (print_is_contained_by ~eq_mode is_contained_by)
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
@@ -2307,7 +2337,7 @@ module Report = struct
     let side = adjust_side obj side in
     if sub
     then (
-      Format.pp_print_string ppf "which ";
+      fprintf ppf "@ which ";
       match side with
       | `Actual -> pp_print_string ppf "is "
       | `Expected -> pp_print_string ppf "is expected to be ");
@@ -2341,17 +2371,19 @@ module Report = struct
       print_error_result option =
    fun ?(sub = false) side pp (obj : a C.obj) ppf (a, hint) ->
     match hint with
-    | Apply (morph_hint, src, ahint)
-      when (not (is_rigid morph_hint)) && eq_mode obj src a (fst ahint) ->
-      print_ahint ~sub side pp src ppf ahint
-    | Apply (morph_hint, src, ahint) -> (
-      print_mode_with_side ~sub side obj ppf a;
-      match print_morph pp morph_hint with
-      | None -> Some Mode
-      | Some (t, pp) ->
-        fprintf ppf "@ because it %t@ " t;
-        ignore (print_ahint ~sub:true side pp src ppf ahint);
-        Some Mode_with_hint)
+    | Apply (morph_hint, src, ahint) ->
+      let eq_mode = eq_mode obj src a (fst ahint) in
+      if (not (is_rigid morph_hint)) && eq_mode
+      then print_ahint ~sub side pp src ppf ahint
+      else (
+        print_mode_with_side ~sub side obj ppf a;
+        match print_morph ~eq_mode pp morph_hint with
+        | None -> Some Mode
+        | Some (t, pp) ->
+          fprintf ppf "@ because it %t" t;
+          if is_known_pinpoint pp
+          then ignore (print_ahint ~sub:true side pp src ppf ahint);
+          Some Mode_with_hint)
     | Const Unknown ->
       print_mode_with_side ~sub side obj ppf a;
       Some Mode
@@ -4101,10 +4133,12 @@ module Modality = struct
         match then_, t with
         | Join_const c0, Join_const c1 -> Join_const (Mode.Const.join c0 c1)
 
-      let apply : type l r. t -> (l * r) Mode.t -> (l * r) Mode.t =
-       fun t x ->
-        match t with
-        | Join_const c -> Mode.join_const ~hint:Unknown_non_rigid c x
+      let apply :
+          type l r.
+          ?hint:(l * r) neg Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
+          =
+       fun ?(hint = Hint.Unknown_non_rigid) t x ->
+        match t with Join_const c -> Mode.join_const ~hint c x
 
       let proj ax (Join_const c) : _ Atom.t = Join_with (Axis.proj ax c)
 
@@ -4240,10 +4274,12 @@ module Modality = struct
         match then_, t with
         | Meet_const c0, Meet_const c1 -> Meet_const (Mode.Const.meet c0 c1)
 
-      let apply : type l r. t -> (l * r) Mode.t -> (l * r) Mode.t =
-       fun t x ->
-        match t with
-        | Meet_const c -> Mode.meet_const ~hint:Unknown_non_rigid c x
+      let apply :
+          type l r.
+          ?hint:(l * r) pos Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
+          =
+       fun ?(hint = Hint.Unknown_non_rigid) t x ->
+        match t with Meet_const c -> Mode.meet_const ~hint c x
 
       let proj ax (Meet_const c) : _ Atom.t = Meet_with (Axis.proj ax c)
 
@@ -4423,9 +4459,17 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply t { monadic; comonadic } =
-      let monadic = Monadic.apply t.monadic monadic in
-      let comonadic = Comonadic.apply t.comonadic comonadic in
+    let apply ?hint t { monadic; comonadic } =
+      let monadic =
+        Monadic.apply
+          ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
+          t.monadic monadic
+      in
+      let comonadic =
+        Comonadic.apply
+          ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
+          t.comonadic comonadic
+      in
       { monadic; comonadic }
 
     let concat ~then_ t =
