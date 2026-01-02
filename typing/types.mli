@@ -187,6 +187,11 @@ and type_desc =
       where 'a1 ... 'an are names given to types in tyl
       and occurrences of those types in ty. *)
 
+  | Trepr of type_expr * type_expr list
+  (** [Trepr (ty,tyl)] ==> [repr_ 'a1... 'an. ty],
+      where 'a1 ... 'an are names given to types in tyl
+      and occurrences of those types in ty. *)
+
   | Tpackage of Path.t * (Longident.t * type_expr) list
   (** Type of a first-class module (a.k.a package). *)
 
