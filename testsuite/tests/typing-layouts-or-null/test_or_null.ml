@@ -492,3 +492,21 @@ type t : immediate & immediate = #(int or_null * int)
 [%%expect{|
 type t = #(int or_null * int)
 |}]
+
+module M : sig
+  type t : immediate_or_null
+end = struct
+  type t = int or_null
+end
+[%%expect{|
+module M : sig type t : immediate_or_null end
+|}]
+
+module M : sig
+  type t : immediate_or_null & immediate
+end = struct
+  type t = #(int or_null * int)
+end
+[%%expect{|
+module M : sig type t : immediate_or_null & immediate_or_null end
+|}]
