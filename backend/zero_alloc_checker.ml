@@ -1200,7 +1200,8 @@ end = struct
     | Safe, Join j | Join j, Safe -> Join (Join.add_safe j)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
       Join (Join.add_var j var witnesses)
-    | Join j, Transform tr | Transform tr, Join j -> Join (Join.add_tr j tr)
+    | Join j, Transform tr | Transform tr, Join j ->
+      bounded_join (fun () -> Join.add_tr j tr)
     | Join j1, Join j2 -> bounded_join (Join.flatten j1 j2)
 
   (* CR gyorsh: Handling of constant cases here is an optimization, instead of
