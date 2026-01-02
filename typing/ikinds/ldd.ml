@@ -239,7 +239,11 @@ module Make (V : ORDERED) = struct
 
   (* --------- boolean algebra over nodes --------- *)
   let rec join (a : node) (b : node) =
-    (* Variable-order merge: [order] decides which side can be descended. *)
+    (* Variable-order merge: [order] decides which side can be descended.
+       This is similar to merge on sorted lists as we go down one path of
+       the tree, but unlike merge on lists, we traverse all paths down the
+       tree.
+    *)
     if a == b
     then a
     else if is_leaf a
