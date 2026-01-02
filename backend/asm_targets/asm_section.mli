@@ -50,12 +50,17 @@ type t =
   | Sixtyfour_byte_literals
   | Jump_tables
   | Text
+  | Function_text of string
+      (** Individual function section, e.g. ".text.caml.func" *)
   | Stapsdt_base
   | Stapsdt_note
   | Probes
   | Note_ocaml_eh
+  | Note_gnu_stack
 
 val to_string : t -> string
+
+val of_names : string list -> t option
 
 type section_details = private
   { names : string list;
@@ -80,6 +85,10 @@ val print : Format.formatter -> t -> unit
 val compare : t -> t -> int
 
 val equal : t -> t -> bool
+
+val hash : t -> int
+
+module Tbl : Hashtbl.S with type key = t
 
 (** Whether the section holds code. *)
 val section_is_text : t -> bool
