@@ -1365,9 +1365,14 @@ void caml_darken_cont(value cont)
               Hp_atomic_val(cont), &hd,
               With_status_hd(hd, NOT_MARKABLE))) {
         value stk = Field(cont, 0);
-        if (Ptr_val(stk) != NULL)
+        if (Ptr_val(stk) != NULL) {
+          value *gc_regs =
+            /* Note this is NULL if the continuation is not a preemption. That's
+               fine; caml_scan_stack handles it */
+            caml_continuation_gc_regs(cont);
           caml_scan_stack(&caml_darken, darken_scanning_flags, Caml_state,
-                          Ptr_val(stk), 0);
+                          Ptr_val(stk), gc_regs);
+        }
         atomic_store_release(Hp_atomic_val(cont),
                              With_status_hd(hd, caml_global_heap_state.MARKED));
         Caml_state->mark_work_done_between_slices += Whsize_hd(hd);
