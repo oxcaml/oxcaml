@@ -194,8 +194,7 @@ stdenv.mkDerivation {
       pkgs.which
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
-      # CR sspies: ocamlformat_0_28_1 requires a newer version of nixpkgs
-      upstream.ocamlformat_0_24_1 # required for make fmt
+      upstream.ocamlformat_0_28_1 # required for make fmt
       pkgs.removeReferencesTo
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
