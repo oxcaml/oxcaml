@@ -4183,12 +4183,15 @@ module Modality = struct
       | Undefined, _ | _, Undefined ->
         Misc.fatal_error "modality Undefined should not be in sub."
 
-    let id = Const Const.id
-
-    let apply : type r. t -> (allowed * r) Mode.t -> Mode.l =
-     fun t x ->
+    let apply :
+        type r.
+        ?hint:(allowed * r) neg Hint.morph ->
+        t ->
+        (allowed * r) Mode.t ->
+        Mode.l =
+     fun ?hint t x ->
       match t with
-      | Const c -> Const.apply c x |> Mode.disallow_right
+      | Const c -> Const.apply ?hint c x |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Diff (_, m) -> Mode.join [Mode.allow_right m; x]
@@ -4227,7 +4230,10 @@ module Modality = struct
 
     let zap_to_id = zap_to_floor
 
-    let to_const_opt = function Const c -> Some c | Undefined | Diff _ -> None
+    let to_const_opt = function
+      | Const c -> Some c
+      | Undefined -> assert false
+      | Diff _ -> None
 
     let of_const c = Const c
 
@@ -4327,12 +4333,15 @@ module Modality = struct
       | Undefined, _ | _, Undefined ->
         Misc.fatal_error "modality Undefined should not be in sub."
 
-    let id = Const Const.id
-
-    let apply : type r. t -> (allowed * r) Mode.t -> Mode.l =
-     fun t x ->
+    let apply :
+        type r.
+        ?hint:(allowed * r) pos Hint.morph ->
+        t ->
+        (allowed * r) Mode.t ->
+        Mode.l =
+     fun ?hint t x ->
       match t with
-      | Const c -> Const.apply c x |> Mode.disallow_right
+      | Const c -> Const.apply ?hint c x |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Exactly (_mm, m) ->
@@ -4396,7 +4405,8 @@ module Modality = struct
 
     let to_const_opt = function
       | Const c -> Some c
-      | Undefined | Exactly _ -> None
+      | Undefined -> assert false
+      | Exactly _ -> None
 
     let of_const c = Const c
   end
@@ -4502,13 +4512,24 @@ module Modality = struct
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
 
-  let id : t = { monadic = Monadic.id; comonadic = Comonadic.id }
+  let undefined : t = { monadic = Undefined; comonadic = Undefined }
 
-  let undefined : t = { monadic = Undefined; comonadic = Comonadic.Undefined }
+  let is_undefined : t -> bool = function
+    | { monadic = Undefined; comonadic = Undefined } -> true
+    | _ -> false
+    [@@ocaml.warning "-4"]
 
-  let apply t { monadic; comonadic } =
-    let monadic = Monadic.apply t.monadic monadic in
-    let comonadic = Comonadic.apply t.comonadic comonadic in
+  let apply ?hint t { monadic; comonadic } =
+    let monadic =
+      Monadic.apply
+        ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
+        t.monadic monadic
+    in
+    let comonadic =
+      Comonadic.apply
+        ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
+        t.comonadic comonadic
+    in
     { monadic; comonadic }
 
   let sub_log t0 t1 ~log : (unit, error) Result.t =
