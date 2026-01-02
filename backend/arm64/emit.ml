@@ -56,8 +56,8 @@ let reg_stack_arg_begin = phys_reg Int 17 (* x20 *)
 
 let reg_stack_arg_end = phys_reg Int 18 (* x21 *)
 
-(** Turn a Linear label into an assembly label. The section is checked against the
-    section tracked by [D] when emitting label definitions. *)
+(** Turn a Linear label into an assembly label. The section is checked against
+    the section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
     =
   L.create_int section (Label.to_int l)
@@ -1051,10 +1051,10 @@ let num_call_gc_points instr =
     | Lop (Alloc { mode = Local | Heap; _ })
     | Lop
         (Specific
-          ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-          | Inegmulsubf | Isqrtf | Imove32
-          | Ishiftarith (_, _)
-          | Ibswap _ | Isignext _ | Isimd _ ))
+           ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
+           | Inegmulsubf | Isqrtf | Imove32
+           | Ishiftarith (_, _)
+           | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
         | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
@@ -1191,14 +1191,14 @@ module BR = Branch_relaxation.Make (struct
       if String.equal func.sym_name !function_name then 1 else epilogue_size ()
     | Lcall_op
         (Lextcall
-          { alloc;
-            stack_ofs;
-            stack_align = _;
-            func = _;
-            ty_res = _;
-            ty_args = _;
-            returns = _
-          }) ->
+           { alloc;
+             stack_ofs;
+             stack_align = _;
+             func = _;
+             ty_res = _;
+             ty_args = _;
+             returns = _
+           }) ->
       if Config.runtime5 && stack_ofs > 0 then 5 else if alloc then 3 else 5
     | Lop (Stackoffset _) -> 2
     | Lop (Load { memory_chunk; addressing_mode; is_atomic; mutability = _ }) ->
@@ -1248,51 +1248,51 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Intop Ipopcnt) -> if !Arch.feat_cssc then 1 else 4
     | Lop
         (Intop
-          (Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
+           (Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
       ->
       1
     | Lop
         (Intop_imm
-          ( ( Iadd | Isub | Imul | Idiv | Imod | Imulh _ | Iand | Ior | Ixor
-            | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
-            _ )) ->
+           ( ( Iadd | Isub | Imul | Idiv | Imod | Imulh _ | Iand | Ior | Ixor
+             | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
+             _ )) ->
       1
     | Lop (Floatop (Float64, (Iabsf | Inegf))) -> 1
     | Lop (Floatop (Float32, (Iabsf | Inegf))) -> 1
     | Lop (Specific Isqrtf) -> 1
     | Lop
         (Reinterpret_cast
-          (Value_of_int | Int_of_value | Float_of_int64 | Int64_of_float)) ->
+           (Value_of_int | Int_of_value | Float_of_int64 | Int64_of_float)) ->
       1
     | Lop
         (Reinterpret_cast
-          ( Float32_of_float | Float_of_float32 | Float32_of_int32
-          | Int32_of_float32 )) ->
+           ( Float32_of_float | Float_of_float32 | Float32_of_int32
+           | Int32_of_float32 )) ->
       1
     | Lop (Reinterpret_cast (V128_of_vec Vec128)) -> 1
     | Lop
         (Reinterpret_cast
-          (V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _)) ->
+           (V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _)) ->
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Static_cast (Float_of_int Float64 | Int_of_float Float64)) -> 1
     | Lop
         (Static_cast
-          ( Float_of_int Float32
-          | Int_of_float Float32
-          | Float_of_float32 | Float32_of_float )) ->
+           ( Float_of_int Float32
+           | Int_of_float Float32
+           | Float_of_float32 | Float32_of_float )) ->
       1
     | Lop (Static_cast (Scalar_of_v128 Float16x8 | V128_of_scalar Float16x8)) ->
       Misc.fatal_error "float16 scalar type not supported"
     | Lop (Static_cast (Scalar_of_v128 (Int8x16 | Int16x8))) -> 2
     | Lop
         (Static_cast
-          (Scalar_of_v128 (Int32x4 | Int64x2 | Float32x4 | Float64x2))) ->
+           (Scalar_of_v128 (Int32x4 | Int64x2 | Float32x4 | Float64x2))) ->
       1
     | Lop (Static_cast (V128_of_scalar _)) -> 1
     | Lop
         (Static_cast
-          ( V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _
-          | Scalar_of_v512 _ )) ->
+           ( V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _
+           | Scalar_of_v512 _ )) ->
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Floatop (Float64, (Iaddf | Isubf | Imulf | Idivf))) -> 1
     | Lop (Floatop (Float32, (Iaddf | Isubf | Imulf | Idivf))) -> 1
@@ -1423,12 +1423,12 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
       emit_subimm reg_alloc_ptr reg_alloc_ptr n;
       DSL.ins I.CMP [| DSL.emit_reg reg_alloc_ptr; DSL.emit_reg reg_tmp1 |];
       (if not far
-      then DSL.ins (I.B_cond CC) [| DSL.emit_label lbl_call_gc |]
-      else
-        let lbl = L.create Text in
-        DSL.ins (I.B_cond CS) [| DSL.emit_label lbl |];
-        DSL.ins I.B [| DSL.emit_label lbl_call_gc |];
-        D.define_label lbl);
+       then DSL.ins (I.B_cond CC) [| DSL.emit_label lbl_call_gc |]
+       else
+         let lbl = L.create Text in
+         DSL.ins (I.B_cond CS) [| DSL.emit_label lbl |];
+         DSL.ins I.B [| DSL.emit_label lbl_call_gc |];
+         D.define_label lbl);
       DSL.labeled_ins lbl_after_alloc I.ADD
         [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_alloc_ptr; DSL.imm 8 |];
       call_gc_sites
@@ -1461,25 +1461,25 @@ let assembly_code_for_poll i ~far ~return_label =
     |];
   DSL.ins I.CMP [| DSL.emit_reg reg_alloc_ptr; DSL.emit_reg reg_tmp1 |];
   (if not far
-  then (
-    match return_label with
-    | None ->
-      DSL.ins (I.B_cond LS) [| DSL.emit_label lbl_call_gc |];
-      D.define_label lbl_after_poll
-    | Some return_label ->
-      DSL.ins (I.B_cond HI) [| DSL.emit_label return_label |];
-      DSL.ins I.B [| DSL.emit_label lbl_call_gc |])
-  else
-    match return_label with
-    | None ->
-      DSL.ins (I.B_cond HI) [| DSL.emit_label lbl_after_poll |];
-      DSL.ins I.B [| DSL.emit_label lbl_call_gc |];
-      D.define_label lbl_after_poll
-    | Some return_label ->
-      let lbl = L.create Text in
-      DSL.ins (I.B_cond LS) [| DSL.emit_label lbl |];
-      DSL.ins I.B [| DSL.emit_label return_label |];
-      DSL.labeled_ins lbl I.B [| DSL.emit_label lbl_call_gc |]);
+   then (
+     match return_label with
+     | None ->
+       DSL.ins (I.B_cond LS) [| DSL.emit_label lbl_call_gc |];
+       D.define_label lbl_after_poll
+     | Some return_label ->
+       DSL.ins (I.B_cond HI) [| DSL.emit_label return_label |];
+       DSL.ins I.B [| DSL.emit_label lbl_call_gc |])
+   else
+     match return_label with
+     | None ->
+       DSL.ins (I.B_cond HI) [| DSL.emit_label lbl_after_poll |];
+       DSL.ins I.B [| DSL.emit_label lbl_call_gc |];
+       D.define_label lbl_after_poll
+     | Some return_label ->
+       let lbl = L.create Text in
+       DSL.ins (I.B_cond LS) [| DSL.emit_label lbl |];
+       DSL.ins I.B [| DSL.emit_label return_label |];
+       DSL.labeled_ins lbl I.B [| DSL.emit_label lbl_call_gc |]);
   call_gc_sites
     := { gc_lbl = lbl_call_gc;
          gc_return_lbl = lbl_after_poll;
@@ -2018,8 +2018,8 @@ let emit_instr i =
     DSL.ins I.CLZ [| DSL.emit_reg i.res.(0); DSL.emit_reg i.arg.(0) |]
   | Lop
       (Intop
-        ((Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr) as
-        op)) ->
+         ((Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr)
+          as op)) ->
     let instr = instr_for_int_operation op in
     DSL.ins instr
       [| DSL.emit_reg i.res.(0);

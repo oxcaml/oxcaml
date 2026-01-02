@@ -507,8 +507,7 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
   in
   traverse denv acc body
 
-and traverse_cont_handler :
-    type a.
+and traverse_cont_handler : type a.
     denv -> acc -> Continuation_handler.t -> (cont_handler -> acc -> a) -> a =
  fun denv acc cont_handler k ->
   let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
@@ -694,17 +693,17 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
   let params_and_body = Code.params_and_body code in
   Function_params_and_body.pattern_match params_and_body
     ~f:(fun
-         ~return_continuation
-         ~exn_continuation
-         params
-         ~body
-         ~my_closure
-         ~is_my_closure_used:_
-         ~my_region
-         ~my_ghost_region
-         ~my_depth
-         ~free_names_of_body:_
-       ->
+        ~return_continuation
+        ~exn_continuation
+        params
+        ~body
+        ~my_closure
+        ~is_my_closure_used:_
+        ~my_region
+        ~my_ghost_region
+        ~my_depth
+        ~free_names_of_body:_
+      ->
       traverse_function_params_and_body acc code_id code ~return_continuation
         ~exn_continuation params ~body ~my_closure ~my_region ~my_ghost_region
         ~my_depth ~le_monde_exterieur ~all_constants)

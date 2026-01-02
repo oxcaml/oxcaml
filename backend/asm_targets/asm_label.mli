@@ -52,7 +52,8 @@ val create_int : Asm_section.t -> int -> t
 (** Create a textual label. The supplied name must not require escaping. *)
 val create_string : Asm_section.t -> string -> t
 
-(** Create a textual label. Argument string is not checked, so use with caution. *)
+(** Create a textual label. Argument string is not checked, so use with caution.
+*)
 val create_string_unchecked : Asm_section.t -> string -> t
 
 (** Create a special label for a local symbol. *)

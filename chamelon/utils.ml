@@ -67,7 +67,8 @@ let rec path_eq p1 p2 =
   | Papply (t11, t12), Papply (t21, t22) -> path_eq t11 t21 && path_eq t12 t22
   | _ -> false
 
-(** [replace_path path n_path] is a mapper replacing each occurence of the path [path] by [n_path]*)
+(** [replace_path path n_path] is a mapper replacing each occurence of the path
+    [path] by [n_path]*)
 let replace_path path n_path =
   {
     Tast_mapper.default with
@@ -112,7 +113,8 @@ let replace_path path n_path =
         | _ -> Tast_mapper.default.typ mapper ct);
   }
 
-(** [replace_id id n_id] is a mapper replacing each occurence of the ident [id] by [n_id]*)
+(** [replace_id id n_id] is a mapper replacing each occurence of the ident [id]
+    by [n_id]*)
 let replace_id id n_id =
   {
     Tast_mapper.default with
@@ -169,14 +171,14 @@ exception Not_equal
 let str_sub_equal s ofs s' =
   String.length s >= String.length s' + ofs
   &&
-  try
-    for i = 0 to String.length s' - 1 do
-      let c = String.unsafe_get s (ofs + i) in
-      let c' = String.unsafe_get s' i in
-      if c <> c' then raise Not_equal
-    done;
-    true
-  with Not_equal -> false
+    try
+      for i = 0 to String.length s' - 1 do
+        let c = String.unsafe_get s (ofs + i) in
+        let c' = String.unsafe_get s' i in
+        if c <> c' then raise Not_equal
+      done;
+      true
+    with Not_equal -> false
 
 exception Found
 
@@ -287,15 +289,16 @@ let update_single name str =
   flush oc;
   close_out oc
 
-(** [add_def str] adds dummy1, dummy2 and ignore definitions, needed by some minmizers, in [str]*)
+(** [add_def str] adds dummy1, dummy2 and ignore definitions, needed by some
+    minmizers, in [str]*)
 let add_def str =
   {
     str with
     str_items = dummy1_def :: dummy2_def :: ignore_def :: str.str_items;
   }
 
-(** [update_output map] replaces the content of each file
-    by its associated structure in [map] *)
+(** [update_output map] replaces the content of each file by its associated
+    structure in [map] *)
 let update_output map = Smap.iter update_single (Smap.map add_def map)
 
 let save_outputs map =

@@ -33,28 +33,26 @@ let find_all_aliases env arg =
   in
   Simple.pattern_match'
     ~var:(fun _var ~coercion:_ ->
-      (* We use find alias to find a common simple to different
-         simples.
+      (* We use find alias to find a common simple to different simples.
 
          This simple is already guaranteed to be the cannonical alias.
 
-       * If there is a common alias between variables, the
-         cannonical alias must also be a common alias.
+         * If there is a common alias between variables, the cannonical alias
+         must also be a common alias.
 
-       * For constants and symbols there can be a common alias that
-         is not cannonical: A variable can have different constant
-         values in different branches: this variable is not the
-         cannonical alias, the cannonical would be the constant or
-         the symbol. But the only common alias could be a variable
-         in that case.
+         * For constants and symbols there can be a common alias that is not
+         cannonical: A variable can have different constant values in different
+         branches: this variable is not the cannonical alias, the cannonical
+         would be the constant or the symbol. But the only common alias could be
+         a variable in that case.
 
-         hence there is no loss of generality in returning the
-         cannonical alias as the single alias if it is a variable.
+         hence there is no loss of generality in returning the cannonical alias
+         as the single alias if it is a variable.
 
-         Note that the main reason for this is to allow changing the
-         arguments of continuations to variables that where not in
-         scope during the downward traversal. In particular for the
-         alias rewriting provided by data_flow *)
+         Note that the main reason for this is to allow changing the arguments
+         of continuations to variables that where not in scope during the
+         downward traversal. In particular for the alias rewriting provided by
+         data_flow *)
       TE.Alias_set.singleton arg)
     ~symbol:(fun _sym ~coercion:_ -> find_all_aliases ())
     ~const:(fun _cst -> find_all_aliases ())
@@ -176,10 +174,11 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
               maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
             else
               let machine_width = UE.machine_width (UA.uenv uacc) in
-              if TI.equal arm (TI.bool_true machine_width)
-                 && TI.equal arg (TI.bool_false machine_width)
-                 || TI.equal arm (TI.bool_false machine_width)
-                    && TI.equal arg (TI.bool_true machine_width)
+              if
+                TI.equal arm (TI.bool_true machine_width)
+                && TI.equal arg (TI.bool_false machine_width)
+                || TI.equal arm (TI.bool_false machine_width)
+                   && TI.equal arg (TI.bool_true machine_width)
               then
                 let not_arms = TI.Map.add arm action not_arms in
                 maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
@@ -514,8 +513,9 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
   let switch_is_boolean_not =
     let arm_discrs = TI.Map.keys arms in
     let not_arms_discrs = TI.Map.keys not_arms in
-    if (not (TI.Set.equal arm_discrs (TI.all_bools machine_width)))
-       || not (TI.Set.equal arm_discrs not_arms_discrs)
+    if
+      (not (TI.Set.equal arm_discrs (TI.all_bools machine_width)))
+      || not (TI.Set.equal arm_discrs not_arms_discrs)
     then None
     else
       TI.Map.data not_arms
@@ -539,9 +539,10 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
         let expr, uacc =
           EB.create_switch uacc ~condition_dbg ~scrutinee ~arms
         in
-        if Flambda_features.check_invariants ()
-           && Simple.is_const scrutinee
-           && TI.Map.cardinal arms > 1
+        if
+          Flambda_features.check_invariants ()
+          && Simple.is_const scrutinee
+          && TI.Map.cardinal arms > 1
         then
           Misc.fatal_errorf
             "[Switch] with constant scrutinee (type: %a) should have been \
@@ -746,8 +747,9 @@ let simplify_switch dacc switch ~down_to_up =
             specialization_budget > 0
             && specialization_cost <= specialization_budget
           in
-          if (not is_lifting_allowed_by_budget)
-             || not is_specialization_allowed_by_budget
+          if
+            (not is_lifting_allowed_by_budget)
+            || not is_specialization_allowed_by_budget
           then dacc
           else
             (* TODO/FIXME: implement an actual criterion for when to lift

@@ -143,21 +143,21 @@ let save_cfg f =
 
 let save_cfg_before_regalloc (cfg_with_infos : Cfg_with_infos.t) =
   (if should_save_cfg_before_regalloc ()
-  then
-    (* CFGs and registers are mutable, so make sure what we will save is a
-       snapshot of the current state. *)
-    let copy x = Marshal.from_string (Marshal.to_string x []) 0 in
-    cfg_before_regalloc_unit_info.items
-      <- Cfg_format.(
-           Cfg_before_regalloc
-             { cfg_with_layout_and_relocatable_regs =
-                 copy
-                   ( Cfg_with_infos.cfg_with_layout cfg_with_infos,
-                     Reg.all_relocatable_regs () );
-               cmm_label = Cmm.cur_label ();
-               reg_stamp = Reg.For_testing.get_stamp ()
-             })
-         :: cfg_before_regalloc_unit_info.items);
+   then
+     (* CFGs and registers are mutable, so make sure what we will save is a
+        snapshot of the current state. *)
+     let copy x = Marshal.from_string (Marshal.to_string x []) 0 in
+     cfg_before_regalloc_unit_info.items
+       <- Cfg_format.(
+            Cfg_before_regalloc
+              { cfg_with_layout_and_relocatable_regs =
+                  copy
+                    ( Cfg_with_infos.cfg_with_layout cfg_with_infos,
+                      Reg.all_relocatable_regs () );
+                cmm_label = Cmm.cur_label ();
+                reg_stamp = Reg.For_testing.get_stamp ()
+              })
+          :: cfg_before_regalloc_unit_info.items);
   cfg_with_infos
 
 let write_ir prefix =
@@ -279,8 +279,8 @@ let count_spills_reloads_moves (block : Cfg.basic_block) =
   in
   DLL.fold_left ~f ~init:{ spills = 0; reloads = 0; moves = 0 } block.body
 
-(** Returns all CFG counters that work on a single block and are summative over the
-    blocks. *)
+(** Returns all CFG counters that work on a single block and are summative over
+    the blocks. *)
 let cfg_block_counters (block : Cfg.basic_block) =
   let dup_spills, dup_reloads = count_duplicate_spills_reloads_in_block block in
   let { spills; reloads; moves } = count_spills_reloads_moves block in
@@ -398,13 +398,13 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   let module CSE = Cfg_cse.Cse_generic (CSE) in
   cfg_with_layout
   ++ (fun cfg_with_layout ->
-       match should_vectorize () with
-       | false -> cfg_with_layout
-       | true ->
-         cfg_with_layout
-         ++ cfg_with_layout_profile ~accumulate:true "vectorize"
-              (Vectorize.cfg ppf_dump)
-         ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
+  match should_vectorize () with
+  | false -> cfg_with_layout
+  | true ->
+    cfg_with_layout
+    ++ cfg_with_layout_profile ~accumulate:true "vectorize"
+         (Vectorize.cfg ppf_dump)
+    ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
   ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
        (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
@@ -417,25 +417,25 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
   ++ save_cfg_before_regalloc
   ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_infos ->
-         let cfg_description =
-           Regalloc_validate.Description.create
-             (Cfg_with_infos.cfg_with_layout cfg_with_infos)
-         in
-         cfg_with_infos ++ register_allocator fd_cmm
-         ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
-              (Regalloc_validate.run cfg_description))
+      let cfg_description =
+        Regalloc_validate.Description.create
+          (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+      in
+      cfg_with_infos ++ register_allocator fd_cmm
+      ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
+           (Regalloc_validate.run cfg_description))
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate
   ++ (fun (cfg_with_infos : Cfg_with_infos.t) ->
-       (* After this point, we no longer rely on loop infos if stack checks are
-          disabled. We can thus perform rewrites that will make the CFG
-          irreducible. *)
-       if not !Oxcaml_flags.cfg_stack_checks
-       then (
-         Cfg_with_infos.invalidate_loop_infos cfg_with_infos;
-         (Cfg_with_infos.cfg cfg_with_infos).allowed_to_be_irreducible <- true);
-       cfg_with_infos)
+  (* After this point, we no longer rely on loop infos if stack checks are
+     disabled. We can thus perform rewrites that will make the CFG
+     irreducible. *)
+  if not !Oxcaml_flags.cfg_stack_checks
+  then (
+    Cfg_with_infos.invalidate_loop_infos cfg_with_infos;
+    (Cfg_with_infos.cfg cfg_with_infos).allowed_to_be_irreducible <- true);
+  cfg_with_infos)
   ++ Cfg_with_infos.cfg_with_layout
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_prologue"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
@@ -449,14 +449,14 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_layout_profile ~accumulate:true "peephole_optimize_cfg"
        Peephole_optimize.peephole_optimize_cfg
   ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
-       match !Oxcaml_flags.cfg_stack_checks with
-       | false -> cfg_with_layout
-       | true ->
-         let cfg_with_layout = Cfg_stack_checks.cfg cfg_with_layout in
-         (* After this point, we no longer rely on loop infos. *)
-         (Cfg_with_layout.cfg cfg_with_layout).allowed_to_be_irreducible <- true;
-         cfg_with_layout_profile ~accumulate:true "cfg_simplify"
-           Regalloc_utils.simplify_cfg cfg_with_layout)
+  match !Oxcaml_flags.cfg_stack_checks with
+  | false -> cfg_with_layout
+  | true ->
+    let cfg_with_layout = Cfg_stack_checks.cfg cfg_with_layout in
+    (* After this point, we no longer rely on loop infos. *)
+    (Cfg_with_layout.cfg cfg_with_layout).allowed_to_be_irreducible <- true;
+    cfg_with_layout_profile ~accumulate:true "cfg_simplify"
+      Regalloc_utils.simplify_cfg cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)
@@ -488,9 +488,9 @@ let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
   ++ Profile.record ~accumulate:true "save_linear" save_linear
   ++ (fun (fd : Linear.fundecl) ->
-       match !Oxcaml_flags.cfg_stack_checks with
-       | false -> Stack_check.linear fd
-       | true -> fd)
+  match !Oxcaml_flags.cfg_stack_checks with
+  | false -> Stack_check.linear fd
+  | true -> fd)
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
 
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
@@ -499,13 +499,13 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
   ++ (fun (fd_cmm : Cmm.fundecl) ->
-       Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-       ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
+  Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
-         if !Clflags.llvm_backend
-         then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
-         else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
+      if !Clflags.llvm_backend
+      then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
+      else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
 
 let compile_data dl = dl ++ save_data ++ emit_data
 
@@ -622,7 +622,7 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
   emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
   ++ (fun x ->
-       if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
+  if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cmm
   ++ Profile.record "compile_phrases" (compile_phrases ~ppf_dump)
   ++ fun () -> () );

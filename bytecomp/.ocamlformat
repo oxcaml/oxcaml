@@ -13,4 +13,4 @@ sequence-blank-line=compact
 space-around-lists=false
 space-around-variants=false
 type-decl=sparse
-version=0.24.1
+version=0.28.1

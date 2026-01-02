@@ -4,22 +4,22 @@ open Asttypes
 open Transl_comprehension_utils
 open Lambda_utils.Constants
 
-(** List comprehensions are compiled in terms of "reversed difference lists".  A
+(** List comprehensions are compiled in terms of "reversed difference lists". A
     difference list in general is a function from lists to lists; by "reversed",
     we mean that these lists are stored backwards, and need to be reversed at
-    the end.  We make both these choices for the usual efficiency reasons;
+    the end. We make both these choices for the usual efficiency reasons;
     difference lists allow for efficient concatenation; they can also be viewed
     as based on passing around accumulators, which allows us to make our
-    functions tail-recursive, at the cost of building our lists up backwards.
-    An additional choice we make is to build all these intermediate data
-    structures on the stack (i.e., make them [local_]); again, this is for
-    efficiency, as it means we don't need to get the structure of these
-    difference lists involved with the garbage collector.  Since we can
-    currently only generate global lists with list comprehensions (see the
-    comment "What modes should comprehensions use?" in [typecore.ml]), we need a
-    type that is spine-local but element-global; we thus define a custom type of
-    such snoc lists, and define our difference lists in terms of that, in the
-    internal module [CamlinternalComprehension]:
+    functions tail-recursive, at the cost of building our lists up backwards. An
+    additional choice we make is to build all these intermediate data structures
+    on the stack (i.e., make them [local_]); again, this is for efficiency, as
+    it means we don't need to get the structure of these difference lists
+    involved with the garbage collector. Since we can currently only generate
+    global lists with list comprehensions (see the comment "What modes should
+    comprehensions use?" in [typecore.ml]), we need a type that is spine-local
+    but element-global; we thus define a custom type of such snoc lists, and
+    define our difference lists in terms of that, in the internal module
+    [CamlinternalComprehension]:
     {[
       type 'a rev_list =
         | Nil
@@ -41,17 +41,17 @@ open Lambda_utils.Constants
     Here, the [...iterator arguments...] define the sequence of values to be
     iterated over (the [seq] of a [for pat in seq] iterator, or the [start] and
     [end] of a [for x = start to/downto end] iterator); the function argument is
-    then to be called once for each item.  What goes in the function?  It will
-    be the next iterator, desugared in the same way.  At any time, a [when]
-    clause might intervene, which is simply desugared into a conditional that
-    gates entering the next phase of the translation.
+    then to be called once for each item. What goes in the function? It will be
+    the next iterator, desugared in the same way. At any time, a [when] clause
+    might intervene, which is simply desugared into a conditional that gates
+    entering the next phase of the translation.
 
     Eventually, we reach the body, which is placed into the body of the
     innermost translated function; it produces the single-item reversed
     difference list (alternatively, snocs its generated value onto the
-    accumulator).  Because each function is analogous to `concat_map`, this
-    builds up the correct list in the end.  The whole thing is then passed into
-    a reversal function, building the final list.
+    accumulator). Because each function is analogous to `concat_map`, this
+    builds up the correct list in the end. The whole thing is then passed into a
+    reversal function, building the final list.
 
     For example, consider the following list comprehension:
     {[
@@ -82,7 +82,7 @@ open Lambda_utils.Constants
             else
               acc_x)
           Nil)
-         ]}
+    ]}
 
     See [CamlinternalComprehension] for the types and functions we desugar to,
     along with some more documentation. *)
@@ -124,43 +124,45 @@ let rev_list_nil = int 0
     [for ... and ...] clause (i.e., [x = e1 (down)to e2] or [for pat in xs]). *)
 type translated_iterator =
   { builder : lambda Lazy.t;
-        (** The function that does the appropriate iteration (counting up, counting
-      down, or iterating over a list).  As discussed at the start of this file,
-      this function is expected to have a type of the following form:
-      {[
-        ...iterator arguments... ->
-        local_ ('elt -> local_ 'res rev_dlist) ->
-        local_ 'res rev_dlist
-      ]}
-      Once the "iterator arguments", which vary depending on the iterator, are
-      applied to this function (see [arg_lets]), then it is simply waiting for
-      the body of the iterator (the final function argument).  Lazy because it
-      holds a reference to a primitive, which has to be constructed lazily (see
-      above). *)
+        (** The function that does the appropriate iteration (counting up,
+            counting down, or iterating over a list). As discussed at the start
+            of this file, this function is expected to have a type of the
+            following form:
+            {[
+              ...iterator arguments... ->
+              local_ ('elt -> local_ 'res rev_dlist) ->
+              local_ 'res rev_dlist
+            ]}
+            Once the "iterator arguments", which vary depending on the iterator,
+            are applied to this function (see [arg_lets]), then it is simply
+            waiting for the body of the iterator (the final function argument).
+            Lazy because it holds a reference to a primitive, which has to be
+            constructed lazily (see above). *)
     arg_lets : Let_binding.t list;
-        (** The first-class let bindings that bind the arguments to the [builder]
-      function that actually does the iteration.  These let bindings need to be
-      collected separately so that they can all be bound at once before the
-      whole [for ... and ...] clause, so that iterators in such a clause don't
-      have their side effects performed multiple times in relation to each
-      other.  Every variable bound by one of these let bindings will be passed
-      to [builder], filling in the [...iterator arguments...] in its type. *)
+        (** The first-class let bindings that bind the arguments to the
+            [builder] function that actually does the iteration. These let
+            bindings need to be collected separately so that they can all be
+            bound at once before the whole [for ... and ...] clause, so that
+            iterators in such a clause don't have their side effects performed
+            multiple times in relation to each other. Every variable bound by
+            one of these let bindings will be passed to [builder], filling in
+            the [...iterator arguments...] in its type. *)
     element : Ident.t;
-        (** The name given to the values we're iterating over; needs to be a fresh
-      name for [for]-[in] iterators in case the user specifies a complex
-      pattern. *)
+        (** The name given to the values we're iterating over; needs to be a
+            fresh name for [for]-[in] iterators in case the user specifies a
+            complex pattern. *)
     element_debug_uid : Lambda.debug_uid;
         (** The [debug_uid] of the element identifier. *)
     element_kind : layout;
         (** The [layout] of the values we're iterating over. *)
     add_bindings : lambda -> lambda
-        (** Any extra bindings that should be present in the body of this iterator,
-      for use by nested pieces of the translation; used if the user specifies a
-      complex pattern in a [for]-[in] iterator. *)
+        (** Any extra bindings that should be present in the body of this
+            iterator, for use by nested pieces of the translation; used if the
+            user specifies a complex pattern in a [for]-[in] iterator. *)
   }
 
 (** Translates an iterator ([Typedtree.comprehension_iterator]), one piece of a
-    [for ... and ... and ...] expression, into Lambda.  This translation is into
+    [for ... and ... and ...] expression, into Lambda. This translation is into
     a [translated_iterator], not just a Lambda term, because the iterator
     desugars into a higher-order function which is applied to another function
     containing the body of the iteration; that body function can't be filled in
@@ -211,12 +213,12 @@ let iterator ~transl_exp ~scopes = function
     }
 
 (** Translates a list comprehension binding
-    ([Typedtree.comprehension_clause_binding]) into Lambda.  At parse time,
+    ([Typedtree.comprehension_clause_binding]) into Lambda. At parse time,
     iterators don't include patterns and bindings do; however, in the typedtree
     representation, the patterns have been moved into the iterators (so that
     range iterators can just have an [Ident.t], for translation into for loops),
-    so bindings are just like iterators with a possible annotation.  As a
-    result, this function is essentially the same as [iterator], which see. *)
+    so bindings are just like iterators with a possible annotation. As a result,
+    this function is essentially the same as [iterator], which see. *)
 let binding ~transl_exp ~scopes { comp_cb_iterator; comp_cb_attributes = _ } =
   (* No attributes are meaningful here; see the definition of
      [comp_cb_attributes]. *)
@@ -229,9 +231,9 @@ let binding ~transl_exp ~scopes { comp_cb_iterator; comp_cb_attributes = _ } =
     ought to be nested within it (the [inner_body], a function awaiting the most
     nested accumulator as a labeled argument which will produce the body of the
     iterations) and have a name for the accumulator of the current [rev_dlist]
-    ([accumulator], which changes at every recursive step).  It folds together
+    ([accumulator], which changes at every recursive step). It folds together
     all the [translated_iterator]s by connecting their [body_func]tions to each
-    other, and bottoms out at the [inner_body].  *)
+    other, and bottoms out at the [inner_body]. *)
 let rec translate_bindings ~transl_exp ~scopes ~loc ~inner_body ~accumulator =
   function
   | cur_binding :: bindings ->

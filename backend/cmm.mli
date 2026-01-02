@@ -84,16 +84,16 @@ val lub_component :
     or equal to the second under the relation used by [lub_component]. *)
 val ge_component : machtype_component -> machtype_component -> bool
 
-(** A variant of [machtype] used to describe arguments
-    to external C functions *)
+(** A variant of [machtype] used to describe arguments to external C functions
+*)
 type exttype =
   | XInt  (**r OCaml value, word-sized integer *)
   | XInt8  (**r 8-bit integer *)
   | XInt16  (**r 16-bit integer *)
   | XInt32  (**r 32-bit integer *)
-  | XInt64  (**r 64-bit integer  *)
+  | XInt64  (**r 64-bit integer *)
   | XFloat32  (**r single-precision FP number *)
-  | XFloat  (**r double-precision FP number  *)
+  | XFloat  (**r double-precision FP number *)
   | XVec128  (**r 128-bit vector *)
   | XVec256  (**r 256-bit vector *)
   | XVec512  (**r 512-bit vector *)
@@ -188,39 +188,39 @@ type phantom_defining_expr =
      representation of "target-width OCaml integers of type [int]" becomes when
      merged). *)
   | Cphantom_const_int of Targetint.t
-      (** The phantom-let-bound variable is a constant integer.
-      The argument must be the tagged representation of an integer within
-      the range of type [int] on the target.  (Analogously to [Cconst_int].) *)
+      (** The phantom-let-bound variable is a constant integer. The argument
+          must be the tagged representation of an integer within the range of
+          type [int] on the target. (Analogously to [Cconst_int].) *)
   | Cphantom_const_symbol of string
       (** The phantom-let-bound variable is an alias for a symbol. *)
   | Cphantom_var of Backend_var.t
-      (** The phantom-let-bound variable is an alias for another variable.  The
-      aliased variable must not be a bound by a phantom let. *)
+      (** The phantom-let-bound variable is an alias for another variable. The
+          aliased variable must not be a bound by a phantom let. *)
   | Cphantom_offset_var of
       { var : Backend_var.t;
         offset_in_words : int
       }
       (** The phantom-let-bound-variable's value is defined by adding the given
-      number of words to the pointer contained in the given identifier. *)
+          number of words to the pointer contained in the given identifier. *)
   | Cphantom_read_field of
       { var : Backend_var.t;
         field : int
       }
       (** The phantom-let-bound-variable's value is found by adding the given
-      number of words to the pointer contained in the given identifier, then
-      dereferencing. *)
+          number of words to the pointer contained in the given identifier, then
+          dereferencing. *)
   | Cphantom_read_symbol_field of
       { sym : string;
         field : int
       }
-      (** As for [Uphantom_read_var_field], but with the pointer specified by
-      a symbol. *)
+      (** As for [Uphantom_read_var_field], but with the pointer specified by a
+          symbol. *)
   | Cphantom_block of
       { tag : int;
         fields : Backend_var.t list
       }
       (** The phantom-let-bound variable points at a block with the given
-      structure. *)
+          structure. *)
 
 type trywith_shared_label = Lambda.static_label (* Same as Ccatch handlers *)
 
@@ -361,11 +361,11 @@ type alloc_block_kind =
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
 
-(** Due to Comballoc, a single Ialloc instruction may combine several
-    unrelated allocations. Their Debuginfo.t (which may differ) are stored
-    as a list of alloc_dbginfo. This list is in order of increasing memory
-    address, which is the reverse of the original allocation order. Later
-    allocations are consed to the front of this list by Comballoc. *)
+(** Due to Comballoc, a single Ialloc instruction may combine several unrelated
+    allocations. Their Debuginfo.t (which may differ) are stored as a list of
+    alloc_dbginfo. This list is in order of increasing memory address, which is
+    the reverse of the original allocation order. Later allocations are consed
+    to the front of this list by Comballoc. *)
 type alloc_dbginfo_item =
   { alloc_words : int;
     alloc_block_kind : alloc_block_kind;
@@ -415,10 +415,10 @@ type operation =
         effects : effects;
         coeffects : coeffects
       }
-      (** The [machtype] is the machine type of the result.
-          The [exttype list] describes the unboxing types of the arguments.
-          An empty list means "all arguments are machine words [XInt]".
-          The boolean indicates whether the function may allocate. *)
+      (** The [machtype] is the machine type of the result. The [exttype list]
+          describes the unboxing types of the arguments. An empty list means
+          "all arguments are machine words [XInt]". The boolean indicates
+          whether the function may allocate. *)
   | Cload of
       { memory_chunk : memory_chunk;
         mutability : Asttypes.mutable_flag;
@@ -590,9 +590,8 @@ type fundecl =
     fields are 64-bits wide, the following rules apply:
 
     - For int32, the value is sign extended.
-    - For float32, the value is zero extended.  It is ok to rely on
-      zero-initialization of the data section to achieve this.
-*)
+    - For float32, the value is zero extended. It is ok to rely on
+      zero-initialization of the data section to achieve this. *)
 type data_item =
   | Cdefine_symbol of symbol
   | Cint8 of int
@@ -634,23 +633,22 @@ val ctrywith :
 
 val reset : unit -> unit
 
-(** Either apply the callback to all immediate sub-expressions that
-      can produce the final result for the expression and return
-      [true], or do nothing and return [false].  Note that the notion
-      of "tail" sub-expression used here does not match the one used
-      to trigger tail calls; in particular, try...with handlers are
-      considered to be in tail position (because their result become
-      the final result for the expression).  *)
+(** Either apply the callback to all immediate sub-expressions that can produce
+    the final result for the expression and return [true], or do nothing and
+    return [false]. Note that the notion of "tail" sub-expression used here does
+    not match the one used to trigger tail calls; in particular, try...with
+    handlers are considered to be in tail position (because their result become
+    the final result for the expression). *)
 val iter_shallow_tail : (expression -> unit) -> expression -> bool
 
-(** Apply the transformation to those immediate sub-expressions of an
-      expression that are in tail position, using the same definition of "tail"
-      as [iter_shallow_tail] *)
+(** Apply the transformation to those immediate sub-expressions of an expression
+    that are in tail position, using the same definition of "tail" as
+    [iter_shallow_tail] *)
 val map_shallow_tail : (expression -> expression) -> expression -> expression
 
-(** Apply the transformation to an expression, trying to push it
-      to all inner sub-expressions that can produce the final result,
-      by recursively applying map_shallow_tail *)
+(** Apply the transformation to an expression, trying to push it to all inner
+    sub-expressions that can produce the final result, by recursively applying
+    map_shallow_tail *)
 val map_tail : (expression -> expression) -> expression -> expression
 
 (** Apply the callback to each immediate sub-expression. *)

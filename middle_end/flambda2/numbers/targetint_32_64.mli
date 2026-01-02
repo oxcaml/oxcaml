@@ -22,7 +22,7 @@
     32-bit target platforms) or signed 64-bit integers (on 64-bit target
     platforms). This integer type has exactly the same width as that of a
     pointer type in the C compiler. All arithmetic operations over are taken
-    modulo 2{^32} or 2{^64} depending on the word size of the target
+    modulo 2{^ 32} or 2{^ 64} depending on the word size of the target
     architecture.
 
     {b Warning:} this module is unstable and part of
@@ -36,10 +36,10 @@ type targetint = t
 (** The target integer 0. *)
 val zero : Target_system.Machine_width.t -> t
 
-(** The target integer 0, taking the machine width from the argument.  (Note
-    that no function is provided to extract a [Machine_width] given a [t],
-    because we can't distinguish between the [Thirty_two] and
-    [Thirty_two_no_gc_bit] cases.) *)
+(** The target integer 0, taking the machine width from the argument. (Note that
+    no function is provided to extract a [Machine_width] given a [t], because we
+    can't distinguish between the [Thirty_two] and [Thirty_two_no_gc_bit]
+    cases.) *)
 val zero_like : t -> t
 
 (** The target integer 1. *)
@@ -65,39 +65,39 @@ val mul : t -> t -> t
     specified for {!Stdlib.(/)}. *)
 val div : t -> t -> t
 
-(** Same as {!div}, except that arguments and result are interpreted as {e
-    unsigned} integers. *)
+(** Same as {!div}, except that arguments and result are interpreted as
+    {e unsigned} integers. *)
 val unsigned_div : t -> t -> t
 
-(** Integer remainder. If [y] is not zero, the result of [Targetint_32_64.rem
-    x y] satisfies the following properties:
+(** Integer remainder. If [y] is not zero, the result of
+    [Targetint_32_64.rem x y] satisfies the following properties:
     - [Targetint_32_64.zero <= Nativeint.rem x y < Targetint_32_64.abs y] and
     - [x = Targetint_32_64.add (Targetint_32_64.mul (Targetint_32_64.div x y) y)
        * (Targetint_32_64.rem x y)].
     - If [y = 0], [Targetint_32_64.rem x y] raises [Division_by_zero]. *)
 val rem : t -> t -> t
 
-(** Same as {!rem}, except that arguments and result are interpreted as {e
-    unsigned} integers. *)
+(** Same as {!rem}, except that arguments and result are interpreted as
+    {e unsigned} integers. *)
 val unsigned_rem : t -> t -> t
 
-(** Successor. [Targetint_32_64.succ x] is [Targetint_32_64.add x
-    Targetint_32_64.one]. *)
+(** Successor. [Targetint_32_64.succ x] is
+    [Targetint_32_64.add x Targetint_32_64.one]. *)
 val succ : t -> t
 
-(** Predecessor. [Targetint_32_64.pred x] is [Targetint_32_64.sub x
-    Targetint_32_64.one]. *)
+(** Predecessor. [Targetint_32_64.pred x] is
+    [Targetint_32_64.sub x Targetint_32_64.one]. *)
 val pred : t -> t
 
 (** Return the absolute value of its argument. *)
 val abs : t -> t
 
-(** The greatest representable target integer, either 2{^31} - 1 on a 32-bit
-    platform, or 2{^63} - 1 on a 64-bit platform. *)
+(** The greatest representable target integer, either 2{^ 31} - 1 on a 32-bit
+    platform, or 2{^ 63} - 1 on a 64-bit platform. *)
 val max_int : Target_system.Machine_width.t -> t
 
-(** The smallest representable target integer, either -2{^31} on a 32-bit
-    platform, or -2{^63} on a 64-bit platform. *)
+(** The smallest representable target integer, either -2{^ 31} on a 32-bit
+    platform, or -2{^ 63} on a 64-bit platform. *)
 val min_int : Target_system.Machine_width.t -> t
 
 (** Bitwise logical and. *)
@@ -166,7 +166,7 @@ val of_int32 : Target_system.Machine_width.t -> int32 -> t
 
 (** Convert the given target integer to a 32-bit integer (type [int32]).
 
-    On 64-bit platforms, the 64-bit native integer is taken modulo 2{^32}, i.e.
+    On 64-bit platforms, the 64-bit native integer is taken modulo 2{^ 32}, i.e.
     the top 32 bits are lost. On 32-bit platforms, the conversion is exact. *)
 val to_int32 : t -> int32
 

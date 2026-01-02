@@ -126,8 +126,7 @@ let equal_move_kind left right =
   | Store, Store -> true
   | (Load | Store), _ -> false
 
-let rewrite_gen :
-    type s.
+let rewrite_gen : type s.
     (module State with type t = s) ->
     (module Utils) ->
     s ->
@@ -207,25 +206,28 @@ let rewrite_gen :
           | Some (r, dir) -> not (equal_move_kind dir move_dir), r
         in
         (if add_instr
-        then
-          let from, to_ =
-            match move_dir with Load -> spilled, temp | Store -> temp, spilled
-          in
-          let id =
-            InstructionId.get_and_incr
-              (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
-          in
-          let new_instr = Move.make_instr move ~id ~copy:instr ~from ~to_ in
-          match direction with
-          | Load_before_cell cell -> DLL.insert_before cell new_instr
-          | Store_after_cell cell ->
-            (* See comment before Insert_skipping_name_for_debugger *)
-            Insert_skipping_name_for_debugger.insert_after cell new_instr
-              ~reg:from
-          | Load_after_list list -> DLL.add_end list new_instr
-          | Store_before_list list ->
-            (* See comment before Insert_skipping_name_for_debugger *)
-            Insert_skipping_name_for_debugger.add_begin list new_instr ~reg:from);
+         then
+           let from, to_ =
+             match move_dir with
+             | Load -> spilled, temp
+             | Store -> temp, spilled
+           in
+           let id =
+             InstructionId.get_and_incr
+               (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
+           in
+           let new_instr = Move.make_instr move ~id ~copy:instr ~from ~to_ in
+           match direction with
+           | Load_before_cell cell -> DLL.insert_before cell new_instr
+           | Store_after_cell cell ->
+             (* See comment before Insert_skipping_name_for_debugger *)
+             Insert_skipping_name_for_debugger.insert_after cell new_instr
+               ~reg:from
+           | Load_after_list list -> DLL.add_end list new_instr
+           | Store_before_list list ->
+             (* See comment before Insert_skipping_name_for_debugger *)
+             Insert_skipping_name_for_debugger.add_begin list new_instr
+               ~reg:from);
         temp)
       else reg
     in
@@ -268,10 +270,11 @@ let rewrite_gen :
                temporary is spilled, stack operands will apply to it in the next
                round in the same way it would have done to the original
                variable. *)
-            if should_coalesce_temp_spills_and_reloads
-               || Regalloc_utils.equal_stack_operands_rewrite
-                    (Regalloc_stack_operands.basic spilled_map instr)
-                    May_still_have_spilled_registers
+            if
+              should_coalesce_temp_spills_and_reloads
+              || Regalloc_utils.equal_stack_operands_rewrite
+                   (Regalloc_stack_operands.basic spilled_map instr)
+                   May_still_have_spilled_registers
             then (
               block_rewritten := true;
               let sharing = Reg.Tbl.create 8 in
@@ -283,10 +286,11 @@ let rewrite_gen :
       then
         (* CR-soon mitom: Same issue as short circuiting in basic instruction
            rewriting *)
-        if should_coalesce_temp_spills_and_reloads
-           || Regalloc_utils.equal_stack_operands_rewrite
-                (Regalloc_stack_operands.terminator spilled_map block.terminator)
-                May_still_have_spilled_registers
+        if
+          should_coalesce_temp_spills_and_reloads
+          || Regalloc_utils.equal_stack_operands_rewrite
+               (Regalloc_stack_operands.terminator spilled_map block.terminator)
+               May_still_have_spilled_registers
         then (
           block_rewritten := true;
           let sharing = Reg.Tbl.create 8 in
@@ -350,9 +354,10 @@ let compute_critical_edges : Cfg.t -> Cfg_edge.Set.t =
           Label.Set.fold
             (fun successor_label critical_edges ->
               let successor_block = Cfg.get_block_exn cfg successor_label in
-              if (not (Cfg.can_raise_terminator block.terminator.desc))
-                 && (not (Label.equal label successor_label))
-                 && Label.Set.cardinal successor_block.predecessors > 1
+              if
+                (not (Cfg.can_raise_terminator block.terminator.desc))
+                && (not (Label.equal label successor_label))
+                && Label.Set.cardinal successor_block.predecessors > 1
               then (
                 assert (not successor_block.is_trap_handler);
                 Cfg_edge.Set.add
@@ -447,8 +452,9 @@ let prelude :
   in
   if debug then Utils.log "#temporaries(before):%d" num_temporaries;
   let cfg_infos, stack_slots =
-    if num_temporaries >= threshold_split_live_ranges
-       || Flambda2_ui.Flambda_features.classic_mode ()
+    if
+      num_temporaries >= threshold_split_live_ranges
+      || Flambda2_ui.Flambda_features.classic_mode ()
     then cfg_infos, Regalloc_stack_slots.make ()
     else if Lazy.force Regalloc_split_utils.split_live_ranges
     then
@@ -462,8 +468,7 @@ let prelude :
   in
   cfg_infos, stack_slots, Regalloc_affinity.compute cfg_with_infos
 
-let postlude :
-    type s.
+let postlude : type s.
     (module State with type t = s) ->
     (module Utils) ->
     s ->

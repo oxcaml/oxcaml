@@ -15,8 +15,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** IEE754 32-bit floats represented as 32-bit integers.
-    Operations are implemented in C stubs. *)
+(** IEE754 32-bit floats represented as 32-bit integers. Operations are
+    implemented in C stubs. *)
 
 type t
 

@@ -14,8 +14,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Translate Lambda code to Cmm using Flambda 2.
-    This function is not currently re-entrant. *)
+(** Translate Lambda code to Cmm using Flambda 2. This function is not currently
+    re-entrant. *)
 val lambda_to_cmm :
   ppf_dump:Format.formatter ->
   prefixname:string ->
@@ -31,8 +31,8 @@ type flambda_result =
     reachable_names : Flambda2_nominal.Name_occurrences.t
   }
 
-(** Translate Lambda code into (potentially Simplified) Flambda 2.
-    This function is not currently re-entrant. *)
+(** Translate Lambda code into (potentially Simplified) Flambda 2. This function
+    is not currently re-entrant. *)
 val lambda_to_flambda :
   ppf_dump:Format.formatter ->
   prefixname:string ->

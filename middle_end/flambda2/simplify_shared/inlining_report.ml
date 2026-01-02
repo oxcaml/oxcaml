@@ -299,8 +299,9 @@ let log : raw_decision list ref = ref []
 
 let record_decision_at_call_site_for_known_function ~tracker ~unrolling_depth
     ~apply ~pass ~callee ~are_rebuilding_terms decision =
-  if Flambda_features.inlining_report ()
-     || Flambda_features.inlining_report_bin ()
+  if
+    Flambda_features.inlining_report ()
+    || Flambda_features.inlining_report_bin ()
   then
     let dbg = Apply_expr.dbg apply in
     let path =
@@ -325,8 +326,9 @@ let record_decision_at_call_site_for_known_function ~tracker ~unrolling_depth
 
 let record_decision_at_call_site_for_unknown_function ~tracker ~apply ~pass:_ ()
     =
-  if Flambda_features.inlining_report ()
-     || Flambda_features.inlining_report_bin ()
+  if
+    Flambda_features.inlining_report ()
+    || Flambda_features.inlining_report_bin ()
   then
     let dbg = Apply_expr.dbg apply in
     let path =
@@ -339,8 +341,9 @@ let record_decision_at_call_site_for_unknown_function ~tracker ~apply ~pass:_ ()
 
 let record_decision_at_function_definition ~absolute_history ~code_metadata
     ~pass ~are_rebuilding_terms decision =
-  if Flambda_features.inlining_report ()
-     || Flambda_features.inlining_report_bin ()
+  if
+    Flambda_features.inlining_report ()
+    || Flambda_features.inlining_report_bin ()
   then
     let dbg = Code_metadata.dbg code_metadata in
     let args = Code_metadata.inlining_arguments code_metadata in

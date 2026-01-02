@@ -41,8 +41,8 @@ let is_empty : type t k v. (t, k, v) is_trie -> t -> bool = function
   | Map_is_trie -> Int.Map.is_empty
   | Nested_trie _ -> Int.Map.is_empty
 
-let rec find0 :
-    type t k r v. (t, k -> r, v) is_trie -> k -> r Constant.hlist -> t -> v =
+let rec find0 : type t k r v.
+    (t, k -> r, v) is_trie -> k -> r Constant.hlist -> t -> v =
  fun w k ks t ->
   match ks, w with
   | [], Nested_trie _ -> .
@@ -55,8 +55,8 @@ let find : type t k v. (t, k, v) is_trie -> k Constant.hlist -> t -> v =
 let find_opt w k t =
   match find w k t with exception Not_found -> None | datum -> Some datum
 
-let rec singleton0 :
-    type t k r v. (t, k -> r, v) is_trie -> k -> r Constant.hlist -> v -> t =
+let rec singleton0 : type t k r v.
+    (t, k -> r, v) is_trie -> k -> r Constant.hlist -> v -> t =
  fun w k ks v ->
   match ks, w with
   | [], Nested_trie _ -> .
@@ -66,9 +66,8 @@ let rec singleton0 :
 let singleton : type t k v. (t, k, v) is_trie -> k Constant.hlist -> v -> t =
  fun w k v -> match k, w with [], _ -> . | k :: ks, _ -> singleton0 w k ks v
 
-let rec add0 :
-    type t k r v. (t, k -> r, v) is_trie -> k -> r Constant.hlist -> v -> t -> t
-    =
+let rec add0 : type t k r v.
+    (t, k -> r, v) is_trie -> k -> r Constant.hlist -> v -> t -> t =
  fun w k ks v t ->
   match ks, w with
   | [], Nested_trie _ -> .
@@ -78,12 +77,12 @@ let rec add0 :
     | Some m -> Int.Map.add k (add0 w' k' ks' v m) t
     | None -> Int.Map.add k (singleton0 w' k' ks' v) t)
 
-let add_or_replace :
-    type t k v. (t, k, v) is_trie -> k Constant.hlist -> v -> t -> t =
+let add_or_replace : type t k v.
+    (t, k, v) is_trie -> k Constant.hlist -> v -> t -> t =
  fun w k v t -> match k, w with [], _ -> . | k :: ks, _ -> add0 w k ks v t
 
-let rec remove0 :
-    type t k r v. (t, k -> r, v) is_trie -> k -> r Constant.hlist -> t -> t =
+let rec remove0 : type t k r v.
+    (t, k -> r, v) is_trie -> k -> r Constant.hlist -> t -> t =
  fun w k ks t ->
   match ks, w with
   | [], Nested_trie _ -> .
@@ -98,8 +97,8 @@ let rec remove0 :
 let remove : type t k v. (t, k, v) is_trie -> k Constant.hlist -> t -> t =
  fun w k t -> match k, w with [], _ -> . | k :: ks, _ -> remove0 w k ks t
 
-let rec union :
-    type t k v. (t, k, v) is_trie -> (v -> v -> v option) -> t -> t -> t =
+let rec union : type t k v.
+    (t, k, v) is_trie -> (v -> v -> v option) -> t -> t -> t =
  fun w f t1 t2 ->
   match w with
   | Map_is_trie -> Int.Map.union (fun _ left right -> f left right) t1 t2
@@ -110,8 +109,7 @@ let rec union :
         if is_empty w' s then None else Some s)
       t1 t2
 
-let rec iter :
-    type t k v.
+let rec iter : type t k v.
     (t, k, v) is_trie -> (k Constant.hlist -> v -> unit) -> t -> unit =
  fun is_trie f t ->
   match is_trie with
@@ -119,8 +117,7 @@ let rec iter :
   | Nested_trie is_trie' ->
     Int.Map.iter (fun k t' -> iter is_trie' (fun ks v -> f (k :: ks) v) t') t
 
-let rec fold :
-    type t k v.
+let rec fold : type t k v.
     (t, k, v) is_trie -> (k Constant.hlist -> v -> 'a -> 'a) -> t -> 'a -> 'a =
  fun is_trie f t acc ->
   match is_trie with
@@ -139,8 +136,7 @@ module Iterator = struct
 
   let create_iterator = create
 
-  let rec create :
-      type m k v.
+  let rec create : type m k v.
       (m, k, v) is_trie -> m Channel.receiver -> v Channel.sender -> k hlist =
    fun is_trie this_ref value_handler ->
     match is_trie with

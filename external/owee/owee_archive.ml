@@ -136,9 +136,10 @@ let parse_bsd_extended_name ar_name = parse_extended_name ~prefix:"#1/" ar_name
    digit. *)
 let parse_sysv_extended_name ar_name =
   let trimmed = String.trim ar_name in
-  if String.length trimmed >= 2
-     && Char.equal trimmed.[0] '/'
-     && match trimmed.[1] with '0' .. '9' -> true | _ -> false
+  if
+    String.length trimmed >= 2
+    && Char.equal trimmed.[0] '/'
+    && match trimmed.[1] with '0' .. '9' -> true | _ -> false
   then
     let offset_str = String.sub trimmed 1 (String.length trimmed - 1) in
     int_of_string_opt (String.trim offset_str)

@@ -33,8 +33,8 @@ val pure : t
 val pure_can_be_duplicated : t
 
 (** The value stating that any effects and/or coeffects may take place (with
-    strict placement). This is exactly [Arbitrary_effects, Has_coeffects,
-    Strict]. *)
+    strict placement). This is exactly
+    [Arbitrary_effects, Has_coeffects, Strict]. *)
 val all : t
 
 (** The value stating that a read (i.e only a coeffect) takes place (with strict

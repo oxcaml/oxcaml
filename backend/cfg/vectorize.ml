@@ -84,9 +84,9 @@ module Substitution : sig
    *     type [typ] and maps [r] to [r']. *)
    * val fresh_reg : t -> Reg.t -> Cmm.machtype_component -> Reg.t *)
 
-  (** [fresh_reg_for_pack t pack typ] assumes that none of the registers in [pack] are
-      mapped, creates a fresh register [r'] of type [typ] and maps all registers in [pack]
-      to [r]. *)
+  (** [fresh_reg_for_pack t pack typ] assumes that none of the registers in
+      [pack] are mapped, creates a fresh register [r'] of type [typ] and maps
+      all registers in [pack] to [r]. *)
   val fresh_reg_for_pack : t -> Reg.t list -> Cmm.machtype_component -> unit
 end = struct
   type t = Reg.t Reg.Tbl.t
@@ -350,14 +350,15 @@ module Block : sig
 
   val terminator : t -> Instruction.t
 
-  (** original size of the block before vectorization  *)
+  (** original size of the block before vectorization *)
   val size : t -> int
 
   val find : t -> Instruction.Id.t -> Instruction.t
 
-  (** [find_last_instruction_id_and_pos group block] returns scalar instruction [i] from
-      [group] and its position [pos] such that [i] appears after all other instructions
-        from [group] according to the order of instructions in this basic [block].  *)
+  (** [find_last_instruction_id_and_pos group block] returns scalar instruction
+      [i] from [group] and its position [pos] such that [i] appears after all
+      other instructions from [group] according to the order of instructions in
+      this basic [block]. *)
   val find_last_instruction_id_and_pos :
     t -> Instruction.t list -> Instruction.Id.t * int
 
@@ -369,8 +370,8 @@ module Block : sig
 
   val start : t -> Label.t
 
-  (** [pos t id] returns the original position of [id] instruction within the body of [t].
-      Raises if [id] is not in the body. *)
+  (** [pos t id] returns the original position of [id] instruction within the
+      body of [t]. Raises if [id] is not in the body. *)
   val pos : t -> Instruction.Id.t -> int
 end = struct
   type t =
@@ -614,8 +615,8 @@ module Dependencies : sig
 
   val independent : t -> Instruction.t -> Instruction.t -> bool
 
-  (** [all_independent t l] returns true when all instructions in [l] are pairwise
-      independent.  *)
+  (** [all_independent t l] returns true when all instructions in [l] are
+      pairwise independent. *)
   val all_independent : t -> Instruction.t list -> bool
 
   (** [all_adjacent t l] raises if [l] are not all memory operations. *)
@@ -657,13 +658,14 @@ end = struct
 
     val from_block : Block.t -> t
 
-    (** [get t cur_id reg] For register [r], return [id] of instruction that defines [r]
-        and there is no other instruction that defines [r] or destroys/clobbers [r] on any
-        path from [id] to the current program point, i.e., the program point immediately
-        before [cur_id]. An instruction defines [r] means that [r] is a "result" register
-        that the instruction writes to, not clobbers it.  Returns [None] if there is no
+    (** [get t cur_id reg] For register [r], return [id] of instruction that
+        defines [r] and there is no other instruction that defines [r] or
+        destroys/clobbers [r] on any path from [id] to the current program
+        point, i.e., the program point immediately before [cur_id]. An
+        instruction defines [r] means that [r] is a "result" register that the
+        instruction writes to, not clobbers it. Returns [None] if there is no
         definition of [r] in the block, or the definition of [r] is clobbered
-        prior to the current program point.  *)
+        prior to the current program point. *)
     val get : t -> Instruction.Id.t -> Reg.t -> Instruction.Id.t option
 
     val dump : Format.formatter -> block:Block.t -> t -> unit
@@ -777,7 +779,9 @@ end = struct
          returns the accumulated offset N such that [t2 = t1 + N]. *)
       let add n acc =
         (* [acc = None] indicates that the accumulator is not initialized. *)
-        match acc with None -> Some n | Some n' -> Some (n + n')
+        match acc with
+        | None -> Some n
+        | Some n' -> Some (n + n')
       in
       let rec loop ~cur ~dst acc =
         (* If [cur] does not depend on [dst], or an operation is encountered
@@ -875,7 +879,7 @@ end = struct
     module Partition : sig
       include Identifiable.S
 
-      (** Abstraction of all previously allocated blocks of memory.  *)
+      (** Abstraction of all previously allocated blocks of memory. *)
       val unknown : t
 
       (** Represents a block of memory that was freshly allocated at the
@@ -944,15 +948,15 @@ end = struct
 
       val get_instruction_id : t -> Instruction.Id.t
 
-      (** [is_adjacent t1 t2] assumes that [t1] and [t2] have isomorphic operations,
-          and conservatively returns [false] unless it can prove that [t1] and [t2]
-          are adjacent (i.e., the accesses are disjoint but the intervals of addresses
-          have no gap between them). *)
+      (** [is_adjacent t1 t2] assumes that [t1] and [t2] have isomorphic
+          operations, and conservatively returns [false] unless it can prove
+          that [t1] and [t2] are adjacent (i.e., the accesses are disjoint but
+          the intervals of addresses have no gap between them). *)
       val is_adjacent : t -> t -> Block.t -> Reaching_definitions.t -> bool
 
-      (** [is_disjoint t1 t2] assumes that [t1] and [t2] have isomorphic operations,
-          and conservatively returns [false] unless it can prove that [t1] and [t2]
-          access disjoint memory addresses.   *)
+      (** [is_disjoint t1 t2] assumes that [t1] and [t2] have isomorphic
+          operations, and conservatively returns [false] unless it can prove
+          that [t1] and [t2] access disjoint memory addresses. *)
       val is_disjoint : t -> t -> Block.t -> Reaching_definitions.t -> bool
 
       val dump : Format.formatter -> t -> unit
@@ -1016,8 +1020,8 @@ end = struct
                   addressing_mode;
                   init_or_assign =
                     (if is_assign
-                    then Memory_access.Init_or_assign.Assignment
-                    else Memory_access.Init_or_assign.Initialization)
+                     then Memory_access.Init_or_assign.Assignment
+                     else Memory_access.Init_or_assign.Initialization)
                 }
             in
             create desc ~first_memory_arg_index:1
@@ -1142,8 +1146,8 @@ end = struct
         | Some offset_in_bytes ->
           to_bits offset_in_bytes = get_width_in_bits_exn t1
 
-      (** [is_before t1 t2] returns true if we can prove that t1 and t2 are disjoint
-          intervals within the same block, and t1 is before t2. *)
+      (** [is_before t1 t2] returns true if we can prove that t1 and t2 are
+          disjoint intervals within the same block, and t1 is before t2. *)
       let is_before ~arg_offset_in_bytes t1 t2 block =
         let res =
           match offset_in_bytes ~arg_offset_in_bytes t1 t2 with
@@ -1238,10 +1242,11 @@ end = struct
             match equiv () with
             | None -> None
             | Some (base1, base2) ->
-              if Reg_defined_at_instruction.equal base1 r1
-                 && Reg_defined_at_instruction.equal base2 r2
-                 || Reg_defined_at_instruction.equal base1 r2
-                    && Reg_defined_at_instruction.equal base2 r1
+              if
+                Reg_defined_at_instruction.equal base1 r1
+                && Reg_defined_at_instruction.equal base2 r2
+                || Reg_defined_at_instruction.equal base1 r2
+                   && Reg_defined_at_instruction.equal base2 r1
               then (
                 (* pretend that the registers r1 and r2 are the same. *)
                 State.dump_debug (Block.state block)
@@ -1292,9 +1297,9 @@ end = struct
     end
 
     module Partitions : sig
-      (** Graph where nodes represent disjoint memory areas (partitions) and an edge from
-          partition A to B means that A may point to B (i.e., a memory location in A may
-          contain the address of a memory location in B). *)
+      (** Graph where nodes represent disjoint memory areas (partitions) and an
+          edge from partition A to B means that A may point to B (i.e., a memory
+          location in A may contain the address of a memory location in B). *)
       type t
 
       val init : t
@@ -1351,8 +1356,8 @@ end = struct
       val fold :
         f:(Partition.t -> Operation.t list -> 'a -> 'a) -> init:'a -> t -> 'a
     end = struct
-      (** The order of operations in the list is the reverse of the order they appear in the
-          block (relative to each other). *)
+      (** The order of operations in the list is the reverse of the order they
+          appear in the block (relative to each other). *)
       type t = Operation.t list Partition.Map.t
 
       let empty = Partition.Map.empty
@@ -1379,8 +1384,8 @@ end = struct
 
       val get_regs : Reg.t array -> t -> Partition.Set.t
     end = struct
-      (** for each p, a set of partitions that p may point to, including p itself
-          explicitly. *)
+      (** for each p, a set of partitions that p may point to, including p
+          itself explicitly. *)
       type t = Partition.Set.t Reg.Map.t
 
       let empty = Reg.Map.empty
@@ -1426,10 +1431,12 @@ end = struct
           aliases : Aliases.t;
               (** For each register, the set of partitions it may point to. *)
           accesses : Accesses.t;
-              (** For each partition, the list of instructions that may access it. *)
+              (** For each partition, the list of instructions that may access
+                  it. *)
           operations : Operation.t Instruction.Id.Map.t
-              (** Mapping from instruction id to the corresponding memory operations. Instructions
-              that do no access memory are not in the map. *)
+              (** Mapping from instruction id to the corresponding memory
+                  operations. Instructions that do no access memory are not in
+                  the map. *)
         }
 
       let init =
@@ -1559,8 +1566,8 @@ end = struct
 
       val dump : Format.formatter -> block:Block.t -> t -> unit
     end = struct
-      (** [i] is mapped to [j] if [i] may directly depend on [j] via memory, i.e., [i] may
-          read and [j] may write the same memory location. *)
+      (** [i] is mapped to [j] if [i] may directly depend on [j] via memory,
+          i.e., [i] may read and [j] may write the same memory location. *)
       type t = Instruction.Id.Set.t Instruction.Id.Map.t
 
       let get t id =
@@ -1763,11 +1770,12 @@ end = struct
         { direct_dependencies_of_args : Instruction.Id.t option array;
               (** instruction that defines the argument *)
           direct_dependencies : Instruction.Id.Set.t;
-              (** direct dependencies of all register arguments of this instruction (does
-                  not include memory dependencies). *)
+              (** direct dependencies of all register arguments of this
+                  instruction (does not include memory dependencies). *)
           all_dependencies : Instruction.Id.Set.t
-              (** transitive reflexive dependencies of this instruction, covers register and
-              memory dependencies (but not order constraints). *)
+              (** transitive reflexive dependencies of this instruction, covers
+                  register and memory dependencies (but not order constraints).
+              *)
         }
 
       let init instruction reaching_definitions : t =
@@ -1839,7 +1847,8 @@ end = struct
               let (new_node : Node.t) = Instruction.Id.Tbl.find t new_id in
               Instruction.Id.Set.union new_node.all_dependencies acc)
             init init
-          |> (* reflexivity *)
+          |>
+          (* reflexivity *)
           Instruction.Id.Set.add id
         in
         let node = { node with all_dependencies } in
@@ -1930,8 +1939,9 @@ end = struct
       match tl1 with
       | [] -> true
       | hd2 :: tl2 ->
-        if Memory.is_adjacent t.memory_operations hd1 hd2 t.block
-             t.reaching_definitions
+        if
+          Memory.is_adjacent t.memory_operations hd1 hd2 t.block
+            t.reaching_definitions
         then check_adjacent hd2 tl2
         else false
     in
@@ -2011,16 +2021,16 @@ module Computation : sig
 
   val dump_all : Format.formatter -> block:Block.t -> t list -> unit
 
-  (** [contains t i] returns true iff instruction [i] belongs to some
-      group in [t]. [i] need not be the key instruction of the group. *)
+  (** [contains t i] returns true iff instruction [i] belongs to some group in
+      [t]. [i] need not be the key instruction of the group. *)
   val contains : t -> Instruction.t -> bool
 
-  (** [find_group t key] returns the group of [key] instruction, or
-      None if [key] instruction is not the key of any group in [t].  *)
+  (** [find_group t key] returns the group of [key] instruction, or None if
+      [key] instruction is not the key of any group in [t]. *)
   val find_group : t -> key:Instruction.t -> Group.t option
 
-  (** Selects disjoint computations from the input list of computations
-      and returns their union. *)
+  (** Selects disjoint computations from the input list of computations and
+      returns their union. *)
   val select_and_join : t list -> Block.t -> Dependencies.t -> t option
 
   val cost : t -> int
@@ -2028,30 +2038,30 @@ module Computation : sig
   val num_groups : t -> int
 end = struct
   module Group : sig
-    (** Represents scalar instructions and the corresponding
-        vector instructions. *)
+    (** Represents scalar instructions and the corresponding vector
+        instructions. *)
     type t
 
     (** guaranteed to return a list with at least 2 instructions. *)
     val scalar_instructions : t -> Instruction.t list
 
-    (** guaranteed to return a non-empty list.  *)
+    (** guaranteed to return a non-empty list. *)
     val vector_instructions : t -> Vectorize_utils.Vectorized_instruction.t list
 
-    (** maps over the indexes of arguments that need to be considered when vectorizing
-        dependencies. Currently skips over arguments that are used for memory address
-        calculation. [init] ensures that the memory address arguments have the same values
-        for all instructions in the group. The result list is in reverse order. *)
+    (** maps over the indexes of arguments that need to be considered when
+        vectorizing dependencies. Currently skips over arguments that are used
+        for memory address calculation. [init] ensures that the memory address
+        arguments have the same values for all instructions in the group. The
+        result list is in reverse order. *)
     val map_vectorizable_args : t -> f:(arg_i:int -> 'a) -> 'a list
 
     val iter_vectorizable_args : t -> f:(arg_i:int -> unit) -> unit
 
     val for_all_non_vectorizable_args : t -> f:(arg_i:int -> bool) -> bool
 
-    (** [init width_in_bits instructions] checks that [instructions]
-        are supported isomorphic scalar instructions that are
-        inter-independent and if they have memory accesses,
-        the accesses must be adjacent. *)
+    (** [init width_in_bits instructions] checks that [instructions] are
+        supported isomorphic scalar instructions that are inter-independent and
+        if they have memory accesses, the accesses must be adjacent. *)
     val init :
       width_in_bits:Vectorize_utils.Width_in_bits.t ->
       Instruction.t list ->
@@ -2129,8 +2139,8 @@ end = struct
       let rec loop index =
         if index = count
         then true
-        else if Vectorize_utils.vectorizable_machtypes regs1.(index)
-                  regs2.(index)
+        else if
+          Vectorize_utils.vectorizable_machtypes regs1.(index) regs2.(index)
         then loop (index + 1)
         else false
       in
@@ -2161,10 +2171,10 @@ end = struct
       res
 
     (** Returns true if all memory accesses performed by the [instructions] are
-        vectorizable.  Current implementation assumes that all instructions have
+        vectorizable. Current implementation assumes that all instructions have
         isomorphic operations. It returns true if the operations do not access
-        memory, or if all memory accesses are adjacent; otherwise returns false.  In
-        the future, this can be extended to support shuffles. *)
+        memory, or if all memory accesses are adjacent; otherwise returns false.
+        In the future, this can be extended to support shuffles. *)
     let can_vectorize_memory_accesses mem_op instructions deps =
       match mem_op with
       | None -> true
@@ -2196,12 +2206,13 @@ end = struct
           | Some mem_op ->
             Dependencies.Memory.Operation.first_memory_arg_index mem_op
         in
-        if not
-             (same_stack_offset instructions
-             && have_isomorphic_op instructions
-             && vectorizable_machtypes instructions ~non_address_arg_count
-             && independent instructions deps
-             && can_vectorize_memory_accesses mem_op instructions deps)
+        if
+          not
+            (same_stack_offset instructions
+            && have_isomorphic_op instructions
+            && vectorizable_machtypes instructions ~non_address_arg_count
+            && independent instructions deps
+            && can_vectorize_memory_accesses mem_op instructions deps)
         then None
         else
           let alignment_in_bytes =
@@ -2251,8 +2262,8 @@ end = struct
   end
 
   module Seed : sig
-    (** A seed is a group of inter-independent store instructions that access adjacent
-        memory addresses. *)
+    (** A seed is a group of inter-independent store instructions that access
+        adjacent memory addresses. *)
     type t
 
     val lane_width_in_bits : t -> Vectorize_utils.Width_in_bits.t
@@ -2402,14 +2413,16 @@ end = struct
     { groups : Group.t Instruction.Id.Map.t;
       all_scalar_instructions : Instruction.Id.Set.t;
           (** [all_scalar_instructions] is all the scalar instructions in the
-              computations.  It is an optimization to cache this value here. It is used
-              for ruling out computations that are invalid or not implementable, and to
-              estimate cost/benefit of vectorized computations. *)
+              computations. It is an optimization to cache this value here. It
+              is used for ruling out computations that are invalid or not
+              implementable, and to estimate cost/benefit of vectorized
+              computations. *)
       new_positions : int Instruction.Id.Map.t;
           (** [new_positions] is used for validation. *)
       last_pos : int option
-          (** [last_pos] the position in the block body of the last scalar instruction, used
-             for heuristics. [None] for empty computations. *)
+          (** [last_pos] the position in the block body of the last scalar
+              instruction, used for heuristics. [None] for empty computations.
+          *)
     }
 
   let num_groups t = Instruction.Id.Map.cardinal t.groups
@@ -2422,14 +2435,14 @@ end = struct
   let num_scalar_instructions t =
     Instruction.Id.Set.cardinal t.all_scalar_instructions
 
-  (** [cost t] returns an integer [n] describing the cost of
-      vectorized computation [t] instead of the original code:
-      negative [n] means vectorized computation is better than
-      the original code. The goal is to find [t] that minimizes cost(t).
+  (** [cost t] returns an integer [n] describing the cost of vectorized
+      computation [t] instead of the original code: negative [n] means
+      vectorized computation is better than the original code. The goal is to
+      find [t] that minimizes cost(t).
 
-      Currently, [cost] uses a naive measure of number of instructions,
-      i.e., the difference between the number of vector instructions
-      and the number of scalar instructions. *)
+      Currently, [cost] uses a naive measure of number of instructions, i.e.,
+      the difference between the number of vector instructions and the number of
+      scalar instructions. *)
   let cost t = num_vector_instructions t - num_scalar_instructions t
 
   let is_cost_effective t = cost t < 0
@@ -2651,8 +2664,8 @@ end = struct
     && respects_register_order_constraints t deps
     && not (is_dependency_of_outside_body t block deps)
 
-  (** The key is the last instruction id, for now. This is the place in the body of the
-      block where the vectorized instructions will be inserted. *)
+  (** The key is the last instruction id, for now. This is the place in the body
+      of the block where the vectorized instructions will be inserted. *)
   let get_key group block =
     let id, _pos =
       Block.find_last_instruction_id_and_pos block
@@ -2667,9 +2680,9 @@ end = struct
     in
     pos
 
-  (** Returns the dependencies of arguments at position [arg_i]
-      of each instruction in [instruction_ids]. Returns None if
-      one of the instruction's dependencies is None for [arg_i]. *)
+  (** Returns the dependencies of arguments at position [arg_i] of each
+      instruction in [instruction_ids]. Returns None if one of the instruction's
+      dependencies is None for [arg_i]. *)
   let get_deps deps ~arg_i group =
     Misc.Stdlib.List.map_option
       (fun instruction ->
@@ -2819,9 +2832,9 @@ end = struct
       last_pos = max_pos t1.last_pos t2.last_pos
     }
 
-  (** address registers and vectorizable registers of [t] and [t'] are compatible, i.e.,
-      register [r] used as an address argument in [t] is not replaced by a vectorizable
-      argument in [t'] and vice versa. *)
+  (** address registers and vectorizable registers of [t] and [t'] are
+      compatible, i.e., register [r] used as an address argument in [t] is not
+      replaced by a vectorizable argument in [t'] and vice versa. *)
   let register_compatible t t' deps =
     let sub t1 t2 =
       Instruction.Id.Map.for_all
@@ -2841,12 +2854,13 @@ end = struct
     in
     sub t t' && sub t' t
 
-  (** [compatible t t'] returns true if for every group [g] in [t],
-      and [g'] in [t'],  [g] and [g'] are equal or have disjoint sets
-      of scalar instructions. *)
+  (** [compatible t t'] returns true if for every group [g] in [t], and [g'] in
+      [t'], [g] and [g'] are equal or have disjoint sets of scalar instructions.
+  *)
   let instruction_compatible t t' =
-    if Instruction.Id.Set.disjoint t.all_scalar_instructions
-         t'.all_scalar_instructions
+    if
+      Instruction.Id.Set.disjoint t.all_scalar_instructions
+        t'.all_scalar_instructions
     then true
     else
       let sub t1 t2 =
@@ -2909,9 +2923,10 @@ end = struct
       assert (is_valid res block deps);
       State.dump_debug (Block.state block) "Computation.select_and_join %a\n"
         (dump ~block) res;
-      if is_dependency_of_the_rest_of_body res block deps
-         || (not (respects_register_dependencies res block deps))
-         || not (is_cost_effective res)
+      if
+        is_dependency_of_the_rest_of_body res block deps
+        || (not (respects_register_dependencies res block deps))
+        || not (is_cost_effective res)
       then None
       else Some res
 end
@@ -3184,9 +3199,9 @@ let maybe_vectorize block =
         let scoped_name =
           State.fun_dbg state |> Debuginfo.get_dbg |> Debuginfo.Dbg.to_list
           |> List.map (fun dbg ->
-                 Debuginfo.(
-                   Scoped_location.string_of_scopes ~include_zero_alloc:false
-                     dbg.dinfo_scopes))
+              Debuginfo.(
+                Scoped_location.string_of_scopes ~include_zero_alloc:false
+                  dbg.dinfo_scopes))
           |> String.concat ","
         in
         State.dump state "**** Vectorize selected computation: %a (%s)\n"

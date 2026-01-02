@@ -27,8 +27,8 @@
  ******************************************************************************)
 
 (** A mixed block shape is essentially the runtime representation of a block
-    ({i i.e.}) value prefix and flat suffix), and the permutation from the
-    type definition in the surface language to that representation. *)
+    ({i i.e.}) value prefix and flat suffix), and the permutation from the type
+    definition in the surface language to that representation. *)
 type 'a t
 
 type path

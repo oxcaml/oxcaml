@@ -378,12 +378,12 @@ let () =
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
       (if String.equal Config.architecture "amd64"
-      then
-        ">> Fatal error: instruction 20 has a register (anon:V/37) with an \
-         unknown location"
-      else
-        ">> Fatal error: instruction 20 has a register (anon:V/68) with an \
-         unknown location")
+       then
+         ">> Fatal error: instruction 20 has a register (anon:V/37) with an \
+          unknown location"
+       else
+         ">> Fatal error: instruction 20 has a register (anon:V/68) with an \
+          unknown location")
 
 let () =
   check "Precoloring can't change"
@@ -427,7 +427,7 @@ let () =
     ~exp_err:
       ">> Fatal error: Register allocation changed existing instruction no. 23 \
        into a register allocation specific instruction"
-  (*= CR xclerc for xclerc: same as above (polymorphic compare on values
+(*= CR xclerc for xclerc: same as above (polymorphic compare on values
       with cycles).
       let () =
      check "Regalloc added non-regalloc specific instr"
@@ -445,7 +445,7 @@ let () =
          ">> Fatal error: Register allocation added non-regalloc specific \
           instruction no. 26"
   *)
-  (*= CR xclerc for xclerc: same as above (polymorphic compare on values
+(*= CR xclerc for xclerc: same as above (polymorphic compare on values
      with cycles).
      let () =
        check "Regalloc added a 'goto' and a block"
@@ -474,7 +474,7 @@ let () =
            cfg1, cfg2)
          ~exp_std:"" ~exp_err:""
   *)
-  [@@ocamlformat "wrap-comments=false"]
+[@@ocamlformat "wrap-comments=false"]
 
 let () =
   check "Regalloc added a fallthrough block that goes to the wrong label"
@@ -556,9 +556,9 @@ let () =
       let cfg1 = Cfg_desc.make_pre_regalloc templ in
       let block = templ.&(move_tmp_res_label) in
       block.body
-        <- (block.body |> List.rev |> function
-            | i1 :: i2 :: t -> i2 :: i1 :: t
-            | l -> l |> List.rev);
+        <- ( block.body |> List.rev |> function
+             | i1 :: i2 :: t -> i2 :: i1 :: t
+             | l -> l |> List.rev );
       let cfg2 = Cfg_desc.make_post_regalloc templ in
       cfg1, cfg2)
     ~exp_std:"fatal exception raised when validating description"
@@ -700,18 +700,18 @@ let make_loop ~loop_loc_first n =
               make_moves arg_locs args
               (* Move [arg3] to all [extra_regs]. *)
               @ List.init n (fun n ->
-                    { Instruction.id = make_id ();
-                      desc = Op Move;
-                      arg = [| int_arg3 |];
-                      res = [| extra_regs.(n) |]
-                    })
+                  { Instruction.id = make_id ();
+                    desc = Op Move;
+                    arg = [| int_arg3 |];
+                    res = [| extra_regs.(n) |]
+                  })
               (* Spill [arg3] to locations [0;n-1] *)
               @ List.init n (fun n ->
-                    { Instruction.id = make_id ();
-                      desc = Op Spill;
-                      arg = [| int_arg3 |];
-                      res = [| stack_loc n |]
-                    })
+                  { Instruction.id = make_id ();
+                    desc = Op Spill;
+                    arg = [| int_arg3 |];
+                    res = [| stack_loc n |]
+                  })
               (* Spill [arg2] to location n. If we spilled [arg3] the code would
                  be correct. *)
               @ [ { Instruction.id = make_id ();

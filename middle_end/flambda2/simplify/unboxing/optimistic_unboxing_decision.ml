@@ -177,7 +177,8 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
   let tenv =
     Misc.Stdlib.List.fold_lefti
       (fun index acc
-           { Extra_param_and_args.param = var; param_debug_uid = _; args = _ } ->
+           { Extra_param_and_args.param = var; param_debug_uid = _; args = _ }
+         ->
         let name = Bound_name.create (Name.var var) Name_mode.normal in
         TE.add_definition acc name (K.Block_shape.element_kind shape index))
       tenv field_vars

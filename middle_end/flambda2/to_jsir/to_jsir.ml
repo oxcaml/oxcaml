@@ -45,8 +45,8 @@ let create_let_simple ~env ~res fvar simple =
       let expr = Jsir.Constant (To_jsir_shared.reg_width_const const) in
       To_jsir_shared.bind_expr_to_var ~env ~res fvar expr)
 
-(** Bind a fresh variable to the result of translating [prim] into JSIR, and
-    map [fvar] to this new variable in the environment. *)
+(** Bind a fresh variable to the result of translating [prim] into JSIR, and map
+    [fvar] to this new variable in the environment. *)
 let create_let_prim ~env ~res fvar prim =
   let jvar, env, res = To_jsir_primitive.primitive ~env ~res prim in
   match jvar with
@@ -61,7 +61,8 @@ let apply_fn ~res ~f ~args ~exact =
   let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
   var, res
 
-(** For exception continuations with multiple arguments. See comment in [let_cont]. *)
+(** For exception continuations with multiple arguments. See comment in
+    [let_cont]. *)
 let assign_extra_args ~env ~res exn_handler extra_args =
   let extra_param_vars =
     if Continuation.equal (To_jsir_env.exn_continuation env) exn_handler

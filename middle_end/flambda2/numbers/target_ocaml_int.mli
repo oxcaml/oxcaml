@@ -81,7 +81,8 @@ val of_int : Target_system.Machine_width.t -> int -> t
 val of_int_option : Target_system.Machine_width.t -> int -> t option
 
 (** Convert the given OCaml integer (type [t]) to an integer (type [int]),
-    modulo the [int] size, i.e. high-order bits are lost during the conversion. *)
+    modulo the [int] size, i.e. high-order bits are lost during the conversion.
+*)
 val to_int : t -> int
 
 (** Convert the given OCaml integer (type [t]) to an integer (type [int]).
@@ -90,8 +91,8 @@ val to_int_option : t -> int option
 
 (** Convert the given OCaml integer (type [t]) to an integer (type [int]).
 
-    @raise Fatal_error if the original OCaml integer does not fit into an
-    integer *)
+    @raise Fatal_error
+      if the original OCaml integer does not fit into an integer *)
 val to_int_exn : t -> int
 
 (** Convert the given 32-bit integer (type [int32]) to a OCaml integer, modulo
@@ -172,8 +173,8 @@ val shift_right : t -> int -> t
 
 (** [Targetint_32_64.shift_right_logical x y] shifts [x] to the right by [y]
     bits. This is a logical shift: zeroes are inserted in the vacated bits
-    regardless of the sign of [x]. The result is unspecified if [y < 0] or [y >=
-    bitsize]. *)
+    regardless of the sign of [x]. The result is unspecified if [y < 0] or
+    [y >= bitsize]. *)
 val shift_right_logical : t -> int -> t
 
 (** Returns the smaller integer. *)

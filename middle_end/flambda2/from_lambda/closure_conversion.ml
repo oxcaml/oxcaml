@@ -371,8 +371,9 @@ module Inlining = struct
       let fun_params_length =
         Code_metadata.params_arity metadata |> Flambda_arity.num_params
       in
-      if (not (Code_or_metadata.code_present code))
-         || fun_params_length > List.length (Apply_expr.args apply)
+      if
+        (not (Code_or_metadata.code_present code))
+        || fun_params_length > List.length (Apply_expr.args apply)
       then (
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
@@ -496,17 +497,17 @@ module Inlining = struct
     let cost_metrics = Code.cost_metrics code in
     Function_params_and_body.pattern_match params_and_body
       ~f:(fun
-           ~return_continuation
-           ~exn_continuation
-           params
-           ~body
-           ~my_closure
-           ~is_my_closure_used:_
-           ~my_region
-           ~my_ghost_region
-           ~my_depth
-           ~free_names_of_body
-         ->
+          ~return_continuation
+          ~exn_continuation
+          params
+          ~body
+          ~my_closure
+          ~is_my_closure_used:_
+          ~my_region
+          ~my_ghost_region
+          ~my_depth
+          ~free_names_of_body
+        ->
         let free_names_of_body =
           match free_names_of_body with
           | Unknown ->
@@ -1302,8 +1303,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
       in
       Variadic
         ( (if is_try_region
-          then Begin_try_region { ghost }
-          else Begin_region { ghost }),
+           then Begin_try_region { ghost }
+           else Begin_region { ghost }),
           arg )
     in
     Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
@@ -1313,8 +1314,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
     let prim : Lambda_to_flambda_primitives_helpers.expr_primitive =
       Unary
         ( (if is_try_region
-          then End_try_region { ghost }
-          else End_region { ghost }),
+           then End_try_region { ghost }
+           else End_region { ghost }),
           Simple named )
     in
     Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
@@ -1371,9 +1372,10 @@ let classify_fields_of_block env fields alloc_mode =
             ~const:(fun _cst -> Some (f :: fields))
             ~symbol:(fun _sym ~coercion:_ -> Some (f :: fields))
             ~var:(fun _var ~coercion:_ ->
-              if Env.at_toplevel env
-                 && Flambda_features.classic_mode ()
-                 && not is_local
+              if
+                Env.at_toplevel env
+                && Flambda_features.classic_mode ()
+                && not is_local
               then Some (f :: fields)
               else None))
       (Some []) fields
@@ -1382,10 +1384,11 @@ let classify_fields_of_block env fields alloc_mode =
   match static_fields with
   | None -> Dynamic_block
   | Some fields ->
-    if List.exists
-         (fun simple_with_dbg ->
-           Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
-         fields
+    if
+      List.exists
+        (fun simple_with_dbg ->
+          Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
+        fields
     then Computed_static fields
     else Constant fields
 
@@ -1643,13 +1646,13 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
     ~(handler : Acc.t -> Env.t -> Expr_with_acc.t)
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
   (if is_exn_handler
-  then
-    match recursive with
-    | Nonrecursive -> ()
-    | Recursive ->
-      Misc.fatal_errorf
-        "[Let_cont]s marked as exception handlers must be [Nonrecursive]: %a"
-        Continuation.print name);
+   then
+     match recursive with
+     | Nonrecursive -> ()
+     | Recursive ->
+       Misc.fatal_errorf
+         "[Let_cont]s marked as exception handlers must be [Nonrecursive]: %a"
+         Continuation.print name);
   let handler_env, env_params = Env.add_vars_like env params in
   let handler_params =
     List.map2
@@ -1737,12 +1740,13 @@ let close_exact_or_unknown_apply acc env
           acc, Call_kind.indirect_function_call_unknown_arity mode, false
         else
           let result_arity_from_code = Code_metadata.result_arity meta in
-          if (* See comment about when this check can be done, in
-                simplify_apply_expr.ml *)
-             Flambda_features.kind_checks ()
-             && not
-                  (Flambda_arity.equal_ignoring_subkinds return_arity
-                     result_arity_from_code)
+          if
+            (* See comment about when this check can be done, in
+               simplify_apply_expr.ml *)
+            Flambda_features.kind_checks ()
+            && not
+                 (Flambda_arity.equal_ignoring_subkinds return_arity
+                    result_arity_from_code)
           then
             Misc.fatal_errorf
               "Wrong return arity for direct OCaml function call to %a@ \
@@ -2751,8 +2755,9 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
        functions in a set a recursive definitions with more than one function,
        we do not try to reproduce this particular property and can mark as
        inlinable such functions. *)
-    if contains_subfunctions
-       && Flambda_features.Expert.fallback_inlining_heuristic ()
+    if
+      contains_subfunctions
+      && Flambda_features.Expert.fallback_inlining_heuristic ()
     then Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in
@@ -3040,7 +3045,8 @@ let close_functions acc external_env ~current_region function_declarations =
   in
   let acc, (approximations, function_code_ids_in_order) =
     List.fold_left
-      (fun (acc, (by_function_slot, function_code_ids_in_order)) function_decl ->
+      (fun (acc, (by_function_slot, function_code_ids_in_order)) function_decl
+         ->
         let code_id =
           Function_slot.Map.find
             (Function_decl.function_slot function_decl)
@@ -3346,8 +3352,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   let free_idents_of_body =
     List.fold_left
       (fun ids -> function
-        | IR.Var id -> Ident.Set.add id ids
-        | IR.Const _ -> ids)
+        | IR.Var id -> Ident.Set.add id ids | IR.Const _ -> ids)
       (Ident.Set.singleton apply.func)
       all_args
   in

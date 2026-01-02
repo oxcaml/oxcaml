@@ -17,7 +17,7 @@
 
 open Cmm
 
-(** Tags for unboxed or untagged arrays using mixed block headers with 
+(** Tags for unboxed or untagged arrays using mixed block headers with
     scannable_prefix = 0 *)
 module Unboxed_or_untagged_array_tags : sig
   val untagged_int_array_tag : int
@@ -153,7 +153,7 @@ val or_int : expression -> expression -> Debuginfo.t -> expression
 val xor_int : expression -> expression -> Debuginfo.t -> expression
 
 (** Similar to [add_int] but produces a result with machtype [Addr] iff
-  [ptr_out_of_heap] is [false]. *)
+    [ptr_out_of_heap] is [false]. *)
 val add_int_ptr :
   ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 
@@ -245,14 +245,14 @@ val strided_field_address :
   expression -> index:int -> stride:int -> Debuginfo.t -> expression
 
 (** [field_address ptr n dbg] returns an expression for the address of the [n]th
-    field of the block pointed to by [ptr].  [memory_chunk] is only used for
+    field of the block pointed to by [ptr]. [memory_chunk] is only used for
     computation of the field width; it defaults to a memory chunk matching the
     machine width. *)
 val field_address :
   ?memory_chunk:memory_chunk -> expression -> int -> Debuginfo.t -> expression
 
 (** [get_field_gen mut ptr n dbg] returns an expression for the access to the
-    [n]th field of the block pointed to by [ptr].  The [memory_chunk] used is
+    [n]th field of the block pointed to by [ptr]. The [memory_chunk] used is
     always [Word_val]. *)
 val get_field_gen :
   Asttypes.mutable_flag -> expression -> int -> Debuginfo.t -> expression
@@ -277,8 +277,8 @@ val get_field_computed :
   expression
 
 (** [field_address_computed ptr ofs dbg] returns an expression for the address
-    at offset [ofs] (in machine words) of the block pointed to by [ptr].
-    The resulting expression is a derived pointer of type [Addr]. *)
+    at offset [ofs] (in machine words) of the block pointed to by [ptr]. The
+    resulting expression is a derived pointer of type [Addr]. *)
 val field_address_computed :
   expression -> expression -> Debuginfo.t -> expression
 
@@ -344,10 +344,10 @@ val bigstring_get_alignment :
 
 module Extended_machtype_component : sig
   (** Like [Cmm.machtype_component] but has a case explicitly for tagged
-      integers.  This enables caml_apply functions to be insensitive to whether
-      a particular argument or return value is a tagged integer or a normal
-      value.  In turn this significantly reduces the number of caml_apply
-      functions that are generated. *)
+      integers. This enables caml_apply functions to be insensitive to whether a
+      particular argument or return value is a tagged integer or a normal value.
+      In turn this significantly reduces the number of caml_apply functions that
+      are generated. *)
   type t =
     | Val
     | Addr
@@ -391,7 +391,7 @@ module Extended_machtype : sig
   val to_machtype : t -> machtype
 
   (** Like [to_machtype] but tagged integer extended machtypes are mapped to
-      value machtypes.  This is used to avoid excessive numbers of generic
+      value machtypes. This is used to avoid excessive numbers of generic
       functions being generated (see comments in cmm_helpers.ml). *)
   val change_tagged_int_to_val : t -> machtype
 end
@@ -416,8 +416,8 @@ val make_float_alloc :
 
 (** Allocate a closure block, to hold a set of closures.
 
-    This takes a list of expressions [exprs] and a list of [memory_chunk]s
-    that correspond pairwise.  Both lists must be the same length.
+    This takes a list of expressions [exprs] and a list of [memory_chunk]s that
+    correspond pairwise. Both lists must be the same length.
 
     The list of expressions includes _all_ fields of the closure block,
     including the code pointers and closure information fields. *)
@@ -430,8 +430,8 @@ val make_closure_alloc :
   expression
 
 (** Allocate an mixed block of the corresponding tag and scannable prefix size.
-    The [memory_chunk] list should give the memory_chunk corresponding to
-    each element from the [expression] list. *)
+    The [memory_chunk] list should give the memory_chunk corresponding to each
+    element from the [expression] list. *)
 val make_mixed_alloc :
   mode:Cmm.Alloc_mode.t ->
   Debuginfo.t ->
@@ -446,8 +446,8 @@ val opaque : expression -> Debuginfo.t -> expression
 
 (** Generic application functions *)
 
-(** Get an identifier for a given machtype, used in the name of the
-    generic functions. *)
+(** Get an identifier for a given machtype, used in the name of the generic
+    functions. *)
 val machtype_identifier : machtype -> string
 
 (** Get the symbol for the generic currying or tuplifying wrapper with [n]
@@ -469,18 +469,20 @@ val bigarray_word_kind : Lambda.bigarray_kind -> memory_chunk
 
 (** Operations on n-bit integers *)
 
-(** Simplify the given expression knowing the low bit of the argument will be irrelevant
-*)
+(** Simplify the given expression knowing the low bit of the argument will be
+    irrelevant *)
 val ignore_low_bit_int : expression -> expression
 
-(** Simplify the given expression knowing that bits other than the low [bits] bits will be
-    irrelevant *)
+(** Simplify the given expression knowing that bits other than the low [bits]
+    bits will be irrelevant *)
 val low_bits : bits:int -> dbg:Debuginfo.t -> expression -> expression
 
-(** sign-extend a given integer expression from [bits] bits to an entire register *)
+(** sign-extend a given integer expression from [bits] bits to an entire
+    register *)
 val sign_extend : bits:int -> dbg:Debuginfo.t -> expression -> expression
 
-(** zero-extend a given integer expression from [bits] bits to an entire register *)
+(** zero-extend a given integer expression from [bits] bits to an entire
+    register *)
 val zero_extend : bits:int -> dbg:Debuginfo.t -> expression -> expression
 
 (** Box a given integer, without sharing of constants *)
@@ -675,13 +677,13 @@ val transl_switch_clambda :
 (** Method call : [send kind met obj args dbg]
 
     - [met] is a method identifier, which can be a hashed variant or an index in
-    [obj]'s method table, depending on [kind]
+      [obj]'s method table, depending on [kind]
 
     - [obj] is the object whose method is being called
 
     - [args] is the extra arguments to the method call (Note: I'm not aware of
-    any way for the frontend to generate any arguments other than the cache and
-    cache position) *)
+      any way for the frontend to generate any arguments other than the cache
+      and cache position) *)
 val send :
   Lambda.meth_kind ->
   expression ->
@@ -703,8 +705,8 @@ val global_table : Compilation_unit.t list -> phrase
 val reference_symbols : symbol list -> phrase
 
 (** Generate the caml_globals_map structure, as a marshalled string constant.
-    The runtime representation of the type here must match that of [type
-    global_map] in the natdynlink code. *)
+    The runtime representation of the type here must match that of
+    [type global_map] in the natdynlink code. *)
 val globals_map :
   (Compilation_unit.t * Digest.t option * Digest.t option * Symbol.t list) list ->
   phrase
@@ -764,7 +766,8 @@ val emit_float_array_constant :
 
 (* CR mshinwell: [dbg] should not be optional. *)
 
-(** The void (i.e. empty tuple) cmm value. Not to be confused with [() : unit]. *)
+(** The void (i.e. empty tuple) cmm value. Not to be confused with [() : unit].
+*)
 val void : Cmm.expression
 
 (** Create the single unit value. *)
@@ -838,8 +841,8 @@ val trywith :
 
 (** {2 Static jumps} *)
 
-(** [handler id vars body is_cold] creates a static handler for exit number [id],
-    binding variables [vars] in [body]. *)
+(** [handler id vars body is_cold] creates a static handler for exit number
+    [id], binding variables [vars] in [body]. *)
 val handler :
   dbg:Debuginfo.t ->
   Lambda.static_label ->
@@ -867,12 +870,10 @@ val create_ccatch :
   body:Cmm.expression ->
   Cmm.expression
 
-(** Shift operations.
-    Inputs: a tagged caml integer and an untagged machine integer.
-    Outputs: a tagged caml integer.
-    Takes as first argument a tagged caml integer, and as
-    second argument an untagged machine intger which is the amount to shift the
-    first argument by. *)
+(** Shift operations. Inputs: a tagged caml integer and an untagged machine
+    integer. Outputs: a tagged caml integer. Takes as first argument a tagged
+    caml integer, and as second argument an untagged machine intger which is the
+    amount to shift the first argument by. *)
 
 val lsl_int_caml_raw : dbg:Debuginfo.t -> expression -> expression -> expression
 
@@ -913,7 +914,8 @@ val le : dbg:Debuginfo.t -> expression -> expression -> expression
 val gt : dbg:Debuginfo.t -> expression -> expression -> expression
 
 (** Integer arithmetic signed comparisons on cmm expressions. Returns an
-    untagged integer (either 0 or 1) to represent the result of the comparison. *)
+    untagged integer (either 0 or 1) to represent the result of the comparison.
+*)
 val ge : dbg:Debuginfo.t -> expression -> expression -> expression
 
 val ult : dbg:Debuginfo.t -> expression -> expression -> expression
@@ -923,7 +925,8 @@ val ule : dbg:Debuginfo.t -> expression -> expression -> expression
 val ugt : dbg:Debuginfo.t -> expression -> expression -> expression
 
 (** Integer arithmetic unsigned comparisons on cmm expressions. Returns an
-    untagged integer (either 0 or 1) to represent the result of the comparison. *)
+    untagged integer (either 0 or 1) to represent the result of the comparison.
+*)
 val uge : dbg:Debuginfo.t -> expression -> expression -> expression
 
 (** Asbolute value on floats. *)
@@ -1304,7 +1307,8 @@ val untagged_int16_array_length : expression -> Debuginfo.t -> expression
 (** Compute the length of an unboxed int32 array. *)
 val unboxed_int32_array_length : expression -> Debuginfo.t -> expression
 
-(** Compute the length of an untagged int or unboxed int64 or unboxed nativeint array. *)
+(** Compute the length of an untagged int or unboxed int64 or unboxed nativeint
+    array. *)
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_length :
   expression -> Debuginfo.t -> expression
 
@@ -1321,29 +1325,27 @@ val unboxed_vec512_array_length : expression -> Debuginfo.t -> expression
 val unboxed_float32_array_ref :
   expression -> expression -> Debuginfo.t -> expression
 
-(** Read an unboxed float32 from a 64-bit field in an array represented as
-    a mixed block (with tag zero), as used for unboxed product arrays.
+(** Read an unboxed float32 from a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
 
-    The float32 is expected to be in the least significant bits of the
-    64-bit field.  The most significant 32 bits of such field are ignored.
+    The float32 is expected to be in the least significant bits of the 64-bit
+    field. The most significant 32 bits of such field are ignored.
 
-    The zero-indexed element number is specified as a tagged immediate.
-*)
+    The zero-indexed element number is specified as a tagged immediate. *)
 val unboxed_mutable_float32_unboxed_product_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
 (* CR mshinwell/mslater: We could do movss xmm xmm, movsd mem xmm instead of
    separate writes *)
 
-(** Write an unboxed float32 into a 64-bit field in an array represented as
-    a mixed block (with tag zero), as used for unboxed product arrays.
+(** Write an unboxed float32 into a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
 
     The zero-indexed element number is specified as a tagged immediate.
 
-    The float32 will be written to the least significant bits of the
-    64-bit field.  The top 32 bits of the written word will be initialized
-    to zero.  Note that two writes are involved.
-*)
+    The float32 will be written to the least significant bits of the 64-bit
+    field. The top 32 bits of the written word will be initialized to zero. Note
+    that two writes are involved. *)
 val unboxed_mutable_float32_unboxed_product_array_set :
   expression ->
   array_index:expression ->
@@ -1363,15 +1365,14 @@ val untagged_int16_array_ref :
 val unboxed_int32_array_ref :
   expression -> expression -> Debuginfo.t -> expression
 
-(** Read an untagged int8 from (the least significant bits of) a 64-bit field
-    in an array represented as a mixed block (with tag zero), as used for
-    unboxed product arrays.
+(** Read an untagged int8 from (the least significant bits of) a 64-bit field in
+    an array represented as a mixed block (with tag zero), as used for unboxed
+    product arrays.
 
     The zero-indexed element number is specified as a tagged immediate.
 
-    The returned value is always sign extended, but it is not assumed that
-    the 64-bit field in the array contains a sign-extended representation.
-*)
+    The returned value is always sign extended, but it is not assumed that the
+    64-bit field in the array contains a sign-extended representation. *)
 val untagged_mutable_int8_unboxed_product_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
@@ -1381,32 +1382,29 @@ val untagged_mutable_int8_unboxed_product_array_ref :
 
     The zero-indexed element number is specified as a tagged immediate.
 
-    The returned value is always sign extended, but it is not assumed that
-    the 64-bit field in the array contains a sign-extended representation.
-*)
+    The returned value is always sign extended, but it is not assumed that the
+    64-bit field in the array contains a sign-extended representation. *)
 val untagged_mutable_int16_unboxed_product_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
-(** Read an unboxed int32 from (the least significant bits of) a 64-bit field
-    in an array represented as a mixed block (with tag zero), as used for
-    unboxed product arrays.
+(** Read an unboxed int32 from (the least significant bits of) a 64-bit field in
+    an array represented as a mixed block (with tag zero), as used for unboxed
+    product arrays.
 
     The zero-indexed element number is specified as a tagged immediate.
 
-    The returned value is always sign extended, but it is not assumed that
-    the 64-bit field in the array contains a sign-extended representation.
-*)
+    The returned value is always sign extended, but it is not assumed that the
+    64-bit field in the array contains a sign-extended representation. *)
 val unboxed_mutable_int32_unboxed_product_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
-(** Write an untagged int8 into a 64-bit field in an array represented as
-    a mixed block (with tag zero), as used for unboxed product arrays.
+(** Write an untagged int8 into a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
 
     The zero-indexed element number is specified as a tagged immediate.
 
     The write is done as a 64-bit write of a sign-extended version of the
-    supplied [new_value].
-*)
+    supplied [new_value]. *)
 val untagged_mutable_int8_unboxed_product_array_set :
   expression ->
   array_index:expression ->
@@ -1414,14 +1412,13 @@ val untagged_mutable_int8_unboxed_product_array_set :
   Debuginfo.t ->
   expression
 
-(** Write an untagged int16 into a 64-bit field in an array represented as
-    a mixed block (with tag zero), as used for unboxed product arrays.
+(** Write an untagged int16 into a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
 
     The zero-indexed element number is specified as a tagged immediate.
 
     The write is done as a 64-bit write of a sign-extended version of the
-    supplied [new_value].
-*)
+    supplied [new_value]. *)
 val untagged_mutable_int16_unboxed_product_array_set :
   expression ->
   array_index:expression ->
@@ -1429,14 +1426,13 @@ val untagged_mutable_int16_unboxed_product_array_set :
   Debuginfo.t ->
   expression
 
-(** Write an unboxed int32 into a 64-bit field in an array represented as
-    a mixed block (with tag zero), as used for unboxed product arrays.
+(** Write an unboxed int32 into a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
 
     The zero-indexed element number is specified as a tagged immediate.
 
     The write is done as a 64-bit write of a sign-extended version of the
-    supplied [new_value].
-*)
+    supplied [new_value]. *)
 val unboxed_mutable_int32_unboxed_product_array_set :
   expression ->
   array_index:expression ->
@@ -1450,8 +1446,7 @@ val unboxed_mutable_int32_unboxed_product_array_set :
     The zero-indexed element number is specified as a tagged immediate.
 
     A better name would be `naked_int_or_int64_or_nativeint_array_ref`, but this
-    name was chosen for consistency.
-*)
+    name was chosen for consistency. *)
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
@@ -1487,9 +1482,8 @@ val unboxed_int32_array_set :
   Debuginfo.t ->
   expression
 
-(** Update an unboxed int64 or unboxed nativeint or untagged int array (without bounds
-    check).
-*)
+(** Update an unboxed int64 or unboxed nativeint or untagged int array (without
+    bounds check). *)
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_set :
   expression ->
   index:expression ->
@@ -1499,13 +1493,13 @@ val unboxed_or_untagged_int_or_int64_or_nativeint_array_set :
 
 (** {2 Getters and setters for unboxed fields of mixed blocks}
 
-    The first argument is the heap block to modify a field of.
-    The [index_in_words] should be an untagged integer.
+    The first argument is the heap block to modify a field of. The
+    [index_in_words] should be an untagged integer.
 
-    In contrast to [setfield] and [setfield_computed], [immediate_or_pointer] is not
-    needed as the layout is known from the [memory_chunk] argument, and
-    [initialization_or_assignment] is not needed as unboxed ints can always be assigned
-    without caml_modify (etc.). *)
+    In contrast to [setfield] and [setfield_computed], [immediate_or_pointer] is
+    not needed as the layout is known from the [memory_chunk] argument, and
+    [initialization_or_assignment] is not needed as unboxed ints can always be
+    assigned without caml_modify (etc.). *)
 
 val get_field_unboxed :
   dbg:Debuginfo.t ->
@@ -1531,24 +1525,26 @@ val cpu_relax : dbg:Debuginfo.t -> expression
 
 val poll : dbg:Debuginfo.t -> expression
 
-(** This module defines the various kinds of scalars usable in Cmm. It also provides ways
-    to generate expressions to cast between them. *)
+(** This module defines the various kinds of scalars usable in Cmm. It also
+    provides ways to generate expressions to cast between them. *)
 module Scalar_type : sig
-  (** A static_cast from a larger integral type to a smaller one logically truncates the
-      upper bits. Note that values are stored in registers sign- or zero- extended
-      according to their signdness, so the result may be sign-extended.
+  (** A static_cast from a larger integral type to a smaller one logically
+      truncates the upper bits. Note that values are stored in registers sign-
+      or zero- extended according to their signdness, so the result may be
+      sign-extended.
 
-      A static_cast from a smaller integral type to an equal or larger sized-integral type
-      sign- or zero-extends the input value according to the sign of the result.
+      A static_cast from a smaller integral type to an equal or larger
+      sized-integral type sign- or zero-extends the input value according to the
+      sign of the result.
 
       A static_cast from an integral type to a float is pretty self-explanatory.
 
-      A static_cast from a float to an integral type always rounds toward zero. If the
-      resulting integral does not fit in the destination type, the result is unspecified
-      (although it's generally zero).
+      A static_cast from a float to an integral type always rounds toward zero.
+      If the resulting integral does not fit in the destination type, the result
+      is unspecified (although it's generally zero).
 
-      Casting floats to/from unsigned register-width integers is not implemented and will
-      raise in the compiler. *)
+      Casting floats to/from unsigned register-width integers is not implemented
+      and will raise in the compiler. *)
   type 'a static_cast :=
     dbg:Debuginfo.t -> src:'a -> dst:'a -> expression -> expression
 
@@ -1600,9 +1596,9 @@ module Scalar_type : sig
 
     val unsigned : t -> t
 
-    (** This function relates to the set of possible values that each type can represent.
-        Even if it returns [true], it does not necessarily mean that casting from [src] to
-        [dst] is a no-op. *)
+    (** This function relates to the set of possible values that each type can
+        represent. Even if it returns [true], it does not necessarily mean that
+        casting from [src] to [dst] is a no-op. *)
     val can_cast_without_losing_information : src:t -> dst:t -> bool
 
     val static_cast : t static_cast
@@ -1610,8 +1606,9 @@ module Scalar_type : sig
     val conjugate : t conjugate
   end
 
-  (** An integer stored the lower [bits] bits of a register-width twos-complement integer,
-      and sign- or zero-extended as needed, according to [signedness]. *)
+  (** An integer stored the lower [bits] bits of a register-width
+      twos-complement integer, and sign- or zero-extended as needed, according
+      to [signedness]. *)
   module Integer : sig
     type t [@@immediate]
 
@@ -1624,8 +1621,9 @@ module Scalar_type : sig
     include Integral_ops with type t := t
   end
 
-  (** An {!Integer.t} but with the additional stipulation that its lowest bit is always
-      set to 1 and is not considered in mathematical operations on the numbers. *)
+  (** An {!Integer.t} but with the additional stipulation that its lowest bit is
+      always set to 1 and is not considered in mathematical operations on the
+      numbers. *)
   module Tagged_integer : sig
     type t [@@immediate]
 
@@ -1650,11 +1648,12 @@ module Scalar_type : sig
 
     val nativeint : t
 
-    (** Gets the integer resulting from untagging the integeral iff it is tagged.
+    (** Gets the integer resulting from untagging the integeral iff it is
+        tagged.
 
-        E.g., you can use [static_cast ~src ~dst:(Untagged (untagged src))] to untag a
-        value of type [src], And in the cas where [src] is already untagged, this becomes
-        the identity function *)
+        E.g., you can use [static_cast ~src ~dst:(Untagged (untagged src))] to
+        untag a value of type [src], And in the cas where [src] is already
+        untagged, this becomes the identity function *)
     val untagged_or_identity : t -> Integer.t
 
     include Integral_ops with type t := t

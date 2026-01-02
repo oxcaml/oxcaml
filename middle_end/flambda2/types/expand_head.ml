@@ -567,8 +567,8 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
         then
           Misc.fatal_errorf
             "Variable to be bound %a is expected to already be\n\
-            \   bound in the [suitable_for] environment:@ %a" Name.print bind_to
-            TE.print suitable_for)
+            \   bound in the [suitable_for] environment:@ %a"
+            Name.print bind_to TE.print suitable_for)
       bind_to_and_types
   | All_variables_except _ -> ());
   (* Do a quick free variables check first to try to catch easy cases. *)
@@ -618,15 +618,16 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
         in
         Name_occurrences.fold_variables free_vars ~init:([], [], [])
           ~f:(fun
-               (( unavailable_vars_renamed,
-                  unavailable_vars_expanded,
-                  unavailable_vars_removed ) as unavailable_vars)
-               var
-             ->
+              (( unavailable_vars_renamed,
+                 unavailable_vars_expanded,
+                 unavailable_vars_removed ) as unavailable_vars)
+              var
+            ->
             if erase var
             then
-              if Name_occurrences.mem_var free_vars_except_through_value_slots
-                   var
+              if
+                Name_occurrences.mem_var free_vars_except_through_value_slots
+                  var
               then
                 match Name_occurrences.count_variable free_vars var with
                 | Zero ->

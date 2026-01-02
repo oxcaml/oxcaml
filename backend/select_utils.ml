@@ -54,8 +54,8 @@ type environment =
       (Reg.t array * Backend_var.Provenance.t option * Asttypes.mutable_flag)
       V.Map.t;
     static_exceptions : static_handler Static_label.Map.t;
-        (** Which registers must be populated when jumping to the given
-        handler. *)
+        (** Which registers must be populated when jumping to the given handler.
+        *)
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t
   }
