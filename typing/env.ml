@@ -772,10 +772,7 @@ and cltype_data =
   { cltda_declaration : class_type_declaration;
     cltda_shape : Shape.t }
 
-let clda_mode = Mode.Value.(
-  Const.legacy
-  |> of_const ~hint_monadic:Class_legacy_monadic
-      ~hint_comonadic:Class_legacy_comonadic)
+let clda_mode = Types.class_mode |> Mode.Value.disallow_right
 
 let fcomp_res_mode = Types.functor_res_mode |> Mode.Alloc.disallow_right
 
@@ -1165,19 +1162,9 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
   }
 
 let mode_unit =
-  Mode.Value.of_const
-    { areality = Global;
-      linearity = Many;
-      uniqueness = Aliased;
-      portability = Nonportable;
-      contention = Uncontended;
-      forkable = Forkable;
-      yielding = Unyielding;
-      statefulness = Stateful;
-      visibility = Read_write;
-      staticity = Dynamic;
-      (* CR-soon zqian: persistent modules are always static *)
-    }
+  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
+  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  (* CR-soon zqian: persistent modules are always static *)
 
 let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in
