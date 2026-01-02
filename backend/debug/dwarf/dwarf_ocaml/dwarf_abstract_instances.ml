@@ -38,7 +38,7 @@ let attributes fun_name =
   [DAH.create_name fun_name; DAH.create_external ~is_visible_externally:true]
 
 let abstract_instance_proto_die_symbol ~fun_symbol =
-  Asm_symbol.create (Asm_symbol.to_raw_string fun_symbol ^ "_absinst")
+  Asm_symbol.create_local (Asm_symbol.to_raw_string fun_symbol ^ "_absinst")
 
 let add_empty state ~compilation_unit_proto_die ~fun_symbol ~demangled_name =
   let abstract_instance_proto_die =
@@ -118,7 +118,8 @@ let decompose_singleton_debuginfo dbg =
     let dbg = Debuginfo.of_items [item] in
     let fun_symbol =
       match dinfo_function_symbol with
-      | Some dinfo_function_symbol -> Asm_symbol.create dinfo_function_symbol
+      | Some dinfo_function_symbol ->
+        Asm_symbol.create_global dinfo_function_symbol
       | None ->
         Misc.fatal_errorf
           "No function symbol in Debuginfo.t: orig_dbg=%a dbg=%a"
