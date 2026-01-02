@@ -1,4 +1,4 @@
-(** Max priority queue  *)
+(** Max priority queue *)
 
 [@@@ocaml.warning "+a-40-41-42"]
 

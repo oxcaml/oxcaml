@@ -93,9 +93,10 @@ end = struct
      check a name if it has a prefix. In particular, this allows single-module
      executables to have names like ".cinaps" that aren't valid module names. *)
   let check_as_path_component t =
-    if String.length t < 1
-       || (not (isupper (String.get t 0)))
-       || String.contains t '.'
+    if
+      String.length t < 1
+      || (not (isupper (String.get t 0)))
+      || String.contains t '.'
     then raise (Error (Bad_compilation_unit_name t))
 
   let dummy = "*dummy*"

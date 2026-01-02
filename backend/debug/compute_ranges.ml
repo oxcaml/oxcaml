@@ -67,8 +67,9 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     let rewrite_labels t ~env =
       let start_pos = rewrite_label env t.start_pos in
       let end_pos = rewrite_label env t.end_pos in
-      if Label.equal start_pos end_pos
-         && t.start_pos_offset = 0 && t.end_pos_offset = 0
+      if
+        Label.equal start_pos end_pos
+        && t.start_pos_offset = 0 && t.end_pos_offset = 0
       then None
       else Some { t with start_pos; end_pos }
   end
@@ -490,31 +491,32 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
           first_insn)
     in
     (if !Dwarf_flags.ddebug_invariants
-    then
-      let currently_open_subranges =
-        KS.of_list
-          (List.map
-             (fun (key, _datum) -> key)
-             (KM.bindings currently_open_subranges))
-      in
-      match S.available_across insn with
-      | None | Some Unreachable -> ()
-      | Some (Ok _ as should_be_open) -> (
-        match KS.diff should_be_open currently_open_subranges with
-        | Unreachable -> assert false
-        | Ok not_open_but_should_be as not_open_but_should_be' ->
-          (* Avoid having [KS.is_empty], which seems a bit tricky to think
-             about, just for this check. *)
-          if not (S.Key.Raw_set.is_empty not_open_but_should_be)
-          then
-            Misc.fatal_errorf
-              "%s: ranges for %a not open across the following instruction:\n\
-               %a\n\
-               available_across:@ %a\n\
-               currently_open_subranges: %a" fundecl.fun_name KS.print
-              not_open_but_should_be' Printlinear.instr
-              { insn with L.next = L.end_instr }
-              KS.print should_be_open KS.print currently_open_subranges));
+     then
+       let currently_open_subranges =
+         KS.of_list
+           (List.map
+              (fun (key, _datum) -> key)
+              (KM.bindings currently_open_subranges))
+       in
+       match S.available_across insn with
+       | None | Some Unreachable -> ()
+       | Some (Ok _ as should_be_open) -> (
+         match KS.diff should_be_open currently_open_subranges with
+         | Unreachable -> assert false
+         | Ok not_open_but_should_be as not_open_but_should_be' ->
+           (* Avoid having [KS.is_empty], which seems a bit tricky to think
+              about, just for this check. *)
+           if not (S.Key.Raw_set.is_empty not_open_but_should_be)
+           then
+             Misc.fatal_errorf
+               "%s: ranges for %a not open across the following instruction:\n\
+                %a\n\
+                available_across:@ %a\n\
+                currently_open_subranges: %a"
+               fundecl.fun_name KS.print not_open_but_should_be'
+               Printlinear.instr
+               { insn with L.next = L.end_instr }
+               KS.print should_be_open KS.print currently_open_subranges));
     match insn.desc with
     | Lend -> first_insn
     | Lprologue | Lepilogue_open | Lepilogue_close | Lop _ | Lcall_op _

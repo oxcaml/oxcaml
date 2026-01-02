@@ -29,8 +29,8 @@
 
 (** Measuring allocated section sizes in object files.
 
-    This module computes the total size of allocated ELF sections across
-    a collection of object files, archives, and OCaml compilation units. *)
+    This module computes the total size of allocated ELF sections across a
+    collection of object files, archives, and OCaml compilation units. *)
 
 (** Errors that can occur when measuring object files. *)
 type error =
@@ -80,8 +80,8 @@ end
     multiple times. Returns an empty entry for files with unrecognized
     extensions.
 
-    Each file is paired with its origin, which determines partition
-    placement. *)
+    Each file is paired with its origin, which determines partition placement.
+*)
 val measure_files :
   (module Compiler_owee.Unix_intf.S) ->
   files:(string * file_origin) list ->

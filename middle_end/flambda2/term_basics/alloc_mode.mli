@@ -37,7 +37,8 @@ module For_types : sig
       transform into constraints have this semantics *)
   val from_lambda : Lambda.locality_mode -> t
 
-  (** Symmetric to [from_lambda], so [Heap_or_local] is mapped to [Alloc_local] *)
+  (** Symmetric to [from_lambda], so [Heap_or_local] is mapped to [Alloc_local]
+  *)
   val to_lambda : t -> Lambda.locality_mode
 end
 

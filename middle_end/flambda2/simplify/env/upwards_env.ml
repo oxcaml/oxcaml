@@ -59,8 +59,9 @@ let find_continuation t cont =
 let mem_continuation t cont = Continuation.Map.mem cont t.continuations
 
 let check_shortcut_transitivity t cont shortcut_to =
-  if Flambda_features.check_invariants ()
-     && Continuation.Map.mem shortcut_to t.continuation_shortcuts
+  if
+    Flambda_features.check_invariants ()
+    && Continuation.Map.mem shortcut_to t.continuation_shortcuts
   then
     Misc.fatal_errorf
       "@[<hov 2>The continuation shortcut map does not represent the \

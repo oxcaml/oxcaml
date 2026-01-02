@@ -43,8 +43,9 @@ let create_exn tag =
 let create_from_targetint machine_width ti =
   let min_tag = Target_ocaml_int.of_int machine_width min_tag in
   let max_tag = Target_ocaml_int.of_int machine_width max_tag in
-  if Target_ocaml_int.compare ti min_tag >= 0
-     && Target_ocaml_int.compare ti max_tag <= 0
+  if
+    Target_ocaml_int.compare ti min_tag >= 0
+    && Target_ocaml_int.compare ti max_tag <= 0
   then Some (Target_ocaml_int.to_int ti)
   else None
 

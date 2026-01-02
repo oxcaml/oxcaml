@@ -128,7 +128,7 @@ module Make_value
     (Witnesses : WS)
     (V : Component with type witnesses := Witnesses.t) =
 struct
-  (** Lifts V to triples  *)
+  (** Lifts V to triples *)
   type t =
     { nor : V.t;
       exn : V.t;

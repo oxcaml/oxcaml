@@ -18,7 +18,7 @@ type key = int
 
 external int_clz : int -> (int[@untagged])
   = "caml_int_clz_tagged_to_tagged" "caml_int_clz_tagged_to_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+[@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
 (* A bit [b], represented as a bitmask with only [b] set. This makes testing an
    individual bit very cheap. *)
@@ -137,7 +137,10 @@ module Set0 = struct
   let[@inline always] is_value_of (type a) (t : a t) : a is_value =
     (* Crucially, this compiles down to just [Unit], making this function cost
        nothing. *)
-    match t with Empty -> Unit | Leaf _ -> Unit | Branch _ -> Unit
+    match t with
+    | Empty -> Unit
+    | Leaf _ -> Unit
+    | Branch _ -> Unit
 
   let[@inline always] empty (type a) (Unit : a is_value) : a t = Empty
 
@@ -358,11 +361,11 @@ end = struct
     | Empty, _ -> t1
     | _, Empty -> t0
     | (Leaf _ | Branch _), (Leaf _ | Branch _) -> Tree.branch prefix bit t0 t1
-    [@@inline always]
+  [@@inline always]
 
   let branch_non_empty prefix bit t0 t1 =
     (Tree.branch [@inlined hint]) prefix bit t0 t1
-    [@@inline always]
+  [@@inline always]
 
   let is_empty t =
     match descr t with Empty -> true | Leaf _ -> false | Branch _ -> false
@@ -634,7 +637,7 @@ end = struct
             | Some t0, None -> (only_left [@inlined hint]) t0
             | None, Some t1 -> (only_right [@inlined hint]) t1
             | Some t0, Some t1 -> (both_sides [@inlined hint]) t0 t1
-            [@@inline always]
+              [@@inline always]
           in
           let t0' = both_sides' t00 t10 in
           let t1' = both_sides' t01 t11 in
@@ -1076,7 +1079,7 @@ end = struct
       ~only_right:(fun t1 -> merge_right iv f t1)
       ~both_sides:(fun t0 t1 -> merge' iv f t0 t1)
       iv
-      (fun [@inline always] i d0 d1 -> f i (Some d0) (Some d1))
+      (fun[@inline always] i d0 d1 -> f i (Some d0) (Some d1))
       t0 t1
 
   let find_opt t key =
@@ -1139,7 +1142,7 @@ end = struct
       ~only_right:(fun t1 -> update_many_right iv f t1)
       ~both_sides:(fun t0 t1 -> update_many f t0 t1)
       iv
-      (fun [@inline always] k d0 d1 -> f k (Some d0) d1)
+      (fun[@inline always] k d0 d1 -> f k (Some d0) d1)
       t0 t1
 
   let rec filter_map_sharing f t =

@@ -143,9 +143,10 @@ let add_equations_on_params typing_env ~is_recursive ~params:params'
   let rec add_equations_on_params typing_env params param_types =
     match params with
     | [] ->
-      if Flambda_features.check_invariants ()
-         && (not is_recursive)
-         && match param_types with [] -> false | _ :: _ -> true
+      if
+        Flambda_features.check_invariants ()
+        && (not is_recursive)
+        && match param_types with [] -> false | _ :: _ -> true
       then number_of_parameters_mismatch ();
       typing_env
     | param :: params -> (

@@ -66,13 +66,12 @@ let typ_int128 = [| Int; Int |]
       Int
     v}
 
-  In particular, [Addr] must be above [Val], to ensure that if there is
-  a join point between a code path yielding [Addr] and one yielding [Val]
-  then the result is treated as a derived pointer into the heap (i.e. [Addr]).
-  (Such a result may not be live across any call site or a fatal compiler
-  error will result.)
-  The order is used only in selection, Valx2 is generated after selection.
-*)
+    In particular, [Addr] must be above [Val], to ensure that if there is a join
+    point between a code path yielding [Addr] and one yielding [Val] then the
+    result is treated as a derived pointer into the heap (i.e. [Addr]). (Such a
+    result may not be live across any call site or a fatal compiler error will
+    result.) The order is used only in selection, Valx2 is generated after
+    selection. *)
 
 let lub_component comp1 comp2 =
   match comp1, comp2 with

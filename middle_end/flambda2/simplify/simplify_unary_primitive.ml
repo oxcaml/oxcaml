@@ -451,8 +451,8 @@ let simplify_boolean_not dacc ~original_term ~arg:_ ~arg_ty ~result_var =
         (fun imm ->
           if Target_ocaml_int.equal imm (Target_ocaml_int.zero machine_width)
           then Some (Target_ocaml_int.one machine_width)
-          else if Target_ocaml_int.equal imm
-                    (Target_ocaml_int.one machine_width)
+          else if
+            Target_ocaml_int.equal imm (Target_ocaml_int.one machine_width)
           then Some (Target_ocaml_int.zero machine_width)
           else None)
         imms

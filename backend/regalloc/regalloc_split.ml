@@ -442,14 +442,15 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
                 let inserted_label = inserted_block.start in
                 if not (Label.Set.mem inserted_label block.predecessors)
                 then fatal "inserted block is not a predecessor";
-                if not
-                     (Label.Set.mem inserted_label
-                        (Cfg.successor_labels ~normal:true ~exn:false
-                           inserted_block))
+                if
+                  not
+                    (Label.Set.mem inserted_label
+                       (Cfg.successor_labels ~normal:true ~exn:false
+                          inserted_block))
                 then fatal "inserted block not a normal successor";
-                if Label.Set.mem inserted_label
-                     (Cfg.successor_labels ~normal:false ~exn:true
-                        inserted_block)
+                if
+                  Label.Set.mem inserted_label
+                    (Cfg.successor_labels ~normal:false ~exn:true inserted_block)
                 then fatal "inserted block an exceptional successor"
               | [] -> fatal "no block was inserted"
               | _ :: _ :: _ -> fatal "several blocks were inserted");

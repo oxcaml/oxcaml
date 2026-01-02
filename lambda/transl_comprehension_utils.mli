@@ -1,7 +1,7 @@
 open Lambda
 
-(** Code-generation utilities for use when generating Lambda for
-    comprehensions. *)
+(** Code-generation utilities for use when generating Lambda for comprehensions.
+*)
 
 (** First-class let bindings (mutable and immutable); we sometimes need to
     collect these while translating array comprehension clauses and bind them
@@ -18,8 +18,8 @@ module Let_binding : sig
     (** What sort of variable are we binding? *)
     type t =
       | Immutable of let_kind
-          (** Bind an immutable variable of the specified [let_kind]; corresponds to
-          [Llet]. *)
+          (** Bind an immutable variable of the specified [let_kind];
+              corresponds to [Llet]. *)
       | Mutable  (** Bind a mutable variable; corresponds to [Lmutlet]. *)
   end
 
@@ -37,8 +37,8 @@ module Let_binding : sig
       argument) to bind to an initial value given by the lambda argument. *)
   val make : Let_kind.t -> layout -> string -> debug_uid -> lambda -> t
 
-  (** Create a Lambda let-binding (with [Llet]) from a first-class let
-      binding, providing the body. *)
+  (** Create a Lambda let-binding (with [Llet]) from a first-class let binding,
+      providing the body. *)
   val let_one : t -> lambda -> lambda
 
   (** Create Lambda let-bindings (with [Llet]) from multiple first-class let
@@ -188,16 +188,16 @@ end
 
 module Cps_utils : sig
   (** [compose_map f xs] applies [f] to every element of [xs], obtaining a list
-      of functions, and then composes these functions (from left to right).
-      This is useful for, e.g., combining a sequence of translated clauses into
-      a single [lambda -> lambda] function. *)
+      of functions, and then composes these functions (from left to right). This
+      is useful for, e.g., combining a sequence of translated clauses into a
+      single [lambda -> lambda] function. *)
   val compose_map : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 
   (** [compose_map_acc f xs] is like [compose_map], but [f] returns a pair of a
       function and some extra data; the final result is then the composition (as
-      in [compose_map]) paired with the list of all these extra values.  This is
-      useful for combining a sequence of iterators into a single [lambda ->
-      lambda] function and their list of generated bindings (a
+      in [compose_map]) paired with the list of all these extra values. This is
+      useful for combining a sequence of iterators into a single
+      [lambda -> lambda] function and their list of generated bindings (a
       ['u Iterator_bindings.t list]), as the [binding] function returns this
       extra data. *)
   val compose_map_acc :

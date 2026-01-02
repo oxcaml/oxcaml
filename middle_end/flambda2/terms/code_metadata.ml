@@ -182,15 +182,17 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
     ()
   | true, (Always_inline | Unroll _) ->
     Misc.fatal_error "Stubs may not be annotated as [Always_inline] or [Unroll]");
-  if first_complex_local_param < 0
-     || first_complex_local_param > Flambda_arity.num_params params_arity
+  if
+    first_complex_local_param < 0
+    || first_complex_local_param > Flambda_arity.num_params params_arity
   then
     Misc.fatal_errorf
       "Illegal first_complex_local_param=%d for params arity: %a"
       first_complex_local_param Flambda_arity.print params_arity;
-  if List.compare_length_with param_modes
-       (Flambda_arity.cardinal_unarized params_arity)
-     <> 0
+  if
+    List.compare_length_with param_modes
+      (Flambda_arity.cardinal_unarized params_arity)
+    <> 0
   then
     Misc.fatal_errorf "Parameter modes do not match arity: %a and (%a)"
       Flambda_arity.print params_arity
@@ -484,9 +486,10 @@ let apply_renaming
       Or_unknown_or_bottom.Ok
         (Result_types.apply_renaming result_types renaming)
   in
-  if code_id == code_id'
-     && newer_version_of == newer_version_of'
-     && result_types == result_types'
+  if
+    code_id == code_id'
+    && newer_version_of == newer_version_of'
+    && result_types == result_types'
   then t
   else
     { t with

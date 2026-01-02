@@ -355,7 +355,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
 let find_sections_with_prefix sections prefix =
   Array.to_list sections
   |> List.filter (fun (section : Elf.section) ->
-         String.starts_with ~prefix section.sh_name_str)
+      String.starts_with ~prefix section.sh_name_str)
 
 let rewrite unix ~input_file ~output_file ~partition_kind ~igot_and_iplt
     ~relocations =

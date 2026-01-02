@@ -29,9 +29,9 @@ val should_be_escaped : char -> bool
 
 include Identifiable.S
 
-(** [create] creates a new symbol. By default, it is assumed that the symbol has not been
-    encoded. In some rare cases, the symbol is encoded elsewhere. In these cases, set the
-    flag [already_encoded] to [true].  *)
+(** [create] creates a new symbol. By default, it is assumed that the symbol has
+    not been encoded. In some rare cases, the symbol is encoded elsewhere. In
+    these cases, set the flag [already_encoded] to [true]. *)
 val create : string -> t
 
 val encode : t -> string

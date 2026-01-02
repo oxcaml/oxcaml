@@ -24,8 +24,7 @@ let extend_live () = !Dwarf_flags.gdwarf_may_alter_codegen_experimental
 (* CR mshinwell: The old "all_regs_that_might_be_named" (see git history) seems
    broken, I think a backwards dataflow pass may be necessary to compute this *)
 
-let check_invariants :
-    type a.
+let check_invariants : type a.
     a Cfg.instruction ->
     print_instr:(Format.formatter -> a Cfg.instruction -> unit) ->
     avail_before:RAS.t ->
@@ -37,10 +36,11 @@ let check_invariants :
     (* Every register that is live across an instruction should also be
        available before the instruction. *)
     let live = instr.live in
-    if not
-         (R.Set.subset live
-            (RD.Set_distinguishing_names_and_locations.forget_debug_info
-               avail_before))
+    if
+      not
+        (R.Set.subset live
+           (RD.Set_distinguishing_names_and_locations.forget_debug_info
+              avail_before))
     then
       Misc.fatal_errorf
         "Named live registers not a subset of available registers: live={%a}  \
@@ -130,8 +130,7 @@ module Transfer = struct
 
   let ok set = RAS.Ok set
 
-  let[@inline] common :
-      type a.
+  let[@inline] common : type a.
       avail_before:RD_quotient_set.t ->
       destroyed_at:(a -> Reg.t array) ->
       is_interesting_constructor:(a -> bool) ->
@@ -194,12 +193,13 @@ module Transfer = struct
             let remains_available =
               live_across || (holds_immediate && on_stack)
             in
-            if remains_available
-               || (not (extend_live ()))
-               || is_end_region instr.desc
-               || (not (RD.assigned_to_stack reg))
-               || RD_quotient_set.mem reg made_unavailable_1
-               || Reg.is_of_type_addr (RD.reg reg)
+            if
+              remains_available
+              || (not (extend_live ()))
+              || is_end_region instr.desc
+              || (not (RD.assigned_to_stack reg))
+              || RD_quotient_set.mem reg made_unavailable_1
+              || Reg.is_of_type_addr (RD.reg reg)
             then not remains_available
             else (
               instr.live <- Reg.Set.add (RD.reg reg) instr.live;
@@ -245,7 +245,10 @@ module Transfer = struct
       | Ok avail_before -> (
         match instr.desc with
         | Op (Name_for_debugger { ident; which_parameter; provenance; regs }) ->
-          let avail_after = ref avail_before (* forgetting_ident *) in
+          let avail_after =
+            ref avail_before
+            (* forgetting_ident *)
+          in
           let num_parts_of_value = Array.length regs in
           (* Add debug info about [ident], but only for registers that are known
              to be available. ([Name_for_debugger] is not intended to be used in
@@ -261,8 +264,9 @@ module Transfer = struct
                use, but which have been substituted since the original
                construction of such operations, should have been renamed by
                [Regalloc_substitution.apply_basic_instruction_in_place]. *)
-            if (not (Reg.is_unknown reg))
-               && RD_quotient_set.mem_reg_by_loc avail_before reg
+            if
+              (not (Reg.is_unknown reg))
+              && RD_quotient_set.mem_reg_by_loc avail_before reg
             then
               let regd =
                 RD.create ~reg ~holds_value_of:ident ~part_of_value

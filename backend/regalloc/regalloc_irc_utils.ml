@@ -96,7 +96,7 @@ module InstrWorkList = struct
 
   let equal
       ((Unknown_list | Coalesced | Constrained | Frozen | Work_list | Active) as
-      left) right =
+       left) right =
     rank left = rank right
 
   let to_string = function

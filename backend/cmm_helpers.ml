@@ -623,9 +623,9 @@ let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
 
 let neg_int c dbg = sub_int (Cconst_int (0, dbg)) c dbg
 
-(** This function conservatively approximates the number of significant bits in its signed
-    argument. That is, it computes the number of bits required to represent the absolute
-    value of its argument. *)
+(** This function conservatively approximates the number of significant bits in
+    its signed argument. That is, it computes the number of bits required to
+    represent the absolute value of its argument. *)
 let rec max_signed_bit_length e =
   match prefer_or e with
   | Cop ((Ccmpi _ | Ccmpf _), _, _) ->
@@ -957,9 +957,9 @@ let get_const_bitmask = function
     Some (x, Nativeint.of_int mask)
   | _ -> None
 
-(** [low_bits ~bits x] is a (potentially simplified) value which agrees with x on at least
-    the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask], where [mask] is a
-    bitmask of the low [bits] bits . *)
+(** [low_bits ~bits x] is a (potentially simplified) value which agrees with x
+    on at least the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask],
+    where [mask] is a bitmask of the low [bits] bits . *)
 let rec low_bits ~bits ~dbg x =
   assert (bits > 0);
   if bits >= arch_bits
@@ -1185,12 +1185,12 @@ let[@inline] get_const = function
   | Cconst_natint (i, _) -> Some i
   | _ -> None
 
-(** Division or modulo on registers. The overflow case min_int / -1 can
-    occur, in which case we force x / -1 = -x and x mod -1 = 0. (PR#5513).
-    In typical cases, [operator] is used to compute the result.
+(** Division or modulo on registers. The overflow case min_int / -1 can occur,
+    in which case we force x / -1 = -x and x mod -1 = 0. (PR#5513). In typical
+    cases, [operator] is used to compute the result.
 
-    However, if division crashes on overflow, we will insert a runtime check for a divisor
-    of -1, and fall back to [if_divisor_is_minus_one]. *)
+    However, if division crashes on overflow, we will insert a runtime check for
+    a divisor of -1, and fall back to [if_divisor_is_minus_one]. *)
 let make_safe_divmod operator ~if_divisor_is_negative_one
     ?(dividend_cannot_be_min_int = false) c1 c2 ~dbg =
   if dividend_cannot_be_min_int || not Arch.division_crashes_on_overflow
@@ -1454,7 +1454,7 @@ let unbox_vec512 =
       match Cmmgen_state.structured_constant_of_sym symbol with
       | Some
           (Const_vec512
-            { word0; word1; word2; word3; word4; word5; word6; word7 }) ->
+             { word0; word1; word2; word3; word4; word5; word6; word7 }) ->
         Some
           (Cconst_vec512
              ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
@@ -1580,8 +1580,8 @@ let get_tag ptr dbg =
     (* Same comment as [get_header] above *)
     Cop
       ( (if Config.runtime5
-        then mk_load_immut Byte_unsigned
-        else mk_load_mut Byte_unsigned),
+         then mk_load_immut Byte_unsigned
+         else mk_load_mut Byte_unsigned),
         [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
         dbg )
 
@@ -1811,8 +1811,8 @@ let addr_array_initialize arr ofs newval dbg =
       [array_indexing log2_size_addr arr ofs dbg; newval],
       dbg )
 
-(** [zero_extend ~bits dbg e] returns [e] with the most significant [arch_bits - bits]
-    bits set to 0 *)
+(** [zero_extend ~bits dbg e] returns [e] with the most significant
+    [arch_bits - bits] bits set to 0 *)
 let zero_extend ~bits ~dbg e =
   assert (0 < bits && bits <= arch_bits);
   let mask = Nativeint.pred (Nativeint.shift_left 1n bits) in
@@ -3036,9 +3036,10 @@ let make_switch arg cases actions dbg =
           | Cint v -> v = Nativeint.(add (mul (of_int i) slope) v0)
           | _ -> false
         in
-        if Misc.Stdlib.Array.for_alli
-             (fun i idx -> check i const_actions.(idx))
-             cases
+        if
+          Misc.Stdlib.Array.for_alli
+            (fun i idx -> check i const_actions.(idx))
+            cases
         then Some (v0, slope)
         else None
       | _, _ -> None
@@ -3898,12 +3899,12 @@ let intermediate_curry_functions ~nlocal ~arity result =
                         ~is_last:true,
                       dbg () ) ]
                 @ (if has_nary
-                  then
-                    [ Cconst_symbol
-                        ( global_symbol
-                            (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app"),
-                          dbg () ) ]
-                  else [])
+                   then
+                     [ Cconst_symbol
+                         ( global_symbol
+                             (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app"),
+                           dbg () ) ]
+                   else [])
                 @ value_slot_given_machtype args
                 @ [Cvar clos],
                 dbg () );
@@ -3914,39 +3915,39 @@ let intermediate_curry_functions ~nlocal ~arity result =
         }
       ::
       (if has_nary
-      then
-        let direct_args =
-          List.mapi
-            (fun i ty ->
-              V.create_local (Printf.sprintf "arg%d" (i + num + 2)), ty)
-            remaining_args
-        in
-        let fun_args =
-          List.map
-            (fun (arg, ty) -> VP.create arg, ty)
-            (direct_args @ [clos, typ_val])
-        in
-        let fun_name =
-          global_symbol (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app")
-        in
-        let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
-        let cf =
-          Cfunction
-            { fun_name;
-              fun_args;
-              fun_body =
-                make_curry_apply result narity
-                  (arg_type :: accumulated_args)
-                  (List.map (fun (arg, _) -> Cvar arg) direct_args)
-                  clos (num + 1);
-              fun_codegen_options = [];
-              fun_dbg;
-              fun_poll = Default_poll;
-              fun_ret_type = result
-            }
-        in
-        [cf]
-      else [])
+       then
+         let direct_args =
+           List.mapi
+             (fun i ty ->
+               V.create_local (Printf.sprintf "arg%d" (i + num + 2)), ty)
+             remaining_args
+         in
+         let fun_args =
+           List.map
+             (fun (arg, ty) -> VP.create arg, ty)
+             (direct_args @ [clos, typ_val])
+         in
+         let fun_name =
+           global_symbol (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app")
+         in
+         let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
+         let cf =
+           Cfunction
+             { fun_name;
+               fun_args;
+               fun_body =
+                 make_curry_apply result narity
+                   (arg_type :: accumulated_args)
+                   (List.map (fun (arg, _) -> Cvar arg) direct_args)
+                   clos (num + 1);
+               fun_codegen_options = [];
+               fun_dbg;
+               fun_poll = Default_poll;
+               fun_ret_type = result
+             }
+         in
+         [cf]
+       else [])
       @ loop (arg_type :: accumulated_args) remaining_args (num + 1)
   in
   loop [] arity 0
@@ -3981,12 +3982,13 @@ let addr_array_length arg dbg =
 
 let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
   let op = Cbswap { bitwidth } in
-  if Proc.operation_supported op
-     && not
-          ((match bitwidth with
-           | Sixtyfour -> true
-           | Sixteen | Thirtytwo -> false)
-          && size_int < 8)
+  if
+    Proc.operation_supported op
+    && not
+         ((match bitwidth with
+            | Sixtyfour -> true
+            | Sixteen | Thirtytwo -> false)
+         && size_int < 8)
   then Cop (op, [arg], dbg)
   else
     let func, tyarg =
@@ -5243,10 +5245,11 @@ module Scalar_type = struct
   end
 
   module Bit_width_and_signedness : sig
-    (** An integer with signedness [signedness t] that fits into a general-purpose
-        register. It is canonically stored in twos-complement representation, in the lower
-        [bits] bits of its container (whether that be memory or a register), and is sign-
-        or zero-extended to fill the entire container. *)
+    (** An integer with signedness [signedness t] that fits into a
+        general-purpose register. It is canonically stored in twos-complement
+        representation, in the lower [bits] bits of its container (whether that
+        be memory or a register), and is sign- or zero-extended to fill the
+        entire container. *)
     type t [@@immediate]
 
     val create_exn : bit_width:int -> signedness:Signedness.t -> t
@@ -5298,7 +5301,8 @@ module Scalar_type = struct
 
     let[@inline] unsigned t = with_signedness t ~signedness:Unsigned
 
-    (** Determines whether [dst] can represent every value of [src], preserving sign *)
+    (** Determines whether [dst] can represent every value of [src], preserving
+        sign *)
     let[@inline] can_cast_without_losing_information ~src ~dst =
       match signedness src, signedness dst with
       | Signed, Signed | Unsigned, Unsigned -> bit_width src <= bit_width dst
@@ -5333,8 +5337,9 @@ module Scalar_type = struct
     let nativeint = create_exn ~bit_width:arch_bits ~signedness:Signed
   end
 
-  (** An {!Integer.t} but with the additional stipulation that its container must
-      reserve its lowest bit to be 1. The [bit_width] field includes this bit. *)
+  (** An {!Integer.t} but with the additional stipulation that its container
+      must reserve its lowest bit to be 1. The [bit_width] field includes this
+      bit. *)
   module Tagged_integer = struct
     include Integral_type
 
@@ -5435,9 +5440,10 @@ module Scalar_type = struct
     | Float src, Float dst -> Float_width.static_cast ~dbg ~src ~dst exp
     | Integral src, Float dst ->
       let float_of_int_arg = Integral.nativeint in
-      if not
-           (Integral.can_cast_without_losing_information ~src
-              ~dst:float_of_int_arg)
+      if
+        not
+          (Integral.can_cast_without_losing_information ~src
+             ~dst:float_of_int_arg)
       then
         Misc.fatal_errorf "static_cast: casting %a to float is not implemented"
           Integral.print src

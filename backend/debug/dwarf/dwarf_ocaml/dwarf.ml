@@ -80,10 +80,11 @@ type fundecl =
   }
 
 let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
-  if not
-       (!Clflags.debug
-       && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
-          || !Dwarf_flags.dwarf_inlined_frames))
+  if
+    not
+      (!Clflags.debug
+      && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
+         || !Dwarf_flags.dwarf_inlined_frames))
   then { fun_end_label; fundecl }
   else
     let available_ranges_vars, fundecl =

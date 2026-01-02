@@ -142,9 +142,10 @@ module Ident : sig
   end
 end
 
-(** Values in LLVM IR. These are the main operands to instructions. They consist of a
-    type and something that inhabits that type (confusingly called [value] here...).
-    The latter can be an immediate, an identifier, among other things. *)
+(** Values in LLVM IR. These are the main operands to instructions. They consist
+    of a type and something that inhabits that type (confusingly called [value]
+    here...). The latter can be an immediate, an identifier, among other things.
+*)
 module Value : sig
   type contents
 

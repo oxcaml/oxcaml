@@ -124,9 +124,10 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
         Name_occurrences.union names_to_add names_already_added
       in
       let fold_code_id names_to_add code_id =
-        if not
-             (Code_id.in_compilation_unit code_id
-                (Compilation_unit.get_current_exn ()))
+        if
+          not
+            (Code_id.in_compilation_unit code_id
+               (Compilation_unit.get_current_exn ()))
         then
           (* Code in units upon which the current unit depends cannot reference
              this unit. *)
@@ -148,10 +149,11 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
             Name_occurrences.union new_names names_to_add
       in
       let fold_name names_to_add name =
-        if not
-             (Compilation_unit.equal
-                (Name.compilation_unit name)
-                (Compilation_unit.get_current_exn ()))
+        if
+          not
+            (Compilation_unit.equal
+               (Name.compilation_unit name)
+               (Compilation_unit.get_current_exn ()))
         then
           (* Names in units upon which the current unit depends cannot reference
              this unit. *)

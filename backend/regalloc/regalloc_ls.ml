@@ -56,8 +56,7 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
   in
   (* Equivalent to [update_interval_position_by_instr] in
      "backend/interval.ml". *)
-  let update_instr :
-      type a.
+  let update_instr : type a.
       int ->
       a Cfg.instruction ->
       trap_handler:bool ->
@@ -93,15 +92,15 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
       incr pos);
   Reg.Tbl.iter (fun reg (range : Range.t) -> add_range reg range) current_ranges;
   (if debug && Lazy.force verbose
-  then
-    let ls_order_mapping = State.ls_order_mapping state in
-    Cfg.iter_blocks_dfs (Cfg_with_layout.cfg cfg_with_layout)
-      ~f:(fun _label block ->
-        indent ();
-        log "(block %a)" Label.format block.start;
-        log_body_and_terminator_with_ls_order ls_order_mapping block.body
-          block.terminator liveness;
-        dedent ()));
+   then
+     let ls_order_mapping = State.ls_order_mapping state in
+     Cfg.iter_blocks_dfs (Cfg_with_layout.cfg cfg_with_layout)
+       ~f:(fun _label block ->
+         indent ();
+         log "(block %a)" Label.format block.start;
+         log_body_and_terminator_with_ls_order ls_order_mapping block.body
+           block.terminator liveness;
+         dedent ()));
   State.update_intervals state past_ranges;
   dedent ()
 
@@ -150,9 +149,10 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
       let remove_bound_overlapping (itv : Interval.t) : unit =
         match itv.reg.loc with
         | Reg r ->
-          if r - first_available < num_available_registers
-             && available.(r - first_available)
-             && Interval.overlap itv interval
+          if
+            r - first_available < num_available_registers
+            && available.(r - first_available)
+            && Interval.overlap itv interval
           then set_not_available r
         | Stack _ | Unknown -> ()
       in
@@ -201,10 +201,11 @@ let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
       assert (same_reg_class r.Interval.reg hd.Interval.reg);
       Reg.same_loc r.Interval.reg hd.Interval.reg && Interval.overlap r interval
     in
-    if hd.end_ > interval.end_
-       && not
-            (DLL.exists ~f:chk intervals.fixed_dll
-            || DLL.exists ~f:chk intervals.inactive_dll)
+    if
+      hd.end_ > interval.end_
+      && not
+           (DLL.exists ~f:chk intervals.fixed_dll
+           || DLL.exists ~f:chk intervals.inactive_dll)
     then (
       (match hd.reg.loc with Reg _ -> () | Stack _ | Unknown -> assert false);
       Reg.set_loc interval.reg hd.reg.loc;

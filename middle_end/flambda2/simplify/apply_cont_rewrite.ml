@@ -241,9 +241,10 @@ let make_rewrite rewrite ~machine_width ~ctx id args : _ Or_invalid.t =
 
 let rewrite_exn_continuation rewrite id exn_cont =
   let exn_cont_arity = Exn_continuation.arity exn_cont in
-  if not
-       (Flambda_arity.equal_ignoring_subkinds exn_cont_arity
-          (original_params_arity rewrite))
+  if
+    not
+      (Flambda_arity.equal_ignoring_subkinds exn_cont_arity
+         (original_params_arity rewrite))
   then
     Misc.fatal_errorf
       "Arity of exception continuation %a does not match@ [original_params] \
@@ -258,10 +259,11 @@ let rewrite_exn_continuation rewrite id exn_cont =
       "The usage of the exn parameter of the continuation rewrite should be \
        [Used]: %a"
       print rewrite);
-  if List.exists
-       (fun x ->
-         match x with Used_as_invariant -> true | Used | Unused -> false)
-       (rewrite.original_params_usage @ rewrite.extra_params_usage)
+  if
+    List.exists
+      (fun x ->
+        match x with Used_as_invariant -> true | Used | Unused -> false)
+      (rewrite.original_params_usage @ rewrite.extra_params_usage)
   then
     Misc.fatal_errorf
       "An exception continuation should never have invariant parameters: %a"

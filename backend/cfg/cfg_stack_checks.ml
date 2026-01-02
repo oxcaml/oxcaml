@@ -203,15 +203,16 @@ let cfg (cfg_with_layout : Cfg_with_layout.t) =
   | true ->
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     (if not Config.no_stack_checks
-    then
-      let { max_frame_size; blocks_needing_stack_checks } =
-        build_cfg_info cfg
-      in
-      if not (Label.Set.is_empty blocks_needing_stack_checks)
-      then
-        if Label.Tbl.length cfg.blocks
+     then
+       let { max_frame_size; blocks_needing_stack_checks } =
+         build_cfg_info cfg
+       in
+       if not (Label.Set.is_empty blocks_needing_stack_checks)
+       then
+         if
+           Label.Tbl.length cfg.blocks
            < !Oxcaml_flags.cfg_stack_checks_threshold
-        then
-          insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
-        else insert_instruction cfg cfg.entry_label ~max_frame_size);
+         then
+           insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
+         else insert_instruction cfg cfg.entry_label ~max_frame_size);
     cfg_with_layout

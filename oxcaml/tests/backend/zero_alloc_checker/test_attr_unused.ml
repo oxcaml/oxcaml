@@ -13,4 +13,4 @@ let h x = g x
 
 [@@@zero_alloc]
 
-let[@zero_alloc] g x = (x [@zero_alloc])
+let[@zero_alloc] g x = x [@zero_alloc]
