@@ -20,6 +20,9 @@ module type ORDERED = sig
   val to_string : t -> string
 end
 
+(** Lattice polynomial terms built from joins, meets, constants, and
+    variables. The interface supports least and greatest fixpoint solving
+    over these terms. *)
 module Make (V : ORDERED) : sig
   type node
 
