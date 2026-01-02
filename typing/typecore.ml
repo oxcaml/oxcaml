@@ -992,7 +992,7 @@ let mkexp exp_desc exp_type exp_loc exp_env =
 let type_option_none env ty loc =
   let lid = Longident.Lident "None" in
   let cnone = Env.find_ident_constructor Predef.ident_none env in
-  mkexp (Texp_construct(mknoloc lid, cnone, [], None)) ty loc env
+  mkexp (Texp_construct (mknoloc lid, cnone, [], None)) ty loc env
 
 let extract_option_type env ty =
   match get_desc (expand_head env ty) with
@@ -2182,6 +2182,11 @@ let get_constr_type_path ty =
   | Tconstr(p, _, _) -> p
   | _ -> assert false
 
+let get_constr_type_arity ty =
+  match get_desc ty with
+  | Tconstr(_, ts, _) -> List.length ts
+  | _ -> assert false
+
 module NameChoice(Name : sig
   type t
   type usage
@@ -2199,6 +2204,7 @@ end) = struct
   open Name
 
   let get_type_path d = get_constr_type_path (get_type d)
+  let get_type_arity d = get_constr_type_arity (get_type d)
 
   let lookup_from_type env type_path usage lid =
     let descrs = lookup_all_from_type lid.loc usage type_path env in
@@ -2278,17 +2284,19 @@ end) = struct
         (Warnings.Name_out_of_scope (path_s, Name (Longident.last lid.txt)))
     end
 
+  let check_disambiguated_name lbl scope =
+    match scope with
+    | Ok ((lab1,_) :: _) when lab1 == lbl -> false
+    | _ -> true
+
   (* warn if the selected name is not the last introduced in scope
      -- in these cases the resolution is different from pre-disambiguation OCaml
      (this warning is not enabled by default, it is specifically for people
       wishing to write backward-compatible code).
    *)
-  let warn_if_disambiguated_name warn lid lbl scope =
-    match scope with
-    | Ok ((lab1,_) :: _) when lab1 == lbl -> ()
-    | _ ->
-        warn lid.loc
-          (Warnings.Disambiguated_name (get_name lbl))
+  let warn_for_disambiguated_name warn lid lbl =
+    warn lid.loc
+      (Warnings.Disambiguated_name (get_name lbl))
 
   let force_error : ('a, _) result -> 'a = function
     | Ok lbls -> lbls
@@ -2325,7 +2333,8 @@ end) = struct
         ?(filter : nonempty_candidate_filter = Result.ok)
         usage lid env
         expected_type
-        candidates_in_scope =
+        candidates_in_scope
+        : t * label_ambiguity =
     let lbl = match expected_type with
     | None ->
         (* no expected type => no disambiguation *)
@@ -2396,9 +2405,15 @@ end) = struct
         end
     in
     (* warn only on nominal labels *)
-    if in_env lbl then
-      warn_if_disambiguated_name warn lid lbl candidates_in_scope;
-    lbl
+    let ambiguity =
+      match check_disambiguated_name lbl candidates_in_scope with
+      | true ->
+        if in_env lbl then
+          warn_for_disambiguated_name warn lid lbl;
+        Ambiguous { path = get_type_path lbl; arity = get_type_arity lbl }
+      | false -> Unambiguous
+    in
+    lbl, ambiguity
 end
 
 let wrap_disambiguate msg ty f x =
@@ -2476,7 +2491,7 @@ let label_disambiguate
       : (rep candidates -> (rep candidates, rep candidates) result) option)
     (record_form : rep record_form) usage lid env expected_type
     (scope : (rep candidates, _) result)
-  : rep gen_label_description =
+  : rep gen_label_description * label_ambiguity =
   match record_form with
   | Legacy ->
     Label.disambiguate ?warn ?filter usage lid env expected_type scope
@@ -2553,6 +2568,7 @@ let disambiguate_sort_lid_a_list
             lid, process_label qual_lid, a
       ) lid_a_list lbl_list
   in
+  (* These ambiguity check warnings could probably use [ambiguity] *)
   if !w_pr then
     Location.prerr_warning loc
       (Warnings.Not_principal
@@ -2562,7 +2578,7 @@ let disambiguate_sort_lid_a_list
     match List.rev !w_amb with
       (_,types,ex)::_ as amb ->
         let paths =
-          List.map (fun (_,lbl,_) -> label_get_type_path record_form lbl)
+          List.map (fun (_,(lbl,_),_) -> label_get_type_path record_form lbl)
             lbl_a_list in
         let path = List.hd paths in
         let fst3 (x,_,_) = x in
@@ -2576,15 +2592,31 @@ let disambiguate_sort_lid_a_list
             amb
     | _ -> ()
   end;
+  (* At this point we are sure disambiguations for each label are consistent,
+     so we select an arbitrary one *)
+  let ambiguity =
+    List.find_map
+      (fun (_, (_, amb), _) ->
+        match amb with
+        | Unambiguous -> None
+        | Ambiguous _ as amb -> Some amb)
+      lbl_a_list
+    |> Option.value ~default:Unambiguous
+  and lbl_a_list =
+    List.map (fun (lid, (lbl, _), a) -> lid, lbl, a) lbl_a_list
+  in
   (if !w_scope <> [] then
     let record_form = record_form_to_string record_form in
     let warning = Warnings.Fields { record_form; fields = List.rev !w_scope} in
     Location.prerr_warning loc
       (Warnings.Name_out_of_scope (!w_scope_ty, warning)));
   (* Invariant: records are sorted in the typed tree *)
-  List.sort
-    (fun (_,lbl1,_) (_,lbl2,_) -> compare lbl1.lbl_pos lbl2.lbl_pos)
-    lbl_a_list
+  let lbl_a_list =
+    List.sort
+      (fun (_,lbl1,_) (_,lbl2,_) -> compare lbl1.lbl_pos lbl2.lbl_pos)
+      lbl_a_list
+  in
+  lbl_a_list, ambiguity
 
 let map_fold_cont f xs k =
   List.fold_right (fun x k ys -> f x (fun y -> k (y :: ys)))
@@ -2981,7 +3013,7 @@ and type_pat_aux
           (Jkind.Sort.of_const label.lbl_sort))
       in
       let make_record_pat
-            (lbl_pat_list : (_ * rep gen_label_description * _) list) =
+            (lbl_pat_list : (_ * rep gen_label_description * _) list) amb =
         check_recordpat_labels loc lbl_pat_list closed record_form;
         List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
         let pat_desc = match record_form with
@@ -2990,14 +3022,16 @@ and type_pat_aux
             Tpat_record_unboxed_product (lbl_pat_list, closed)
         in
         {
-          pat_desc; pat_loc = loc; pat_extra=[];
+          pat_desc;
+          pat_loc = loc;
+          pat_extra = [Tpat_inspected_type (Label_disambiguation amb), loc, []];
           pat_type = instance record_ty;
           pat_attributes = sp.ppat_attributes;
           pat_env = !!penv;
           pat_unique_barrier = Unique_barrier.not_computed ();
         }
       in
-      let lbl_a_list =
+      let lbl_a_list, ambiguity =
         wrap_disambiguate
           ("This " ^ (record_form_to_string record_form) ^
            " pattern is expected to have")
@@ -3007,7 +3041,7 @@ and type_pat_aux
           lid_sp_list
       in
       let lbl_a_list = List.map type_label_pat lbl_a_list in
-      rvp @@ solve_expected (make_record_pat lbl_a_list)
+      rvp @@ solve_expected (make_record_pat lbl_a_list ambiguity)
   in
   match sp.ppat_desc with
     Ppat_any ->
@@ -3141,7 +3175,7 @@ and type_pat_aux
             let error = Wrong_expected_kind(srt, Pattern, expected_ty) in
             raise (Error (loc, !!penv, error))
       in
-      let constr, locks =
+      let (constr, locks), ambiguity =
         let candidates =
           Env.lookup_all_constructors Env.Pattern ~loc:lid.loc lid.txt !!penv in
         wrap_disambiguate "This variant pattern is expected to have"
@@ -3245,8 +3279,10 @@ and type_pat_aux
                (Jkind.Sort.of_const arg.ca_sort))
           sargs args
       in
-      rvp { pat_desc=Tpat_construct(lid, constr, args, existential_ctyp);
-            pat_loc = loc; pat_extra=[];
+      rvp { pat_desc = Tpat_construct (lid, constr, args, existential_ctyp);
+            pat_loc = loc;
+            pat_extra = [
+              Tpat_inspected_type (Label_disambiguation ambiguity), loc, []];
             pat_type = instance expected_ty;
             pat_attributes = sp.ppat_attributes;
             pat_env = !!penv;
@@ -5833,7 +5869,7 @@ and type_expect_
             ty, opt_exp_opath
       in
       let closed = (opt_sexp = None && overwrite = No_overwrite) in
-      let lbl_a_list =
+      let lbl_a_list, ambiguity =
         wrap_disambiguate
           ("This " ^ (record_form_to_string record_form)
             ^ " expression is expected to have")
@@ -6030,7 +6066,7 @@ and type_expect_
           Texp_record {
             fields; representation;
             extended_expression = opt_exp;
-            alloc_mode;
+            alloc_mode
           }
         | Unboxed_product ->
           let opt_exp = match opt_exp with
@@ -6039,11 +6075,13 @@ and type_expect_
           in
           Texp_record_unboxed_product {
             fields; representation;
-            extended_expression = opt_exp;
+            extended_expression = opt_exp
           }
       in
       re {
-        exp_desc; exp_loc = loc; exp_extra = [];
+        exp_desc; exp_loc = loc;
+        exp_extra = [
+          Texp_inspected_type (Label_disambiguation ambiguity), loc, []];
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
@@ -6498,7 +6536,7 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
-      let (record, record_sort, rmode, label, _) =
+      let (record, record_sort, rmode, label, _, ambiguity) =
         type_label_access Legacy env srecord Env.Projection lid
       in
       let ty_arg =
@@ -6551,6 +6589,11 @@ and type_expect_
           let uu = unique_use ~loc ~env mode (as_single_mode expected_mode) in
           Non_boxing uu
       in
+      let record =
+        { record with exp_extra =
+          (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
+            :: record.exp_extra }
+      in
       rue {
         exp_desc =
           Texp_field(record, record_sort, lid, label, boxing,
@@ -6561,7 +6604,7 @@ and type_expect_
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      let (record, record_sort, rmode, label, _) =
+      let (record, record_sort, rmode, label, _, ambiguity) =
         type_label_access Unboxed_product env srecord Env.Projection lid
       in
       let ty_arg =
@@ -6587,6 +6630,11 @@ and type_expect_
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
       let uu = unique_use ~loc ~env mode (as_single_mode expected_mode) in
+      let record =
+        { record with exp_extra =
+          (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
+            :: record.exp_extra }
+      in
       rue {
         exp_desc = Texp_unboxed_field(record, record_sort, lid, label, uu);
         exp_loc = loc; exp_extra = [];
@@ -6594,7 +6642,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-      let (record, _, rmode, label, expected_type) =
+      let (record, _, rmode, label, expected_type, ambiguity) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
@@ -6617,9 +6665,14 @@ and type_expect_
         | Immutable ->
           raise(Error(loc, env, Label_not_mutable lid.txt))
       in
+      let record =
+        { record with exp_extra =
+          (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
+            :: record.exp_extra }
+      in
       unify_exp env record ty_record;
       rue {
-        exp_desc = Texp_setfield(record,
+        exp_desc = Texp_setfield (record,
           Locality.disallow_right (regional_to_local
             (Value.proj_comonadic Areality rmode)),
           label_loc, label, newval);
@@ -7412,7 +7465,7 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let (record, record_sort, rmode, label, _) =
+          let (record, record_sort, rmode, label, _, _ambiguity) =
             type_label_access Legacy env srecord Env.Mutation lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
@@ -7662,7 +7715,7 @@ and type_block_access env expected_base_ty principal
       Env.lookup_all_labels ~record_form:Legacy ~loc:lid.loc Projection
         lid.txt env
     in
-    let label =
+    let label, _ambiguity =
       wrap_disambiguate "This block index is expected to have base"
         (mk_expected expected_base_ty)
         (label_disambiguate Legacy Projection lid env expected_record_type)
@@ -7760,7 +7813,7 @@ and type_unboxed_access env loc el_ty ua =
       Env.lookup_all_labels ~record_form:Unboxed_product ~loc:lid.loc
         Projection lid.txt env
     in
-    let label =
+    let label, _ambiguity =
       wrap_disambiguate "This unboxed access is expected to have base"
         (mk_expected el_ty)
         (label_disambiguate Unboxed_product Projection lid env
@@ -8380,7 +8433,7 @@ and type_function
 
 and type_label_access
   : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * 'rep gen_label_description * _
+    _ * _ * _ * 'rep gen_label_description * _ * _
   = fun record_form env srecord usage lid ->
   let mode = Value.newvar () in
   let record_jkind, record_sort =
@@ -8408,10 +8461,11 @@ and type_label_access
   in
   let labels =
     Env.lookup_all_labels ~record_form ~loc:lid.loc usage lid.txt env in
-  let label =
+  let label, ambiguity =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
-  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type)
+  (record, record_sort, Mode.Value.disallow_right mode,
+   label, expected_type, ambiguity)
 
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.
@@ -9312,7 +9366,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   let constrs =
     Env.lookup_all_constructors ~loc:lid.loc Env.Positive lid.txt env
   in
-  let constr, locks =
+  let (constr, locks), ambiguity =
     wrap_disambiguate "This variant expression is expected to have"
       ty_expected_explained
       (Constructor.disambiguate Env.Positive lid env expected_type) constrs
@@ -9346,7 +9400,9 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
           let texp =
             re {
             exp_desc = Texp_construct(lid, constr, [], None);
-            exp_loc = loc; exp_extra = [];
+            exp_loc = loc;
+            exp_extra = [
+              Texp_inspected_type (Label_disambiguation ambiguity), loc, []];
             exp_type = ty_res;
             exp_attributes = attrs;
             exp_env = env } in

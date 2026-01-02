@@ -1896,7 +1896,7 @@ module Ast = struct
          pp fmt "@]");
       pp fmt "@]"
     | Setfield (obj, field, exp) ->
-      pp fmt "%a#%a <- %a"
+      pp fmt "%a.%a <- %a"
         (print_exp_with_parens env)
         obj (print_field env) field (print_exp env) exp
     | Letmodule (None, module_exp, exp) ->
@@ -1918,9 +1918,10 @@ module Ast = struct
     | Unboxed_tuple ts ->
       pp fmt "#";
       print_tuple (print_exp env) fmt ts
-    | Unboxed_record_product (ts, exp_opt) -> print_record env fmt (ts, exp_opt)
+    | Unboxed_record_product (ts, exp_opt) ->
+      pp fmt "#%a" (print_record env) (ts, exp_opt)
     | Unboxed_field (exp, rec_field) ->
-      pp fmt "#%a.%a" (print_exp env) exp (print_field env) rec_field
+      pp fmt "%a.#%a" (print_exp env) exp (print_field env) rec_field
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
     | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
     | List_comprehension _ | Array_comprehension _ ->
