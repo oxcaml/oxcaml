@@ -45,8 +45,8 @@ let command_line_options = [
 (* Addressing modes *)
 
 type addressing_mode =
-  | Iindexed of int                     (* reg + displ *)
-  | Ibased of string * int              (* global var + displ *)
+  | Iindexed of int                          (* reg + displ *)
+  | Ibased of Asm_targets.Asm_symbol.t * int (* symbol + displ *)
 
 (* We do not support the reg + shifted reg addressing mode, because
    what we really need is reg + shifted reg + displ,
@@ -137,9 +137,9 @@ let print_addressing printreg addr ppf arg =
       printreg ppf arg.(0);
       if n <> 0 then fprintf ppf " + %i" n
   | Ibased(s, 0) ->
-      fprintf ppf "\"%s\"" s
+      fprintf ppf "\"%s\"" (Asm_targets.Asm_symbol.encode s)
   | Ibased(s, n) ->
-      fprintf ppf "\"%s\" + %i" s n
+      fprintf ppf "\"%s\" + %i" (Asm_targets.Asm_symbol.encode s) n
 
 let int_of_bswap_bitwidth = function
   | Sixteen -> 16
@@ -246,8 +246,8 @@ let equal_addressing_mode left right =
   match left, right with
   | Iindexed left_int, Iindexed right_int ->
     Int.equal left_int right_int
-  | Ibased (left_string, left_int), Ibased (right_string, right_int) ->
-    String.equal left_string right_string
+  | Ibased (left_sym, left_int), Ibased (right_sym, right_int) ->
+    Asm_targets.Asm_symbol.equal left_sym right_sym
     && Int.equal left_int right_int
   | (Iindexed _ | Ibased _), _ -> false
 
@@ -287,10 +287,6 @@ let equal_specific_operation left right =
 
 let isomorphic_specific_operation op1 op2 =
   equal_specific_operation op1 op2
-
-(* Recognition of logical immediate arguments *)
-
-let is_logical_immediate = Arm64_ast.Logical_immediates.is_logical_immediate
 
 (* Specific operations that are pure *)
 
@@ -341,7 +337,7 @@ let equal_addressing_mode_without_displ (addressing_mode_1: addressing_mode)
       (addressing_mode_2 : addressing_mode) =
   match addressing_mode_1, addressing_mode_2 with
   | Iindexed _, Iindexed _ -> true
-  | Ibased (var1, _), Ibased (var2, _) -> String.equal var1 var2
+  | Ibased (sym1, _), Ibased (sym2, _) -> Asm_targets.Asm_symbol.equal sym1 sym2
   | (Iindexed _ | Ibased _), _ -> false
 
 let addressing_offset_in_bytes (_addressing_mode_1: addressing_mode)
