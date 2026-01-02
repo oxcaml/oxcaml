@@ -1874,7 +1874,7 @@ module Const = struct
           mk_jkind
             (Base
                ( Scannable,
-                 { nullability = Maybe_null; separability = Non_pointer } ))
+                 { nullability = Maybe_null; separability = Non_pointer64 } ))
             ~crossing:cross_all_except_staticity
             ~externality:Externality.External64;
         name = "immediate64_or_null"
