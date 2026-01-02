@@ -96,8 +96,9 @@ let mk_float_cond ~lt ~eq ~gt ~uo =
   | true, false, false, true -> Must_be_last
 
 let cross_section cfg_with_layout src dst =
-  if !Oxcaml_flags.basic_block_sections
-     && not (Label.equal dst Linear_utils.labelled_insn_end.label)
+  if
+    !Oxcaml_flags.basic_block_sections
+    && not (Label.equal dst Linear_utils.labelled_insn_end.label)
   then
     let src_section = CL.get_section cfg_with_layout src in
     let dst_section = CL.get_section cfg_with_layout dst in
@@ -123,8 +124,9 @@ let linearize_terminator cfg_with_layout (func : string) start
   (* If one of the successors is a fallthrough label, do not emit a jump for it.
      Otherwise, the last jump is unconditional. *)
   let branch_or_fallthrough d lbl =
-    if (not (Label.equal next.label lbl))
-       || cross_section cfg_with_layout start lbl
+    if
+      (not (Label.equal next.label lbl))
+      || cross_section cfg_with_layout start lbl
     then d @ [L.Lbranch lbl]
     else d
   in
@@ -297,8 +299,9 @@ let linearize_terminator cfg_with_layout (func : string) start
         then
           (* generates one cmp instruction for all conditional jumps here *)
           let find l =
-            if (not (cross_section cfg_with_layout start l))
-               && Label.equal next.label l
+            if
+              (not (cross_section cfg_with_layout start l))
+              && Label.equal next.label l
             then None
             else Some l
           in
@@ -392,8 +395,8 @@ let make_Llabel cfg_with_layout label =
     { label;
       section_name =
         (if !Oxcaml_flags.basic_block_sections
-        then CL.get_section cfg_with_layout label
-        else None)
+         then CL.get_section cfg_with_layout label
+         else None)
     }
 
 (* CR-someday gyorsh: handle duplicate labels in new layout: print the same

@@ -35,12 +35,12 @@
 
     Each PLT entry is 8 bytes:
 
-    - ff 25 XX XX XX XX  : jmp [rip + displacement] (6 bytes)
+    - ff 25 XX XX XX XX : jmp [rip + displacement] (6 bytes)
 
-    - 90 90              : 2-byte nop padding (two single-byte nops)
+    - 90 90 : 2-byte nop padding (two single-byte nops)
 
-    The 4-byte displacement at offset +2 is filled by a PC32 relocation
-    pointing to the corresponding IGOT entry. *)
+    The 4-byte displacement at offset +2 is filled by a PC32 relocation pointing
+    to the corresponding IGOT entry. *)
 
 (** Size of each IPLT entry in bytes. *)
 val entry_size : int
@@ -71,8 +71,8 @@ type t
 (** [build ~prefix ~igot symbols] builds an intermediate PLT from a list of
     symbols that need PLT entries.
 
-    Each PLT entry requires a corresponding IGOT entry, which must exist in
-    the provided [igot].
+    Each PLT entry requires a corresponding IGOT entry, which must exist in the
+    provided [igot].
 
     @param prefix A unique prefix for this partition (e.g., "0", "1")
     @param igot The intermediate GOT (must contain entries for all symbols)
@@ -111,6 +111,6 @@ module Relocation : sig
   val addend : t -> int64
 end
 
-(** [relocations t] returns the list of R_X86_64_PC32 relocations needed to
-    fill the IPLT entries with displacements to their IGOT entries. *)
+(** [relocations t] returns the list of R_X86_64_PC32 relocations needed to fill
+    the IPLT entries with displacements to their IGOT entries. *)
 val relocations : t -> Relocation.t list

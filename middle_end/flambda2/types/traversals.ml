@@ -847,10 +847,11 @@ struct
               let acc_ref = ref acc in
               let coercion =
                 Coercion.map_depth_variables coercion ~f:(fun variable ->
-                    if not
-                         (Compilation_unit.equal
-                            (Variable.compilation_unit variable)
-                            (Compilation_unit.get_current_exn ()))
+                    if
+                      not
+                        (Compilation_unit.equal
+                           (Variable.compilation_unit variable)
+                           (Compilation_unit.get_current_exn ()))
                     then variable
                     else
                       let canonical_var, acc =
@@ -874,10 +875,11 @@ struct
                precise type that we would have for these variables in the
                current compilation unit, but this should be rare at top level
                (which is where this API is intended to be used). *)
-            if not
-                 (Compilation_unit.equal
-                    (Name.compilation_unit name)
-                    (Compilation_unit.get_current_exn ()))
+            if
+              not
+                (Compilation_unit.equal
+                   (Name.compilation_unit name)
+                   (Compilation_unit.get_current_exn ()))
             then canonical, acc
             else
               let canonical_name, acc =
@@ -1292,8 +1294,9 @@ struct
               Name.pattern_match name_after_rewrite
                 ~symbol:(fun _ -> base_env)
                 ~var:(fun var_after_rewrite ->
-                  if TE.mem ~min_name_mode:Name_mode.in_types base_env
-                       (Name.var var_after_rewrite)
+                  if
+                    TE.mem ~min_name_mode:Name_mode.in_types base_env
+                      (Name.var var_after_rewrite)
                   then base_env
                   else
                     let bound_name =

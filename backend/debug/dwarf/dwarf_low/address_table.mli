@@ -12,7 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Management of the .debug_addr table (DWARF-5 spec section 7.2.7, page 241). *)
+(** Management of the .debug_addr table (DWARF-5 spec section 7.2.7, page 241).
+*)
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 

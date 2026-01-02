@@ -26,7 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Translate a dynamically allocated [Set_of_closures.t] into a JSIR [Closure]. *)
+(** Translate a dynamically allocated [Set_of_closures.t] into a JSIR [Closure].
+*)
 val dynamic_set_of_closures :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
@@ -34,7 +35,8 @@ val dynamic_set_of_closures :
   Set_of_closures.t ->
   To_jsir_env.t * To_jsir_result.t
 
-(** Translate a statically allocated [Set_of_closures.t] into a JSIR [Closure]. *)
+(** Translate a statically allocated [Set_of_closures.t] into a JSIR [Closure].
+*)
 val static_set_of_closures :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->

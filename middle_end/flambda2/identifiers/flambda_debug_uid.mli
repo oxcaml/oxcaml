@@ -12,8 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Augmented version of [Lambda.debug_uid] that can track variables forming parts
-    of unboxed products. *)
+(** Augmented version of [Lambda.debug_uid] that can track variables forming
+    parts of unboxed products. *)
 
 type t = private
   | Uid of Lambda.debug_uid

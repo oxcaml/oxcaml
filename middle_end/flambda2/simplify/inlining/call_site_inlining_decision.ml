@@ -126,9 +126,10 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   UA.cost_metrics uacc
 
 let argument_types_useful dacc apply =
-  if not
-       (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
-          ())
+  if
+    not
+      (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
+         ())
   then true
   else
     let typing_env = DE.typing_env (DA.denv dacc) in
@@ -329,8 +330,9 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
               Flambda_features.Inlining.max_rec_depth
                 (Round (DE.round (DA.denv dacc)))
             in
-            if Simplify_rec_info_expr.depth_may_exceed dacc rec_info
-                 max_rec_depth
+            if
+              Simplify_rec_info_expr.depth_may_exceed dacc rec_info
+                max_rec_depth
             then (
               fail_if_must_inline ();
               Recursion_depth_exceeded)

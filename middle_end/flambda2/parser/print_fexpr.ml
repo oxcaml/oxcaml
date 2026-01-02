@@ -80,11 +80,11 @@ let symbol ppf { txt = cunit, s; loc = _ } =
   Format.pp_print_char ppf '$';
   cunit
   |> Option.iter (fun { ident; linkage_name } ->
-         symbol_part ppf ident;
-         linkage_name
-         |> Option.iter (fun linkage_name ->
-                Format.fprintf ppf "/%a" symbol_part linkage_name);
-         Format.pp_print_char ppf '.');
+      symbol_part ppf ident;
+      linkage_name
+      |> Option.iter (fun linkage_name ->
+          Format.fprintf ppf "/%a" symbol_part linkage_name);
+      Format.pp_print_char ppf '.');
   symbol_part ppf s
 
 let ident ppf s =

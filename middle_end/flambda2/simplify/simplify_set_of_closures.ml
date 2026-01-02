@@ -253,16 +253,18 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       |> NO.diff ~without:(Bound_parameters.free_names params)
       |> NO.diff ~without:previously_free_depth_variables
     in
-    if not
-         (NO.no_variables free_names_of_code
-         && NO.no_continuations free_names_of_code)
+    if
+      not
+        (NO.no_variables free_names_of_code
+        && NO.no_continuations free_names_of_code)
     then
       Misc.fatal_errorf
         "Unexpected free name(s):@ %a@ in:@ \n\
          %a@ \n\
          Simplified version:@ fun %a %a %a %a %a ->@ \n\
-        \  %a" NO.print free_names_of_code Code_id.print code_id
-        Bound_parameters.print params Variable.print my_closure
+        \  %a"
+        NO.print free_names_of_code Code_id.print code_id Bound_parameters.print
+        params Variable.print my_closure
         (Format.pp_print_option Variable.print)
         my_region
         (Format.pp_print_option Variable.print)
@@ -594,7 +596,8 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures
     Function_slot.Lmap.fold_left_map
       (fun (result_code_ids_to_never_delete_this_set, fun_types, outer_dacc)
            function_slot
-           (old_code_id : Function_declarations.code_id_in_function_declaration) ->
+           (old_code_id : Function_declarations.code_id_in_function_declaration)
+         ->
         match old_code_id with
         | Deleted _ ->
           ( ( result_code_ids_to_never_delete_this_set,
@@ -832,7 +835,8 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
         in
         let function_decls =
           Function_slot.Lmap.map
-            (fun (func : Function_declarations.code_id_in_function_declaration) ->
+            (fun (func : Function_declarations.code_id_in_function_declaration)
+               ->
               match func with
               | Deleted _ -> func
               | Code_id { code_id; _ } ->

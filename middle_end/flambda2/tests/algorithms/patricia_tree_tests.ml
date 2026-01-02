@@ -934,8 +934,8 @@ module Types = struct
       ~is_empty:Map.is_empty
       ~mem:(fun (k, _) m -> Map.mem k m)
     |> Arbitrary.map ~f:(fun (m, (k, v)) ->
-           let v = Arbitrary.value val_arb v in
-           Map_and_binding.{ map = m; key = k; value = v })
+        let v = Arbitrary.value val_arb v in
+        Map_and_binding.{ map = m; key = k; value = v })
 
   module Key_container_types :
     Flambda2_algorithms.Container_types.S with type t = int = struct
@@ -983,7 +983,7 @@ module Types = struct
       ~print_element:(print_two_way_binding Key.print Key.print)
       ~is_empty:Perm.is_empty ~mem:(fun (v, _) p -> v != Perm.apply p v)
     |> Arbitrary.map ~f:(fun (p, (v, _)) ->
-           Perm_and_non_fixed_point.{ perm = p; value = v })
+        Perm_and_non_fixed_point.{ perm = p; value = v })
 end
 
 let () =

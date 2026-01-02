@@ -840,7 +840,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
     Primitive (L.Pccall desc, [L.lambda_unit], loc)
   | _, _ -> Primitive (prim, args, loc)
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]
 
 let transform_primitive env (prim : L.primitive) args loc =
   match prim with
@@ -849,4 +849,4 @@ let transform_primitive env (prim : L.primitive) args loc =
   | Parrayblit { src_mutability; dst_array_set_kind } ->
     arrayblit env ~src_mutability ~dst_array_set_kind args loc
   | _ -> env, transform_primitive0 env prim args loc
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]

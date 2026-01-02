@@ -49,7 +49,8 @@ let add_or_replace_equation ({ equations } : t) name ty =
     Format.eprintf
       "Warning: Overriding equation for name %a@\n\
        Old equation is@ @[%a@]@\n\
-       New equation is@ @[%a@]@." Name.print name TG.print
+       New equation is@ @[%a@]@."
+      Name.print name TG.print
       (Name.Map.find name equations)
       TG.print ty;
   TG.Env_extension.create ~equations:(Name.Map.add name ty equations)

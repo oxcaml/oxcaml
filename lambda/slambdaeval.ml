@@ -12,8 +12,8 @@ let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Punboxed_product layouts ->
     List.iter assert_layout_contains_no_splices layouts
 
-let rec assert_mixed_block_element_contains_no_splices :
-    type a. a Lambda.mixed_block_element -> unit = function
+let rec assert_mixed_block_element_contains_no_splices : type a.
+    a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->

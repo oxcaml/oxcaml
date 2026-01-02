@@ -133,10 +133,11 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
         match simplified_named with
         | Invalid -> invalid
         | Ok simplified_named ->
-          if Flambda_features.check_invariants ()
-             && not
-                  (TE.mem (DA.typing_env dacc)
-                     (Name.var (Bound_var.var bound_var)))
+          if
+            Flambda_features.check_invariants ()
+            && not
+                 (TE.mem (DA.typing_env dacc)
+                    (Name.var (Bound_var.var bound_var)))
           then
             Misc.fatal_errorf "Primitive %a = %a did not yield a result var"
               Bound_var.print bound_var P.print prim;
@@ -253,8 +254,9 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
   | Ok result -> (
     match original with
     | Set_of_closures _ ->
-      if Simplify_named_result.was_lifted_set_of_closures result
-         || Simplify_named_result.no_bindings result
+      if
+        Simplify_named_result.was_lifted_set_of_closures result
+        || Simplify_named_result.no_bindings result
       then Removed_operations.alloc
       else zero
     | Static_consts _ ->
@@ -264,43 +266,44 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
       (* [Simple]s only simplify to other [Simple]s. *)
       zero
     | Prim (original_prim, _) ->
-      if List.exists
-           (fun (binding : Expr_builder.binding_to_place) ->
-             match binding with
-             | Keep_binding
-                 { simplified_defining_expr =
-                     { named = Prim (rewritten_prim, _); _ };
-                   _
-                 } ->
-               (* Do not consider the original primitive to have been removed if
-                  there is a rewritten primitive that is equivalent modulo
-                  changes of canonical names.
+      if
+        List.exists
+          (fun (binding : Expr_builder.binding_to_place) ->
+            match binding with
+            | Keep_binding
+                { simplified_defining_expr =
+                    { named = Prim (rewritten_prim, _); _ };
+                  _
+                } ->
+              (* Do not consider the original primitive to have been removed if
+                 there is a rewritten primitive that is equivalent modulo
+                 changes of canonical names.
 
-                  Previously, we simply checked the equality of [original_prim]
-                  and [rewritten_prim], but this meant that a primitive [%prim
-                  param] that gets transformed into [%prim arg] due to inlining
-                  was counted as having been removed. *)
-               let c =
-                 Flambda_primitive.compare_primitive_application
-                   ~compare_simple:(fun original_simple rewritten_simple ->
-                     let _, original_simple =
-                       S.simplify_simple dacc original_simple ~min_name_mode
-                     in
-                     let _, rewritten_simple =
-                       S.simplify_simple dacc rewritten_simple ~min_name_mode
-                     in
-                     Simple.compare original_simple rewritten_simple)
-                   original_prim rewritten_prim
-               in
-               c = 0
-             | Keep_binding
-                 { simplified_defining_expr =
-                     { named = Simple _ | Set_of_closures _ | Rec_info _; _ };
-                   _
-                 }
-             | Delete_binding _ ->
-               false)
-           (Simplify_named_result.bindings_to_place result)
+                 Previously, we simply checked the equality of [original_prim]
+                 and [rewritten_prim], but this meant that a primitive [%prim
+                 param] that gets transformed into [%prim arg] due to inlining
+                 was counted as having been removed. *)
+              let c =
+                Flambda_primitive.compare_primitive_application
+                  ~compare_simple:(fun original_simple rewritten_simple ->
+                    let _, original_simple =
+                      S.simplify_simple dacc original_simple ~min_name_mode
+                    in
+                    let _, rewritten_simple =
+                      S.simplify_simple dacc rewritten_simple ~min_name_mode
+                    in
+                    Simple.compare original_simple rewritten_simple)
+                  original_prim rewritten_prim
+              in
+              c = 0
+            | Keep_binding
+                { simplified_defining_expr =
+                    { named = Simple _ | Set_of_closures _ | Rec_info _; _ };
+                  _
+                }
+            | Delete_binding _ ->
+              false)
+          (Simplify_named_result.bindings_to_place result)
       then zero
       else Removed_operations.prim original_prim
     | Rec_info _ -> zero)

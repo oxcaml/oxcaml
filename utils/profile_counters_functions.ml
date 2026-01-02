@@ -37,9 +37,10 @@ let count_language_extensions typing_input =
       counters := Profile.Counters.set (to_string lang_ext) 0 !counters)
     supported_lang_exts;
   let check_for_labeled_tuples label_opt_pair_list =
-    if List.exists
-         (fun (label_opt, _) -> Option.is_some label_opt)
-         label_opt_pair_list
+    if
+      List.exists
+        (fun (label_opt, _) -> Option.is_some label_opt)
+        label_opt_pair_list
     then incr Labeled_tuples
   in
   let check_array_mutability mutability =
@@ -93,14 +94,17 @@ let count_language_extensions typing_input =
             (* CR-someday mitom: type occurence of [iarray] double counted in
                [let a_iarray : int iarray = [: 1; 2; 3; 4; 5 :]] *)
             | Ttyp_constr (Pident ident, _, _) ->
-              if Ident.is_predef ident
-                 && String.equal (Ident.name ident) "iarray"
+              if
+                Ident.is_predef ident
+                && String.equal (Ident.name ident) "iarray"
               then incr Immutable_arrays
             | _ -> ());
             default_iterator.typ sub ctyp);
         pat =
-          (fun (type k) sub
-               ({ pat_desc; _ } as gen_pat : k Typedtree.general_pattern) ->
+          (fun (type k)
+            sub
+            ({ pat_desc; _ } as gen_pat : k Typedtree.general_pattern)
+          ->
             (match pat_desc with
             | Tpat_tuple label_opt_pair_list ->
               check_for_labeled_tuples label_opt_pair_list

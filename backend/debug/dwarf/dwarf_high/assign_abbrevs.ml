@@ -38,9 +38,10 @@ let run ~proto_die_root =
     let next_abbreviation_code = ref 1 in
     Proto_die.depth_first_fold proto_die_root
       ~init:(Abbreviations_table.create (), [], None, [])
-      ~f:
-        (fun (abbrev_table, dies, compilation_unit_die, location_lists_rev)
-             (action : Proto_die.fold_arg) ->
+      ~f:(fun
+          (abbrev_table, dies, compilation_unit_die, location_lists_rev)
+          (action : Proto_die.fold_arg)
+        ->
         let abbrev_table, die, compilation_unit_die, location_lists_rev =
           match action with
           | End_of_siblings ->

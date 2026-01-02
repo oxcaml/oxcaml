@@ -242,17 +242,17 @@ let prepare_code ~env ~res ~code_id code =
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body
     ~f:(fun
-         ~return_continuation:_
-         ~exn_continuation:_
-         bound_params
-         ~body:_
-         ~my_closure:_
-         ~is_my_closure_used:_
-         ~my_region:_
-         ~my_ghost_region:_
-         ~my_depth:_
-         ~free_names_of_body:_
-       ->
+        ~return_continuation:_
+        ~exn_continuation:_
+        bound_params
+        ~body:_
+        ~my_closure:_
+        ~is_my_closure_used:_
+        ~my_region:_
+        ~my_ghost_region:_
+        ~my_depth:_
+        ~free_names_of_body:_
+      ->
       let params =
         List.init (Bound_parameters.cardinal bound_params) (fun _ ->
             Jsir.Var.fresh ())
@@ -288,17 +288,17 @@ let code ~env ~res ~translate_body ~code_id code =
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body
     ~f:(fun
-         ~return_continuation
-         ~exn_continuation
-         bound_params
-         ~body
-         ~my_closure
-         ~is_my_closure_used:_
-         ~my_region:_
-         ~my_ghost_region:_
-         ~my_depth:_
-         ~free_names_of_body:_
-       ->
+        ~return_continuation
+        ~exn_continuation
+        bound_params
+        ~body
+        ~my_closure
+        ~is_my_closure_used:_
+        ~my_region:_
+        ~my_ghost_region:_
+        ~my_depth:_
+        ~free_names_of_body:_
+      ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)
       let ({ addr; params = params_jvar; closure } : To_jsir_env.code_id) =

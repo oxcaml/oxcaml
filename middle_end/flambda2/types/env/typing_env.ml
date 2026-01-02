@@ -509,9 +509,10 @@ let find_with_binding_time_and_mode t name kind =
     Binding_time.With_name_mode.scoped_name_mode binding_time_and_mode
       ~min_binding_time:t.min_binding_time
   in
-  if Name_mode.equal
-       (Binding_time.With_name_mode.name_mode binding_time_and_mode)
-       scoped_mode
+  if
+    Name_mode.equal
+      (Binding_time.With_name_mode.name_mode binding_time_and_mode)
+      scoped_mode
   then found
   else
     ( ty,
@@ -784,22 +785,22 @@ let invariant_for_new_equation (t : t) name ty =
 
 let replace_equation (t : t) name ty =
   (if Flambda_features.Debug.concrete_types_only_on_canonicals ()
-  then
-    let is_concrete =
-      match TG.get_alias_exn ty with exception Not_found -> true | _ -> false
-    in
-    if is_concrete
-    then
-      let canonical =
-        Aliases.get_canonical_ignoring_name_mode (aliases t) name
-        |> Simple.without_coercion
-      in
-      if not (Simple.equal canonical (Simple.name name))
-      then
-        Misc.fatal_errorf
-          "Trying to add equation giving concrete type on %a which is not \
-           canonical (its canonical is %a): %a"
-          Name.print name Simple.print canonical TG.print ty);
+   then
+     let is_concrete =
+       match TG.get_alias_exn ty with exception Not_found -> true | _ -> false
+     in
+     if is_concrete
+     then
+       let canonical =
+         Aliases.get_canonical_ignoring_name_mode (aliases t) name
+         |> Simple.without_coercion
+       in
+       if not (Simple.equal canonical (Simple.name name))
+       then
+         Misc.fatal_errorf
+           "Trying to add equation giving concrete type on %a which is not \
+            canonical (its canonical is %a): %a"
+           Name.print name Simple.print canonical TG.print ty);
   invariant_for_new_equation t name ty;
   let level =
     TEL.add_or_replace_equation (One_level.level t.current_level) name ty
@@ -808,9 +809,10 @@ let replace_equation (t : t) name ty =
     Name.pattern_match name
       ~var:(fun var ->
         let just_after_level =
-          if Compilation_unit.equal
-               (Variable.compilation_unit var)
-               (Compilation_unit.get_current_exn ())
+          if
+            Compilation_unit.equal
+              (Variable.compilation_unit var)
+              (Compilation_unit.get_current_exn ())
           then
             Cached_level.replace_variable_binding
               (One_level.just_after_level t.current_level)
@@ -999,13 +1001,13 @@ let get_alias_then_canonical_simple_exn t ?min_name_mode
 let aliases_of_simple t ~min_name_mode simple =
   Aliases.get_aliases (aliases t) simple
   |> Aliases.Alias_set.filter ~f:(fun alias ->
-         let name_mode =
-           Binding_time.With_name_mode.name_mode
-             (binding_time_and_mode_of_simple t alias)
-         in
-         match Name_mode.compare_partial_order name_mode min_name_mode with
-         | None -> false
-         | Some c -> c >= 0)
+      let name_mode =
+        Binding_time.With_name_mode.name_mode
+          (binding_time_and_mode_of_simple t alias)
+      in
+      match Name_mode.compare_partial_order name_mode min_name_mode with
+      | None -> false
+      | Some c -> c >= 0)
 
 let aliases_of_simple_allowable_in_types t simple =
   aliases_of_simple t ~min_name_mode:Name_mode.in_types simple
@@ -1125,8 +1127,9 @@ end = struct
     let defined_symbols_without_equations =
       Symbol.Set.fold
         (fun symbol defined_symbols_without_equations ->
-          if Name_occurrences.mem_symbol reachable_names symbol
-             && not (Name.Map.mem (Name.symbol symbol) names_to_types)
+          if
+            Name_occurrences.mem_symbol reachable_names symbol
+            && not (Name.Map.mem (Name.symbol symbol) names_to_types)
           then symbol :: defined_symbols_without_equations
           else defined_symbols_without_equations)
         env.defined_symbols []

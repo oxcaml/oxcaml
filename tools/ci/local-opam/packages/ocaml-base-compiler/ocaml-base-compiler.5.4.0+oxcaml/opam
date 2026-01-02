@@ -1,0 +1,48 @@
+opam-version: "2.0"
+synopsis: "OCaml 5.4.0 for OxCaml Bootstrapping"
+maintainer: "oxcaml-team"
+license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
+authors: "Xavier Leroy and many contributors"
+homepage: "https://ocaml.org"
+bug-reports: "https://github.com/ocaml/ocaml/issues"
+dev-repo: "git+https://github.com/ocaml/ocaml#5.4"
+depends: [
+  "ocaml" {= "5.4.0" & post}
+  "base-unix" {post}
+  "base-bigarray" {post}
+  "base-threads" {post}
+  "ocaml-options-vanilla" {post}
+]
+conflict-class: "ocaml-core-compiler"
+flags: compiler
+setenv: CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"
+x-env-path-rewrite: [
+  [CAML_LD_LIBRARY_PATH (";" {os = "win32"} ":" {os != "win32"}) "target"]
+]
+patches: ["ocaml-base-compiler.5.4.0+oxcaml.patch"]
+build: [
+  [
+    "./configure"
+    "--prefix=%{prefix}%"
+    "--docdir=%{doc}%/ocaml"
+    "-C"
+    "CC=cc" {os = "openbsd" | os = "macos"}
+    "ASPP=cc -c" {os = "openbsd" | os = "macos"}
+  ]
+  [make "-j%{jobs}%"]
+]
+install: [
+  [make "install"]
+  ["sh" "-c" "rm -rf %{prefix}%/lib/ocaml/expunge %{prefix}%/bin/*.byte"]
+]
+url {
+  src: "https://github.com/ocaml/ocaml/archive/5.4.0.tar.gz"
+  checksum: "sha256=4ab55ac30d247e20f35df20a9f7596e5eb5f92fbbd0f8e3e54838bbc3edf931e"
+}
+extra-files: [
+  ["ocaml-base-compiler.5.4.0+oxcaml.patch" "sha256=0d9e699cf91890a5baab3a3841ad383a1d7244e0183801753508a885100e2369"]
+]
+extra-source "ocaml-base-compiler.install" {
+  src: "https://raw.githubusercontent.com/ocaml/opam-source-archives/main/patches/ocaml-base-compiler/ocaml-base-compiler.install"
+  checksum: "sha256=79f2a1a5044a91350a0eb6ce12e261a72a2855c094c425cddf3860e58c486678"
+}

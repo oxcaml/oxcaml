@@ -549,14 +549,16 @@ let mk_flambda2_cse_depth f =
     Arg.Int f,
     Printf.sprintf
       " Depth threshold for eager tracking of CSE equations\n\
-      \     (default %d) (Flambda 2 only)" Flambda2.Default.cse_depth )
+      \     (default %d) (Flambda 2 only)"
+      Flambda2.Default.cse_depth )
 
 let mk_flambda2_join_depth f =
   ( "-flambda2-join-depth",
     Arg.Int f,
     Printf.sprintf
       " Depth threshold for alias expansion in join\n\
-      \     (default %d) (Flambda 2 only)" Flambda2.Default.join_depth )
+      \     (default %d) (Flambda 2 only)"
+      Flambda2.Default.join_depth )
 
 let mk_flambda2_reaper f =
   ( "-flambda2-reaper",
@@ -820,8 +822,8 @@ let mk_flambda2_inline_cost arg descr ~default f =
     Printf.sprintf
       "<float>|<round>=<float>[,...]\n\
       \     The cost of not removing %s during inlining\n\
-      \     (default %.03f, higher = more costly) (Flambda 2 only)" descr
-      default )
+      \     (default %.03f, higher = more costly) (Flambda 2 only)"
+      descr default )
 
 module Flambda2_inlining_default = Oxcaml_flags.Flambda2.Inlining.Default
 
@@ -1906,7 +1908,8 @@ module Debugging_options_impl = struct
           (Arg.Bad
              (Printf.sprintf
                 "Invalid value for -gdwarf-fission: %s\n\
-                 Valid values are: none, objcopy, dsymutil" value))
+                 Valid values are: none, objcopy, dsymutil"
+                value))
 
   let gdwarf_pedantic () = Clflags.dwarf_pedantic := true
 end

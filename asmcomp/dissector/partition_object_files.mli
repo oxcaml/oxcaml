@@ -29,8 +29,8 @@
 
 (** Partitioning object files into size-limited buckets.
 
-    This module partitions a list of files with their sizes into buckets,
-    where each bucket's total size is at most a configurable threshold. *)
+    This module partitions a list of files with their sizes into buckets, where
+    each bucket's total size is at most a configurable threshold. *)
 
 (** Errors that can occur during file partitioning. *)
 type error =

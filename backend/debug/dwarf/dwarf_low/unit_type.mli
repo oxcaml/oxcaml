@@ -12,7 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Compilation unit header unit types (DWARF-5 spec section 7.5.1, page 199). *)
+(** Compilation unit header unit types (DWARF-5 spec section 7.5.1, page 199).
+*)
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 

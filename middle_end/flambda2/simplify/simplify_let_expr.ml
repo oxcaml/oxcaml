@@ -84,7 +84,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
         | Delete_binding _ -> binding
         | Keep_binding
             ({ let_bound; simplified_defining_expr; original_defining_expr = _ }
-            as kept_binding) -> (
+             as kept_binding) -> (
           match simplified_defining_expr.named with
           | Prim (prim, _dbg) -> (
             match Bound_pattern.must_be_singleton_opt let_bound with

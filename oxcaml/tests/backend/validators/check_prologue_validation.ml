@@ -294,7 +294,9 @@ let () =
             instr.stack_offset <- acc;
             (* The actual value of the stack offset is not important for the
                validator, just that it's non-zero. *)
-            match instr.desc with Pushtrap _ -> acc + 1 | _ -> acc)
+            match instr.desc with
+            | Pushtrap _ -> acc + 1
+            | _ -> acc)
           ~init:0
       in
       cfg_with_infos)

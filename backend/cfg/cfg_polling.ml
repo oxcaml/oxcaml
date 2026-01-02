@@ -74,7 +74,9 @@ let report_error ppf = function
         ~f:(fun s (p, _) ->
           s
           +
-          match p with Poll -> 1 | Alloc | Function_call | External_call -> 0)
+          match p with
+          | Poll -> 1
+          | Alloc | Function_call | External_call -> 0)
         ~init:0 instrs
     in
     let num_user_polls = List.length instrs - num_inserted_polls in
@@ -208,7 +210,8 @@ module Polls_before_prtc_transfer = struct
       Cfg.terminator Cfg.instruction ->
       context ->
       (domain, error) result =
-   fun dom ~exn term { future_funcnames; optimistic_prologue_poll_instr_id = _ } ->
+   fun dom ~exn term
+       { future_funcnames; optimistic_prologue_poll_instr_id = _ } ->
     match term.desc with
     | Never -> assert false
     | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
@@ -217,8 +220,9 @@ module Polls_before_prtc_transfer = struct
     | Raise _ -> Ok exn
     | Tailcall_self _ | Tailcall_func (Indirect _) -> Ok Might_not_poll
     | Tailcall_func (Direct func) ->
-      if String.Set.mem func.sym_name future_funcnames
-         || function_is_assumed_to_never_poll func.sym_name
+      if
+        String.Set.mem func.sym_name future_funcnames
+        || function_is_assumed_to_never_poll func.sym_name
       then Ok Might_not_poll
       else Ok Always_polls
     | Return -> Ok Always_polls

@@ -123,9 +123,10 @@ let check_pattern_list_invariant pattern_list =
   let everything_being_defined_as_set =
     Code_id_or_symbol.Set.of_list everything_being_defined
   in
-  if List.compare_length_with everything_being_defined
-       (Code_id_or_symbol.Set.cardinal everything_being_defined_as_set)
-     <> 0
+  if
+    List.compare_length_with everything_being_defined
+      (Code_id_or_symbol.Set.cardinal everything_being_defined_as_set)
+    <> 0
   then
     Misc.fatal_errorf
       "Illegal pattern list (duplicate code IDs or symbols):@ %a"

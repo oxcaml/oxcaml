@@ -120,13 +120,14 @@ let classify env ty : classification =
       then Float
       else if Path.same p Predef.path_lazy_t
       then Lazy
-      else if Path.same p Predef.path_string
-              || Path.same p Predef.path_bytes
-              || Path.same p Predef.path_array
-              || Path.same p Predef.path_iarray
-              || Path.same p Predef.path_nativeint
-              || Path.same p Predef.path_int32
-              || Path.same p Predef.path_int64
+      else if
+        Path.same p Predef.path_string
+        || Path.same p Predef.path_bytes
+        || Path.same p Predef.path_array
+        || Path.same p Predef.path_iarray
+        || Path.same p Predef.path_nativeint
+        || Path.same p Predef.path_int32
+        || Path.same p Predef.path_int64
       then Addr
       else
         try

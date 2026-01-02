@@ -22,7 +22,7 @@ module T = struct
   let num_registers : t -> int = function GPR -> 13 | SIMD -> 16
 
   (** See "System V Application Binary Interface, AMD64 Architecture Processor
-    Supplement" (www.x86-64.org/documentation/abi.pdf) page 57, fig. 3.36. *)
+      Supplement" (www.x86-64.org/documentation/abi.pdf) page 57, fig. 3.36. *)
   let gpr_dwarf_reg_numbers = [| 0; 3; 5; 4; 1; 2; 8; 9; 12; 13; 10; 11; 6 |]
 
   let simd_dwarf_reg_numbers =

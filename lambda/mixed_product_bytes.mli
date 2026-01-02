@@ -75,13 +75,13 @@ module Wrt_path : sig
   val add : t -> t -> t
 
   (** Given an outer mixed block element, and a path into that as a list of
-    positions, count value/flat bytes to the left, at, and to the right that
-    subelement *)
+      positions, count value/flat bytes to the left, at, and to the right that
+      subelement *)
   val count : unit Lambda.mixed_block_element -> int list -> t
 
-  (** Similar to the above, except for a [mixed_block_shape] (which corresponds to
-    a boxed record, while a [unit mixed_block_element] corresponds to an unboxed
-    record (within an array or boxed record). *)
+  (** Similar to the above, except for a [mixed_block_shape] (which corresponds
+      to a boxed record, while a [unit mixed_block_element] corresponds to an
+      unboxed record (within an array or boxed record). *)
   val count_shape : Lambda.mixed_block_shape -> int -> int list -> t
 
   val all : t -> mpb
@@ -92,10 +92,10 @@ module Wrt_path : sig
     }
 
   (** Compute the offset and gap in bytes for an index to [here]. Returns [None]
-    if the index could lead to an "illegal" gap of 2^16 or greater bytes, which
-    is the case if either:
-    - An index to [here] would have an illegal gap.
-    - Conservatively, whether an index to [here] could be deepened to have an
-      illegal gap. *)
+      if the index could lead to an "illegal" gap of 2^16 or greater bytes,
+      which is the case if either:
+      - An index to [here] would have an illegal gap.
+      - Conservatively, whether an index to [here] could be deepened to have an
+        illegal gap. *)
   val offset_and_gap : t -> offset_and_gap_bytes option
 end
