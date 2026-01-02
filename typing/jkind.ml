@@ -2029,7 +2029,12 @@ let apply_modality_r modality jk =
 
 let apply_or_null_l jkind =
   match get_root_scannable_axes jkind with
-  | Some { nullability = Non_null; separability } ->
+  | Some { nullability = Non_null | Maybe_null; separability } ->
+    (* When nullability is [Maybe_null], it could be an unconstrained type
+       variable that will be constrained to [Non_null] by the type parameter
+       constraint on [or_null]. We treat it the same as [Non_null] here;
+       if it's truly a nullable type (e.g., nested or_null), that will be
+       caught by the type parameter constraint check. *)
     let jkind = set_root_nullability jkind Maybe_null in
     let jkind =
       match separability with
@@ -2038,11 +2043,6 @@ let apply_or_null_l jkind =
       | Non_float | Non_pointer64 | Non_pointer -> jkind
     in
     Ok jkind
-  | Some { nullability = Maybe_null; separability = _ } -> Error ()
-  (* this function is only called (in [Ctype.ml]) in response to seeing a
-     [Stepped_or_null] when unboxing, which only comes from [Variant_with_null]
-     which in turn requires the type argument's layout be scannable.
-     Thus, hitting this case indicates a mistake has been made. *)
   | None ->
     Misc.fatal_error "or_null applied to a type without a scannable layout"
 

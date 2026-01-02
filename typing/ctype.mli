@@ -26,8 +26,6 @@ exception Subtype  of Errortrace.Subtype.error
 
 exception Escape of type_expr Errortrace.escape
 
-exception Nested_or_null of type_expr
-
 exception Tags of label * label
 exception Cannot_expand
 exception Cannot_apply

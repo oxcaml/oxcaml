@@ -239,7 +239,6 @@ type error =
   | Not_an_object of type_expr * type_forcing_context option
   | Non_value_object of Jkind.Violation.t * type_forcing_context option
   | Non_value_let_rec of Jkind.Violation.t * type_expr
-  | Nested_or_null of type_expr
   | Undefined_method of type_expr * string * string list option
   | Undefined_self_method of string * string list
   | Virtual_class of Longident.t

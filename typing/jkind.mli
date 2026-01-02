@@ -550,8 +550,9 @@ val apply_modality_r :
 
 (** Change a jkind to be appropriate for ['a or_null] based on passed ['a].
     Adjusts nullability to be [Maybe_null], and separability to be
-    [Maybe_separable] if it is already [Separable]. If the jkind is already
-    [Maybe_null], fails. *)
+    [Maybe_separable] if it is already [Separable]. Handles [Maybe_null]
+    (e.g., unconstrained type variables) by treating it as [Non_null], since
+    the type parameter constraint on [or_null] ensures non-nullability. *)
 val apply_or_null_l : Types.jkind_l -> (Types.jkind_l, unit) result
 
 (** Change a jkind to be appropriate for an expectation of a type passed to
