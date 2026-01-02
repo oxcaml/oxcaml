@@ -46,6 +46,7 @@ module Make (V : ORDERED) : sig
 
   val meet : node -> node -> node
 
+  (** [sub_subsets a b] computes co-Heyting subtraction (a - b) for LDDs. *)
   val sub_subsets : node -> node -> node
 
   (** Solving interface. *)

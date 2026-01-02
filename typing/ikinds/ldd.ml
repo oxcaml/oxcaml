@@ -39,16 +39,16 @@ module Make (V : ORDERED) = struct
     { v : var;
       lo : node;
       hi : node;
-      (* Cached lattice value of the all-zero (lo) branch. *)
       down0 : Axis_lattice.t
+      (* Cached lattice value of the lo->lo->..->lo leaf. *)
     }
 
   and var =
       { id : int;
       mutable state : var_state;
+      mutable var_node : node
       (** [var_node] is the node representing just this var
           (⊥ ⊔ (v ⊓ ⊤)). *)
-      mutable var_node : node
     }
 
   and var_state =
@@ -440,7 +440,6 @@ module Make (V : ORDERED) = struct
             join lo' (meet hi' d')
       | Rigid _ -> node
 
-  (** [sub_subsets a b] computes co-Heyting subtraction (a - b) for LDDs. *)
   let sub_subsets (a : node) (b : node) : node =
     canonicalize ~hi:(inline_solved_vars a) ~lo:(inline_solved_vars b)
 
@@ -607,9 +606,7 @@ module Make (V : ORDERED) = struct
   let leq_with_reason (a : node) (b : node) :
       Jkind_axis.Axis.packed list =
     solve_pending ();
-    let left = inline_solved_vars a in
-    let right = inline_solved_vars b in
-    let diff = sub_subsets left right in
+    let diff = sub_subsets a b in
     let witness = round_up' diff in
     Axis_lattice.non_bot_axes witness
     |> List.map Axis_lattice.axis_number_to_axis_packed
