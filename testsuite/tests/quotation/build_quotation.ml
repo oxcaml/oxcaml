@@ -868,3 +868,11 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[int -> int list]> expr = <[fun x -> [(x : int); (x + 1 : int)]]>
 |}];;
+
+<[ (fun f -> (f 42, f "abc") : ('a. 'a -> 'a) -> (int * string)) ]>
+[%%expect {|
+- : <[('a. 'a -> 'a) -> int * string]> expr =
+<[(fun (f : 'a. 'a -> 'a) -> ((f 42), (f "abc")) : ('a__1. 'a__1 -> 'a__1) ->
+  (int) * (string))
+]>
+|}];;

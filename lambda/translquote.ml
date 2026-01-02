@@ -659,7 +659,7 @@ module Identifier : sig
 
     val lexing_position : t'
 
-    val code : t'
+    val expr : t'
 
     val unboxed_float : t'
 
@@ -855,7 +855,7 @@ end = struct
 
     let lexing_position = use "Identifier.Type" "lexing_position"
 
-    let code = use "Identifier.Type" "code"
+    let expr = use "Identifier.Type" "expr"
 
     let unboxed_float = use "Identifier.Type" "unboxed_float"
 
@@ -1196,7 +1196,91 @@ end = struct
   let apply_unit loc a1 = apply1 "Module" "apply_unit" loc (extract a1)
 end
 
-module rec Variant_type : sig
+module rec Object_type : sig
+  module Object_closed_flag : sig
+    type s
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    val wrap : t' -> t
+
+    val open_ : t'
+
+    val closed : t'
+  end
+
+  module Object_field : sig
+    type s
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    val wrap : t' -> t
+
+    val inherit_ : Location.t -> Type.t -> t'
+
+    val tag : Location.t -> Method.t -> Type.t -> t'
+  end
+
+  type s
+
+  type t' = s lazy_t
+
+  type t = s lam
+
+  val wrap : t' -> t
+
+  val of_object_fields_list :
+    Location.t -> Object_field.t list -> Object_closed_flag.t -> t'
+end = struct
+  module Object_closed_flag = struct
+    type s = lambda
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    let wrap = inject_force
+
+    let open_ = use "Object_type.Object_closed_flag" "open_"
+
+    let closed = use "Object_type.Object_closed_flag" "closed"
+  end
+
+  module Object_field = struct
+    type s = lambda
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    let wrap = inject_force
+
+    let inherit_ loc a1 =
+      apply1 "Object_type.Object_field" "inherit_" loc (extract a1)
+
+    let tag loc a1 a2 =
+      apply2 "Object_type.Object_field" "tag" loc (extract a1) (extract a2)
+  end
+
+  type s = lambda
+
+  type t' = s lazy_t
+
+  type t = s lam
+
+  let wrap = inject_force
+
+  let of_object_fields_list loc a1 a2 =
+    apply2 "Object_type" "of_object_fields_list" loc
+      (mk_list (List.map extract a1))
+      (extract a2)
+end
+
+and Variant_type : sig
   module Variant_form : sig
     type s
 
@@ -1306,6 +1390,8 @@ and Type : sig
 
   val constr : Location.t -> Identifier.Type.t -> t list -> t'
 
+  val object_ : Location.t -> Object_type.t -> t'
+
   val alias : Location.t -> t -> Var.Type_var.t -> t'
 
   val variant : Location.t -> Variant_type.t -> t'
@@ -1316,6 +1402,8 @@ and Type : sig
   val package : Location.t -> Module_type.t -> (Fragment.t * t) list -> t'
 
   val quote : Location.t -> t -> t'
+
+  val splice : Location.t -> t -> t'
 
   val call_pos : t'
 end = struct
@@ -1343,6 +1431,8 @@ end = struct
   let constr loc a1 a2 =
     apply2 "Type" "constr" loc (extract a1) (mk_list (List.map extract a2))
 
+  let object_ loc a1 = apply1 "Type" "object_" loc (extract a1)
+
   let alias loc a1 a2 = apply2 "Type" "alias" loc (extract a1) (extract a2)
 
   let variant loc a1 = apply1 "Type" "variant" loc (extract a1)
@@ -1358,6 +1448,8 @@ end = struct
          (List.map (fun (frag, ty) -> pair (extract frag, extract ty)) a2))
 
   let quote loc a1 = apply1 "Type" "quote" loc (extract a1)
+
+  let splice loc a1 = apply1 "Type" "splice" loc (extract a1)
 
   let call_pos = use "Type" "call_pos"
 end
@@ -2129,7 +2221,7 @@ let type_for_path loc = function
       | "extension_constructor" -> Identifier.Type.extension_constructor
       | "floatarray" -> Identifier.Type.floatarray
       | "lexing_position" -> Identifier.Type.lexing_position
-      | "expr" -> Identifier.Type.code
+      | "expr" -> Identifier.Type.expr
       | "unboxed_float" -> Identifier.Type.unboxed_float
       | "unboxed_nativeint" -> Identifier.Type.unboxed_nativeint
       | "unboxed_int32" -> Identifier.Type.unboxed_int32
@@ -2365,6 +2457,111 @@ let rec quote_module_path loc = function
     |> Identifier.Module.wrap
   | _ -> fatal_error "No support for Papply in quoting modules"
 
+let construct_spine ~env ~loc typ =
+  let mk ctyp_desc ctyp_type =
+    { ctyp_desc;
+      ctyp_type;
+      ctyp_env = env;
+      ctyp_loc = loc;
+      ctyp_attributes = []
+    }
+  in
+  let unwrap_univar ty =
+    match get_desc ty with
+    | Tunivar { name; jkind } ->
+      ( Option.value name ~default:("poly" ^ (ty |> get_id |> string_of_int)),
+        jkind.annotation )
+    | _ -> assert false
+  in
+  let aliasable ty =
+    match get_desc ty with Tvar _ | Tunivar _ -> false | _ -> true
+  in
+  let aliased = ref [] in
+  let with_alias ty f =
+    let aliased' = !aliased in
+    aliased := ty :: aliased';
+    let ret = f () in
+    aliased := aliased';
+    ret
+  in
+  let rec go ty =
+    if aliasable ty && List.memq ty !aliased
+    then mk (Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation)) ty
+    else
+      with_alias ty (fun () ->
+          let mk desc = mk desc ty in
+          match get_desc ty with
+          | Tvar { name = _; jkind } | Tof_kind jkind ->
+            mk (Ttyp_var (None, jkind.annotation))
+          | Tunivar _ ->
+            let name, jkind_annotation = unwrap_univar ty in
+            mk (Ttyp_var (Some name, jkind_annotation))
+          | Tarrow ((arg_label, _, _), ty, ty', _) ->
+            mk (Ttyp_arrow (arg_label, go ty, go ty'))
+          | Tpoly (ty, tyl) ->
+            if tyl <> []
+            then mk (Ttyp_poly (List.map unwrap_univar tyl, go ty))
+            else go ty
+          | Ttuple tyl ->
+            mk (Ttyp_tuple (List.map (fun (l, ty') -> l, go ty') tyl))
+          | Tunboxed_tuple tyl ->
+            mk (Ttyp_unboxed_tuple (List.map (fun (l, ty') -> l, go ty') tyl))
+          | Tconstr (p, tyl, _) ->
+            mk
+              (Ttyp_constr
+                 (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl))
+          (* objects *)
+          (* TESTME - more complex object types *)
+          | Tobject (fields, _) ->
+            let rec go_fields ty =
+              match get_desc ty with
+              | Tfield (label, _, field, fields) ->
+                OTtag (mkloc label loc, go field) :: go_fields fields
+              | Tnil | Tvar _ | Tunivar _ | Tconstr _ -> []
+              | _ -> assert false
+            in
+            mk
+              (Ttyp_object
+                 ( List.map
+                     (fun of_desc ->
+                       { of_desc; of_loc = loc; of_attributes = [] })
+                     (go_fields fields),
+                   Closed ))
+          (* polymorphic variants *)
+          (* TESTME - more complex structures *)
+          | Tvariant row_desc ->
+            let fields = row_fields row_desc in
+            mk
+              (Ttyp_variant
+                 ( List.filter_map
+                     (fun (label, field) ->
+                       let label = mkloc label loc in
+                       match row_field_repr field with
+                       | Rpresent None -> Some (Ttag (label, true, []))
+                       | Rpresent (Some ty) ->
+                         Some (Ttag (label, false, [go ty]))
+                       | Reither (cst, tyl, _matched) ->
+                         Some (Ttag (label, cst, List.map go tyl))
+                       | Rabsent -> None)
+                     fields
+                   |> List.map (fun rf_desc ->
+                          { rf_desc; rf_loc = loc; rf_attributes = [] }),
+                   Closed,
+                   None ))
+          | Tquote ty -> mk (Ttyp_quote (go ty))
+          | Tsplice ty -> mk (Ttyp_splice (go ty))
+          (* TESTME *)
+          | Tpackage _ ->
+            (* where to get a (pack_type : module_type) from? what about pack_txt? *)
+            (* move to [Translquote] and avoid constructing module_type *)
+            mk (Ttyp_var (None, None))
+          | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
+            (* fatal error in [Translquote] *)
+            assert false)
+  in
+  let ttyp = go typ in
+  ttyp
+
 let rec quote_computation_pattern p =
   let loc = p.pat_loc in
   match p.pat_desc with
@@ -2376,8 +2573,8 @@ let rec quote_computation_pattern p =
     let pat2 = quote_computation_pattern pat2 in
     Pat.or_ loc pat1 pat2 |> Pat.wrap
 
-and quote_pat_extra loc pat_lam extra =
-  let extra, _, _ = extra in
+and quote_pat_extra ~env pat_lam extra =
+  let extra, loc, _ = extra in
   match extra with
   | Tpat_constraint ty ->
     Pat.constraint_ loc pat_lam (quote_core_type ty) |> Pat.wrap
@@ -2385,7 +2582,9 @@ and quote_pat_extra loc pat_lam extra =
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
   | Tpat_open _ -> fatal_error "No support for open patterns."
   | Tpat_inspected_type Label_disambiguation -> pat_lam
-  | Tpat_inspected_type Polymorphic_parameter -> pat_lam
+  | Tpat_inspected_type (Polymorphic_parameter (Param ty)) ->
+    Pat.constraint_ loc pat_lam (construct_spine ~env ~loc ty |> quote_core_type)
+    |> Pat.wrap
 
 and quote_value_pattern p =
   let env = p.pat_env and loc = p.pat_loc in
@@ -2472,7 +2671,7 @@ and quote_value_pattern p =
       Pat.lazy_ loc pat
   in
   List.fold_right
-    (fun extra p -> quote_pat_extra loc p extra)
+    (fun extra p -> quote_pat_extra ~env p extra)
     p.pat_extra (Pat.wrap pat_quoted)
 
 and quote_core_type ty =
@@ -2511,8 +2710,36 @@ and quote_core_type ty =
   | Ttyp_constr (path, _, tys) ->
     let ident = type_for_path loc path and tys = List.map quote_core_type tys in
     Type.constr loc ident tys |> Type.wrap
-  | Ttyp_object (_, _) -> fatal_error "Still not implemented."
-  | Ttyp_class (_, _, _) -> fatal_error "Still not implemented."
+  | Ttyp_object (object_fields, closed) ->
+    let object_fields =
+      List.map
+        (fun { of_desc; of_loc = loc; of_attributes } ->
+          if of_attributes <> []
+          then
+            fatal_errorf
+              "Translquote [at %a]: attributes are not supported on fields in \
+               object types"
+              Location.print_loc_in_lowercase loc;
+          match of_desc with
+          | OTtag (name, ty) ->
+            Object_type.Object_field.tag loc
+              (Method.of_string name.loc name.txt |> Method.wrap)
+              (quote_core_type ty)
+          | OTinherit ty ->
+            Object_type.Object_field.inherit_ loc (quote_core_type ty))
+        object_fields
+    and object_closed_flag =
+      match closed with
+      | Open -> Object_type.Object_closed_flag.open_
+      | Closed -> Object_type.Object_closed_flag.closed
+    in
+    Object_type.of_object_fields_list loc
+      (List.map Object_type.Object_field.wrap object_fields)
+      (Object_type.Object_closed_flag.wrap object_closed_flag)
+    |> Object_type.wrap |> Type.object_ loc |> Type.wrap
+  | Ttyp_class (_, _, _) ->
+    fatal_errorf "Translquote [at %a]: class types are not supported"
+      Location.print_loc_in_lowercase loc
   | Ttyp_alias (ty, alias_opt, _) -> (
     let ty = quote_core_type ty in
     match alias_opt with
@@ -2523,14 +2750,20 @@ and quote_core_type ty =
   | Ttyp_variant (row_fields, closed_flag, labels) ->
     let row_fields =
       List.map
-        (fun rf ->
-          match rf.rf_desc with
+        (fun { rf_desc; rf_loc; rf_attributes } ->
+          if rf_attributes <> []
+          then
+            fatal_errorf
+              "Translquote [at %a]: attributes are not supported on fields in \
+               polymorphic variant types"
+              Location.print_loc_in_lowercase loc;
+          match rf_desc with
           | Tinherit ty ->
-            Variant_type.Row_field.inherit_ rf.rf_loc (quote_core_type ty)
+            Variant_type.Row_field.inherit_ rf_loc (quote_core_type ty)
             |> Variant_type.Row_field.wrap
           | Ttag (tag, b, tys) ->
             let variant = Variant.of_string tag.loc tag.txt |> Variant.wrap in
-            Variant_type.Row_field.tag rf.rf_loc variant b
+            Variant_type.Row_field.tag rf_loc variant b
               (List.map quote_core_type tys)
             |> Variant_type.Row_field.wrap)
         row_fields
@@ -2567,7 +2800,7 @@ and quote_core_type ty =
     in
     Type.package loc mod_type with_types |> Type.wrap
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ty) |> Type.wrap
-  | Ttyp_splice _ -> Type.var loc None |> Type.wrap
+  | Ttyp_splice ty -> Type.splice loc (quote_core_type ty) |> Type.wrap
   | Ttyp_open _ -> fatal_error "Still not implemented."
   | Ttyp_of_kind _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> Type.wrap Type.call_pos
@@ -2789,7 +3022,7 @@ and quote_comprehension transl stage loc { comp_body; comp_clauses } =
     (fun body clause -> add_clause body clause)
     (Comprehension.wrap body) comp_clauses
 
-and quote_expression_extra _ _ extra lambda =
+and quote_expression_extra ~env _ _ extra lambda =
   let extra, loc, _ = extra in
   match extra with
   | Texp_newtype _ -> lambda
@@ -2812,7 +3045,52 @@ and quote_expression_extra _ _ extra lambda =
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> lambda (* FIXME: add modes to quotation representation *)
   | Texp_inspected_type Label_disambiguation -> lambda
-  | Texp_inspected_type Polymorphic_parameter -> lambda
+  | Texp_inspected_type (Polymorphic_parameter poly_param) ->
+    (* unused dummy for [core_type.ctyp_type] *)
+    let newvar () = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
+    (* wildcard annotation *)
+    let newcorevar () =
+      { ctyp_desc = Ttyp_var (None, None);
+        ctyp_type = newvar ();
+        ctyp_env = env;
+        ctyp_loc = loc;
+        ctyp_attributes = []
+      }
+    in
+    let cty =
+      match poly_param with
+      | Method (met, ty) ->
+        let met_cty = construct_spine ~env ~loc ty in
+        let met_field =
+          { of_desc = OTtag (met, met_cty); of_loc = loc; of_attributes = [] }
+        in
+        { ctyp_desc = Ttyp_object ([met_field], Open);
+          ctyp_type = newvar ();
+          ctyp_env = env;
+          ctyp_loc = loc;
+          ctyp_attributes = []
+        }
+      | Arrow params ->
+        List.fold_right
+          (fun (arg_lbl, sch) spine ->
+            { ctyp_desc =
+                Ttyp_arrow
+                  ( arg_lbl,
+                    (match sch with
+                    | Some sch -> construct_spine ~env ~loc sch
+                    | None -> newcorevar ()),
+                    spine );
+              ctyp_type = newvar ();
+              ctyp_env = env;
+              ctyp_loc = loc;
+              ctyp_attributes = []
+            })
+          params (newcorevar ())
+    in
+    Exp_desc.constraint_ loc (mk_exp_noattr loc lambda)
+      (Type_constraint.constraint_ loc (quote_core_type cty)
+      |> Type_constraint.wrap)
+    |> Exp_desc.wrap
 
 and update_env_with_extra extra =
   let extra, _, _ = extra in
@@ -2822,7 +3100,7 @@ and update_env_with_extra extra =
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> ()
   | Texp_inspected_type Label_disambiguation -> ()
-  | Texp_inspected_type Polymorphic_parameter -> ()
+  | Texp_inspected_type (Polymorphic_parameter _) -> ()
 
 and update_env_without_extra extra =
   let extra, _, _ = extra in
@@ -2832,7 +3110,7 @@ and update_env_without_extra extra =
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> ()
   | Texp_inspected_type Label_disambiguation -> ()
-  | Texp_inspected_type Polymorphic_parameter -> ()
+  | Texp_inspected_type (Polymorphic_parameter _) -> ()
 
 and quote_expression_desc transl stage e =
   let env = e.exp_env in
@@ -3153,7 +3431,7 @@ and quote_expression_desc transl stage e =
   in
   List.iter update_env_without_extra e.exp_extra;
   List.fold_right
-    (quote_expression_extra transl stage)
+    (quote_expression_extra ~env transl stage)
     e.exp_extra (Exp_desc.wrap body)
 
 and quote_expression transl stage e =
