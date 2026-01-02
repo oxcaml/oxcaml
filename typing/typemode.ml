@@ -270,6 +270,12 @@ let transl_mod_bounds annots =
          separability is adopted. There is no warning raised currently for dupes
          because the warnings would be reported 3 times. If this is fixed before
          the syntax is deprecated, dupes really should raise warnings! *)
+      | "non_pointer" ->
+        Transled_modifiers.set_separability bounds_so_far
+          (Some { txt = Non_pointer; loc })
+      | "non_pointer64" ->
+        Transled_modifiers.set_separability bounds_so_far
+          (Some { txt = Non_pointer64; loc })
       | "non_float" ->
         Transled_modifiers.set_separability bounds_so_far
           (Some { txt = Non_float; loc })
