@@ -1693,3 +1693,6 @@ let undo_compress (changes, _old) =
 
 let functor_param_mode = Mode.Alloc.legacy
 let functor_res_mode = Mode.Alloc.legacy
+
+let ignore_md_modalities md =
+  {md with md_modalities = Mode.Modality.(Const.id |> of_const)}

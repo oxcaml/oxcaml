@@ -3859,7 +3859,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
-        mode, Mode.Modality.id
+        mode, Mode.Modality.undefined
     | Sig_value (md_mode, sig_modalities) ->
         let modalities =
           match valdecl.pval_modalities with

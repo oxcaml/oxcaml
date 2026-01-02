@@ -1702,7 +1702,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                to be [max] for conservative soundness. [new_env] is only used
                for printing in debugger. *)
             let vd = Env.find_value (Path.Pident id) old_env in
-            let vd = {vd with val_modalities = Mode.Modality.id} in
+            let vd = {vd with val_modalities = Mode.Modality.undefined} in
             let mode = Mode.Value.max |> Mode.Value.disallow_right in
             (vd, mode)
           in
