@@ -45,7 +45,7 @@ end
 
 module Default_jit = struct
   let jit_load ~phrase_name fmt prog : _ Result.t =
-    match Jit.jit_load ~phrase_name fmt prog with
+    match Jit.jit_load_program ~phrase_name fmt prog with
     | Result obj -> Ok obj
     | Exception exn -> Error exn
 
