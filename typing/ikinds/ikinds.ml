@@ -28,12 +28,6 @@ module Ldd = Ikind.Ldd
       describes the contribution coming from the i-th type argument. *)
 module Solver = struct
 
-  module Ldd = Ikind.Ldd
-
-  type poly = Ldd.node
-
-  type kind = Ldd.node
-
   type mode =
     | Normal
     | Round_up
@@ -47,20 +41,14 @@ module Solver = struct
   let constr_to_string (path : Path.t) : string =
     Format.asprintf "%a" Path.print path
 
-  (* Path does not expose a dedicated hash table module. *)
-  module ConstrTbl = Hashtbl.Make (struct
-    type t = Path.t
-
-    let equal a b = Path.same a b
-
-    let hash x = Path.hash x
-  end)
+  (* Hash table for caching constructor kinds. *)
+  module ConstrTbl = Path.Tbl
 
   (** Kind function for constructors: computes a kind from a context.
       This is used because many kinds don't make sense outside of a 
       context, e.g., the kind of a type containing a constructor 
       depends on the context telling us what its kind is. *)
-  type ckind = ctx -> kind
+  type ckind = ctx -> Ldd.node
 
   (** Result of constructor lookup.
       [Ty] describes a constructor declaration with arguments and a kind
@@ -71,7 +59,7 @@ module Solver = struct
           kind : ckind;
           abstract : bool
         }
-    | Poly of poly * poly array
+    | Poly of Ldd.node * Ldd.node array
 
   (* The environment supplies constructor lookup so callers can use
      alternative environments (e.g., identity environments when inlining
@@ -81,8 +69,8 @@ module Solver = struct
   and ctx =
     { env : env;
       mode : mode;
-      ty_to_kind : kind TyTbl.t;
-      constr_to_coeffs : (poly * poly array) ConstrTbl.t
+      ty_to_kind : Ldd.node TyTbl.t;
+      constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
 
   (** Start a new solver context. *)
@@ -95,13 +83,13 @@ module Solver = struct
 
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
 
-  let rigid_name (ctx : ctx) (name : Ldd.Name.t) : kind =
+  let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
     match ctx.mode with
     | Normal -> Ldd.node_of_var (Ldd.rigid name)
     | Round_up -> Ldd.const Axis_lattice.top
 
   (** A rigid variable corresponding to a type parameter [t]. *)
-  let rigid (ctx : ctx) (ty : Types.type_expr) : kind =
+  let rigid (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     let param_id = Types.get_id ty in
     rigid_name ctx (Ldd.Name.param param_id)
 
@@ -113,7 +101,8 @@ module Solver = struct
     | _ -> false
 
   (** Fetch or compute the polynomial for constructor [c]. *)
-  let rec constr_kind (ctx : ctx) (path : Path.t) : poly * poly array =
+  let rec constr_kind (ctx : ctx) (path : Path.t)
+      : Ldd.node * Ldd.node array =
     (* Return placeholder nodes stored in [constr_to_coeffs] for recursion. *)
     match ConstrTbl.find_opt ctx.constr_to_coeffs path with
     | Some base_and_coeffs -> base_and_coeffs
@@ -133,7 +122,7 @@ module Solver = struct
         (* Replace rigid atoms that refer to other constructors with the
            corresponding cached placeholders.  Atoms that refer back to
            [c] are kept rigid to avoid infinite expansion. *)
-        let instantiate (name : Ldd.Name.t) : kind =
+        let instantiate (name : Ldd.Name.t) : Ldd.node =
           match name with
           | Ldd.Name.Param _ | Ldd.Name.Unknown _ -> rigid_name ctx name
           | Ldd.Name.Atom { constr = other_path; arg_index } ->
@@ -214,7 +203,8 @@ module Solver = struct
         base_poly, coeffs_poly)
 
   (* Apply a constructor polynomial to argument kinds. *)
-  let constr (ctx : ctx) (path : Path.t) (arg_kinds : kind list) : kind =
+  let constr (ctx : ctx) (path : Path.t) (arg_kinds : Ldd.node list)
+      : Ldd.node =
     let base, coeffs = constr_kind ctx path in
     let rec loop acc remaining i =
       if i = Array.length coeffs
@@ -229,8 +219,8 @@ module Solver = struct
 
   (* Converting surface jkinds to solver ckinds. *)
   let ckind_of_jkind_with_kind
-      (kind_fn : ctx -> Types.type_expr -> kind) (ctx : ctx)
-      (jkind : ('l * 'r) Types.jkind) : kind =
+      (kind_fn : ctx -> Types.type_expr -> Ldd.node) (ctx : ctx)
+      (jkind : ('l * 'r) Types.jkind) : Ldd.node =
     (* Base is the modality bounds stored on this jkind. *)
     let base =
       Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
@@ -252,7 +242,7 @@ module Solver = struct
   let kind_of_counter = ref 0
 
   (** Compute the kind for [t]. *)
-  let rec kind (ctx : ctx) (ty : Types.type_expr) : kind =
+  let rec kind (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     (* Memoize only potentially cyclic types; LFPs handle recursion. *)
     match TyTbl.find_opt ctx.ty_to_kind ty with
     | Some kind_poly -> kind_poly
@@ -273,7 +263,7 @@ module Solver = struct
   (* Compute the ikind polynomial for an arbitrary [type_expr].  This is the
      semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD
      form. *)
-  and kind_of (ctx : ctx) (ty : Types.type_expr) : kind =
+  and kind_of (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     incr kind_of_depth;
     if !kind_of_depth > 500 then failwith "kind_of_depth too deep" else ();
     incr kind_of_counter;
@@ -361,35 +351,37 @@ module Solver = struct
     decr kind_of_depth;
     kind_poly
 
-  let ckind_of_jkind (ctx : ctx) (jkind : ('l * 'r) Types.jkind) : kind =
+  let ckind_of_jkind (ctx : ctx) (jkind : ('l * 'r) Types.jkind)
+      : Ldd.node =
     ckind_of_jkind_with_kind kind ctx jkind
 
-  let ckind_of_jkind_l (ctx : ctx) (j : Types.jkind_l) : kind =
+  let ckind_of_jkind_l (ctx : ctx) (j : Types.jkind_l) : Ldd.node =
     ckind_of_jkind ctx j
 
-  let ckind_of_jkind_r (jkind : Types.jkind_r) : kind =
+  let ckind_of_jkind_r (jkind : Types.jkind_r) : Ldd.node =
     (* For r-jkinds used in sub checks, with-bounds are not present
        on the right (see Jkind_desc.sub's precondition). So only the
        base mod-bounds matter. *)
     Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
-  let normalize (kind_poly : kind) : poly =
+  let normalize (kind_poly : Ldd.node) : Ldd.node =
     Ldd.solve_pending ();
     kind_poly
 
   (* Materialize a solved polynomial for storing in
      [Types.constructor_ikind]. *)
-  let constr_kind_poly (ctx : ctx) (c : Path.t) : poly * poly array =
+  let constr_kind_poly (ctx : ctx) (c : Path.t)
+      : Ldd.node * Ldd.node array =
     let base, coeffs = constr_kind ctx c in
     Ldd.solve_pending ();
     base, coeffs
 
-  let leq_with_reason (left : kind) (right : kind) :
+  let leq_with_reason (left : Ldd.node) (right : Ldd.node) :
       Jkind_axis.Axis.packed list =
     Ldd.leq_with_reason left right
 
-  let round_up (k : kind) : Axis_lattice.t = Ldd.round_up k
+  let round_up (k : Ldd.node) : Axis_lattice.t = Ldd.round_up k
 end
 
 let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
@@ -402,16 +394,16 @@ let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
   ({ Types.base = base; coeffs } : Types.constructor_ikind)
 
 let ckind_of_jkind (ctx : Solver.ctx) (jkind : ('l * 'r) Types.jkind) :
-    Solver.kind =
+    Ldd.node =
   Solver.ckind_of_jkind ctx jkind
 
-let ckind_of_jkind_l (ctx : Solver.ctx) (j : Types.jkind_l) : Solver.kind =
+let ckind_of_jkind_l (ctx : Solver.ctx) (j : Types.jkind_l) : Ldd.node =
   Solver.ckind_of_jkind_l ctx j
 
-let ckind_of_jkind_r (jkind : Types.jkind_r) : Solver.kind =
+let ckind_of_jkind_r (jkind : Types.jkind_r) : Ldd.node =
   Solver.ckind_of_jkind_r jkind
 
-let kind_of (ctx : Solver.ctx) (ty : Types.type_expr) : Solver.kind =
+let kind_of (ctx : Solver.ctx) (ty : Types.type_expr) : Ldd.node =
   Solver.kind_of ctx ty
 
 let has_mutable_label lbls =
@@ -428,7 +420,7 @@ let relevance_of_rep = function
   | `Record _ | `Variant _ -> `Irrelevant
 
 let constructor_ikind_polynomial (packed : Types.constructor_ikind) :
-    Solver.poly * Solver.poly array =
+    Ldd.node * Ldd.node array =
   packed.base, packed.coeffs
 
 (* Lookup function supplied to the solver.
@@ -950,7 +942,7 @@ let identity_lookup_from_arity_map (arity : int Path.Map.t) (path : Path.t) :
   Solver.Poly (base, coeffs)
 
 let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
-    ~(body : Types.type_expr) : Solver.poly * Solver.poly array =
+    ~(body : Types.type_expr) : Ldd.node * Ldd.node array =
   (* Approximate type-function substitution by evaluating in an identity
      environment, i.e. every constructor contributes an independent rigid
      atom. *)
@@ -981,7 +973,7 @@ let substitute_decl_ikind_with_lookup
     Types.ikinds_todo "ikind substitution reset"
   | Types.Constructor_ikind packed ->
     let payload = packed in
-    let memo : (Path.t, Solver.poly * Solver.poly array) Hashtbl.t =
+    let memo : (Path.t, Ldd.node * Ldd.node array) Hashtbl.t =
       Hashtbl.create 17
     in
     (* Rewrite a polynomial by mapping each rigid atom through [lookup]. *)

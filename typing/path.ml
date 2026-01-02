@@ -209,3 +209,9 @@ let rec hash_aux acc p =
       end
 
 let hash p = hash_aux 0 p
+
+module Tbl = Hashtbl.Make(struct
+  type nonrec t = t
+  let equal = same
+  let hash = hash
+end)
