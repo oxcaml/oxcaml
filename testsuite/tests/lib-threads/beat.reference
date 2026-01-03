@@ -1,1 +1,8 @@
-passed
+resonant, with slack:
+  passed.
+resonant, with no slack:
+  passed.
+not resonant, with slack:
+  passed.
+not resonant, with no slack:
+  passed.
