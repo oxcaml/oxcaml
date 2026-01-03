@@ -74,7 +74,7 @@ val get_continuation_scope : t -> Scope.t
 
 val typing_env : t -> Flambda2_types.Typing_env.t
 
-val define_continuations : t -> Continuation.t list -> t
+val define_continuations : is_wrapper:bool -> t -> Continuation.t list -> t
 
 val define_variable : t -> Bound_var.t -> Flambda_kind.t -> t
 
