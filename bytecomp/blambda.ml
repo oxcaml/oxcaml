@@ -27,6 +27,8 @@
     time we change Lambda.
 *)
 
+(* this is a test comment, do not merge please *)
+
 type constant = Lambda.constant
 
 (** [structured_constant] needs to match the cmo file format *)
