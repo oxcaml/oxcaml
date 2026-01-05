@@ -21,6 +21,7 @@ module type Common_options = sig
   val _no_absname : unit -> unit
   val _alert : string -> unit
   val _ikinds : unit -> unit
+  val _ikinds_debug : unit -> unit
   val _I : string -> unit
   val _H : string -> unit
   val _I_manifest : string -> unit

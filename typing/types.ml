@@ -29,7 +29,7 @@ type constructor_ikind_entry =
 
 type type_ikind = constructor_ikind_entry
 
-let ikind_debug : bool ref = ref false
+let ikind_debug : bool ref = Clflags.ikinds_debug
 
 let ikinds_todo (message : string) : type_ikind =
   if !ikind_debug then Format.eprintf "[ikinds-todo] %s@." message;

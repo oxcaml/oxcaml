@@ -768,6 +768,9 @@ let mk_dump_into_csv f =
 let mk_ikinds f =
   "-ikinds", Arg.Unit f, " Enable ikinds-based kind checker (experimental)"
 
+let mk_ikinds_debug f =
+  "-ikinds-debug", Arg.Unit f, " Enable ikinds debug logging"
+
 let mk_extension f =
   let available_extensions =
     Language_extension.Exist.(List.concat_map to_command_line_strings all)
@@ -1063,6 +1066,7 @@ module type Common_options = sig
   val _no_absname : unit -> unit
   val _alert : string -> unit
   val _ikinds : unit -> unit
+  val _ikinds_debug : unit -> unit
   val _I : string -> unit
   val _H : string -> unit
   val _I_manifest : string -> unit
@@ -1400,6 +1404,7 @@ struct
     mk_custom F._custom;
     mk_disable_all_extensions F._disable_all_extensions;
     mk_ikinds F._ikinds;
+    mk_ikinds_debug F._ikinds_debug;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_dllib F._dllib;
     mk_dllpath F._dllpath;
@@ -1543,6 +1548,7 @@ struct
     mk_directory F._directory;
     mk_disable_all_extensions F._disable_all_extensions;
     mk_ikinds F._ikinds;
+    mk_ikinds_debug F._ikinds_debug;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -1642,6 +1648,7 @@ struct
     mk_dtypes F._annot;
     mk_disable_all_extensions F._disable_all_extensions;
     mk_ikinds F._ikinds;
+    mk_ikinds_debug F._ikinds_debug;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -1851,6 +1858,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_directory F._directory;
     mk_disable_all_extensions F._disable_all_extensions;
     mk_ikinds F._ikinds;
+    mk_ikinds_debug F._ikinds_debug;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -2207,6 +2215,7 @@ module Default = struct
     let _absname = set Clflags.absname
     let _alert = Warnings.parse_alert_option
     let _ikinds = set Clflags.ikinds
+    let _ikinds_debug = set Clflags.ikinds_debug
     let _alias_deps = clear transparent_modules
     let _app_funct = set applicative_functors
     let _labels = clear classic

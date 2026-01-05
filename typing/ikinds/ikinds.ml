@@ -13,15 +13,13 @@
 (**************************************************************************)
 
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true;
+let () = Clflags.ikinds := true
 (* CR jujacobs: set this to false before merging. *)
 
 (* Global feature toggles for the ikinds experiment.
    These are intended to be easy to flip while iterating on
    performance or correctness. *)
 (* CR jujacobs: remove toggles in the final version. *)
-Types.ikind_debug := false
-
 let enable_crossing = true
 
 let enable_sub_jkind_l = true
