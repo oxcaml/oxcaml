@@ -1100,33 +1100,6 @@ let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
 
-let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
-  match t.desc with
-  | Predef (t, _) -> Some (Shape.Predef.to_layout t)
-  | Constr (_, _) ->
-    None (* recursive occurrence, conservatively not handled for now *)
-  | Unboxed_tuple fields ->
-    let field_layouts = List.map estimate_layout_from_type_shape fields in
-    if List.for_all Option.is_some field_layouts
-    then Some (Layout.Product (List.map Option.get field_layouts))
-    else None
-  | Var _ -> None (* CR sspies: Find out what happens to type variables. *)
-  | Variant_unboxed { arg_layout; _ } ->
-    Some arg_layout
-    (* CR sspies: [arg_layout] could become unreliable in the future. Consider
-       recursively descending in that case. *)
-  | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
-    Some (Layout.Base Value)
-  | Alias t -> estimate_layout_from_type_shape t
-  | Mu t ->
-    estimate_layout_from_type_shape t
-    (* Simple treatment of recursion, we simply look inside. *)
-  | Unknown_type -> None
-  | At_layout (_, layout) -> Some layout
-  | Leaf | Abs _ | Mutrec _ | Error _ | Comp_unit _ | Rec_var _ | App _ | Proj _
-  | Struct _ | Proj_decl _ ->
-    None
-
 let print_table_all_type_decls ppf =
   let entries = Uid.Tbl.to_list all_type_decls in
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
