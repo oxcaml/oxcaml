@@ -2194,8 +2194,8 @@ module Report = struct
     | Float_projection ->
       dprintf "is a float-record projection (and thus an allocation)"
 
-  let modality_or_source ~eq_mode pp =
-    if eq_mode
+  let modality_if_relevant ~fixpoint pp =
+    if fixpoint
        (* if the modality doesn't change the bound, we omit the modality and
           print the remaining chain. *)
     then (fun _ppf Modality -> ()), pp
@@ -2208,13 +2208,13 @@ module Report = struct
         (Location.none, Unknown : pinpoint) )
 
   let print_contains :
-      eq_mode:bool -> contains -> ((formatter -> unit) * pinpoint) option =
-   fun ~eq_mode { containing; contained } ->
+      fixpoint:bool -> contains -> ((formatter -> unit) * pinpoint) option =
+   fun ~fixpoint { containing; contained } ->
     print_pinpoint contained
     |> Option.map (fun print_pp ->
            let print_pp = print_pp ~definite:true ~capitalize:false in
            let maybe_modality, contained =
-             modality_or_source ~eq_mode contained
+             modality_if_relevant ~fixpoint contained
            in
            let pr =
              match containing with
@@ -2232,10 +2232,10 @@ module Report = struct
            pr, contained)
 
   let print_is_contained_by :
-      eq_mode:bool -> is_contained_by -> (formatter -> unit) * pinpoint =
-   fun ~eq_mode { containing; container } ->
+      fixpoint:bool -> is_contained_by -> (formatter -> unit) * pinpoint =
+   fun ~fixpoint { containing; container } ->
     let maybe_modality, pp =
-      modality_or_source ~eq_mode (container, Expression)
+      modality_if_relevant ~fixpoint (container, Expression)
     in
     let pr =
       match containing with
@@ -2255,14 +2255,16 @@ module Report = struct
     pr, pp
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
-      morph and have been expressed already, print the morph and gives the source pinpoint. *)
+      morph and have been expressed already, print the morph and return the
+      source pinpoint. The source pinpoint could be [Unknown], in which case the
+      rest of the chain will not be printed. *)
   let print_morph :
       type l r.
-      eq_mode:bool ->
+      fixpoint:bool ->
       pinpoint ->
       (l * r) morph ->
       ((formatter -> unit) * pinpoint) option =
-   fun ~eq_mode pp -> function
+   fun ~fixpoint pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Unknown | Unknown_non_rigid -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
@@ -2294,10 +2296,10 @@ module Report = struct
     | Crossing -> Some (dprintf "crosses with something", pp)
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
-    | Contains_l (_, contains) -> print_contains ~eq_mode contains
-    | Contains_r (_, contains) -> print_contains ~eq_mode contains
+    | Contains_l (_, contains) -> print_contains ~fixpoint contains
+    | Contains_r (_, contains) -> print_contains ~fixpoint contains
     | Is_contained_by (_, is_contained_by) ->
-      Some (print_is_contained_by ~eq_mode is_contained_by)
+      Some (print_is_contained_by ~fixpoint is_contained_by)
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
@@ -2372,12 +2374,12 @@ module Report = struct
    fun ?(sub = false) side pp (obj : a C.obj) ppf (a, hint) ->
     match hint with
     | Apply (morph_hint, src, ahint) ->
-      let eq_mode = eq_mode obj src a (fst ahint) in
-      if (not (is_rigid morph_hint)) && eq_mode
+      let fixpoint = eq_mode obj src a (fst ahint) in
+      if (not (is_rigid morph_hint)) && fixpoint
       then print_ahint ~sub side pp src ppf ahint
       else (
         print_mode_with_side ~sub side obj ppf a;
-        match print_morph ~eq_mode pp morph_hint with
+        match print_morph ~fixpoint pp morph_hint with
         | None -> Some Mode
         | Some (t, pp) ->
           fprintf ppf "@ because it %t" t;
