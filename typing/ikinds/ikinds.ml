@@ -447,7 +447,6 @@ let constructor_ikind_polynomial (packed : Types.constructor_ikind) :
    type declaration in [context]. *)
 let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
     Solver.constr_decl =
-  (* Note: this currently ignores any GADT-installed equations. *)
   match context.lookup_type path with
   | None ->
     (* Format.eprintf "ERROR: unknown constructor %a@." Path.print path; *)
