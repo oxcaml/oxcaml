@@ -169,8 +169,8 @@ module Solver = struct
             (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
             params
         in
-        (* Treat parameters as rigid vars while computing [kind'] so that
-           the result is linear in those vars. *)
+        (* We add the parameters to the TyTbl so that they will refer to 
+           rigid variables that represent them in the solver. *)
         List.iter2
           (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.node_of_var var))
           params rigid_vars;
@@ -194,10 +194,12 @@ module Solver = struct
                (Array.length coeffs_rhs));
         if abstract
         then (
-          (* For abstract types we don't trust [kind'] as an exact formula.
-             Instead we relate the placeholders to it via GFP bounds, while
-             keeping the original rigid atoms around as conservative
-             unknowns. *)
+          (* For abstract types we solve the solver variables using 
+             greatest fixpoints. This ensures that abstract types' 
+             bounds are incorporated into all kind polynomials that
+             mention the abstract type. This way, we can check kind
+             subsumption without having to consider hypotheses for the
+             bounds of abstract types. *)
           Ldd.enqueue_gfp base_var
             (Ldd.meet base_rhs (rigid_name ctx (Ldd.Name.atomic path 0)));
           Array.iteri
