@@ -428,6 +428,9 @@ let has_mutable_label lbls =
       match lbl.ld_mutable with Immutable -> false | Mutable _ -> true)
     lbls
 
+(* This function determines whether the shallow axes are relevant for a given
+   representation. For example, for unboxed types, shallow axes of inner data
+   stay relevant. For boxed types, shallow axes of inner data are not relevant. *)
 let relevance_of_rep = function
   | `Record Types.Record_unboxed
   | `Record (Types.Record_inlined (_, _, Types.Variant_unboxed)) ->
