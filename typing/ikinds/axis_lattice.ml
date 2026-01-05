@@ -277,7 +277,7 @@ let relevant_axes_of_modality
     (modality : Mode.Modality.Const.t) : Jkind_axis.Axis_set.t =
   Jkind_axis.Axis_set.create ~f:(fun ~axis:(Jkind_axis.Axis.Pack axis) ->
       match axis with
-      | Jkind_axis.Axis.Modal axis ->
+      | Modal axis ->
         let (Mode.Modality.Axis.P axis_for_modality) =
           Mode.Crossing.Axis.(P axis |> to_modality)
         in
@@ -286,12 +286,8 @@ let relevant_axes_of_modality
         in
         not
           (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
-      | Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality -> true
-      | Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability -> (
-        match relevant_for_shallow with
-        | `Relevant -> true
-        | `Irrelevant -> false)
-      | Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability -> (
+      | Nonmodal Externality -> true
+      | Nonmodal (Separability | Nullability) -> (
         match relevant_for_shallow with
         | `Relevant -> true
         | `Irrelevant -> false))
