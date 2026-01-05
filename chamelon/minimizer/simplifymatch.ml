@@ -49,31 +49,52 @@ let replace_mapper id to_replace =
 
 let minimize should_remove map cur_name =
   let simplify_match_mapper =
-    (* match e1 with x -> e2 => e2[x->e1]*)
-    (* We could add the transf. match e1 with p -> e2 => let p = e1 in e2 *)
+    (* match e1 with x -> e2 => e2[x->e1] *)
+    (* match e1 with p -> e2 => let p = e1 in e2 *)
     {
       Tast_mapper.default with
       expr =
         (fun mapper e ->
           Tast_mapper.default.expr mapper
             (match view_texp e.exp_desc with
-            | Texp_match (e_match, cc_l, _, _) ->
-                Format.print_flush ();
-                if List.length cc_l = 1 then
-                  let cc = List.hd cc_l in
-                  match (cc.c_lhs.pat_desc, cc.c_guard) with
-                  | Tpat_value tva, None -> (
-                      match
-                        view_tpat (tva :> value general_pattern).pat_desc
-                      with
-                      | Tpat_var (id, _, _) ->
-                          if should_remove () then
-                            let rep_map = replace_mapper id e_match.exp_desc in
-                            rep_map.expr rep_map cc.c_rhs
-                          else e
-                      | _ -> e)
-                  | _ -> e
-                else e
+            | Texp_match
+                ( e_match,
+                  [
+                    {
+                      c_lhs = { pat_desc = Tpat_value tva; _ } as c_lhs;
+                      c_guard;
+                      c_rhs;
+                    };
+                  ],
+                  _partial,
+                  id ) -> (
+                match (view_tpat (tva :> pattern).pat_desc, c_guard) with
+                | Tpat_var (id, _, _), None when should_remove () ->
+                    let rep_map = replace_mapper id e_match.exp_desc in
+                    rep_map.expr rep_map c_rhs
+                | _ when should_remove () ->
+                    (* Note: we get rid of the guard, if any, so this will fail
+                       if the bug is due to the guard. *)
+                    let pat_desc = (tva :> pattern) in
+                    let pat_desc =
+                      {
+                        pat_desc with
+                        pat_extra = c_lhs.pat_extra @ pat_desc.pat_extra;
+                      }
+                    in
+                    let value_binding =
+                      mk_value_binding
+                        ~id:
+                          (value_binding_identifier_from_texp_match_identifier
+                             id)
+                        ~vb_pat:(pat_desc :> pattern)
+                        ~vb_expr:e_match ~vb_attributes:c_lhs.pat_attributes ()
+                    in
+                    let texp_let =
+                      Texp_let (Nonrecursive, [ value_binding ], c_rhs)
+                    in
+                    { e with exp_desc = texp_let }
+                | _ -> e)
             | _ -> e));
     }
   in

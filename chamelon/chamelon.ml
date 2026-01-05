@@ -100,6 +100,7 @@ let all_minimizers =
       Simplifymatch.minimizer;
       Simplifysequences.minimizer;
       Simplifytypes.minimizer;
+      Reducepat.minimizer;
     ]
 
 let default_iteration =
@@ -108,6 +109,7 @@ let default_iteration =
     "reduce-expr";
     "reduce-expr-2";
     "remove-dead-code";
+    "reduce-pat";
     "inline-never";
     "remove-unit";
     "reduce-def";
