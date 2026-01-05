@@ -2252,7 +2252,8 @@ let is_principal ty =
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : type_declaration option }
+  ; or_null : (type_declaration * unwrapped_type_expr) option;
+  }
 
 let mk_unwrapped_type_expr ty =
   { ty; modality = Mode.Modality.Const.id; or_null = None }
@@ -2268,7 +2269,7 @@ type unbox_result =
   (* definition not in environment: missing cmi *)
   | Missing of Path.t
 
-let unbox_once env ty =
+let unbox_once env ty prev_unwrapped_ty =
   match get_desc ty with
   | Tconstr (p, args, _) ->
     begin match Env.find_type p env with
@@ -2324,7 +2325,7 @@ let unbox_once env ty =
                when we let users define custom or-null-like types. *)
             Stepped { ty = apply arg.ca_type ~extra_substs:[];
                       modality = arg.ca_modalities;
-                      or_null = Some decl }
+                      or_null = Some (decl, prev_unwrapped_ty) }
           | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
@@ -2342,7 +2343,7 @@ let unbox_once env ty =
 let contained_without_boxing env ty =
   match get_desc ty with
   | Tconstr _ ->
-    begin match unbox_once env ty with
+    begin match unbox_once env ty (mk_unwrapped_type_expr ty) with
     | Stepped { ty; modality = _; or_null = _ } -> [ty]
     | Stepped_record_unboxed_product tys ->
       List.map (fun { ty; _ } -> ty) tys
@@ -2364,16 +2365,17 @@ let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
     (* We use expand_head_opt version of expand_head to get access
        to the manifest type of private abbreviations. *)
     let ty = expand_head_opt env ty in
-    match unbox_once env ty with
-    | Stepped { ty = ty2; modality = modality2; or_null = or_null2 } ->
+    match unbox_once env ty { ty; modality; or_null } with
+    | Stepped { ty = ty2; modality = modality2; or_null = or_null2 }
+      ->
       let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
-      let or_null =
-        if Option.is_none or_null then or_null2
-        else if Option.is_none or_null2 then or_null
-        else Misc.fatal_error
-               "Ctype.get_unboxed_type_representation: nested or_nulls"
-      in
-      get_unboxed_type_representation ~modality ~or_null env ty ty2 (fuel - 1)
+      begin match or_null, or_null2 with
+      | None, or_null | or_null, None ->
+        get_unboxed_type_representation ~modality ~or_null env ty ty2 (fuel - 1)
+      | Some _, Some _ ->
+        (* Nested or-nulls are possible as a result of [Typecore.type_approx] *)
+        Ok { ty = ty_prev; modality; or_null }
+      end
     | Stepped_record_unboxed_product _ | Final_result ->
       Ok { ty; modality; or_null }
     | Missing _ -> Ok { ty = ty_prev; modality; or_null }
@@ -2415,34 +2417,39 @@ let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
 
 let apply_layout_wrapping_l ~unwrapped_ty:{ ty = _; or_null; modality = _ }
-      jkind =
+      jkind : (_, unwrapped_type_expr) Result.t =
   match or_null with
-  | Some _ ->
+  | Some (_, prev) ->
     (* The layout on ['a or_null] is imprecise - it's always [scannable]. But
         when ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
         ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
         here we recompute the layout based on the inner jkind. *)
-    Jkind.apply_or_null_l jkind |> Result.get_ok |> Jkind.extract_layout
+    begin match Jkind.apply_or_null_l jkind with
+    | Ok jkind -> Ok (Jkind.extract_layout jkind)
+    | Error () -> Error prev
+    end
   | None ->
-    Jkind.extract_layout jkind
+    Ok (Jkind.extract_layout jkind)
 
-let apply_jkind_wrapping_l ~env ~level ~unwrapped_ty:{ ty; or_null; modality }
-      jkind =
+let apply_jkind_wrapping_l ~env ~level
+          ~unwrapped_ty:{ ty; or_null; modality } jkind =
   begin
     match or_null with
-    | Some decl ->
+    | Some (decl, _) ->
       (* We get the mode crossing behavior of the wrapped jkind from the
           declaration of the [or_null]-like type. *)
       let instance_jkind =
         jkind_subst env level decl.type_params [ty] decl.type_jkind
       in
-      let layout =
+      begin match
         apply_layout_wrapping_l ~unwrapped_ty:{ ty; modality; or_null } jkind
-      in
-      Jkind.set_layout instance_jkind layout
-    | None -> jkind
+      with
+      | Ok layout -> Ok (Jkind.set_layout instance_jkind layout)
+      | Error _ as e -> e
+      end
+    | None -> Ok jkind
   end
-  |> Jkind.apply_modality_l modality
+  |> Result.map (Jkind.apply_modality_l modality)
 
 let apply_jkind_wrapping_r ~unwrapped_ty:{ ty = _; modality; or_null } jkind =
   begin
@@ -2474,19 +2481,21 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
+    let rec compute_ty_modality_layout unwrapped_ty =
+      let jkind =
+        (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
+           just to throw most of it away will go away once we get [layout_of].
+           Internal ticket 2912. *)
+        estimate_type_jkind ~expand_component ~ignore_mod_bounds env
+          unwrapped_ty.ty
+      in
+      match apply_layout_wrapping_l ~unwrapped_ty jkind with
+      | Ok layout -> (unwrapped_ty.ty, unwrapped_ty.modality), layout
+      | Error prev_unwrapped_ty -> compute_ty_modality_layout prev_unwrapped_ty
+    in
     let tys_modalities, layouts =
       List.map
-        (fun (_lbl, ty) ->
-          let unwrapped_ty = expand_component ty in
-          (* CR layouts v2.8: This pretty ridiculous use of
-             [estimate_type_jkind] just to throw most of it away will go away
-             once we get [layout_of]. Internal ticket 2912. *)
-          let layout =
-            estimate_type_jkind ~expand_component ~ignore_mod_bounds env
-              unwrapped_ty.ty
-            |> apply_layout_wrapping_l ~unwrapped_ty
-          in
-          (unwrapped_ty.ty, unwrapped_ty.modality), layout)
+        (fun (_lbl, ty) -> compute_ty_modality_layout (expand_component ty))
         ltys
       |> List.split
     in
@@ -2538,11 +2547,17 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
     Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 
-let estimate_type_jkind_unwrapped
+let rec estimate_type_jkind_unwrapped
       level ~expand_component env ~unwrapped_ty =
-  estimate_type_jkind ~expand_component ~ignore_mod_bounds:false env
-    unwrapped_ty.ty
-  |> apply_jkind_wrapping_l ~env ~level ~unwrapped_ty
+  match
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds:false env
+      unwrapped_ty.ty
+    |> apply_jkind_wrapping_l ~env ~level ~unwrapped_ty
+  with
+  | Ok jkind -> jkind
+  | Error prev_unwrapped_ty ->
+    estimate_type_jkind_unwrapped level ~expand_component env
+      ~unwrapped_ty:prev_unwrapped_ty
 
 let type_jkind env ty =
   let unwrapped_ty = get_unboxed_type_approximation env ty in
@@ -2754,7 +2769,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                let ty = expand_head_opt env ty in
                estimate_jkind_and_loop ~fuel ~expanded:true ty jkind
              else
-               begin match unbox_once env ty with
+               begin match unbox_once env ty (mk_unwrapped_type_expr ty) with
                | Missing path -> Error (Jkind.Violation.of_
                                           ~context ~missing_cmi:path
                                           (Not_a_subjkind (ty's_jkind, jkind,
