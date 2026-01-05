@@ -878,11 +878,11 @@ let sub_or_intersect ?origin:_origin
   else
     let layout_sub = Jkind.Layout.sub ~level t1.jkind.layout t2.jkind.layout in
     match layout_sub with
-    | Jkind.Sub_result.Not_le reasons ->
+    | Not_le reasons ->
       if Jkind.has_intersection ~level t1 t2
       then Jkind.Has_intersection reasons
       else Jkind.Disjoint reasons
-    | Jkind.Sub_result.Equal | Jkind.Sub_result.Less -> (
+    | Equal | Less -> (
       (* The RHS is a jkind_r (no with-bounds), so its ikind is constant. *)
       let ctx = make_ctx_with_mode ~mode:Solver.Round_up ~context in
       let sub_poly = ckind_of_jkind_l ctx (Jkind.disallow_right t1) in
