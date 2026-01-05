@@ -469,6 +469,50 @@ Error: Signature mismatch:
        but the right-hand side is "shareable".
 |}]
 
+module type T = sig val t : int * int end
+
+module F (M : T @ unique -> S) = (M : T -> S)
+[%%expect{|
+module type T = sig val t : int * int end
+Line 3, characters 34-35:
+3 | module F (M : T @ unique -> S) = (M : T -> S)
+                                      ^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (Arg : T @ unique) -> ...
+       is not included in
+         functor T @ aliased -> ...
+       Module types do not match:
+         T @ unique
+       does not include
+         T @ aliased
+       Got "aliased" but expected "unique".
+|}]
+
+module F (M : T -> S) = (M : T @ unique -> S)
+[%%expect{|
+module F : functor (M : T -> S) -> T @ unique -> S @@ stateless
+|}]
+
+module F (M : S -> T @ unique) = (M : S -> T)
+[%%expect{|
+module F : functor (M : S -> T @ unique) -> S -> T @@ stateless
+|}]
+
+module F (M : S -> T) = (M : S -> T @ unique)
+[%%expect{|
+Line 1, characters 25-26:
+1 | module F (M : S -> T) = (M : S -> T @ unique)
+                             ^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (Arg : S) -> sig val t : int * int end
+       is not included in
+         S -> T @ unique
+       Got "aliased"
+       but expected "unique".
+|}]
+
 (* refering to [F(M).t] is allowed even if [M] is weaker than what [F] wants *)
 module F (X : S @ portable) = struct
   type t = int
