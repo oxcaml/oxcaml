@@ -930,8 +930,7 @@ let rec max_arity_in_jkind (acc : int Path.Map.t) (jkind : _ Types.jkind) =
   |> Seq.fold_left (fun acc (ty, _) -> max_arity_in_type acc ty) acc
 
 and max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
-  let open Types in
-  match get_desc ty with
+  match Types.get_desc ty with
   | Tvar { jkind; _ } | Tunivar { jkind; _ } -> max_arity_in_jkind acc jkind
   | Tconstr (path, args, _) ->
     let n = List.length args in
@@ -953,7 +952,7 @@ and max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
   | Tfield (_, _, t1, t2) -> max_arity_in_type (max_arity_in_type acc t1) t2
   | Tvariant row ->
     let acc = Btype.fold_row max_arity_in_type acc row in
-    max_arity_in_type acc (row_more row)
+    max_arity_in_type acc (Types.row_more row)
   | Tpackage (_, fields) ->
     List.fold_left (fun acc (_n, t) -> max_arity_in_type acc t) acc fields
   | Tquote t | Tsplice t -> max_arity_in_type acc t
