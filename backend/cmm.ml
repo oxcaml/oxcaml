@@ -1054,3 +1054,9 @@ let is_addr (m : machtype_component) =
 
 let is_exn_handler (flag : ccatch_flag) =
   match flag with Exn_handler -> true | Normal | Recursive -> false
+
+let equal_exit_label (lbl1 : exit_label) (lbl2 : exit_label) =
+  match lbl1, lbl2 with
+  | Return_lbl, Return_lbl -> true
+  | Lbl lbl1, Lbl lbl2 -> Static_label.equal lbl1 lbl2
+  | Return_lbl, Lbl _ | Lbl _, Return_lbl -> false
