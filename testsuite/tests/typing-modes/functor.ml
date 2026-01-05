@@ -462,3 +462,120 @@ module F :
   functor (G : S -> S @ portable) -> sig module H : S -> S @ portable end @@
   stateless
 |}]
+
+module F(G : S -> S) = struct
+  module H : S -> S @ portable
+    = functor (X : S) -> struct include G(X) end
+end
+[%%expect{|
+Line 3, characters 14-48:
+3 |     = functor (X : S) -> struct include G(X) end
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (X : S) -> sig val f : unit -> unit end
+       is not included in
+         S -> S @ portable
+       Modules do not match:
+         sig val f : unit -> unit end @ nonportable
+       is not included in
+         S @ portable
+       Values do not match:
+         val f : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val f : unit -> unit (* in a structure at portable *)
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
+|}]
+
+module F(G : S @ portable-> S) = struct
+  module H : S -> S
+    = functor (X : S) -> struct include G(X) end
+end
+[%%expect{|
+Line 3, characters 40-44:
+3 |     = functor (X : S) -> struct include G(X) end
+                                            ^^^^
+Error: Modules do not match: sig val f : unit -> unit end @ nonportable
+     is not included in S @ portable
+     Values do not match:
+       val f : unit -> unit (* in a structure at nonportable *)
+     is not included in
+       val f : unit -> unit (* in a structure at portable *)
+     The left-hand side is "nonportable"
+     but the right-hand side is "portable".
+|}]
+
+module F(G : S -> S) = struct
+  module H : S @ portable -> S
+    = functor (X : S) -> struct include G(X) end
+end
+[%%expect{|
+module F : functor (G : S -> S) -> sig module H : S @ portable -> S end @@
+  stateless
+|}]
+
+module F (M : (S @ portable -> S) -> S) = (M : (S -> S) -> S)
+[%%expect{|
+module F : functor (M : (S @ portable -> S) -> S) -> (S -> S) -> S @@
+  stateless
+|}]
+
+module F (M : (S -> S) -> S) = (M : (S @ portable -> S) -> S)
+[%%expect{|
+Line 1, characters 32-33:
+1 | module F (M : (S -> S) -> S) = (M : (S @ portable -> S) -> S)
+                                    ^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (Arg : $S1) -> ...
+       is not included in
+         functor $T1 -> ...
+       Module types do not match:
+         $S1 = S -> S
+       does not include
+         $T1 = S @ portable -> S
+       Modules do not match:
+         functor S @ portable -> ...
+       is not included in
+         functor S @ nonportable -> ...
+       Module types do not match:
+         S @ portable
+       does not include
+         S @ nonportable
+       Values do not match:
+         val f : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val f : unit -> unit (* in a structure at portable *)
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
+|}]
+
+module F (M : (S -> S @ portable) -> S) = (M : (S -> S) -> S)
+[%%expect{|
+Line 1, characters 43-44:
+1 | module F (M : (S -> S @ portable) -> S) = (M : (S -> S) -> S)
+                                               ^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (Arg : $S1) -> ...
+       is not included in
+         functor $T1 -> ...
+       Module types do not match:
+         $S1 = S -> S @ portable
+       does not include
+         $T1 = S -> S
+       Modules do not match: S @ nonportable is not included in S @ portable
+       Values do not match:
+         val f : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val f : unit -> unit (* in a structure at portable *)
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
+|}]
+
+module F (M : (S -> S) -> S) = (M : (S -> S @ portable) -> S)
+[%%expect{|
+module F : functor (M : (S -> S) -> S) -> (S -> S @ portable) -> S @@
+  stateless
+|}]
