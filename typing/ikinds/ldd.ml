@@ -40,7 +40,7 @@ module Make (V : ORDERED) = struct
       lo : node;
       hi : node;
       down0 : Axis_lattice.t
-      (* Cached lattice value of the lo->lo->..->lo leaf. *)
+      (** Cached lattice value of the lo->lo->..->lo leaf. *)
     }
 
   and var =
