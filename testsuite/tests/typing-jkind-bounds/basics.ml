@@ -2016,7 +2016,7 @@ type b = Foo of a
 Line 4, characters 0-68:
 4 | type c : value mod portable contended = { a : a @@ portable; b : b }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "c" is immutable_data with t
+Error: The kind of type "c" is value mod non_float
          because it's a boxed record type.
        But the kind of type "c" must be a subkind of
            value mod portable contended

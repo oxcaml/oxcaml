@@ -436,10 +436,10 @@ type t2 : immediate with string = M1.t
 Line 1, characters 0-38:
 1 | type t2 : immediate with string = M1.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
-         because of the annotation on the declaration of the type t2.
-       But the kind of type "t2" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t2.
+Error: The kind of type "M1.t" is value mod non_float
+         because it's a polymorphic variant type.
+       But the kind of type "M1.t" must be a subkind of immutable_data
+         because of the definition of t2 at line 1, characters 0-38.
 |}]
 
 type t2 : value mod portable = M1.t

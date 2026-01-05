@@ -36,13 +36,23 @@ end = struct
   type t : immediate with string
 end
 [%%expect {|
-Line 4, characters 2-32:
+Lines 3-5, characters 6-3:
+3 | ......struct
 4 |   type t : immediate with string
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data
-         because of the annotation on the declaration of the type t.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : immutable_data end
+       is not included in
+         sig type t : immediate end
+       Type declarations do not match:
+         type t : immutable_data
+       is not included in
+         type t : immediate
+       The kind of the first is immutable_data
+         because of the definition of t at line 4, characters 2-32.
+       But the kind of the first must be a subkind of immediate
+         because of the definition of t at line 2, characters 2-20.
 |}]
 
 module M : sig

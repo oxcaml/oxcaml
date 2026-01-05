@@ -483,7 +483,13 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           let kind : Solver.ckind =
            fun ctx -> ckind_of_jkind_l ctx type_decl.type_jkind
           in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = true }
+          let abstract =
+            match type_decl.type_kind with
+            | Types.Type_abstract _ ->
+              not (Jkind.is_best type_decl.type_jkind)
+            | _ -> true
+          in
+          Solver.Ty { args = type_decl.type_params; kind; abstract }
         in
         match type_decl.type_kind with
         (* For abstract types and allow_any_crossing types, we derive the
