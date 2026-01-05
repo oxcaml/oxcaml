@@ -488,12 +488,13 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = true }
         in
+        match type_decl.type_kind with
         (* For abstract types and allow_any_crossing types, we derive the
            ikind from the jkind annotation, instead of computing it from
-           the type declaration's body. *)
-        match type_decl.type_kind with
+           the type declaration's body: *)
         | _ when allow_any_crossing -> use_decl_jkind ()
         | Types.Type_abstract _ -> use_decl_jkind ()
+        (* For other cases, we compute the ikind from the type definition{} *)
         | Types.Type_record (lbls, rep, _umc_opt) ->
           (* Build from components: base (non-float value) + per-label
              contributions. *)
