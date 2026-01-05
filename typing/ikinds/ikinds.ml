@@ -1013,9 +1013,9 @@ let substitute_decl_ikind_with_lookup
       Ldd.map_rigid (map_name expanding) poly
     and map_name (expanding : Path.Set.t) (name : Ldd.Name.t) : Ldd.node =
       match name with
-      | Ldd.Name.Param _ -> Ldd.node_of_var (Ldd.rigid name)
-      | Ldd.Name.Unknown _ -> Ldd.node_of_var (Ldd.rigid name)
-      | Ldd.Name.Atom { constr = path; arg_index } -> (
+      | Param _ -> Ldd.node_of_var (Ldd.rigid name)
+      | Unknown _ -> Ldd.node_of_var (Ldd.rigid name)
+      | Atom { constr = path; arg_index } -> (
         match lookup path with
         | Lookup_identity -> Ldd.node_of_var (Ldd.rigid name)
         | Lookup_path alias_path ->
