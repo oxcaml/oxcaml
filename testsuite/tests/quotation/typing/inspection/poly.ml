@@ -71,16 +71,29 @@ let () =
   test <[ ignore (((fun x -> x) $f) : t2) ]>
 ;;
 
-(* Structured polymorphic spine: arrows, tuples, objects and variants *)
+(* Structured polymorphic spine *)
+(* arrows, tuples, objects and polymorphic variants *)
 let () =
   let (f : <[t3]> expr) = <[fun f -> (f 42 0, f "abc" 1)]> in
   test <[ ignore (((fun x -> x) $f) : t3) ]>
 ;;
-
+(* polymorphic variants *)
 let () =
   let (f : <[t3']> expr) = <[fun f -> (f 42 0, f "abc" 1)]> in
   test <[ ignore (((fun x -> x) $f) : t3') ]>
 ;;
+(* FIXME: quotes and splices *)
+(* Once enabled and passing, [poly_quote.ml] can be removed *)
+(*
+let () =
+  let (f : <[t3'']> expr) =
+    <[fun f -> (
+      f () (fun x -> <[$x + 1]>),
+      f () (fun x -> <[Int.to_string $x]>))]>
+  in
+  test <[ ignore (((fun x -> x) $f) : t3'') ]>
+;;
+*)
 
 (* Parameter polymorphic in a jkind-annotated variable *)
 (* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)

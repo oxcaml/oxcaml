@@ -2571,7 +2571,11 @@ let construct_spine ~env ~loc typ =
                    Closed,
                    None ))
           | Tquote ty -> mk (Ttyp_quote (go ty))
-          | Tsplice ty -> mk (Ttyp_splice (go ty))
+          | Tsplice _ ->
+            fatal_errorf
+              "Translquote [at %a]: splices cannot appear in the spine of a \
+               quoted higher-rank function type"
+              Location.print_loc_in_lowercase loc
           (* TESTME *)
           | Tpackage _ ->
             (* where to get a (pack_type : module_type) from? what about pack_txt? *)
