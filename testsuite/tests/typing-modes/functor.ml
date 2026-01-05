@@ -415,6 +415,60 @@ module F : functor (M : Portable_Portable) -> Portable_Nonportable @@
   stateless
 |}]
 
+module F (M : S @ shareable -> S) = (M : S -> S)
+[%%expect{|
+Line 1, characters 37-38:
+1 | module F (M : S @ shareable -> S) = (M : S -> S)
+                                         ^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (Arg : S @ shareable) -> ...
+       is not included in
+         functor S @ nonportable -> ...
+       Module types do not match:
+         S @ shareable
+       does not include
+         S @ nonportable
+       Values do not match:
+         val f : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val f : unit -> unit (* in a structure at shareable *)
+       The left-hand side is "nonportable"
+       but the right-hand side is "shareable".
+|}]
+
+module F (M : S -> S) = (M : S @ shareable -> S)
+[%%expect{|
+module F : functor (M : S -> S) -> S @ shareable -> S @@ stateless
+|}]
+
+module F (M : S -> S @ shareable) = (M : S -> S)
+[%%expect{|
+module F : functor (M : S -> S @ shareable) -> S -> S @@ stateless
+|}]
+
+module F (M : S -> S) = (M : S -> S @ shareable)
+[%%expect{|
+Line 1, characters 25-26:
+1 | module F (M : S -> S) = (M : S -> S @ shareable)
+                             ^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (Arg : S) -> sig val f : unit -> unit end
+       is not included in
+         S -> S @ shareable
+       Modules do not match:
+         sig val f : unit -> unit end @ nonportable
+       is not included in
+         S @ shareable
+       Values do not match:
+         val f : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val f : unit -> unit (* in a structure at shareable *)
+       The left-hand side is "nonportable"
+       but the right-hand side is "shareable".
+|}]
+
 (* refering to [F(M).t] is allowed even if [M] is weaker than what [F] wants *)
 module F (X : S @ portable) = struct
   type t = int
