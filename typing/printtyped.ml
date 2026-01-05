@@ -451,8 +451,8 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
      attributes i ppf attrs;
   | Tpat_inspected_type ti ->
      line i ppf "Tpat_inspected_type\n";
-      attributes i ppf attrs;
-      line (i+1) ppf "%a\n" fmt_type_inspection ti;
+     attributes i ppf attrs;
+     line (i+1) ppf "%a\n" fmt_type_inspection ti;
 
 and function_body i ppf (body : function_body) =
   match[@warning "+9"] body with

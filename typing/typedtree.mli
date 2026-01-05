@@ -139,7 +139,7 @@ type label_ambiguity =
 
 type _ type_inspection =
   | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
-  | Polymorphic_parameter : [<  `pat | `exp ] type_inspection
+  | Polymorphic_parameter : [< `pat | `exp ] type_inspection
 
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
