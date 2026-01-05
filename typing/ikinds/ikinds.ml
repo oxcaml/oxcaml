@@ -138,8 +138,8 @@ module Solver = struct
            [c] are kept rigid to avoid infinite expansion. *)
         let instantiate (name : Ldd.Name.t) : Ldd.node =
           match name with
-          | Ldd.Name.Param _ | Ldd.Name.Unknown _ -> rigid_name ctx name
-          | Ldd.Name.Atom { constr = other_path; arg_index } ->
+          | Param _ | Unknown _ -> rigid_name ctx name
+          | Atom { constr = other_path; arg_index } ->
             if Path.same other_path path
             then rigid_name ctx name
             else
