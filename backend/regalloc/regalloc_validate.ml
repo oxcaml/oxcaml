@@ -977,10 +977,6 @@ end = struct
       t.for_loc
 end
 
-module type Description_value = sig
-  val description : Description.t
-end
-
 let print_reg_as_loc ppf reg =
   Printreg.loc
     ~unknown:(fun ppf -> Format.fprintf ppf "<Unknown>")
@@ -1073,18 +1069,22 @@ end = struct
   let print ppf (T t) = print_unpacked ppf t
 end
 
-module Transfer (Desc_val : Description_value) :
+module Transfer :
   Cfg_dataflow.Backward_transfer
-    with type domain = Domain.t
+    with type d = Domain.t
      and type error = Transfer_error.t
-     and type context = unit = struct
+     and type context = Description.t = struct
   type domain = Domain.t
 
   type error = Transfer_error.t
 
-  type context = unit
+  type context = Description.t
 
-  let description = Desc_val.description
+  type d = domain
+
+  type input = domain Cfg_dataflow.control
+
+  type output = domain
 
   (** This corresponds to case (10) in Fig. 1 of the paper [1]. *)
   let rename_location equations ~loc_instr =
@@ -1178,7 +1178,7 @@ module Transfer (Desc_val : Description_value) :
              ~loc_arg:(Location.of_regs_exn loc_instr.arg)
              equations)
 
-  let basic t instr () : (domain, error) result =
+  let basic t instr description : (domain, error) result =
     match Description.find_basic description instr with
     | None ->
       (match instr.desc with
@@ -1200,7 +1200,7 @@ module Transfer (Desc_val : Description_value) :
           ~destroyed:(Proc.destroyed_at_basic instr.desc |> Location.of_regs_exn)
       )
 
-  let terminator t ~exn instr () =
+  let terminator ({ normal = t; exceptional = exn } : input) instr description =
     match Description.find_terminator description instr with
     | Some instr_before ->
       (* CR-soon azewierzejew: This is kind of fragile for [Tailcall (Self _)]
@@ -1232,11 +1232,10 @@ module Transfer (Desc_val : Description_value) :
   (* This should remove the equations for the exception value, but we do that in
      [Domain.append_equations] because there we have more information to give if
      there's an error. *)
-  let exception_ t () = Ok t
+  let exception_ t _desc = Ok t
 end
 
-module Check_backwards (Desc_val : Description_value) =
-  Cfg_dataflow.Backward (Domain) (Transfer (Desc_val))
+module Check_backwards = Cfg_dataflow.Backward (Domain) (Transfer)
 
 let save_as_dot_with_equations ~desc ~res_instr ~res_block ?filename cfg msg =
   Cfg_with_layout.save_as_dot
@@ -1399,13 +1398,13 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
       ~annotate_instr:[Cfg.print_instruction' ~print_reg:print_reg_as_loc]
       ~filename:"after.dot" cfg "after_allocation_before_validation";
   Description.verify desc cfg;
-  let module Check_backwards = Check_backwards (struct
-    let description = desc
-  end) in
   let res_instr, res_block, result =
+    let init : Check_backwards.init =
+      { normal = Domain.bot; exceptional = Domain.bot }
+    in
     match
-      Check_backwards.run (Cfg_with_layout.cfg cfg) ~init:Domain.bot
-        ~map:Check_backwards.Both ()
+      Check_backwards.run (Cfg_with_layout.cfg cfg) ~init ~map:Cfg_dataflow.Both
+        desc
     with
     | Ok (res_instr, res_block) -> res_instr, res_block, Ok ()
     | Aborted ((res_instr, res_block), error) ->

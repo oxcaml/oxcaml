@@ -626,6 +626,7 @@
   cfg_with_layout
   cfg_with_infos
   cfg_comballoc
+  cfg_dataflow_intf
   cfg_dataflow
   cfg_deadcode
   cfg_liveness

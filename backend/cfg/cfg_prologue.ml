@@ -172,7 +172,13 @@ let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
    leading to a block in the CFG needs a prologue. This then allows us to check
    whether we can stop shrink-wrapping if all descendant leaf blocks need a
    prologue *)
-module Path_needs_prologue = struct
+module Path_needs_prologue : sig
+  type t
+
+  val build : Cfg.t -> t
+
+  val needs_prologue : t -> Label.t -> bool
+end = struct
   type state = bool
 
   type context = { fun_name : string }
@@ -193,17 +199,19 @@ module Path_needs_prologue = struct
   end
 
   module Transfer :
-    Cfg_dataflow.Forward_transfer
-      with type domain = bool
-       and type context = context = struct
+    Cfg_dataflow.Forward_transfer with type d = bool and type context = context =
+  struct
     type domain = bool
+
+    type error = |
 
     type nonrec context = context
 
-    type image =
-      { normal : domain;
-        exceptional : domain
-      }
+    type d = domain
+
+    type input = domain
+
+    type output = domain Cfg_dataflow.control
 
     let transfer : domain -> Instruction_requirements.t -> domain =
      fun domain requirements ->
@@ -211,60 +219,50 @@ module Path_needs_prologue = struct
       | _, Requires_prologue -> true
       | domain, (No_requirements | Requires_no_prologue) -> domain
 
-    let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
+    let basic :
+        domain -> Cfg.basic Cfg.instruction -> context -> (domain, error) result
+        =
      fun domain instr _ ->
       match domain, Instruction_requirements.basic instr with
       | _, (Prologue | Epilogue) ->
+        (* CR-someday gyorsh: use error? *)
         Misc.fatal_error
           "found prologue or epilogue instruction before prologue addition \
            phase"
-      | domain, Requirements requirements -> transfer domain requirements
+      | domain, Requirements requirements -> Ok (transfer domain requirements)
 
     let terminator :
-        domain -> Cfg.terminator Cfg.instruction -> context -> image =
+        domain ->
+        Cfg.terminator Cfg.instruction ->
+        context ->
+        (output, error) result =
      fun domain instr { fun_name } ->
       let res =
         transfer domain (Instruction_requirements.terminator instr fun_name)
       in
-      { normal = res; exceptional = res }
+      Ok { normal = res; exceptional = res }
+
+    let exception_ d _ = Ok d
   end
 
-  module T = struct
-    include Cfg_dataflow.Forward (Domain) (Transfer)
-  end
-
-  include (T : module type of T with type context := context)
+  module A = Cfg_dataflow.Forward (Domain) (Transfer)
 
   type t = bool Label.Tbl.t
 
   let build (cfg : Cfg.t) : t =
-    match
-      run ~init:false ~handlers_are_entry_points:true cfg
-        { fun_name = cfg.fun_name }
-    with
-    | Ok res_at_entry ->
-      (* The result returned by the forward analysis is the state at the entry
-         of each block, but we want the state just before the terminator, i.e.
-         after the entire body of the block. *)
-      (* CR-someday cfalas: to avoid having to recompute this, we can change
-         [Cfg_dataflow] so that we can choose whether we want the results
-         returned to be at the block input or at the block output (or before the
-         terminator). This can be done for both forward and backward
-         analysis. *)
-      let res_at_exit = Label.Tbl.copy res_at_entry in
-      let context = { fun_name = cfg.fun_name } in
-      Label.Tbl.iter
-        (fun label at_entry ->
-          let block = Cfg.get_block_exn cfg label in
-          let at_exit =
-            DLL.fold_left
-              ~f:(fun acc instr -> Transfer.basic acc instr context)
-              ~init:at_entry block.body
-          in
-          Label.Tbl.replace res_at_exit label at_exit)
-        res_at_entry;
-      res_at_exit
-    | Error () -> Misc.fatal_error "Cfg_prologue: unreachable code"
+    let init : A.init = { normal = false; exceptional = false } in
+    match A.run cfg ~init ~map:Body { fun_name = cfg.fun_name } with
+    | Ok res_after_body -> res_after_body
+    | Aborted _ ->
+      Misc.fatal_errorf
+        "Cfg_prologue.Path_needs_prologue.build: Aborted on CFG for function \
+         %s@."
+        cfg.Cfg.fun_name ()
+    | Max_iterations_reached ->
+      Misc.fatal_errorf
+        "Cfg_prologue.Path_needs_prologue.build: Max_iterations_reached on CFG \
+         for function %s@."
+        cfg.Cfg.fun_name ()
 
   let needs_prologue (t : t) (label : Label.t) = Label.Tbl.find t label
 end
@@ -490,7 +488,9 @@ let add_prologue_if_required (cfg_with_infos : Cfg_with_infos.t) ~f =
            ()))
     epilogue_blocks
 
-module Validator = struct
+module Validator : sig
+  val run : Cfg.t -> unit
+end = struct
   type state =
     | No_prologue_on_stack
     | Prologue_on_stack
@@ -536,54 +536,66 @@ module Validator = struct
 
   module Transfer :
     Cfg_dataflow.Forward_transfer
-      with type domain = State_set.t
+      with type d = State_set.t
        and type context = context = struct
     type domain = State_set.t
 
     type nonrec context = context
 
-    type image =
-      { normal : domain;
-        exceptional : domain
-      }
+    type d = domain
 
+    type input = domain
+
+    type output = domain Cfg_dataflow.control
+
+    type error = |
+
+    (* CR-someday gyorsh: use error *)
     let error_with_instruction (msg : string) (instr : _ Cfg.instruction) =
       Misc.fatal_errorf "Cfg_prologue: error validating instruction %s: %s"
         (InstructionId.to_string_padded instr.id)
         msg
 
-    let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
+    let basic :
+        domain -> Cfg.basic Cfg.instruction -> context -> (domain, error) result
+        =
      fun domain instr _ ->
-      State_set.map
-        (fun domain ->
-          match domain, Instruction_requirements.basic instr with
-          | No_prologue_on_stack, Prologue when instr.stack_offset <> 0 ->
-            error_with_instruction "prologue has a non-zero stack offset" instr
-          | No_prologue_on_stack, Prologue -> Prologue_on_stack
-          | No_prologue_on_stack, Epilogue ->
-            error_with_instruction
-              "epilogue appears without a prologue on the stack" instr
-          | No_prologue_on_stack, Requirements Requires_prologue ->
-            error_with_instruction
-              "instruction needs prologue but no prologue on the stack" instr
-          | ( No_prologue_on_stack,
-              Requirements (No_requirements | Requires_no_prologue) ) ->
-            No_prologue_on_stack
-          | Prologue_on_stack, Prologue ->
-            error_with_instruction
-              "prologue appears while prologue is already on the stack" instr
-          | Prologue_on_stack, Epilogue -> No_prologue_on_stack
-          | Prologue_on_stack, Requirements (No_requirements | Requires_prologue)
-            ->
-            Prologue_on_stack
-          | Prologue_on_stack, Requirements Requires_no_prologue ->
-            error_with_instruction
-              "basic instruction requires no prologue, this should never happen"
-              instr)
-        domain
+      Ok
+        (State_set.map
+           (fun domain ->
+             match domain, Instruction_requirements.basic instr with
+             | No_prologue_on_stack, Prologue when instr.stack_offset <> 0 ->
+               error_with_instruction "prologue has a non-zero stack offset"
+                 instr
+             | No_prologue_on_stack, Prologue -> Prologue_on_stack
+             | No_prologue_on_stack, Epilogue ->
+               error_with_instruction
+                 "epilogue appears without a prologue on the stack" instr
+             | No_prologue_on_stack, Requirements Requires_prologue ->
+               error_with_instruction
+                 "instruction needs prologue but no prologue on the stack" instr
+             | ( No_prologue_on_stack,
+                 Requirements (No_requirements | Requires_no_prologue) ) ->
+               No_prologue_on_stack
+             | Prologue_on_stack, Prologue ->
+               error_with_instruction
+                 "prologue appears while prologue is already on the stack" instr
+             | Prologue_on_stack, Epilogue -> No_prologue_on_stack
+             | ( Prologue_on_stack,
+                 Requirements (No_requirements | Requires_prologue) ) ->
+               Prologue_on_stack
+             | Prologue_on_stack, Requirements Requires_no_prologue ->
+               error_with_instruction
+                 "basic instruction requires no prologue, this should never \
+                  happen"
+                 instr)
+           domain)
 
     let terminator :
-        domain -> Cfg.terminator Cfg.instruction -> context -> image =
+        domain ->
+        Cfg.terminator Cfg.instruction ->
+        context ->
+        (output, error) result =
      fun domain instr { fun_name } ->
       let res =
         State_set.map
@@ -605,14 +617,41 @@ module Validator = struct
                 instr)
           domain
       in
-      { normal = res; exceptional = res }
+      Ok { normal = res; exceptional = res }
+
+    let exception_ d _ = Ok d
   end
 
-  module T = struct
-    include Cfg_dataflow.Forward (Domain) (Transfer)
-  end
+  module A = Cfg_dataflow.Forward (Domain) (Transfer)
 
-  include (T : module type of T with type context := context)
+  let run cfg =
+    let fun_name = Cfg.fun_name cfg in
+    let init : A.init =
+      { normal = State_set.singleton No_prologue_on_stack;
+        exceptional = Domain.bot
+      }
+    in
+    match A.run cfg ~init ~map:Block { fun_name } with
+    | Ok block_states ->
+      Label.Tbl.iter
+        (fun label state ->
+          let block = Cfg.get_block_exn cfg label in
+          if block.is_trap_handler && State_set.mem No_prologue_on_stack state
+          then
+            Misc.fatal_errorf
+              "Cfg_prologue: can reach trap handler with no prologue at block \
+               %s"
+              (Label.to_string label))
+        block_states
+    | Aborted _ ->
+      Misc.fatal_errorf
+        "Cfg_prologue.Path_needs_prologue.build: Aborted on CFG for function \
+         %s@."
+        cfg.Cfg.fun_name ()
+    | Max_iterations_reached ->
+      Misc.fatal_errorf
+        "Cfg_prologue.validate: Max_iterations_reached on CFG for function %s@."
+        cfg.Cfg.fun_name ()
 end
 
 let run : Cfg_with_infos.t -> Cfg_with_infos.t =
@@ -632,27 +671,6 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
 
 let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
-  let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  let fun_name = Cfg.fun_name cfg in
-  match !Oxcaml_flags.cfg_prologue_validate with
-  | true -> (
-    match
-      Validator.run cfg
-        ~init:(Validator.State_set.singleton No_prologue_on_stack)
-        ~handlers_are_entry_points:false { fun_name }
-    with
-    | Ok block_states ->
-      Label.Tbl.iter
-        (fun label state ->
-          let block = Cfg.get_block_exn cfg label in
-          if block.is_trap_handler
-             && Validator.State_set.mem No_prologue_on_stack state
-          then
-            Misc.fatal_errorf
-              "Cfg_prologue: can reach trap handler with no prologue at block \
-               %s"
-              (Label.to_string label))
-        block_states;
-      cfg_with_infos
-    | Error () -> Misc.fatal_error "Cfg_prologue: dataflow analysis failed")
-  | false -> cfg_with_infos
+  if !Oxcaml_flags.cfg_prologue_validate
+  then Validator.run (Cfg_with_infos.cfg cfg_with_infos);
+  cfg_with_infos
