@@ -1001,10 +1001,10 @@ let substitute_decl_ikind_with_lookup
     (ikind_entry : Types.type_ikind) : Types.type_ikind =
   (* Inline type functions in an identity environment (no Env). *)
   match ikind_entry with
-  | Types.No_constructor_ikind _ -> ikind_entry
-  | Types.Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
+  | No_constructor_ikind _ -> ikind_entry
+  | Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
     Types.ikinds_todo "ikind substitution reset"
-  | Types.Constructor_ikind packed ->
+  | Constructor_ikind packed ->
     let payload = packed in
     let memo : (Path.t, Ldd.node * Ldd.node array) Hashtbl.t =
       Hashtbl.create 17
