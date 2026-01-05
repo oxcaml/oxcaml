@@ -3276,7 +3276,7 @@ let assert_does_not_cross_quotation ~loc_use ~loc_def path locks =
   | Ok () -> ()
   | Error _ ->
       Misc.fatal_errorf
-        "Parameterised module %a defined at %a crosses quotation at %a."
+        "Identifier %a defined at %a crosses quotation at %a."
         Path.print path
         Location.print_loc loc_def
         Location.print_loc loc_use
@@ -3412,10 +3412,10 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use s env.modules with
     | path, locks, data -> begin
-        let stage_locks, nonstage_locks = partition_locks locks in
+        let stage_locks, locks = partition_locks locks in
         check_cross_quotation ~errors ~loc_use:loc ~loc_def:Location.none env
           path (Lident s) stage_locks;
-        path, nonstage_locks, data
+        path, locks, data
     end
     | exception Not_found ->
         may_lookup_error errors loc env (Unbound_module (Lident s))
@@ -3555,8 +3555,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
       | Const_closure_lock (true, _, _) ->
           mode
-      | Const_closure_lock (false, pp, _)
-      | Closure_lock (pp, _) ->
+      | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
       | Unboxed_lock -> mode
@@ -3565,17 +3564,17 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
 let lookup_ident_value ~errors ~use ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) ->
-      let stage_locks, nonstage_locks = partition_locks locks in
+      let stage_locks, locks = partition_locks locks in
       begin match vda with
       | {vda_description={val_kind=Val_mut (m0, _); _}; _} ->
           m0
-          |> walk_locks_for_mutable_mode ~errors ~loc ~env nonstage_locks
+          |> walk_locks_for_mutable_mode ~errors ~loc ~env locks
           |> ignore
       | _ -> () end;
       check_cross_quotation ~errors ~loc_use:loc
         ~loc_def:vda.vda_description.val_loc env path (Lident name) stage_locks;
       use_value ~use ~loc path vda;
-      path, nonstage_locks, vda
+      path, locks, vda
   | Ok (_, _, Val_unbound reason) ->
       report_value_unbound ~errors ~loc env reason (Lident name)
   | Error _ ->
@@ -3604,11 +3603,11 @@ let lookup_ident_modtype ~errors ~use ~loc s env =
 let lookup_ident_class ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.classes with
   | Ok (path, locks, clda) ->
-      let stage_locks, nonstage_locks = partition_locks locks in
+      let stage_locks, locks = partition_locks locks in
       check_cross_quotation ~errors ~loc_def:loc
         ~loc_use:clda.clda_declaration.cty_loc env path (Lident s) stage_locks;
       use_class ~use ~loc path clda;
-      path, nonstage_locks, clda.clda_declaration
+      path, locks, clda.clda_declaration
   | Error _ ->
       may_lookup_error errors loc env (Unbound_class (Lident s))
 
@@ -3664,9 +3663,9 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
   let cstrs_filtered =
     List.filter_map
       (fun (path, cda, (locks, use_fn)) ->
-         let stage_locks, nonstage_locks = partition_locks locks in
+         let stage_locks, locks = partition_locks locks in
          does_not_cross_quotation path stage_locks
-         |> Result.map (fun () -> (path, cda, (nonstage_locks, use_fn)))
+         |> Result.map (fun () -> (path, cda, (locks, use_fn)))
          |> Result.to_option)
       cstrs
   in
@@ -3675,7 +3674,7 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
       match cstrs with
       | [] -> may_lookup_error errors loc env (Unbound_constructor (Lident s))
       | (_, _, (locks, _)) :: _ ->
-        let stage_locks, _nonstage_locks = partition_locks locks in
+        let stage_locks, _locks = partition_locks locks in
         let lbl_stage = env.stage - stage_locks_offset stage_locks in
         may_lookup_error errors loc env
           (Unbound_in_stage (Constructor, Lident s, loc, env.stage, lbl_stage))
@@ -4124,9 +4123,9 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
       in
       path, mda.mda_declaration.md_loc
   in
-  let stage_locks, nonstage_locks = partition_locks locks in
+  let stage_locks, locks = partition_locks locks in
   assert_does_not_cross_quotation ~loc_use:loc ~loc_def path stage_locks;
-  path, nonstage_locks
+  path, locks
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
   check_value_name (Longident.last lid) loc;
@@ -4404,7 +4403,7 @@ type settable_variable =
 let lookup_settable_variable ?(use=true) ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) -> begin
-      let stage_locks, nonstage_locks = partition_locks locks in
+      let stage_locks, locks = partition_locks locks in
       check_cross_quotation ~errors:true ~loc_use:loc
         ~loc_def:vda.vda_description.val_loc env path (Lident name) stage_locks;
       let desc = vda.vda_description in
@@ -4417,7 +4416,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           let val_type = Subst.Lazy.force_type_expr desc.val_type in
           let mode =
             m0
-            |> walk_locks_for_mutable_mode ~errors:true ~loc ~env nonstage_locks
+            |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
             |> Mode.Modality.Const.apply
                 Typemode.let_mutable_modalities
           in
