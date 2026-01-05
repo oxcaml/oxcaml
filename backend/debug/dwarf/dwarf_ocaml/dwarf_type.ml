@@ -1171,52 +1171,67 @@ let create_boxed_simd_type ?name ~reference ~parent_proto_die split =
            DAH.create_type_from_reference ~proto_die_reference:base_ref ])
     ()
 
-module Shape_with_layout = struct
-  type t =
-    { type_shape : Shape.t;
-      type_layout : Layout.t
-    }
+module Rec_env : sig
+  type t
 
-  include Identifiable.Make (struct
-    type nonrec t = t
+  include Hashtbl.HashedType with type t := t
 
-    let compare = Stdlib.compare
-    (* CR sspies: Fix compare and equals on this type. Move the module to type
-       shape once it is more cleaned up. *)
+  val empty : t
 
-    let print fmt { type_shape; type_layout } =
-      Format.fprintf fmt "%a @ %a" Shape.print type_shape Layout.format
-        type_layout
+  val push : t -> Proto_die.reference -> t
 
-    let hash { type_shape; type_layout } =
-      Hashtbl.hash (type_shape.hash, type_layout)
+  val get_opt :
+    t -> de_bruijn_index:RS.DeBruijn_index.t -> Proto_die.reference option
+end = struct
+  (* We deduplicate the recursive environment for efficiency. Modifications to
+     the environment are rare compared to equality checks and hashing, so we
+     wrap each environment value with its precomputed hash. This enables O(1)
+     equality checks when used as a key in [Dwarf_die_cache]. *)
+  include Hash_consed.Dedup (struct
+    type t = Proto_die.reference RS.DeBruijn_env.t
 
-    let equal ({ type_shape = x1; type_layout = y1 } : t)
-        ({ type_shape = x2; type_layout = y2 } : t) =
-      Shape.equal x1 x2 && Layout.equal y1 y2
+    let initial_size = 256
 
-    let output _oc _t = Misc.fatal_error "unimplemented"
+    let hash = RS.DeBruijn_env.hash Asm_targets.Asm_label.hash
+
+    let equal = RS.DeBruijn_env.equal Asm_targets.Asm_label.equal
   end)
+
+  let empty = create RS.DeBruijn_env.empty
+
+  let push rec_env ref = create (RS.DeBruijn_env.push (value rec_env) ref)
+
+  let get_opt rec_env ~de_bruijn_index =
+    RS.DeBruijn_env.get_opt (value rec_env) ~de_bruijn_index
 end
 
 module Dwarf_die_cache : sig
-  val find_in_cache :
-    RS.t -> rec_env:'a RS.DeBruijn_env.t -> Proto_die.reference option
+  val find : inp:RS.t -> rec_env:Rec_env.t -> Proto_die.reference option
 
-  val add_to_cache :
-    RS.t -> Proto_die.reference -> rec_env:'a RS.DeBruijn_env.t -> unit
+  val add : inp:RS.t -> rec_env:Rec_env.t -> outp:Proto_die.reference -> unit
 end = struct
-  let cache = RS.Cache.create 100
+  type t =
+    { runtime_shape : RS.t;
+      rec_env : Rec_env.t
+    }
 
-  let find_in_cache (runtime_shape : RS.t) ~rec_env =
-    if RS.DeBruijn_env.is_empty rec_env
-    then RS.Cache.find_opt cache runtime_shape
-    else None
+  module Cache = Hashtbl.Make (struct
+    type nonrec t = t
 
-  let add_to_cache (runtime_shape : RS.t) reference ~rec_env =
-    (* [rec_env] being empty means that the shape is closed. *)
-    if RS.DeBruijn_env.is_empty rec_env
-    then RS.Cache.add cache runtime_shape reference
+    let equal ({ runtime_shape = s1; rec_env = r1 } : t)
+        ({ runtime_shape = s2; rec_env = r2 } : t) =
+      RS.equal s1 s2 && Rec_env.equal r1 r2
+
+    let hash { runtime_shape; rec_env } =
+      Hashtbl.hash (RS.hash runtime_shape, Rec_env.hash rec_env)
+  end)
+
+  let cache = Cache.create 100
+
+  let find ~inp ~rec_env = Cache.find_opt cache { runtime_shape = inp; rec_env }
+
+  let add ~inp ~rec_env ~outp =
+    Cache.add cache { runtime_shape = inp; rec_env } outp
 end
 
 (* CR sspies: We have to be careful here, because LLDB currently disambiguates
@@ -1227,11 +1242,11 @@ end
    below. *)
 let rec runtime_shape_to_dwarf_die (t : RS.t) ~parent_proto_die
     ~fallback_value_die ~rec_env =
-  match Dwarf_die_cache.find_in_cache t ~rec_env with
+  match Dwarf_die_cache.find ~inp:t ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    Dwarf_die_cache.add_to_cache t reference ~rec_env;
+    Dwarf_die_cache.add ~inp:t ~rec_env ~outp:reference;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to
@@ -1254,7 +1269,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
   in
   let die_with_extended_env sh new_ref =
     runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-      ~rec_env:(RS.DeBruijn_env.push rec_env new_ref)
+      ~rec_env:(Rec_env.push rec_env new_ref)
       sh
   in
   match t.desc with
@@ -1383,7 +1398,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
              Format.pp_print_string)
           constructor_names)
   | Rec_var (de_bruijn_index, layout) -> (
-    match RS.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
+    match Rec_env.get_opt rec_env ~de_bruijn_index with
     | Some reference' ->
       create_typedef_die ~reference ~parent_proto_die ?name reference'
     | None ->
@@ -1550,7 +1565,7 @@ let runtime_shape_to_dwarf_die_with_aliased_name (type_name : string)
     let unnamed_die =
       runtime_shape_to_dwarf_die runtime_shape ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:RS.DeBruijn_env.empty
+        ~rec_env:Rec_env.empty
     in
     let reference = Proto_die.create_reference () in
     let runtime_layout = RS.runtime_layout runtime_shape in

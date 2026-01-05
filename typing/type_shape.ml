@@ -43,6 +43,10 @@ module Recursive_binder : sig
   val mark_as_used : t -> Shape.t
 
   val close_term_if_binder_is_used : t -> Shape.t -> Shape.t
+
+  val equal : t -> t -> bool
+
+  val hash : t -> int
 end = struct
   type t =
     { rv : Shape.Rec_var_ident.t;
@@ -57,6 +61,10 @@ end = struct
 
   let close_term_if_binder_is_used db sh =
     if not db.used then sh else Shape.mu db.rv sh
+
+  let equal t1 t2 = t1 == t2
+
+  let hash t = Shape.Rec_var_ident.hash t.rv
 end
 
 module Type_shape = struct
@@ -730,32 +738,140 @@ let rec decompose_application (t : Shape.t) =
   | Unknown_type | At_layout _ ->
     t, []
 
-let find_constr_id_with_args (subst_constr, _) id args =
-  match Ident.Map.find_opt id subst_constr with
-  | Some t ->
-    List.find_opt (fun (args', _) -> List.equal Shape.equal args args') t
-    |> Option.map snd
-  | None -> None
+(* To avoid the performance penalty of always using structural equality and
+   structural hashing, we deduplicate the substitution maps. We deduplicate them
+   individually to avoid combinatorial blowup when one of the maps is changed
+   and the others are kept the same. *)
 
-let find_mut_rec_shape (_, subst_constr_mut) id =
-  Ident.Map.find_opt id subst_constr_mut
+module Shape_map = struct
+  type t = Shape.t Ident.Map.t
 
-let update_subst_with_id_arg_binder (subst_constr, subst_constr_mut) id args
-    rec_binder =
-  let new_list =
-    (args, rec_binder)
-    ::
-    (match Ident.Map.find_opt id subst_constr with
-    | Some t -> t
-    | None -> [])
-  in
-  Ident.Map.add id new_list subst_constr, subst_constr_mut
-
-let update_subst_with_mutrec_decl (subst_constr, subst_constr_mut) t map =
-  ( subst_constr,
+  let hash m =
     Ident.Map.fold
-      (fun id _ map -> Ident.Map.add id (Shape.proj_decl t id) map)
-      map subst_constr_mut )
+      (fun id shape acc -> Hashtbl.hash (Ident.hash id, shape.Shape.hash, acc))
+      m 0
+
+  let equal m1 m2 = m1 == m2 || Ident.Map.equal Shape.equal m1 m2
+end
+
+(** [Type_var_env] maps type variables to their shape substitutions. Used for
+    beta reduction when evaluating type applications (e.g.,
+    [App (Abs (x, body), arg)] reduces to [body] with [x -> arg]). *)
+module Type_var_env = Hash_consed.Dedup (struct
+  include Shape_map
+
+  let initial_size = 256
+end)
+
+(** [Mutrec_env] maps constructor IDs to their mutually recursive declaration
+    shapes. When encountering a [Constr (id, args)] during evaluation, we look
+    up [id] here to find the shape of the type declaration it belongs to. *)
+module Mutrec_env = Hash_consed.Dedup (struct
+  include Shape_map
+
+  let initial_size = 128
+end)
+
+(** [Rec_constr_env] maps constructor IDs to lists of (args, recursive_binder)
+    pairs. Used for cycle detection: when we see the same [Constr (id, args)]
+    again during evaluation, we return the associated recursive variable instead
+    of unfolding infinitely. *)
+module Rec_constr_env = Hash_consed.Dedup (struct
+  type t = (Shape.t list * Recursive_binder.t) list Ident.Map.t
+
+  let initial_size = 128
+
+  let hash =
+    let hash_entry (args, rb) =
+      Hashtbl.hash
+        (List.map (fun s -> s.Shape.hash) args, Recursive_binder.hash rb)
+    in
+    fun m ->
+      Ident.Map.fold
+        (fun id entries acc ->
+          Hashtbl.hash (Ident.hash id, List.map hash_entry entries, acc))
+        m 0
+
+  let equal =
+    let equal_entry (args1, rb1) (args2, rb2) =
+      Recursive_binder.equal rb1 rb2 && List.equal Shape.equal args1 args2
+    in
+    fun m1 m2 -> m1 == m2 || Ident.Map.equal (List.equal equal_entry) m1 m2
+end)
+
+module Eval_env = struct
+  type t =
+    { type_var_env : Type_var_env.t;
+      mutrec_env : Mutrec_env.t;
+      rec_constr_env : Rec_constr_env.t
+    }
+
+  let equal t1 t2 =
+    Type_var_env.equal t1.type_var_env t2.type_var_env
+    && Mutrec_env.equal t1.mutrec_env t2.mutrec_env
+    && Rec_constr_env.equal t1.rec_constr_env t2.rec_constr_env
+
+  let hash { type_var_env; mutrec_env; rec_constr_env } =
+    Hashtbl.hash
+      ( Type_var_env.hash type_var_env,
+        Mutrec_env.hash mutrec_env,
+        Rec_constr_env.hash rec_constr_env )
+
+  let empty =
+    { type_var_env = Type_var_env.create Ident.Map.empty;
+      mutrec_env = Mutrec_env.create Ident.Map.empty;
+      rec_constr_env = Rec_constr_env.create Ident.Map.empty
+    }
+
+  let lookup_rec_constr t id args =
+    let rec_constr_env = Rec_constr_env.value t.rec_constr_env in
+    match Ident.Map.find_opt id rec_constr_env with
+    | Some entries ->
+      List.find_opt
+        (fun (args', _) -> List.equal Shape.equal args args')
+        entries
+      |> Option.map snd
+    | None -> None
+
+  let lookup_mutrec_decl t id =
+    Ident.Map.find_opt id (Mutrec_env.value t.mutrec_env)
+
+  let lookup_type_var t id =
+    Ident.Map.find_opt id (Type_var_env.value t.type_var_env)
+
+  let extend_rec_constr_env t id args rec_binder =
+    let map = Rec_constr_env.value t.rec_constr_env in
+    let old_list = Option.value ~default:[] (Ident.Map.find_opt id map) in
+    let map = Ident.Map.add id ((args, rec_binder) :: old_list) map in
+    { t with rec_constr_env = Rec_constr_env.create map }
+
+  let extend_mutrec_env t ~self ~defs =
+    let map =
+      Ident.Map.fold
+        (fun id _ acc -> Ident.Map.add id (Shape.proj_decl self id) acc)
+        defs
+        (Mutrec_env.value t.mutrec_env)
+    in
+    { t with mutrec_env = Mutrec_env.create map }
+
+  let extend_type_var_env t id shape =
+    let map = Ident.Map.add id shape (Type_var_env.value t.type_var_env) in
+    { t with type_var_env = Type_var_env.create map }
+end
+
+module Shape_dedup = struct
+  include Hash_consed.Dedup (struct
+    type t = Shape.t
+
+    let initial_size = 1024
+
+    let hash t = t.Shape.hash
+
+    let equal = Shape.equal
+  end)
+
+  let dedup shape = value (create shape)
+end
 
 module Evaluation_diagnostics = struct
   type evaluate_diagnostics = { mutable reduction_steps : int }
@@ -779,41 +895,28 @@ module D = Evaluation_diagnostics
 
 (* The cache can be used across invocations of [unfold_and_evaluate] and can
    improve the performance if we deal with the same type (or components of it)
-   repeatedly. *)
-let eval_cache = Shape.Cache.create 256
+   repeatedly. The cache key is (Shape.t, Eval_env.t) since the evaluation
+   result depends on both the shape and the evaluation environment. *)
+module Eval_cache : sig
+  val add : inp:Shape.t -> env:Eval_env.t -> outp:Shape.t -> unit
 
-let add_to_cache t res subst_type (subst_constr_mut, subst_constr) =
-  (* Due to internal sharing in memory, type shapes can become too large to
-     traverse recursively. As such, we cannot check here whether the shape [t]
-     is actually closed. We approximate this by checking whether it is being
-     evaluated in an empty environment, since an empty environment will always
-     lead to the same result (regardless of whether the shape is actually
-     closed). In an empty environment:
+  val find : inp:Shape.t -> env:Eval_env.t -> Shape.t option
+end = struct
+  module Cache = Hashtbl.Make (struct
+    type t = Shape.t * Eval_env.t
 
-     - [subst_type] is empty, meaning there are no free type variables to
-       substitute,
+    let equal (s1, env1) (s2, env2) =
+      Shape.equal s1 s2 && Eval_env.equal env1 env2
 
-     - [subst_constr_mut] is empty, meaning there are no mutually-recursive
-       declarations that we could insert for [Constr]-entries, and
+    let hash (s, env) = Hashtbl.hash (s.Shape.hash, Eval_env.hash env)
+  end)
 
-     - [subst_constr] is empty, meaning there are no recursive occurrences
-       of a particular [Constr (id, args)] to be substituted with a recursive
-       variable. *)
-  if
-    Ident.Map.is_empty subst_type
-    && Ident.Map.is_empty subst_constr_mut
-    && Ident.Map.is_empty subst_constr
-  then Shape.Cache.add eval_cache t res
+  let eval_cache = Cache.create 256
 
-let find_in_cache t subst_type (subst_constr_mut, subst_constr) =
-  (* We perform the same emptiness check as in [add_to_cache] when looking up a
-     value. *)
-  if
-    Ident.Map.is_empty subst_type
-    && Ident.Map.is_empty subst_constr_mut
-    && Ident.Map.is_empty subst_constr
-  then Shape.Cache.find_opt eval_cache t
-  else None
+  let add ~inp ~env ~outp = Cache.add eval_cache (inp, env) outp
+
+  let find ~inp ~env = Cache.find_opt eval_cache (inp, env)
+end
 
 let is_above_unfold_and_evaluate_max_depth depth =
   match !Clflags.gdwarf_config_shape_eval_depth with
@@ -822,8 +925,8 @@ let is_above_unfold_and_evaluate_max_depth depth =
 
 (* To unroll the mutually recursive declarations, we perform a simple call by
    value evaluation and catch cycles for ident binders. *)
-let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-    subst_constr (t : Shape.t) =
+let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining ~env
+    (t : Shape.t) =
   D.count_evaluation_step diagnostics;
   if Misc.Maybe_bounded.is_depleted steps_remaining
   then Shape.unknown_type ()
@@ -831,18 +934,15 @@ let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
   then Shape.unknown_type ()
   else (
     Misc.Maybe_bounded.decr steps_remaining;
-    match find_in_cache t subst_type subst_constr with
+    match Eval_cache.find ~inp:t ~env with
     | Some res -> res
-    | None ->
-      unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
-        subst_constr t)
+    | None -> unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining ~env t)
 
-and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
-    subst_constr (t : Shape.t) =
+and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining ~env (t : Shape.t)
+    =
   let head, args = decompose_application t in
   let unfold_and_eval =
-    unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-      subst_constr
+    unfold_and_evaluate ~diagnostics ~depth ~steps_remaining ~env
   in
   let unfold_and_eval_list = List.map unfold_and_eval in
   let maybe_evaluated_shape =
@@ -856,13 +956,11 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
       | Mutrec ts ->
         let depth = depth + 1 in
         let rec_binder = Recursive_binder.create () in
-        let subst_constr = update_subst_with_mutrec_decl subst_constr str ts in
-        let subst_constr =
-          update_subst_with_id_arg_binder subst_constr id args rec_binder
-        in
+        let env = Eval_env.extend_mutrec_env env ~self:str ~defs:ts in
+        let env = Eval_env.extend_rec_constr_env env id args rec_binder in
         let ts = Ident.Map.find id ts in
-        unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-          subst_constr (Shape.app_list ts args)
+        unfold_and_evaluate ~diagnostics ~depth ~steps_remaining ~env
+          (Shape.app_list ts args)
         |> Recursive_binder.close_term_if_binder_is_used rec_binder
         |> Option.some
       | Unknown_type | At_layout _ | Error _ -> None
@@ -909,15 +1007,15 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
     | None -> (
       match t.desc with
       | Var id -> (
-        match Ident.Map.find_opt id subst_type with
+        match Eval_env.lookup_type_var env id with
         | Some t -> t
         | None -> t (* we encountered a free variable *))
       | Constr (id, constr_args) -> (
         let constr_args = unfold_and_eval_list constr_args in
-        match find_constr_id_with_args subst_constr id constr_args with
+        match Eval_env.lookup_rec_constr env id constr_args with
         | Some t -> Recursive_binder.mark_as_used t
         | None -> (
-          match find_mut_rec_shape subst_constr id with
+          match Eval_env.lookup_mutrec_decl env id with
           | Some t -> unfold_and_eval (Shape.app_list t constr_args)
           | None -> Shape.unknown_type ()))
       | App (f, arg) -> (
@@ -925,9 +1023,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
         let arg = unfold_and_eval arg in
         match f.Shape.desc with
         | Abs (x, s') ->
-          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
-            (Ident.Map.add x arg subst_type)
-            subst_constr s'
+          let env = Eval_env.extend_type_var_env env x arg in
+          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining ~env s'
         | Var _
         | App (_, _)
         | Struct _ | Alias _ | Leaf
@@ -971,20 +1068,17 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
           arg_layout
       | Proj (t, i) ->
         Shape.proj
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-             subst_constr t)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining ~env t)
           i
       | Tuple args -> Shape.tuple (unfold_and_eval_list args)
       | Unboxed_tuple args -> Shape.unboxed_tuple (unfold_and_eval_list args)
       | Predef (p, args) -> Shape.predef p (unfold_and_eval_list args)
       | Mu (rv, body) ->
         Shape.mu rv
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-             subst_constr body)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining ~env body)
       | Alias t ->
         Shape.alias
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-             subst_constr t)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining ~env t)
       | At_layout (t, layout) -> Shape.at_layout (unfold_and_eval t) layout
       | Struct items -> Shape.str (Shape.Item.Map.map unfold_and_eval items)
       (* normal forms for CBV evaluation *)
@@ -992,7 +1086,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
       | Unknown_type ->
         t)
   in
-  add_to_cache t result subst_type subst_constr;
+  let result = Shape_dedup.dedup result in
+  Eval_cache.add ~inp:t ~env ~outp:result;
   result
 
 let unfold_and_evaluate ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t
@@ -1001,8 +1096,7 @@ let unfold_and_evaluate ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t
     Misc.Maybe_bounded.of_option
       !Clflags.gdwarf_config_max_evaluation_steps_per_variable
   in
-  unfold_and_evaluate ~diagnostics ~depth:0 ~steps_remaining Ident.Map.empty
-    (Ident.Map.empty, Ident.Map.empty)
+  unfold_and_evaluate ~diagnostics ~depth:0 ~steps_remaining ~env:Eval_env.empty
     t
 
 type shape_with_layout =
