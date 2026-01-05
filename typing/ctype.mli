@@ -585,10 +585,15 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : type_declaration option
+  ; or_null : (type_declaration * unwrapped_type_expr) option;
     (* We store the declaration rather than a bool to avoid re-writing the
        with-bounds of [or_null], and to be more robust for the future where we
-       have user-defined [or_null]-like types *)
+       have user-defined [or_null]-like types
+
+       We also store the previous unwrapped_type_expr, as reapplying or_null can
+       fail, in which case we fall back to the type that was unwrapped one time
+       fewer.
+    *)
   }
 
 val get_unboxed_type_representation :
