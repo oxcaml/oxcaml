@@ -488,8 +488,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = true }
         in
-        (* If we cannot soundly derive a polynomial from components, fall back
-           to the stored jkind and mark it abstract. *)
+        (* For abstract types and allow_any_crossing types, we derive the
+           ikind from the jkind annotation, instead of computing it from
+           the type declaration's body. *)
         match type_decl.type_kind with
         | _ when allow_any_crossing -> use_decl_jkind ()
         | Types.Type_abstract _ -> use_decl_jkind ()
