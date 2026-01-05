@@ -479,24 +479,26 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
             Option.is_some umc_opt
           | Types.Type_abstract _ | Types.Type_open -> false
         in
-        let use_decl_jkind () =
+        let use_decl_jkind ~treat_as_abstract =
           let kind : Solver.ckind =
            fun ctx -> ckind_of_jkind_l ctx type_decl.type_jkind
           in
-          let abstract =
-            match type_decl.type_kind with
-            | Types.Type_abstract _ ->
-              not (Jkind.is_best type_decl.type_jkind)
-            | _ -> true
-          in
-          Solver.Ty { args = type_decl.type_params; kind; abstract }
+          Solver.Ty
+            { args = type_decl.type_params;
+              kind;
+              abstract = treat_as_abstract
+            }
         in
         match type_decl.type_kind with
         (* For abstract types and allow_any_crossing types, we derive the
            ikind from the jkind annotation, instead of computing it from
            the type declaration's body: *)
-        | _ when allow_any_crossing -> use_decl_jkind ()
-        | Types.Type_abstract _ -> use_decl_jkind ()
+        | _ when allow_any_crossing ->
+          use_decl_jkind ~treat_as_abstract:false
+        | Types.Type_abstract _ ->
+          use_decl_jkind
+            ~treat_as_abstract:
+              (not (Jkind.is_best type_decl.type_jkind))
         (* For other cases, we compute the ikind from the type definition{} *)
         | Types.Type_record (lbls, rep, _umc_opt) ->
           (* Build from components: base (non-float value) + per-label
