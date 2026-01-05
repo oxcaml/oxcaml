@@ -28,3 +28,12 @@ type t : immediate with int
 [%%expect{|
 type t : immediate
 |}]
+
+module M : sig
+  type t : immediate with string
+end = struct
+  type t = int list
+end
+[%%expect {|
+module M : sig type t : immutable_data end
+|}]
