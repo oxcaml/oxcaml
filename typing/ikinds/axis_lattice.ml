@@ -54,7 +54,7 @@
 
 let axis_sizes = [| 3; 2; 2; 3; 3; 2; 2; 3; 3; 2; 3; 2; 3 |]
 
-let num_axes = 13
+let num_axes = Array.length axis_sizes
 
 let axis_by_number = Array.of_list Jkind_axis.Axis.all
 
@@ -66,13 +66,10 @@ let widths =
 
 (* consecutive packing offsets *)
 let offsets =
-  let off = Array.make num_axes 0 in
-  let a = ref 0 in
-  for i = 0 to num_axes - 1 do
-    off.(i) <- !a;
-    a := !a + widths.(i)
-  done;
-  off
+  let _, offs =
+    Array.fold_left_map (fun acc width -> acc + width, acc) 0 widths
+  in
+  offs
 
 (* 1 if axis i has a high bit (i.e. width=2), else 0 *)
 let has_hi =
