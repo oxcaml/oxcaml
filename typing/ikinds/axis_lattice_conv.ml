@@ -55,10 +55,10 @@ let of_mod_bounds (mb : Types.Jkind_mod_bounds.t) : Axis_lattice.t =
   let open Axis_lattice.Levels in
   let levels =
     [| level_of_areality (areality_const mb);
-       level_of_linearity (linearity_const mb);
        level_of_uniqueness_monadic (uniqueness_const mb);
-       level_of_portability (portability_const mb);
+       level_of_linearity (linearity_const mb);
        level_of_contention_monadic (contention_const mb);
+       level_of_portability (portability_const mb);
        level_of_forkable (forkable_const mb);
        level_of_yielding (yielding_const mb);
        level_of_statefulness (statefulness_const mb);
@@ -75,10 +75,10 @@ let to_mod_bounds (x : Axis_lattice.t) : Types.Jkind_mod_bounds.t =
   let open Axis_lattice.Levels in
   let lv = Axis_lattice.to_levels x in
   let areality = areality_of_level lv.(0) in
-  let linearity = linearity_of_level lv.(1) in
-  let uniqueness = uniqueness_of_level_monadic lv.(2) in
-  let portability = portability_of_level lv.(3) in
-  let contention = contention_of_level_monadic lv.(4) in
+  let uniqueness = uniqueness_of_level_monadic lv.(1) in
+  let linearity = linearity_of_level lv.(2) in
+  let contention = contention_of_level_monadic lv.(3) in
+  let portability = portability_of_level lv.(4) in
   let forkable = forkable_of_level lv.(5) in
   let yielding = yielding_of_level lv.(6) in
   let statefulness = statefulness_of_level lv.(7) in

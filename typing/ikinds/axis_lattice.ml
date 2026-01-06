@@ -21,10 +21,10 @@
 
    Axis layout (index, name, values from level 0 to max):
    0. Areality (Regionality): Global -> Regional -> Local
-   1. Linearity: Many -> Once
-   2. Uniqueness (monadic): Aliased -> Unique
-   3. Portability: Portable -> Shareable -> Nonportable
-   4. Contention (monadic): Contended -> Shared -> Uncontended
+   1. Uniqueness (monadic): Aliased -> Unique
+   2. Linearity: Many -> Once
+   3. Contention (monadic): Contended -> Shared -> Uncontended
+   4. Portability: Portable -> Shareable -> Nonportable
    5. Forkable: Forkable -> Unforkable
    6. Yielding: Unyielding -> Yielding
    7. Statefulness: Stateless -> Observing -> Stateful
@@ -45,16 +45,15 @@ let axis_sizes = [| 3; 2; 2; 3; 3; 2; 2; 3; 3; 2; 3; 2; 3 |]
 
 let num_axes = 13
 
-(* Axes in the correct order matching axis_index (NOT Jkind_axis.Axis.all).
-   This is the order used by Axis_set.create and axis_index.
-   DO NOT use Jkind_axis.Axis.all directly as it has a different order. *)
+(* Axes in the order matching axis_index. This order matches Jkind_axis.Axis.all,
+   but we keep it explicit here to avoid depending on that list. *)
 let all_axes_correct_order : Jkind_axis.Axis.packed list =
   let open Mode.Crossing.Axis in
   [ Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Areality));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity));
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity));
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability));
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Forkable));
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding));
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness));
@@ -187,29 +186,29 @@ let areality_regional : t = set_axis bot ~axis:0 ~level:1
 
 let areality_local : t = set_axis bot ~axis:0 ~level:2
 
-(* Linearity axis: 0=Many, 1=Once *)
-let linearity_many : t = set_axis bot ~axis:1 ~level:0
-
-let linearity_once : t = set_axis bot ~axis:1 ~level:1
-
 (* Uniqueness axis (monadic): 0=Aliased, 1=Unique *)
-let uniqueness_aliased : t = set_axis bot ~axis:2 ~level:0
+let uniqueness_aliased : t = set_axis bot ~axis:1 ~level:0
 
-let uniqueness_unique : t = set_axis bot ~axis:2 ~level:1
+let uniqueness_unique : t = set_axis bot ~axis:1 ~level:1
 
-(* Portability axis: 0=Portable, 1=Shareable, 2=Nonportable *)
-let portability_portable : t = set_axis bot ~axis:3 ~level:0
+(* Linearity axis: 0=Many, 1=Once *)
+let linearity_many : t = set_axis bot ~axis:2 ~level:0
 
-let portability_shareable : t = set_axis bot ~axis:3 ~level:1
-
-let portability_nonportable : t = set_axis bot ~axis:3 ~level:2
+let linearity_once : t = set_axis bot ~axis:2 ~level:1
 
 (* Contention axis (monadic): 0=Contended, 1=Shared, 2=Uncontended *)
-let contention_contended : t = set_axis bot ~axis:4 ~level:0
+let contention_contended : t = set_axis bot ~axis:3 ~level:0
 
-let contention_shared : t = set_axis bot ~axis:4 ~level:1
+let contention_shared : t = set_axis bot ~axis:3 ~level:1
 
-let contention_uncontended : t = set_axis bot ~axis:4 ~level:2
+let contention_uncontended : t = set_axis bot ~axis:3 ~level:2
+
+(* Portability axis: 0=Portable, 1=Shareable, 2=Nonportable *)
+let portability_portable : t = set_axis bot ~axis:4 ~level:0
+
+let portability_shareable : t = set_axis bot ~axis:4 ~level:1
+
+let portability_nonportable : t = set_axis bot ~axis:4 ~level:2
 
 (* Forkable axis: 0=Forkable, 1=Unforkable *)
 let forkable_forkable : t = set_axis bot ~axis:5 ~level:0
@@ -263,7 +262,7 @@ let separability_maybe_separable : t = set_axis bot ~axis:12 ~level:2
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   let levels = Array.make num_axes 0 in
   let open Jkind_axis in
-  (* Iterate in the correct axis_index order, not Axis.all order *)
+  (* Iterate in axis_index order. *)
   List.iteri
     (fun i (Axis.Pack ax) ->
       if Axis_set.mem set ax then levels.(i) <- axis_sizes.(i) - 1)
@@ -444,10 +443,10 @@ let const_of_levels ~areality ~linearity ~uniqueness ~portability ~contention
   encode
     ~levels:
       [| level_of_areality areality;
-         level_of_linearity linearity;
          level_of_uniqueness_monadic uniqueness;
-         level_of_portability portability;
+         level_of_linearity linearity;
          level_of_contention_monadic contention;
+         level_of_portability portability;
          level_of_forkable forkable;
          level_of_yielding yielding;
          level_of_statefulness statefulness;
@@ -549,10 +548,10 @@ let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
   let open Mode.Crossing.Axis in
   match axis_number with
   | 0 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Areality))
-  | 1 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity))
-  | 2 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness))
-  | 3 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability))
-  | 4 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention))
+  | 1 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness))
+  | 2 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity))
+  | 3 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention))
+  | 4 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability))
   | 5 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Forkable))
   | 6 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding))
   | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
