@@ -101,7 +101,6 @@ Error: This expression has type "t" but an expression was expected of type
 
 type 'a u
 type t : immutable_data with (type : value) u = { foo : 'a. 'a u }
-(* CR layouts v2.8: This should be accepted. Internal ticket 5770. *)
 [%%expect{|
 type 'a u
 type t = { foo : 'a. 'a u; }
