@@ -558,10 +558,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
              jkinds because ikinds cannot express this today. This deferral
              can be removed once separability and nullability become layout
              properties rather than modal axes. *)
-          let kind : Solver.ckind =
-           fun ctx -> ckind_of_jkind_l ctx type_decl.type_jkind
-          in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+          use_decl_jkind ~treat_as_abstract:false
         | Types.Type_variant (cstrs, rep, _umc_opt) ->
           (* GADTs introduce existential type variables via [cd_res] and can
              install local equations. For ikinds, we conservatively round up
