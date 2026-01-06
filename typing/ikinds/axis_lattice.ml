@@ -52,11 +52,31 @@
    OR/AND compute join/meet, and disjoint slots make that true for all
    axes at once. *)
 
-let axis_sizes = [| 3; 2; 2; 3; 3; 2; 2; 3; 3; 2; 3; 2; 3 |]
+let axis_by_number = Array.of_list Jkind_axis.Axis.all
+
+let axis_sizes =
+  let open Jkind_axis.Axis in
+  let open Mode.Axis in
+  let open Mode.Crossing.Axis in
+  Array.map
+    (fun (Pack axis) ->
+      match axis with
+      | Modal (Comonadic Areality) -> 3
+      | Modal (Monadic Uniqueness) -> 2
+      | Modal (Comonadic Linearity) -> 2
+      | Modal (Monadic Contention) -> 3
+      | Modal (Comonadic Portability) -> 3
+      | Modal (Comonadic Forkable) -> 2
+      | Modal (Comonadic Yielding) -> 2
+      | Modal (Comonadic Statefulness) -> 3
+      | Modal (Monadic Visibility) -> 3
+      | Modal (Monadic Staticity) -> 2
+      | Nonmodal Externality -> 3
+      | Nonmodal Nullability -> 2
+      | Nonmodal Separability -> 3)
+    axis_by_number
 
 let num_axes = Array.length axis_sizes
-
-let axis_by_number = Array.of_list Jkind_axis.Axis.all
 
 (* widths[i] = 2 for size-3 axes, 1 for size-2 *)
 let widths =
