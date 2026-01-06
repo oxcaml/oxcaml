@@ -388,7 +388,6 @@ module M2 : S with type t = [ `A of string ] = struct
   type t = [ `A of string ]
 end
 type t3 : immediate with M2.t = C of string (* should be accepted *)
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 module M2 : sig type t = [ `A of string ] end
 type t3 = C of string
