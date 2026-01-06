@@ -648,10 +648,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
         | Types.Type_open ->
           (* Use the stored jkind here in case it is `exn`,
              which is special. *)
-          let kind : Solver.ckind =
-           fun ctx -> ckind_of_jkind_l ctx type_decl.type_jkind
-          in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+          use_decl_jkind ~treat_as_abstract:false
         (*
            (* This is the code we'd use otherwise *)
            let kind : Solver.ckind =
