@@ -2582,8 +2582,10 @@ let construct_spine ~env ~loc typ =
             (* move to [Translquote] and avoid constructing module_type *)
             mk (Ttyp_var (None, None))
           | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
-            (* fatal error in [Translquote] *)
-            assert false)
+            fatal_errorf
+              "Translquote [at %a]: unexpected type expression in the spine of \
+               a quoted higher-rank function type"
+              Location.print_loc_in_lowercase loc)
   in
   let ttyp = go typ in
   ttyp
