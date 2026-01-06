@@ -45,9 +45,9 @@ val mask_shallow : t
 val mask_of_modality :
   relevant_for_shallow:[`Relevant | `Irrelevant] -> Mode.Modality.Const.t -> t
 
-(* CR jujacobs: Jkind_mod_bounds.t is the same type as this.
-   When ikinds is fully merged, make Jkind_mod_bounds.t an alias 
-   for this type. *)
+(** [Jkind_mod_bounds.t] is morally the same type as this.
+   However, its encoding of Crossing.t is different and more complex
+   than record below. *)
 type boxed = {
   areality : Mode.Regionality.Const.t;
   linearity : Mode.Linearity.Const.t;
