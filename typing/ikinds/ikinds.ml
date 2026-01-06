@@ -906,7 +906,7 @@ let sub_or_intersect ?origin:_origin
         in
         let reasons : Jkind.Sub_failure_reason.t Misc.Nonempty_list.t =
           match axis_reasons with
-          | [] -> Jkind.Sub_failure_reason.Layout_disagreement :: []
+          | [] -> [ Layout_disagreement ]
           | hd :: tl -> hd :: tl
         in
         Jkind.Has_intersection reasons)
