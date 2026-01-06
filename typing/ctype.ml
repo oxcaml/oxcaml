@@ -2269,6 +2269,9 @@ type unbox_result =
   (* definition not in environment: missing cmi *)
   | Missing of Path.t
 
+
+(* [prev_unwrapped_ty] allows us to backtrack in case an [or_null] cannot be
+   re-applied: see Note [unwrapped_type_expr backtracking for or_null]. *)
 let unbox_once env ty prev_unwrapped_ty =
   match get_desc ty with
   | Tconstr (p, args, _) ->

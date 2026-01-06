@@ -590,9 +590,23 @@ type unwrapped_type_expr =
        with-bounds of [or_null], and to be more robust for the future where we
        have user-defined [or_null]-like types
 
+       Note [unwrapped_type_expr backtracking for or_null]:
+
        We also store the previous unwrapped_type_expr, as reapplying or_null can
        fail, in which case we fall back to the type that was unwrapped one time
-       fewer.
+       fewer. In particular, it can fail for functions like the following:
+
+         let rec bad () : float# or_null = Null
+
+       Although this is ill-typed, we don't realize this when we typecheck it
+       with [type_approx], which we use for recursive functions. This gets us
+       into trouble when [type_approx] calls [type_jkind], which could then
+       unwraps and re-wraps an invalid application of [or_null] like the above.
+       So, to avoid needing to consider invalid applications of [or_null], we
+       use the previous [unwrapped_type_expr] as a fallback.
+
+       This hack should be removed when we refactor [type_jkind] and
+       [estimate_type_jkind] to fix another bug.
     *)
   }
 
