@@ -184,10 +184,10 @@ module Axis = struct
 
   let all =
     [ Pack (Modal (Comonadic Areality));
-      Pack (Modal (Monadic Uniqueness));
       Pack (Modal (Comonadic Linearity));
-      Pack (Modal (Monadic Contention));
+      Pack (Modal (Monadic Uniqueness));
       Pack (Modal (Comonadic Portability));
+      Pack (Modal (Monadic Contention));
       Pack (Modal (Comonadic Forkable));
       Pack (Modal (Comonadic Yielding));
       Pack (Modal (Comonadic Statefulness));
