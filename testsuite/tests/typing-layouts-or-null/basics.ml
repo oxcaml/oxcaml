@@ -171,7 +171,6 @@ Error: This type "t_any" should be an instance of type "('a : any mod separable)
 
 module M (X : sig type t : any end) : sig type t : any mod separable end = X
 
-(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
 Line 1, characters 75-76:
 1 | module M (X : sig type t : any end) : sig type t : any mod separable end = X
@@ -222,7 +221,6 @@ Error: This type "t_value_or_null" should be an instance of type "('a : value)"
 
 module M (X : sig type t : value_or_null end) : sig type t : value end = X
 
-(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
 Line 1, characters 73-74:
 1 | module M (X : sig type t : value_or_null end) : sig type t : value end = X
@@ -271,7 +269,6 @@ Error: This type "t_value_or_null" should be an instance of type
 
 module M (X : sig type t : value_or_null end) : sig type t : any mod separable end = X
 
-(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
 Line 1, characters 85-86:
 1 | module M (X : sig type t : value_or_null end) : sig type t : any mod separable end = X

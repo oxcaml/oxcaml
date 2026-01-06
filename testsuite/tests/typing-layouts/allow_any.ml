@@ -551,7 +551,6 @@ end
 module M : sig type t : immutable_data end
 |}]
 
-(* CR jujacobs: this should be accepted. *)
 module M : sig 
   type t : immutable_data
 end = struct

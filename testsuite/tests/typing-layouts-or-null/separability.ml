@@ -723,7 +723,6 @@ type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
 
 type a : value = #{ a : t_maybesep_val }
 
-(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
 Line 1, characters 0-40:
 1 | type a : value = #{ a : t_maybesep_val }

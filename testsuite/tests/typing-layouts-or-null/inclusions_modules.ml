@@ -53,7 +53,6 @@ Error: Signature mismatch:
 (* value_or_null is not a sublayout of value (module inclusion) *)
 module M1 (X : sig type t : value_or_null end) : sig type t : value end = X
 
-(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
 Line 1, characters 74-75:
 1 | module M1 (X : sig type t : value_or_null end) : sig type t : value end = X
@@ -73,7 +72,6 @@ Error: Signature mismatch:
 (* any is not a sublayout of any mod separable (module inclusion) *)
 module M2 (X : sig type t : any end) : sig type t : any mod separable end = X
 
-(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
 Line 1, characters 76-77:
 1 | module M2 (X : sig type t : any end) : sig type t : any mod separable end = X
