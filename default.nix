@@ -42,15 +42,112 @@ let
       (mkFlag syntaxQuotations "syntax-quotations")
     ];
 
-  upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
+  ocaml_5_4 = (pkgs.callPackage (
+    import (pkgs.path + "/pkgs/development/compilers/ocaml/generic.nix") {
+      major_version = "5";
+      minor_version = "4";
+      patch_version = "0";
+      sha256 = "sha256-36qKLhHHmbwXZdi+9EkRQG7l9IAwJxkDgqk5+IyRImY=";
+    }) {}).overrideAttrs {
+      # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
+      # compiler that we use to bootstrap ourselves on ARM64
+      patches = [
+        # ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.4.14.2+oxcaml/files/ocaml-base-compiler.4.14.2+oxcaml.patch
+      ];
+    };
 
-  ocaml = (upstream.ocaml.override { inherit stdenv; }).overrideAttrs {
-    # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
-    # compiler that we use to bootstrap ourselves on ARM64
-    patches = [
-      ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.4.14.2+oxcaml/files/ocaml-base-compiler.4.14.2+oxcaml.patch
-    ];
-  };
+  ocamlPackages_5_4 =
+    (pkgs.ocaml-ng.mkOcamlPackages ocaml_5_4).overrideScope (final: prev: {
+      ppxlib =
+        prev.ppxlib.overrideAttrs (old: rec {
+          name = "${old.pname}-${version}";
+          version = "0.37.0";
+          src = pkgs.fetchurl {
+            url = "https://github.com/ocaml-ppx/ppxlib/releases/download/${version}/ppxlib-${version}.tbz";
+            sha256 = "sha256-LiI4N+fOzDvISkMkMsCnL04dW+kWXJwzdy8VbbhdsLM=";
+          };
+        });
+
+      ppx_optcomp = prev.ppx_optcomp.overrideAttrs (old: rec {
+        name = "${old.pname}-${version}";
+        version = "0.17.1";
+        src = pkgs.fetchFromGitHub {
+          owner = "janestreet";
+          repo = old.pname;
+          rev = "v${version}";
+          sha256 = "sha256-mi9YM0WGkc4sI1GF2YGTFwmPdF+4s5Ou2l7i07ys9nw=";
+        };
+      });
+
+      ppxlib_jane = prev.ppxlib_jane.overrideAttrs (old: rec {
+        name = "${old.pname}-${version}";
+        version = "0.17.4";
+        src = pkgs.fetchFromGitHub {
+          owner = "janestreet";
+          repo = old.pname;
+          rev = "v${version}";
+          sha256 = "sha256-cqF7aT0ubutRxsSTD5aHnHx4zvlPDkTzdBqONU6EgO0=";
+        };
+      });
+
+      ppx_sexp_conv = prev.ppx_sexp_conv.overrideAttrs (old: rec {
+        name = "${old.pname}-${version}";
+        version = "0.17.1";
+        src = pkgs.fetchFromGitHub {
+          owner = "janestreet";
+          repo = old.pname;
+          rev = "v${version}";
+          sha256 = "sha256-yQJluA/NSzCAID/ydBgRuc1sFHyjbXare9vxen6f1iw=";
+        };
+      });
+
+      ppx_globalize = prev.ppx_globalize.overrideAttrs (old: rec {
+        name = "${old.pname}-${version}";
+        version = "0.17.2";
+        src = pkgs.fetchFromGitHub {
+          owner = "janestreet";
+          repo = old.pname;
+          rev = "v${version}";
+          sha256 = "sha256-5pHqyv94DXpSG69TEATcnJwFh5YurxVCM5ZPtrlbXSo=";
+        };
+      });
+
+      ppx_inline_test = prev.ppx_inline_test.overrideAttrs (old: rec {
+        name = "${old.pname}-${version}";
+        version = "0.17.2";
+        src = pkgs.fetchFromGitHub {
+          owner = "janestreet";
+          repo = old.pname;
+          rev = "v${version}";
+          sha256 = "sha256-wNDDdNUeWTW87HRKbRSuOXaCPQnDWx7/RXuCDISc9Pg=";
+        };
+      });
+
+      ppx_expect = prev.ppx_expect.overrideAttrs (old: rec {
+        name = "${old.pname}-${version}";
+        version = "0.17.3";
+        src = pkgs.fetchFromGitHub {
+          owner = "janestreet";
+          repo = old.pname;
+          rev = "v${version}";
+          sha256 = "sha256-eYZ3p3FYjHd15pj79TKyHSHNKRSWj80iHJFxBZN40s4=";
+        };
+      });
+
+      ocamlformat_0_28_1 =
+        prev.ocamlformat.overrideAttrs (old: rec {
+          name = "${old.pname}-${version}";
+          version = "0.28.1";
+          src = pkgs.fetchurl {
+            url = "https://github.com/ocaml-ppx/ocamlformat/releases/download/${version}/ocamlformat-${version}.tbz";
+            sha256 = "sha256-cL2gN9C+2WHtkb21GYsu7vVCREdQqLAV2AzLlLP/Qfs=";
+          };
+        });
+      ocamlformat = final.ocamlformat_0_28_1;
+    });
+
+  upstream = ocamlPackages_5_4;
+  ocaml = upstream.ocaml;
 
   dune = upstream.dune_3.overrideAttrs rec {
     version = "3.19.1";
@@ -194,7 +291,7 @@ stdenv.mkDerivation {
       pkgs.which
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
-      upstream.ocamlformat_0_24_1 # required for make fmt
+      upstream.ocamlformat_0_28_1 # required for make fmt
       pkgs.removeReferencesTo
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
@@ -258,4 +355,7 @@ stdenv.mkDerivation {
   meta =
     { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
 
+  passthru = {
+    inherit ocaml_5_4 ocamlPackages_5_4;
+  };
 }
