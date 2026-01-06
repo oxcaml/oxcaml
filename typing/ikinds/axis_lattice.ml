@@ -39,7 +39,18 @@
    Axes 11-12 are "shallow" axes (nullability and separability) that are
    sometimes excluded from masking operations.
 
-   Each 3-valued axis uses 2 bits, each 2-valued axis uses 1 bit. *)
+   Each 3-valued axis uses 2 bits, each 2-valued axis uses 1 bit.
+   For 3-valued axes, level 2 is encoded as 0b11 (not 0b10).
+
+   Encoding scheme: each axis uses a "prefix ones" encoding within its slot.
+   For 2 levels: 0 -> 0b0, 1 -> 0b1.
+   For 3 levels: 0 -> 0b00, 1 -> 0b01, 2 -> 0b11.
+   If an axis had 5 levels, it would be 0b0000, 0b0001, 0b0011,
+   0b0111, 0b1111.
+
+   With this encoding, per-axis order is just bit inclusion, so bitwise
+   OR/AND compute join/meet, and disjoint slots make that true for all
+   axes at once. *)
 
 let axis_sizes = [| 3; 2; 2; 3; 3; 2; 2; 3; 3; 2; 3; 2; 3 |]
 
@@ -64,15 +75,21 @@ let offsets =
   off
 
 (* 1 if axis i has a high bit (i.e. width=2), else 0 *)
-let has_hi = Array.init num_axes (fun i -> (widths.(i) lsr 1) land 1)
+let has_hi =
+  Array.init num_axes (fun i ->
+      match axis_sizes.(i) with
+      | 3 -> 1
+      | 2 -> 0
+      | _ -> invalid_arg "bad axis size")
 
-let lo_mask = Array.init num_axes (fun i -> 1 lsl offsets.(i))
+let lo_mask = Array.map (fun off -> 1 lsl off) offsets
 
 let hi_mask =
-  Array.init num_axes (fun i ->
-      if has_hi.(i) = 1 then 1 lsl (offsets.(i) + 1) else 0)
+  Array.mapi
+    (fun i off -> if has_hi.(i) = 1 then 1 lsl (off + 1) else 0)
+    offsets
 
-let axis_mask = Array.init num_axes (fun i -> lo_mask.(i) lor hi_mask.(i))
+let axis_mask = Array.map2 (fun lo hi -> lo lor hi) lo_mask hi_mask
 
 (* OR of all low bits (for size-2 axes that’s their only bit).
    For this layout: 0x6D75D. *)
@@ -116,11 +133,12 @@ let set_axis (v : t) ~axis:i ~level:lev : t =
   cleared lor (lo lsl off) lor (hi lsl (off + 1))
 
 let encode ~levels : t =
-  let v = ref 0 in
-  for i = 0 to num_axes - 1 do
-    v := set_axis !v ~axis:i ~level:levels.(i)
-  done;
-  !v
+  let _, v =
+    Array.fold_left
+      (fun (i, acc) lev -> i + 1, set_axis acc ~axis:i ~level:lev)
+      (0, 0) levels
+  in
+  v
 
 let decode (v : t) : int array =
   Array.init num_axes (fun i -> get_axis v ~axis:i)
