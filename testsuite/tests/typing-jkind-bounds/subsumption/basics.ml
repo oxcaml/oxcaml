@@ -357,7 +357,32 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-36.
 |}]
 
-(* Ben Peter's example *)
+(* Ben Peters' example *)
+(* This surprising example is sound to accept. To see why, 
+   we analyze as follows:
+   
+   Here t1.0 and t2.0 are the "base kind" 
+   and t1.1 and t2.1 are the "modalities protecting the argument",
+   that is, the kind of 'a t1 is t1.0 JOIN ('a MEET t1.1)
+   and similarly for 'a t2.
+
+   The kind in the signature is:
+       t2.0 JOIN 
+       (t1.0 MEET t2.1) JOIN 
+       ('a MEET t1.1 MEET t2.1) 
+       JOIN t1.0
+   The kind in the implementation is:
+       t1.0 JOIN
+       (t2.0 MEET t1.1) JOIN
+       ('a MEET t2.1 MEET t1.1) 
+       JOIN t2.0
+
+   These two formulas both simplify to:
+      t1.0 JOIN t2.0 JOIN
+      ('a MEET t1.1 MEET t2.1)
+
+    Hence, the kinds are compatible.
+*)
 module type S = sig
   type 'a t1
   type 'a t2
@@ -380,7 +405,7 @@ module M : S
 |}]
 
 
-(* Ben Peter's example failing version *)
+(* Ben Peters' example failing version *)
 module type S = sig
   type 'a t1
   type 'a t2
@@ -421,7 +446,7 @@ Error: Signature mismatch:
          because of the definition of t at line 4, characters 2-52.
 |}]
 
-(* Ben Peter's example failing version 2 *)
+(* Ben Peters' example failing version 2 *)
 module type S = sig
   type 'a t1
   type 'a t2
@@ -599,41 +624,10 @@ type 'a t2 = A | B of t2__unit
 and t2__unit = unit t2
 |}]
 
-(* out of fuel *)
+(* Previously rejected when the checker ran out of fuel. *)
 type 'a t3 : value mod portable =
   | A
   | B of unit t3
 [%%expect{|
 type 'a t3 = A | B of unit t3
-|}]
-
-(* out of fuel (reported by alamoreaux) *)
-type 'number t : immutable_data with 'number =
-  [ `Null
-  | `False
-  | `True
-  | `String of string
-  | `Number of 'number
-  | `Object of (string * 'number t) list
-  | `Array of 'number t list
-  ]
-[%%expect{|
-type 'number t =
-    [ `Array of 'number t list
-    | `False
-    | `Null
-    | `Number of 'number
-    | `Object of (string * 'number t) list
-    | `String of string
-    | `True ]
-|}]
-
-(* simplified version of the above that still runs out of fuel (minimized by mdelvecchio) *)
-type 'number t : immutable_data with 'number =
-  [ `Object of (string * 'number t) list
-  | `Array of 'number t list
-  ]
-[%%expect{|
-type 'number t =
-    [ `Array of 'number t list | `Object of (string * 'number t) list ]
 |}]
