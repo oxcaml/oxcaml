@@ -174,7 +174,7 @@ type t = int * int
 |}]
 
 
-(* Failure case extracted from DLS *)
+(* This is a regression test of a failure that used to occur in DLS. *)
 
 module Portable = struct
   type 'a t = { portable : 'a @@ portable } [@@unboxed]
