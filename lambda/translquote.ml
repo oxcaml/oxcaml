@@ -1039,9 +1039,9 @@ end = struct
 
   let wrap = inject_force
 
-  let ident loc a1 = apply1 "Module_type" "of_string" loc (extract a1)
+  let ident loc a1 = apply1 "Module_type" "ident" loc (extract a1)
 
-  let of_string loc a1 = apply1 "Module_type" "ident" loc (string loc a1)
+  let of_string loc a1 = apply1 "Module_type" "of_string" loc (string loc a1)
 end
 
 module Fragment : sig

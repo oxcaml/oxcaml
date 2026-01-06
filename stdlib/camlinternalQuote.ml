@@ -1673,16 +1673,19 @@ module Ast = struct
       pp fmt "%a@ %a"
         (print_tuple_like "" "" "." (Var.Type_var.print env)) tvs
         (print_core_type env) ty
-    | TypePackage (ident, []) -> print_module_type env fmt ident
+    | TypePackage (ident, []) ->
+      pp fmt "(module@a %a)"
+        (print_module_type env) ident
     | TypePackage (ident, (fragment, core_type) :: wcs) ->
-      pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
+      pp fmt "(@[module@ %a@ with@ type@ %a@ =@ %a"
+        (print_module_type env) ident
         print_fragment fragment (print_core_type env) core_type;
       List.iter
         (fun (fragment, core_type) ->
           pp fmt "@ and@ type@ %a@ =@ %a" print_fragment fragment
             (print_core_type env) core_type)
         wcs;
-      pp fmt "@]"
+      pp fmt "@])"
     | TypeQuote core_type ->
       pp fmt "@[<2><[@,%a@,]>@]" (print_core_type env) core_type
     | TypeCallPos -> pp fmt "call_pos"
