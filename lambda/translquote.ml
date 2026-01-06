@@ -1876,6 +1876,9 @@ and Exp_desc : sig
 
   val array_comprehension : Debuginfo.Scoped_location.t -> Comprehension.t -> t'
 
+  val immutable_array_comprehension :
+    Debuginfo.Scoped_location.t -> Comprehension.t -> t'
+
   val unboxed_tuple :
     Debuginfo.Scoped_location.t -> (Label.Nonoptional.t * Exp.t) list -> t'
 
@@ -2017,6 +2020,9 @@ end = struct
 
   let array_comprehension loc a1 =
     apply1 "Exp_desc" "array_comprehension" loc (extract a1)
+
+  let immutable_array_comprehension loc a1 =
+    apply1 "Exp_desc" "immutable_array_comprehension" loc (extract a1)
 
   let unboxed_tuple loc a1 =
     apply1 "Exp_desc" "unboxed_tuple" loc
@@ -3354,7 +3360,10 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_list_comprehension compr ->
       Exp_desc.list_comprehension loc
         (quote_comprehension ~scopes ~transl stage loc compr)
-    | Texp_array_comprehension (_, _, compr) ->
+    | Texp_array_comprehension (Immutable, _, compr) ->
+      Exp_desc.immutable_array_comprehension loc
+        (quote_comprehension ~scopes ~transl stage loc compr)
+    | Texp_array_comprehension (Mutable _, _, compr) ->
       Exp_desc.array_comprehension loc
         (quote_comprehension ~scopes ~transl stage loc compr)
     | Texp_overwrite _ ->

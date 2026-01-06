@@ -617,6 +617,8 @@ and Exp_desc : sig
 
   val array_comprehension : Comprehension.t -> t
 
+  val immutable_array_comprehension : Comprehension.t -> t
+
   val unboxed_tuple : (Label.Nonoptional.t * Exp.t) list -> t
 
   val unboxed_record_product : (Field.t * Exp.t) list -> Exp.t option -> t

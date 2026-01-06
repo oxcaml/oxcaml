@@ -720,6 +720,11 @@ let _ = <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
 - : <[string array]> expr = <[[| a ^ "!" for a in [|"foo"; "bar"|] |]]>
 |}];;
 
+let _ = <[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
+[%%expect {|
+- : <[string iarray]> expr = <[[: a ^ "!" for a in [|"foo"; "bar"|] :]]>
+|}];;
+
 let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
 [%%expect {|
 - : <[string list]> expr =
@@ -728,21 +733,21 @@ let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
 
 <[ let o = object method f = 1 end in o#f ]>;;
 [%%expect {|
-Line 729, characters 11-34:
-729 | <[ let o = object method f = 1 end in o#f ]>;;
+Line 734, characters 11-34:
+734 | <[ let o = object method f = 1 end in o#f ]>;;
                  ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object definition using "object..end"
        is not supported inside quoted expressions,
-       as seen at Line 729, characters 11-34.
+       as seen at Line 734, characters 11-34.
 |}];;
 
 <[ let open List in map ]>;;
 [%%expect {|
-Line 739, characters 3-23:
-739 | <[ let open List in map ]>;;
+Line 744, characters 3-23:
+744 | <[ let open List in map ]>;;
          ^^^^^^^^^^^^^^^^^^^^
 Error: Opening modules is not supported inside quoted expressions,
-       as seen at Line 739, characters 3-23.
+       as seen at Line 744, characters 3-23.
 |}];;
 
 <[ fun x -> $ (<[ x ]>) ]>;;

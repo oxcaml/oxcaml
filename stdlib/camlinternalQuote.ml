@@ -1306,6 +1306,7 @@ module Ast = struct
     | Extension_constructor of Name.t
     | List_comprehension of comprehension
     | Array_comprehension of comprehension
+    | Immutable_array_comprehension of comprehension
     | Quote of expression
     | Antiquote of expression
     | Eval of core_type
@@ -1528,7 +1529,8 @@ module Ast = struct
     | Record (_, None)
     | Field _ | Array _ | Send _ | Unreachable | Src_pos | Unboxed_tuple _
     | Unboxed_record_product (_, None)
-    | List_comprehension _ | Array_comprehension _ | Quote _ ->
+    | List_comprehension _ | Array_comprehension _
+    | Immutable_array_comprehension _ | Quote _ ->
       (print_exp env) fmt exp
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
 
@@ -1926,6 +1928,8 @@ module Ast = struct
       pp fmt "@[<2>[@ %a@ ]@]" (print_comprehension env) compr
     | Array_comprehension compr ->
       pp fmt "@[<2>[|@ %a@ |]@]" (print_comprehension env) compr
+    | Immutable_array_comprehension compr ->
+      pp fmt "@[<2>[:@ %a@ :]@]" (print_comprehension env) compr
     | Eval typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
     | Unreachable | Src_pos -> pp fmt "."
 
@@ -2782,6 +2786,10 @@ module Exp_desc = struct
   let array_comprehension compr =
     let+ compr = compr in
     Ast.Array_comprehension compr
+
+  let immutable_array_comprehension compr =
+    let+ compr = compr in
+    Ast.Immutable_array_comprehension compr
 
   let unboxed_tuple fs =
     let entries =
