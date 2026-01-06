@@ -188,8 +188,8 @@ module Test_5 (X : sig val f : (repr_ 'a) (repr_ 'b). 'a -> 'b end)
   : sig val f : (repr_ 'a) (repr_ 'b). 'b -> 'a end
   = X
 [%%expect {|
-Line 5, characters 4-5:
-5 |   = X
+Line 6, characters 4-5:
+6 |   = X
         ^
 Error: Signature mismatch:
        Modules do not match:
