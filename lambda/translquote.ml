@@ -108,6 +108,12 @@ let bind id def body =
       def,
       body )
 
+(* Utility for loop/comprehension direction *)
+
+let for_dir_as_bool = function
+  | Upto -> true
+  | Downto -> false
+
 (* Typed representation of complex lambdas *)
 
 module rec Var : sig
@@ -2962,11 +2968,9 @@ and quote_comprehension ~scopes ~transl stage loc { comp_body; comp_clauses } =
             | Texp_comp_range rcd ->
               let start = quote_expression ~scopes ~transl stage rcd.start
               and stop = quote_expression ~scopes ~transl stage rcd.stop
-              and direction =
-                match rcd.direction with Upto -> true | Downto -> false
-              in
+              and is_upto = for_dir_as_bool rcd.direction in
               let iter_var = Hashtbl.find vars_env.env_vals rcd.ident in
-              Comprehension.Iterator.range loc iter_var start stop direction
+              Comprehension.Iterator.range loc iter_var start stop is_upto
             | Texp_comp_in { pattern; sequence } ->
               let expr_lam = quote_expression ~scopes ~transl stage sequence in
               let pat_lam = quote_value_pattern ~scopes pattern in
@@ -3246,15 +3250,12 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_for floop ->
       let low = quote_expression ~scopes ~transl stage floop.for_from
       and high = quote_expression ~scopes ~transl stage floop.for_to
-      and dir =
-        match floop.for_dir with
-        | Asttypes.Upto -> true
-        | Asttypes.Downto -> false
+      and is_upto = for_dir_as_bool floop.for_dir
       and name = quote_name loc (Ident.name floop.for_id) in
       with_new_idents_values [floop.for_id];
       let body = quote_expression ~scopes ~transl stage floop.for_body in
       without_idents_values [floop.for_id];
-      Exp_desc.for_simple loc (quote_loc loc) name low high dir
+      Exp_desc.for_simple loc (quote_loc loc) name low high is_upto
         (Lam.func ~loc Var_value extract floop.for_id body)
     | Texp_send (obj, meth, _) ->
       let obj = quote_expression ~scopes ~transl stage obj in
