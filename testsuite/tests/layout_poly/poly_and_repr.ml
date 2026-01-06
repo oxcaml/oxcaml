@@ -216,7 +216,7 @@ module Test_5' :
 
 (** This should pass and generate a module coercion.
     Currently not accepted.
-    CR layout-polymorphism aivaskovic: internal ticket XXXX. *)
+    CR layout-polymorphism aivaskovic: internal ticket 6187. *)
 module Test_6 (X : sig val f : (repr_ 'a). 'a -> unit end)
   : sig val f : 'a -> unit end
   = X
