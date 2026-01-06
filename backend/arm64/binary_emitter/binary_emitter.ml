@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell/xclerc: Add some kind of coverage testing. *)
+
 open Arm64_ast.Ast
 module Asm_section = Asm_targets.Asm_section
 module D = Asm_targets.Asm_directives
