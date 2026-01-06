@@ -2296,8 +2296,9 @@ let check_unused pred casel =
               in
               match r with
               | Unused ->
-                  Location.prerr_warning
-                    q.pat_loc Warnings.Redundant_case
+                  Builtin_attributes.warning_scope q.pat_attributes (fun () ->
+                    Location.prerr_warning
+                      q.pat_loc Warnings.Redundant_case)
               | Upartial ps ->
                   List.iter
                     (fun p ->

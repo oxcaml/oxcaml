@@ -394,3 +394,34 @@ Here is an example of a case that is not matched:
 module Single_row_optim :
   sig type t = A | B val non_exhaustive : t * t * t * t -> unit end
 |}]
+
+(* warning 11 is on, as shown here: *)
+let f x = match x with
+  | true -> 1
+  | false -> 2
+  | false -> 3
+
+[%%expect{|
+Line 4, characters 4-9:
+4 |   | false -> 3
+        ^^^^^
+Warning 11 [redundant-case]: this match case is unused.
+
+val f : bool -> int = <fun>
+|}]
+
+(* and warning 11 can be suppressed per pattern *)
+let f x = match x with
+  | true -> 1
+  | false -> 2
+  | false -> 3
+  | (false[@warning "-11"]) -> 4
+
+[%%expect{|
+Line 4, characters 4-9:
+4 |   | false -> 3
+        ^^^^^
+Warning 11 [redundant-case]: this match case is unused.
+
+val f : bool -> int = <fun>
+|}]
