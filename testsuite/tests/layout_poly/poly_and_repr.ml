@@ -183,6 +183,7 @@ Error: Signature mismatch:
 
 (** Order of [repr_]-bound type variables matters. *)
 
+(* CR layouts: consider improving error message (without the last line) *)
 module Test_5 (X : sig val f : (repr_ 'a) (repr_ 'b). 'a -> 'b end)
   : sig val f : (repr_ 'a) (repr_ 'b). 'b -> 'a end
   = X
