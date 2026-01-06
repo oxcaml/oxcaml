@@ -2270,10 +2270,15 @@ type unbox_result =
   | Missing of Path.t
 
 
-(* [prev_unwrapped_ty] allows us to backtrack in case an [or_null] cannot be
-   re-applied: see Note [unwrapped_type_expr backtracking for or_null]. *)
-let unbox_once env ty prev_unwrapped_ty =
-  match get_desc ty with
+(* We pass in [ty] as an [unwrapped_type_expr], which represents the state of a
+   process of unwrapping before we do this extra step. This allows us to
+   backtrack in case an [or_null] we unwrap here cannot be re-applied: see
+   Note [unwrapped_type_expr backtracking for or_null].
+
+   (In most callers of this, there is no ongoing state of unwrapping, so we just
+   use [mk_unwrapped_type_expr]). *)
+let unbox_once env ty =
+  match get_desc ty.ty with
   | Tconstr (p, args, _) ->
     begin match Env.find_type p env with
     | exception Not_found -> Missing p
@@ -2328,7 +2333,7 @@ let unbox_once env ty prev_unwrapped_ty =
                when we let users define custom or-null-like types. *)
             Stepped { ty = apply arg.ca_type ~extra_substs:[];
                       modality = arg.ca_modalities;
-                      or_null = Some (decl, prev_unwrapped_ty) }
+                      or_null = Some (decl, ty) }
           | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
@@ -2346,7 +2351,7 @@ let unbox_once env ty prev_unwrapped_ty =
 let contained_without_boxing env ty =
   match get_desc ty with
   | Tconstr _ ->
-    begin match unbox_once env ty (mk_unwrapped_type_expr ty) with
+    begin match unbox_once env (mk_unwrapped_type_expr ty) with
     | Stepped { ty; modality = _; or_null = _ } -> [ty]
     | Stepped_record_unboxed_product tys ->
       List.map (fun { ty; _ } -> ty) tys
@@ -2368,9 +2373,8 @@ let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
     (* We use expand_head_opt version of expand_head to get access
        to the manifest type of private abbreviations. *)
     let ty = expand_head_opt env ty in
-    match unbox_once env ty { ty; modality; or_null } with
-    | Stepped { ty = ty2; modality = modality2; or_null = or_null2 }
-      ->
+    match unbox_once env { ty; modality; or_null } with
+    | Stepped { ty = ty2; modality = modality2; or_null = or_null2 } ->
       let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
       begin match or_null, or_null2 with
       | None, or_null | or_null, None ->
@@ -2772,7 +2776,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                let ty = expand_head_opt env ty in
                estimate_jkind_and_loop ~fuel ~expanded:true ty jkind
              else
-               begin match unbox_once env ty (mk_unwrapped_type_expr ty) with
+               begin match unbox_once env (mk_unwrapped_type_expr ty) with
                | Missing path -> Error (Jkind.Violation.of_
                                           ~context ~missing_cmi:path
                                           (Not_a_subjkind (ty's_jkind, jkind,

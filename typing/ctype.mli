@@ -601,7 +601,7 @@ type unwrapped_type_expr =
        Although this is ill-typed, we don't realize this when we typecheck it
        with [type_approx], which we use for recursive functions. This gets us
        into trouble when [type_approx] calls [type_jkind], which could then
-       unwraps and re-wraps an invalid application of [or_null] like the above.
+       unwrap and re-wrap an invalid application of [or_null] like the above.
        So, to avoid needing to consider invalid applications of [or_null], we
        use the previous [unwrapped_type_expr] as a fallback.
 
