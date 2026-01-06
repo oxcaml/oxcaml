@@ -1527,7 +1527,15 @@ module Ast = struct
       pp fmt "%a@ |@ %a" (print_pat env) pat1 (print_pat env) pat2
     | PatConstraint (pat, ty) ->
       if with_parens then pp fmt "(";
-      pp fmt "%a@ :@ %a" (print_pat env) pat (print_core_type env) ty;
+      (match pat, ty with
+      | PatUnpack _, TypePackage (ident, wcs) ->
+        (* Package types should not be preceded by "module"
+           inside unpack patterns, so we have a separate case *)
+        pp fmt "%a@ :@ %a"
+          (print_pat env) pat (print_package_type env) (ident, wcs)
+      | _ ->
+        pp fmt "%a@ :@ %a"
+          (print_pat env) pat (print_core_type env) ty);
       if with_parens then pp fmt ")"
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
@@ -1610,6 +1618,21 @@ module Ast = struct
         module_2
     | ModuleApply_unit module_ -> pp fmt "%a()" (print_module_exp env) module_
 
+  and print_package_type env fmt (ident, wcs) =
+    match wcs with
+    | [] ->
+      pp fmt "%a" (print_module_type env) ident
+    | (modtype_path, core_type) :: wcs ->
+      pp fmt "@[%a@ with@ type@ %a@ =@ %a"
+        (print_module_type env) ident
+        print_modtype_path modtype_path (print_core_type env) core_type;
+      List.iter
+        (fun (modtype_path, core_type) ->
+          pp fmt "@ and@ type@ %a@ =@ %a" print_modtype_path modtype_path
+            (print_core_type env) core_type)
+        wcs;
+      pp fmt "@]"
+
   and print_core_type env fmt = function
     | TypeAny -> pp fmt "_"
     | TypeVar v -> Var.Type_var.print env fmt v
@@ -1680,16 +1703,8 @@ module Ast = struct
       pp fmt "%a@ %a"
         (print_tuple_like "" "" "." (Var.Type_var.print env)) tvs
         (print_core_type env) ty
-    | TypePackage (ident, []) -> print_module_type env fmt ident
-    | TypePackage (ident, (modtype_path, core_type) :: wcs) ->
-      pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
-        print_modtype_path modtype_path (print_core_type env) core_type;
-      List.iter
-        (fun (modtype_path, core_type) ->
-          pp fmt "@ and@ type@ %a@ =@ %a" print_modtype_path modtype_path
-            (print_core_type env) core_type)
-        wcs;
-      pp fmt "@]"
+    | TypePackage (ident, wcs) ->
+      pp fmt "(module@ %a)" (print_package_type env) (ident, wcs)
     | TypeQuote core_type ->
       pp fmt "@[<2><[@,%a@,]>@]" (print_core_type env) core_type
     | TypeCallPos -> pp fmt "call_pos"
