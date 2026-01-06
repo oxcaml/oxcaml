@@ -158,87 +158,6 @@ let co_sub (a : t) (b : t) : t =
   let r = a land lnot b in
   r lor ((r lsr 1) land lnot_lsr_1_lows)
 
-(* Individual axis constants: each axis at a specific non-bot level *)
-
-(* Areality axis: 0=Global, 1=Regional, 2=Local *)
-let areality_global : t = set_axis bot ~axis:0 ~level:0
-
-let areality_regional : t = set_axis bot ~axis:0 ~level:1
-
-let areality_local : t = set_axis bot ~axis:0 ~level:2
-
-(* Uniqueness axis (monadic): 0=Aliased, 1=Unique *)
-let uniqueness_aliased : t = set_axis bot ~axis:1 ~level:0
-
-let uniqueness_unique : t = set_axis bot ~axis:1 ~level:1
-
-(* Linearity axis: 0=Many, 1=Once *)
-let linearity_many : t = set_axis bot ~axis:2 ~level:0
-
-let linearity_once : t = set_axis bot ~axis:2 ~level:1
-
-(* Contention axis (monadic): 0=Contended, 1=Shared, 2=Uncontended *)
-let contention_contended : t = set_axis bot ~axis:3 ~level:0
-
-let contention_shared : t = set_axis bot ~axis:3 ~level:1
-
-let contention_uncontended : t = set_axis bot ~axis:3 ~level:2
-
-(* Portability axis: 0=Portable, 1=Shareable, 2=Nonportable *)
-let portability_portable : t = set_axis bot ~axis:4 ~level:0
-
-let portability_shareable : t = set_axis bot ~axis:4 ~level:1
-
-let portability_nonportable : t = set_axis bot ~axis:4 ~level:2
-
-(* Forkable axis: 0=Forkable, 1=Unforkable *)
-let forkable_forkable : t = set_axis bot ~axis:5 ~level:0
-
-let forkable_unforkable : t = set_axis bot ~axis:5 ~level:1
-
-(* Yielding axis: 0=Unyielding, 1=Yielding *)
-let yielding_unyielding : t = set_axis bot ~axis:6 ~level:0
-
-let yielding_yielding : t = set_axis bot ~axis:6 ~level:1
-
-(* Statefulness axis: 0=Stateless, 1=Observing, 2=Stateful *)
-let statefulness_stateless : t = set_axis bot ~axis:7 ~level:0
-
-let statefulness_observing : t = set_axis bot ~axis:7 ~level:1
-
-let statefulness_stateful : t = set_axis bot ~axis:7 ~level:2
-
-(* Visibility axis (monadic): 0=Immutable, 1=Read, 2=Read_write *)
-let visibility_immutable : t = set_axis bot ~axis:8 ~level:0
-
-let visibility_read : t = set_axis bot ~axis:8 ~level:1
-
-let visibility_read_write : t = set_axis bot ~axis:8 ~level:2
-
-(* Staticity axis (monadic): 0=Dynamic, 1=Static *)
-let staticity_dynamic : t = set_axis bot ~axis:9 ~level:0
-
-let staticity_static : t = set_axis bot ~axis:9 ~level:1
-
-(* Externality axis: 0=External, 1=External64, 2=Internal *)
-let externality_external : t = set_axis bot ~axis:10 ~level:0
-
-let externality_external64 : t = set_axis bot ~axis:10 ~level:1
-
-let externality_internal : t = set_axis bot ~axis:10 ~level:2
-
-(* Nullability axis: 0=Non_null, 1=Maybe_null *)
-let nullability_non_null : t = set_axis bot ~axis:11 ~level:0
-
-let nullability_maybe_null : t = set_axis bot ~axis:11 ~level:1
-
-(* Separability axis: 0=Non_float, 1=Separable, 2=Maybe_separable *)
-let separability_non_float : t = set_axis bot ~axis:12 ~level:0
-
-let separability_separable : t = set_axis bot ~axis:12 ~level:1
-
-let separability_maybe_separable : t = set_axis bot ~axis:12 ~level:2
-
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   let levels = Array.make num_axes 0 in
@@ -416,6 +335,75 @@ module Levels = struct
     | 2 -> Jkind_axis.Separability.Maybe_separable
     | _ -> invalid_arg "Axis_lattice.separability_of_level"
 end
+
+type boxed = {
+  areality : Mode.Regionality.Const.t;
+  linearity : Mode.Linearity.Const.t;
+  uniqueness : Mode.Uniqueness.Const.t;
+  portability : Mode.Portability.Const.t;
+  contention : Mode.Contention.Const.t;
+  forkable : Mode.Forkable.Const.t;
+  yielding : Mode.Yielding.Const.t;
+  statefulness : Mode.Statefulness.Const.t;
+  visibility : Mode.Visibility.Const.t;
+  staticity : Mode.Staticity.const;
+  externality : Jkind_axis.Externality.t;
+  nullability : Jkind_axis.Nullability.t;
+  separability : Jkind_axis.Separability.t;
+}
+
+let of_boxed
+    ({ areality;
+       linearity;
+       uniqueness;
+       portability;
+       contention;
+       forkable;
+       yielding;
+       statefulness;
+       visibility;
+       staticity;
+       externality;
+       nullability;
+       separability
+     } :
+      boxed) : t =
+  let open Levels in
+  let levels =
+    [| level_of_areality areality;
+       level_of_uniqueness_monadic uniqueness;
+       level_of_linearity linearity;
+       level_of_contention_monadic contention;
+       level_of_portability portability;
+       level_of_forkable forkable;
+       level_of_yielding yielding;
+       level_of_statefulness statefulness;
+       level_of_visibility_monadic visibility;
+       level_of_staticity_monadic staticity;
+       level_of_externality externality;
+       level_of_nullability nullability;
+       level_of_separability separability
+    |]
+  in
+  of_levels ~levels
+
+let to_boxed (x : t) : boxed =
+  let open Levels in
+  let lv = to_levels x in
+  { areality = areality_of_level lv.(0);
+    uniqueness = uniqueness_of_level_monadic lv.(1);
+    linearity = linearity_of_level lv.(2);
+    contention = contention_of_level_monadic lv.(3);
+    portability = portability_of_level lv.(4);
+    forkable = forkable_of_level lv.(5);
+    yielding = yielding_of_level lv.(6);
+    statefulness = statefulness_of_level lv.(7);
+    visibility = visibility_of_level_monadic lv.(8);
+    staticity = staticity_of_level_monadic lv.(9);
+    externality = externality_of_level lv.(10);
+    nullability = nullability_of_level lv.(11);
+    separability = separability_of_level lv.(12)
+  }
 
 let const_of_levels ~areality ~linearity ~uniqueness ~portability ~contention
     ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality
