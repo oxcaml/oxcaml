@@ -53,7 +53,6 @@ Error: This expression has type "'a t" but an expression was expected of type
 |}]
 
 type 'a t : immutable_data = { f : 'b. 'b t }
-(* CR layouts v2.8: This should be accepted. Internal ticket 5746. *)
 [%%expect {|
 type 'a t = { f : 'b. 'b t; }
 |}]
