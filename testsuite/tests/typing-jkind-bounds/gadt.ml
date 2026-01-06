@@ -699,15 +699,15 @@ type 'a t3 = T : 'b t2 -> ([< `A ] as 'b) t3
 
 (*********************************************************)
 
-type zero = private Zero
-type 'a succ = private Succ
+type zero = Zero
+type 'a succ = Succ
 type _ t : immutable_data =
   | Zero : zero t
   | Succ : 'a t -> 'a succ t
 (* CR: This should be accepted. Internal ticket 6194. *)
 [%%expect {|
-type zero = private Zero
-type 'a succ = private Succ
+type zero = Zero
+type 'a succ = Succ
 Lines 3-5, characters 0-28:
 3 | type _ t : immutable_data =
 4 |   | Zero : zero t
