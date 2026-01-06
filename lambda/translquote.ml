@@ -2553,6 +2553,28 @@ let construct_spine ~env ~loc typ =
           (* TESTME - more complex structures *)
           | Tvariant row_desc ->
             let fields = row_fields row_desc in
+            let closed = if row_closed row_desc then Closed else Open in
+            let tags =
+              let (Row { fields; name = _; fixed = _; closed }) =
+                row_repr row_desc
+              in
+              let fields =
+                if closed
+                then
+                  List.filter (fun (_, f) -> row_field_repr f <> Rabsent) fields
+                else fields
+              in
+              let present =
+                List.filter
+                  (fun (_, f) ->
+                    match row_field_repr f with
+                    | Rpresent _ -> true
+                    | _ -> false)
+                  fields
+              in
+              let all_present = List.length present = List.length fields in
+              if all_present then None else Some (List.map fst present)
+            in
             mk
               (Ttyp_variant
                  ( List.filter_map
@@ -2568,8 +2590,8 @@ let construct_spine ~env ~loc typ =
                      fields
                    |> List.map (fun rf_desc ->
                           { rf_desc; rf_loc = loc; rf_attributes = [] }),
-                   Closed,
-                   None ))
+                   closed,
+                   tags ))
           | Tquote ty -> mk (Ttyp_quote (go ty))
           | Tsplice _ ->
             fatal_errorf

@@ -37,6 +37,8 @@ type t3'' =
   ('a 'b. unit -> ('a expr -> 'b expr) -> <[unit -> $('a) -> $('b)]> expr) ->
   <[unit -> int -> int]> expr * <[unit -> int -> string]> expr
 
+type 'b tbar = [`Bar of 'b]
+
 module type T = sig
   type t
   val a : t

@@ -100,6 +100,28 @@ let () =
   test <[ ignore (((fun x -> x) $f) : t3''') ]>
 ;;
 
+(* funky object types *)
+let () =
+  let (f : <[('a. < x : 'a; .. > -> 'a) -> int * string]> expr) =
+    <[fun f -> (42, "abc")]>
+  in
+  test <[ignore (
+      ((fun x -> x) $f) : ('a. < x : 'a; .. > -> 'a) -> int * string
+    )]>
+;;
+
+(* funky polymorphic variant types *)
+let () =
+  let (f : <[('a 'b. [< `Foo of 'a & 'b | 'b tbar ]
+                  -> [> `Foo of 'a | `Baz ]) -> unit]> expr) =
+    <[fun f -> ()]>
+  in
+  test <[ignore (
+      ((fun x -> x) $f) : ('a 'b. [< `Foo of 'a & 'b | 'b tbar ]
+                               -> [> `Foo of 'a | `Baz ]) -> unit
+    )]>
+;;
+
 (* Parameter polymorphic in a jkind-annotated variable *)
 (* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)
 let () =

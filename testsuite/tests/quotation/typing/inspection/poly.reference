@@ -67,6 +67,19 @@ Stdlib.ignore
   : B.t3''')
 
 Stdlib.ignore
+  ((fun x -> x) (fun (f : 'a. < x : 'a > -> 'a) -> (42, "abc")) :
+  ('a__1. < x : 'a__1; .. > -> 'a__1) -> (int) * (string))
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (f : 'poly7388 'poly7389 'a 'b. [< `Bar of 'b | `Foo of 'a & 'b ]
+        -> [> `Foo of 'a | `Baz ]) -> ())
+  :
+  ('a__1 'b__1. [< `Foo of 'a__1 & 'b__1 | 'b__1 B.tbar ] -> [> `Foo of 'a__1
+   | `Baz ])
+  -> unit)
+
+Stdlib.ignore
   ((fun x -> x) (fun (f : 'a. 'a -> 'a) -> ((f 42), (f true))) : B.t4)
 
 Stdlib.ignore
