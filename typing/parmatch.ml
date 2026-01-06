@@ -2294,19 +2294,19 @@ let check_unused pred casel =
                     Used
                 | _ -> r
               in
-              match r with
-              | Unused ->
-                  Builtin_attributes.warning_scope q.pat_attributes (fun () ->
-                    Location.prerr_warning
-                      q.pat_loc Warnings.Redundant_case)
-              | Upartial ps ->
+              Builtin_attributes.warning_scope q.pat_attributes (fun () ->
+                match r with
+                | Unused ->
+                  Location.prerr_warning
+                    q.pat_loc Warnings.Redundant_case
+                | Upartial ps ->
                   List.iter
                     (fun p ->
-                      Location.prerr_warning
-                        p.pat_loc Warnings.Redundant_subpat)
+                       Location.prerr_warning
+                         p.pat_loc Warnings.Redundant_subpat)
                     ps
-              | Used -> ()
-            with Empty | Not_found -> assert false
+                | Used -> ())
+          with Empty | Not_found -> assert false
             end ;
 
           if has_guard then
