@@ -652,7 +652,8 @@ module Functor_suberror = struct
       let mty2_with_mode =
         match e.With_shorthand.item with
         | Types.Unit -> Format.dprintf "()"
-        | Types.Named(_, mty, mm) -> dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
+        | Types.Named(_, mty, mm) ->
+            dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
       in
       Format.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\

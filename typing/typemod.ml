@@ -2577,9 +2577,12 @@ let rec nongen_modtype env f g = function
       nongen_modtype env f g body
   | Mty_strengthen (mty,_ ,_) -> nongen_modtype env f g mty
 
-(** Iterate a signature, and:
-- call [f] on all types that potentailly contain non-generalized type variables.
-- call [g] on all module types that potentially contains loose mode variables. *)
+(** Recursively iterate a signature, and:
+- call [f] on all value description types, which potentailly contain
+  non-generalized type variables.
+- call [g] on all module declaration types, which potentially contains loose
+  mode variables.
+  *)
 and nongen_signature_item env f g = function
   | Sig_value(_id, desc, _) ->
       f env desc.val_type
