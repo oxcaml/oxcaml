@@ -2576,11 +2576,17 @@ let construct_spine ~env ~loc typ =
               "Translquote [at %a]: splices cannot appear in the spine of a \
                quoted higher-rank function type"
               Location.print_loc_in_lowercase loc
-          (* TESTME *)
-          | Tpackage _ ->
-            (* where to get a (pack_type : module_type) from? what about pack_txt? *)
-            (* move to [Translquote] and avoid constructing module_type *)
-            mk (Ttyp_var (None, None))
+          | Tpackage (pack_path, pack_fields) ->
+            mk
+              (Ttyp_package
+                 { pack_path;
+                   pack_fields =
+                     List.map
+                       (fun (lident, ty) -> mkloc lident loc, go ty)
+                       pack_fields;
+                   pack_type = Mty_ident pack_path;
+                   pack_txt = mkloc (Untypeast.lident_of_path pack_path) loc
+                 })
           | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
             fatal_errorf
               "Translquote [at %a]: unexpected type expression in the spine of \

@@ -61,6 +61,12 @@ Stdlib.ignore
   : B.t3')
 
 Stdlib.ignore
+  ((fun x -> x)
+     (fun (f : 'a. 'a -> (module B.T with type t = 'a)) ->
+        ((f 42), (f "abc")))
+  : B.t3''')
+
+Stdlib.ignore
   ((fun x -> x) (fun (f : 'a. 'a -> 'a) -> ((f 42), (f true))) : B.t4)
 
 Stdlib.ignore

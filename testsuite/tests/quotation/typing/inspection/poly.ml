@@ -94,6 +94,11 @@ let () =
   test <[ ignore (((fun x -> x) $f) : t3'') ]>
 ;;
 *)
+(* package types *)
+let () =
+  let (f : <[t3''']> expr) = <[fun f -> (f 42, f "abc")]> in
+  test <[ ignore (((fun x -> x) $f) : t3''') ]>
+;;
 
 (* Parameter polymorphic in a jkind-annotated variable *)
 (* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)

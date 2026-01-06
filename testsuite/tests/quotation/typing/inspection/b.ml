@@ -37,6 +37,15 @@ type t3'' =
   ('a 'b. unit -> ('a expr -> 'b expr) -> <[unit -> $('a) -> $('b)]> expr) ->
   <[unit -> int -> int]> expr * <[unit -> int -> string]> expr
 
+module type T = sig
+  type t
+  val a : t
+end
+
+type t3''' =
+  ('a. 'a -> (module T with type t = 'a)) ->
+  (module T with type t = int) * (module T with type t = string)
+
 type t4 = (('a : immediate). 'a -> 'a) -> int * bool
 
 
