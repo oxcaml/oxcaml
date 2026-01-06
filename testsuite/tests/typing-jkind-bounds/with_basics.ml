@@ -244,7 +244,6 @@ val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
   <fun>
 |}]
 
-(* CR layouts v2.8: This should be accepted. Internal ticket 5111 *)
 let foo (t : ('a : value mod contended portable) option @ contended nonportable) =
   use_uncontended t;
   use_portable t
@@ -777,7 +776,6 @@ val foo : int t @ contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
-(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 |}]
@@ -948,7 +946,6 @@ val foo : int t -> unit = <fun>
 |}]
 
 let foo (t : _ t @ nonportable) = use_portable t
-(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t -> unit = <fun>
 |}]
