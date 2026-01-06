@@ -45,26 +45,7 @@ let axis_sizes = [| 3; 2; 2; 3; 3; 2; 2; 3; 3; 2; 3; 2; 3 |]
 
 let num_axes = 13
 
-(* Axes in the order matching axis_index. This order matches Jkind_axis.Axis.all,
-   but we keep it explicit here to avoid depending on that list. *)
-let all_axes_correct_order : Jkind_axis.Axis.packed list =
-  let open Mode.Crossing.Axis in
-  [ Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Areality));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Forkable));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility));
-    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Staticity));
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality);
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability);
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability) ]
+let axis_by_number = Array.of_list Jkind_axis.Axis.all
 
 (* widths[i] = 2 for size-3 axes, 1 for size-2 *)
 let widths =
@@ -266,7 +247,7 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   List.iteri
     (fun i (Axis.Pack ax) ->
       if Axis_set.mem set ax then levels.(i) <- axis_sizes.(i) - 1)
-    all_axes_correct_order;
+    Axis.all;
   encode ~levels
 
 (* IK-only: compute relevant axes of a constant modality, mirroring
@@ -545,25 +526,6 @@ let object_legacy : t =
     ~separability:Jkind_axis.Separability.Non_float
 
 let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
-  let open Mode.Crossing.Axis in
-  match axis_number with
-  | 0 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Areality))
-  | 1 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness))
-  | 2 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity))
-  | 3 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention))
-  | 4 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability))
-  | 5 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Forkable))
-  | 6 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding))
-  | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
-  | 8 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility))
-  | 9 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Staticity))
-  | 10 ->
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
-  | 11 ->
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
-  | 12 ->
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability)
-  | _ -> failwith "axis_number_to_axis_packed: invalid axis number"
+  if axis_number < 0 || axis_number >= Array.length axis_by_number
+  then failwith "axis_number_to_axis_packed: invalid axis number"
+  else axis_by_number.(axis_number)
