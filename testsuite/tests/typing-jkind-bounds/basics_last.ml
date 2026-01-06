@@ -167,7 +167,7 @@ module M : sig type t : value mod portable end
 module S : sig type t : value mod portable end
 |}]
 
-(* Another example from Ben Peters *)
+(* Example from Ben Peters *)
 
 type 'a t : value mod portable with 'a @@ portable
 type t2 = A of int | B of t2 t
