@@ -429,7 +429,7 @@ let has_mutable_label lbls =
 (* This function determines whether the shallow axes are relevant for a given
    representation. For example, for unboxed types, shallow axes of inner data
    stay relevant. For boxed types, shallow axes of inner data are not relevant. *)
-let relevance_of_rep = function
+let shallow_axes_are_relevant_for_rep = function
   | `Record Types.Record_unboxed
   | `Record (Types.Record_inlined (_, _, Types.Variant_unboxed)) ->
     `Relevant
@@ -511,7 +511,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
               | Types.Record_unboxed -> Axis_lattice.immediate
               | _ -> Axis_lattice.immutable_data
           in
-          let relevant_for_shallow = relevance_of_rep (`Record rep) in
+          let relevant_for_shallow = shallow_axes_are_relevant_for_rep (`Record rep) in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             let base = Ldd.const base_lat in
@@ -603,7 +603,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
             then Axis_lattice.mutable_data
             else Axis_lattice.immutable_data
           in
-          let relevant_for_shallow = relevance_of_rep (`Variant rep) in
+          let relevant_for_shallow = shallow_axes_are_relevant_for_rep (`Variant rep) in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             let ctx =
@@ -995,13 +995,15 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   in
   base, Array.of_list coeffs
 
-type lookup_result =
-  | Lookup_identity
-  | Lookup_path of Path.t
-  | Lookup_type_fun of Types.type_expr list * Types.type_expr
+module Lookup_result = struct
+  type t =
+    | Lookup_identity
+    | Lookup_path of Path.t
+    | Lookup_type_fun of Types.type_expr list * Types.type_expr
+end
 
 let substitute_decl_ikind_with_lookup
-    ~(lookup : Path.t -> lookup_result)
+    ~(lookup : Path.t -> Lookup_result.t)
     (ikind_entry : Types.type_ikind) : Types.type_ikind =
   (* Inline type functions in an identity environment (no Env). *)
   match ikind_entry with
