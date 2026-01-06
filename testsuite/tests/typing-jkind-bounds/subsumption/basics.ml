@@ -357,7 +357,7 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-36.
 |}]
 
-(* Benjamin's example *)
+(* Ben Peter's example *)
 module type S = sig
   type 'a t1
   type 'a t2
@@ -380,7 +380,7 @@ module M : S
 |}]
 
 
-(* Benjamin's example failing version *)
+(* Ben Peter's example failing version *)
 module type S = sig
   type 'a t1
   type 'a t2
@@ -421,7 +421,7 @@ Error: Signature mismatch:
          because of the definition of t at line 4, characters 2-52.
 |}]
 
-(* Benjamin's example failing version 2 *)
+(* Ben Peter's example failing version 2 *)
 module type S = sig
   type 'a t1
   type 'a t2
