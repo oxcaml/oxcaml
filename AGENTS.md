@@ -39,16 +39,14 @@ make fmt                   # Auto-format code (always run before committing)
 make test-one TEST=test-dir/path.ml      # Run a single test testsuite/tests/test-dir/path.ml
 make test-one DIR=test-dir               # Run all tests in testsuite/tests/test-dir
 make promote-one TEST=test-dir/path.ml   # Update expected test output
-make test                                # Run all tests
+make test runtest                        # Run all tests
 ```
 
 ## Configuration Commands
 ```bash
-autoconf                  # Generate configure script
-./configure               # Configure the compiler
+autoconf27                # Generate configure script
+./configure --enable-runtime5 --enable-multidomain --enable-poll-insertion --enable-ocamltest --enable-warn-error --prefix="$(pwd)/_install"              # Configure the compiler
 ```
-
-If the execution of `autoconf` fails because the version is too old, try with `autoconf27` instead.
 
 Configuration is needed after changing `.in` files or the autoconf script.
 
