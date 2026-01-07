@@ -1748,23 +1748,14 @@ let emit_instr i =
       A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.res.(0)))
   | Lop (Intop (Iclz _)) -> A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
   | Lop (Intop Iand) ->
-    A.ins4 AND_shifted_register
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (H.reg_x i.arg.(1))
-      O.optional_none
+    let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
+    A.ins4 AND_shifted_register rd rn rm O.optional_none
   | Lop (Intop Ior) ->
-    A.ins4 ORR_shifted_register
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (H.reg_x i.arg.(1))
-      O.optional_none
+    let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
+    A.ins4 ORR_shifted_register rd rn rm O.optional_none
   | Lop (Intop Ixor) ->
-    A.ins4 EOR_shifted_register
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (H.reg_x i.arg.(1))
-      O.optional_none
+    let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
+    A.ins4 EOR_shifted_register rd rn rm O.optional_none
   | Lop (Intop Ilsl) ->
     A.ins3 LSLV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Ilsr) ->
@@ -1772,36 +1763,24 @@ let emit_instr i =
   | Lop (Intop Iasr) ->
     A.ins3 ASRV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Iadd) ->
-    A.ins4 ADD_shifted_register
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (H.reg_x i.arg.(1))
-      O.optional_none
+    let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
+    A.ins4 ADD_shifted_register rd rn rm O.optional_none
   | Lop (Intop Isub) ->
-    A.ins4 SUB_shifted_register
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (H.reg_x i.arg.(1))
-      O.optional_none
+    let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
+    A.ins4 SUB_shifted_register rd rn rm O.optional_none
   | Lop (Intop Imul) ->
     A.ins_mul (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Idiv) ->
     A.ins3 SDIV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop_imm (Iand, n)) ->
-    A.ins3 AND_immediate
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (O.bitmask (Nativeint.of_int n))
+    let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
+    A.ins3 AND_immediate rd rn (O.bitmask (Nativeint.of_int n))
   | Lop (Intop_imm (Ior, n)) ->
-    A.ins3 ORR_immediate
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (O.bitmask (Nativeint.of_int n))
+    let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
+    A.ins3 ORR_immediate rd rn (O.bitmask (Nativeint.of_int n))
   | Lop (Intop_imm (Ixor, n)) ->
-    A.ins3 EOR_immediate
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (O.bitmask (Nativeint.of_int n))
+    let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
+    A.ins3 EOR_immediate rd rn (O.bitmask (Nativeint.of_int n))
   | Lop (Intop_imm (Ilsl, shift_in_bits)) ->
     A.ins_lsl_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop (Intop_imm (Ilsr, shift_in_bits)) ->
@@ -1863,16 +1842,11 @@ let emit_instr i =
     | D_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB rd rn rm ra)
   | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
   | Lop (Specific (Ishiftarith (op, shift))) ->
-    let open I in
-    let open Ast.Operand.Shift.Kind in
-    let emit_shift_arith instr shift_kind shift_amount =
-      A.ins4 instr
-        (H.reg_x i.res.(0))
-        (H.reg_x i.arg.(0))
-        (H.reg_x i.arg.(1))
-        (O.optional_shift ~kind:shift_kind ~amount:shift_amount)
+    let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
+    let emit_shift_arith instr kind amount =
+      A.ins4 instr rd rn rm (O.optional_shift ~kind ~amount)
     in
-    let instr =
+    let instr : _ I.t =
       match op with
       | Ishiftadd -> ADD_shifted_register
       | Ishiftsub -> SUB_shifted_register
@@ -1881,33 +1855,22 @@ let emit_instr i =
     then emit_shift_arith instr LSL shift
     else emit_shift_arith instr ASR (-shift)
   | Lop (Specific Imuladd) ->
-    A.ins4 MADD
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (H.reg_x i.arg.(1))
-      (H.reg_x i.arg.(2))
+    let rd, rn, rm, ra = i.res.(0), i.arg.(0), i.arg.(1), i.arg.(2) in
+    A.ins4 MADD (H.reg_x rd) (H.reg_x rn) (H.reg_x rm) (H.reg_x ra)
   | Lop (Specific Imulsub) ->
-    A.ins4 MSUB
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (H.reg_x i.arg.(1))
-      (H.reg_x i.arg.(2))
+    let rd, rn, rm, ra = i.res.(0), i.arg.(0), i.arg.(1), i.arg.(2) in
+    A.ins4 MSUB (H.reg_x rd) (H.reg_x rn) (H.reg_x rm) (H.reg_x ra)
   | Lop (Specific (Ibswap { bitwidth })) -> (
     match bitwidth with
     | Sixteen ->
-      A.ins2 REV16 (H.reg_w i.res.(0)) (H.reg_w i.arg.(0));
-      A.ins4 UBFM
-        (H.reg_w i.res.(0))
-        (H.reg_w i.res.(0))
-        (O.imm_six 0) (O.imm_six 15)
+      let res_w = H.reg_w i.res.(0) in
+      A.ins2 REV16 res_w (H.reg_w i.arg.(0));
+      A.ins4 UBFM res_w res_w (O.imm_six 0) (O.imm_six 15)
     | Thirtytwo -> A.ins2 REV (H.reg_w i.res.(0)) (H.reg_w i.arg.(0))
     | Sixtyfour -> A.ins2 REV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)))
   | Lop (Specific (Isignext size)) ->
-    A.ins4 SBFM
-      (H.reg_x i.res.(0))
-      (H.reg_x i.arg.(0))
-      (O.imm_six 0)
-      (O.imm_six (size - 1))
+    let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
+    A.ins4 SBFM rd rn (O.imm_six 0) (O.imm_six (size - 1))
   | Lop (Specific (Isimd simd)) -> simd_instr simd i
   | Lop (Name_for_debugger _) -> ()
   | Lcall_op (Lprobe _) ->
@@ -1923,14 +1886,13 @@ let emit_instr i =
     (* Compare with 0 and set result to 1 if non-zero, 0 if zero *)
     A.ins_cmp (H.reg_w i.res.(0)) (O.imm 0) O.optional_none;
     A.ins_cset (H.reg_x i.res.(0)) Cond.NE
+  | Lop Dls_get when not Config.runtime5 ->
+    Misc.fatal_error "Dls is not supported in runtime4."
   | Lop Dls_get ->
-    if Config.runtime5
-    then
-      let offset = Domainstate.(idx_of_field Domain_dls_state) * 8 in
-      A.ins2 LDR
-        (H.reg_x i.res.(0))
-        (H.addressing (Iindexed offset) reg_domain_state_ptr)
-    else Misc.fatal_error "Dls is not supported in runtime4."
+    let offset = Domainstate.(idx_of_field Domain_dls_state) * 8 in
+    A.ins2 LDR
+      (H.reg_x i.res.(0))
+      (H.addressing (Iindexed offset) reg_domain_state_ptr)
   | Lop Tls_get ->
     let offset = Domainstate.(idx_of_field Domain_tls_state) * 8 in
     A.ins2 LDR
