@@ -190,7 +190,7 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
         (Simd.print_name op)
   | _ -> ());
   let module RM = Simd_rounding_mode in
-  let open A.Tupled [@ocaml.warning "-44"] in
+  let open A.Tupled in
   (* CR mshinwell: let open A.Ins in *)
   let open H in
   let arg = i.arg in
