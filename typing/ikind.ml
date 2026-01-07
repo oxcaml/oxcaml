@@ -327,7 +327,8 @@ module Solver = struct
       | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
       | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
       | Types.Tpoly (ty, _) -> 
-        (* This is sound but not fully precise (internal ticket 5746). *)
+        (* CR ikinds: this is sound but not fully precise.
+          Internal ticket 5746. *)
         kind ctx ty
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
