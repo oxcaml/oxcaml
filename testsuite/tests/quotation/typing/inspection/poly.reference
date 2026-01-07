@@ -18,11 +18,11 @@ Stdlib.ignore
 Stdlib.ignore
   ((fun x -> x)
      (fun obj ->
-        (((obj : < f : 'a. 'a -> _ -> [ `Foo of < foo : 'a > ] * _; .. >)#
-            f 42 0),
+        (((obj : < f : 'a. 'a -> _ -> [ `Foo of < foo : 'a; .. > ] * _; ..
+            >)#f 42 0),
          ((obj : <
-            f : 'a__1. 'a__1 -> _ -> [ `Foo of < foo : 'a__1 > ] * _; .. >)#
-            f "abc" 1)))
+            f : 'a__1. 'a__1 -> _ -> [ `Foo of < foo : 'a__1; .. > ] * _; ..
+            >)#f "abc" 1)))
   : B.to3)
 
 Stdlib.ignore
@@ -36,7 +36,7 @@ Stdlib.ignore
   ((fun x -> x)
      (fun obj ->
         (((obj : < f : 'a. 'a -> _ -> 'a; .. >)#f
-            ((obj : < f : 'a__1. 'a__1 -> _ -> 'a__1; .. >)#f 42 obj) 
+            ((obj : < f : 'a__1. 'a__1 -> _ -> 'a__1; .. >)#f 42 obj)
             obj),
          ((obj : < f : 'a__2. 'a__2 -> _ -> 'a__2; .. >)#f "abc" obj)))
   : B.tr)
@@ -51,7 +51,7 @@ Stdlib.ignore
 
 Stdlib.ignore
   ((fun x -> x)
-     (fun (f : 'a. 'a -> _ -> [ `Foo of < foo : 'a > ] * _) ->
+     (fun (f : 'a. 'a -> _ -> [ `Foo of < foo : 'a; .. > ] * _) ->
         ((f 42 0), (f "abc" 1)))
   : B.t3)
 
@@ -67,13 +67,13 @@ Stdlib.ignore
   : B.t3''')
 
 Stdlib.ignore
-  ((fun x -> x) (fun (f : 'a. < x : 'a > -> 'a) -> (42, "abc")) :
+  ((fun x -> x) (fun (f : 'a. < x : 'a; .. > -> 'a) -> (42, "abc")) :
   ('a__1. < x : 'a__1; .. > -> 'a__1) -> (int) * (string))
 
 Stdlib.ignore
   ((fun x -> x)
-     (fun (f : 'poly7388 'poly7389 'a 'b. [< `Bar of 'b | `Foo of 'a & 'b ]
-        -> [> `Foo of 'a | `Baz ]) -> ())
+     (fun (f : 'a 'b. [< `Bar of 'b | `Foo of 'a & 'b ] -> [> `Foo of 'a |
+        `Baz ]) -> ())
   :
   ('a__1 'b__1. [< `Foo of 'a__1 & 'b__1 | 'b__1 B.tbar ] -> [> `Foo of 'a__1
    | `Baz ])
@@ -101,4 +101,3 @@ Stdlib.ignore
 Stdlib.ignore
   ((fun x -> x) (fun f -> (f : ('a. 'a -> 'a) -> _) (fun x__1 -> x__1)) :
   B.te4)
-
