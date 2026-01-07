@@ -1515,13 +1515,13 @@ let narrow_to_manifest_jkind env loc path decl =
     begin match Jkind.try_allow_r decl.type_jkind with
     | None ->
         (* Under -ikinds we keep [decl.type_jkind] in left/Best form, so
-           [try_allow_r] returns [None] and we route through Ikinds. We also
+           [try_allow_r] returns [None] and we route through Ikind. We also
            fall back here when [decl.type_jkind] cannot allow-right
            (e.g. due to with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
         (match
-           Ikinds.sub_jkind_l
+           Ikind.sub_jkind_l
              ~origin:(Format.asprintf
                         "typedecl:manifest_vs_decl %a"
                         Location.print_loc decl.type_loc)
@@ -1543,7 +1543,7 @@ let narrow_to_manifest_jkind env loc path decl =
     let context =
       Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
     in
-    let type_ikind = Ikinds.type_declaration_ikind_gated ~context ~path in
+    let type_ikind = Ikind.type_declaration_ikind_gated ~context ~path in
     { decl with type_jkind = manifest_jkind; type_ikind }
 
 (* Check that the type expression (if present) is compatible with the kind.
@@ -2841,7 +2841,7 @@ let normalize_decl_jkinds env decls =
       { decl with
         type_jkind = normalized_jkind;
         type_ikind =
-          Ikinds.type_declaration_ikind_gated
+          Ikind.type_declaration_ikind_gated
             ~context:normalization_context ~path;
         type_unboxed_version
       }
@@ -2860,7 +2860,7 @@ let normalize_decl_jkinds env decls =
       match
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
-        Ikinds.sub_jkind_l
+        Ikind.sub_jkind_l
           ~origin:(Format.asprintf
                      "typedecl:normalize %a (%a)"
                      Path.print path
@@ -2894,7 +2894,7 @@ let normalize_decl_jkinds env decls =
               Type_variant (cs, rep, umc)
           in
           let type_ikind =
-            Ikinds.type_declaration_ikind_of_jkind
+            Ikind.type_declaration_ikind_of_jkind
               ~context:normalization_context
               ~params:decl.type_params
               type_jkind

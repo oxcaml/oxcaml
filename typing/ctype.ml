@@ -2659,7 +2659,7 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     | _ ->
        match
-         Ikinds.sub_or_intersect ~type_equal ~context ~level:!current_level
+         Ikind.sub_or_intersect ~type_equal ~context ~level:!current_level
            ty's_jkind jkind
        with
        | Sub -> Ok ()
@@ -5350,7 +5350,7 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-  Ikinds.crossing_of_jkind ~context jkind
+  Ikind.crossing_of_jkind ~context jkind
 
 let crossing_of_ty env ?modalities ty =
   let crossing =
@@ -7617,7 +7617,7 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match
-    Ikinds.sub_jkind_l
+    Ikind.sub_jkind_l
       ~origin:
         (Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
       ~type_equal ~context ~level:!current_level decl_jkind jkind
@@ -7629,7 +7629,7 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match
-        Ikinds.sub_jkind_l
+        Ikind.sub_jkind_l
           ~origin:
             (Format.asprintf "ctype:manifest %a"
                Location.print_loc decl.type_loc)
@@ -7651,9 +7651,9 @@ let constrain_decl_jkind env decl jkind =
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      (* Use Ikinds when enabled so axis constraints are checked; it falls
+      (* Use Ikind when enabled so axis constraints are checked; it falls
          back to [Jkind.sub_or_error] when ikinds are disabled. *)
-      Ikinds.sub_or_error ~type_equal ~context ~level:!current_level
+      Ikind.sub_or_error ~type_equal ~context ~level:!current_level
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok

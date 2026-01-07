@@ -135,7 +135,7 @@
   ldd
   axis_lattice
   axis_lattice_conv
-  ikinds
+  ikind
   value_rec_types
   btype
   lazy_backtrack
@@ -648,7 +648,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikinds.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Subst.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_with_global_bindings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Bytesections.cmo
@@ -753,7 +753,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikinds.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Subst.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_with_global_bindings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Bytesections.cmx

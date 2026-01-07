@@ -260,13 +260,13 @@ let initial_env ~loc ~initially_opened_module
            match path with
            | Path.Pident id ->
              let type_ikind =
-               Ikinds.type_declaration_ikind_gated ~context ~path
+               Ikind.type_declaration_ikind_gated ~context ~path
              in
              let type_unboxed_version =
                Option.map
                  (fun ud ->
                     let uik =
-                      Ikinds.type_declaration_ikind_gated
+                      Ikind.type_declaration_ikind_gated
                         ~context ~path:(Path.unboxed_version path)
                     in
                     { ud with type_ikind = uik })

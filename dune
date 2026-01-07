@@ -254,7 +254,7 @@
   ldd
   axis_lattice
   axis_lattice_conv
-  ikinds
+  ikind
   typetexp
   patterns
   printpat
