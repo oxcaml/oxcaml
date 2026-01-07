@@ -78,6 +78,8 @@ and non-float elements. However, all types in vanilla OCaml are `separable`.
 
 Scannable axes written after a value layout overwrite the previous value of the axis. They can also be written after non-value layouts, but have no effect, e.g. `float64 = float64 non_null = float64 maybe_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout. For example, `float64` and `value` are both sublayouts of `any non_null`, but not `value maybe_null`.
 
+We also support the `mod` syntax for scannable axes, which only lowers the scannable axis (takes the meet). For example, `value mod non_pointer` is equivalent to `value non_pointer`, but `value mod maybe_separable` is equivalent to `value`.
+
 ### Relationship between `immediate` and value layouts
 
 In a previous design of OxCaml, `immediate` was a sublayout of `value`. It is still a *subkind* of `value`, but now conveys more kind information than just the layout:

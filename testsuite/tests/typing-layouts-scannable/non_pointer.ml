@@ -575,11 +575,9 @@ end
 module M : sig type t : value non_float end
 |}]
 
-(* This test demonstrates a change in behavior now that the mod bound syntax
-   gets parsed into scannable axes: before, mod bounds could only make non-modal
-   axes lower (so [mod separable] would be a no-op, since [immediate] already
-   meant [non_float]). But these now (currently, at least) override the
-   existing scannable axes! *)
+(* This test demonstrates a change the mod bound syntax gets parsed into
+   scannable axes still only make non-modal axes lower (so [mod separable] is a
+   no-op, since [immediate] already meant [non_float]). *)
 
 (* CR layouts-scannable: as we deprecate the old syntax, this small collection
    of tests should be removed. *)
@@ -589,23 +587,25 @@ end = struct
   type t : immediate mod separable
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t : immediate mod separable
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : immediate separable end
-       is not included in
-         sig type t : value non_float end
-       Type declarations do not match:
-         type t : immediate separable
-       is not included in
-         type t : value non_float
-       The layout of the first is value
-         because of the definition of t at line 4, characters 2-34.
-       But the layout of the first must be a sublayout of value non_float
-         because of the definition of t at line 2, characters 2-26.
+module M : sig type t : value non_float end
+|}]
+
+module M : sig
+  type t : immediate
+end = struct
+  type t : value mod everything non_pointer
+end
+[%%expect{|
+module M : sig type t : immediate end
+|}]
+
+module M : sig
+  type t : immediate64
+end = struct
+  type t : value mod everything non_pointer64
+end
+[%%expect{|
+module M : sig type t : immediate64 end
 |}]
 
 module M : sig
