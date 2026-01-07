@@ -46,26 +46,22 @@ module Map = struct
 
   let from_program prog =
     let open X86_ast in
-    if DLL.is_empty prog then String.Map.empty
-    else
-      match DLL.hd prog with
-      | None -> String.Map.empty
-      | Some (Directive (Section {names = s_l; flags = s_opt; args = s_l'; _})) ->
-        let initial_section = name s_l s_opt s_l' in
-        let acc = ref String.Map.empty in
-        let current_section = ref initial_section in
-        let current_instrs = ref (DLL.make_empty ()) in
-        DLL.iter prog ~f:(fun instr ->
-          match instr with
-          | Directive (Section {names = s_l; flags = s_opt; args = s_l'; _}) ->
-            if not (DLL.is_empty !current_instrs) then
-              acc := append !current_section !current_instrs !acc;
-            current_section := name s_l s_opt s_l';
-            current_instrs := DLL.make_empty ()
-          | _ ->
-            DLL.add_end !current_instrs instr);
-        if not (DLL.is_empty !current_instrs) then
+    match DLL.hd prog with
+    | None -> String.Map.empty
+    | Some (Directive (Section {names = s_l; flags = s_opt; args = s_l'; _})) ->
+      let initial_section = name s_l s_opt s_l' in
+      let acc = ref String.Map.empty in
+      let current_section = ref initial_section in
+      let current_instrs = ref (DLL.make_empty ()) in
+      DLL.iter prog ~f:(fun instr ->
+        match instr with
+        | Directive (Section {names = s_l; flags = s_opt; args = s_l'; _}) ->
           acc := append !current_section !current_instrs !acc;
-        !acc
-      | Some _ -> failwithf "Invalid program, should start with section"
+          current_section := name s_l s_opt s_l';
+          current_instrs := DLL.make_empty ()
+        | _ ->
+          DLL.add_end !current_instrs instr);
+      acc := append !current_section !current_instrs !acc;
+      !acc
+    | Some _ -> failwithf "Invalid program, should start with section"
 end
