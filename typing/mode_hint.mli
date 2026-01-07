@@ -74,11 +74,16 @@ type closure_details =
     closed : pinpoint
   }
 
+(* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
+   resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
+   while [Modality] stays in place. *)
+type modality = Modality
+
 type containing =
   | Tuple
-  | Record of string
-  | Array
-  | Constructor of string
+  | Record of string * modality
+  | Array of modality
+  | Constructor of string * modality
 (* CR-soon zqian: add the relation between structure and items *)
 
 type contains =

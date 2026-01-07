@@ -17,6 +17,7 @@
 
 open Types
 open Misc
+module Jkind = Btype.Jkind0
 
 type value_unbound_reason =
   | Val_unbound_instance_variable
@@ -56,7 +57,7 @@ type summary =
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * Jkind.Sort.t array * int
+  | Adot of address * Jkind_types.Sort.t array * int
 
 type t
 
@@ -218,6 +219,10 @@ type no_open_quotations_context =
   | Sig_qt
   | Open_qt
 
+type none_in_quotations_context =
+  | Constructor
+  | Label
+
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
   | Unbound_type of Longident.t
@@ -252,7 +257,8 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
-  | No_constructor_in_stage of Longident.t * Location.t * int
+  | Unbound_in_stage of
+      none_in_quotations_context * Longident.t * Location.t * stage * stage
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -331,7 +337,7 @@ val lookup_all_labels_from_type:
 
 type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
-  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
+  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind_types.Sort.t
 
 (** For a mutable variable, [use] means mark as mutated. For an instance
     variable, it means mark as used. *)
@@ -671,6 +677,10 @@ val print_longident: (Format.formatter -> Longident.t -> unit) ref
 val print_path: (Format.formatter -> Path.t -> unit) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_type_expr: (Format.formatter -> Types.type_expr -> unit) ref
+(* Forward declaration to break mutual recursion with Jkind. *)
+val report_jkind_violation_with_offender:
+  (offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
+   Jkind.Violation.t -> unit) ref
 
 
 (** Folds *)

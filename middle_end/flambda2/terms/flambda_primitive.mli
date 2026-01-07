@@ -61,6 +61,9 @@ module Array_kind : sig
         (** An array consisting of naked floats, represented using
             [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -111,6 +114,9 @@ module Array_load_kind : sig
         (** An array consisting of naked floats, represented using
             [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -135,6 +141,9 @@ module Array_set_kind : sig
         (** An array consisting of naked floats, represented using
         [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -171,6 +180,9 @@ module Duplicate_array_kind : sig
     | Values
     | Naked_floats of { length : Target_ocaml_int.t option }
     | Naked_float32s of { length : Target_ocaml_int.t option }
+    | Naked_ints of { length : Target_ocaml_int.t option }
+    | Naked_int8s of { length : Target_ocaml_int.t option }
+    | Naked_int16s of { length : Target_ocaml_int.t option }
     | Naked_int32s of { length : Target_ocaml_int.t option }
     | Naked_int64s of { length : Target_ocaml_int.t option }
     | Naked_nativeints of { length : Target_ocaml_int.t option }
@@ -546,6 +558,14 @@ type int_atomic_op =
   | Or
   | Xor
 
+module Write_offset_kind : sig
+  type t =
+    | Into_block
+    | Into_block_or_off_heap
+
+  val compare : t -> t -> int
+end
+
 (** Primitives taking exactly three arguments. *)
 type ternary_primitive =
   | Array_set of Array_kind.t * Array_set_kind.t
@@ -556,7 +576,20 @@ type ternary_primitive =
   | Atomic_field_int_arith of int_atomic_op
   | Atomic_set_field of Block_access_field_kind.t
   | Atomic_exchange_field of Block_access_field_kind.t
-  | Write_offset of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
+  | Write_offset of
+      Write_offset_kind.t
+      * Flambda_kind.With_subkind.t
+      * Alloc_mode.For_assignments.t
+      (** For the arguments (base, byte_offset, payload), write the payload to
+          (base + byte_offset).
+
+          - If the write offset kind is [Into_block], the base must be a pointer
+            to a block.
+          - If it is [Into_block_or_off_heap], then the base can also be NULL,
+            in which case the byte_offset must be a pointer that does not point
+            into the OCaml heap (as the payload will be written via a raw
+            store).
+      *)
 
 (** Primitives taking exactly four arguments. *)
 type quaternary_primitive =

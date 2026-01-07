@@ -379,6 +379,43 @@ let mk_internal_assembler f =
     "Write object files directly instead of using the system assembler (x86-64 \
      ELF only)" )
 
+let mk_dissector f =
+  ( "-dissector",
+    Arg.Unit f,
+    " Enable the dissector pass (prevents relocation overflow when linking \
+     very large executables with the small code model).  (Experimental)" )
+
+let mk_dissector_partition_size f =
+  ( "-dissector-partition-size",
+    Arg.Float f,
+    Printf.sprintf
+      "<size>  Set the partition size threshold in gigabytes for the dissector \
+       pass (default: %g)"
+      Clflags.dissector_partition_size_default )
+
+let mk_ddissector f =
+  ("-ddissector", Arg.Unit f, " Print verbose logging from the dissector pass")
+
+let mk_ddissector_sizes f =
+  ( "-ddissector-sizes",
+    Arg.Unit f,
+    " Dump allocated section sizes for each input file during linking" )
+
+let mk_ddissector_verbose f =
+  ( "-ddissector-verbose",
+    Arg.Unit f,
+    " Print detailed per-relocation logging from the dissector pass" )
+
+let mk_ddissector_partitions f =
+  ( "-ddissector-partitions",
+    Arg.Unit f,
+    " Keep partition .o files and print their paths (for debugging)" )
+
+let mk_ddissector_inputs f =
+  ( "-ddissector-inputs",
+    Arg.String f,
+    "<file>  Write dissector input analysis to <file>" )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -623,6 +660,21 @@ let mk_no_flambda2_expert_inline_effects_in_cmm f =
       \     expressions in the produced Cmm code into\n\
       \     the arguments of allocation primitives%s (Flambda 2 only)"
       (format_not_default Flambda2.Expert.Default.inline_effects_in_cmm) )
+
+let mk_flambda2_expert_cmm_safe_subst f =
+  ( "-flambda2-expert-cmm-safe-subst",
+    Arg.Unit f,
+    Printf.sprintf
+      " Prevent potentially unsafe substitutions in cmm but may produce less \
+       optimized code%s"
+      (format_default Flambda2.Expert.Default.cmm_safe_subst) )
+
+let mk_no_flambda2_expert_cmm_safe_subst f =
+  ( "-no-flambda2-expert-cmm-safe-subst",
+    Arg.Unit f,
+    Printf.sprintf
+      " Allow more substitutions in cmm, even ones that may be unsafe%s"
+      (format_not_default Flambda2.Expert.Default.cmm_safe_subst) )
 
 let mk_flambda2_expert_phantom_lets f =
   ( "-flambda2-expert-phantom-lets",
@@ -890,6 +942,13 @@ let mk_dfexpr f =
     Arg.Unit f,
     " Like -dflambda but outputs fexpr language\n     (Flambda 2 only)" )
 
+let mk_dfexpr_after f =
+  let passes = [ "simplify"; "reaper" ] in
+  ( "-dfexpr-after",
+    Arg.Symbol (passes, f),
+    " <pass> Like -dfexpr, but dumps after the provided pass (Flambda 2 only)"
+  )
+
 let mk_dfexpr_to f =
   ( "-dfexpr-to",
     Arg.String f,
@@ -1108,6 +1167,13 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
+  val dissector : unit -> unit
+  val dissector_partition_size : float -> unit
+  val ddissector : unit -> unit
+  val ddissector_sizes : unit -> unit
+  val ddissector_verbose : unit -> unit
+  val ddissector_partitions : unit -> unit
+  val ddissector_inputs : string -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -1144,6 +1210,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
   val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val flambda2_expert_cmm_safe_subst : unit -> unit
+  val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
@@ -1179,6 +1247,7 @@ module type Oxcaml_options = sig
   val drawfexpr_to : string -> unit
   val dfexpr : unit -> unit
   val dfexpr_to : string -> unit
+  val dfexpr_after : string -> unit
   val dflexpect_to : string -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
@@ -1257,6 +1326,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_debug_long_frames_threshold F.long_frames_threshold;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_internal_assembler F.internal_assembler;
+      mk_dissector F.dissector;
+      mk_dissector_partition_size F.dissector_partition_size;
+      mk_ddissector F.ddissector;
+      mk_ddissector_sizes F.ddissector_sizes;
+      mk_ddissector_verbose F.ddissector_verbose;
+      mk_ddissector_partitions F.ddissector_partitions;
+      mk_ddissector_inputs F.ddissector_inputs;
       mk_gc_timings F.gc_timings;
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
@@ -1303,6 +1379,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_expert_inline_effects_in_cmm;
       mk_no_flambda2_expert_inline_effects_in_cmm
         F.no_flambda2_expert_inline_effects_in_cmm;
+      mk_flambda2_expert_cmm_safe_subst F.flambda2_expert_cmm_safe_subst;
+      mk_no_flambda2_expert_cmm_safe_subst F.no_flambda2_expert_cmm_safe_subst;
       mk_flambda2_expert_phantom_lets F.flambda2_expert_phantom_lets;
       mk_no_flambda2_expert_phantom_lets F.no_flambda2_expert_phantom_lets;
       mk_flambda2_expert_max_block_size_for_projections
@@ -1353,6 +1431,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_drawfexpr_to F.drawfexpr_to;
       mk_dfexpr F.dfexpr;
       mk_dfexpr_to F.dfexpr_to;
+      mk_dfexpr_after F.dfexpr_after;
       mk_dflexpect_to F.dflexpect_to;
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
@@ -1497,6 +1576,13 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
   let internal_assembler = set' Oxcaml_flags.internal_assembler
+  let dissector = set' Clflags.dissector
+  let dissector_partition_size f = Clflags.dissector_partition_size := Some f
+  let ddissector = set' Clflags.ddissector
+  let ddissector_sizes = set' Clflags.ddissector_sizes
+  let ddissector_verbose = set' Clflags.ddissector_verbose
+  let ddissector_partitions = set' Clflags.ddissector_partitions
+  let ddissector_inputs f = Clflags.ddissector_inputs := Some f
   let gc_timings = set' Oxcaml_flags.gc_timings
   let no_mach_ir () = ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
@@ -1593,6 +1679,8 @@ module Oxcaml_options_impl = struct
   let no_flambda2_expert_inline_effects_in_cmm =
     clear Flambda2.Expert.inline_effects_in_cmm
 
+  let flambda2_expert_cmm_safe_subst = set Flambda2.Expert.cmm_safe_subst
+  let no_flambda2_expert_cmm_safe_subst = clear Flambda2.Expert.cmm_safe_subst
   let flambda2_expert_phantom_lets = set Flambda2.Expert.phantom_lets
   let no_flambda2_expert_phantom_lets = clear Flambda2.Expert.phantom_lets
 
@@ -1710,6 +1798,11 @@ module Oxcaml_options_impl = struct
   let drawfexpr () = Flambda2.Dump.rawfexpr := Flambda2.Dump.Main_dump_stream
   let drawfexpr_to file = Flambda2.Dump.rawfexpr := Flambda2.Dump.File file
   let dfexpr () = Flambda2.Dump.fexpr := Flambda2.Dump.Main_dump_stream
+
+  let dfexpr_after pass =
+    dfexpr ();
+    Flambda2.Dump.fexpr_after := Flambda2.Dump.This_pass pass
+
   let dfexpr_to file = Flambda2.Dump.fexpr := Flambda2.Dump.File file
   let dflexpect_to file = Flambda2.Dump.flexpect := Flambda2.Dump.File file
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
@@ -2041,6 +2134,7 @@ module Extra_params = struct
     | "flambda2-join-depth" -> set_int Flambda2.join_depth
     | "flambda2-expert-inline-effects-in-cmm" ->
         set Flambda2.Expert.inline_effects_in_cmm
+    | "flambda2-expert-cmm-safe-subst" -> set Flambda2.Expert.cmm_safe_subst
     | "flambda2-expert-phantom-lets" -> set Flambda2.Expert.phantom_lets
     | "flambda2-expert-max-unboxing-depth" ->
         set_int Flambda2.Expert.max_unboxing_depth
@@ -2149,6 +2243,22 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "dissector" -> set' Clflags.dissector
+    | "dissector-partition-size" -> (
+        match float_of_string_opt v with
+        | Some f ->
+            Clflags.dissector_partition_size := Some f;
+            true
+        | None ->
+            raise
+              (Arg.Bad (Printf.sprintf "Expected float for %s, got %S" name v)))
+    | "ddissector" -> set' Clflags.ddissector
+    | "ddissector-sizes" -> set' Clflags.ddissector_sizes
+    | "ddissector-verbose" -> set' Clflags.ddissector_verbose
+    | "ddissector-partitions" -> set' Clflags.ddissector_partitions
+    | "ddissector-inputs" ->
+        Clflags.ddissector_inputs := Some v;
+        true
     | _ -> false
 end
 

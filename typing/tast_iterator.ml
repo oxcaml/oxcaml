@@ -245,6 +245,8 @@ let pat_extra sub (e, loc, attrs) =
   | Tpat_unpack -> ()
   | Tpat_open (_, lid, env) -> iter_loc sub lid; sub.env sub env
   | Tpat_constraint ct -> sub.typ sub ct
+  | Tpat_inspected_type (Label_disambiguation _) -> ()
+  | Tpat_inspected_type Polymorphic_parameter -> ()
 
 let pat
   : type k . iterator -> k general_pattern -> unit
@@ -292,6 +294,8 @@ let extra sub = function
   | Texp_poly cto -> Option.iter (sub.typ sub) cto
   | Texp_stack -> ()
   | Texp_mode _ -> ()
+  | Texp_inspected_type (Label_disambiguation _) -> ()
+  | Texp_inspected_type Polymorphic_parameter -> ()
 
 let function_param sub { fp_loc; fp_kind; fp_newtypes; _ } =
   sub.location sub fp_loc;
@@ -522,7 +526,7 @@ let class_description sub x =
 
 let functor_parameter sub = function
   | Unit -> ()
-  | Named (_, s, mtype) -> iter_loc sub s; sub.module_type sub mtype
+  | Named (_, s, mtype, _) -> iter_loc sub s; sub.module_type sub mtype
 
 let module_type sub {mty_loc; mty_desc; mty_env; mty_attributes; _} =
   sub.location sub mty_loc;
@@ -532,7 +536,7 @@ let module_type sub {mty_loc; mty_desc; mty_env; mty_attributes; _} =
   | Tmty_ident (_, lid) -> iter_loc sub lid
   | Tmty_alias (_, lid) -> iter_loc sub lid
   | Tmty_signature sg -> sub.signature sub sg
-  | Tmty_functor (arg, mtype2) ->
+  | Tmty_functor (arg, mtype2, _) ->
       functor_parameter sub arg;
       sub.module_type sub mtype2
   | Tmty_with (mtype, list) ->

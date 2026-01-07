@@ -637,6 +637,12 @@ val is_bottom : Typing_env.t -> t -> bool
 
 val is_unknown : Typing_env.t -> t -> bool
 
+(** Whether the given type contains no information, except about nullability
+    (i.e. returns `true` for both `value` and `value_or_null`, whereas
+    `is_unknown` returns `false` for `value` because we know something -- it
+    can't be `null`). *)
+val is_unknown_maybe_null : Typing_env.t -> t -> bool
+
 val is_alias_to_a_symbol : t -> bool
 
 val type_for_const : Reg_width_const.t -> t
@@ -886,6 +892,9 @@ type to_lift = private
       { fields : Numeric_types.Float32_by_bit_pattern.t list }
   | Immutable_float_array of
       { fields : Numeric_types.Float_by_bit_pattern.t list }
+  | Immutable_int_array of { fields : Target_ocaml_int.t list }
+  | Immutable_int8_array of { fields : Numeric_types.Int8.t list }
+  | Immutable_int16_array of { fields : Numeric_types.Int16.t list }
   | Immutable_int32_array of { fields : Int32.t list }
   | Immutable_int64_array of { fields : Int64.t list }
   | Immutable_nativeint_array of { fields : Targetint_32_64.t list }
@@ -948,6 +957,10 @@ module Rewriter : sig
 
     val block_field :
       Target_ocaml_int.t -> Flambda_kind.t -> 'a t -> 'a block_field
+
+    val is_int : 'a t -> 'a block_field
+
+    val get_tag : 'a t -> 'a block_field
 
     val block : ?tag:Tag.t -> 'a block_field list -> 'a t
 
@@ -1029,6 +1042,8 @@ module Rewriter : sig
     val print : Format.formatter -> t -> unit
 
     module Map : Container_types.Map with type key = t
+
+    val in_coercion : t -> t
 
     val rewrite : t -> typing_env -> flambda_type -> t Rule.t
 

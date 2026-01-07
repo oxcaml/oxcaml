@@ -306,7 +306,7 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
   | prim ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
-      | Arbitrary_effects, _, _ ->
+      | Arbitrary_effects, _, _, _ ->
         let bound_to = Bound_pattern.free_names bound_pattern in
         Name_occurrences.fold_names bound_to
           ~f:(fun () bound_to ->

@@ -190,7 +190,7 @@ module Type : sig
       record with the structure:
       [#{ a : #{ b : int; c : int } }]
       produces:
-      [(0, [<empty path>]), (1, [.#a]]); (2, [[.#a.#b]; [.#a.#c]])]
+      [(0, [<empty path>]), (1, [.#a]); (2, [[.#a.#b]; [.#a.#c]])]
   *)
   val unboxed_paths_by_depth : t -> (int * Path.t list) list
 end

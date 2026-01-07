@@ -144,18 +144,18 @@ val naive_iter : 'v t -> Table.Map.t -> ('v Constant.hlist -> unit) -> unit
     by iterating over [join(P, Q)]. If [P = P + ΔP] and [Q = P + ΔQ], we can
     rewrite:
 
-    ```
+    {v
     join(P + ΔP, Q + ΔQ) = join(P, Q) + join(ΔP, Q) + join(P + ΔP, ΔQ)
-    ```
+    v}
 
     Seminaive evaluation ignores the [join(P, Q)] term and only computes the
     last two terms. Note that the term [join(P + ΔP, ΔQ)] does not need to be
     further decomposed, so that in the general case we only need to combine
     linearly many terms of the form:
 
-    ```
+    {v
     join(P₁ + ΔP₁, …, Pᵢ-₁ + ΔPᵢ-₁, ΔPᵢ, Pᵢ+₁, …, Pₙ
-    ```
+    v}
 
     The terms on the left use the [current] databse, the middle term uses the
     [diff] database, and the terms on the right use the [previous] database.

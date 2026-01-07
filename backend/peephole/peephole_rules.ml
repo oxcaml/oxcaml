@@ -16,10 +16,10 @@ let delete_fst_if_redundant ~fst ~snd ~(fst_val : Cfg.basic Cfg.instruction)
   else None
 
 (** Logical condition for simplifying the following case:
-    {|
+    {v
     mov ..., x
     mov ..., x
-    |}
+    v}
 
     In this case, the first instruction should be removed *)
 
@@ -47,10 +47,10 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
   | _ -> None
 
 (** Logical condition for simplifying the following case:
-    {|
+    {v
     mov x, y
     mov y, x
-    |}
+    v}
 
     In this case, the second instruction should be removed *)
 
@@ -75,15 +75,15 @@ let remove_useless_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
   | _ -> None
 
 (** Logical condition for simplifying the following case:
-  {|
+  {v
     <op1> const1, r
     <op2> const2, r
-  |}
+  v}
 
   to:
-  {|
+  {v
     <op1> (const1 <op2> const2), r
-  |}
+  v}
 
     where
     const1 and const2 are immediate values, and
@@ -196,6 +196,41 @@ let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
     else None
   | _ -> None
 
+let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  (* CR-someday xclerc for xclerc: it is not clear we want these rewrites to
+     happen here. Indeed, it is probably better to avoid these useless
+     operations when generating CMM, but this is currently blocked on an
+     upcoming refactoring there and it is simple enough to do here. *)
+  match U.get_cells cell 1 with
+  | [cell] -> (
+    let instr = DLL.value cell in
+    match instr.desc with
+    | Op (Intop_imm (op, imm))
+      when Array.length instr.arg = 1
+           && Array.length instr.res = 1
+           && U.are_equal_regs
+                (Array.unsafe_get instr.arg 0)
+                (Array.unsafe_get instr.res 0) ->
+      (* CR-soon xclerc for xclerc: when the source and the destination are not
+         the same, we should downgrade the operation to a mere move. *)
+      let to_remove =
+        (* CR-soon xclerc for xclerc: we should add other cases, such as `Imul,
+           1` or `Idiv, 1`, but we need to be careful because these can clobber
+           registers on amd64. *)
+        match op, imm with
+        | Iadd, 0 | Isub, 0 | Ior, 0 | Ixor, 0 | Ilsl, 0 | Ilsr, 0 | Iasr, 0 ->
+          true
+        | _ -> false
+      in
+      if to_remove
+      then (
+        let continue = Some (U.prev_at_most U.go_back_const cell) in
+        DLL.delete_curr cell;
+        continue)
+      else None
+    | _ -> None)
+  | _ -> None
+
 let apply cell =
   let[@inline always] if_none_do f o =
     match o with Some _ -> o | None -> f cell
@@ -204,3 +239,4 @@ let apply cell =
   |> if_none_do remove_overwritten_mov
   |> if_none_do remove_useless_mov
   |> if_none_do fold_intop_imm
+  |> if_none_do remove_intop_neutral_element

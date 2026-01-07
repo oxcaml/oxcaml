@@ -17,6 +17,7 @@
 (* SIMD instructions for ARM64 *)
 
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+module Arm64_ast = Arm64_ast.Ast
 
 type operation_class = Pure
 

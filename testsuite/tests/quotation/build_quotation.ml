@@ -538,7 +538,12 @@ type rcd = { x : int; y : string; }
 
 <[ {x = 42; y = "foo"} ]>;;
 [%%expect {|
-- : <[rcd]> expr = <[{ x = 42; y = "foo"; }]>
+Line 1, characters 4-5:
+1 | <[ {x = 42; y = "foo"} ]>;;
+        ^
+Error: Label "x" used at Line 1, characters 4-5 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 type rcd_u = #{xu: int; yu: string};;
@@ -548,17 +553,34 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
 [%%expect {|
-- : <[unit -> rcd_u]> expr = <[fun () -> { xu = 42; yu = "foo"; }]>
+Line 1, characters 15-17:
+1 | <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
+                   ^^
+Error: Label "xu" used at Line 1, characters 15-17
+       cannot be used in this context;
+       "xu" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "xu" is defined outside any quotations.
 |}];;
 
 <[ fun r -> r.x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun r -> r.x]>
+Line 1, characters 14-15:
+1 | <[ fun r -> r.x ]>;;
+                  ^
+Error: Label "x" used at Line 1, characters 14-15
+       cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ fun {x; y} -> x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun {x=x; y=y; } -> x]>
+Line 1, characters 8-9:
+1 | <[ fun {x; y} -> x ]>;;
+            ^
+Error: Label "x" used at Line 1, characters 8-9 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;
@@ -738,6 +760,22 @@ Error: Opening modules is not supported inside quoted expressions,
        as seen at Line 1, characters 3-23.
 |}];;
 
+module M = struct
+  let foo = 42
+end;;
+
+<[ let open M in M.foo ]>
+;;
+[%%expect {|
+module M : sig val foo : int end
+Line 5, characters 3-22:
+5 | <[ let open M in M.foo ]>
+       ^^^^^^^^^^^^^^^^^^^
+Error: Opening modules is not supported inside quoted expressions,
+       as seen at Line 5, characters 3-22.
+|}]
+;;
+
 <[ fun x -> $ (<[ x ]>) ]>;;
 [%%expect {|
 - : <[$('a) -> $('a)]> expr = <[fun x -> x]>
@@ -798,8 +836,73 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 = <[fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
 |}];;
 
+<[ let rec add : int * int -> int = fun (x, y) -> x + y in add ]>
+[%%expect {|
+- : <[int * int -> int]> expr =
+<[
+  let rec add : (int) * (int) -> int =
+  (fun (x, y) -> x + y : (int) * (int) -> int) in add
+]>
+|}];;
+
+<[ let rec id : 'a. 'a -> 'a = fun x -> x in id ]>
+[%%expect {|
+- : <[$('a) -> $('a)]> expr =
+<[let rec id : 'a. 'a -> 'a = (fun x -> x) in id]>
+|}];;
+
+<[ let rec foo : int -> int = fun x -> if x < 0 then bar x else 0
+   and bar : int -> int = fun x -> if x > 0 then foo x else 0
+   in foo, bar ]>
+[%%expect {|
+- : <[(int -> int) * (int -> int)]> expr =
+<[
+  let rec foo : int -> int =
+  (fun x -> if (x < 0) then (bar x) else 0 : int -> int)
+  and bar : int -> int =
+  (fun x__1 -> if (x__1 > 0) then (foo x__1) else 0 : int -> int) in
+  (foo, bar)
+]>
+|}];;
+
+<[ let rec foo (x : int) : int = if x < 0 then bar x else 0
+   and bar (x : int) : int = if x > 0 then foo x else 0
+   in foo, bar ]>
+[%%expect {|
+- : <[(int -> int) * (int -> int)]> expr =
+<[
+  let rec foo = (fun (x : int) -> (if (x < 0) then (bar x) else 0 : int))
+  and bar =
+  (fun (x__1 : int) -> (if (x__1 > 0) then (foo x__1) else 0 : int)) in
+  (foo, bar)
+]>
+|}];;
+
 <[ fun x -> function None -> 0 | Some x -> x ]>
 [%%expect {|
 - : <[$('a) -> int option -> int]> expr =
 <[fun x -> function | None -> 0 | Some (x__1) -> x__1]>
+|}];;
+
+<[ fun f x -> (f [@inlined]) x [@nontail] ]>
+[%%expect {|
+- : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
+<[fun f x -> ((f [@inlined]) x [@nontail])]>
+|}];;
+
+<[ fun x -> [ x ; x + 1 ] ]>
+[%%expect {|
+- : <[int -> int list]> expr = <[fun x -> [x; x + 1]]>
+|}];;
+
+(* Constraints must be parenthesised in tuple and list elements *)
+
+<[ fun x -> ((x : int), (x + 1 : int)) ]>
+[%%expect {|
+- : <[int -> int * int]> expr = <[fun x -> ((x : int), (x + 1 : int))]>
+|}];;
+
+<[ fun x -> [(x : int); (x + 1 : int)] ]>
+[%%expect {|
+- : <[int -> int list]> expr = <[fun x -> [(x : int); (x + 1 : int)]]>
 |}];;

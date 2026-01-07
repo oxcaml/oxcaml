@@ -1,3 +1,5 @@
+module Jkind = Btype.Jkind0
+
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified *)
 val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t
 
@@ -5,7 +7,10 @@ val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t
+val transl_alloc_mode :
+  Parsetree.modes -> Mode.Alloc.Const.Option.t * Mode.Alloc.Const.t
+(* CR-soon zqian: The first return value should be typedtree.modes. Fix the
+   dependency cycle that blocks this. *)
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
@@ -31,8 +36,8 @@ val untransl_modalities :
   Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
 
 (** Interpret a mod-bounds. *)
-val transl_mod_bounds : Parsetree.modes -> Types.Jkind_mod_bounds.t
+val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t
 
-val untransl_mod_bounds : Types.Jkind_mod_bounds.t -> Parsetree.modes
+val untransl_mod_bounds : Jkind.Mod_bounds.t -> Parsetree.modes
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t

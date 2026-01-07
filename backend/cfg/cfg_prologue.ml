@@ -291,10 +291,12 @@ let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
 
        This might happen when duplicating a prologue in the following CFG:
 
-     * Block A: Condition with branch to Block B / C
-     * Block B: Contains an instruction requiring a prologue, with terminator
+       - Block A: Condition with branch to Block B / C
+
+       - Block B: Contains an instruction requiring a prologue, with terminator
        that jumps to Block C
-     * Block C: Return
+
+       - Block C: Return
 
        If we duplicate the prologue to both B and C (which are both children of
        A), the prologue will execute twice on the A->B->C path.

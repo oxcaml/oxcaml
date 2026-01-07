@@ -19,11 +19,17 @@
     Overview: This module provides a comprehensive type system for scalar values in OCaml.
 
     Type Hierarchy:
-    - Scalar.t
-      - Integral: Integer types
-        - Taggable (fits in word_size-1 bits): Int8, Int16, Int
-        - Boxable (requires boxing): Int32, Int64, Nativeint
-      - Floating: Float32, Float64
+    {ul
+     {- Scalar.t
+        {ul
+         {- Integral: Integer types
+            - Taggable (fits in word_size-1 bits): Int8, Int16, Int
+            - Boxable (requires boxing): Int32, Int64, Nativeint
+         }
+         {- Floating: Float32, Float64 }
+        }
+     }
+    }
 
     Representation Forms:
     - Value: Tagged (small integers) or boxed representation
@@ -51,18 +57,27 @@
     arguments to [any_locality_mode] when defining primitives, e.g.:
       [Icmp (Scalar.Integral.ignore_locality size, cmp)]
 
-    - Some primitives only take integers, some take only floats, and Three_way_compare
-    takes any scalar type. This is represented using specialized operation types:
-      - [Intrinsic.Binary.Int_op.t] for integer-only ops (Add, Sub, Mul, etc.)
-      - [Intrinsic.Binary.Float_op.t] for float-only ops
-      - [Intrinsic.Binary.Three_way_compare of any_locality_mode t] accepts any scalar
+    {ul
+     {- Some primitives only take integers, some take only floats, and
+        Three_way_compare takes any scalar type. This is represented using
+        specialized operation types:
+        - [Intrinsic.Binary.Int_op.t] for integer-only ops (Add, Sub, Mul, etc.)
+        - [Intrinsic.Binary.Float_op.t] for float-only ops
+        - [Intrinsic.Binary.Three_way_compare of any_locality_mode t] accepts
+          any scalar
+     }
+    }
 
-    - The bytecode compiler wants to easily map unboxed/untagged values to their [value]
-    equivalents. This is supported by [Maybe_naked.t]:
-      - [Value of 'a] represents boxed/tagged values
-      - [Naked of 'b] represents unboxed/untagged values
-      Example: [Scalar.Maybe_naked.Value (Integral.Width.Taggable Int)] vs
-               [Scalar.Maybe_naked.Naked (Integral.Width.Taggable Int)]
+    {ul
+     {- The bytecode compiler wants to easily map unboxed/untagged values to
+        their [value] equivalents. This is supported by [Maybe_naked.t]:
+        - [Value of 'a] represents boxed/tagged values
+        - [Naked of 'b] represents unboxed/untagged values
+     }
+    }
+
+    Example: [Scalar.Maybe_naked.Value (Integral.Width.Taggable Int)] vs
+    [Scalar.Maybe_naked.Naked (Integral.Width.Taggable Int)]
 
     - The middle-end wants to easily cast between any integral values using only certain
     primitives. This is enabled by [Intrinsic.Unary.Static_cast]:

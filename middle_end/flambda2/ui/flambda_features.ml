@@ -149,7 +149,16 @@ let dump_flambda () = !Clflags.dump_flambda
 
 let dump_rawfexpr () = !Oxcaml_flags.Flambda2.Dump.rawfexpr
 
-let dump_fexpr () = !Oxcaml_flags.Flambda2.Dump.fexpr
+type pass = Oxcaml_flags.Flambda2.Dump.pass =
+  | Last_pass
+  | This_pass of string
+
+let dump_fexpr pass =
+  match pass, !Oxcaml_flags.Flambda2.Dump.fexpr_after with
+  | Last_pass, Last_pass -> !Oxcaml_flags.Flambda2.Dump.fexpr
+  | This_pass pass1, This_pass pass2 when String.equal pass1 pass2 ->
+    !Oxcaml_flags.Flambda2.Dump.fexpr
+  | (Last_pass | This_pass _), _ -> Nowhere
 
 let dump_flexpect () = !Oxcaml_flags.Flambda2.Dump.flexpect
 
@@ -271,6 +280,10 @@ module Expert = struct
   let inline_effects_in_cmm () =
     !Oxcaml_flags.Flambda2.Expert.inline_effects_in_cmm
     |> with_default ~f:(fun d -> d.inline_effects_in_cmm)
+
+  let cmm_safe_subst () =
+    !Oxcaml_flags.Flambda2.Expert.cmm_safe_subst
+    |> with_default ~f:(fun d -> d.cmm_safe_subst)
 
   (* CR mshinwell: Remove any uses of this flag, then remove the flag. *)
   let max_block_size_for_projections () =

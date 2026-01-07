@@ -544,17 +544,30 @@ CAMLextern void caml_Store_double_val (value,double);
 #define Double_array_tag 254
 
 /* Unboxed array tags (for mixed blocks)
-   These must stay in sync with Cmm_helpers.Unboxed_array_tags */
+   These must stay in sync with Cmm_helpers.Unboxed_or_untagged_array_tags */
 #define Unboxed_product_array_tag 0
 #define Unboxed_int64_array_tag 1
-#define Unboxed_int32_array_even_tag 2
-#define Unboxed_int32_array_odd_tag 3
-#define Unboxed_float32_array_even_tag 4
-#define Unboxed_float32_array_odd_tag 5
+#define Unboxed_int32_array_zero_tag 2
+#define Unboxed_int32_array_one_tag 3
+#define Unboxed_float32_array_zero_tag 4
+#define Unboxed_float32_array_one_tag 5
 #define Unboxed_vec128_array_tag 6
 #define Unboxed_vec256_array_tag 7
 #define Unboxed_vec512_array_tag 8
 #define Unboxed_nativeint_array_tag 9
+#define Untagged_int_array_tag 10
+#define Untagged_int16_array_zero_tag 12
+#define Untagged_int16_array_three_tag 13
+#define Untagged_int16_array_two_tag 14
+#define Untagged_int16_array_one_tag 15
+#define Untagged_int8_array_zero_tag 16
+#define Untagged_int8_array_seven_tag 17
+#define Untagged_int8_array_six_tag 18
+#define Untagged_int8_array_five_tag 19
+#define Untagged_int8_array_four_tag 20
+#define Untagged_int8_array_three_tag 21
+#define Untagged_int8_array_two_tag 22
+#define Untagged_int8_array_one_tag 23
 
 /* The [_flat_field] macros are for [floatarray] values and float-only records.
 */

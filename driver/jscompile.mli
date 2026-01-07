@@ -34,13 +34,12 @@ val instance :
   keep_symbol_tables:bool ->
   unit
 
-(** {2 Internal functions} **)
+(** {2 Internal functions} *)
 
 val to_jsir :
   Compile_common.info ->
   Typedtree.implementation ->
   as_arg_for:Global_module.Parameter_name.t option ->
   Flambda2_to_jsir.To_jsir_result.program
-(** [to_jsir info typed] takes a typechecked implementation
-    and returns its Js_of_ocaml IR representation.
-*)
+(** [to_jsir info typed] takes a typechecked implementation and returns its
+    Js_of_ocaml IR representation. *)

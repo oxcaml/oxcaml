@@ -13,12 +13,12 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
-(** This module follows the structure of driver/main_args.ml{i}.
-    It provides a way to (a) share argument implementations between
-    different installable tools and (b) override default implementations
-    of arguments. *)
+(** This module follows the structure of driver/main_args.ml and
+    driver/main_args.mli. It provides a way to (a) share argument
+    implementations between different installable tools and (b) override
+    default implementations of arguments. *)
 
-(** Command line arguments required for flambda backend.  *)
+(** Command line arguments required for flambda backend. *)
 module type Oxcaml_options = sig
   val ocamlcfg : unit -> unit
   val no_ocamlcfg : unit -> unit
@@ -83,6 +83,13 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
+  val dissector : unit -> unit
+  val dissector_partition_size : float -> unit
+  val ddissector : unit -> unit
+  val ddissector_sizes : unit -> unit
+  val ddissector_verbose : unit -> unit
+  val ddissector_partitions : unit -> unit
+  val ddissector_inputs : string -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -119,6 +126,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
   val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val flambda2_expert_cmm_safe_subst : unit -> unit
+  val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
@@ -154,6 +163,7 @@ module type Oxcaml_options = sig
   val drawfexpr_to : string -> unit
   val dfexpr : unit -> unit
   val dfexpr_to : string -> unit
+  val dfexpr_after : string -> unit
   val dflexpect_to : string -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
@@ -196,25 +206,24 @@ module type Opttop_options = sig
   include Debugging_options
 end
 
-(** Transform required command-line arguments into actual arguments.
-    Each tool can define its own argument implementations and
-    call the right functor to actualize them into [Arg.t] list. *)
+(** Transform required command-line arguments into actual arguments. Each tool
+    can define its own argument implementations and call the right functor to
+    actualize them into [Arg.t] list. *)
 module Make_optcomp_options (_ : Optcomp_options) : Main_args.Arg_list
 
 module Make_opttop_options (_ : Opttop_options) : Main_args.Arg_list
 
-(** Default implementations of required arguments for each tool.  *)
+(** Default implementations of required arguments for each tool. *)
 module Default : sig
   module Optmain : Optcomp_options
   module Opttopmain : Opttop_options
 end
 
-(** Extra_params module provides a way to read oxcaml
-    flags from OCAMLPARAM. All command line flags should support it,
-    with the exception of debug printing, such as -dcfg.
-*)
+(** Extra_params module provides a way to read oxcaml flags from OCAMLPARAM. All
+    command line flags should support it, with the exception of debug printing,
+    such as -dcfg. *)
 module Extra_params : sig
   val read_param :
     Format.formatter -> Compenv.readenv_position -> string -> string -> bool
-  (** [read_param ppf pos name value] returns whether the param was handled.  *)
+  (** [read_param ppf pos name value] returns whether the param was handled. *)
 end

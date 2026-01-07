@@ -22,6 +22,7 @@ jobs:
           - name: runtime5 (x86_64-linux)
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
+            build_debug: true
 
           - name: runtime5 stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
@@ -75,7 +76,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml'
 
           - name: runtime4 (aarch64-darwin)
             config: --disable-runtime5 --disable-warn-error
@@ -157,6 +158,17 @@ jobs:
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
 
+          - name: runtime5 musl (x86_64-linux)
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            cc: musl-gcc
+
+          - name: runtime5 reaper
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,reaper=1'
+            ocamlparam: '_,reaper=1'
+
     env:
       J: "8"
       run_testsuite: "true"
@@ -168,6 +180,18 @@ jobs:
       - name: Install clang (Linux)
         if: runner.os == 'Linux' && matrix.cc == 'clang'
         run: sudo apt-get install clang
+
+      - name: Install musl (Linux)
+        if: runner.os == 'Linux' && matrix.cc == 'musl-gcc'
+        run: |
+          sudo apt-get install musl musl-tools
+          # Install musl-compatible kernel headers
+          mkdir musl-kernel
+          filename='v4.19.88-1.tar.gz'
+          wget "https://github.com/sabotage-linux/kernel-headers/archive/refs/tags/$filename"
+          shasum --check <(echo "44a07e9f18033cff7840dbb112fff2862c0fb8fc  $filename")
+          tar -xzf "$filename" -C musl-kernel --strip-components=1
+          echo "C_INCLUDE_PATH=$PWD/musl-kernel/x86/include" >> "$GITHUB_ENV"
 
       - name: Install autoconf and bash and parallel (macOS)
         if: runner.os == 'macOS'
@@ -374,6 +398,10 @@ jobs:
         if: matrix.check_arch == true
         run: make check_all_arches
 
+      - name: Build debug target
+        if: matrix.build_debug == true
+        run: make debug
+
       - name: Run register allocation on artifacts
         if: matrix.run_regalloc_tool == true
         run: |
@@ -388,6 +416,10 @@ jobs:
           for allocator in irc ls gi; do \
             ./_build/main/tools/regalloc/regalloc.exe _build \
               -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
+          done
+          for allocator in irc ls gi; do \
+            ./_build/main/tools/regalloc/regalloc.exe _build \
+              -validate -param AFFINITY:on -regalloc $allocator || exit 1; \
           done
 
       - name: Collect and push metrics

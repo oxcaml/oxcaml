@@ -37,3 +37,8 @@ backend/llvmize/extcalls.ml
 backend/oxcaml_dwarf/test_unboxed_dwarf.ml
 backend/oxcaml_dwarf/test_datatypes_dwarf.ml
 backend/oxcaml_dwarf/test_simd_dwarf.ml
+dissector/large_module*.ml
+dissector/huge_module*.ml
+dissector/module_a.ml
+dissector/module_b.ml
+dissector/module_c.ml

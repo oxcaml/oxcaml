@@ -214,41 +214,41 @@ let add_set_of_closures_dep let_bound_name_of_the_closure closure_code_id
        }
        :: t.set_of_closures_dep
 
-(* Encoding of sets of closures and apply
- *
- * Let us consider, for now, a set of closures that is only directly called.
- * Assume that it has a value slot x, two function slots f and g, with
- * associated code_ids p (param a, return s) and q (param b, return t).
- * We will name the respective witnesses n and m, and ignore exception returns
- * to make the diagram simpler.
+(*= Encoding of sets of closures and apply
 
- * We will create a widget looking like this:
- *  ┌──╔═══╗─────[g]────>╔═══╗──┐
- * [f] ║ f ║             ║ g ║ [g]
- *  └─>╚═══╝<────[f]─────╚═══╝<─┘
- *      │ │     ╔═══╗     │ │
- *      │ └[x]─>║ x ║<─[x]┘ │
- *    [wit]     ╚═══╝     [wit]
- *      │                   │
- *      v                   v
- *    ╔═══╗               ╔═══╗
- *    ║ n ║               ║ m ║
- *    ╚═══╝               ╚═══╝
- *     ││║          ╔═══╗  ││║          ╔═══╗
- *     ││╚[param0]═>║ a ║  ││╚[param0]═>║ b ║
- *     ││           ╚═══╝  ││           ╚═══╝
- *     ││           ╔═══╗  ││           ╔═══╗
- *     │└[return0]─>║ s ║  │└[return0]─>║ t ║
- *     │            ╚═══╝  │            ╚═══╝
- *     │            ╔═══╗  │            ╔═══╗
- *     └─[code_id]─>║ p ║  └─[code_id]─>║ q ║
- *                  ╚═══╝               ╚═══╝
- *
- * For indirect calls, we have a series of call witnesses for each
- * complex parameter, each with coconstructors for each part of the
- * complex parameter, the code_id, and returning a value with the next call
- * witness.
- *)
+   Let us consider, for now, a set of closures that is only directly called.
+   Assume that it has a value slot x, two function slots f and g, with
+   associated code_ids p (param a, return s) and q (param b, return t).
+   We will name the respective witnesses n and m, and ignore exception returns
+   to make the diagram simpler.
+
+   We will create a widget looking like this:
+    ┌──╔═══╗─────[g]────>╔═══╗──┐
+   [f] ║ f ║             ║ g ║ [g]
+    └─>╚═══╝<────[f]─────╚═══╝<─┘
+        │ │     ╔═══╗     │ │
+        │ └[x]─>║ x ║<─[x]┘ │
+      [wit]     ╚═══╝     [wit]
+        │                   │
+        v                   v
+      ╔═══╗               ╔═══╗
+      ║ n ║               ║ m ║
+      ╚═══╝               ╚═══╝
+       ││║          ╔═══╗  ││║          ╔═══╗
+       ││╚[param0]═>║ a ║  ││╚[param0]═>║ b ║
+       ││           ╚═══╝  ││           ╚═══╝
+       ││           ╔═══╗  ││           ╔═══╗
+       │└[return0]─>║ s ║  │└[return0]─>║ t ║
+       │            ╚═══╝  │            ╚═══╝
+       │            ╔═══╗  │            ╔═══╗
+       └─[code_id]─>║ p ║  └─[code_id]─>║ q ║
+                    ╚═══╝               ╚═══╝
+
+   For indirect calls, we have a series of call witnesses for each
+   complex parameter, each with coconstructors for each part of the
+   complex parameter, the code_id, and returning a value with the next call
+   witness.
+*)
 
 let create_known_arity_call_witness t code_id ~params ~returns ~exn =
   let witness =

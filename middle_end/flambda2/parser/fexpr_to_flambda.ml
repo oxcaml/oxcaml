@@ -138,7 +138,10 @@ let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
   match DM.find_opt env.code_ids name with
   | Some code_id -> code_id
   | None ->
-    let c = Code_id.create ~name (Compilation_unit.get_current_exn ()) in
+    let c =
+      Code_id.create ~name ~debug:Debuginfo.none
+        (Compilation_unit.get_current_exn ())
+    in
     DM.add env.code_ids name c;
     c
 
@@ -506,8 +509,9 @@ let array_kind : 'a -> Fexpr.array_kind -> Flambda_primitive.Array_kind.t =
   | Naked_floats -> Naked_floats
   | Gc_ignorable_values -> Gc_ignorable_values
   | Values -> Values
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
+  | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
+  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | Naked_vec512s | Unboxed_product _ ->
     Misc.fatal_error
       "fexpr support for arrays of unboxed elements not yet implemented"
 
@@ -518,8 +522,9 @@ let array_set_kind :
   | Gc_ignorable_values -> Gc_ignorable_values
   | Values ia -> Values (init_or_assign env ia)
   | Naked_floats -> Naked_floats
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+  | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
+  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | Naked_vec512s ->
     Misc.fatal_error
       "fexpr support for arrays of unboxed elements not yet implemented"
 

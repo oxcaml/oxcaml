@@ -29,6 +29,7 @@ open Reg
 open! Operation
 open Linear
 open Emitaux
+module Arm64_ast = Arm64_ast.Ast
 module I = Arm64_ast.Instruction_name
 module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol

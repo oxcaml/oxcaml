@@ -243,9 +243,11 @@ module Flambda2 = struct
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
+    type pass = Last_pass | This_pass of string
 
     let rawfexpr = ref Nowhere
     let fexpr = ref Nowhere
+    let fexpr_after = ref Last_pass
     let flexpect = ref Nowhere
     let slot_offsets = ref false
     let freshen = ref false
@@ -258,6 +260,7 @@ module Flambda2 = struct
     module Default = struct
       let fallback_inlining_heuristic = false
       let inline_effects_in_cmm = false
+      let cmm_safe_subst = false
       let phantom_lets = false
       let max_block_size_for_projections = None
       let max_unboxing_depth = 3
@@ -271,6 +274,7 @@ module Flambda2 = struct
     type flags = {
       fallback_inlining_heuristic : bool;
       inline_effects_in_cmm : bool;
+      cmm_safe_subst : bool;
       phantom_lets : bool;
       max_block_size_for_projections : int option;
       max_unboxing_depth : int;
@@ -284,6 +288,7 @@ module Flambda2 = struct
     let default = {
       fallback_inlining_heuristic = Default.fallback_inlining_heuristic;
       inline_effects_in_cmm = Default.inline_effects_in_cmm;
+      cmm_safe_subst = Default.cmm_safe_subst;
       phantom_lets = Default.phantom_lets;
       max_block_size_for_projections = Default.max_block_size_for_projections;
       max_unboxing_depth = Default.max_unboxing_depth;
@@ -312,6 +317,7 @@ module Flambda2 = struct
 
     let fallback_inlining_heuristic = ref Default
     let inline_effects_in_cmm = ref Default
+    let cmm_safe_subst = ref Default
     let phantom_lets = ref Default
     let max_block_size_for_projections = ref Default
     let max_unboxing_depth = ref Default

@@ -186,6 +186,12 @@ module Lambda_utils = struct
 
     let make_unboxed_float32_vect = unary "caml_make_unboxed_float32_vect"
 
+    let make_untagged_int_vect = unary "caml_make_untagged_int_vect"
+
+    let make_untagged_int8_vect = unary "caml_make_untagged_int8_vect"
+
+    let make_untagged_int16_vect = unary "caml_make_untagged_int16_vect"
+
     let make_unboxed_int32_vect = unary "caml_make_unboxed_int32_vect"
 
     let make_unboxed_int64_vect = unary "caml_make_unboxed_int64_vect"

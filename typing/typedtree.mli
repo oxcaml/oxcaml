@@ -121,6 +121,30 @@ type texp_field_boxing =
 
 val aliased_many_use : unique_use
 
+(* CR-soon zqian: introduce a proper typedtree representation for modes. For
+example, each non-none axis should have a location. *)
+type modes = Mode.Alloc.Const.Option.t
+
+(** [label_ambiguity] specifies the result of type-driven label disambiguation.
+    Disambiguation occurs when the same label (record field or variant case)
+    occurs in many types, when performing operations like variant construction
+    or record access, but also when specifying record and variant patterns.
+
+    Where disambiguation was necessary (i.e. the label was ambiguous),
+    the disambiguated path and arity (number of parameters) of the resolved
+    type constructor is preserved so that we can insert a type annotation.
+
+    The [arity] is necessary to insert the right number of wildcards in the
+    type constructor's argument list, e.g.: [{ path = result; arity = 2 }]
+    results in the annotation [(_, _) result]. *)
+type label_ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
+type _ type_inspection =
+  | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
+  | Polymorphic_parameter : [< `pat | `exp ] type_inspection
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -155,6 +179,11 @@ and pat_extra =
             (module _)     { pat_desc  = Tpat_any
             ; pat_extra = (Tpat_unpack, _, _) :: ... }
          *)
+  | Tpat_inspected_type of [ `pat ] type_inspection
+        (** Inserted when type inspection was necessary to resolve types
+            during inference. Generally, elaborated to a type constraint.
+
+            See specific [type_inspection] cases for details. *)
 
 and 'k pattern_desc =
   (* value patterns *)
@@ -292,8 +321,13 @@ and exp_extra =
         them here, as the cost of tracking this additional information is minimal. *)
   | Texp_stack
         (** stack_ E *)
-  | Texp_mode of Mode.Alloc.Const.Option.t
+  | Texp_mode of modes
         (** E : _ @@ M  *)
+  | Texp_inspected_type of [ `exp ] type_inspection
+        (** Inserted when type inspection was necessary to resolve types
+            during inference. Generally, elaborated to a type constraint.
+
+            See specific [type_inspection] cases for details. *)
 
 and arg_label = Types.arg_label =
   | Nolabel
@@ -796,7 +830,7 @@ and functor_parameter =
   | Unit
   (* CR sspies: We should add an additional [debug_uid] here to support functor
      arguments in the debugger. *)
-  | Named of Ident.t option * string option loc * module_type
+  | Named of Ident.t option * string option loc * module_type * modes
 
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
@@ -897,7 +931,7 @@ and module_type =
 and module_type_desc =
     Tmty_ident of Path.t * Longident.t loc
   | Tmty_signature of signature
-  | Tmty_functor of functor_parameter * module_type
+  | Tmty_functor of functor_parameter * module_type * modes
   | Tmty_with of module_type * (Path.t * Longident.t loc * with_constraint) list
   | Tmty_typeof of module_expr
   | Tmty_alias of Path.t * Longident.t loc

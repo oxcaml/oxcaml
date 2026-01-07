@@ -23,7 +23,7 @@ module SC = Static_const
 module R = To_cmm_result
 module UK = C.Update_kind
 module MBS = Flambda_kind.Mixed_block_shape
-module Tags = C.Unboxed_array_tags
+module Tags = C.Unboxed_or_untagged_array_tags
 
 let static_field res field field_kind =
   Simple.pattern_match'
@@ -80,10 +80,13 @@ let rec static_block_updates symb env res acc i = function
       (i + UK.field_size_in_words update_kind)
       r
 
-type maybe_int32 =
-  | Int32
-  | Int64
-  | Nativeint
+type int_type =
+  | Int_u
+  | Int8_u
+  | Int16_u
+  | Int32_u
+  | Int64_u
+  | Nativeint_u
 
 (* The index [i] is always in the units of the size of the integer concerned,
    not units of 64-bit words. *)
@@ -146,13 +149,54 @@ let preallocate_set_of_closures (res, updates, env) ~closure_symbols
   let res = R.set_data res data in
   res, updates, env
 
-let immutable_unboxed_int_array_payload maybe_int32 num_fields ~elts ~to_int64 =
+let pack_small_ints_into_word ~bits int64_list =
+  if bits * List.length int64_list > 64
+  then Misc.fatal_error "To_cmm_static.pack_small_ints_into_word: too many bits";
+  if Sys.big_endian
+  then
+    Misc.fatal_error
+      "Big-endian platforms not yet supported for untagged arrays";
+  let rec loop previously_packed = function
+    | [] -> Misc.fatal_error "Can't pack an empty payload"
+    | [a] -> Int64.shift_left a previously_packed
+    | a :: rest ->
+      (* values are sign-extended by default. We need to change zero-extend for
+         the `or` operation to be correct. *)
+      let mask = Int64.(sub (shift_left 1L bits) 1L) in
+      let a = Int64.(shift_left (logand a mask) previously_packed) in
+      Int64.add a (loop (previously_packed + bits) rest)
+  in
+  loop 0 int64_list
+
+let immutable_unboxed_int_array_payload int_type num_fields ~elts ~to_int64 =
   let int64_of_elts =
     List.map (Or_variable.value_map ~default:0L ~f:to_int64) elts
   in
   let packed_int64s =
-    match maybe_int32 with
-    | Int32 ->
+    match int_type with
+    | Int8_u ->
+      let rec aux acc = function
+        | [] -> List.rev acc
+        | a :: b :: c :: d :: e :: f :: g :: h :: r ->
+          let i = pack_small_ints_into_word ~bits:8 [a; b; c; d; e; f; g; h] in
+          aux (i :: acc) r
+        | v ->
+          let i = pack_small_ints_into_word ~bits:8 v in
+          List.rev (i :: acc)
+      in
+      aux [] int64_of_elts
+    | Int16_u ->
+      let rec aux acc = function
+        | [] -> List.rev acc
+        | a :: b :: c :: d :: r ->
+          let i = pack_small_ints_into_word ~bits:16 [a; b; c; d] in
+          aux (i :: acc) r
+        | v ->
+          let i = pack_small_ints_into_word ~bits:16 v in
+          List.rev (i :: acc)
+      in
+      aux [] int64_of_elts
+    | Int32_u ->
       let rec aux acc = function
         | [] -> List.rev acc
         | a :: [] -> List.rev (a :: acc)
@@ -161,33 +205,43 @@ let immutable_unboxed_int_array_payload maybe_int32 num_fields ~elts ~to_int64 =
           aux (i :: acc) r
       in
       aux [] int64_of_elts
-    | Int64 | Nativeint -> int64_of_elts
+    | Int_u | Int64_u | Nativeint_u -> int64_of_elts
   in
   assert (List.length packed_int64s = num_fields);
   List.map (fun i -> Cmm.Cint (Int64.to_nativeint i)) packed_int64s
 
-let immutable_unboxed_int_array env res updates maybe_int32 ~symbol ~elts
-    ~to_int64 =
+let immutable_unboxed_int_array env res updates int_type ~symbol ~elts ~to_int64
+    =
   let sym = R.symbol res symbol in
   let num_elts = List.length elts in
   let num_fields, update_kind, tag =
-    match maybe_int32 with
-    | Int32 ->
+    match int_type with
+    | Int8_u ->
+      let fields = (7 + num_elts) / 8 in
+      let tag = Tags.untagged_int8_array_tag num_elts in
+      fields, UK.naked_int8s, tag
+    | Int16_u ->
+      let fields = (3 + num_elts) / 4 in
+      let tag = Tags.untagged_int16_array_tag num_elts in
+      fields, UK.naked_int16s, tag
+    | Int32_u ->
       let fields = (1 + num_elts) / 2 in
       let tag =
-        if num_elts mod 2 = 0
-        then Tags.unboxed_int32_array_even_tag
-        else Tags.unboxed_int32_array_odd_tag
+        match num_elts mod 2 with
+        | 0 -> Tags.unboxed_int32_array_zero_tag
+        | 1 -> Tags.unboxed_int32_array_one_tag
+        | _ -> assert false
       in
       fields, UK.naked_int32s, tag
-    | Int64 -> num_elts, UK.naked_int64s, Tags.unboxed_int64_array_tag
-    | Nativeint -> num_elts, UK.naked_int64s, Tags.unboxed_nativeint_array_tag
+    | Int_u -> num_elts, UK.naked_int64s, Tags.untagged_int_array_tag
+    | Int64_u -> num_elts, UK.naked_int64s, Tags.unboxed_int64_array_tag
+    | Nativeint_u -> num_elts, UK.naked_int64s, Tags.unboxed_nativeint_array_tag
   in
   let header =
     C.black_mixed_block_header tag num_fields ~scannable_prefix_len:0
   in
   let static_fields =
-    immutable_unboxed_int_array_payload maybe_int32 num_fields ~elts ~to_int64
+    immutable_unboxed_int_array_payload int_type num_fields ~elts ~to_int64
   in
   let block = C.emit_block sym header static_fields in
   let env, res, updates =
@@ -201,8 +255,8 @@ let immutable_unboxed_float32_array env res updates ~symbol ~elts =
   let num_fields = (1 + num_elts) / 2 in
   let tag =
     if num_elts mod 2 = 0
-    then Tags.unboxed_float32_array_even_tag
-    else Tags.unboxed_float32_array_odd_tag
+    then Tags.unboxed_float32_array_zero_tag
+    else Tags.unboxed_float32_array_one_tag
   in
   let header =
     C.black_mixed_block_header tag num_fields ~scannable_prefix_len:0
@@ -473,15 +527,27 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     env, R.update_data res float_array, e
   | Block_like symbol, Immutable_float32_array elts ->
     immutable_unboxed_float32_array env res updates ~symbol ~elts
+  | Block_like symbol, Immutable_int_array elts ->
+    assert (Arch.size_int = 8);
+    immutable_unboxed_int_array env res updates Int_u ~symbol ~elts
+      ~to_int64:Target_ocaml_int.to_int64
+  | Block_like symbol, Immutable_int8_array elts ->
+    assert (Arch.size_int = 8);
+    immutable_unboxed_int_array env res updates Int8_u ~symbol ~elts
+      ~to_int64:(fun i -> Int64.of_int (Numeric_types.Int8.to_int i))
+  | Block_like symbol, Immutable_int16_array elts ->
+    assert (Arch.size_int = 8);
+    immutable_unboxed_int_array env res updates Int16_u ~symbol ~elts
+      ~to_int64:(fun i -> Int64.of_int (Numeric_types.Int16.to_int i))
   | Block_like symbol, Immutable_int32_array elts ->
     assert (Arch.size_int = 8);
-    immutable_unboxed_int_array env res updates Int32 ~symbol ~elts
+    immutable_unboxed_int_array env res updates Int32_u ~symbol ~elts
       ~to_int64:Int64.of_int32
   | Block_like symbol, Immutable_int64_array elts ->
-    immutable_unboxed_int_array env res updates Int64 ~symbol ~elts
+    immutable_unboxed_int_array env res updates Int64_u ~symbol ~elts
       ~to_int64:Fun.id
   | Block_like symbol, Immutable_nativeint_array elts ->
-    immutable_unboxed_int_array env res updates Nativeint ~symbol ~elts
+    immutable_unboxed_int_array env res updates Nativeint_u ~symbol ~elts
       ~to_int64:Targetint_32_64.to_int64
   | Block_like symbol, Immutable_vec128_array elts ->
     immutable_unboxed_vec128_array env res updates ~symbol ~elts
@@ -514,6 +580,21 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_float32s ->
+    let sym = R.symbol res s in
+    let header = C.black_block_header 0 0 in
+    let block = C.emit_block sym header [] in
+    env, R.set_data res block, updates
+  | Block_like s, Empty_array Naked_ints ->
+    let sym = R.symbol res s in
+    let header = C.black_block_header 0 0 in
+    let block = C.emit_block sym header [] in
+    env, R.set_data res block, updates
+  | Block_like s, Empty_array Naked_int8s ->
+    let sym = R.symbol res s in
+    let header = C.black_block_header 0 0 in
+    let block = C.emit_block sym header [] in
+    env, R.set_data res block, updates
+  | Block_like s, Empty_array Naked_int16s ->
     let sym = R.symbol res s in
     let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
@@ -560,11 +641,13 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
       ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
       | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
       | Boxed_nativeint _ | Immutable_float_block _ | Immutable_float_array _
-      | Immutable_float32_array _ | Immutable_int32_array _
-      | Immutable_int64_array _ | Immutable_nativeint_array _
-      | Immutable_vec128_array _ | Immutable_vec256_array _
-      | Immutable_vec512_array _ | Immutable_value_array _ | Empty_array _
-      | Mutable_string _ | Immutable_string _ ) ) ->
+      | Immutable_float32_array _ | Immutable_int_array _
+      | Immutable_int8_array _ | Immutable_int16_array _
+      | Immutable_int32_array _ | Immutable_int64_array _
+      | Immutable_nativeint_array _ | Immutable_vec128_array _
+      | Immutable_vec256_array _ | Immutable_vec512_array _
+      | Immutable_value_array _ | Empty_array _ | Mutable_string _
+      | Immutable_string _ ) ) ->
     Misc.fatal_errorf
       "Block-like constants cannot be bound by [Code] or [Set_of_closures] \
        bindings:@ %a"

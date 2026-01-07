@@ -4,6 +4,9 @@ Testing statically-allocated unboxed arrays
 Testing empty arrays:
 empty int64#: OK - no allocation
 empty int32#: OK - no allocation
+empty int16#: OK - no allocation
+empty int8#: OK - no allocation
+empty int#: OK - no allocation
 empty float32#: OK - no allocation
 empty nativeint#: OK - no allocation
 empty float#: OK - no allocation
@@ -19,6 +22,32 @@ int32# [42l]: OK - no allocation
 int32# [1l; 2l]: OK - no allocation
 int32# [1l; 2l; 3l]: OK - no allocation
 int32# array tests passed
+
+Testing int16# arrays:
+int16# [42S]: OK - no allocation
+int16# [1S; 2S]: OK - no allocation
+int16# [1S; 2S; 3S]: OK - no allocation
+int16# [1S; 2S; 3S; 4S]: OK - no allocation
+int16# [1S; 2S; 3S; 4S; 5S]: OK - no allocation
+int16# array tests passed
+
+Testing int8# arrays:
+int8# [42s]: OK - no allocation
+int8# [1s; 2s]: OK - no allocation
+int8# [1s; 2s; 3s]: OK - no allocation
+int8# [1s; 2s; 3s; 4s]: OK - no allocation
+int8# [1s; 2s; 3s; 4s; 5s]: OK - no allocation
+int8# [1s; 2s; 3s; 4s; 5s; 6s]: OK - no allocation
+int8# [1s; 2s; 3s; 4s; 5s; 6s; 7s]: OK - no allocation
+int8# [1s; 2s; 3s; 4s; 5s; 6s; 7s; 8s]: OK - no allocation
+int8# [1s; 2s; 3s; 4s; 5s; 6s; 7s; 8s; 9s]: OK - no allocation
+int8# array tests passed
+
+Testing int# arrays:
+int# [42m]: OK - no allocation
+int# [1m; 2m]: OK - no allocation
+int# [1m; 2m; 3m]: OK - no allocation
+int# array tests passed
 
 Testing float32# arrays:
 float32# [42.0s]: OK - no allocation

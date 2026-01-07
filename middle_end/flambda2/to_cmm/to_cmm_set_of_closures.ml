@@ -693,19 +693,18 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
   let layout = layout_for_set_of_closures env set in
   let_static_set_of_closures0 env res closure_symbols layout set ~prev_updates
 
-(* Sets of closures with no value slots can be statically allocated. This
+(*= Sets of closures with no value slots can be statically allocated. This
    usually happens earlier (in Simplify, or Closure_conversion for classic mode)
    but the extra information that To_cmm has about unused closure variables
    enables certain extra cases to be caught. For example the following closure
    [g] is not lifted by Simplify, but can be in To_cmm:
 
- * let f () =
- *   let x = Sys.opaque_identity 0 in
- *   let y = true in
- *   let g () = if y then 1 else x in
- *   g
-
- *)
+   let f () =
+     let x = Sys.opaque_identity 0 in
+     let y = true in
+     let g () = if y then 1 else x in
+     g
+*)
 let lift_set_of_closures env res ~body ~bound_vars layout set
     ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
@@ -766,7 +765,8 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
       (match closure_alloc_mode with
       | Heap -> No_coeffects
       | Local _ -> Has_coeffects),
-      Strict )
+      Strict,
+      Can_move_anywhere )
   in
   let decl_map =
     decls |> Function_slot.Lmap.bindings |> Function_slot.Map.of_list

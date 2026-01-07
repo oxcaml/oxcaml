@@ -294,8 +294,9 @@ let minimize should_remove map cur_name =
         nstr !to_change
     in
     let nmap = Smap.map correcter nmap in
-    (*The t list we are considering here is different*)
-    nmap (*Final result*)
+    (* The t list we are considering here is different *)
+    (* Final result: *)
+    nmap
   else
     let nmap = Smap.add cur_name nstr map in
     nmap

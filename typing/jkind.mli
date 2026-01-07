@@ -13,6 +13,7 @@
 (**************************************************************************)
 
 open Allowance
+module Jkind0 := Btype.Jkind0
 
 (* This module is named Jkind, with a 'j', to distinguish jkinds
    as used here from type kinds (which might be abstract or record or variant,
@@ -59,7 +60,7 @@ end
 type sort = Sort.t
 
 module Sub_failure_reason : sig
-  type t =
+  type t = Jkind0.Violation.Sub_failure_reason.t =
     | Axis_disagreement of Jkind_axis.Axis.packed
     | Layout_disagreement
     | Constrain_ran_out_of_fuel
@@ -101,8 +102,6 @@ module Layout : sig
     val to_string : t -> string
   end
 
-  val of_const : Const.t -> Sort.t t
-
   val sub : level:int -> Sort.t t -> Sort.t t -> Sub_result.t
 
   module Debug_printers : sig
@@ -112,9 +111,7 @@ module Layout : sig
 end
 
 module Mod_bounds : sig
-  type t = Types.Jkind_mod_bounds.t
-
-  val to_mode_crossing : t -> Mode.Crossing.t
+  val debug_print : Format.formatter -> Types.mod_bounds -> unit
 end
 
 module With_bounds : sig
@@ -188,7 +185,7 @@ type jkind_context =
 (* errors *)
 
 module Violation : sig
-  type violation =
+  type violation = Jkind0.Violation.violation =
     (* [Not_a_subjkind] allows l-jkinds on the right so that it can be used
        in [sub_jkind_l]. There is no downside to this, as the printing
        machinery works over l-jkinds. *)
@@ -199,7 +196,7 @@ module Violation : sig
         -> violation
     | No_intersection : 'd Types.jkind * ('l * allowed) Types.jkind -> violation
 
-  type t
+  type t = Jkind0.Violation.t
 
   (** Set [?missing_cmi] to mark [t] as having arisen from a missing cmi *)
 
@@ -250,138 +247,9 @@ module Const : sig
       The "constant" refers to the fact that there are no sort variables here.
       The existence of [with]-types means, though, that we still need the
       allowance machinery here. *)
-  type 'd t constraint 'd = 'l * 'r
-
-  include Allowance.Allow_disallow with type (_, _, 'd) sided = 'd t
+  type 'd t = 'd Jkind0.Const.t constraint 'd = 'l * 'r
 
   val to_out_jkind_const : 'd t -> Outcometree.out_jkind_const
-
-  (** This returns [true] iff both types have no with-bounds and they are equal.
-      Normally, we want an equality check to happen only on values that are
-      allowed on both the left and the right. But a type with no with-bounds is
-      allowed on the left and the right, so we test for that condition first
-      before doing the proper equality check. *)
-  val no_with_bounds_and_equal : 'd1 t -> 'd2 t -> bool
-
-  (* CR layouts: Remove this once we have a better story for printing with jkind
-     abbreviations. *)
-  module Builtin : sig
-    type nonrec t =
-      { jkind : (allowed * allowed) t;
-        name : string
-      }
-
-    (** This jkind is the top of the jkind lattice. All types have jkind [any].
-    But we cannot compile run-time manipulations of values of types with jkind
-    [any]. *)
-    val any : t
-
-    (** Value of types of this jkind are not retained at all at runtime *)
-    val void : t
-
-    (** This is the jkind of normal ocaml values or null pointers *)
-    val value_or_null : t
-
-    (** Same kind mod everything. *)
-    val value_or_null_mod_everything : t
-
-    (** This is the jkind of normal ocaml values *)
-    val value : t
-
-    (** Immutable non-float values that don't contain functions. *)
-    val immutable_data : t
-
-    (** Exceptions; crossing portability, contention, statelessness and visibility. *)
-    val exn : t
-
-    (** Atomically mutable non-float values that don't contain functions. *)
-    val sync_data : t
-
-    (** Mutable non-float values that don't contain functions. *)
-    val mutable_data : t
-
-    (** Values of types of this jkind are immediate on 64-bit platforms; on other
-    platforms, we know nothing other than that it's a value. *)
-    val immediate64 : t
-
-    (** We know for sure that values of types of this jkind are always immediate *)
-    val immediate : t
-
-    (** Values of types of this jkind are either immediate or null pointers *)
-    val immediate_or_null : t
-
-    (** Values of types of this jkind are either immediate64 or null pointers *)
-    val immediate64_or_null : t
-
-    (** The jkind of unboxed 64-bit floats with no mode crossing. *)
-    val float64 : t
-
-    (** The jkind of unboxed 64-bit floats with mode crossing. *)
-    val kind_of_unboxed_float : t
-
-    (** The jkind of unboxed 32-bit floats with no mode crossing. *)
-    val float32 : t
-
-    (** The jkind of unboxed 32-bit floats with mode crossing. *)
-    val kind_of_unboxed_float32 : t
-
-    (** The jkind of unboxed 32-bit native-sized integers with no mode crossing. *)
-    val word : t
-
-    (** The jkind of unboxed 32-bit native-sized integers with mode crossing. *)
-    val kind_of_unboxed_nativeint : t
-
-    (** The jkind of untagged immediates with mode crossing. *)
-    val kind_of_untagged_immediate : t
-
-    (** The jkind of unboxed 8-bit integers with no mode crossing. *)
-    val bits8 : t
-
-    (** The jkind of unboxed 8-bit integers with mode crossing. *)
-    val kind_of_unboxed_int8 : t
-
-    (** The jkind of unboxed 16-bit integers with no mode crossing. *)
-    val bits16 : t
-
-    (** The jkind of unboxed 16-bit integers with mode crossing. *)
-    val kind_of_unboxed_int16 : t
-
-    (** The jkind of unboxed 32-bit integers with no mode crossing. *)
-    val bits32 : t
-
-    (** The jkind of unboxed 32-bit integers with mode crossing. *)
-    val kind_of_unboxed_int32 : t
-
-    (** The jkind of unboxed 64-bit integers with no mode crossing. *)
-    val bits64 : t
-
-    (** The jkind of unboxed 64-bit integers with mode crossing. *)
-    val kind_of_unboxed_int64 : t
-
-    (** The jkind of block indices with mode crossing. *)
-    val kind_of_idx : t
-
-    (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
-    val vec128 : t
-
-    (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
-    val vec256 : t
-
-    (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
-    val vec512 : t
-
-    (** The jkind of unboxed 128-bit vectors with mode crossing. *)
-    val kind_of_unboxed_128bit_vectors : t
-
-    (** The jkind of unboxed 256-bit vectors with mode crossing. *)
-    val kind_of_unboxed_256bit_vectors : t
-
-    (** The jkind of unboxed 512-bit vectors with mode crossing. *)
-    val kind_of_unboxed_512bit_vectors : t
-
-    (** A list of all Builtin jkinds *)
-    val all : t list
-  end
 end
 
 module Builtin : sig
@@ -443,13 +311,6 @@ end
 val unsafely_set_bounds :
   from:'d Types.jkind -> 'd Types.jkind -> 'd Types.jkind
 
-(** Take an existing [jkind_l] and add some with-bounds. *)
-val add_with_bounds :
-  modality:Mode.Modality.Const.t ->
-  type_expr:Types.type_expr ->
-  Types.jkind_l ->
-  Types.jkind_l
-
 (** Does this jkind have with-bounds? *)
 val has_with_bounds : Types.jkind_l -> bool
 
@@ -490,21 +351,6 @@ val of_new_legacy_sort :
     Defaulting the sort variable produces exactly the sort [value].  *)
 val of_new_non_float_sort_var :
   why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
-
-(** Construct a jkind from a constant jkind, at quality [Not_best] *)
-val of_const :
-  annotation:Parsetree.jkind_annotation option ->
-  why:History.creation_reason ->
-  quality:'d Types.jkind_quality ->
-  ran_out_of_fuel_during_normalize:bool ->
-  'd Const.t ->
-  'd Types.jkind
-
-(** Construct a jkind from a builtin kind, at quality [Best]. *)
-val of_builtin :
-  why:History.creation_reason ->
-  Const.Builtin.t ->
-  ('l * disallowed) Types.jkind
 
 val of_annotation :
   context:('l * allowed) History.annotation_context ->
@@ -585,9 +431,6 @@ val for_arrow : Types.jkind_l
 (** The jkind of an object type.  *)
 val for_object : Types.jkind_l
 
-(** The jkind of a float. *)
-val for_float : Ident.t -> Types.jkind_l
-
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
 
@@ -618,11 +461,9 @@ val for_abbreviation :
   Types.type_expr ->
   Types.jkind_l
 
-(** The jkind for [array] type arguments. *)
-val for_array_argument : Types.jkind_lr
-
 (** The jkind for array elements, creating a new sort variable. *)
 val for_array_element_sort : level:int -> Types.jkind_lr * sort
+
 (******************************)
 (* elimination and defaulting *)
 
@@ -643,10 +484,6 @@ val get : 'd Types.jkind -> 'd Desc.t
 (** [get_layout_defaulting_to_value] extracts a constant layout, defaulting
     any sort variable to [value]. *)
 val get_layout_defaulting_to_value : 'd Types.jkind -> Layout.Const.t
-
-(** [get_const] returns a [Const.t] if the layout has no sort variables,
-    returning [None] otherwise *)
-val get_const : 'd Types.jkind -> 'd Const.t option
 
 (** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
 val default_to_value : 'd Types.jkind -> unit
@@ -757,7 +594,8 @@ val normalize :
 (* pretty printing *)
 
 (** Call these before trying to print. *)
-val set_outcometree_of_type : (Types.type_expr -> Outcometree.out_type) -> unit
+val set_outcometrees_of_types :
+  (Types.type_expr list -> Outcometree.out_type list) -> unit
 
 val set_outcometree_of_modalities :
   (Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list) ->
@@ -917,3 +755,15 @@ module Debug_printers : sig
     val t : Format.formatter -> 'd Const.t -> unit
   end
 end
+
+(* These aliases are here to make sure various modules don't depend on [jkind] -
+   they would create a cycle causing the build system to error otherwise.  They
+   will be removed in the PR that adds abstract kinds, and until then they
+   ensure that the dependency structure needed for that PR isn't broken. *)
+type temp_cycle_check_subst = Subst.t
+
+type temp_cycle_check_env = Env.t
+
+module type temp_cycle_check_datarepr = module type of Datarepr
+
+module type temp_cycle_check_predef = module type of Predef

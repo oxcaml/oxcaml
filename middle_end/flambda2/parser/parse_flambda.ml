@@ -60,9 +60,9 @@ let run_parser ~start_symbol ~start_pos (lb : Lexing.lexbuf) =
           in
           Error (Parsing_error (msg, loc))
         | _ ->
-          assert false
           (* the manual promises that HandlingError is the only possible
-             constructor *))
+             constructor *)
+          assert false)
       supplier start
   with Lex.Error (error, loc) ->
     Error (Lexing_error (error, make_loc ~relative_to:start_pos loc))

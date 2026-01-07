@@ -233,7 +233,7 @@ module Code_id : sig
 
   val initialise : unit -> unit
 
-  val create : name:string -> Compilation_unit.t -> t
+  val create : name:string -> debug:Debuginfo.t -> Compilation_unit.t -> t
 
   val get_compilation_unit : t -> Compilation_unit.t
 

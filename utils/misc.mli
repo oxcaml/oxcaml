@@ -29,9 +29,6 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** Format the arguments according to the given format string
       and raise [Fatal_error] with the resulting string. *)
 
-val unboxed_small_int_arrays_are_not_implemented : unit -> _
-  (** Unboxed small int arrays are not implemented. *)
-
 val splices_should_not_exist_after_eval : unit -> _
   (** Raise a [Fatal_error] explaining that a slambda splice shouldn't exist in
       lambda code after slambda eval has happened. *)
@@ -441,6 +438,11 @@ val remove_file: string -> unit
 val remove_dir: string -> unit
        (** Delete the given directory if it exists, is a directory, and is
            empty. Never raises an error. *)
+
+val remove_dir_contents: string -> unit
+       (** Delete all files in the given directory, then delete the directory
+           itself. Only handles flat directories (no subdirectories).
+           Never raises an error. *)
 
 val expand_directory: string -> string -> string
        (** [expand_directory alt file] eventually expands a [+] at the

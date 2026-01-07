@@ -338,10 +338,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   | Array_load (kind, load_kind, _mut) -> (
     match kind, load_kind with
     | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
-        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-        | Unboxed_product _ ),
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
-        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+        | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
       use_prim' Array_get
     | (Naked_vec128s | Naked_vec256s | Naked_vec512s), _
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
@@ -517,10 +518,11 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Array_set (kind, set_kind) -> (
     match kind, set_kind with
     | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
-        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-        | Unboxed_product _ ),
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
         ( Immediates | Gc_ignorable_values | Values _ | Naked_floats
-        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+        | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
       let arr, res =
         match prim_arg ~env ~res x with
         | Pv v, res -> v, res
@@ -602,18 +604,25 @@ let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
     let tag =
       match kind with
       | Immediates | Gc_ignorable_values | Values -> 0
+      | Naked_ints ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int_array_tag
+      | Naked_int8s ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int8_array_tag
+          (List.length xs)
+      | Naked_int16s ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int16_array_tag
+          (List.length xs)
       | Naked_int32s ->
-        if List.length xs mod 2 = 0
-        then Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag
-        else Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_odd_tag
-      | Naked_int64s -> Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_tag
+          (List.length xs)
+      | Naked_int64s ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
       | Naked_nativeints ->
-        Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
       | Naked_floats -> Tag.double_array_tag |> Tag.to_int
       | Naked_float32s ->
-        if List.length xs mod 2 = 0
-        then Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
-        else Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_odd_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_tag
+          (List.length xs)
       | Unboxed_product _ -> 0
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         (* No SIMD *)

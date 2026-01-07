@@ -40,6 +40,14 @@ let () =
       assert (b = #2.)
     | _ -> assert false
 
+let () =
+  let d = [: #1.; #2. :] in
+  match d with
+    | [: a; b :] ->
+      assert (a = #1.);
+      assert (b = #2.)
+    | _ -> assert false
+
 (* let statement pattern *)
 let () =
   let a = [||] in

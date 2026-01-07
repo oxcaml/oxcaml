@@ -101,7 +101,11 @@ val dump_flambda : unit -> bool
 
 val dump_rawfexpr : unit -> dump_target
 
-val dump_fexpr : unit -> dump_target
+type pass = Oxcaml_flags.Flambda2.Dump.pass =
+  | Last_pass
+  | This_pass of string
+
+val dump_fexpr : pass -> dump_target
 
 val dump_flexpect : unit -> dump_target
 
@@ -158,6 +162,8 @@ module Expert : sig
   val fallback_inlining_heuristic : unit -> bool
 
   val inline_effects_in_cmm : unit -> bool
+
+  val cmm_safe_subst : unit -> bool
 
   val max_block_size_for_projections : unit -> int option
 

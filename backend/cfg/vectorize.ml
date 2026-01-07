@@ -447,7 +447,9 @@ end
    within a basic block can replace reorder or replace instructions that are not
    consecutive, as long as the transformation preserves dependencies. *)
 
-(**
+(* CR sspies: The comment below is not formatted, because it is not valid odoc.
+   Turn it into a Markdown doc. *)
+(*=
    Construct an overapproximation of transitive dependencies between instructions, and
    use this information to identify instructions that can run in parallel and can be
    reordered.

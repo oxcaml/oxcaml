@@ -295,6 +295,8 @@ let pat_extra sub = function
   | Tpat_open (path,loc,env) ->
       Tpat_open (path, map_loc sub loc, sub.env sub env)
   | Tpat_constraint ct -> Tpat_constraint (sub.typ sub ct)
+  | Tpat_inspected_type (Label_disambiguation _) as d -> d
+  | Tpat_inspected_type Polymorphic_parameter as d -> d
 
 let pat
   : type k . mapper -> k general_pattern -> k general_pattern
@@ -392,6 +394,8 @@ let extra sub = function
   | Texp_poly cto -> Texp_poly (Option.map (sub.typ sub) cto)
   | Texp_stack as d -> d
   | Texp_mode _ as d -> d
+  | Texp_inspected_type (Label_disambiguation _) as d -> d
+  | Texp_inspected_type Polymorphic_parameter as d -> d
 
 let function_body sub body =
   match body with
@@ -744,7 +748,8 @@ let class_description sub x =
 
 let functor_parameter sub = function
   | Unit -> Unit
-  | Named (id, s, mtype) -> Named (id, map_loc sub s, sub.module_type sub mtype)
+  | Named (id, s, mtype, mmode) ->
+      Named (id, map_loc sub s, sub.module_type sub mtype, mmode)
 
 let module_type sub x =
   let mty_loc = sub.location sub x.mty_loc in
@@ -754,8 +759,9 @@ let module_type sub x =
     | Tmty_ident (path, lid) -> Tmty_ident (path, map_loc sub lid)
     | Tmty_alias (path, lid) -> Tmty_alias (path, map_loc sub lid)
     | Tmty_signature sg -> Tmty_signature (sub.signature sub sg)
-    | Tmty_functor (arg, mtype2) ->
-        Tmty_functor (functor_parameter sub arg, sub.module_type sub mtype2)
+    | Tmty_functor (arg, mtype2, mmode2) ->
+        Tmty_functor (functor_parameter sub arg, sub.module_type sub mtype2,
+          mmode2)
     | Tmty_with (mtype, list) ->
         Tmty_with (
           sub.module_type sub mtype,

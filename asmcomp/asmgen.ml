@@ -295,7 +295,12 @@ let cfg_block_counters (block : Cfg.basic_block) =
   |> Profile.Counters.set "move" moves
 
 (** Returns all CFG counters that require the whole CFG to produce a count. *)
-let whole_cfg_counters (_ : Cfg.t) = Profile.Counters.create ()
+let whole_cfg_counters (cfg : Cfg.t) =
+  let stack_slots =
+    Stack_class.Tbl.fold cfg.fun_num_stack_slots ~init:0
+      ~f:(fun _stack_class num acc -> num + acc)
+  in
+  Profile.Counters.create () |> Profile.Counters.set "stack_slot" stack_slots
 
 let cfg_profile to_cfg =
   let total_counters = ref (Profile.Counters.create ()) in

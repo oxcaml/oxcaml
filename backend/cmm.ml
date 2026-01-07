@@ -56,6 +56,7 @@ let typ_int128 = [| Int; Int |]
 
 (** [machtype_component]s are partially ordered as follows:
 
+    {v
       Addr     Float32     Float     Vec128     Vec256     Vec512   Valx2
        ^
        |
@@ -63,6 +64,7 @@ let typ_int128 = [| Int; Int |]
        ^
        |
       Int
+    v}
 
   In particular, [Addr] must be above [Val], to ensure that if there is
   a join point between a code path yielding [Addr] and one yielding [Val]
@@ -393,6 +395,9 @@ type alloc_block_kind =
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
+  | Alloc_block_kind_int_u_array
+  | Alloc_block_kind_int8_u_array
+  | Alloc_block_kind_int16_u_array
   | Alloc_block_kind_int32_u_array
   | Alloc_block_kind_int64_u_array
   | Alloc_block_kind_vec128_u_array
