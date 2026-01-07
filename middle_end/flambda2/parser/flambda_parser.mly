@@ -546,8 +546,8 @@ binary_int_arith_op:
   | PLUS { Add }
   | MINUS { Sub }
   | STAR { Mul }
-  | SLASH { Div }
-  | PERCENT { Mod }
+  | SLASH { Div Scalar.Signedness.Signed }
+  | PERCENT { Mod Scalar.Signedness.Signed }
   | KWD_LAND { And }
   | KWD_LOR { Or }
   | KWD_LXOR { Xor }

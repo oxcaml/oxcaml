@@ -818,14 +818,15 @@ let instr_for_int_operation = function
   | Iadd -> I.ADD
   | Isub -> I.SUB
   | Imul -> I.MUL
-  | Idiv -> I.SDIV
+  | Idiv { signed = true } -> I.SDIV
+  | Idiv { signed = false } -> I.DIV
   | Iand -> I.AND
   | Ior -> I.ORR
   | Ixor -> I.EOR
   | Ilsl -> I.LSL
   | Ilsr -> I.LSR
   | Iasr -> I.ASR
-  | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imod | Imulh _ -> assert false
+  | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imod _ | Imulh _ -> assert false
 
 (* Decompose an integer constant into four 16-bit shifted fragments. Omit the
    fragments that are equal to "default" (16 zeros or 16 ones). *)
@@ -1241,19 +1242,19 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Floatop (Float32, Icompf _)) -> 2
     | Lop (Intop_imm (Icomp _, _)) -> 2
     | Lop (Int128op (Iadd128 | Isub128 | Imul64 _)) -> 2
-    | Lop (Intop Imod) -> 2
+    | Lop (Intop (Imod _)) -> 2
     | Lop (Intop (Imulh _)) -> 1
     | Lop (Intop (Iclz _)) -> 1
     | Lop (Intop (Ictz _)) -> if !Arch.feat_cssc then 1 else 2
     | Lop (Intop Ipopcnt) -> if !Arch.feat_cssc then 1 else 4
     | Lop
         (Intop
-          (Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
+          (Iadd | Isub | Imul | Idiv _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
       ->
       1
     | Lop
         (Intop_imm
-          ( ( Iadd | Isub | Imul | Idiv | Imod | Imulh _ | Iand | Ior | Ixor
+          ( ( Iadd | Isub | Imul | Idiv _ | Imod _ | Imulh _ | Iand | Ior | Ixor
             | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
             _ )) ->
       1
@@ -1969,8 +1970,9 @@ let emit_instr i =
     emit_cmpimm i.arg.(0) n;
     DSL.ins I.CSET
       [| DSL.emit_reg i.res.(0); DSL.cond (cond_for_comparison cmp) |]
-  | Lop (Intop Imod) ->
-    DSL.ins I.SDIV
+  | Lop (Intop (Imod { signed })) ->
+    DSL.ins
+      (if signed then I.SDIV else I.DIV)
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
          DSL.emit_reg i.arg.(1)
@@ -2018,8 +2020,8 @@ let emit_instr i =
     DSL.ins I.CLZ [| DSL.emit_reg i.res.(0); DSL.emit_reg i.arg.(0) |]
   | Lop
       (Intop
-        ((Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr) as
-        op)) ->
+        ((Iadd | Isub | Imul | Idiv _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr)
+        as op)) ->
     let instr = instr_for_int_operation op in
     DSL.ins instr
       [| DSL.emit_reg i.res.(0);

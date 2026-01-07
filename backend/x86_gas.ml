@@ -128,6 +128,7 @@ let print_instr b = function
   | DEC arg -> i1_s b "dec" arg
   | HLT -> i0 b "hlt"
   | IDIV arg -> i1_s b "idiv" arg
+  | DIV arg -> i1_s b "div" arg
   | IMUL (arg, None) -> i1_s b "imul" arg
   | IMUL (arg1, Some arg2) -> i2_s b "imul" arg1 arg2
   | MUL arg -> i1_s b "mul" arg

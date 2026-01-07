@@ -340,8 +340,8 @@ module Operation : sig
         | Add
         | Sub
         | Mul
-        | Div of division_is_safe
-        | Mod of division_is_safe
+        | Div of division_is_safe * Signedness.t
+        | Mod of division_is_safe * Signedness.t
         | And
         | Or
         | Xor
