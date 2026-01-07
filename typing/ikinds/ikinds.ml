@@ -112,6 +112,9 @@ module Solver = struct
     | Types.Tobject _ -> true
     | _ -> false
 
+  (* CR jujacobs: we could optimize the join with masks you see below 
+     using a combined [Ldd.join_with_mask left mask right] operation. *)
+
   (** Fetch or compute the polynomial for constructor [c]. *)
   let rec constr_kind (ctx : ctx) (path : Path.t)
       : Ldd.node * Ldd.node array =
@@ -289,11 +292,9 @@ module Solver = struct
       match Types.get_desc ty with
       | Types.Tvar { name = _name; jkind }
       | Types.Tunivar { name = _name; jkind } ->
-        (* TODO: allow general jkinds here (including with-bounds) *)
-        let jkind_l = Jkind.disallow_right jkind in
         (* Keep a rigid param, but cap it by its annotated jkind. *)
         Ldd.meet (rigid ctx ty)
-          (ckind_of_jkind_with_kind kind ctx jkind_l)
+          (ckind_of_jkind_with_kind kind ctx jkind)
       | Types.Tconstr (path, args, _abbrev_memo) ->
         let arg_kinds = List.map (fun t -> kind ctx t) args in
         constr ctx path arg_kinds
