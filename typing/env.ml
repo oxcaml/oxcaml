@@ -1019,42 +1019,38 @@ let vda_description vda =
   let vda_description = vda.vda_description in
   {vda_description with val_modalities = Mode.Modality.undefined}
 
-(** Assert that the mode is already normalized, and return the mode *)
-let assert_normalized_mode modality mode =
-  if Mode.Modality.is_undefined modality then
-    modality, mode
-  else
-    Misc.fatal_error "mode is not normalized but expected otherwise"
-
-(** Normalize a mode with a modality. Raise if already normalized. *)
-let normalize_mode_exn modality mode =
-  if Mode.Modality.is_undefined modality then
-    Misc.fatal_error "mode is normalized but expected otherwise"
-  else
-    Mode.Modality.undefined,
-    Mode.Modality.apply ~hint:{monadic = Unknown; comonadic = Unknown}
-      modality mode
-
-(** Normalize a mode with a modality. Use the previous two functions instead if
-the mode is statically known to be normalized/not normalized. *)
-let normalize_mode modality mode =
-  if Mode.Modality.is_undefined modality then
-    modality, mode
-  else
-    Mode.Modality.undefined,
-    Mode.Modality.apply ~hint:{monadic = Unknown; comonadic = Unknown}
-      modality mode
-
 module Normalize_mode = struct
-  let vd norm (vd : Subst.Lazy.value_description) mode =
-    let val_modalities, mode = norm vd.val_modalities mode in
+  type t =
+    | Normalize_exn (** Normalize a mode; raise if already normalized. *)
+    | Assert_normalized
+      (** Assert that the mode is already normalized, and return the mode *)
+    | Normalize
+      (** Normalize a mode; do nothing if already normalized.
+          Use the other two instead whenever possible *)
+
+  let modality t modality mode =
+    let normalized = Mode.Modality.is_undefined modality in
+    match t, normalized with
+    | Normalize, true -> modality, mode
+    | Normalize_exn, true ->
+        Misc.fatal_error "mode is already normalized but expected otherwise"
+    | Assert_normalized, true -> modality, mode
+    | (Normalize | Normalize_exn), false ->
+        Mode.Modality.undefined,
+        Mode.Modality.apply ~hint:{monadic = Unknown; comonadic = Unknown}
+          modality mode
+    | Assert_normalized, false ->
+        Misc.fatal_error "mode is not already normalized but expected otherwise"
+
+  let vd t (vd : Subst.Lazy.value_description) mode =
+    let val_modalities, mode = modality t vd.val_modalities mode in
     let vd = {vd with val_modalities} in
     vd, mode
 
   let vda norm vda = vd norm vda.vda_description vda.vda_mode
 
-  let md norm (md : Subst.Lazy.module_declaration) mode =
-    let md_modalities, mode = norm md.md_modalities mode in
+  let md t (md : Subst.Lazy.module_declaration) mode =
+    let md_modalities, mode = modality t md.md_modalities mode in
     let md = {md with md_modalities} in
     md, mode
 
@@ -1622,7 +1618,7 @@ let find_value path env =
 let find_value_no_locks_exn id env =
   match IdTbl.find_same_and_locks id env.values with
   | Val_bound _, _ :: _ -> Misc.fatal_error "locks encountered"
-  | Val_bound data, [] -> Normalize_mode.vda normalize_mode data
+  | Val_bound data, [] -> Normalize_mode.vda Normalize data
   | Val_unbound _, _ -> raise Not_found
 
 let find_class path env =
@@ -2333,7 +2329,7 @@ let rec components_of_module_maker
             in
             c.comp_constrs <- add_to_tbl (Ident.name id) cda c.comp_constrs
         | Sig_module(id, pres, md, _, _) ->
-            let md, mode = Normalize_mode.md normalize_mode_exn md cm_mode in
+            let md, mode = Normalize_mode.md Normalize_exn md cm_mode in
             let md' =
               (* The prefixed items get the same scope as [cm_path], which is
                  the prefix. *)
@@ -2680,7 +2676,7 @@ and store_module ?(update_summary=true) ~check
     (fun f -> check_usage loc id md.md_uid f !module_declarations) check;
   Builtin_attributes.mark_alerts_used md.md_attributes;
   let alerts = Builtin_attributes.alerts_of_attrs md.md_attributes in
-  let md, mode = Normalize_mode.md normalize_mode md mode in
+  let md, mode = Normalize_mode.md Normalize md mode in
   let comps =
     components_of_module ~alerts ~uid:md.md_uid
       env Subst.identity (Pident id) addr md.md_type mode shape
@@ -3453,7 +3449,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   match data with
   | Mod_local (mda, alias_locks) -> begin
       use_module ~use ~loc path mda;
-      let _, mode = Normalize_mode.mda assert_normalized_mode mda in
+      let _, mode = Normalize_mode.mda Assert_normalized mda in
       let locks = alias_locks @ locks in
       match load with
       (* CR-soon zqian: duplication of information. Should move modes out of
@@ -3828,7 +3824,7 @@ and lookup_module_lazy ~errors ~use ~loc lid env =
       path, data.mda_declaration, mode_with_locks
   | Ldot(l, s) ->
       let path, locks, data = lookup_dot_module ~errors ~use ~loc l s env in
-      let md, mode = Normalize_mode.mda assert_normalized_mode data in
+      let md, mode = Normalize_mode.mda Assert_normalized data in
       path, md, (mode, locks)
   | Lapply _ as lid ->
       let path_f, comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
@@ -4129,7 +4125,7 @@ let lookup_module_path ~errors ~use ~loc ~load lid env =
         path, mode_with_locks
   | Ldot(l, s) ->
       let path, locks, data = lookup_dot_module ~errors ~use ~loc l s env in
-      let _, mode = Normalize_mode.mda assert_normalized_mode data in
+      let _, mode = Normalize_mode.mda Assert_normalized data in
       path, (mode, locks)
   | Lapply _ as lid ->
       let path_f, _comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
@@ -4163,7 +4159,7 @@ let lookup_value_lazy ~errors ~use ~loc lid env =
     | Ldot(l, s) -> lookup_dot_value ~errors ~use ~loc l s env
     | Lapply _ -> assert false
   in
-  let vd, mode = Normalize_mode.vda normalize_mode vda in
+  let vd, mode = Normalize_mode.vda Normalize vda in
   path, vd, (mode, locks)
 
 let lookup_value ~errors ~use ~loc lid env =
@@ -4592,7 +4588,7 @@ let fold_values f =
        match ve with
        | Val_unbound _ -> acc
        | Val_bound vda ->
-          let vd, mode = Normalize_mode.vda normalize_mode vda in
+          let vd, mode = Normalize_mode.vda Normalize vda in
           f k p vd mode acc)
 and fold_constructors f =
   find_all_simple_list (fun env -> env.constrs) (fun sc -> sc.comp_constrs)
