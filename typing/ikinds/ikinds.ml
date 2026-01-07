@@ -234,10 +234,15 @@ module Solver = struct
     in
     loop base arg_kinds 0
 
+  (* Guards against accidental infinite recursion when traversing types. *)
+  let kind_of_depth = ref 0
+
+  let kind_of_counter = ref 0
+
   (* Converting surface jkinds to solver ckinds. *)
-  let ckind_of_jkind_with_kind
-      (kind_fn : ctx -> Types.type_expr -> Ldd.node) (ctx : ctx)
-      (jkind : ('l * 'r) Types.jkind) : Ldd.node =
+  let rec ckind_of_jkind :
+      type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
+   fun ctx jkind ->
     (* Base is the modality bounds stored on this jkind. *)
     let base =
       Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
@@ -249,17 +254,12 @@ module Solver = struct
          (fun acc (ty, bound_info) ->
            let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
            let mask = Axis_lattice.of_axis_set axes in
-           let ty_kind = kind_fn ctx ty in
+           let ty_kind = kind ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base
 
-  (* Guards against accidental infinite recursion when traversing types. *)
-  let kind_of_depth = ref 0
-
-  let kind_of_counter = ref 0
-
   (** Compute the kind for [t]. *)
-  let rec kind (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
+  and kind (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     (* Memoize only potentially cyclic types; LFPs handle recursion. *)
     match TyTbl.find_opt ctx.ty_to_kind ty with
     | Some kind_poly -> kind_poly
@@ -292,11 +292,12 @@ module Solver = struct
     let kind_poly =
       (* [ty] is expected to be representative: no links/substs/fields/nil. *)
       match Types.get_desc ty with
-      | Types.Tvar { name = _name; jkind }
+      | Types.Tvar { name = _name; jkind } ->
+        (* Keep a rigid param, but cap it by its annotated jkind. *)
+        Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
       | Types.Tunivar { name = _name; jkind } ->
         (* Keep a rigid param, but cap it by its annotated jkind. *)
-        Ldd.meet (rigid ctx ty)
-          (ckind_of_jkind_with_kind kind ctx jkind)
+        Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
       | Types.Tconstr (path, args, _abbrev_memo) ->
         let arg_kinds = List.map (fun t -> kind ctx t) args in
         constr ctx path arg_kinds
@@ -327,8 +328,7 @@ module Solver = struct
       | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
       | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
       | Types.Tpoly (ty, _) -> kind ctx ty
-      | Types.Tof_kind jkind ->
-        ckind_of_jkind_with_kind kind ctx jkind
+      | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tfield _ ->
         failwith "Tfield shouldn't appear in kind"
@@ -367,10 +367,6 @@ module Solver = struct
     in
     decr kind_of_depth;
     kind_poly
-
-  let ckind_of_jkind (ctx : ctx) (jkind : ('l * 'r) Types.jkind)
-      : Ldd.node =
-    ckind_of_jkind_with_kind kind ctx jkind
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (kind_poly : Ldd.node) : Ldd.node =
@@ -812,11 +808,12 @@ let sub_jkind_l ?allow_any_crossing ?origin
              (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
 
 let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level (sub : Types.jkind_l)
-    (super : Types.jkind_r) : bool =
+    ~(context : Jkind.jkind_context) ~level
+    (sub : (Allowance.allowed * 'r1) Types.jkind)
+    (super : ('l2 * Allowance.allowed) Types.jkind) : bool =
   ignore origin;
   if not !Clflags.ikinds
-  then Jkind.sub ~type_equal ~context ~level sub super
+  then Result.is_ok (Jkind.sub_or_error ~type_equal ~context ~level sub super)
   else
     let ctx = make_ctx ~mode:Solver.Normal ~context in
     match
@@ -861,12 +858,8 @@ let sub_or_intersect ?origin:_origin
     | Equal | Less -> (
       (* The RHS is a jkind_r (no with-bounds), so its ikind is constant. *)
       let ctx = make_ctx ~mode:Solver.Round_up ~context in
-      let sub_poly =
-        Solver.ckind_of_jkind ctx (Jkind.disallow_right t1)
-      in
-      let super_poly =
-        Solver.ckind_of_jkind ctx (Jkind.disallow_left t2)
-      in
+      let sub_poly = Solver.ckind_of_jkind ctx t1 in
+      let super_poly = Solver.ckind_of_jkind ctx t2 in
       (* Layouts already checked above. Remaining failure reasons are
          per-axis disagreements. *)
       match Solver.leq_with_reason sub_poly super_poly with
@@ -892,8 +885,7 @@ let sub_or_error ?origin:_origin
     (unit, Jkind.Violation.t) result =
   if not (enable_sub_or_error && !Clflags.ikinds)
   then Jkind.sub_or_error ~type_equal ~context ~level t1 t2
-  else if sub ~type_equal ~context ~level (Jkind.disallow_right t1)
-            (Jkind.disallow_left t2)
+  else if sub ~type_equal ~context ~level t1 t2
   then Ok ()
   else
     (* Delegate to Jkind for detailed error reporting. *)
