@@ -156,9 +156,18 @@ val reg_fp_operand_3 : Reg.t -> Reg.t -> Reg.t -> scalar_fp_regs_3
 
 val reg_fp_operand_4 : Reg.t -> Reg.t -> Reg.t -> Reg.t -> scalar_fp_regs_4
 
-(** {1 Memory operands from Reg.t} *)
+(** {1 Memory operands} *)
 
-val mem : Reg.t -> [`Mem of [> `Base_reg]] Ast.Operand.t
+(** Convert a compiler [Reg.t] to an AST GP register for use as a memory base.
+
+    The compiler's [Reg.t] never represents SP (x31) - SP is always handled
+    specially via [Ast.Reg.sp] or [Ast.DSL.sp]. The [int_reg_name_to_arch_index]
+    array maps compiler register indices to architecture indices 0-28, never 31.
+    Therefore this function always returns an X register, never SP. *)
+val gp_reg_of_reg : Reg.t -> [`GP of [`X]] Ast.Reg.t
+
+val mem :
+  [`GP of [< `X | `SP]] Ast.Reg.t -> [`Mem of [> `Base_reg]] Ast.Operand.t
 
 val addressing :
   Arch.addressing_mode ->
@@ -173,15 +182,15 @@ val stack :
   [`Mem of [> `Offset_imm | `Offset_unscaled]] Ast.Operand.t
 
 val mem_symbol_reg :
+  [`GP of [< `X | `SP]] Ast.Reg.t ->
   reloc:[`Twelve] Ast.Symbol.same_unit_or_reloc ->
   ?offset:int ->
-  Reg.t ->
   Asm_targets.Asm_symbol.t ->
   [`Mem of [> `Offset_sym]] Ast.Operand.t
 
 val mem_label :
+  [`GP of [< `X | `SP]] Ast.Reg.t ->
   reloc:[`Twelve] Ast.Symbol.same_unit_or_reloc ->
   ?offset:int ->
-  Reg.t ->
   Asm_targets.Asm_label.t ->
   [`Mem of [> `Offset_sym]] Ast.Operand.t

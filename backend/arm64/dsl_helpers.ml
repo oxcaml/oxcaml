@@ -97,54 +97,30 @@ let v8h_v8h i = reg_v8h i.Linear.res.(0), reg_v8h i.Linear.arg.(0)
 
 let v16b_v16b i = reg_v16b i.Linear.res.(0), reg_v16b i.Linear.arg.(0)
 
-let mem_symbol_reg ~(reloc : [`Twelve] Ast.Symbol.same_unit_or_reloc) ?offset r
-    sym =
-  let index = reg_index r in
+let mem_symbol_reg base ~(reloc : [`Twelve] Ast.Symbol.same_unit_or_reloc)
+    ?offset sym =
   let symbol = Ast.Symbol.create_symbol reloc ?offset sym in
-  match r.typ with
-  | Val | Int | Addr ->
-    if index = 31
-    then Ast.DSL.mem_symbol ~base:Ast.Reg.sp ~symbol
-    else Ast.DSL.mem_symbol ~base:(Ast.Reg.reg_x index) ~symbol
-  | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
-    Misc.fatal_errorf
-      "mem_symbol_reg: expected integer register for base, got %a" Printreg.reg
-      r
+  Ast.DSL.mem_symbol ~base ~symbol
 
-let mem_label ~(reloc : [`Twelve] Ast.Symbol.same_unit_or_reloc) ?offset r lbl =
-  let index = reg_index r in
+let mem_label base ~(reloc : [`Twelve] Ast.Symbol.same_unit_or_reloc) ?offset
+    lbl =
   let symbol = Ast.Symbol.create_label reloc ?offset lbl in
-  match r.typ with
-  | Val | Int | Addr ->
-    if index = 31
-    then Ast.DSL.mem_symbol ~base:Ast.Reg.sp ~symbol
-    else Ast.DSL.mem_symbol ~base:(Ast.Reg.reg_x index) ~symbol
-  | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
-    Misc.fatal_errorf "mem_label: expected integer register for base, got %a"
-      Printreg.reg r
+  Ast.DSL.mem_symbol ~base ~symbol
 
-let mem r =
+let mem base = Ast.DSL.mem ~base
+
+(* See .mli for why this returns [`X] and not [`X | `SP]. *)
+let gp_reg_of_reg r : [`GP of [`X]] Ast.Reg.t =
   let index = reg_index r in
   match r.typ with
-  | Val | Int | Addr ->
-    if index = 31
-    then Ast.DSL.mem ~base:Ast.Reg.sp
-    else Ast.DSL.mem ~base:(Ast.Reg.reg_x index)
+  | Val | Int | Addr -> Ast.Reg.reg_x index
   | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
-    Misc.fatal_errorf "mem: expected integer register for base, got %a"
+    Misc.fatal_errorf "gp_reg_of_reg: expected integer register, got %a"
       Printreg.reg r
 
 let mem_offset_reg r offset =
-  let index = reg_index r in
-  match r.typ with
-  | Val | Int | Addr ->
-    if index = 31
-    then Ast.DSL.mem_offset ~base:Ast.Reg.sp ~offset
-    else Ast.DSL.mem_offset ~base:(Ast.Reg.reg_x index) ~offset
-  | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
-    Misc.fatal_errorf
-      "mem_offset_reg: expected integer register for base, got %a" Printreg.reg
-      r
+  let base = gp_reg_of_reg r in
+  Ast.DSL.mem_offset ~base ~offset
 
 let addressing addr r =
   match addr with
@@ -152,6 +128,7 @@ let addressing addr r =
   | Ibased (s, ofs) ->
     assert (not !Clflags.dlcode);
     (* see selection.ml *)
+    let base = gp_reg_of_reg r in
     if S.is_local s
     then
       (* Local symbols are defined as labels (not linker symbols) to avoid ELF
@@ -159,8 +136,8 @@ let addressing addr r =
       let lbl =
         L.create_label_for_local_symbol Asm_targets.Asm_section.Data s
       in
-      mem_label r ~reloc:(Needs_reloc LOWER_TWELVE) ~offset:ofs lbl
-    else mem_symbol_reg r ~reloc:(Needs_reloc LOWER_TWELVE) s ~offset:ofs
+      mem_label base ~reloc:(Needs_reloc LOWER_TWELVE) ~offset:ofs lbl
+    else mem_symbol_reg base ~reloc:(Needs_reloc LOWER_TWELVE) ~offset:ofs s
 
 let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
   let slot_offset loc stack_class =
