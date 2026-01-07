@@ -148,8 +148,14 @@ let
       ocamlformat = final.ocamlformat_0_28_1;
     });
 
-  upstream = ocamlPackages_5_4;
-  ocaml = upstream.ocaml;
+  upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
+  ocaml = (upstream.ocaml.override { inherit stdenv; }).overrideAttrs {
+    # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
+    # compiler that we use to bootstrap ourselves on ARM64
+    patches = [
+      ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.4.14.2+oxcaml/files/ocaml-base-compiler.4.14.2+oxcaml.patch
+    ];
+  };
 
   dune = upstream.dune_3.overrideAttrs rec {
     version = "3.19.1";
