@@ -39,17 +39,6 @@ let () = require_immutable_data v
 (* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
 val v : 'a t = {f = <cycle>}
-Line 2, characters 32-33:
-2 | let () = require_immutable_data v
-                                    ^
-Error: This expression has type "'a t" but an expression was expected of type
-         "('b : immutable_data)"
-       The kind of 'a t is immutable_data with 'b. 'b t
-         because of the definition of t at line 1, characters 0-28.
-       But the kind of 'a t must be a subkind of immutable_data
-         because of the definition of require_immutable_data at line 2, characters 27-58.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
 |}]
 
 type 'a t : immutable_data = { f : 'b. 'b t }
@@ -83,18 +72,6 @@ let f (t : t) =
 type t = { foo : 'a. Abs.t * unit; }
 type t = { foo : 'a. Abs.t * unit; }
 val f : t -> unit = <fun>
-|}, Principal{|
-type t = { foo : 'a. Abs.t * unit; }
-type t = { foo : 'a. Abs.t * unit; }
-Line 7, characters 27-28:
-7 |     require_immutable_data t
-                               ^
-Error: This expression has type "t" but an expression was expected of type
-         "('a : immutable_data)"
-       The kind of t is immutable_data with Abs.t
-         because of the definition of t at line 3, characters 0-47.
-       But the kind of t must be a subkind of immutable_data
-         because of the definition of require_immutable_data at line 2, characters 27-58.
 |}]
 
 (******************************************)
