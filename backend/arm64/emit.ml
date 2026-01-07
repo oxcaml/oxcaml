@@ -1566,8 +1566,8 @@ let emit_instr i =
     stack_offset := !stack_offset + n
   | Lop (Load { memory_chunk; addressing_mode; is_atomic; _ }) -> (
     assert (
-      Cmm.equal_memory_chunk memory_chunk Cmm.Word_int
-      || Cmm.equal_memory_chunk memory_chunk Cmm.Word_val
+      Cmm.equal_memory_chunk memory_chunk Word_int
+      || Cmm.equal_memory_chunk memory_chunk Word_val
       || not is_atomic);
     let dst = i.res.(0) in
     let base =
