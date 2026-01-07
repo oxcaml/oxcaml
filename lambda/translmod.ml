@@ -1015,11 +1015,8 @@ let add_arg_block_to_module_representation = function
     (* NB: this assumes [arg_block] has layout value *)
   | Module_value_only { field_count } ->
     Module_value_only { field_count = field_count + 1 }
-  | Module_mixed (shape, shape_for_read) ->
-    Module_mixed
-      ( Array.append shape [| mixed_block_element_for_module |],
-        Array.append shape_for_read
-          [| mixed_block_element_with_locality_mode_for_module |] )
+  | Module_mixed shape ->
+    Module_mixed (Array.append shape [| mixed_block_element_for_module |])
 
 let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
   let primary_block_id = Ident.create_local "*primary-block*" in

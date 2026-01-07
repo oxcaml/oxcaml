@@ -482,12 +482,18 @@ let primitive ppf = function
   | Pufloatfield (n, sem) ->
       fprintf ppf "ufloatfield%a %i"
         field_read_semantics sem n
-  | Pmixedfield (n, shape, sem) ->
+  | Pmixedfield (n, Mbs_with_locality_mode shape, sem) ->
       fprintf ppf "mixedfield%a %a %a"
         field_read_semantics sem
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
         (mixed_block_shape
           (fun ppf mode -> fprintf ppf "%s" (locality_mode_if_local mode)))
+        shape
+  | Pmixedfield (n, Mbs_no_alloc shape, sem) ->
+      fprintf ppf "mixedfield%a %a %a"
+        field_read_semantics sem
+        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
+        (mixed_block_shape (fun _ _ -> ()))
         shape
   | Psetfloatfield (n, init) ->
       let init =

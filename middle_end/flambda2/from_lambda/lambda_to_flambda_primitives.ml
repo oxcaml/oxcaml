@@ -2396,12 +2396,19 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ Unary
         (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
     ]
-  | Pmixedfield (field_path, shape, sem), [[arg]] ->
+  | Pmixedfield (field_path, shape_for_read, sem), [[arg]] ->
     if List.length field_path < 1
     then Misc.fatal_error "Pmixedfield: field_path must be non-empty";
     let shape =
-      Mixed_block_shape.of_mixed_block_elements shape
-        ~print_locality:Printlambda.locality_mode
+      match shape_for_read with
+      | Mbs_with_locality_mode shape ->
+        Mixed_block_shape.of_mixed_block_elements shape
+          ~print_locality:Printlambda.locality_mode
+      | Mbs_no_alloc shape ->
+        Mixed_block_shape.of_mixed_block_elements shape
+          ~print_locality:(fun _ _ -> ())
+        |> Obj.magic
+      (* CR jrayman *)
     in
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape

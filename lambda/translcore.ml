@@ -726,7 +726,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                           \ present for float field read")
               shape
           in
-          Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
+          Some
+            ( Pmixedfield ([lbl.lbl_pos], Mbs_with_locality_mode shape, sem)
+            , [targ]
+            )
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
       begin match prim_and_args with
@@ -2177,7 +2180,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                          Lambda.alloc_heap)
                       shape
                    in
-                   Pmixedfield ([i], shape, sem)
+                   Pmixedfield ([i], Mbs_with_locality_mode shape, sem)
                  | Record_inlined (_, _, Variant_with_null) -> assert false
                in
                Lprim(access, [Lvar init_id],

@@ -137,7 +137,7 @@ type primitive =
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
-  | Pmixedfield of int list * mixed_block_shape_with_locality_mode
+  | Pmixedfield of int list * mixed_block_shape_for_read
       * field_read_semantics
     (** The index to [Pmixedfield] corresponds to an element of the shape, not
         necessarily the index of the field at runtime, as reordering may take
@@ -499,10 +499,18 @@ and 'a mixed_block_element =
   | Untagged_immediate
   | Product of 'a mixed_block_element array
 
+and nothing = |
+
 and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
+
+and mixed_block_shape_no_alloc = nothing mixed_block_element array
+
+and mixed_block_shape_for_read =
+  | Mbs_with_locality_mode of mixed_block_shape_with_locality_mode
+  | Mbs_no_alloc of mixed_block_shape_no_alloc
 
 and constructor_shape =
   | Constructor_uniform of value_kind list
@@ -939,11 +947,10 @@ type runtime_param =
 type module_representation =
   | Module_value_only of { field_count : int }
   (* All module fields are boxed. *)
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
-  (* The module contains both values and unboxed elements. We have two shapes:
-     one for allocating (used by [block_of_module_representation]) and one for
-     reading (used by [mod_field]). This will be cleaned up after we add
-     [Pmixedfieldzeroalloc] (name subject to change) *)
+  | Module_mixed of mixed_block_shape_no_alloc
+  (* The module contains both values and unboxed elements. Since modules are not
+     subject to the flat float optimization, projections never allocate and we
+     store the shape as a [mixed_block_shape_no_alloc] *)
 
 (* Logical field count: Each unboxed product counts as 1 field *)
 val module_representation_field_count : module_representation -> int
@@ -1078,9 +1085,7 @@ val layout_unboxed_product : layout list -> layout
 val layout_top : layout
 val layout_bottom : layout
 
-val mixed_block_element_for_module : unit mixed_block_element
-val mixed_block_element_with_locality_mode_for_module :
-  locality_mode mixed_block_element
+val mixed_block_element_for_module : nothing mixed_block_element
 
 
 (** [dummy_constant] produces a placeholder value with a recognizable

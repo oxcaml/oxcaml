@@ -157,7 +157,7 @@ type primitive =
      `Psetmixedfield` (the path / list of indices) should probably be
      abstracted so that we do not check in multiple places that its length is
      correct. *)
-  | Pmixedfield of int list * mixed_block_shape_with_locality_mode
+  | Pmixedfield of int list * mixed_block_shape_for_read
       * field_read_semantics
   | Psetfloatfield of int * initialization_or_assignment
   | Psetufloatfield of int * initialization_or_assignment
@@ -416,10 +416,18 @@ and 'a mixed_block_element =
   | Untagged_immediate
   | Product of 'a mixed_block_element array
 
+and nothing = |
+
 and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
+
+and mixed_block_shape_no_alloc = nothing mixed_block_element array
+
+and mixed_block_shape_for_read =
+  | Mbs_with_locality_mode of mixed_block_shape_with_locality_mode
+  | Mbs_no_alloc of mixed_block_shape_no_alloc
 
 and constructor_shape =
   | Constructor_uniform of value_kind list
@@ -959,11 +967,11 @@ type runtime_param =
 
 type module_representation =
   | Module_value_only of { field_count : int }
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+  | Module_mixed of mixed_block_shape_no_alloc
 
 let module_representation_field_count = function
   | Module_value_only { field_count } -> field_count
-  | Module_mixed (shape, _) -> Array.length shape
+  | Module_mixed shape -> Array.length shape
 
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
@@ -1103,7 +1111,6 @@ let layout_top = layout_any_value
 let layout_bottom = Pbottom
 
 let mixed_block_element_for_module = Value generic_value
-let mixed_block_element_with_locality_mode_for_module = Value generic_value
 
 let default_function_attribute = {
   inline = Default_inline;
@@ -1479,8 +1486,8 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->
     Pfield(pos, Pointer, read_semantics)
-  | Module_mixed (_, shape_for_read) ->
-    Pmixedfield([pos], shape_for_read, read_semantics)
+  | Module_mixed shape ->
+    Pmixedfield([pos], Mbs_no_alloc shape, read_semantics)
 
 let transl_module_representation repr =
   let shape =
@@ -1502,8 +1509,7 @@ let transl_module_representation repr =
   then Module_value_only { field_count = Array.length shape }
   else
     Module_mixed
-      ( transl_mixed_product_shape shape,
-        transl_mixed_product_shape_for_read
+      (transl_mixed_product_shape_for_read
         ~get_value_kind:(fun _ -> generic_value)
         ~get_mode:(fun _ ->
            fatal_error "Lambda.transl_module_representation: \
@@ -1552,7 +1558,7 @@ let transl_prim mod_name name =
 
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
-  | Module_mixed (shape, _) ->
+  | Module_mixed shape ->
     let rec count_values shape =
       Array.fold_left
         (fun acc elt ->
@@ -1565,7 +1571,8 @@ let block_of_module_representation ~loc = function
     in
     Typedecl.assert_mixed_product_support loc Module
       ~value_prefix_len:(count_values shape);
-    Pmakemixedblock(0, Immutable, shape, alloc_heap)
+    (* CR jrayman *)
+    Pmakemixedblock(0, Immutable, Obj.magic shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
@@ -2003,8 +2010,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pfield _ | Pfield_computed _ | Psetfield _ | Psetfield_computed _ -> None
   | Pfloatfield (_, _, m) -> Some m
   | Pufloatfield _ -> None
-  | Pmixedfield (path, shape, _) ->
+  | Pmixedfield (path, Mbs_with_locality_mode shape, _) ->
     mixed_block_projection_may_allocate shape ~path
+  | Pmixedfield (_, Mbs_no_alloc _, _) -> None
   | Psetfloatfield _ -> None
   | Psetufloatfield _ -> None
   | Psetmixedfield _ -> None
@@ -2407,7 +2415,7 @@ let layout_of_mixed_block_shape
 let layout_of_module_field repr pos =
   match repr with
   | Module_value_only _ -> layout_value_field
-  | Module_mixed (shape, _) ->
+  | Module_mixed shape ->
     layout_of_mixed_block_element shape.(pos)
 
 let rec mixed_block_element_of_layout (layout : layout) :
@@ -2545,7 +2553,10 @@ let primitive_result_layout (p : primitive) =
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
   | Pbox_vector (v, _) -> layout_boxed_vector v
   | Punbox_vector v -> layout_unboxed_vector (Primitive.unboxed_vector v)
-  | Pmixedfield (path, shape, _) -> layout_of_mixed_block_shape shape ~path
+  | Pmixedfield (path, Mbs_with_locality_mode shape, _) ->
+    layout_of_mixed_block_shape shape ~path
+  | Pmixedfield (path, Mbs_no_alloc shape, _) ->
+    layout_of_mixed_block_shape shape ~path
   | Pccall { prim_native_repr_res = _, repr_res } -> layout_of_extern_repr repr_res
   | Praise _ -> layout_bottom
   | Psequor | Psequand | Pnot

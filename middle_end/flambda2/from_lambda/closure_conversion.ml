@@ -3833,10 +3833,10 @@ let final_module_block_representation acc
       field_count,
       block_access,
       fun _ -> K.value )
-  | Module_mixed (shape, _) ->
+  | Module_mixed shape ->
     let shape =
       K.Mixed_block_lambda_shape.of_mixed_block_elements shape
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+        ~print_locality:(fun _ _ -> ())
     in
     let flattened_reordered_shape =
       K.Mixed_block_lambda_shape.flattened_reordered_shape shape
