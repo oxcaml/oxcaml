@@ -4259,6 +4259,9 @@ let transl_package_constraint ~loc ty =
     type_arity = 0;
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+    (* There is no reason to calculate an accurate jkind here.  This typedecl
+       will be thrown away once it is used for the package constraint inclusion
+       check, and that check will expand the manifest as needed. *)
     type_ikind = Types.ikinds_todo "transl_package_constraint";
     type_private = Public;
     type_manifest = Some ty;
