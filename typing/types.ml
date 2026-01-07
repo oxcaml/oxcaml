@@ -1690,6 +1690,3 @@ let undo_compress (changes, _old) =
             Transient_expr.set_desc ty desc; r := !next
         | _ -> ())
         log
-
-let ignore_md_modalities md =
-  {md with md_modalities = Mode.Modality.(Const.id |> of_const)}

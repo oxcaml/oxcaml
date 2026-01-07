@@ -1090,7 +1090,9 @@ module Merge = struct
               remove_modality_and_zero_alloc_variables_mty sig_env
                 ~zap_modality:Mode.Modality.zap_to_id mty
             in
-            let md'' = { md' with md_type = mty } in
+            assert (Modality.is_undefined md'.md_modalities);
+            let modalities = Modality.(Const.id |> of_const) in
+            let md'' = { md' with md_type = mty; md_modalities = modalities} in
             let newmd =
               Mtype.strengthen_decl ~aliasable:false md'' path in
             (* Inclusion check with the original signature *)
@@ -1561,7 +1563,6 @@ and approx_constraint env body constr =
          (GPR#1626) *)
       let path, approx_md, _ =
         Env.lookup_module ~use:false ~loc:lid.loc lid.txt env in
-      let approx_md = ignore_md_modalities approx_md in
       let _,_,sg =
         Merge.merge_module ~approx:true ~destructive env
           lid.loc body id approx_md path false in
@@ -1973,7 +1974,6 @@ and transl_modtype_aux env smty =
       let path, md, _ =
         Env.lookup_module ~use:false ~loc:mod_id.loc mod_id.txt env
       in
-      let md = ignore_md_modalities md in
       let aliasable = not (Env.is_functor_arg path env) in
       try
         ignore
@@ -2008,7 +2008,6 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
     | Pwith_module (l, l')
     | Pwith_modsubst (l,l') ->
         let path, md, _ = Env.lookup_module ~loc l'.txt env in
-        let md = ignore_md_modalities md in
         let constr = if destructive then
             (Twith_modsubst (path, l'))
           else
