@@ -48,7 +48,7 @@ module T = struct
 
   let xmm_name = gen_mm_names ~kind:'x'
 
-  let ymm_name = gen_mm_names ~kind:'y'
+  (*= let ymm_name = gen_mm_names ~kind:'y' *)
 
   let zmm_name = gen_mm_names ~kind:'z'
 
@@ -58,12 +58,12 @@ module T = struct
     | Int | Addr | Val -> gpr_name.(r - first_available_register GPR)
     | Float | Float32 | Vec128 | Valx2 ->
       xmm_name.(r - first_available_register SIMD)
-    | Vec256 -> ymm_name.(r - first_available_register SIMD)
+    (*= | Vec256 -> ymm_name.(r - first_available_register SIMD) *)
     | Vec512 -> zmm_name.(r - first_available_register SIMD)
 
   let of_machtype : Cmm.machtype_component -> t = function
     | Val | Int | Addr -> GPR
-    | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2 -> SIMD
+    | Float | Float32 | Vec128  | Vec512 | Valx2 -> SIMD
 
   let gc_regs_offset ~(simd : save_simd_regs) (typ : Cmm.machtype_component)
       (reg_index : int) =

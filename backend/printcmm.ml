@@ -38,7 +38,7 @@ let machtype_component ppf (ty : machtype_component) =
   | Int -> fprintf ppf "int"
   | Float -> fprintf ppf "float"
   | Vec128 -> fprintf ppf "vec128"
-  | Vec256 -> fprintf ppf "vec256"
+  (*= | Vec256 -> fprintf ppf "vec256" *)
   | Vec512 -> fprintf ppf "vec512"
   | Float32 -> fprintf ppf "float32"
   | Valx2 -> fprintf ppf "valx2"

@@ -84,12 +84,12 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
   | Float32, Float32
   | (Valx2 | Vec128), (Valx2 | Vec128) ->
     true
-  | Vec256, Vec256 ->
-    true
+  (*= | Vec256, Vec256 ->
+    true *)
   | Vec512, Vec512 ->
     true
   | (Int | Val | Addr | Float | Float32 |
-     Vec128 | Vec256 | Vec512 | Valx2), _ -> false
+     Vec128 | Vec512 | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
 
@@ -105,16 +105,16 @@ let hard_float_reg =
 
 let hard_vec128_reg =
   Array.map (fun r -> {r with Reg.typ = Vec128}) hard_float_reg
-let hard_vec256_reg =
-  Array.map (fun r -> {r with Reg.typ = Vec256}) hard_float_reg
+(*= let hard_vec256_reg =
+  Array.map (fun r -> {r with Reg.typ = Vec256}) hard_float_reg *)
 let hard_vec512_reg =
   Array.map (fun r -> {r with Reg.typ = Vec512}) hard_float_reg
 let hard_float32_reg =
   Array.map (fun r -> {r with Reg.typ = Float32}) hard_float_reg
 
-let add_hard_vec256_regs list ~f =
+(*= let add_hard_vec256_regs list ~f =
   if Arch.Extension.enabled_vec256 ()
-  then f hard_vec256_reg :: list else list
+  then f hard_vec256_reg :: list else list *)
 
 let add_hard_vec512_regs list ~f =
   if Arch.Extension.enabled_vec512 ()
@@ -122,7 +122,7 @@ let add_hard_vec512_regs list ~f =
 
 let all_phys_regs =
   [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg]
-  |> add_hard_vec256_regs ~f:(fun regs -> regs)
+  (*= |> add_hard_vec256_regs ~f:(fun regs -> regs) *)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> Array.concat
 
@@ -139,7 +139,7 @@ let phys_reg ty n =
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
-  | Vec256 -> hard_vec256_reg.(n - 100)
+  (*= | Vec256 -> hard_vec256_reg.(n - 100) *)
   | Vec512 -> hard_vec512_reg.(n - 100)
 
 let rax = phys_reg Int 0
@@ -154,7 +154,7 @@ let rbp = phys_reg Int 12
 let destroy_xmm =
   let types =
     ([ Float; Float32; Vec128 ] : machtype_component list)
-    |> add_hard_vec256_regs ~f:(fun _ : machtype_component -> Vec256)
+    (*= |> add_hard_vec256_regs ~f:(fun _ : machtype_component -> Vec256) *)
     |> add_hard_vec512_regs ~f:(fun _ : machtype_component -> Vec512)
     |> Array.of_list
   in
@@ -224,7 +224,7 @@ let calling_conventions
         loc.(i) <- stack_slot (make_stack !ofs) Vec128;
         ofs := !ofs + size_vec128
       end
-    | Vec256 ->
+    (*= | Vec256 ->
       if !float <= last_float then begin
         loc.(i) <- phys_reg Vec256 !float;
         incr float
@@ -233,7 +233,7 @@ let calling_conventions
         ofs := align !ofs size_vec256;
         loc.(i) <- stack_slot (make_stack !ofs) Vec256;
         ofs := !ofs + size_vec256
-      end
+      end *)
     | Vec512 ->
       if !float <= last_float then begin
         loc.(i) <- phys_reg Vec512 !float;
@@ -405,7 +405,7 @@ let win64_loc_external_arguments arg =
           (* float32 slots still take up a full word *)
           ofs := !ofs + size_float
         end
-    | Vec128 | Vec256 | Vec512 ->
+    | Vec128  | Vec512 ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)
         Misc.fatal_error "SIMD external arguments are not supported on Win64"
     | Valx2 ->
@@ -441,7 +441,7 @@ let destroyed_at_c_call_win64 =
     Array.sub hard_float_reg 0 6;
     Array.sub hard_float32_reg 0 6;
     Array.sub hard_vec128_reg 0 6 ]
-  |> add_hard_vec256_regs ~f:(fun regs -> Array.sub regs 0 6)
+  (*= |> add_hard_vec256_regs ~f:(fun regs -> Array.sub regs 0 6) *)
   |> add_hard_vec512_regs ~f:(fun regs -> Array.sub regs 0 6)
   |> Array.concat
 
@@ -451,7 +451,7 @@ let destroyed_at_c_call_unix =
     hard_float_reg;
     hard_float32_reg;
     hard_vec128_reg ]
-  |> add_hard_vec256_regs ~f:(fun regs -> regs)
+  (*= |> add_hard_vec256_regs ~f:(fun regs -> regs) *)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> Array.concat
 
@@ -503,13 +503,13 @@ let destroyed_at_single_float64_store =
 ;;
 
 let all_256bit_regs = []
-  |> add_hard_vec256_regs ~f:(fun regs -> regs)
+  (*= |> add_hard_vec256_regs ~f:(fun regs -> regs) *)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> Array.concat
 
 let all_simd_regs =
   [hard_float32_reg; hard_float_reg; hard_vec128_reg]
-  |> add_hard_vec256_regs ~f:(fun regs -> regs)
+  (*= |> add_hard_vec256_regs ~f:(fun regs -> regs) *)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> Array.concat
 

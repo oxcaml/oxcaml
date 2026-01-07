@@ -112,7 +112,7 @@ let int_reg_name : X86_ast.reg64 array =
 
 let xmm_reg_name = Array.init 16 (fun i -> X86_ast.XMM i)
 
-let ymm_reg_name = Array.init 16 (fun i -> X86_ast.YMM i)
+(*= let ymm_reg_name = Array.init 16 (fun i -> X86_ast.YMM i) *)
 
 let zmm_reg_name = Array.init 16 (fun i -> X86_ast.ZMM i)
 
@@ -120,9 +120,9 @@ let register_name typ r : X86_ast.arg =
   match (typ : Cmm.machtype_component) with
   | Int | Val | Addr -> Reg64 int_reg_name.(r)
   | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
-  | Vec256 ->
+  (*= | Vec256 ->
     I.require_vec256 ();
-    Regf ymm_reg_name.(r - 100)
+    Regf ymm_reg_name.(r - 100) *)
   | Vec512 ->
     I.require_vec512 ();
     Regf zmm_reg_name.(r - 100)
@@ -372,9 +372,9 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
   function
   | Float -> REAL8
   | Vec128 -> VEC128
-  | Vec256 ->
+  (*= | Vec256 ->
     I.require_vec256 ();
-    VEC256
+    VEC256 *)
   | Vec512 ->
     I.require_vec512 ();
     VEC512
@@ -474,7 +474,7 @@ let must_save_simd_regs live =
       then ()
       else
         match r.typ with
-        | Vec256 -> v256 := true
+        (*= | Vec256 -> v256 := true *)
         | Vec512 -> v512 := true
         | Val | Addr | Int | Float | Vec128 | Float32 | Valx2 -> ())
     live;
@@ -515,7 +515,7 @@ let record_frame_label live dbg =
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
       | { typ = Val | Valx2; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512; _ } -> ())
+      | { typ = Int | Float | Float32 | Vec128  | Vec512; _ } -> ())
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of Linear labels. *)
@@ -1027,7 +1027,7 @@ let movpd ~unaligned src dst =
   | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
 let move (src : Reg.t) (dst : Reg.t) =
-  let open Simd_instrs in
+  (*= let open Simd_instrs in *)
   let distinct = not (Reg.same_loc src dst) in
   match src.typ, src.loc, dst.typ, dst.loc with
   | _, Stack _, _, Stack _ ->
@@ -1039,12 +1039,12 @@ let move (src : Reg.t) (dst : Reg.t) =
     (* Vec128 stack slots are aligned, domainstate slots are not. *)
     let unaligned = Reg.is_domainstate src || Reg.is_domainstate dst in
     if distinct then movpd ~unaligned (reg src) (reg dst)
-  | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
+  (*= | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct then I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
   | Vec256, Stack _, Vec256, Reg _ ->
     (* CR-soon mslater: align vec256/512 stack slots *)
-    if distinct then I.simd vmovupd_Y_Ym256 [| reg src; reg dst |]
+    if distinct then I.simd vmovupd_Y_Ym256 [| reg src; reg dst |] *)
   | Vec512, _, Vec512, _ ->
     (* CR-soon mslater: avx512 *)
     Misc.fatal_error "avx512 instructions not yet implemented"
@@ -1060,7 +1060,7 @@ let move (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Int | Val | Addr | Valx2),
+  | ( (Float | Float32 | Vec128  | Vec512 | Int | Val | Addr | Valx2),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -1077,7 +1077,7 @@ let stack_to_stack_move (src : Reg.t) (dst : Reg.t) =
       (* Not calling move because r15 is not in int_reg_name. *)
       I.mov (reg src) r15;
       I.mov r15 (reg dst)
-    | Float | Addr | Vec128 | Vec256 | Vec512 | Valx2 | Float32 ->
+    | Float | Addr | Vec128  | Vec512 | Valx2 | Float32 ->
       Misc.fatal_errorf
         "Unexpected register type for stack to stack move: from %a to %a\n"
         Printreg.reg src Printreg.reg dst
@@ -2761,7 +2761,7 @@ let size_of_regs regs =
         (* Float32 slots still take up a full word *)
         acc + size_float
       | Vec128 | Valx2 -> acc + size_vec128
-      | Vec256 -> acc + size_vec256
+      (*= | Vec256 -> acc + size_vec256 *)
       | Vec512 -> acc + size_vec512)
     regs 0
 
@@ -2778,7 +2778,7 @@ let stack_locations ~offset regs =
             (* Float32 slots still take up a full word *)
             size_float
           | Vec128 | Valx2 -> size_vec128
-          | Vec256 -> size_vec256
+          (*= | Vec256 -> size_vec256 *)
           | Vec512 -> size_vec512
         in
         next, make_stack_loc n r ~offset :: offsets)
@@ -2870,7 +2870,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
         | Stack (Outgoing k) -> (
           match r.typ with
           | Val -> k :: acc
-          | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> acc
+          | Int | Float | Vec128  | Vec512 | Float32 -> acc
           | Valx2 -> k :: (k + Arch.size_addr) :: acc
           | Addr -> Misc.fatal_errorf "bad GC root %a" Printreg.reg r)
         | Stack (Incoming _ | Reg.Local _ | Domainstate _) | Reg _ | Unknown ->

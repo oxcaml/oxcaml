@@ -649,7 +649,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               (* SIMD memory operations are unaligned by default. Aligned
                  bigarray operations are handled separately via cmm. *)
               | Vec128 -> Onetwentyeight_unaligned
-              | Vec256 -> Twofiftysix_unaligned
+              (*= | Vec256 -> Twofiftysix_unaligned *)
               | Vec512 -> Fivetwelve_unaligned
               | Val | Addr | Int -> Word_val
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
@@ -1177,7 +1177,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             match reg.Reg.typ with
             | Addr -> assert false
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
+            | Val | Int | Float | Vec128  | Vec512 | Float32 -> ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;
         SU.insert_moves env sub_cfg tmp_regs (Array.concat handler.regs);

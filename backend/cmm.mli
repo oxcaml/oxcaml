@@ -23,7 +23,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Int
   | Float
   | Vec128
-  | Vec256
+  (*_ | Vec256 *)
   | Vec512
   | Float32
   | Valx2

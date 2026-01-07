@@ -164,7 +164,7 @@ module Type = struct
          handle derived pointers for us. *)
     | Float -> double
     | Float32 -> float
-    | Vec128 | Vec256 | Vec512 | Valx2 ->
+    | Vec128 | Vec512 | Valx2 ->
       fail_msg ~name:"Type.of_machtype_component" "not_implemented"
 
   let of_reg (reg : Reg.t) = of_machtype_component reg.typ

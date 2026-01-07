@@ -275,9 +275,7 @@ let size_component : machtype_component -> int = function
   | Valx2 ->
     assert (Int.equal (Arch.size_addr * 2) Arch.size_vec128);
     Arch.size_vec128
-  | Vec256 ->
-    assert (Int.equal (Arch.size_addr * 4) Arch.size_vec256);
-    Arch.size_vec256
+
   | Vec512 ->
     assert (Int.equal (Arch.size_addr * 8) Arch.size_vec512);
     Arch.size_vec512

@@ -2011,7 +2011,7 @@ module Extended_machtype_component = struct
     | Int -> Any_int
     | Float -> Float
     | Vec128 -> Vec128
-    | Vec256 -> Vec256
+    (*= | Vec256 -> Vec256 *)
     | Vec512 -> Vec512
     | Float32 -> Float32
     | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
@@ -2023,7 +2023,7 @@ module Extended_machtype_component = struct
     | Val_and_int | Any_int -> Int
     | Float -> Float
     | Vec128 -> Vec128
-    | Vec256 -> Vec256
+    | Vec256 -> assert false
     | Vec512 -> Vec512
     | Float32 -> Float32
 
@@ -2035,7 +2035,7 @@ module Extended_machtype_component = struct
     | Any_int -> Int
     | Float -> Float
     | Vec128 -> Vec128
-    | Vec256 -> Vec256
+    | Vec256 -> assert false
     | Vec512 -> Vec512
     | Float32 -> Float32
 end
@@ -2055,7 +2055,7 @@ module Extended_machtype = struct
 
   let typ_vec128 = [| Extended_machtype_component.Vec128 |]
 
-  let typ_vec256 = [| Extended_machtype_component.Vec256 |]
+  let typ_vec256 = [| Extended_machtype_component.Vec128;Extended_machtype_component.Vec128 |]
 
   let typ_vec512 = [| Extended_machtype_component.Vec512 |]
 
@@ -2102,7 +2102,7 @@ let machtype_identifier t =
     | Int -> 'I'
     | Float -> 'F'
     | Vec128 -> 'X'
-    | Vec256 -> 'Y'
+    (*= | Vec256 -> 'Y' *)
     | Vec512 -> 'Z'
     | Float32 -> 'S'
     | Addr ->
@@ -3610,7 +3610,7 @@ let machtype_stored_size t =
         (* Float32 slots still take up a full word *)
         cur + 1
       | Vec128 -> cur + ints_per_vec128
-      | Vec256 -> cur + ints_per_vec256
+      (*= | Vec256 -> cur + ints_per_vec256 *)
       | Vec512 -> cur + ints_per_vec512)
     0 t
 
@@ -3627,7 +3627,7 @@ let machtype_non_scanned_size t =
         (* Float32 slots still take up a full word *)
         cur + 1
       | Vec128 -> cur + ints_per_vec128
-      | Vec256 -> cur + ints_per_vec256
+      (*= | Vec256 -> cur + ints_per_vec256 *)
       | Vec512 -> cur + ints_per_vec512)
     0 t
 
@@ -3641,7 +3641,7 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 -> true
+        | Int | Float | Float32 | Vec128  | Vec512 -> true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> assert false)
@@ -3670,9 +3670,9 @@ let read_from_closure_given_machtype t clos base_offset dbg =
         | Vec128 ->
           ( (non_scanned_pos + ints_per_vec128, scanned_pos),
             load Onetwentyeight_unaligned non_scanned_pos )
-        | Vec256 ->
+        (*= | Vec256 ->
           ( (non_scanned_pos + ints_per_vec256, scanned_pos),
-            load Twofiftysix_unaligned non_scanned_pos )
+            load Twofiftysix_unaligned non_scanned_pos ) *)
         | Vec512 ->
           ( (non_scanned_pos + ints_per_vec512, scanned_pos),
             load Fivetwelve_unaligned non_scanned_pos )

@@ -128,9 +128,9 @@ let vectorizable_machtypes (r1 : Reg.t) (r2 : Reg.t) =
        [Addr], we could generalize [machtype], but for simplicity do not
        vectorize [Addr]. *)
     false
-  | ( (Vec128 | Vec256 | Vec512 | Valx2),
-      (Val | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2) )
-  | (Val | Int | Float | Float32), (Vec128 | Vec256 | Vec512 | Valx2) ->
+  | ( (Vec128  | Vec512 | Valx2),
+      (Val | Int | Float | Float32 | Vec128  | Vec512 | Valx2) )
+  | (Val | Int | Float | Float32), (Vec128  | Vec512 | Valx2) ->
     Misc.fatal_errorf "Unexpected vector machtype: %a %a" Printreg.reg r1
       Printreg.reg r2
   | Val, Val -> true
@@ -160,5 +160,5 @@ let vectorize_machtypes (pack : Reg.t list) : Cmm.machtype_component =
     | Val, 2 -> Valx2
     | (Val | Float | Float32), n ->
       Misc.fatal_errorf "Unexpected pack size %d for %a" n Printreg.reglist pack
-    | Vec128, _ | Vec256, _ | Vec512, _ | Valx2, _ ->
+    | Vec128, _  | Vec512, _ | Valx2, _ ->
       Misc.fatal_errorf "Unexpected machtype for %a" Printreg.reg hd)

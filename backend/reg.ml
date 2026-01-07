@@ -308,7 +308,7 @@ let compare_loc_fatal_on_unknown ~fatal_message left right =
     | Unknown -> Misc.fatal_error fatal_message
     | Reg _ | Stack _ -> compare_loc left right
 
-let hash_stack_loc = function 
+let hash_stack_loc = function
   | Local x -> 400 + x
   | Incoming x -> 200 + x
   | Outgoing x -> 300 + x
@@ -322,7 +322,7 @@ let hash_loc = function
 let is_of_type_addr t =
   match t.typ with
   | Addr -> true
-  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+  | Val | Int | Float | Vec128 | Vec512 | Float32 | Valx2 -> false
 
 module UsingLocEquality = struct
   module RegOrder = struct

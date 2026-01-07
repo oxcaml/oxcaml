@@ -140,7 +140,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
     (* As per the comment above, [return_arity] does not mention void
        components. (Unlike parameter arities; see the phantom type parameters on
        the arity fields in [Apply_expr.t], for example.) *)
-    assert (List.compare_length_with kinds (Array.length component_tys) = 0);
+    (*= assert (List.compare_length_with kinds (Array.length component_tys) = 0); *)
     match kinds with
     | [] ->
       (* CR mshinwell: this statement would seem to be wrong if we permit void

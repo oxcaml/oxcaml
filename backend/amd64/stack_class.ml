@@ -60,7 +60,7 @@ module T = struct
     | Val | Int | Addr -> Int64
     | Float | Float32 -> Float64
     | Vec128 | Valx2 -> Vector128
-    | Vec256 -> Vector256
+
     | Vec512 -> Vector512
 end
 
