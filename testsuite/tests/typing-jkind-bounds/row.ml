@@ -93,7 +93,6 @@ module type S =
 (* Since the jkind of [ `A of 'a ] has best quality, we can substitute with another type *)
 type 'a simple : immutable_data with 'a
 module type S2 = S with type 'a abstract = 'a simple
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type 'a simple : immutable_data with 'a
 module type S2 =
