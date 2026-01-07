@@ -265,6 +265,19 @@ end
 val print_items: (Env.t -> signature_item -> 'a option) ->
   Env.t -> signature_item list -> (out_sig_item * 'a option) list
 
+(* for [Translquote] *)
+type typobject_repr = { fields : (string * type_expr) list; open_row : bool }
+type typvariant_repr = {
+  fields : (string * bool * type_expr list) list;
+  name : (Path.t * type_expr list) option;
+  closed : bool;
+  present : (string * row_field) list;
+  all_present : bool;
+  tags : string list option
+}
+val tree_of_typobject_repr : type_expr -> typobject_repr
+val tree_of_typvariant_repr : row_desc -> typvariant_repr
+
 (* Simple heuristic to rewrite Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
 val rewrite_double_underscore_paths: Env.t -> Path.t -> Path.t
