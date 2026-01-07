@@ -129,7 +129,7 @@ let successor_labels_normal ti =
   | Tailcall_self { destination } -> Label.Set.singleton destination
   | Switch labels -> Array.to_seq labels |> Label.Set.of_seq
   | Return | Raise _ | Tailcall_func _ -> Label.Set.empty
-  | Call_no_return _ -> Label.Set.empty
+  | Call_no_return _ | Invalid _ -> Label.Set.empty
   | Never -> Label.Set.empty
   | Always l -> Label.Set.singleton l
   | Parity_test { ifso; ifnot } | Truth_test { ifso; ifnot } ->
@@ -189,7 +189,7 @@ let replace_successor_labels t ~normal ~exn block ~f =
         Tailcall_self { destination = f destination }
       | Tailcall_func (Indirect _)
       | Tailcall_func (Direct _)
-      | Return | Raise _ | Call_no_return _ ->
+      | Return | Raise _ | Call_no_return _ | Invalid _ ->
         block.terminator.desc
       | Call { op; label_after } -> Call { op; label_after = f label_after }
       | Prim { op; label_after } -> Prim { op; label_after = f label_after }
@@ -402,6 +402,8 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
       | Probe { name; handler_code_sym; enabled_at_init } ->
         Linear.Lprobe { name; handler_code_sym; enabled_at_init });
     Format.fprintf ppf "%sgoto %a" sep Label.format label_after
+  | Invalid { message; symbol = _; _ } ->
+    fprintf ppf "Invalid %S" message
 
 let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator
 
@@ -437,10 +439,8 @@ let print_instruction ppf i = print_instruction' ppf i
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Call_no_return { func_symbol; _ } ->
-    not (String.equal func_symbol Cmm.caml_flambda2_invalid)
   | Raise _ | Tailcall_func _ | Call _ | Prim { op = Probe _; label_after = _ }
-    ->
+  | Call_no_return _ ->
     true
   | Prim { op = External { alloc; effects; _ }; label_after = _ } -> (
     if not alloc
@@ -452,7 +452,7 @@ let can_raise_terminator (i : terminator) =
       | No_effects -> false
       | Arbitrary_effects -> true)
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Return | Tailcall_self _ ->
+  | Switch _ | Return | Tailcall_self _ | Invalid _ ->
     false
 
 (* CR gyorsh: [is_pure_terminator] is not the same as [can_raise_terminator]
@@ -462,8 +462,8 @@ let can_raise_terminator (i : terminator) =
    taking into account [effects] on extcalls *)
 let is_pure_terminator desc =
   match (desc : terminator) with
-  | Return | Raise _ | Call_no_return _ | Tailcall_func _ | Tailcall_self _
-  | Call _ | Prim _ ->
+  | Return | Raise _ | Call_no_return _ | Invalid _ | Tailcall_func _
+  | Tailcall_self _ | Call _ | Prim _ ->
     false
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
@@ -475,7 +475,7 @@ let is_never_terminator desc =
   | Never -> true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ ->
+  | Call_no_return _ | Invalid _ | Call _ | Prim _ ->
     false
 
 let is_return_terminator desc =
@@ -483,7 +483,7 @@ let is_return_terminator desc =
   | Return -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ ->
+  | Invalid _ | Call _ | Prim _ ->
     false
 
 let is_pure_basic : basic -> bool = function
@@ -667,10 +667,10 @@ let basic_block_contains_calls block =
         (* PR#6239 *)
         (* caml_stash_backtrace; we #mark_call rather than #mark_c_tailcall to
             get a good stack backtrace *)
-        true)
+         true)
     | Tailcall_self _ -> false
     | Tailcall_func _ -> false
-    | Call_no_return _ -> true
+    | Call_no_return _ | Invalid _ -> true
     | Call _ -> true
     | Prim { op = External _; _ } -> true
     | Prim { op = Probe _; _ } -> true)
@@ -727,7 +727,7 @@ let remove_trap_instructions t removed_trap_handlers =
     | Tailcall_self _ -> assert (Int.equal stack_offset 0)
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ ->
+    | Call_no_return _ | Invalid _ | Call _ | Prim _ ->
       ());
     update_instruction terminator ~stack_offset
   and update_block label ~stack_offset =

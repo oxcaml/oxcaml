@@ -102,7 +102,8 @@ let extract_constant args name ~max =
       | Cifthenelse (_, _, _, _, _, _)
       | Cswitch (_, _, _, _)
       | Ccatch (_, _, _)
-      | Cexit (_, _, _) ))
+      | Cexit (_, _, _)
+      | Cinvalid _ ))
     :: _ ->
     bad_immediate "Did not get integer immediate for %s" name
 

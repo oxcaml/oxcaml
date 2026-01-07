@@ -349,6 +349,9 @@ module Cmm_comparator = struct
       equal_exit_label lbl1 lbl2
       && List.equal equivalent args1 args2
       && List.equal equal_trap_action traps1 traps2
+    | ( Cinvalid { message = m1; symbol = s1 },
+        Cinvalid { message = m2; symbol = s2 } ) ->
+      String.equal m1 m2 && equal_symbol s1 s2
     | ( ( Cconst_int (_, _)
         | Cconst_natint (_, _)
         | Cconst_float32 (_, _)
@@ -366,7 +369,8 @@ module Cmm_comparator = struct
         | Cifthenelse (_, _, _, _, _, _)
         | Cswitch (_, _, _, _)
         | Ccatch (_, _, _)
-        | Cexit (_, _, _) ),
+        | Cexit (_, _, _)
+        | Cinvalid _ ),
         _ ) ->
       false
 end

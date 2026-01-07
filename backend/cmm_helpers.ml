@@ -477,7 +477,7 @@ let rec map_tail1 e ~f =
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _ | Ccatch _ | Cswitch _
-    ->
+  | Cinvalid _ ->
     f e
 
 let map_tail2 x y ~f = map_tail1 y ~f:(fun y -> map_tail1 x ~f:(fun x -> f x y))
@@ -4464,7 +4464,7 @@ let letin v ~defining_expr ~body =
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
   | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ ->
+  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -4821,7 +4821,7 @@ let cmm_arith_size (e : Cmm.expression) =
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
   | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _
-  | Ccatch _ | Cexit _ ->
+  | Ccatch _ | Cexit _ | Cinvalid _ ->
     None
 
 (* Atomics *)

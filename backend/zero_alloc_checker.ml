@@ -2737,6 +2737,9 @@ end = struct
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
+        | Invalid _ ->
+          (* Invalid terminators never return, so sound to return bot *)
+          Value.bot
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
         Ok (terminator next ~exn i t)
@@ -2807,6 +2810,24 @@ let update_caml_flambda_invalid_cfg cfg_with_layout =
             block.exn <- None;
             block.can_raise <- false;
             (* update predecessors for successors of [block]. *)
+            Label.Set.iter
+              (fun successor_label ->
+                let successor_block = Cfg.get_block_exn cfg successor_label in
+                successor_block.predecessors
+                  <- Label.Set.remove label successor_block.predecessors)
+              successors;
+            modified := true)
+        | Invalid _ ->
+          (* Invalid terminators already have the correct properties (no
+             successors, cannot raise), but we still need to clean up any
+             exn handlers and update predecessors if needed. *)
+          let successors =
+            Cfg.successor_labels ~normal:true ~exn:true block
+          in
+          if Option.is_some block.exn || not (Label.Set.is_empty successors)
+          then (
+            block.exn <- None;
+            block.can_raise <- false;
             Label.Set.iter
               (fun successor_label ->
                 let successor_block = Cfg.get_block_exn cfg successor_label in

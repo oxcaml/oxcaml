@@ -77,7 +77,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
       | Cdls_get | Ctls_get ->
         List.for_all is_simple_expr args)
-    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ -> false
+    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> false
 
   and is_simple_expr expr =
     match Target.is_simple_expr expr with
@@ -134,7 +134,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
-    | Cswitch _ | Ccatch _ | Cexit _ -> EC.arbitrary
+    | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> EC.arbitrary
 
   and effects_of (expr : Cmm.expression) =
     match Target.effects_of expr with
@@ -804,6 +804,50 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccatch (rec_flag, handlers, body) ->
       emit_expr_catch env sub_cfg bound_name rec_flag handlers body
     | Cexit (lbl, args, traps) -> emit_expr_exit env sub_cfg lbl args traps
+    | Cinvalid { message; symbol } ->
+      (* Set up the argument for the call to caml_flambda2_invalid *)
+      let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
+      let loc_arg, stack_ofs, stack_align =
+        match emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
+        with
+        | Or_never_returns.Ok result -> result
+        | Or_never_returns.Never_returns ->
+          (* This shouldn't happen for a constant symbol *)
+          assert false
+      in
+      let keep_for_checking = !SU.current_function_is_check_enabled in
+      if keep_for_checking
+      then (
+        (* When zero-alloc checking is enabled, emit as Prim External so the
+           checker can see the invalid block *)
+        let label = Cmm.new_label () in
+        let ext : Cfg.external_call_operation =
+          { func_symbol = Cmm.caml_flambda2_invalid;
+            alloc = false;
+            ty_args = [Cmm.XInt];
+            ty_res = Cmm.typ_int;
+            stack_ofs;
+            stack_align;
+            effects = Arbitrary_effects
+          }
+        in
+        let rd = Reg.createv Cmm.typ_int in
+        let (_ : Reg.t array) =
+          SU.insert_op_debug' env sub_cfg
+            (Cfg.Prim { op = External ext; label_after = label })
+            Debuginfo.none loc_arg (Proc.loc_external_results (Reg.typv rd))
+        in
+        SU.set_traps_for_raise env;
+        Sub_cfg.add_never_block sub_cfg ~label;
+        Ok rd)
+      else (
+        let (_ : Reg.t array) =
+          SU.insert_op_debug' env sub_cfg
+            (Cfg.Invalid { message; symbol; stack_ofs; stack_align })
+            Debuginfo.none loc_arg [||]
+        in
+        SU.set_traps_for_raise env;
+        Never_returns)
 
   (* Emit an expression in tail position of a function. *)
   and emit_tail env sub_cfg (exp : Cmm.expression) =
@@ -827,6 +871,48 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccatch (_, [], e1) -> emit_tail env sub_cfg e1
     | Ccatch (rec_flag, handlers, e1) ->
       emit_tail_catch env sub_cfg rec_flag handlers e1
+    | Cinvalid { message; symbol } ->
+      (* Set up the argument for the call to caml_flambda2_invalid *)
+      let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
+      let loc_arg, stack_ofs, stack_align =
+        match emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
+        with
+        | Or_never_returns.Ok result -> result
+        | Or_never_returns.Never_returns ->
+          (* This shouldn't happen for a constant symbol *)
+          assert false
+      in
+      let keep_for_checking = !SU.current_function_is_check_enabled in
+      if keep_for_checking
+      then (
+        (* When zero-alloc checking is enabled, emit as Prim External so the
+           checker can see the invalid block *)
+        let label = Cmm.new_label () in
+        let ext : Cfg.external_call_operation =
+          { func_symbol = Cmm.caml_flambda2_invalid;
+            alloc = false;
+            ty_args = [Cmm.XInt];
+            ty_res = Cmm.typ_int;
+            stack_ofs;
+            stack_align;
+            effects = Arbitrary_effects
+          }
+        in
+        let rd = Reg.createv Cmm.typ_int in
+        let (_ : Reg.t array) =
+          SU.insert_op_debug' env sub_cfg
+            (Cfg.Prim { op = External ext; label_after = label })
+            Debuginfo.none loc_arg (Proc.loc_external_results (Reg.typv rd))
+        in
+        SU.set_traps_for_raise env;
+        Sub_cfg.add_never_block sub_cfg ~label)
+      else (
+        let (_ : Reg.t array) =
+          SU.insert_op_debug' env sub_cfg
+            (Cfg.Invalid { message; symbol; stack_ofs; stack_align })
+            Debuginfo.none loc_arg [||]
+        in
+        SU.set_traps_for_raise env)
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cvar _ | Ctuple _ | Cexit _ ->

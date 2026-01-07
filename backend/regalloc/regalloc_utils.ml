@@ -441,7 +441,7 @@ module SpillCosts = struct
         | Prim { op = External _; _ }
         | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
         | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-        | Tailcall_func _ | Call_no_return _ | Call _ ->
+        | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ ->
           update_instr cost block.terminator);
     costs
 end

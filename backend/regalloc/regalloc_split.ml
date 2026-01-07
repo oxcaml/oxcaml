@@ -414,7 +414,8 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
             (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
           in
           match predecessor_block.terminator.desc with
-          | Return | Raise _ | Tailcall_func _ | Call_no_return _ | Never ->
+          | Return | Raise _ | Tailcall_func _ | Call_no_return _ | Invalid _
+          | Never ->
             assert false
           | Tailcall_self _ -> ()
           | Always _ ->
