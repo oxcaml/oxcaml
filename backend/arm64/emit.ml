@@ -1943,61 +1943,34 @@ let emit_instr i =
     if Reg.same_loc ifso ifnot
     then move ifso i.res.(0)
     else
+      let res_x = H.reg_x i.res.(0) in
       match tst with
       | Itruetest ->
         A.ins_cmp (H.reg_x i.arg.(0)) (O.imm 0) O.optional_none;
-        A.ins4 CSEL
-          (H.reg_x i.res.(0))
-          (H.reg_x i.arg.(1))
-          (H.reg_x i.arg.(2))
-          (O.cond NE)
+        A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond NE)
       | Ifalsetest ->
         A.ins_cmp (H.reg_x i.arg.(0)) (O.imm 0) O.optional_none;
-        A.ins4 CSEL
-          (H.reg_x i.res.(0))
-          (H.reg_x i.arg.(1))
-          (H.reg_x i.arg.(2))
-          (O.cond EQ)
+        A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond EQ)
       | Iinttest cmp ->
         let cond = cond_for_comparison cmp in
         A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
-        A.ins4 CSEL
-          (H.reg_x i.res.(0))
-          (H.reg_x i.arg.(2))
-          (H.reg_x i.arg.(3))
-          (O.cond cond)
+        A.ins4 CSEL res_x (H.reg_x i.arg.(2)) (H.reg_x i.arg.(3)) (O.cond cond)
       | Iinttest_imm (cmp, n) ->
         let cond = cond_for_comparison cmp in
         emit_cmpimm (H.reg_x i.arg.(0)) n;
-        A.ins4 CSEL
-          (H.reg_x i.res.(0))
-          (H.reg_x i.arg.(1))
-          (H.reg_x i.arg.(2))
-          (O.cond cond)
+        A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond cond)
       | Ifloattest ((Float32 | Float64), cmp) ->
         let cond = cond_for_float_comparison cmp |> Cond.of_float_cond in
         (match H.reg_fp_operand_3 i.arg.(0) i.arg.(1) i.arg.(1) with
         | S_regs (rn, rm, _) -> A.ins2 FCMP rn rm
         | D_regs (rn, rm, _) -> A.ins2 FCMP rn rm);
-        A.ins4 CSEL
-          (H.reg_x i.res.(0))
-          (H.reg_x i.arg.(2))
-          (H.reg_x i.arg.(3))
-          (O.cond cond)
+        A.ins4 CSEL res_x (H.reg_x i.arg.(2)) (H.reg_x i.arg.(3)) (O.cond cond)
       | Ioddtest ->
         A.ins2 TST (H.reg_x i.arg.(0)) (O.bitmask 1n);
-        A.ins4 CSEL
-          (H.reg_x i.res.(0))
-          (H.reg_x i.arg.(1))
-          (H.reg_x i.arg.(2))
-          (O.cond NE)
+        A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond NE)
       | Ieventest ->
         A.ins2 TST (H.reg_x i.arg.(0)) (O.bitmask 1n);
-        A.ins4 CSEL
-          (H.reg_x i.res.(0))
-          (H.reg_x i.arg.(1))
-          (H.reg_x i.arg.(2))
-          (O.cond EQ))
+        A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond EQ))
   | Lreloadretaddr -> ()
   | Lreturn -> A.ins0 RET
   | Llabel { label = lbl; _ } ->
