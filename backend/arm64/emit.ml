@@ -993,8 +993,9 @@ module BR = Branch_relaxation.Make (struct
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Const_symbol _) -> 2
     | Lop (Intop_atomic _) ->
-      (* Never generated; builtins are not yet translated to atomics *)
-      assert false
+      Misc.fatal_errorf
+        "emit_instr: builtins are not yet translated to atomics: %a"
+        Printlinear.instr instr
     | Lcall_op Lcall_ind -> 1
     | Lcall_op (Lcall_imm _) -> 1
     | Lcall_op Ltailcall_ind -> epilogue_size ()
@@ -1490,8 +1491,9 @@ let emit_instr i =
     let n = frame_size () in
     if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Intop_atomic _) ->
-    (* Never generated; builtins are not yet translated to atomics *)
-    assert false
+    Misc.fatal_errorf
+      "emit_instr: builtins are not yet translated to atomics: %a"
+      Printlinear.instr i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
