@@ -4219,7 +4219,8 @@ module Modality = struct
 
     let to_const_opt = function
       | Const c -> Some c
-      | Undefined -> assert false
+      | Undefined ->
+        Misc.fatal_error "modality Undefined should not be looked at"
       | Diff _ -> None
 
     let of_const c = Const c
@@ -4390,7 +4391,8 @@ module Modality = struct
 
     let to_const_opt = function
       | Const c -> Some c
-      | Undefined -> assert false
+      | Undefined ->
+        Misc.fatal_error "modality Undefined should not be looked at"
       | Exactly _ -> None
 
     let of_const c = Const c
