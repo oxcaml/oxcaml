@@ -1339,51 +1339,51 @@ let emit_load_literal dst lbl =
     Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
       Printreg.reg dst
 
-let move (src : Reg.t) (dst : Reg.t) =
+let move_between_distinct_locs (src : Reg.t) (dst : Reg.t) =
+  match src.typ, src.loc, dst.typ, dst.loc with
+  | Float, Reg _, Float, Reg _ -> A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d src)
+  | Float32, Reg _, Float32, Reg _ -> A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
+  | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Reg _ ->
+    A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
+  | (Vec256 | Vec512), _, _, _ | _, _, (Vec256 | Vec512), _ ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
+  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
+    A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
+  | Float, Reg _, Float, Stack _ ->
+    A.ins2 STR_simd_and_fp (H.reg_d src) (stack dst)
+  | Float32, Reg _, Float32, Stack _ ->
+    A.ins2 STR_simd_and_fp (H.reg_s src) (stack dst)
+  | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
+    A.ins2 STR_simd_and_fp (H.reg_q_operand src) (stack dst)
+  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
+    A.ins2 STR (H.reg_x src) (stack dst)
+  | Float, Stack _, Float, Reg _ ->
+    A.ins2 LDR_simd_and_fp (H.reg_d dst) (stack src)
+  | Float32, Stack _, Float32, Reg _ ->
+    A.ins2 LDR_simd_and_fp (H.reg_s dst) (stack src)
+  | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
+    A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) (stack src)
+  | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
+    A.ins2 LDR (H.reg_x dst) (stack src)
+  | _, Stack _, _, Stack _ ->
+    Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
+      Printreg.reg src Printreg.reg dst
+  | _, Unknown, _, (Reg _ | Stack _ | Unknown)
+  | _, (Reg _ | Stack _), _, Unknown ->
+    Misc.fatal_errorf
+      "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
+      src Printreg.reg dst
+  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
+      (Reg _ | Stack _),
+      _,
+      _ ) ->
+    Misc.fatal_errorf
+      "Illegal move between registers of differing types (%a to %a)\n"
+      Printreg.reg src Printreg.reg dst
+
+let move src dst =
   let distinct = not (Reg.same_loc src dst) in
-  if distinct
-  then
-    match src.typ, src.loc, dst.typ, dst.loc with
-    | Float, Reg _, Float, Reg _ -> A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d src)
-    | Float32, Reg _, Float32, Reg _ ->
-      A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
-    | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Reg _ ->
-      A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
-    | (Vec256 | Vec512), _, _, _ | _, _, (Vec256 | Vec512), _ ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-    | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
-      A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
-    | Float, Reg _, Float, Stack _ ->
-      A.ins2 STR_simd_and_fp (H.reg_d src) (stack dst)
-    | Float32, Reg _, Float32, Stack _ ->
-      A.ins2 STR_simd_and_fp (H.reg_s src) (stack dst)
-    | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
-      A.ins2 STR_simd_and_fp (H.reg_q_operand src) (stack dst)
-    | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
-      A.ins2 STR (H.reg_x src) (stack dst)
-    | Float, Stack _, Float, Reg _ ->
-      A.ins2 LDR_simd_and_fp (H.reg_d dst) (stack src)
-    | Float32, Stack _, Float32, Reg _ ->
-      A.ins2 LDR_simd_and_fp (H.reg_s dst) (stack src)
-    | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
-      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) (stack src)
-    | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
-      A.ins2 LDR (H.reg_x dst) (stack src)
-    | _, Stack _, _, Stack _ ->
-      Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
-        Printreg.reg src Printreg.reg dst
-    | _, Unknown, _, (Reg _ | Stack _ | Unknown)
-    | _, (Reg _ | Stack _), _, Unknown ->
-      Misc.fatal_errorf
-        "Illegal move with an unknown register location (%a to %a)\n"
-        Printreg.reg src Printreg.reg dst
-    | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
-        (Reg _ | Stack _),
-        _,
-        _ ) ->
-      Misc.fatal_errorf
-        "Illegal move between registers of differing types (%a to %a)\n"
-        Printreg.reg src Printreg.reg dst
+  if distinct then move_between_distinct_locs src dst
 
 let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   let src = i.arg.(0) in
