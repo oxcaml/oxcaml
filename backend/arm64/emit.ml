@@ -2104,24 +2104,19 @@ let emit_instr i =
       A.ins3 (LDP X) reg_x_trap_ptr reg_x_tmp1
         (O.mem_post_pair ~base:R.sp ~offset:16);
       A.ins1 BR reg_x_tmp1)
-  | Lstackcheck { max_frame_size_bytes } ->
-    let overflow = L.create Text and ret = L.create Text in
+  | Lstackcheck { max_frame_size_bytes = sc_max_frame_size_in_bytes } ->
+    let sc_label = L.create Text and sc_return = L.create Text in
     let threshold_offset =
       (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
     in
-    let f = max_frame_size_bytes + threshold_offset in
+    let f = sc_max_frame_size_in_bytes + threshold_offset in
     let offset = Domainstate.(idx_of_field Domain_current_stack) * 8 in
     A.ins2 LDR reg_x_tmp1 (H.addressing (Iindexed offset) reg_domain_state_ptr);
     emit_addimm reg_x_tmp1 reg_x_tmp1 f;
     A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
-    A.ins1 (B_cond CC) (local_label overflow);
-    D.define_label ret;
-    stack_realloc
-      := Some
-           { sc_label = overflow;
-             sc_return = ret;
-             sc_max_frame_size_in_bytes = max_frame_size_bytes
-           }
+    A.ins1 (B_cond CC) (local_label sc_label);
+    D.define_label sc_return;
+    stack_realloc := Some { sc_label; sc_return; sc_max_frame_size_in_bytes }
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
