@@ -1544,15 +1544,13 @@ let emit_instr i =
       A.ins1 BL (runtime_function S.Predef.caml_c_call);
       record_frame i.live (Dbg_other i.dbg))
     else (
-      (* store ocaml stack in the frame pointer register
-
-         NB: no need to store previous x29 because OCaml frames don't maintain
-         frame pointer *)
+      (* Store OCaml stack pointer in the frame pointer register. No need to
+         store previous x29 because OCaml doesn't maintain frame pointers. *)
       if Config.runtime5
       then (
         A.ins_mov_from_sp ~dst:O.fp;
         D.cfi_remember_state ();
-        (* CR mshinwell: name this integer *)
+        (* CR mshinwell: name this integer + fix the typing *)
         D.cfi_def_cfa_register ~reg:(Int.to_string 29 (* fp *));
         let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
         A.ins2 LDR reg_x_tmp1
