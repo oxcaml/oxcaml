@@ -2031,23 +2031,18 @@ let emit_instr i =
       A.ins3 TBNZ (H.reg_x i.arg.(0)) (O.imm_six 0) (local_label lbl)
     | Ieventest ->
       A.ins3 TBZ (H.reg_x i.arg.(0)) (O.imm_six 0) (local_label lbl))
-  | Lcondbranch3 (lbl0, lbl1, lbl2) -> (
+  | Lcondbranch3 (lbl0, lbl1, lbl2) ->
+    let section = Asm_targets.Asm_section.Text in
+    let ins_cond cond lbl =
+      Option.iter
+        (fun lbl ->
+          A.ins1 (B_cond cond) (local_label (label_to_asm_label ~section lbl)))
+        lbl
+    in
     A.ins_cmp (H.reg_x i.arg.(0)) (O.imm 1) O.optional_none;
-    (match lbl0 with
-    | None -> ()
-    | Some lbl ->
-      let lbl = label_to_asm_label ~section:Text lbl in
-      A.ins1 (B_cond LT) (local_label lbl));
-    (match lbl1 with
-    | None -> ()
-    | Some lbl ->
-      let lbl = label_to_asm_label ~section:Text lbl in
-      A.ins1 (B_cond EQ) (local_label lbl));
-    match lbl2 with
-    | None -> ()
-    | Some lbl ->
-      let lbl = label_to_asm_label ~section:Text lbl in
-      A.ins1 (B_cond Cond.GT) (local_label lbl))
+    ins_cond LT lbl0;
+    ins_cond EQ lbl1;
+    ins_cond GT lbl2
   | Lswitch jumptbl ->
     let lbltbl = L.create Text in
     A.ins2 ADR reg_x_tmp1 (label Same_section_and_unit lbltbl);
