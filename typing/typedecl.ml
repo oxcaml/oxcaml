@@ -311,7 +311,7 @@ in
       type_kind = Type_abstract abstract_source;
       type_jkind;
       type_ikind = Types.ikinds_todo "transl_declaration initial unboxed";
-            type_private = sdecl.ptype_private;
+      type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
       type_separability = Types.Separability.default_signature ~arity;
@@ -330,7 +330,7 @@ in
       type_kind = Type_abstract abstract_source;
       type_jkind;
       type_ikind = Types.ikinds_todo "transl_declaration initial";
-            type_private = sdecl.ptype_private;
+      type_private = sdecl.ptype_private;
       type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
       type_separability = Types.Separability.default_signature ~arity;
@@ -1084,7 +1084,7 @@ let transl_declaration env sdecl (id, uid) =
         type_kind = kind;
         type_jkind = jkind;
         type_ikind = Types.ikinds_todo "update_decl_jkind initial";
-                type_private = sdecl.ptype_private;
+        type_private = sdecl.ptype_private;
         type_manifest = man;
         type_variance = Variance.unknown_signature ~injective:false ~arity;
         type_separability = Types.Separability.default_signature ~arity;
@@ -1261,7 +1261,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_kind = kind;
         type_jkind = jkind;
         type_ikind = Types.ikinds_todo "derive_unboxed_versions";
-                type_private = decl.type_private;
+        type_private = decl.type_private;
         type_manifest;
         type_variance =
           Variance.unknown_signature ~injective:false ~arity:decl.type_arity;
@@ -4119,7 +4119,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
                  Path.print (Path.unboxed_version path)
              in
              Types.ikinds_todo reason);
-                    type_private = priv;
+          type_private = priv;
           type_manifest = Some man;
           type_variance = [];
           type_separability = Types.Separability.default_signature ~arity;
@@ -4157,7 +4157,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
            Format.asprintf "transl_with_constraint path=%a" Path.print decl_path
          in
          Types.ikinds_todo reason);
-            type_private = priv;
+      type_private = priv;
       type_manifest = Some man;
       type_variance = [];
       type_separability = Types.Separability.default_signature ~arity;
@@ -4260,7 +4260,7 @@ let transl_package_constraint ~loc ty =
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
     type_ikind = Types.ikinds_todo "transl_package_constraint";
-        type_private = Public;
+    type_private = Public;
     type_manifest = Some ty;
     type_variance = [];
     type_separability = [];
@@ -4284,7 +4284,7 @@ let abstract_type_decl ~injective ~jkind ~params =
       type_kind = Type_abstract Definition;
       type_jkind = jkind;
       type_ikind = Types.ikinds_todo "abstract_type_decl";
-            type_private = Public;
+      type_private = Public;
       type_manifest = None;
       type_variance = Variance.unknown_signature ~injective ~arity;
       type_separability = Types.Separability.default_signature ~arity;
@@ -4301,7 +4301,7 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_kind = Type_abstract Definition;
           type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
           type_ikind = Types.ikinds_todo "abstract_type_decl unboxed";
-                    type_private = Public;
+          type_private = Public;
           type_manifest = None;
           type_variance = Variance.unknown_signature ~injective ~arity;
           type_separability = Types.Separability.default_signature ~arity;
