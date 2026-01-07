@@ -321,8 +321,8 @@ X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7) X(8) X(9) X(10) X(11) X(12) X(13) X(14) 
 DO_0_15(X) \
 X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(29) X(30) X(31)
 
-#define SAVE__REGS
-#define RESTORE__REGS
+#define SAVE_NO_REGS
+#define RESTORE_NO_REGS
 
 #define SAVE_XMM(i) movupd %xmm##i, (i*16)(%rsp);
 #define SAVE_XMM_REGS                            \
@@ -424,7 +424,7 @@ LBL(caml_call_gc##suffix): \
     CFI_ENDPROC; \
     ENDFUNCTION(G(caml_call_gc ## suffix))
 
-Make_call_gc(,)
+Make_call_gc(, NO)
 Make_call_gc(_sse, XMM)
 Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
@@ -509,7 +509,7 @@ Make_alloc_funs(N) /* caml_allocN* */
    CFI_ENDPROC; \
    ENDFUNCTION(G(caml_call_local_realloc ## suffix))
 
-Make_call_local_realloc(,)
+Make_call_local_realloc(, NO)
 Make_call_local_realloc(_sse, XMM)
 Make_call_local_realloc(_avx, YMM)
 Make_call_local_realloc(_avx512, ZMM)
