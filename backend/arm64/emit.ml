@@ -1544,9 +1544,10 @@ let emit_instr i =
       A.ins1 BL (runtime_function S.Predef.caml_c_call);
       record_frame i.live (Dbg_other i.dbg))
     else (
-      (*= store ocaml stack in the frame pointer register
-             NB: no need to store previous x29 because OCaml frames don't
-             maintain frame pointer *)
+      (* store ocaml stack in the frame pointer register
+
+         NB: no need to store previous x29 because OCaml frames don't maintain
+         frame pointer *)
       if Config.runtime5
       then (
         A.ins_mov_from_sp ~dst:O.fp;
