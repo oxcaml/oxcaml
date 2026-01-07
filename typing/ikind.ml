@@ -176,8 +176,9 @@ module Solver = struct
           (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.node_of_var var))
           params rigid_vars;
         (* Compute body kind *)
-        (* CR jujacobs: still compute the kind in Right mode to keep
-           the cache consistent. *)
+        (* CR jujacobs: potential efficiency win:
+           we could still compute the kind in Right mode to keep
+           the cache consistent, but we don't need to. *)
         let body_kind = body ctx in
         (* Decompose [body_kind] into a base and one coefficient
            per parameter. *)
