@@ -2007,30 +2007,25 @@ let emit_instr i =
     let lbl = label_to_asm_label ~section:Text lbl in
     A.ins1 B (local_label lbl)
   | Lcondbranch (tst, lbl) -> (
-    let lbl = label_to_asm_label ~section:Text lbl in
+    let lbl = label_to_asm_label ~section:Text lbl |> local_label in
     match tst with
-    | Itruetest -> A.ins2 CBNZ (H.reg_x i.arg.(0)) (local_label lbl)
-    | Ifalsetest -> A.ins2 CBZ (H.reg_x i.arg.(0)) (local_label lbl)
+    | Itruetest -> A.ins2 CBNZ (H.reg_x i.arg.(0)) lbl
+    | Ifalsetest -> A.ins2 CBZ (H.reg_x i.arg.(0)) lbl
     | Iinttest cmp ->
       A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
-      let cond = cond_for_comparison cmp in
-      A.ins1 (B_cond cond) (local_label lbl)
+      A.ins1 (B_cond (cond_for_comparison cmp)) lbl
     | Iinttest_imm (cmp, n) ->
       emit_cmpimm (H.reg_x i.arg.(0)) n;
-      let cond = cond_for_comparison cmp in
-      A.ins1 (B_cond cond) (local_label lbl)
+      A.ins1 (B_cond (cond_for_comparison cmp)) lbl
     | Ifloattest (Float64, cmp) ->
-      let cond = cond_for_float_comparison cmp in
       A.ins2 FCMP (H.reg_d i.arg.(0)) (H.reg_d i.arg.(1));
-      A.ins1 (B_cond_float cond) (local_label lbl)
+      A.ins1 (B_cond_float (cond_for_float_comparison cmp)) lbl
     | Ifloattest (Float32, cmp) ->
       let cond = cond_for_float_comparison cmp in
       A.ins2 FCMP (H.reg_s i.arg.(0)) (H.reg_s i.arg.(1));
-      A.ins1 (B_cond_float cond) (local_label lbl)
-    | Ioddtest ->
-      A.ins3 TBNZ (H.reg_x i.arg.(0)) (O.imm_six 0) (local_label lbl)
-    | Ieventest ->
-      A.ins3 TBZ (H.reg_x i.arg.(0)) (O.imm_six 0) (local_label lbl))
+      A.ins1 (B_cond_float cond) lbl
+    | Ioddtest -> A.ins3 TBNZ (H.reg_x i.arg.(0)) (O.imm_six 0) lbl
+    | Ieventest -> A.ins3 TBZ (H.reg_x i.arg.(0)) (O.imm_six 0) lbl)
   | Lcondbranch3 (lbl0, lbl1, lbl2) ->
     let section = Asm_targets.Asm_section.Text in
     let ins_cond cond lbl =
