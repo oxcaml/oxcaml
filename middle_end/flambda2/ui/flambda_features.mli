@@ -101,6 +101,8 @@ val dump_flambda : unit -> bool
 
 val dump_rawfexpr : unit -> dump_target
 
+val dump_fexpr_annot : unit -> bool
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string

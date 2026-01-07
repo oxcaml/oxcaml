@@ -54,6 +54,16 @@ let dump_if_enabled ppf enabled ~header ~f a =
 let pp_flambda_as_fexpr ppf unit =
   Print_fexpr.flambda_unit ppf (unit |> Flambda_to_fexpr.conv)
 
+let dump_fexpr_annot ~prefixname suffix unit =
+  if Flambda_features.dump_fexpr_annot ()
+  then
+    Misc.protect_output_to_file
+      (prefixname ^ "." ^ suffix ^ ".fl")
+      (fun out ->
+        let ppf = Format.formatter_of_out_channel out in
+        pp_flambda_as_fexpr ppf unit;
+        Format.pp_print_flush ppf ())
+
 let print_rawflambda ppf unit =
   dump_if_enabled ppf
     (Flambda_features.dump_rawflambda ())
@@ -182,6 +192,7 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   in
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
+  dump_fexpr_annot ~prefixname "raw" raw_flambda;
   let flambda, offsets, reachable_names, cmx, all_code =
     match mode, close_program_metadata with
     | Classic, Classic (code, reachable_names, cmx, offsets) ->
@@ -221,6 +232,7 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
         (Flambda_features.dump_fexpr (This_pass "simplify"))
         ppf flambda;
       print_flexpect "simplify" ppf ~raw_flambda flambda;
+      dump_fexpr_annot ~prefixname "simplify" flambda;
       let ( flambda,
             free_names,
             all_code,
@@ -238,6 +250,7 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
             (Flambda_features.dump_fexpr (This_pass "reaper"))
             ppf flambda;
           print_flexpect "reaper" ppf ~raw_flambda flambda;
+          dump_fexpr_annot ~prefixname "reaper" flambda;
           ( flambda,
             free_names,
             all_code,
