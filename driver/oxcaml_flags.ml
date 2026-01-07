@@ -252,6 +252,7 @@ module Flambda2 = struct
     let fexpr = ref Nowhere
     let fexpr_after = ref Last_pass
     let flexpect = ref Nowhere
+    let fexpr_annot = ref false
     let slot_offsets = ref false
     let freshen = ref false
     let flow = ref false
