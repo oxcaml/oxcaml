@@ -1580,7 +1580,8 @@ module Ast = struct
 
   and print_core_type_with_arrow env fmt ty =
     match ty with
-    | TypeArrow _ | TypePoly (_::_, _) -> pp fmt "(@[%a@])" (print_core_type env) ty
+    | TypeArrow _ | TypePoly (_::_, _) ->
+      pp fmt "(@[%a@])" (print_core_type env) ty
     | _ -> print_core_type env fmt ty
 
   and print_core_type_with_parens env fmt ty =
