@@ -727,17 +727,17 @@ let sub_jkind_l ?allow_any_crossing ?origin
     ~(context : Jkind.jkind_context) ~level (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
-  (* Check layouts first; if that fails, print both sides with full
-     info and return the error. *)
-  let* () =
-    match Jkind.sub_jkind_l_layout ~context ~level sub super with
-    | Ok () -> Ok ()
-    | Error v -> Error v
-  in
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then
     Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context ~level sub super
   else
+    (* Check layouts first; if that fails, print both sides with full
+       info and return the error. *)
+    let* () =
+      match Jkind.sub_jkind_l_layout ~context ~level sub super with
+      | Ok () -> Ok ()
+      | Error v -> Error v
+    in
     let allow_any =
       match allow_any_crossing with Some true -> true | _ -> false
     in
