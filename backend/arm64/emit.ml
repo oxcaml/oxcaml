@@ -149,12 +149,12 @@ let symbol_or_label_for_data ?offset reloc s =
   then label ?offset reloc (L.create_label_for_local_symbol Data s)
   else symbol ?offset reloc s
 
-(* Labeled instruction helpers *)
-let labeled_ins1 lbl instr op =
+(* labelled instruction helpers *)
+let labelled_ins1 lbl instr op =
   D.define_label lbl;
   A.ins1 instr op
 
-let labeled_ins4 lbl instr ops =
+let labelled_ins4 lbl instr ops =
   D.define_label lbl;
   A.ins4 instr ops
 
@@ -557,8 +557,8 @@ type gc_call =
 let call_gc_sites = ref ([] : gc_call list)
 
 let emit_call_gc gc =
-  labeled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
-  labeled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
+  labelled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
+  labelled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
 
@@ -1232,7 +1232,7 @@ let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
     A.ins1 (B_cond CS) (local_label lbl);
     A.ins1 B (local_label gc_lbl);
     D.define_label lbl);
-  labeled_ins4 gc_return_lbl ADD_immediate
+  labelled_ins4 gc_return_lbl ADD_immediate
     (H.reg_x i.res.(0))
     reg_x_alloc_ptr (O.imm 8) O.optional_none;
   call_gc_sites := { gc_lbl; gc_return_lbl; gc_frame_lbl } :: !call_gc_sites
@@ -1246,7 +1246,7 @@ let assembly_code_for_slow_heap_allocation i ~n ~dbginfo =
   | _ ->
     emit_intconst reg_x_x8 (Nativeint.of_int n);
     A.ins1 BL (runtime_function S.Predef.caml_allocN));
-  labeled_ins4 lbl_frame ADD_immediate
+  labelled_ins4 lbl_frame ADD_immediate
     (H.reg_x i.res.(0))
     reg_x_alloc_ptr (O.imm 8) O.optional_none
 
@@ -1287,7 +1287,7 @@ let assembly_code_for_poll i ~far ~return_label =
       let lbl = L.create Text in
       A.ins1 (B_cond LS) (local_label lbl);
       A.ins1 B (local_label return_label);
-      labeled_ins1 lbl B (local_label lbl_call_gc));
+      labelled_ins1 lbl B (local_label lbl_call_gc));
   call_gc_sites
     := { gc_lbl = lbl_call_gc;
          gc_return_lbl = lbl_after_poll;
@@ -2099,15 +2099,15 @@ let emit_instr i =
     stack_offset := !stack_offset - 16
   | Lraise k -> (
     match k with
-    | Lambda.Raise_regular ->
+    | Raise_regular ->
       A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
       record_frame Reg.Set.empty (Dbg_raise i.dbg)
-    | Lambda.Raise_reraise ->
+    | Raise_reraise ->
       if Config.runtime5
       then A.ins1 BL (runtime_function S.Predef.caml_reraise_exn)
       else A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
       record_frame Reg.Set.empty (Dbg_raise i.dbg)
-    | Lambda.Raise_notrace ->
+    | Raise_notrace ->
       A.ins_mov_to_sp ~src:reg_x_trap_ptr;
       A.ins3 (LDP X) reg_x_trap_ptr reg_x_tmp1
         (O.mem_post_pair ~base:R.sp ~offset:16);
@@ -2228,7 +2228,7 @@ let emit_item (d : Cmm.data_item) =
     | Global ->
       global_maybe_protected sym;
       (* Define both a label and a linker symbol, so the symbol can be
-         referenced either way. This matches amd64 behavior. *)
+         referenced either way. This matches amd64 behaviour. *)
       D.define_joint_label_and_symbol ~section:Data sym)
   | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
   | Cint16 n -> D.int16 (Numbers.Int16.of_int_exn n)
