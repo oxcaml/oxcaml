@@ -172,7 +172,7 @@ let iterator ~transl_exp ~scopes = function
        correct (i.e., left-to-right) order *)
     let transl_bound var debug_uid bound =
       Let_binding.make (Immutable Strict) layout_int var debug_uid
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_value bound)
+        (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable bound)
     in
     let start = transl_bound "start" Lambda.debug_uid_none start in
     let stop = transl_bound "stop" Lambda.debug_uid_none stop in
@@ -190,7 +190,7 @@ let iterator ~transl_exp ~scopes = function
     let iter_list =
       Let_binding.make (Immutable Strict) layout_any_value "iter_list"
         Lambda.debug_uid_none
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_value sequence)
+        (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable sequence)
     in
     (* Create a fresh variable to use as the function argument. The debug uid is
        [.debug_uid_none], because the variable is not visible to users. *)
@@ -304,7 +304,7 @@ let rec translate_clauses ~transl_exp ~scopes ~loc ~comprehension_body
       Let_binding.let_all arg_lets bindings
     | Texp_comp_when cond ->
       Lifthenelse
-        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
           body ~accumulator,
           accumulator,
           layout_any_value (* [list]s have the standard representation *) ))

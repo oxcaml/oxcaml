@@ -119,26 +119,30 @@ The abbreviations defined in the language are as follows:
     Using `mod everything` is appropriate for data represented directly,
     like `int` or `float32#`.
 
-* `any_non_null = any mod non_null separable`
+* `any_non_null = any non_null separable`
 
-* `value = value_or_null mod non_null separable`
+* `value = scannable non_null separable`
 
     This is the kind of typical OCaml values, as they have been before OxCaml
     was invented. When a kind is unknown (but `any` would not be an appropriate
     choice), we default kinds to be `value`. This defaulting action is described
     in further detail in the sections below.
 
-* `immediate = value mod everything non_null non_float`
+    There are also several value-like kinds which can all be expressed in terms
+    of each other by modifying their "scannable axes" - see the [unboxed
+    types][] documentation.
+
+* `immediate = value non_pointer mod everything`
 
     This is the kind of `int` and types like it (including enumerations and
     `bool`). It is the OxCaml equivalent of OCaml's `[@@immediate]` attribute.
 
-* `immediate_or_null = value_or_null mod everything`
+* `immediate_or_null = value non_pointer maybe_null mod everything`
 
     This is the kind of `int or_null` and similar types.
 
-* `immediate64 = value mod global aliased many contended portable forkable
-                 unyielding immutable stateless external64 non_float`
+* `immediate64 = value non_pointer64 mod global aliased many contended portable
+                 forkable unyielding immutable stateless external64 non_float`
 
     This is just like `immediate`, but applies only on 64-bit machines. On a
     32-bit machine, value whose types are `immediate64` may be
@@ -168,20 +172,21 @@ The abbreviations defined in the language are as follows:
     call to `caml_modify` (on 64-bit machines). See also the documentation on
     [externality][].
 
-* `immutable_data = value mod many contended portable forkable unyielding immutable
-                    stateless non_float`
+* `immutable_data = value non_float mod many contended portable forkable
+                    unyielding immutable stateless`
 
     This is a suitable kind for plain old data that is immutable. By "plain
     old data", we mean that values of types of this kind contain no pointers to
     functions. The type `string` has this kind.
 
-* `sync_data = value mod many contended portable forkable unyielding stateless
-               non_float`
+* `sync_data = value non_float mod many contended portable forkable unyielding
+               stateless`
 
    This is a suitable kind of plain old data that the type system guarantees can be mutated only
    safely in parallel, similar to the `Sync` trait in Rust.
 
-* `mutable_data = value mod many portable forkable unyielding stateless non_float`
+* `mutable_data = value non_float mod many portable forkable unyielding
+                  stateless`
 
     This is a suitable kind for plain old data that may be mutable. The
     type `int ref` has this kind.
@@ -448,6 +453,12 @@ brackets to denote optional syntax, and braces with a trailing `+` to denote
 lists containing one or more repetitions. Any nonterminal not defined here is
 defined in the OCaml [manual][].
 
+**Note on syntax for scannable axes:** Previously, scannable axes used to be
+non-modal axes, and were written like `value mod non_null`, which upper-bounds
+the nullability to `non_null`. Now, we can also write them as `value non_null`,
+which overrides the nullability to `non_null`. We will soon remove the ability
+to upper-bound scannable axes via the `mod` syntax.
+
 First we define the syntax for kinds:
 
 ```
@@ -466,6 +477,15 @@ layout ::= `any`
        |   `bits64`
        |   `bits32`
        |   `vec128`
+       |   layout scannable_axis
+
+scannable_axis ::= `non_null`
+              |    `maybe_null`
+              |    `non_pointer`
+              |    `non_pointer64`
+              |    `non_float`
+              |    `separable`
+              |    `maybe_separable`
 
 kind_abbreviation ::= `any_non_null`
                   |   `value`
