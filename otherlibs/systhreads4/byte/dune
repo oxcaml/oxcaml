@@ -8,6 +8,6 @@
  (flags
   (:standard -no-strict-sequence -g -bin-annot -safe-string -w -27))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries unix)
  (library_flags -linkall))
