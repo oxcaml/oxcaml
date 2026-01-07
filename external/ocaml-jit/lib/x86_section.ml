@@ -15,6 +15,7 @@
  *)
 
 open Import
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 let name s_l s_opt s_l' =
   let first = String.concat ~sep:"," s_l in
@@ -22,64 +23,56 @@ let name s_l s_opt s_l' =
   let last = match s_l' with [] -> "" | l -> "," ^ String.concat ~sep:"," l in
   first ^ mid ^ last
 
-type t = { name : string; instructions : X86_ast.asm_line list }
+type t = { name : string; instructions : X86_ast.asm_program }
 
 let assemble ~arch { name; instructions } =
   let section =
     {
       X86_binary_emitter.sec_name = name;
-      sec_instrs = Array.of_list instructions;
+      sec_instrs = DLL.to_array instructions;
     }
   in
   X86_binary_emitter.assemble_section arch section
 
 module Map = struct
-  type nonrec t = X86_ast.asm_line list String.Map.t
+  type nonrec t = X86_ast.asm_program String.Map.t
 
-  let append key l t =
+  let append key dll t =
     String.Map.update ~key t ~f:(function
-      | None -> Some l
-      | Some l' -> Some (l' @ l))
+      | None -> Some dll
+      | Some dll' ->
+        DLL.transfer ~to_:dll' ~from:dll ();
+        Some dll')
 
-  let from_program l =
+  let from_program prog =
     let open X86_ast in
-    let rec aux acc current_section current_instrs l =
-      let add_current () =
-        append current_section (List.rev current_instrs) acc
+    let section_name section first_occurrence =
+      let first_occurrence =
+        match first_occurrence with
+        | `First_occurrence -> true
+        | `Not_first_occurrence -> false
       in
-      match l with
-      | [] -> add_current ()
-      | Directive (Section (section, first_occurrence)) :: tl ->
-          let acc = add_current () in
-          let first_occurrence =
-            match first_occurrence with
-            | `First_occurrence -> true
-            | `Not_first_occurrence -> false
-          in
-          let details =
-            Asm_targets.Asm_section.details section ~first_occurrence
-          in
-          let current_section =
-            name details.names details.flags details.args
-          in
-          let current_instrs = [] in
-          aux acc current_section current_instrs tl
-      | (_ as instr) :: tl ->
-          aux acc current_section (instr :: current_instrs) tl
+      let details =
+        Asm_targets.Asm_section.details section ~first_occurrence
+      in
+      name details.names details.flags details.args
     in
-    match l with
-    | [] -> String.Map.empty
-    | Directive (Section (section, first_occurrence)) :: tl ->
-        let first_occurrence =
-          match first_occurrence with
-          | `First_occurrence -> true
-          | `Not_first_occurrence -> false
-        in
-        let details =
-          Asm_targets.Asm_section.details section ~first_occurrence
-        in
-        let current_section = name details.names details.flags details.args in
-        let current_instrs = [] in
-        aux String.Map.empty current_section current_instrs tl
-    | _line :: _ -> failwithf "Invalid program, should start with section"
+    match DLL.hd prog with
+    | None -> String.Map.empty
+    | Some (Directive (Section (section, first_occurrence))) ->
+      let initial_section = section_name section first_occurrence in
+      let acc = ref String.Map.empty in
+      let current_section = ref initial_section in
+      let current_instrs = ref (DLL.make_empty ()) in
+      DLL.iter prog ~f:(fun instr ->
+        match instr with
+        | Directive (Section (section, first_occurrence)) ->
+          acc := append !current_section !current_instrs !acc;
+          current_section := section_name section first_occurrence;
+          current_instrs := DLL.make_empty ()
+        | _ ->
+          DLL.add_end !current_instrs instr);
+      acc := append !current_section !current_instrs !acc;
+      !acc
+    | Some _ -> failwithf "Invalid program, should start with section"
 end

@@ -1017,14 +1017,14 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type
+  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type
+  | Named of Ident.t option * module_type * Mode.Alloc.lr
 
   and signature = signature_item list wrapped
 
@@ -1238,6 +1238,3 @@ val set_univar: type_expr option ref -> type_expr -> unit
 val link_kind: inside:field_kind -> field_kind -> unit
 val link_commu: inside:commutable -> commutable -> unit
 val set_commu_ok: commutable -> unit
-
-val functor_param_mode : Mode.Alloc.lr
-val functor_res_mode : Mode.Alloc.lr

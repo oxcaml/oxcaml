@@ -338,6 +338,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         (* CR cgunn: recover mode constraint info here *)
         Ppat_constraint (sub.pat sub { pat with pat_extra=rem },
                          Some (sub.typ sub ct), [])
+    | { pat_extra = (Tpat_open (_path, lid, _env), _, _attrs) :: rem; _ } ->
+        Ppat_open (lid, sub.pat sub { pat with pat_extra=rem })
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
@@ -875,7 +877,8 @@ let class_type_declaration sub = class_infos sub.class_type sub
 let functor_parameter sub : functor_parameter -> Parsetree.functor_parameter =
   function
   | Unit -> Unit
-  | Named (_, name, mtype) -> Named (name, sub.module_type sub mtype, [])
+  | Named (_, name, mtype, _mmode) ->
+      Named (name, sub.module_type sub mtype, [])
 
 let module_type (sub : mapper) mty =
   let loc = sub.location sub mty.mty_loc in
@@ -887,7 +890,7 @@ let module_type (sub : mapper) mty =
       Mty.mk ~loc ~attrs (Pmty_alias (map_loc sub lid))
   | Tmty_signature sg ->
       Mty.mk ~loc ~attrs (Pmty_signature (sub.signature sub sg))
-  | Tmty_functor (arg, mtype2) ->
+  | Tmty_functor (arg, mtype2, _mmode2) ->
       Mty.mk ~loc ~attrs
         (Pmty_functor
           (functor_parameter sub arg, sub.module_type sub mtype2, []))

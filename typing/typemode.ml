@@ -686,7 +686,7 @@ let untransl_modalities mut t =
 
 let transl_alloc_mode modes =
   let opt = transl_mode_annots modes in
-  Alloc.Const.Option.value opt ~default:Alloc.Const.legacy
+  opt, Alloc.Const.Option.value opt ~default:Alloc.Const.legacy
 
 (* Error reporting *)
 

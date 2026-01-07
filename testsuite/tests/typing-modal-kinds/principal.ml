@@ -18,6 +18,8 @@ Error: This value is "local"
        because it is contained (via constructor "Pair") in the value at Line 1, characters 37-48
        which is "local"
        because it is allocated at Line 1, characters 51-68 containing data
+       which is "local" to the parent region
+       because it contains (via constructor "Pair") the expression at Line 1, characters 57-58
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -34,6 +36,8 @@ Error: This value is "local"
        because it is contained (via constructor "Pair") in the value at Line 1, characters 37-48
        which is "local"
        because it is allocated at Line 1, characters 51-68 containing data
+       which is "local" to the parent region
+       because it contains (via constructor "Pair") the expression at Line 1, characters 66-67
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -52,6 +56,8 @@ Error: This value is "local"
        because it is contained (via constructor "Pair") in the value at Line 1, characters 34-45
        which is "local"
        because it is allocated at Line 1, characters 48-59 containing data
+       which is "local" to the parent region
+       because it contains (via constructor "Pair") the expression at Line 1, characters 54-55
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -70,6 +76,8 @@ Error: This value is "local"
        because it is contained (via constructor "Pair") in the value at Line 1, characters 34-45
        which is "local"
        because it is allocated at Line 1, characters 48-59 containing data
+       which is "local" to the parent region
+       because it contains (via constructor "Pair") the expression at Line 1, characters 57-58
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.

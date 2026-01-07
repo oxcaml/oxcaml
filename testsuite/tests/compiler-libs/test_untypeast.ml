@@ -110,3 +110,15 @@ run {| let foo : 'a . ('a -> 'a) @ portable = fun x -> x in foo |}
 let foo : ('a : value) . 'a -> 'a = fun x -> x in foo
 - : unit = ()
 |}];;
+
+run {|
+  let module M = struct type t = { x : int } end in
+  fun x -> let M.{ x } = M.{ x } in x
+|}
+
+[%%expect{|
+let module M = struct type t = {
+                        x: int } end in
+  fun x -> let M.{ x }  = let open M in { x } in x
+- : unit = ()
+|}];;

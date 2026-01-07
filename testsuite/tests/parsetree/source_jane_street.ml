@@ -623,7 +623,8 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "x" (with some modality) of the record at Line 1, characters 46-54.
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -666,19 +667,13 @@ module M : sig end @@ stateless
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (X : S @ portable) = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : functor (X : S @ portable) -> sig end @@ stateless
 |}]
 
 module F (_ : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (_ : S @ portable) = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : S @ portable -> sig end @@ stateless
 |}]
 
 module M' = (M : S @ portable)
@@ -689,19 +684,13 @@ module M' : S @@ stateless
 module F (M : S @ portable) : S @ portable = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (M : S @ portable) : S @ portable = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : functor (M : S @ portable) -> S @@ stateless
 |}]
 
 module F (M : S @ portable) @ portable = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (M : S @ portable) @ portable = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : functor (M : S @ portable) -> sig end @@ stateless
 |}]
 
 
@@ -730,19 +719,23 @@ module M : S @@ stateless
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
 [%%expect{|
-Line 1, characters 37-45:
-1 | module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
-                                         ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module type S' =
+  functor () (M : S @ portable) -> S @ portable -> S @ portable
 |}]
 
 
 module type S' = () -> S @ portable -> S @ portable -> S @ portable
 [%%expect{|
-Line 1, characters 27-35:
-1 | module type S' = () -> S @ portable -> S @ portable -> S @ portable
-                               ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module type S' = functor () -> S @ portable -> S @ portable -> S @ portable
+|}]
+
+(* Unlike arrow type, which is by default interpreted as curried and extra
+   parens opt out, functor types are never treated as curried. *)
+module type S' = S @ local -> S -> S
+module type S'' = S @ local -> (S -> S)
+[%%expect{|
+module type S' = S @ local -> S -> S
+module type S'' = S @ local -> S -> S
 |}]
 
 module (F @ portable) () = struct end
@@ -753,10 +746,14 @@ module F : functor () -> sig end @@ stateless
 module (G @ portable) () = F
 
 [%%expect{|
-Line 1, characters 27-28:
-1 | module (G @ portable) () = F
-                               ^
-Error: This is "contended", but expected to be "uncontended" because it is a functor body.
+module G : functor () -> (functor () -> sig end) @ contended @@ portable
+|}]
+
+module (G @ portable) (F : (S @ unique -> S @ once) @ local) @ contended = struct end
+[%%expect{|
+module G :
+  functor (F : (S @ unique -> S @ once) @ local) -> sig end @ contended @@
+  stateless
 |}]
 
 module (G' @ portable) = F

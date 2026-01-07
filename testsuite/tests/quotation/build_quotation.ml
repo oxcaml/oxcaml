@@ -538,7 +538,12 @@ type rcd = { x : int; y : string; }
 
 <[ {x = 42; y = "foo"} ]>;;
 [%%expect {|
-- : <[rcd]> expr = <[{ x = 42; y = "foo"; }]>
+Line 1, characters 4-5:
+1 | <[ {x = 42; y = "foo"} ]>;;
+        ^
+Error: Label "x" used at Line 1, characters 4-5 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 type rcd_u = #{xu: int; yu: string};;
@@ -548,17 +553,34 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
 [%%expect {|
-- : <[unit -> rcd_u]> expr = <[fun () -> { xu = 42; yu = "foo"; }]>
+Line 1, characters 15-17:
+1 | <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
+                   ^^
+Error: Label "xu" used at Line 1, characters 15-17
+       cannot be used in this context;
+       "xu" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "xu" is defined outside any quotations.
 |}];;
 
 <[ fun r -> r.x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun r -> r.x]>
+Line 1, characters 14-15:
+1 | <[ fun r -> r.x ]>;;
+                  ^
+Error: Label "x" used at Line 1, characters 14-15
+       cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ fun {x; y} -> x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun {x=x; y=y; } -> x]>
+Line 1, characters 8-9:
+1 | <[ fun {x; y} -> x ]>;;
+            ^
+Error: Label "x" used at Line 1, characters 8-9 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;
@@ -737,6 +759,22 @@ Line 1, characters 3-23:
 Error: Opening modules is not supported inside quoted expressions,
        as seen at Line 1, characters 3-23.
 |}];;
+
+module M = struct
+  let foo = 42
+end;;
+
+<[ let open M in M.foo ]>
+;;
+[%%expect {|
+module M : sig val foo : int end
+Line 5, characters 3-22:
+5 | <[ let open M in M.foo ]>
+       ^^^^^^^^^^^^^^^^^^^
+Error: Opening modules is not supported inside quoted expressions,
+       as seen at Line 5, characters 3-22.
+|}]
+;;
 
 <[ fun x -> $ (<[ x ]>) ]>;;
 [%%expect {|
