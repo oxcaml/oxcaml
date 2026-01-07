@@ -48,7 +48,9 @@ let
       minor_version = "4";
       patch_version = "0";
       sha256 = "sha256-36qKLhHHmbwXZdi+9EkRQG7l9IAwJxkDgqk5+IyRImY=";
-    }) {}).overrideAttrs {
+    }) {
+      inherit stdenv;
+    }).overrideAttrs {
       # This patch fixes an issue in the upstream compiler that we use to
       # bootstrap ourselves on ARM64
       patches = [
