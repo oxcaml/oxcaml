@@ -141,14 +141,14 @@ COMPILERLIBS_SOURCES=\
   typing/typemode.ml \
   typing/jkind.ml \
   typing/typedtree.ml \
-  typing/ikinds/global_counters.ml \
-  typing/ikinds/ldd_intf.ml \
-  typing/ikinds/ldd.ml \
-  typing/ikinds/axis_lattice.ml \
-  typing/ikinds/axis_lattice_conv.ml \
-  typing/ikinds/axis_lattice_array.ml \
-  typing/ikinds/axis_lattice_array_conv.ml \
-  typing/ikinds/ikind.ml \
+  typing/global_counters.ml \
+  typing/ldd_intf.ml \
+  typing/ldd.ml \
+  typing/axis_lattice.ml \
+  typing/axis_lattice_conv.ml \
+  typing/axis_lattice_array.ml \
+  typing/axis_lattice_array_conv.ml \
+  typing/ikind.ml \
   typing/btype.ml \
   typing/subst.ml \
   typing/signature_with_global_bindings.ml \

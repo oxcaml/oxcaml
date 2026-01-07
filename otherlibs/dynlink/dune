@@ -319,7 +319,9 @@
 (copy_files ../../typing/type_shape.ml)
 
 (copy_files ../../typing/subst.ml)
-(copy_files ../../typing/ikinds/*.ml{,i})
+(copy_files ../../typing/axis_lattice*.ml{,i})
+(copy_files ../../typing/ldd*.ml{,i})
+(copy_files ../../typing/ikind.ml{,i})
 
 (copy_files ../../typing/signature_with_global_bindings.ml)
 
