@@ -49,10 +49,10 @@ let
       patch_version = "0";
       sha256 = "sha256-36qKLhHHmbwXZdi+9EkRQG7l9IAwJxkDgqk5+IyRImY=";
     }) {}).overrideAttrs {
-      # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
-      # compiler that we use to bootstrap ourselves on ARM64
+      # This patch fixes an issue in the upstream compiler that we use to
+      # bootstrap ourselves on ARM64
       patches = [
-        # ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.4.14.2+oxcaml/files/ocaml-base-compiler.4.14.2+oxcaml.patch
+        ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.5.4.0+oxcaml/files/ocaml-base-compiler.5.4.0+oxcaml.patch
       ];
     };
 
