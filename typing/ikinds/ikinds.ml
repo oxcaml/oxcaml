@@ -47,7 +47,7 @@ module Solver = struct
   (* Hash tables avoiding polymorphic structural comparison on deep values.
      [Btype.TypeHash] keys by the representative of a [type_expr], so 
      union-find aliases map to a single entry. This table is used to cache
-     repeated kind_of computations, as well as to make circular types work. *)
+     repeated kind computations, as well as to make circular types work. *)
   module TyTbl = Btype.TypeHash
 
   let constr_to_string (path : Path.t) : string =
@@ -243,7 +243,7 @@ module Solver = struct
       Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
     in
     (* For each with-bound (ty, axes), contribute
-       modality(axes_mask, kind_of ty). *)
+       modality(axes_mask, kind ty). *)
     Jkind.With_bounds.to_seq jkind.jkind.with_bounds
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
@@ -269,18 +269,20 @@ module Solver = struct
         let var = Ldd.new_var () in
         let placeholder = Ldd.node_of_var var in
         TyTbl.add ctx.ty_to_kind ty placeholder;
-        let kind_rhs = kind_of ctx ty in
+        let kind_rhs = kind_uncached ctx ty in
         Ldd.solve_lfp var kind_rhs;
         placeholder)
       else
-        let kind_rhs = kind_of ctx ty in
+        let kind_rhs = kind_uncached ctx ty in
         TyTbl.add ctx.ty_to_kind ty kind_rhs;
         kind_rhs
 
-  (* Compute the ikind polynomial for an arbitrary [type_expr].  This is the
-     semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD
-     form. *)
-  and kind_of (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
+  (* Worker for [kind]; does not memoize.
+     Only call from [kind] so caching and LFP handling apply. *)
+  and kind_uncached (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
+    (* Compute the ikind polynomial for an arbitrary [type_expr]. This is the
+       semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD
+       form. *)
     incr kind_of_depth;
     if !kind_of_depth > 500 then failwith "kind_of_depth too deep" else ();
     incr kind_of_counter;
@@ -322,17 +324,17 @@ module Solver = struct
       | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
         (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
         Ldd.const Axis_lattice.arrow
-      | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind_of"
-      | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind_of"
+      | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
+      | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
       | Types.Tpoly (ty, _) -> kind ctx ty
       | Types.Tof_kind jkind ->
         ckind_of_jkind_with_kind kind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tfield _ ->
-        failwith "Tfield shouldn't appear in kind_of"
+        failwith "Tfield shouldn't appear in kind"
         (* Ldd.const Axis_lattice.value *)
       | Types.Tnil ->
-        failwith "Tnil shouldn't appear in kind_of"
+        failwith "Tnil shouldn't appear in kind"
         (* Ldd.const Axis_lattice.value *)
       | Types.Tquote _ | Types.Tsplice _ ->
         (* Treat quoted/spliced types conservatively as boxed values. *)
