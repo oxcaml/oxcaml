@@ -1313,17 +1313,13 @@ let emit_load_literal dst lbl =
   let reloc : [`Twelve] Ast.Symbol.same_unit_or_reloc =
     if macosx then Needs_reloc PAGE_OFF else Needs_reloc LOWER_TWELVE
   in
+  let addr = H.mem_label reg_tmp1_base ~reloc lbl in
   A.ins2 ADRP reg_x_tmp1 (label (Needs_reloc PAGE) lbl);
   match dst.typ with
-  | Float ->
-    A.ins2 LDR_simd_and_fp (H.reg_d dst) (H.mem_label reg_tmp1_base ~reloc lbl)
-  | Float32 ->
-    A.ins2 LDR_simd_and_fp (H.reg_s dst) (H.mem_label reg_tmp1_base ~reloc lbl)
-  | Val | Int | Addr ->
-    A.ins2 LDR (H.reg_x dst) (H.mem_label reg_tmp1_base ~reloc lbl)
-  | Vec128 | Valx2 ->
-    A.ins2 LDR_simd_and_fp (H.reg_q_operand dst)
-      (H.mem_label reg_tmp1_base ~reloc lbl)
+  | Float -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addr
+  | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
+  | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
+  | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) addr
   | Vec256 | Vec512 ->
     Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
       Printreg.reg dst
