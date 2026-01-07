@@ -20,9 +20,9 @@
    construction. We maintain canonical form [hi = hi - lo], so [hi] is
    disjoint from [lo]. *)
 
-module type ORDERED = Ldd_intf.ORDERED
+module type Ordered = Ldd_intf.Ordered
 
-module Make (V : ORDERED) = struct
+module Make (V : Ordered) = struct
   module Name = V
 
   type node = Obj.t

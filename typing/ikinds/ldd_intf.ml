@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module type ORDERED = sig
+module type Ordered = sig
   type t
 
   val compare : t -> t -> int
@@ -28,7 +28,7 @@ module type S = sig
 
   type var
 
-  module Name : ORDERED
+  module Name : Ordered
 
   (** Constructors. *)
   val bot : node
