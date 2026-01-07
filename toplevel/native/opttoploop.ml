@@ -128,7 +128,7 @@ let close_phrase lam =
 let close_slambda_phrase slam =
   let lam = match (Slambdaeval.trivial_slambda slam) with
   | Some lam -> lam
-  | None -> Slambda.raise (Unsupported "the toplevel")
+  | None -> Lambda.error (Slambda_unsupported "the toplevel")
   in
   Lambda.SLquote (close_phrase lam)
 
