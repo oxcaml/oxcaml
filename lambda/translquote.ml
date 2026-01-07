@@ -2516,7 +2516,6 @@ let construct_spine ~env ~loc typ =
         | Tconstr (p, tyl, _) ->
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
-        (* objects *)
         | Tobject (fields, _) ->
           let Printtyp.{ fields; open_row } =
             Printtyp.tree_of_typobject_repr fields
@@ -2531,7 +2530,6 @@ let construct_spine ~env ~loc typ =
               fields
           in
           Ttyp_object (fields, if open_row then Open else Closed)
-        (* polymorphic variants *)
         | Tvariant row ->
           let Printtyp.
                 { fields; name = _; closed; present = _; all_present = _; tags }
