@@ -436,10 +436,6 @@ let shallow_axes_are_relevant_for_rep = function
   | `Variant Types.Variant_unboxed -> `Relevant
   | `Record _ | `Variant _ -> `Irrelevant
 
-let constructor_ikind_polynomial (packed : Types.constructor_ikind) :
-    Ldd.node * Ldd.node array =
-  packed.base, packed.coeffs
-
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
    type declaration in [context]. *)
@@ -659,13 +655,10 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
     (* Prefer a stored constructor ikind if one is present and enabled. *)
     let ikind =
       match type_decl.type_ikind with
-      | Types.Constructor_ikind constructor when !Clflags.ikinds ->
-        let base, coeffs = constructor_ikind_polynomial constructor in
+      | Types.Constructor_ikind { base; coeffs } when !Clflags.ikinds ->
         Solver.Poly (base, coeffs)
       | Types.No_constructor_ikind reason ->
-        (* Print the reason *)
-        (*= Format.eprintf "[ikind-miss] %s@." reason; *)
-        ignore reason;
+        if !Types.ikind_debug then Format.eprintf "[ikind-miss] %s@." reason;
         fallback ()
       | Types.Constructor_ikind _ -> fallback ()
     in
@@ -686,21 +679,18 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
     ikind
 
 (* Package the above into a full evaluation context. *)
-let make_ctx_with_mode ~(mode : Solver.mode) ~(context : Jkind.jkind_context) :
+let make_ctx ~(mode : Solver.mode) ~(context : Jkind.jkind_context) :
     Solver.ctx =
   Solver.create_ctx ~mode { lookup = lookup_of_context ~context }
 
-let make_ctx ~(context : Jkind.jkind_context) : Solver.ctx =
-  make_ctx_with_mode ~mode:Solver.Normal ~context
-
 let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
     Ldd.node =
-  let ctx = make_ctx ~context in
+  let ctx = make_ctx ~mode:Solver.Normal ~context in
   Solver.normalize (ckind_of_jkind_l ctx jkind)
 
 let type_declaration_ikind ~(context : Jkind.jkind_context) ~(path : Path.t) :
     Types.constructor_ikind =
-  let ctx = make_ctx ~context in
+  let ctx = make_ctx ~mode:Solver.Normal ~context in
   let base, coeffs = Solver.constr_kind_poly ctx path in
   constructor_ikind ~base ~coeffs
 
@@ -786,7 +776,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
           origin_suffix Jkind.format sub Jkind.format super);
       Ok ())
     else
-      let ctx = make_ctx ~context in
+      let ctx = make_ctx ~mode:Solver.Normal ~context in
       let super_poly = ckind_of_jkind_l ctx super in
       let super_is_constant =
         Ldd.solve_pending ();
@@ -847,7 +837,7 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
   if not !Clflags.ikinds
   then Jkind.sub ~type_equal ~context ~level sub super
   else
-    let ctx = make_ctx ~context in
+    let ctx = make_ctx ~mode:Solver.Normal ~context in
     match
       Solver.leq_with_reason (ckind_of_jkind_l ctx sub) (ckind_of_jkind_r super)
     with
@@ -860,7 +850,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   if not (enable_crossing && !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.get_mode_crossing ~context jkind
   else
-    let ctx = make_ctx_with_mode ~mode:Solver.Round_up ~context in
+    let ctx = make_ctx ~mode:Solver.Round_up ~context in
     let lat = Solver.round_up (ckind_of_jkind ctx jkind) in
     let mb = Axis_lattice_conv.to_mod_bounds lat in
     Jkind.Mod_bounds.to_mode_crossing mb
@@ -888,7 +878,7 @@ let sub_or_intersect ?origin:_origin
       else Jkind.Disjoint reasons
     | Equal | Less -> (
       (* The RHS is a jkind_r (no with-bounds), so its ikind is constant. *)
-      let ctx = make_ctx_with_mode ~mode:Solver.Round_up ~context in
+      let ctx = make_ctx ~mode:Solver.Round_up ~context in
       let sub_poly = ckind_of_jkind_l ctx (Jkind.disallow_right t1) in
       let super_poly = ckind_of_jkind_r (Jkind.disallow_left t2) in
       (* Layouts already checked above. Remaining failure reasons are
