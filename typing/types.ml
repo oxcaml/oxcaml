@@ -66,7 +66,8 @@ end
 module Ldd = struct
   module Name = Rigid_name
 
-  include Ldd.Make (Rigid_name)
+  include (Ldd.Make (Rigid_name) :
+             Ldd_intf.S with module Name := Rigid_name)
 end
 
 type constructor_ikind =

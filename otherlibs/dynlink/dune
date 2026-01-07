@@ -131,6 +131,7 @@
   typemode
   jkind
   ;; IKINDS
+  ldd_intf
   ldd
   axis_lattice
   axis_lattice_conv
@@ -636,6 +637,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Zero_alloc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice_conv.cmo
@@ -740,6 +742,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Zero_alloc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice_conv.cmx
@@ -809,6 +812,7 @@
   (dynlink.mli as dynlink/dynlink.mli)
   (dynlink.cmi as dynlink/dynlink.cmi)
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Misc.cmx
   (META as dynlink/META))

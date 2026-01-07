@@ -20,15 +20,10 @@
    construction. We maintain canonical form [hi = hi - lo], so [hi] is
    disjoint from [lo]. *)
 
-module type ORDERED = sig
-  type t
-
-  val compare : t -> t -> int
-
-  val to_string : t -> string
-end
+module type ORDERED = Ldd_intf.ORDERED
 
 module Make (V : ORDERED) = struct
+  module Name = V
 
   type node = Obj.t
   (* node ::= node_block | int (leaf) -- we use Obj magic to unbox leaves *)
