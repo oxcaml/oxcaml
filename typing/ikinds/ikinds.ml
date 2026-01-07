@@ -369,15 +369,6 @@ module Solver = struct
       : Ldd.node =
     ckind_of_jkind_with_kind kind ctx jkind
 
-  let ckind_of_jkind_l (ctx : ctx) (j : Types.jkind_l) : Ldd.node =
-    ckind_of_jkind ctx j
-
-  let ckind_of_jkind_r (jkind : Types.jkind_r) : Ldd.node =
-    (* For r-jkinds used in sub checks, with-bounds are not present
-       on the right (see Jkind_desc.sub's precondition). So only the
-       base mod-bounds matter. *)
-    Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
-
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (kind_poly : Ldd.node) : Ldd.node =
     Ldd.solve_pending ();
@@ -406,19 +397,6 @@ let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
     if coeff != coeff' then coeffs.(i) <- coeff'
   done;
   ({ Types.base = base; coeffs } : Types.constructor_ikind)
-
-let ckind_of_jkind (ctx : Solver.ctx) (jkind : ('l * 'r) Types.jkind) :
-    Ldd.node =
-  Solver.ckind_of_jkind ctx jkind
-
-let ckind_of_jkind_l (ctx : Solver.ctx) (j : Types.jkind_l) : Ldd.node =
-  Solver.ckind_of_jkind_l ctx j
-
-let ckind_of_jkind_r (jkind : Types.jkind_r) : Ldd.node =
-  Solver.ckind_of_jkind_r jkind
-
-let kind_of (ctx : Solver.ctx) (ty : Types.type_expr) : Ldd.node =
-  Solver.kind_of ctx ty
 
 let has_mutable_label lbls =
   List.exists
@@ -477,7 +455,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
         in
         let use_decl_jkind ~treat_as_abstract =
           let kind : Solver.ckind =
-           fun ctx -> ckind_of_jkind_l ctx type_decl.type_jkind
+           fun ctx -> Solver.ckind_of_jkind ctx type_decl.type_jkind
           in
           Solver.Ty
             { args = type_decl.type_params;
@@ -686,7 +664,7 @@ let make_ctx ~(mode : Solver.mode) ~(context : Jkind.jkind_context) :
 let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
     Ldd.node =
   let ctx = make_ctx ~mode:Solver.Normal ~context in
-  Solver.normalize (ckind_of_jkind_l ctx jkind)
+  Solver.normalize (Solver.ckind_of_jkind ctx jkind)
 
 let type_declaration_ikind ~(context : Jkind.jkind_context) ~(path : Path.t) :
     Types.constructor_ikind =
@@ -777,7 +755,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
       Ok ())
     else
       let ctx = make_ctx ~mode:Solver.Normal ~context in
-      let super_poly = ckind_of_jkind_l ctx super in
+      let super_poly = Solver.ckind_of_jkind ctx super in
       let super_is_constant =
         Ldd.solve_pending ();
         Ldd.is_const super_poly
@@ -787,7 +765,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
         then Solver.reset_for_mode ctx ~mode:Solver.Round_up
         else ctx
       in
-      let sub_poly = ckind_of_jkind_l sub_ctx sub in
+      let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
       let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
       (if !Types.ikind_debug
       then
@@ -839,7 +817,8 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
   else
     let ctx = make_ctx ~mode:Solver.Normal ~context in
     match
-      Solver.leq_with_reason (ckind_of_jkind_l ctx sub) (ckind_of_jkind_r super)
+      Solver.leq_with_reason (Solver.ckind_of_jkind ctx sub)
+        (Solver.ckind_of_jkind ctx super)
     with
     | [] -> true
     | _ -> false
@@ -851,7 +830,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   then Jkind.get_mode_crossing ~context jkind
   else
     let ctx = make_ctx ~mode:Solver.Round_up ~context in
-    let lat = Solver.round_up (ckind_of_jkind ctx jkind) in
+    let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
     let mb = Axis_lattice_conv.to_mod_bounds lat in
     Jkind.Mod_bounds.to_mode_crossing mb
 
@@ -879,8 +858,12 @@ let sub_or_intersect ?origin:_origin
     | Equal | Less -> (
       (* The RHS is a jkind_r (no with-bounds), so its ikind is constant. *)
       let ctx = make_ctx ~mode:Solver.Round_up ~context in
-      let sub_poly = ckind_of_jkind_l ctx (Jkind.disallow_right t1) in
-      let super_poly = ckind_of_jkind_r (Jkind.disallow_left t2) in
+      let sub_poly =
+        Solver.ckind_of_jkind ctx (Jkind.disallow_right t1)
+      in
+      let super_poly =
+        Solver.ckind_of_jkind ctx (Jkind.disallow_left t2)
+      in
       (* Layouts already checked above. Remaining failure reasons are
          per-axis disagreements. *)
       match Solver.leq_with_reason sub_poly super_poly with
@@ -976,7 +959,7 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   let arity = max_arity_in_type Path.Map.empty body in
   let lookup path = identity_lookup_from_arity_map arity path in
   let ctx = Solver.create_ctx ~mode:Solver.Normal { lookup } in
-  let poly = Solver.normalize (kind_of ctx body) in
+  let poly = Solver.normalize (Solver.kind ctx body) in
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
   in
