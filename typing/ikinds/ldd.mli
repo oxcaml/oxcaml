@@ -19,6 +19,4 @@ module type ORDERED = Ldd_intf.ORDERED
     over these terms. *)
 module Make (V : ORDERED) : sig
   include Ldd_intf.S with module Name = V
-
-  val top : node
 end
