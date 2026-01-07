@@ -643,6 +643,7 @@ type t = {
   unboxed_labels: (stage_lock, unboxed_label_description) TycompTbl.t;
   types: (stage_lock, type_data, type_data) IdTbl.t;
   modules: (lock_or_stage, module_entry, module_data) IdTbl.t;
+  (* INVARIANT: modules always have its mode normalized *)
   modtypes: (stage_lock, modtype_data, modtype_data) IdTbl.t;
   classes: (lock_or_stage, class_data, class_data) IdTbl.t;
   cltypes: (empty, cltype_data, cltype_data) IdTbl.t;
