@@ -216,7 +216,7 @@ stdenv.mkDerivation {
     [
       pkgs.autoconf
       menhir
-      ocaml_4_14_2
+      ocaml_5_4_0
       dune
       pkgs.pkg-config
       pkgs.rsync
