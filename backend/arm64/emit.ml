@@ -1797,21 +1797,21 @@ let emit_instr i =
     A.ins_mul (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Idiv) ->
     A.ins3 SDIV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
-  | Lop (Intop_imm (Iand, _n)) ->
+  | Lop (Intop_imm (Iand, n)) ->
     A.ins3 AND_immediate
       (H.reg_x i.res.(0))
       (H.reg_x i.arg.(0))
-      (O.bitmask (Nativeint.of_int _n))
-  | Lop (Intop_imm (Ior, _n)) ->
+      (O.bitmask (Nativeint.of_int n))
+  | Lop (Intop_imm (Ior, n)) ->
     A.ins3 ORR_immediate
       (H.reg_x i.res.(0))
       (H.reg_x i.arg.(0))
-      (O.bitmask (Nativeint.of_int _n))
-  | Lop (Intop_imm (Ixor, _n)) ->
+      (O.bitmask (Nativeint.of_int n))
+  | Lop (Intop_imm (Ixor, n)) ->
     A.ins3 EOR_immediate
       (H.reg_x i.res.(0))
       (H.reg_x i.arg.(0))
-      (O.bitmask (Nativeint.of_int _n))
+      (O.bitmask (Nativeint.of_int n))
   | Lop (Intop_imm (Ilsl, shift_in_bits)) ->
     A.ins_lsl_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop (Intop_imm (Ilsr, shift_in_bits)) ->
