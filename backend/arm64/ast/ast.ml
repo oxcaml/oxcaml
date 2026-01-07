@@ -2737,13 +2737,21 @@ module DSL = struct
 
     let ins1 name a = ins name (Singleton a)
 
-    let ins2 name (a, b) = ins name (Pair (a, b))
+    let ins2 name a b = ins name (Pair (a, b))
 
-    let ins3 name (a, b, c) = ins name (Triple (a, b, c))
+    let ins3 name a b c = ins name (Triple (a, b, c))
 
-    let ins4 name (a, b, c, d) = ins name (Quad (a, b, c, d))
+    let ins4 name a b c d = ins name (Quad (a, b, c, d))
 
     let ins0 name = ins name (Singleton Operand.Unit)
+
+    module Tupled = struct
+      let ins2 name (a, b) = ins2 name a b
+
+      let ins3 name (a, b, c) = ins3 name a b c
+
+      let ins4 name (a, b, c, d) = ins4 name a b c d
+    end
 
     (* Instructions that are expanded into others *)
     let ins_mul rd rn rm = ins MADD (Quad (rd, rn, rm, reg_op Reg.xzr))

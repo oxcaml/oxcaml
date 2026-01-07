@@ -190,7 +190,7 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
         (Simd.print_name op)
   | _ -> ());
   let module RM = Simd_rounding_mode in
-  let open A in
+  let open A.Tupled [@ocaml.warning "-44"] in
   (* CR mshinwell: let open A.Ins in *)
   let open H in
   let arg = i.arg in
@@ -602,9 +602,9 @@ let emit_stack_realloc () =
     (* Pass the desired frame size on the stack, since all of the
        argument-passing registers may be in use. *)
     A.ins_mov_imm reg_x_tmp1 (O.imm_sixteen sc_max_frame_size_in_bytes);
-    A.ins3 (STP X) (reg_x_tmp1, O.lr, O.mem_pre_pair ~base:R.sp ~offset:(-16));
+    A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
     A.ins1 BL (runtime_function S.Predef.caml_call_realloc_stack);
-    A.ins3 (LDP X) (reg_x_tmp1, O.lr, O.mem_post_pair ~base:R.sp ~offset:16);
+    A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
     A.ins1 B (local_label sc_return)
 
 (* Names of various instructions *)
@@ -640,11 +640,11 @@ let decompose_int default n =
 (* Load an integer constant into a register *)
 
 let emit_movk dst (f, p) =
-  A.ins3 MOVK (dst, O.imm_sixteen_of_nativeint f, O.shift ~kind:LSL ~amount:p)
+  A.ins3 MOVK dst (O.imm_sixteen_of_nativeint f) (O.shift ~kind:LSL ~amount:p)
 
 let emit_intconst dst n =
   if Arm64_ast.Logical_immediates.is_logical_immediate n
-  then A.ins3 ORR_immediate (dst, O.xzr, O.bitmask n)
+  then A.ins3 ORR_immediate dst O.xzr (O.bitmask n)
   else
     let dz = decompose_int 0x0000n n and dn = decompose_int 0xFFFFn n in
     if List.length dz <= List.length dn
@@ -652,20 +652,18 @@ let emit_intconst dst n =
       match dz with
       | [] -> A.ins_mov_reg dst O.xzr
       | (f, p) :: l ->
-        A.ins3 MOVZ
-          ( dst,
-            O.imm_sixteen_of_nativeint f,
-            O.optional_shift ~kind:LSL ~amount:p );
+        A.ins3 MOVZ dst
+          (O.imm_sixteen_of_nativeint f)
+          (O.optional_shift ~kind:LSL ~amount:p);
         List.iter (emit_movk dst) l)
     else
       match dn with
-      | [] -> A.ins3 MOVN (dst, O.imm_sixteen 0, O.optional_none)
+      | [] -> A.ins3 MOVN dst (O.imm_sixteen 0) O.optional_none
       | (f, p) :: l ->
         let nf = Nativeint.logxor f 0xFFFFn in
-        A.ins3 MOVN
-          ( dst,
-            O.imm_sixteen_of_nativeint nf,
-            O.optional_shift ~kind:LSL ~amount:p );
+        A.ins3 MOVN dst
+          (O.imm_sixteen_of_nativeint nf)
+          (O.optional_shift ~kind:LSL ~amount:p);
         List.iter (emit_movk dst) l
 
 let num_instructions_for_intconst n =
@@ -698,11 +696,11 @@ let emit_stack_adjustment n =
   let ml = m land 0xFFF and mh = m land 0xFFF_000 in
   if n < 0
   then (
-    if mh <> 0 then A.ins4 SUB_immediate (O.sp, O.sp, O.imm mh, O.optional_none);
-    if ml <> 0 then A.ins4 SUB_immediate (O.sp, O.sp, O.imm ml, O.optional_none))
+    if mh <> 0 then A.ins4 SUB_immediate O.sp O.sp (O.imm mh) O.optional_none;
+    if ml <> 0 then A.ins4 SUB_immediate O.sp O.sp (O.imm ml) O.optional_none)
   else (
-    if mh <> 0 then A.ins4 ADD_immediate (O.sp, O.sp, O.imm mh, O.optional_none);
-    if ml <> 0 then A.ins4 ADD_immediate (O.sp, O.sp, O.imm ml, O.optional_none));
+    if mh <> 0 then A.ins4 ADD_immediate O.sp O.sp (O.imm mh) O.optional_none;
+    if ml <> 0 then A.ins4 ADD_immediate O.sp O.sp (O.imm ml) O.optional_none);
   if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n)
 
 (* Output add-immediate / sub-immediate / cmp-immediate instructions *)
@@ -711,23 +709,23 @@ let rec emit_addimm rd rs n =
   if n < 0
   then emit_subimm rd rs (-n)
   else if n <= 0xFFF
-  then A.ins4 ADD_immediate (rd, rs, O.imm n, O.optional_none)
+  then A.ins4 ADD_immediate rd rs (O.imm n) O.optional_none
   else (
     assert (n <= 0xFFF_FFF);
     let nl = n land 0xFFF and nh = n land 0xFFF_000 in
-    A.ins4 ADD_immediate (rd, rs, O.imm nh, O.optional_none);
-    if nl <> 0 then A.ins4 ADD_immediate (rd, rd, O.imm nl, O.optional_none))
+    A.ins4 ADD_immediate rd rs (O.imm nh) O.optional_none;
+    if nl <> 0 then A.ins4 ADD_immediate rd rd (O.imm nl) O.optional_none)
 
 and emit_subimm rd rs n =
   if n < 0
   then emit_addimm rd rs (-n)
   else if n <= 0xFFF
-  then A.ins4 SUB_immediate (rd, rs, O.imm n, O.optional_none)
+  then A.ins4 SUB_immediate rd rs (O.imm n) O.optional_none
   else (
     assert (n <= 0xFFF_FFF);
     let nl = n land 0xFFF and nh = n land 0xFFF_000 in
-    A.ins4 SUB_immediate (rd, rs, O.imm nh, O.optional_none);
-    if nl <> 0 then A.ins4 SUB_immediate (rd, rd, O.imm nl, O.optional_none))
+    A.ins4 SUB_immediate rd rs (O.imm nh) O.optional_none;
+    if nl <> 0 then A.ins4 SUB_immediate rd rd (O.imm nl) O.optional_none)
 
 let emit_cmpimm rs n =
   if n >= 0
@@ -826,24 +824,25 @@ let emit_load_symbol_addr dst s =
     (* Local symbols are defined as labels, so reference them as labels. Use
        Text section since this is referencing code symbols. *)
     let lbl = L.create_label_for_local_symbol Text s in
-    A.ins2 ADRP (dst_x, label (Needs_reloc PAGE) lbl);
-    A.ins4 ADD_immediate
-      (dst_x, dst_x, label (Needs_reloc PAGE_OFF) lbl, O.optional_none))
+    A.ins2 ADRP dst_x (label (Needs_reloc PAGE) lbl);
+    A.ins4 ADD_immediate dst_x dst_x
+      (label (Needs_reloc PAGE_OFF) lbl)
+      O.optional_none)
   else if macosx || !Clflags.dlcode
   then (
     (* Global symbols need GOT on macOS or when building shared objects *)
-    A.ins2 ADRP (dst_x, symbol (Needs_reloc GOT_PAGE) s);
-    A.ins2 LDR
-      ( dst_x,
-        H.mem_symbol_reg (H.gp_reg_of_reg dst)
-          ~reloc:
-            (Needs_reloc (if macosx then GOT_PAGE_OFF else GOT_LOWER_TWELVE))
-          s ))
+    A.ins2 ADRP dst_x (symbol (Needs_reloc GOT_PAGE) s);
+    A.ins2 LDR dst_x
+      (H.mem_symbol_reg (H.gp_reg_of_reg dst)
+         ~reloc:
+           (Needs_reloc (if macosx then GOT_PAGE_OFF else GOT_LOWER_TWELVE))
+         s))
   else (
     (* Global symbols without dlcode can use direct addressing *)
-    A.ins2 ADRP (dst_x, symbol (Needs_reloc PAGE) s);
-    A.ins4 ADD_immediate
-      (dst_x, dst_x, symbol (Needs_reloc PAGE_OFF) s, O.optional_none))
+    A.ins2 ADRP dst_x (symbol (Needs_reloc PAGE) s);
+    A.ins4 ADD_immediate dst_x dst_x
+      (symbol (Needs_reloc PAGE_OFF) s)
+      O.optional_none)
 
 (* The following functions are used for calculating the sizes of the call GC and
    bounds check points emitted out-of-line from the function body. See
@@ -1199,25 +1198,22 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
     let domain_local_sp_offset = DS.(idx_of_field Domain_local_sp) * 8 in
     let domain_local_limit_offset = DS.(idx_of_field Domain_local_limit) * 8 in
     let domain_local_top_offset = DS.(idx_of_field Domain_local_top) * 8 in
-    A.ins2 LDR
-      ( reg_x_tmp1,
-        H.addressing (Iindexed domain_local_limit_offset) reg_domain_state_ptr
-      );
-    A.ins2 LDR
-      (r, H.addressing (Iindexed domain_local_sp_offset) reg_domain_state_ptr);
+    A.ins2 LDR reg_x_tmp1
+      (H.addressing (Iindexed domain_local_limit_offset) reg_domain_state_ptr);
+    A.ins2 LDR r
+      (H.addressing (Iindexed domain_local_sp_offset) reg_domain_state_ptr);
     emit_subimm r r n;
-    A.ins2 STR
-      (r, H.addressing (Iindexed domain_local_sp_offset) reg_domain_state_ptr);
+    A.ins2 STR r
+      (H.addressing (Iindexed domain_local_sp_offset) reg_domain_state_ptr);
     A.ins_cmp_reg r reg_x_tmp1 O.optional_none;
     let lbl_call = L.create Text in
     A.ins1 (B_cond LT) (local_label lbl_call);
     let lbl_after_alloc = L.create Text in
     D.define_label lbl_after_alloc;
-    A.ins2 LDR
-      ( reg_x_tmp1,
-        H.addressing (Iindexed domain_local_top_offset) reg_domain_state_ptr );
-    A.ins4 ADD_shifted_register (r, r, reg_x_tmp1, O.optional_none);
-    A.ins4 ADD_immediate (r, r, O.imm 8, O.optional_none);
+    A.ins2 LDR reg_x_tmp1
+      (H.addressing (Iindexed domain_local_top_offset) reg_domain_state_ptr);
+    A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
+    A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
     local_realloc_sites
       := { lr_lbl = lbl_call; lr_dbg = i.dbg; lr_return_lbl = lbl_after_alloc }
          :: !local_realloc_sites)
@@ -1232,8 +1228,8 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
          the generated code simpler. *)
       assert (16 <= n && n < 0x1_000 && n land 0x7 = 0);
       let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
-      A.ins2 LDR
-        (reg_x_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
+      A.ins2 LDR reg_x_tmp1
+        (H.addressing (Iindexed offset) reg_domain_state_ptr);
       emit_subimm reg_x_alloc_ptr reg_x_alloc_ptr n;
       A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
       (if not far
@@ -1244,7 +1240,8 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
         A.ins1 B (local_label lbl_call_gc);
         D.define_label lbl);
       labeled_ins4 lbl_after_alloc ADD_immediate
-        (H.reg_x i.res.(0), reg_x_alloc_ptr, O.imm 8, O.optional_none);
+        (H.reg_x i.res.(0))
+        reg_x_alloc_ptr (O.imm 8) O.optional_none;
       call_gc_sites
         := { gc_lbl = lbl_call_gc;
              gc_return_lbl = lbl_after_alloc;
@@ -1260,7 +1257,8 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
         emit_intconst reg_x_x8 (Nativeint.of_int n);
         A.ins1 BL (runtime_function S.Predef.caml_allocN));
       labeled_ins4 lbl_frame ADD_immediate
-        (H.reg_x i.res.(0), reg_x_alloc_ptr, O.imm 8, O.optional_none))
+        (H.reg_x i.res.(0))
+        reg_x_alloc_ptr (O.imm 8) O.optional_none)
 
 let assembly_code_for_poll i ~far ~return_label =
   let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
@@ -1269,7 +1267,7 @@ let assembly_code_for_poll i ~far ~return_label =
     match return_label with None -> L.create Text | Some lbl -> lbl
   in
   let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
-  A.ins2 LDR (reg_x_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
+  A.ins2 LDR reg_x_tmp1 (H.addressing (Iindexed offset) reg_domain_state_ptr);
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
   then (
@@ -1320,46 +1318,38 @@ let emit_named_text_section func_name =
 let emit_load_literal dst lbl =
   if macosx
   then (
-    A.ins2 ADRP (reg_x_tmp1, label (Needs_reloc PAGE) lbl);
+    A.ins2 ADRP reg_x_tmp1 (label (Needs_reloc PAGE) lbl);
     match dst.typ with
     | Float ->
-      A.ins2 LDR_simd_and_fp
-        ( H.reg_d dst,
-          H.mem_label reg_tmp1_base ~reloc:(Needs_reloc PAGE_OFF) lbl )
+      A.ins2 LDR_simd_and_fp (H.reg_d dst)
+        (H.mem_label reg_tmp1_base ~reloc:(Needs_reloc PAGE_OFF) lbl)
     | Float32 ->
-      A.ins2 LDR_simd_and_fp
-        ( H.reg_s dst,
-          H.mem_label reg_tmp1_base ~reloc:(Needs_reloc PAGE_OFF) lbl )
+      A.ins2 LDR_simd_and_fp (H.reg_s dst)
+        (H.mem_label reg_tmp1_base ~reloc:(Needs_reloc PAGE_OFF) lbl)
     | Val | Int | Addr ->
-      A.ins2 LDR
-        ( H.reg_x dst,
-          H.mem_label reg_tmp1_base ~reloc:(Needs_reloc PAGE_OFF) lbl )
+      A.ins2 LDR (H.reg_x dst)
+        (H.mem_label reg_tmp1_base ~reloc:(Needs_reloc PAGE_OFF) lbl)
     | Vec128 | Valx2 ->
-      A.ins2 LDR_simd_and_fp
-        ( H.reg_q_operand dst,
-          H.mem_label reg_tmp1_base ~reloc:(Needs_reloc PAGE_OFF) lbl )
+      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst)
+        (H.mem_label reg_tmp1_base ~reloc:(Needs_reloc PAGE_OFF) lbl)
     | Vec256 | Vec512 ->
       Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
         Printreg.reg dst)
   else (
-    A.ins2 ADRP (reg_x_tmp1, label (Needs_reloc PAGE) lbl);
+    A.ins2 ADRP reg_x_tmp1 (label (Needs_reloc PAGE) lbl);
     match dst.typ with
     | Float ->
-      A.ins2 LDR_simd_and_fp
-        ( H.reg_d dst,
-          H.mem_label reg_tmp1_base ~reloc:(Needs_reloc LOWER_TWELVE) lbl )
+      A.ins2 LDR_simd_and_fp (H.reg_d dst)
+        (H.mem_label reg_tmp1_base ~reloc:(Needs_reloc LOWER_TWELVE) lbl)
     | Float32 ->
-      A.ins2 LDR_simd_and_fp
-        ( H.reg_s dst,
-          H.mem_label reg_tmp1_base ~reloc:(Needs_reloc LOWER_TWELVE) lbl )
+      A.ins2 LDR_simd_and_fp (H.reg_s dst)
+        (H.mem_label reg_tmp1_base ~reloc:(Needs_reloc LOWER_TWELVE) lbl)
     | Val | Int | Addr ->
-      A.ins2 LDR
-        ( H.reg_x dst,
-          H.mem_label reg_tmp1_base ~reloc:(Needs_reloc LOWER_TWELVE) lbl )
+      A.ins2 LDR (H.reg_x dst)
+        (H.mem_label reg_tmp1_base ~reloc:(Needs_reloc LOWER_TWELVE) lbl)
     | Vec128 | Valx2 ->
-      A.ins2 LDR_simd_and_fp
-        ( H.reg_q_operand dst,
-          H.mem_label reg_tmp1_base ~reloc:(Needs_reloc LOWER_TWELVE) lbl )
+      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst)
+        (H.mem_label reg_tmp1_base ~reloc:(Needs_reloc LOWER_TWELVE) lbl)
     | Vec256 | Vec512 ->
       Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
         Printreg.reg dst)
@@ -1369,8 +1359,9 @@ let move (src : Reg.t) (dst : Reg.t) =
   if distinct
   then
     match src.typ, src.loc, dst.typ, dst.loc with
-    | Float, Reg _, Float, Reg _ -> A.ins2 FMOV_fp (H.reg_d dst, H.reg_d src)
-    | Float32, Reg _, Float32, Reg _ -> A.ins2 FMOV_fp (H.reg_s dst, H.reg_s src)
+    | Float, Reg _, Float, Reg _ -> A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d src)
+    | Float32, Reg _, Float32, Reg _ ->
+      A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
     | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Reg _ ->
       A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
     | (Vec256 | Vec512), _, _, _ | _, _, (Vec256 | Vec512), _ ->
@@ -1378,21 +1369,21 @@ let move (src : Reg.t) (dst : Reg.t) =
     | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
       A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
     | Float, Reg _, Float, Stack _ ->
-      A.ins2 STR_simd_and_fp (H.reg_d src, stack dst)
+      A.ins2 STR_simd_and_fp (H.reg_d src) (stack dst)
     | Float32, Reg _, Float32, Stack _ ->
-      A.ins2 STR_simd_and_fp (H.reg_s src, stack dst)
+      A.ins2 STR_simd_and_fp (H.reg_s src) (stack dst)
     | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
-      A.ins2 STR_simd_and_fp (H.reg_q_operand src, stack dst)
+      A.ins2 STR_simd_and_fp (H.reg_q_operand src) (stack dst)
     | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
-      A.ins2 STR (H.reg_x src, stack dst)
+      A.ins2 STR (H.reg_x src) (stack dst)
     | Float, Stack _, Float, Reg _ ->
-      A.ins2 LDR_simd_and_fp (H.reg_d dst, stack src)
+      A.ins2 LDR_simd_and_fp (H.reg_d dst) (stack src)
     | Float32, Stack _, Float32, Reg _ ->
-      A.ins2 LDR_simd_and_fp (H.reg_s dst, stack src)
+      A.ins2 LDR_simd_and_fp (H.reg_s dst) (stack src)
     | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
-      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst, stack src)
+      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) (stack src)
     | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
-      A.ins2 LDR (H.reg_x dst, stack src)
+      A.ins2 LDR (H.reg_x dst) (stack src)
     | _, Stack _, _, Stack _ ->
       Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
         Printreg.reg src Printreg.reg dst
@@ -1414,24 +1405,24 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   let dst = i.res.(0) in
   let distinct = not (Reg.same_loc src dst) in
   match cast with
-  | Int64_of_float -> A.ins2 FMOV_fp_to_gp_64 (H.reg_x dst, H.reg_d src)
-  | Float_of_int64 -> A.ins2 FMOV_gp_to_fp_64 (H.reg_d dst, H.reg_x src)
-  | Float32_of_int32 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst, H.reg_w src)
-  | Int32_of_float32 -> A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst, H.reg_s src)
+  | Int64_of_float -> A.ins2 FMOV_fp_to_gp_64 (H.reg_x dst) (H.reg_d src)
+  | Float_of_int64 -> A.ins2 FMOV_gp_to_fp_64 (H.reg_d dst) (H.reg_x src)
+  | Float32_of_int32 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst) (H.reg_w src)
+  | Int32_of_float32 -> A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s src)
   | Float32_of_float ->
     (* Reinterpret cast: treat both as d registers for FMOV if distinct. *)
     if distinct
     then (
       assert (Cmm.equal_machtype_component src.typ Float);
       assert (Cmm.equal_machtype_component dst.typ Float32);
-      A.ins2 FMOV_fp (H.reg_d_of_float_reg dst, H.reg_d_of_float_reg src))
+      A.ins2 FMOV_fp (H.reg_d_of_float_reg dst) (H.reg_d_of_float_reg src))
   | Float_of_float32 ->
     (* Reinterpret cast: treat both as d registers for FMOV if distinct. *)
     if distinct
     then (
       assert (Cmm.equal_machtype_component src.typ Float32);
       assert (Cmm.equal_machtype_component dst.typ Float);
-      A.ins2 FMOV_fp (H.reg_d_of_float_reg dst, H.reg_d_of_float_reg src))
+      A.ins2 FMOV_fp (H.reg_d_of_float_reg dst) (H.reg_d_of_float_reg src))
   | V128_of_vec Vec128 ->
     if distinct
     then A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
@@ -1444,35 +1435,35 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   let src = i.arg.(0) in
   let distinct = not (Reg.same_loc src dst) in
   match cast with
-  | Int_of_float Float64 -> A.ins2 FCVTZS (H.reg_x dst, H.reg_d src)
-  | Int_of_float Float32 -> A.ins2 FCVTZS (H.reg_x dst, H.reg_s src)
-  | Float_of_int Float64 -> A.ins2 SCVTF (H.reg_d dst, H.reg_x src)
-  | Float_of_int Float32 -> A.ins2 SCVTF (H.reg_s dst, H.reg_x src)
-  | Float_of_float32 -> A.ins2 FCVT (H.reg_d dst, H.reg_s src)
-  | Float32_of_float -> A.ins2 FCVT (H.reg_s dst, H.reg_d src)
+  | Int_of_float Float64 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_d src)
+  | Int_of_float Float32 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_s src)
+  | Float_of_int Float64 -> A.ins2 SCVTF (H.reg_d dst) (H.reg_x src)
+  | Float_of_int Float32 -> A.ins2 SCVTF (H.reg_s dst) (H.reg_x src)
+  | Float_of_float32 -> A.ins2 FCVT (H.reg_d dst) (H.reg_s src)
+  | Float32_of_float -> A.ins2 FCVT (H.reg_s dst) (H.reg_d src)
   | Scalar_of_v128 v -> (
     match v with
     | Int8x16 ->
       (* Note this uses [reg_s] even though the source is wider *)
-      A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst, H.reg_s src);
+      A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s src);
       A.ins_uxtb (H.reg_w dst) (H.reg_w dst)
     | Int16x8 ->
-      A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst, H.reg_s src);
+      A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s src);
       A.ins_uxth (H.reg_w dst) (H.reg_w dst)
-    | Int32x4 -> A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst, H.reg_s src)
-    | Int64x2 -> A.ins2 FMOV_fp_to_gp_64 (H.reg_x dst, H.reg_d src)
+    | Int32x4 -> A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s src)
+    | Int64x2 -> A.ins2 FMOV_fp_to_gp_64 (H.reg_x dst) (H.reg_d src)
     | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
-    | Float32x4 -> if distinct then A.ins2 FMOV_fp (H.reg_s dst, H.reg_s src)
-    | Float64x2 -> if distinct then A.ins2 FMOV_fp (H.reg_d dst, H.reg_d src))
+    | Float32x4 -> if distinct then A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
+    | Float64x2 -> if distinct then A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d src))
   | V128_of_scalar v -> (
     match v with
-    | Int8x16 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst, H.reg_w src)
-    | Int16x8 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst, H.reg_w src)
-    | Int32x4 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst, H.reg_w src)
-    | Int64x2 -> A.ins2 FMOV_gp_to_fp_64 (H.reg_d dst, H.reg_x src)
+    | Int8x16 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst) (H.reg_w src)
+    | Int16x8 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst) (H.reg_w src)
+    | Int32x4 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst) (H.reg_w src)
+    | Int64x2 -> A.ins2 FMOV_gp_to_fp_64 (H.reg_d dst) (H.reg_x src)
     | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
-    | Float32x4 -> if distinct then A.ins2 FMOV_fp (H.reg_s dst, H.reg_s src)
-    | Float64x2 -> if distinct then A.ins2 FMOV_fp (H.reg_d dst, H.reg_d src))
+    | Float32x4 -> if distinct then A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
+    | Float64x2 -> if distinct then A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d src))
   | V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
 
@@ -1489,11 +1480,11 @@ let emit_instr i =
     if !contains_calls
     then (
       D.cfi_offset ~reg:30 (* return address *) ~offset:(-8);
-      A.ins2 STR (O.lr, O.mem_offset ~base:R.sp ~offset:(n - 8)))
+      A.ins2 STR O.lr (O.mem_offset ~base:R.sp ~offset:(n - 8)))
   | Lepilogue_open ->
     let n = frame_size () in
     if !contains_calls
-    then A.ins2 LDR (O.lr, O.mem_offset ~base:R.sp ~offset:(n - 8));
+    then A.ins2 LDR O.lr (O.mem_offset ~base:R.sp ~offset:(n - 8));
     if n > 0 then emit_stack_adjustment n
   | Lepilogue_close ->
     let n = frame_size () in
@@ -1510,17 +1501,18 @@ let emit_instr i =
     then
       match src.loc, dst.loc with
       | Reg _, Reg _ -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
-      | Reg _, Stack _ -> A.ins2 STR (H.reg_w src, stack dst)
-      | Stack _, Reg _ -> A.ins2 LDR (H.reg_w dst, stack src)
+      | Reg _, Stack _ -> A.ins2 STR (H.reg_w src) (stack dst)
+      | Stack _, Reg _ -> A.ins2 LDR (H.reg_w dst) (stack src)
       | Stack _, Stack _ | _, Unknown | Unknown, _ -> assert false)
   | Lop (Const_int n) -> emit_intconst (H.reg_x i.res.(0)) n
   | Lop (Const_float32 f) ->
     if Int32.equal f 0l
-    then A.ins2 FMOV_gp_to_fp_32 (H.reg_s i.res.(0), O.wzr)
+    then A.ins2 FMOV_gp_to_fp_32 (H.reg_s i.res.(0)) O.wzr
     else if is_immediate_float32 f
     then
       A.ins2 FMOV_scalar_immediate
-        (H.reg_s i.res.(0), O.imm_float (Int32.float_of_bits f))
+        (H.reg_s i.res.(0))
+        (O.imm_float (Int32.float_of_bits f))
     else
       (* float32 constants take up 8 bytes when we emit them with
          [float_literal] (see the conversion from int32 to int64 below). Thus,
@@ -1530,11 +1522,12 @@ let emit_instr i =
       emit_load_literal i.res.(0) lbl
   | Lop (Const_float f) ->
     if Int64.equal f 0L
-    then A.ins2 FMOV_gp_to_fp_64 (H.reg_d i.res.(0), O.xzr)
+    then A.ins2 FMOV_gp_to_fp_64 (H.reg_d i.res.(0)) O.xzr
     else if is_immediate_float f
     then
       A.ins2 FMOV_scalar_immediate
-        (H.reg_d i.res.(0), O.imm_float (Int64.float_of_bits f))
+        (H.reg_d i.res.(0))
+        (O.imm_float (Int64.float_of_bits f))
     else
       let lbl = float_literal f in
       emit_load_literal i.res.(0) lbl
@@ -1544,7 +1537,7 @@ let emit_instr i =
     match word0, word1 with
     | 0x0000_0000_0000_0000L, 0x0000_0000_0000_0000L ->
       let dst = H.reg_v2d_operand i.res.(0) in
-      A.ins2 MOVI (dst, O.imm 0)
+      A.ins2 MOVI dst (O.imm 0)
     | _ ->
       let lbl = vec128_literal l in
       emit_load_literal i.res.(0) lbl)
@@ -1568,11 +1561,9 @@ let emit_instr i =
     if Config.runtime5 && stack_ofs > 0
     then (
       A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
-      A.ins4 ADD_immediate
-        ( reg_stack_arg_end,
-          O.sp,
-          O.imm (Misc.align stack_ofs 16),
-          O.optional_none );
+      A.ins4 ADD_immediate reg_stack_arg_end O.sp
+        (O.imm (Misc.align stack_ofs 16))
+        O.optional_none;
       emit_load_symbol_addr reg_x8 (S.create_global func);
       A.ins1 BL (runtime_function S.Predef.caml_c_call_stack_args);
       record_frame i.live (Dbg_other i.dbg))
@@ -1592,8 +1583,8 @@ let emit_instr i =
         (* CR mshinwell: name this integer *)
         D.cfi_def_cfa_register ~reg:(Int.to_string 29 (* fp *));
         let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
-        A.ins2 LDR
-          (reg_x_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
+        A.ins2 LDR reg_x_tmp1
+          (H.addressing (Iindexed offset) reg_domain_state_ptr);
         A.ins_mov_to_sp ~src:reg_x_tmp1)
       else D.cfi_remember_state ();
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
@@ -1615,49 +1606,48 @@ let emit_instr i =
       | Ibased (s, ofs) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
-        A.ins2 ADRP
-          (reg_x_tmp1, symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
+        A.ins2 ADRP reg_x_tmp1
+          (symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
         reg_tmp1
     in
     let default_addressing = H.addressing addressing_mode base in
     match memory_chunk with
-    | Byte_unsigned -> A.ins2 LDRB (H.reg_w dst, default_addressing)
-    | Byte_signed -> A.ins2 LDRSB (H.reg_x dst, default_addressing)
-    | Sixteen_unsigned -> A.ins2 LDRH (H.reg_w dst, default_addressing)
-    | Sixteen_signed -> A.ins2 LDRSH (H.reg_x dst, default_addressing)
-    | Thirtytwo_unsigned -> A.ins2 LDR (H.reg_w dst, default_addressing)
-    | Thirtytwo_signed -> A.ins2 LDRSW (H.reg_x dst, default_addressing)
+    | Byte_unsigned -> A.ins2 LDRB (H.reg_w dst) default_addressing
+    | Byte_signed -> A.ins2 LDRSB (H.reg_x dst) default_addressing
+    | Sixteen_unsigned -> A.ins2 LDRH (H.reg_w dst) default_addressing
+    | Sixteen_signed -> A.ins2 LDRSH (H.reg_x dst) default_addressing
+    | Thirtytwo_unsigned -> A.ins2 LDR (H.reg_w dst) default_addressing
+    | Thirtytwo_signed -> A.ins2 LDRSW (H.reg_x dst) default_addressing
     | Single { reg = Float64 } ->
-      A.ins2 LDR_simd_and_fp (reg_s7, default_addressing);
-      A.ins2 FCVT (H.reg_d dst, reg_s7)
+      A.ins2 LDR_simd_and_fp reg_s7 default_addressing;
+      A.ins2 FCVT (H.reg_d dst) reg_s7
     | Word_int | Word_val ->
       if is_atomic
       then (
         assert (Arch.equal_addressing_mode addressing_mode (Iindexed 0));
         A.ins0 (DMB ISHLD);
-        A.ins2 LDAR (H.reg_x dst, H.mem (H.gp_reg_of_reg i.arg.(0))))
-      else A.ins2 LDR (H.reg_x dst, default_addressing)
-    | Double -> A.ins2 LDR_simd_and_fp (H.reg_d dst, default_addressing)
+        A.ins2 LDAR (H.reg_x dst) (H.mem (H.gp_reg_of_reg i.arg.(0))))
+      else A.ins2 LDR (H.reg_x dst) default_addressing
+    | Double -> A.ins2 LDR_simd_and_fp (H.reg_d dst) default_addressing
     | Single { reg = Float32 } ->
-      A.ins2 LDR_simd_and_fp (H.reg_s dst, default_addressing)
+      A.ins2 LDR_simd_and_fp (H.reg_s dst) default_addressing
     | Onetwentyeight_aligned ->
-      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst, default_addressing)
+      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) default_addressing
     | Onetwentyeight_unaligned ->
       (match addressing_mode with
       | Iindexed n ->
-        A.ins4 ADD_immediate
-          (reg_x_tmp1, H.reg_x i.arg.(0), O.imm n, O.optional_none)
+        A.ins4 ADD_immediate reg_x_tmp1
+          (H.reg_x i.arg.(0))
+          (O.imm n) O.optional_none
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
-        A.ins2 ADRP
-          (reg_x_tmp1, symbol_or_label_for_data ~offset (Needs_reloc PAGE) s);
-        A.ins4 ADD_immediate
-          ( reg_x_tmp1,
-            reg_x_tmp1,
-            symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s,
-            O.optional_none ));
-      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst, H.mem reg_tmp1_base)
+        A.ins2 ADRP reg_x_tmp1
+          (symbol_or_label_for_data ~offset (Needs_reloc PAGE) s);
+        A.ins4 ADD_immediate reg_x_tmp1 reg_x_tmp1
+          (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
+          O.optional_none);
+      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) (H.mem reg_tmp1_base)
     | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
     | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector")
@@ -1670,46 +1660,45 @@ let emit_instr i =
       | Iindexed _ -> i.arg.(1)
       | Ibased (s, ofs) ->
         assert (not !Clflags.dlcode);
-        A.ins2 ADRP
-          (reg_x_tmp1, symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
+        A.ins2 ADRP reg_x_tmp1
+          (symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
         reg_tmp1
     in
     match size with
     | Byte_unsigned | Byte_signed ->
-      A.ins2 STRB (H.reg_w src, H.addressing addr base)
+      A.ins2 STRB (H.reg_w src) (H.addressing addr base)
     | Sixteen_unsigned | Sixteen_signed ->
-      A.ins2 STRH (H.reg_w src, H.addressing addr base)
+      A.ins2 STRH (H.reg_w src) (H.addressing addr base)
     | Thirtytwo_unsigned | Thirtytwo_signed ->
-      A.ins2 STR (H.reg_w src, H.addressing addr base)
+      A.ins2 STR (H.reg_w src) (H.addressing addr base)
     | Single { reg = Float64 } ->
-      A.ins2 FCVT (reg_s7, H.reg_d src);
-      A.ins2 STR_simd_and_fp (reg_s7, H.addressing addr base)
+      A.ins2 FCVT reg_s7 (H.reg_d src);
+      A.ins2 STR_simd_and_fp reg_s7 (H.addressing addr base)
     | Word_int | Word_val ->
       (* memory model barrier for non-initializing store *)
       if assignment then A.ins0 (DMB ISHLD);
-      A.ins2 STR (H.reg_x src, H.addressing addr base)
-    | Double -> A.ins2 STR_simd_and_fp (H.reg_d src, H.addressing addr base)
+      A.ins2 STR (H.reg_x src) (H.addressing addr base)
+    | Double -> A.ins2 STR_simd_and_fp (H.reg_d src) (H.addressing addr base)
     | Single { reg = Float32 } ->
-      A.ins2 STR_simd_and_fp (H.reg_s src, H.addressing addr base)
+      A.ins2 STR_simd_and_fp (H.reg_s src) (H.addressing addr base)
     | Onetwentyeight_aligned ->
-      A.ins2 STR_simd_and_fp (H.reg_q_operand src, H.addressing addr base)
+      A.ins2 STR_simd_and_fp (H.reg_q_operand src) (H.addressing addr base)
     | Onetwentyeight_unaligned -> (
       match addr with
       | Iindexed n ->
-        A.ins4 ADD_immediate
-          (reg_x_tmp1, H.reg_x i.arg.(1), O.imm n, O.optional_none);
-        A.ins2 STR_simd_and_fp (H.reg_q_operand src, H.mem reg_tmp1_base)
+        A.ins4 ADD_immediate reg_x_tmp1
+          (H.reg_x i.arg.(1))
+          (O.imm n) O.optional_none;
+        A.ins2 STR_simd_and_fp (H.reg_q_operand src) (H.mem reg_tmp1_base)
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
-        A.ins2 ADRP
-          (reg_x_tmp1, symbol_or_label_for_data ~offset (Needs_reloc PAGE) s);
-        A.ins4 ADD_immediate
-          ( reg_x_tmp1,
-            reg_x_tmp1,
-            symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s,
-            O.optional_none );
-        A.ins2 STR_simd_and_fp (H.reg_q_operand src, H.mem reg_tmp1_base))
+        A.ins2 ADRP reg_x_tmp1
+          (symbol_or_label_for_data ~offset (Needs_reloc PAGE) s);
+        A.ins4 ADD_immediate reg_x_tmp1 reg_x_tmp1
+          (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
+          O.optional_none;
+        A.ins2 STR_simd_and_fp (H.reg_q_operand src) (H.mem reg_tmp1_base))
     | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
     | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector")
@@ -1722,11 +1711,13 @@ let emit_instr i =
   | Lop Begin_region ->
     let offset = Domainstate.(idx_of_field Domain_local_sp) * 8 in
     A.ins2 LDR
-      (H.reg_x i.res.(0), H.addressing (Iindexed offset) reg_domain_state_ptr)
+      (H.reg_x i.res.(0))
+      (H.addressing (Iindexed offset) reg_domain_state_ptr)
   | Lop End_region ->
     let offset = Domainstate.(idx_of_field Domain_local_sp) * 8 in
     A.ins2 STR
-      (H.reg_x i.arg.(0), H.addressing (Iindexed offset) reg_domain_state_ptr)
+      (H.reg_x i.arg.(0))
+      (H.addressing (Iindexed offset) reg_domain_state_ptr)
   | Lop Poll -> assembly_code_for_poll i ~far:false ~return_label:None
   | Lop Pause -> A.ins0 YIELD
   | Lop (Specific Ifar_poll) ->
@@ -1739,82 +1730,106 @@ let emit_instr i =
     A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
     A.ins_cset (H.reg_x i.res.(0)) (cond_for_comparison cmp)
   | Lop (Floatop (Float64, Icompf cmp)) ->
-    let comp = cond_for_cset_for_float_comparison cmp in
-    A.ins2 FCMP (H.reg_d i.arg.(0), H.reg_d i.arg.(1));
-    A.ins_cset (H.reg_x i.res.(0)) comp
+    let cond = cond_for_cset_for_float_comparison cmp in
+    A.ins2 FCMP (H.reg_d i.arg.(0)) (H.reg_d i.arg.(1));
+    A.ins_cset (H.reg_x i.res.(0)) cond
   | Lop (Floatop (Float32, Icompf cmp)) ->
-    let comp = cond_for_cset_for_float_comparison cmp in
-    A.ins2 FCMP (H.reg_s i.arg.(0), H.reg_s i.arg.(1));
-    A.ins_cset (H.reg_x i.res.(0)) comp
+    let cond = cond_for_cset_for_float_comparison cmp in
+    A.ins2 FCMP (H.reg_s i.arg.(0)) (H.reg_s i.arg.(1));
+    A.ins_cset (H.reg_x i.res.(0)) cond
   | Lop (Intop_imm (Icomp cmp, n)) ->
     emit_cmpimm (H.reg_x i.arg.(0)) n;
     A.ins_cset (H.reg_x i.res.(0)) (cond_for_comparison cmp)
   | Lop (Intop Imod) ->
-    A.ins3 SDIV (reg_x_tmp1, H.reg_x i.arg.(0), H.reg_x i.arg.(1));
+    A.ins3 SDIV reg_x_tmp1 (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1));
     A.ins4 MSUB
-      (H.reg_x i.res.(0), reg_x_tmp1, H.reg_x i.arg.(1), H.reg_x i.arg.(0))
+      (H.reg_x i.res.(0))
+      reg_x_tmp1
+      (H.reg_x i.arg.(1))
+      (H.reg_x i.arg.(0))
   | Lop (Intop (Imulh { signed = true })) ->
-    A.ins3 SMULH (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
+    A.ins3 SMULH (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop (Imulh { signed = false })) ->
-    A.ins3 UMULH (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
+    A.ins3 UMULH (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Int128op _) ->
     (* CR mslater: restore after the arm DSL is merged *)
     Misc.fatal_error "arm64: got int128 op"
   | Lop (Intop Ipopcnt) ->
     if !Arch.feat_cssc
-    then A.ins2 CNT (H.reg_x i.res.(0), H.reg_x i.arg.(0))
+    then A.ins2 CNT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
     else
       let tmp = 7 in
       let tmp_v8b = O.reg_op (R.reg_v8b tmp) in
       let tmp_b = O.reg_op (R.reg_b tmp) in
       let tmp_d = O.reg_op (R.reg_d tmp) in
-      A.ins2 FMOV_gp_to_fp_64 (tmp_d, H.reg_x i.arg.(0));
-      A.ins2 CNT_vector (tmp_v8b, tmp_v8b);
-      A.ins2 ADDV (tmp_b, tmp_v8b);
-      A.ins2 FMOV_fp_to_gp_64 (H.reg_x i.res.(0), tmp_d)
+      A.ins2 FMOV_gp_to_fp_64 tmp_d (H.reg_x i.arg.(0));
+      A.ins2 CNT_vector tmp_v8b tmp_v8b;
+      A.ins2 ADDV tmp_b tmp_v8b;
+      A.ins2 FMOV_fp_to_gp_64 (H.reg_x i.res.(0)) tmp_d
   | Lop (Intop (Ictz _)) ->
     (* [ctz Rd, Rn] is optionally supported from Armv8.7, but rbit and clz are
        supported in all ARMv8 CPUs. *)
     if !Arch.feat_cssc
-    then A.ins2 CTZ (H.reg_x i.res.(0), H.reg_x i.arg.(0))
+    then A.ins2 CTZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
     else (
-      A.ins2 RBIT (H.reg_x i.res.(0), H.reg_x i.arg.(0));
-      A.ins2 CLZ (H.reg_x i.res.(0), H.reg_x i.res.(0)))
-  | Lop (Intop (Iclz _)) -> A.ins2 CLZ (H.reg_x i.res.(0), H.reg_x i.arg.(0))
+      A.ins2 RBIT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0));
+      A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.res.(0)))
+  | Lop (Intop (Iclz _)) -> A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
   | Lop (Intop Iand) ->
     A.ins4 AND_shifted_register
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
+      O.optional_none
   | Lop (Intop Ior) ->
     A.ins4 ORR_shifted_register
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
+      O.optional_none
   | Lop (Intop Ixor) ->
     A.ins4 EOR_shifted_register
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
+      O.optional_none
   | Lop (Intop Ilsl) ->
-    A.ins3 LSLV (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
+    A.ins3 LSLV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Ilsr) ->
-    A.ins3 LSRV (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
+    A.ins3 LSRV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Iasr) ->
-    A.ins3 ASRV (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
+    A.ins3 ASRV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Iadd) ->
     A.ins4 ADD_shifted_register
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
+      O.optional_none
   | Lop (Intop Isub) ->
     A.ins4 SUB_shifted_register
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
+      O.optional_none
   | Lop (Intop Imul) ->
     A.ins_mul (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Idiv) ->
-    A.ins3 SDIV (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
-  | Lop (Intop_imm (Iand, n)) ->
+    A.ins3 SDIV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
+  | Lop (Intop_imm (Iand, _n)) ->
     A.ins3 AND_immediate
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), O.bitmask (Nativeint.of_int n))
-  | Lop (Intop_imm (Ior, n)) ->
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (O.bitmask (Nativeint.of_int _n))
+  | Lop (Intop_imm (Ior, _n)) ->
     A.ins3 ORR_immediate
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), O.bitmask (Nativeint.of_int n))
-  | Lop (Intop_imm (Ixor, n)) ->
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (O.bitmask (Nativeint.of_int _n))
+  | Lop (Intop_imm (Ixor, _n)) ->
     A.ins3 EOR_immediate
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), O.bitmask (Nativeint.of_int n))
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (O.bitmask (Nativeint.of_int _n))
   | Lop (Intop_imm (Ilsl, shift_in_bits)) ->
     A.ins_lsl_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop (Intop_imm (Ilsr, shift_in_bits)) ->
@@ -1828,62 +1843,62 @@ let emit_instr i =
       Printlinear.instr i
   | Lop (Specific Isqrtf) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(0) with
-    | S_regs (rd, rn, _) -> A.ins2 FSQRT (rd, rn)
-    | D_regs (rd, rn, _) -> A.ins2 FSQRT (rd, rn))
+    | S_regs (rd, rn, _) -> A.ins2 FSQRT rd rn
+    | D_regs (rd, rn, _) -> A.ins2 FSQRT rd rn)
   | Lop (Floatop ((Float32 | Float64), Iabsf)) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(0) with
-    | S_regs (rd, rn, _) -> A.ins2 FABS (rd, rn)
-    | D_regs (rd, rn, _) -> A.ins2 FABS (rd, rn))
+    | S_regs (rd, rn, _) -> A.ins2 FABS rd rn
+    | D_regs (rd, rn, _) -> A.ins2 FABS rd rn)
   | Lop (Floatop ((Float32 | Float64), Inegf)) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(0) with
-    | S_regs (rd, rn, _) -> A.ins2 FNEG (rd, rn)
-    | D_regs (rd, rn, _) -> A.ins2 FNEG (rd, rn))
+    | S_regs (rd, rn, _) -> A.ins2 FNEG rd rn
+    | D_regs (rd, rn, _) -> A.ins2 FNEG rd rn)
   | Lop (Floatop ((Float32 | Float64), Iaddf)) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(1) with
-    | S_regs (rd, rn, rm) -> A.ins3 FADD (rd, rn, rm)
-    | D_regs (rd, rn, rm) -> A.ins3 FADD (rd, rn, rm))
+    | S_regs (rd, rn, rm) -> A.ins3 FADD rd rn rm
+    | D_regs (rd, rn, rm) -> A.ins3 FADD rd rn rm)
   | Lop (Floatop ((Float32 | Float64), Isubf)) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(1) with
-    | S_regs (rd, rn, rm) -> A.ins3 FSUB (rd, rn, rm)
-    | D_regs (rd, rn, rm) -> A.ins3 FSUB (rd, rn, rm))
+    | S_regs (rd, rn, rm) -> A.ins3 FSUB rd rn rm
+    | D_regs (rd, rn, rm) -> A.ins3 FSUB rd rn rm)
   | Lop (Floatop ((Float32 | Float64), Imulf)) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(1) with
-    | S_regs (rd, rn, rm) -> A.ins3 FMUL (rd, rn, rm)
-    | D_regs (rd, rn, rm) -> A.ins3 FMUL (rd, rn, rm))
+    | S_regs (rd, rn, rm) -> A.ins3 FMUL rd rn rm
+    | D_regs (rd, rn, rm) -> A.ins3 FMUL rd rn rm)
   | Lop (Floatop ((Float32 | Float64), Idivf)) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(1) with
-    | S_regs (rd, rn, rm) -> A.ins3 FDIV (rd, rn, rm)
-    | D_regs (rd, rn, rm) -> A.ins3 FDIV (rd, rn, rm))
+    | S_regs (rd, rn, rm) -> A.ins3 FDIV rd rn rm
+    | D_regs (rd, rn, rm) -> A.ins3 FDIV rd rn rm)
   | Lop (Specific Inegmulf) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(1) with
-    | S_regs (rd, rn, rm) -> A.ins3 FNMUL (rd, rn, rm)
-    | D_regs (rd, rn, rm) -> A.ins3 FNMUL (rd, rn, rm))
+    | S_regs (rd, rn, rm) -> A.ins3 FNMUL rd rn rm
+    | D_regs (rd, rn, rm) -> A.ins3 FNMUL rd rn rm)
   | Lop (Specific Imuladdf) -> (
     match H.reg_fp_operand_4 i.res.(0) i.arg.(1) i.arg.(2) i.arg.(0) with
-    | S_regs (rd, rn, rm, ra) -> A.ins4 FMADD (rd, rn, rm, ra)
-    | D_regs (rd, rn, rm, ra) -> A.ins4 FMADD (rd, rn, rm, ra))
+    | S_regs (rd, rn, rm, ra) -> A.ins4 FMADD rd rn rm ra
+    | D_regs (rd, rn, rm, ra) -> A.ins4 FMADD rd rn rm ra)
   | Lop (Specific Inegmuladdf) -> (
     match H.reg_fp_operand_4 i.res.(0) i.arg.(1) i.arg.(2) i.arg.(0) with
-    | S_regs (rd, rn, rm, ra) -> A.ins4 FNMADD (rd, rn, rm, ra)
-    | D_regs (rd, rn, rm, ra) -> A.ins4 FNMADD (rd, rn, rm, ra))
+    | S_regs (rd, rn, rm, ra) -> A.ins4 FNMADD rd rn rm ra
+    | D_regs (rd, rn, rm, ra) -> A.ins4 FNMADD rd rn rm ra)
   | Lop (Specific Imulsubf) -> (
     match H.reg_fp_operand_4 i.res.(0) i.arg.(1) i.arg.(2) i.arg.(0) with
-    | S_regs (rd, rn, rm, ra) -> A.ins4 FMSUB (rd, rn, rm, ra)
-    | D_regs (rd, rn, rm, ra) -> A.ins4 FMSUB (rd, rn, rm, ra))
+    | S_regs (rd, rn, rm, ra) -> A.ins4 FMSUB rd rn rm ra
+    | D_regs (rd, rn, rm, ra) -> A.ins4 FMSUB rd rn rm ra)
   | Lop (Specific Inegmulsubf) -> (
     match H.reg_fp_operand_4 i.res.(0) i.arg.(1) i.arg.(2) i.arg.(0) with
-    | S_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB (rd, rn, rm, ra)
-    | D_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB (rd, rn, rm, ra))
+    | S_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB rd rn rm ra
+    | D_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB rd rn rm ra)
   | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
   | Lop (Specific (Ishiftarith (op, shift))) ->
     let open I in
     let open Ast.Operand.Shift.Kind in
     let emit_shift_arith instr shift_kind shift_amount =
       A.ins4 instr
-        ( H.reg_x i.res.(0),
-          H.reg_x i.arg.(0),
-          H.reg_x i.arg.(1),
-          O.optional_shift ~kind:shift_kind ~amount:shift_amount )
+        (H.reg_x i.res.(0))
+        (H.reg_x i.arg.(0))
+        (H.reg_x i.arg.(1))
+        (O.optional_shift ~kind:shift_kind ~amount:shift_amount)
     in
     let instr =
       match op with
@@ -1895,27 +1910,32 @@ let emit_instr i =
     else emit_shift_arith instr ASR (-shift)
   | Lop (Specific Imuladd) ->
     A.ins4 MADD
-      ( H.reg_x i.res.(0),
-        H.reg_x i.arg.(0),
-        H.reg_x i.arg.(1),
-        H.reg_x i.arg.(2) )
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
+      (H.reg_x i.arg.(2))
   | Lop (Specific Imulsub) ->
     A.ins4 MSUB
-      ( H.reg_x i.res.(0),
-        H.reg_x i.arg.(0),
-        H.reg_x i.arg.(1),
-        H.reg_x i.arg.(2) )
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
+      (H.reg_x i.arg.(2))
   | Lop (Specific (Ibswap { bitwidth })) -> (
     match bitwidth with
     | Sixteen ->
-      A.ins2 REV16 (H.reg_w i.res.(0), H.reg_w i.arg.(0));
+      A.ins2 REV16 (H.reg_w i.res.(0)) (H.reg_w i.arg.(0));
       A.ins4 UBFM
-        (H.reg_w i.res.(0), H.reg_w i.res.(0), O.imm_six 0, O.imm_six 15)
-    | Thirtytwo -> A.ins2 REV (H.reg_w i.res.(0), H.reg_w i.arg.(0))
-    | Sixtyfour -> A.ins2 REV (H.reg_x i.res.(0), H.reg_x i.arg.(0)))
+        (H.reg_w i.res.(0))
+        (H.reg_w i.res.(0))
+        (O.imm_six 0) (O.imm_six 15)
+    | Thirtytwo -> A.ins2 REV (H.reg_w i.res.(0)) (H.reg_w i.arg.(0))
+    | Sixtyfour -> A.ins2 REV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)))
   | Lop (Specific (Isignext size)) ->
     A.ins4 SBFM
-      (H.reg_x i.res.(0), H.reg_x i.arg.(0), O.imm_six 0, O.imm_six (size - 1))
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (O.imm_six 0)
+      (O.imm_six (size - 1))
   | Lop (Specific (Isimd simd)) -> simd_instr simd i
   | Lop (Name_for_debugger _) -> ()
   | Lcall_op (Lprobe _) ->
@@ -1927,7 +1947,7 @@ let emit_instr i =
     (* Load address of the semaphore symbol *)
     emit_load_symbol_addr reg_tmp1 (S.create_global semaphore_sym);
     (* Load unsigned 2-byte integer value from offset 2 *)
-    A.ins2 LDRH (H.reg_w i.res.(0), H.addressing (Iindexed 2) reg_tmp1);
+    A.ins2 LDRH (H.reg_w i.res.(0)) (H.addressing (Iindexed 2) reg_tmp1);
     (* Compare with 0 and set result to 1 if non-zero, 0 if zero *)
     A.ins_cmp (H.reg_w i.res.(0)) (O.imm 0) O.optional_none;
     A.ins_cset (H.reg_x i.res.(0)) Cond.NE
@@ -1936,12 +1956,14 @@ let emit_instr i =
     then
       let offset = Domainstate.(idx_of_field Domain_dls_state) * 8 in
       A.ins2 LDR
-        (H.reg_x i.res.(0), H.addressing (Iindexed offset) reg_domain_state_ptr)
+        (H.reg_x i.res.(0))
+        (H.addressing (Iindexed offset) reg_domain_state_ptr)
     else Misc.fatal_error "Dls is not supported in runtime4."
   | Lop Tls_get ->
     let offset = Domainstate.(idx_of_field Domain_tls_state) * 8 in
     A.ins2 LDR
-      (H.reg_x i.res.(0), H.addressing (Iindexed offset) reg_domain_state_ptr)
+      (H.reg_x i.res.(0))
+      (H.addressing (Iindexed offset) reg_domain_state_ptr)
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -1953,36 +1975,57 @@ let emit_instr i =
       | Itruetest ->
         A.ins_cmp (H.reg_x i.arg.(0)) (O.imm 0) O.optional_none;
         A.ins4 CSEL
-          (H.reg_x i.res.(0), H.reg_x i.arg.(1), H.reg_x i.arg.(2), O.cond NE)
+          (H.reg_x i.res.(0))
+          (H.reg_x i.arg.(1))
+          (H.reg_x i.arg.(2))
+          (O.cond NE)
       | Ifalsetest ->
         A.ins_cmp (H.reg_x i.arg.(0)) (O.imm 0) O.optional_none;
         A.ins4 CSEL
-          (H.reg_x i.res.(0), H.reg_x i.arg.(1), H.reg_x i.arg.(2), O.cond EQ)
+          (H.reg_x i.res.(0))
+          (H.reg_x i.arg.(1))
+          (H.reg_x i.arg.(2))
+          (O.cond EQ)
       | Iinttest cmp ->
-        let comp = cond_for_comparison cmp in
+        let cond = cond_for_comparison cmp in
         A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
         A.ins4 CSEL
-          (H.reg_x i.res.(0), H.reg_x i.arg.(2), H.reg_x i.arg.(3), O.cond comp)
+          (H.reg_x i.res.(0))
+          (H.reg_x i.arg.(2))
+          (H.reg_x i.arg.(3))
+          (O.cond cond)
       | Iinttest_imm (cmp, n) ->
-        let comp = cond_for_comparison cmp in
+        let cond = cond_for_comparison cmp in
         emit_cmpimm (H.reg_x i.arg.(0)) n;
         A.ins4 CSEL
-          (H.reg_x i.res.(0), H.reg_x i.arg.(1), H.reg_x i.arg.(2), O.cond comp)
+          (H.reg_x i.res.(0))
+          (H.reg_x i.arg.(1))
+          (H.reg_x i.arg.(2))
+          (O.cond cond)
       | Ifloattest ((Float32 | Float64), cmp) ->
         let cond = cond_for_float_comparison cmp |> Cond.of_float_cond in
         (match H.reg_fp_operand_3 i.arg.(0) i.arg.(1) i.arg.(1) with
-        | S_regs (rn, rm, _) -> A.ins2 FCMP (rn, rm)
-        | D_regs (rn, rm, _) -> A.ins2 FCMP (rn, rm));
+        | S_regs (rn, rm, _) -> A.ins2 FCMP rn rm
+        | D_regs (rn, rm, _) -> A.ins2 FCMP rn rm);
         A.ins4 CSEL
-          (H.reg_x i.res.(0), H.reg_x i.arg.(2), H.reg_x i.arg.(3), O.cond cond)
+          (H.reg_x i.res.(0))
+          (H.reg_x i.arg.(2))
+          (H.reg_x i.arg.(3))
+          (O.cond cond)
       | Ioddtest ->
-        A.ins2 TST (H.reg_x i.arg.(0), O.bitmask 1n);
+        A.ins2 TST (H.reg_x i.arg.(0)) (O.bitmask 1n);
         A.ins4 CSEL
-          (H.reg_x i.res.(0), H.reg_x i.arg.(1), H.reg_x i.arg.(2), O.cond NE)
+          (H.reg_x i.res.(0))
+          (H.reg_x i.arg.(1))
+          (H.reg_x i.arg.(2))
+          (O.cond NE)
       | Ieventest ->
-        A.ins2 TST (H.reg_x i.arg.(0), O.bitmask 1n);
+        A.ins2 TST (H.reg_x i.arg.(0)) (O.bitmask 1n);
         A.ins4 CSEL
-          (H.reg_x i.res.(0), H.reg_x i.arg.(1), H.reg_x i.arg.(2), O.cond EQ))
+          (H.reg_x i.res.(0))
+          (H.reg_x i.arg.(1))
+          (H.reg_x i.arg.(2))
+          (O.cond EQ))
   | Lreloadretaddr -> ()
   | Lreturn -> A.ins0 RET
   | Llabel { label = lbl; _ } ->
@@ -1994,26 +2037,28 @@ let emit_instr i =
   | Lcondbranch (tst, lbl) -> (
     let lbl = label_to_asm_label ~section:Text lbl in
     match tst with
-    | Itruetest -> A.ins2 CBNZ (H.reg_x i.arg.(0), local_label lbl)
-    | Ifalsetest -> A.ins2 CBZ (H.reg_x i.arg.(0), local_label lbl)
+    | Itruetest -> A.ins2 CBNZ (H.reg_x i.arg.(0)) (local_label lbl)
+    | Ifalsetest -> A.ins2 CBZ (H.reg_x i.arg.(0)) (local_label lbl)
     | Iinttest cmp ->
       A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
-      let comp = cond_for_comparison cmp in
-      A.ins1 (B_cond comp) (local_label lbl)
+      let cond = cond_for_comparison cmp in
+      A.ins1 (B_cond cond) (local_label lbl)
     | Iinttest_imm (cmp, n) ->
       emit_cmpimm (H.reg_x i.arg.(0)) n;
-      let comp = cond_for_comparison cmp in
-      A.ins1 (B_cond comp) (local_label lbl)
+      let cond = cond_for_comparison cmp in
+      A.ins1 (B_cond cond) (local_label lbl)
     | Ifloattest (Float64, cmp) ->
-      let comp = cond_for_float_comparison cmp in
-      A.ins2 FCMP (H.reg_d i.arg.(0), H.reg_d i.arg.(1));
-      A.ins1 (B_cond_float comp) (local_label lbl)
+      let cond = cond_for_float_comparison cmp in
+      A.ins2 FCMP (H.reg_d i.arg.(0)) (H.reg_d i.arg.(1));
+      A.ins1 (B_cond_float cond) (local_label lbl)
     | Ifloattest (Float32, cmp) ->
-      let comp = cond_for_float_comparison cmp in
-      A.ins2 FCMP (H.reg_s i.arg.(0), H.reg_s i.arg.(1));
-      A.ins1 (B_cond_float comp) (local_label lbl)
-    | Ioddtest -> A.ins3 TBNZ (H.reg_x i.arg.(0), O.imm_six 0, local_label lbl)
-    | Ieventest -> A.ins3 TBZ (H.reg_x i.arg.(0), O.imm_six 0, local_label lbl))
+      let cond = cond_for_float_comparison cmp in
+      A.ins2 FCMP (H.reg_s i.arg.(0)) (H.reg_s i.arg.(1));
+      A.ins1 (B_cond_float cond) (local_label lbl)
+    | Ioddtest ->
+      A.ins3 TBNZ (H.reg_x i.arg.(0)) (O.imm_six 0) (local_label lbl)
+    | Ieventest ->
+      A.ins3 TBZ (H.reg_x i.arg.(0)) (O.imm_six 0) (local_label lbl))
   | Lcondbranch3 (lbl0, lbl1, lbl2) -> (
     A.ins_cmp (H.reg_x i.arg.(0)) (O.imm 1) O.optional_none;
     (match lbl0 with
@@ -2033,12 +2078,10 @@ let emit_instr i =
       A.ins1 (B_cond Cond.GT) (local_label lbl))
   | Lswitch jumptbl ->
     let lbltbl = L.create Text in
-    A.ins2 ADR (reg_x_tmp1, label Same_section_and_unit lbltbl);
-    A.ins4 ADD_shifted_register
-      ( reg_x_tmp1,
-        reg_x_tmp1,
-        H.reg_x i.arg.(0),
-        O.optional_shift ~kind:Ast.Operand.Shift.Kind.LSL ~amount:2 );
+    A.ins2 ADR reg_x_tmp1 (label Same_section_and_unit lbltbl);
+    A.ins4 ADD_shifted_register reg_x_tmp1 reg_x_tmp1
+      (H.reg_x i.arg.(0))
+      (O.optional_shift ~kind:Ast.Operand.Shift.Kind.LSL ~amount:2);
     A.ins1 BR reg_x_tmp1;
     D.define_label lbltbl;
     for j = 0 to Array.length jumptbl - 1 do
@@ -2064,14 +2107,14 @@ let emit_instr i =
     stack_offset := !stack_offset + delta_bytes
   | Lpushtrap { lbl_handler } ->
     let lbl_handler = label_to_asm_label ~section:Text lbl_handler in
-    A.ins2 ADR (reg_x_tmp1, label Same_section_and_unit lbl_handler);
+    A.ins2 ADR reg_x_tmp1 (label Same_section_and_unit lbl_handler);
     stack_offset := !stack_offset + 16;
-    A.ins3 (STP X)
-      (reg_x_trap_ptr, reg_x_tmp1, O.mem_pre_pair ~base:R.sp ~offset:(-16));
+    A.ins3 (STP X) reg_x_trap_ptr reg_x_tmp1
+      (O.mem_pre_pair ~base:R.sp ~offset:(-16));
     D.cfi_adjust_cfa_offset ~bytes:16;
     A.ins_mov_from_sp ~dst:reg_x_trap_ptr
   | Lpoptrap _ ->
-    A.ins2 LDR (reg_x_trap_ptr, O.mem_post ~base:R.sp ~offset:16);
+    A.ins2 LDR reg_x_trap_ptr (O.mem_post ~base:R.sp ~offset:16);
     D.cfi_adjust_cfa_offset ~bytes:(-16);
     stack_offset := !stack_offset - 16
   | Lraise k -> (
@@ -2086,8 +2129,8 @@ let emit_instr i =
       record_frame Reg.Set.empty (Dbg_raise i.dbg)
     | Lambda.Raise_notrace ->
       A.ins_mov_to_sp ~src:reg_x_trap_ptr;
-      A.ins3 (LDP X)
-        (reg_x_trap_ptr, reg_x_tmp1, O.mem_post_pair ~base:R.sp ~offset:16);
+      A.ins3 (LDP X) reg_x_trap_ptr reg_x_tmp1
+        (O.mem_post_pair ~base:R.sp ~offset:16);
       A.ins1 BR reg_x_tmp1)
   | Lstackcheck { max_frame_size_bytes } ->
     let overflow = L.create Text and ret = L.create Text in
@@ -2096,7 +2139,7 @@ let emit_instr i =
     in
     let f = max_frame_size_bytes + threshold_offset in
     let offset = Domainstate.(idx_of_field Domain_current_stack) * 8 in
-    A.ins2 LDR (reg_x_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
+    A.ins2 LDR reg_x_tmp1 (H.addressing (Iindexed offset) reg_domain_state_ptr);
     emit_addimm reg_x_tmp1 reg_x_tmp1 f;
     A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
     A.ins1 (B_cond CC) (local_label overflow);

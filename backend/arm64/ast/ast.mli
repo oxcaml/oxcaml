@@ -1623,19 +1623,43 @@ module DSL : sig
     val ins1 : (singleton, 'a) Instruction_name.t -> 'a Operand.t -> unit
 
     val ins2 :
-      (pair, 'a * 'b) Instruction_name.t -> 'a Operand.t * 'b Operand.t -> unit
+      (pair, 'a * 'b) Instruction_name.t -> 'a Operand.t -> 'b Operand.t -> unit
 
     val ins3 :
       (triple, 'a * 'b * 'c) Instruction_name.t ->
-      'a Operand.t * 'b Operand.t * 'c Operand.t ->
+      'a Operand.t ->
+      'b Operand.t ->
+      'c Operand.t ->
       unit
 
     val ins4 :
       (quad, 'a * 'b * 'c * 'd) Instruction_name.t ->
-      'a Operand.t * 'b Operand.t * 'c Operand.t * 'd Operand.t ->
+      'a Operand.t ->
+      'b Operand.t ->
+      'c Operand.t ->
+      'd Operand.t ->
       unit
 
     val ins0 : (singleton, unit) Instruction_name.t -> unit
+
+    (** Tupled versions of ins2/ins3/ins4 for convenience with helper functions
+        that return tuples. *)
+    module Tupled : sig
+      val ins2 :
+        (pair, 'a * 'b) Instruction_name.t ->
+        'a Operand.t * 'b Operand.t ->
+        unit
+
+      val ins3 :
+        (triple, 'a * 'b * 'c) Instruction_name.t ->
+        'a Operand.t * 'b Operand.t * 'c Operand.t ->
+        unit
+
+      val ins4 :
+        (quad, 'a * 'b * 'c * 'd) Instruction_name.t ->
+        'a Operand.t * 'b Operand.t * 'c Operand.t * 'd Operand.t ->
+        unit
+    end
 
     (** Expansion of instructions that are aliases *)
 
