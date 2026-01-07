@@ -24,7 +24,7 @@ let enable_crossing = true
 
 let enable_sub_jkind_l = true
 
-let enable_sub_or_intersect = false
+let enable_sub_or_intersect = true
 
 let enable_sub_or_error = false
 
