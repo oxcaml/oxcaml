@@ -55,6 +55,6 @@ let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
   | Prim { op = External _; _ }
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ ->
+  | Call_no_return _ | Call _ | Invalid _ ->
     (* no rewrite *)
     May_still_have_spilled_registers
