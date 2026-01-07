@@ -808,7 +808,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       (* Set up the argument for the call to caml_flambda2_invalid *)
       let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
       let loc_arg, stack_ofs, stack_align =
-        match emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
+        match
+          emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
         with
         | Or_never_returns.Ok result -> result
         | Or_never_returns.Never_returns ->
@@ -835,19 +836,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg
             (Cfg.Prim { op = External ext; label_after = label })
-            Debuginfo.none loc_arg (Proc.loc_external_results (Reg.typv rd))
+            Debuginfo.none loc_arg
+            (Proc.loc_external_results (Reg.typv rd))
         in
         SU.set_traps_for_raise env;
         Sub_cfg.add_never_block sub_cfg ~label;
         Ok rd)
-      else (
+      else
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg
             (Cfg.Invalid { message; symbol; stack_ofs; stack_align })
             Debuginfo.none loc_arg [||]
         in
         SU.set_traps_for_raise env;
-        Never_returns)
+        Never_returns
 
   (* Emit an expression in tail position of a function. *)
   and emit_tail env sub_cfg (exp : Cmm.expression) =
@@ -875,7 +877,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       (* Set up the argument for the call to caml_flambda2_invalid *)
       let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
       let loc_arg, stack_ofs, stack_align =
-        match emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
+        match
+          emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
         with
         | Or_never_returns.Ok result -> result
         | Or_never_returns.Never_returns ->
@@ -902,17 +905,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg
             (Cfg.Prim { op = External ext; label_after = label })
-            Debuginfo.none loc_arg (Proc.loc_external_results (Reg.typv rd))
+            Debuginfo.none loc_arg
+            (Proc.loc_external_results (Reg.typv rd))
         in
         SU.set_traps_for_raise env;
         Sub_cfg.add_never_block sub_cfg ~label)
-      else (
+      else
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg
             (Cfg.Invalid { message; symbol; stack_ofs; stack_align })
             Debuginfo.none loc_arg [||]
         in
-        SU.set_traps_for_raise env)
+        SU.set_traps_for_raise env
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cvar _ | Ctuple _ | Cexit _ ->

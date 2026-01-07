@@ -402,8 +402,7 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
       | Probe { name; handler_code_sym; enabled_at_init } ->
         Linear.Lprobe { name; handler_code_sym; enabled_at_init });
     Format.fprintf ppf "%sgoto %a" sep Label.format label_after
-  | Invalid { message; symbol = _; _ } ->
-    fprintf ppf "Invalid %S" message
+  | Invalid { message; symbol = _; _ } -> fprintf ppf "Invalid %S" message
 
 let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator
 
@@ -439,7 +438,8 @@ let print_instruction ppf i = print_instruction' ppf i
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Raise _ | Tailcall_func _ | Call _ | Prim { op = Probe _; label_after = _ }
+  | Raise _ | Tailcall_func _ | Call _
+  | Prim { op = Probe _; label_after = _ }
   | Call_no_return _ ->
     true
   | Prim { op = External { alloc; effects; _ }; label_after = _ } -> (

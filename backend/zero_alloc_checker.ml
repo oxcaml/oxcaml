@@ -2819,11 +2819,9 @@ let update_caml_flambda_invalid_cfg cfg_with_layout =
             modified := true)
         | Invalid _ ->
           (* Invalid terminators already have the correct properties (no
-             successors, cannot raise), but we still need to clean up any
-             exn handlers and update predecessors if needed. *)
-          let successors =
-            Cfg.successor_labels ~normal:true ~exn:true block
-          in
+             successors, cannot raise), but we still need to clean up any exn
+             handlers and update predecessors if needed. *)
+          let successors = Cfg.successor_labels ~normal:true ~exn:true block in
           if Option.is_some block.exn || not (Label.Set.is_empty successors)
           then (
             block.exn <- None;
