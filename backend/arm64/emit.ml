@@ -66,6 +66,8 @@ let reg_domain_state_ptr = phys_reg Int 25 (* x28 *)
 
 let reg_trap_ptr = phys_reg Int 23 (* x26 *)
 
+let reg_x_trap_ptr = H.reg_x reg_trap_ptr
+
 let reg_alloc_ptr = phys_reg Int 24 (* x27 *)
 
 let reg_tmp1 = phys_reg Int 26 (* x16 *)
@@ -73,7 +75,13 @@ let reg_tmp1 = phys_reg Int 26 (* x16 *)
 (* AST register for reg_tmp1, used as memory base *)
 let reg_tmp1_base = R.reg_x 16
 
+let reg_x_tmp1 = H.reg_x reg_tmp1
+
+let reg_x_alloc_ptr = H.reg_x reg_alloc_ptr
+
 let reg_x8 = phys_reg Int 8 (* x8 *)
+
+let reg_x_x8 = H.reg_x reg_x8
 
 let reg_stack_arg_begin = H.reg_x (phys_reg Int 17)
 
@@ -593,12 +601,10 @@ let emit_stack_realloc () =
     D.define_label sc_label;
     (* Pass the desired frame size on the stack, since all of the
        argument-passing registers may be in use. *)
-    A.ins_mov_imm (H.reg_x reg_tmp1) (O.imm_sixteen sc_max_frame_size_in_bytes);
-    A.ins3 (STP X)
-      (H.reg_x reg_tmp1, O.lr, O.mem_pre_pair ~base:R.sp ~offset:(-16));
+    A.ins_mov_imm reg_x_tmp1 (O.imm_sixteen sc_max_frame_size_in_bytes);
+    A.ins3 (STP X) (reg_x_tmp1, O.lr, O.mem_pre_pair ~base:R.sp ~offset:(-16));
     A.ins1 BL (runtime_function S.Predef.caml_call_realloc_stack);
-    A.ins3 (LDP X)
-      (H.reg_x reg_tmp1, O.lr, O.mem_post_pair ~base:R.sp ~offset:16);
+    A.ins3 (LDP X) (reg_x_tmp1, O.lr, O.mem_post_pair ~base:R.sp ~offset:16);
     A.ins1 B (local_label sc_return)
 
 (* Names of various instructions *)
@@ -725,8 +731,8 @@ and emit_subimm rd rs n =
 
 let emit_cmpimm rs n =
   if n >= 0
-  then A.ins_cmp (H.reg_x rs) (O.imm n) O.optional_none
-  else A.ins_cmn (H.reg_x rs) (O.imm (-n)) O.optional_none
+  then A.ins_cmp rs (O.imm n) O.optional_none
+  else A.ins_cmn rs (O.imm (-n)) O.optional_none
 
 (* Name of current function *)
 let function_name = ref ""
@@ -814,35 +820,30 @@ let emit_load_symbol_addr dst s =
      symbols). Global symbols need GOT on macOS (always) or on Linux when
      building shared objects (dlcode). This matches x86-64 behavior in
      amd64/emit.ml. *)
+  let dst_x = H.reg_x dst in
   if S.is_local s
   then (
     (* Local symbols are defined as labels, so reference them as labels. Use
        Text section since this is referencing code symbols. *)
     let lbl = L.create_label_for_local_symbol Text s in
-    A.ins2 ADRP (H.reg_x dst, label (Needs_reloc PAGE) lbl);
+    A.ins2 ADRP (dst_x, label (Needs_reloc PAGE) lbl);
     A.ins4 ADD_immediate
-      ( H.reg_x dst,
-        H.reg_x dst,
-        label (Needs_reloc PAGE_OFF) lbl,
-        O.optional_none ))
+      (dst_x, dst_x, label (Needs_reloc PAGE_OFF) lbl, O.optional_none))
   else if macosx || !Clflags.dlcode
   then (
     (* Global symbols need GOT on macOS or when building shared objects *)
-    A.ins2 ADRP (H.reg_x dst, symbol (Needs_reloc GOT_PAGE) s);
+    A.ins2 ADRP (dst_x, symbol (Needs_reloc GOT_PAGE) s);
     A.ins2 LDR
-      ( H.reg_x dst,
+      ( dst_x,
         H.mem_symbol_reg (H.gp_reg_of_reg dst)
           ~reloc:
             (Needs_reloc (if macosx then GOT_PAGE_OFF else GOT_LOWER_TWELVE))
           s ))
   else (
     (* Global symbols without dlcode can use direct addressing *)
-    A.ins2 ADRP (H.reg_x dst, symbol (Needs_reloc PAGE) s);
+    A.ins2 ADRP (dst_x, symbol (Needs_reloc PAGE) s);
     A.ins4 ADD_immediate
-      ( H.reg_x dst,
-        H.reg_x dst,
-        symbol (Needs_reloc PAGE_OFF) s,
-        O.optional_none ))
+      (dst_x, dst_x, symbol (Needs_reloc PAGE_OFF) s, O.optional_none))
 
 (* The following functions are used for calculating the sizes of the call GC and
    bounds check points emitted out-of-line from the function body. See
@@ -1193,33 +1194,30 @@ let cond_for_cset_for_float_comparison : Cmm.float_comparison -> Cond.t =
 let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
   if local
   then (
-    let r = i.res.(0) in
+    let r = H.reg_x i.res.(0) in
     let module DS = Domainstate in
     let domain_local_sp_offset = DS.(idx_of_field Domain_local_sp) * 8 in
     let domain_local_limit_offset = DS.(idx_of_field Domain_local_limit) * 8 in
     let domain_local_top_offset = DS.(idx_of_field Domain_local_top) * 8 in
     A.ins2 LDR
-      ( H.reg_x reg_tmp1,
+      ( reg_x_tmp1,
         H.addressing (Iindexed domain_local_limit_offset) reg_domain_state_ptr
       );
     A.ins2 LDR
-      ( H.reg_x r,
-        H.addressing (Iindexed domain_local_sp_offset) reg_domain_state_ptr );
-    emit_subimm (H.reg_x r) (H.reg_x r) n;
+      (r, H.addressing (Iindexed domain_local_sp_offset) reg_domain_state_ptr);
+    emit_subimm r r n;
     A.ins2 STR
-      ( H.reg_x r,
-        H.addressing (Iindexed domain_local_sp_offset) reg_domain_state_ptr );
-    A.ins_cmp_reg (H.reg_x r) (H.reg_x reg_tmp1) O.optional_none;
+      (r, H.addressing (Iindexed domain_local_sp_offset) reg_domain_state_ptr);
+    A.ins_cmp_reg r reg_x_tmp1 O.optional_none;
     let lbl_call = L.create Text in
     A.ins1 (B_cond LT) (local_label lbl_call);
     let lbl_after_alloc = L.create Text in
     D.define_label lbl_after_alloc;
     A.ins2 LDR
-      ( H.reg_x reg_tmp1,
+      ( reg_x_tmp1,
         H.addressing (Iindexed domain_local_top_offset) reg_domain_state_ptr );
-    A.ins4 ADD_shifted_register
-      (H.reg_x r, H.reg_x r, H.reg_x reg_tmp1, O.optional_none);
-    A.ins4 ADD_immediate (H.reg_x r, H.reg_x r, O.imm 8, O.optional_none);
+    A.ins4 ADD_shifted_register (r, r, reg_x_tmp1, O.optional_none);
+    A.ins4 ADD_immediate (r, r, O.imm 8, O.optional_none);
     local_realloc_sites
       := { lr_lbl = lbl_call; lr_dbg = i.dbg; lr_return_lbl = lbl_after_alloc }
          :: !local_realloc_sites)
@@ -1235,9 +1233,9 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
       assert (16 <= n && n < 0x1_000 && n land 0x7 = 0);
       let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
       A.ins2 LDR
-        (H.reg_x reg_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
-      emit_subimm (H.reg_x reg_alloc_ptr) (H.reg_x reg_alloc_ptr) n;
-      A.ins_cmp_reg (H.reg_x reg_alloc_ptr) (H.reg_x reg_tmp1) O.optional_none;
+        (reg_x_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
+      emit_subimm reg_x_alloc_ptr reg_x_alloc_ptr n;
+      A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
       (if not far
       then A.ins1 (B_cond CC) (local_label lbl_call_gc)
       else
@@ -1246,7 +1244,7 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
         A.ins1 B (local_label lbl_call_gc);
         D.define_label lbl);
       labeled_ins4 lbl_after_alloc ADD_immediate
-        (H.reg_x i.res.(0), H.reg_x reg_alloc_ptr, O.imm 8, O.optional_none);
+        (H.reg_x i.res.(0), reg_x_alloc_ptr, O.imm 8, O.optional_none);
       call_gc_sites
         := { gc_lbl = lbl_call_gc;
              gc_return_lbl = lbl_after_alloc;
@@ -1259,10 +1257,10 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
       | 24 -> A.ins1 BL (runtime_function S.Predef.caml_alloc2)
       | 32 -> A.ins1 BL (runtime_function S.Predef.caml_alloc3)
       | _ ->
-        emit_intconst (H.reg_x reg_x8) (Nativeint.of_int n);
+        emit_intconst reg_x_x8 (Nativeint.of_int n);
         A.ins1 BL (runtime_function S.Predef.caml_allocN));
       labeled_ins4 lbl_frame ADD_immediate
-        (H.reg_x i.res.(0), H.reg_x reg_alloc_ptr, O.imm 8, O.optional_none))
+        (H.reg_x i.res.(0), reg_x_alloc_ptr, O.imm 8, O.optional_none))
 
 let assembly_code_for_poll i ~far ~return_label =
   let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
@@ -1271,9 +1269,8 @@ let assembly_code_for_poll i ~far ~return_label =
     match return_label with None -> L.create Text | Some lbl -> lbl
   in
   let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
-  A.ins2 LDR
-    (H.reg_x reg_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
-  A.ins_cmp_reg (H.reg_x reg_alloc_ptr) (H.reg_x reg_tmp1) O.optional_none;
+  A.ins2 LDR (reg_x_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
+  A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
   then (
     match return_label with
@@ -1323,7 +1320,7 @@ let emit_named_text_section func_name =
 let emit_load_literal dst lbl =
   if macosx
   then (
-    A.ins2 ADRP (H.reg_x reg_tmp1, label (Needs_reloc PAGE) lbl);
+    A.ins2 ADRP (reg_x_tmp1, label (Needs_reloc PAGE) lbl);
     match dst.typ with
     | Float ->
       A.ins2 LDR_simd_and_fp
@@ -1345,7 +1342,7 @@ let emit_load_literal dst lbl =
       Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
         Printreg.reg dst)
   else (
-    A.ins2 ADRP (H.reg_x reg_tmp1, label (Needs_reloc PAGE) lbl);
+    A.ins2 ADRP (reg_x_tmp1, label (Needs_reloc PAGE) lbl);
     match dst.typ with
     | Float ->
       A.ins2 LDR_simd_and_fp
@@ -1596,8 +1593,8 @@ let emit_instr i =
         D.cfi_def_cfa_register ~reg:(Int.to_string 29 (* fp *));
         let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
         A.ins2 LDR
-          (H.reg_x reg_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
-        A.ins_mov_to_sp ~src:(H.reg_x reg_tmp1))
+          (reg_x_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
+        A.ins_mov_to_sp ~src:reg_x_tmp1)
       else D.cfi_remember_state ();
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
       if Config.runtime5 then A.ins_mov_to_sp ~src:O.fp;
@@ -1619,8 +1616,7 @@ let emit_instr i =
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
         A.ins2 ADRP
-          ( H.reg_x reg_tmp1,
-            symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s );
+          (reg_x_tmp1, symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
         reg_tmp1
     in
     let default_addressing = H.addressing addressing_mode base in
@@ -1650,16 +1646,15 @@ let emit_instr i =
       (match addressing_mode with
       | Iindexed n ->
         A.ins4 ADD_immediate
-          (H.reg_x reg_tmp1, H.reg_x i.arg.(0), O.imm n, O.optional_none)
+          (reg_x_tmp1, H.reg_x i.arg.(0), O.imm n, O.optional_none)
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
         A.ins2 ADRP
-          ( H.reg_x reg_tmp1,
-            symbol_or_label_for_data ~offset (Needs_reloc PAGE) s );
+          (reg_x_tmp1, symbol_or_label_for_data ~offset (Needs_reloc PAGE) s);
         A.ins4 ADD_immediate
-          ( H.reg_x reg_tmp1,
-            H.reg_x reg_tmp1,
+          ( reg_x_tmp1,
+            reg_x_tmp1,
             symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s,
             O.optional_none ));
       A.ins2 LDR_simd_and_fp (H.reg_q_operand dst, H.mem reg_tmp1_base)
@@ -1676,8 +1671,7 @@ let emit_instr i =
       | Ibased (s, ofs) ->
         assert (not !Clflags.dlcode);
         A.ins2 ADRP
-          ( H.reg_x reg_tmp1,
-            symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s );
+          (reg_x_tmp1, symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
         reg_tmp1
     in
     match size with
@@ -1703,17 +1697,16 @@ let emit_instr i =
       match addr with
       | Iindexed n ->
         A.ins4 ADD_immediate
-          (H.reg_x reg_tmp1, H.reg_x i.arg.(1), O.imm n, O.optional_none);
+          (reg_x_tmp1, H.reg_x i.arg.(1), O.imm n, O.optional_none);
         A.ins2 STR_simd_and_fp (H.reg_q_operand src, H.mem reg_tmp1_base)
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
         A.ins2 ADRP
-          ( H.reg_x reg_tmp1,
-            symbol_or_label_for_data ~offset (Needs_reloc PAGE) s );
+          (reg_x_tmp1, symbol_or_label_for_data ~offset (Needs_reloc PAGE) s);
         A.ins4 ADD_immediate
-          ( H.reg_x reg_tmp1,
-            H.reg_x reg_tmp1,
+          ( reg_x_tmp1,
+            reg_x_tmp1,
             symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s,
             O.optional_none );
         A.ins2 STR_simd_and_fp (H.reg_q_operand src, H.mem reg_tmp1_base))
@@ -1754,12 +1747,12 @@ let emit_instr i =
     A.ins2 FCMP (H.reg_s i.arg.(0), H.reg_s i.arg.(1));
     A.ins_cset (H.reg_x i.res.(0)) comp
   | Lop (Intop_imm (Icomp cmp, n)) ->
-    emit_cmpimm i.arg.(0) n;
+    emit_cmpimm (H.reg_x i.arg.(0)) n;
     A.ins_cset (H.reg_x i.res.(0)) (cond_for_comparison cmp)
   | Lop (Intop Imod) ->
-    A.ins3 SDIV (H.reg_x reg_tmp1, H.reg_x i.arg.(0), H.reg_x i.arg.(1));
+    A.ins3 SDIV (reg_x_tmp1, H.reg_x i.arg.(0), H.reg_x i.arg.(1));
     A.ins4 MSUB
-      (H.reg_x i.res.(0), H.reg_x reg_tmp1, H.reg_x i.arg.(1), H.reg_x i.arg.(0))
+      (H.reg_x i.res.(0), reg_x_tmp1, H.reg_x i.arg.(1), H.reg_x i.arg.(0))
   | Lop (Intop (Imulh { signed = true })) ->
     A.ins3 SMULH (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
   | Lop (Intop (Imulh { signed = false })) ->
@@ -1972,7 +1965,7 @@ let emit_instr i =
           (H.reg_x i.res.(0), H.reg_x i.arg.(2), H.reg_x i.arg.(3), O.cond comp)
       | Iinttest_imm (cmp, n) ->
         let comp = cond_for_comparison cmp in
-        emit_cmpimm i.arg.(0) n;
+        emit_cmpimm (H.reg_x i.arg.(0)) n;
         A.ins4 CSEL
           (H.reg_x i.res.(0), H.reg_x i.arg.(1), H.reg_x i.arg.(2), O.cond comp)
       | Ifloattest ((Float32 | Float64), cmp) ->
@@ -2008,7 +2001,7 @@ let emit_instr i =
       let comp = cond_for_comparison cmp in
       A.ins1 (B_cond comp) (local_label lbl)
     | Iinttest_imm (cmp, n) ->
-      emit_cmpimm i.arg.(0) n;
+      emit_cmpimm (H.reg_x i.arg.(0)) n;
       let comp = cond_for_comparison cmp in
       A.ins1 (B_cond comp) (local_label lbl)
     | Ifloattest (Float64, cmp) ->
@@ -2040,13 +2033,13 @@ let emit_instr i =
       A.ins1 (B_cond Cond.GT) (local_label lbl))
   | Lswitch jumptbl ->
     let lbltbl = L.create Text in
-    A.ins2 ADR (H.reg_x reg_tmp1, label Same_section_and_unit lbltbl);
+    A.ins2 ADR (reg_x_tmp1, label Same_section_and_unit lbltbl);
     A.ins4 ADD_shifted_register
-      ( H.reg_x reg_tmp1,
-        H.reg_x reg_tmp1,
+      ( reg_x_tmp1,
+        reg_x_tmp1,
         H.reg_x i.arg.(0),
         O.optional_shift ~kind:Ast.Operand.Shift.Kind.LSL ~amount:2 );
-    A.ins1 BR (H.reg_x reg_tmp1);
+    A.ins1 BR reg_x_tmp1;
     D.define_label lbltbl;
     for j = 0 to Array.length jumptbl - 1 do
       let jumplbl = label_to_asm_label ~section:Text jumptbl.(j) in
@@ -2071,16 +2064,14 @@ let emit_instr i =
     stack_offset := !stack_offset + delta_bytes
   | Lpushtrap { lbl_handler } ->
     let lbl_handler = label_to_asm_label ~section:Text lbl_handler in
-    A.ins2 ADR (H.reg_x reg_tmp1, label Same_section_and_unit lbl_handler);
+    A.ins2 ADR (reg_x_tmp1, label Same_section_and_unit lbl_handler);
     stack_offset := !stack_offset + 16;
     A.ins3 (STP X)
-      ( H.reg_x reg_trap_ptr,
-        H.reg_x reg_tmp1,
-        O.mem_pre_pair ~base:R.sp ~offset:(-16) );
+      (reg_x_trap_ptr, reg_x_tmp1, O.mem_pre_pair ~base:R.sp ~offset:(-16));
     D.cfi_adjust_cfa_offset ~bytes:16;
-    A.ins_mov_from_sp ~dst:(H.reg_x reg_trap_ptr)
+    A.ins_mov_from_sp ~dst:reg_x_trap_ptr
   | Lpoptrap _ ->
-    A.ins2 LDR (H.reg_x reg_trap_ptr, O.mem_post ~base:R.sp ~offset:16);
+    A.ins2 LDR (reg_x_trap_ptr, O.mem_post ~base:R.sp ~offset:16);
     D.cfi_adjust_cfa_offset ~bytes:(-16);
     stack_offset := !stack_offset - 16
   | Lraise k -> (
@@ -2094,12 +2085,10 @@ let emit_instr i =
       else A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
       record_frame Reg.Set.empty (Dbg_raise i.dbg)
     | Lambda.Raise_notrace ->
-      A.ins_mov_to_sp ~src:(H.reg_x reg_trap_ptr);
+      A.ins_mov_to_sp ~src:reg_x_trap_ptr;
       A.ins3 (LDP X)
-        ( H.reg_x reg_trap_ptr,
-          H.reg_x reg_tmp1,
-          O.mem_post_pair ~base:R.sp ~offset:16 );
-      A.ins1 BR (H.reg_x reg_tmp1))
+        (reg_x_trap_ptr, reg_x_tmp1, O.mem_post_pair ~base:R.sp ~offset:16);
+      A.ins1 BR reg_x_tmp1)
   | Lstackcheck { max_frame_size_bytes } ->
     let overflow = L.create Text and ret = L.create Text in
     let threshold_offset =
@@ -2107,10 +2096,9 @@ let emit_instr i =
     in
     let f = max_frame_size_bytes + threshold_offset in
     let offset = Domainstate.(idx_of_field Domain_current_stack) * 8 in
-    A.ins2 LDR
-      (H.reg_x reg_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
-    emit_addimm (H.reg_x reg_tmp1) (H.reg_x reg_tmp1) f;
-    A.ins_cmp_reg O.sp (H.reg_x reg_tmp1) O.optional_none;
+    A.ins2 LDR (reg_x_tmp1, H.addressing (Iindexed offset) reg_domain_state_ptr);
+    emit_addimm reg_x_tmp1 reg_x_tmp1 f;
+    A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
     A.ins1 (B_cond CC) (local_label overflow);
     D.define_label ret;
     stack_realloc
