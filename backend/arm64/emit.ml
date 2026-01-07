@@ -1260,9 +1260,9 @@ let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
 (* Output the assembly code for a poll. *)
 
 let assembly_code_for_poll i ~far ~return_label =
-  let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
-  let lbl_call_gc = L.create Text in
-  let lbl_after_poll =
+  let gc_frame_lbl = record_frame_label i.live (Dbg_alloc []) in
+  let gc_lbl = L.create Text in
+  let gc_return_lbl =
     match return_label with None -> L.create Text | Some lbl -> lbl
   in
   let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
@@ -1272,28 +1272,23 @@ let assembly_code_for_poll i ~far ~return_label =
   then (
     match return_label with
     | None ->
-      A.ins1 (B_cond LS) (local_label lbl_call_gc);
-      D.define_label lbl_after_poll
+      A.ins1 (B_cond LS) (local_label gc_lbl);
+      D.define_label gc_return_lbl
     | Some return_label ->
       A.ins1 (B_cond HI) (local_label return_label);
-      A.ins1 B (local_label lbl_call_gc))
+      A.ins1 B (local_label gc_lbl))
   else
     match return_label with
     | None ->
-      A.ins1 (B_cond HI) (local_label lbl_after_poll);
-      A.ins1 B (local_label lbl_call_gc);
-      D.define_label lbl_after_poll
+      A.ins1 (B_cond HI) (local_label gc_return_lbl);
+      A.ins1 B (local_label gc_lbl);
+      D.define_label gc_return_lbl
     | Some return_label ->
       let lbl = L.create Text in
       A.ins1 (B_cond LS) (local_label lbl);
       A.ins1 B (local_label return_label);
-      labelled_ins1 lbl B (local_label lbl_call_gc));
-  call_gc_sites
-    := { gc_lbl = lbl_call_gc;
-         gc_return_lbl = lbl_after_poll;
-         gc_frame_lbl = lbl_frame
-       }
-       :: !call_gc_sites
+      labelled_ins1 lbl B (local_label gc_lbl));
+  call_gc_sites := { gc_lbl; gc_return_lbl; gc_frame_lbl } :: !call_gc_sites
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
