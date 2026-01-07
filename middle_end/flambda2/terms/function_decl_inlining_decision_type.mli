@@ -44,3 +44,5 @@ val has_attribute_inline : t -> bool
 val cannot_be_inlined : t -> bool
 
 val equal : t -> t -> bool
+
+val is_stub : t -> bool

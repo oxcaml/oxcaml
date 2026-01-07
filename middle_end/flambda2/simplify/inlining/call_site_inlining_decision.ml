@@ -152,12 +152,15 @@ let inlining_does_decrease_code_size ~code_or_metadata cost_metrics =
   not (Code_size.( <= ) original_code_size inlined_code_size)
 
 let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
-    ~return_arity : Call_site_inlining_decision_type.t =
+    ~return_arity ~rec_info : Call_site_inlining_decision_type.t =
   let denv = DA.denv dacc in
   let disable_inlining = DE.disable_inlining denv in
   let decision =
     Code_or_metadata.code_metadata code_or_metadata
     |> Code_metadata.inlining_decision
+  in
+  let max_rec_depth =
+    Flambda_features.Inlining.max_rec_depth (Round (DE.round (DA.denv dacc)))
   in
   let in_a_stub, doing_speculative_inlining =
     match disable_inlining with
@@ -167,6 +170,10 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
   in
   if in_a_stub
   then In_a_stub
+  else if Function_decl_inlining_decision_type.is_stub decision
+  then Definition_says_inline { was_inline_always = false }
+  else if Simplify_rec_info_expr.depth_may_exceed dacc rec_info max_rec_depth
+  then Recursion_depth_exceeded
   else if Function_decl_inlining_decision_type.must_be_inlined decision
   then
     Definition_says_inline
@@ -325,20 +332,11 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
           in
           match policy with
           | `Heuristic ->
-            let max_rec_depth =
-              Flambda_features.Inlining.max_rec_depth
-                (Round (DE.round (DA.denv dacc)))
-            in
-            if Simplify_rec_info_expr.depth_may_exceed dacc rec_info
-                 max_rec_depth
-            then (
-              fail_if_must_inline ();
-              Recursion_depth_exceeded)
-            else if must_inline
+            if must_inline
             then Replay_history_says_must_inline
             else
               might_inline dacc ~apply ~code_or_metadata ~function_type
-                ~simplify_expr ~return_arity
+                ~simplify_expr ~return_arity ~rec_info
           | `Unroll unroll_to ->
             if Simplify_rec_info_expr.can_unroll dacc rec_info
             then
