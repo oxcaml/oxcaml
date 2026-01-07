@@ -36,7 +36,7 @@ Stdlib.ignore
   ((fun x -> x)
      (fun obj ->
         (((obj : < f : 'a. 'a -> _ -> 'a; .. >)#f
-            ((obj : < f : 'a__1. 'a__1 -> _ -> 'a__1; .. >)#f 42 obj)
+            ((obj : < f : 'a__1. 'a__1 -> _ -> 'a__1; .. >)#f 42 obj) 
             obj),
          ((obj : < f : 'a__2. 'a__2 -> _ -> 'a__2; .. >)#f "abc" obj)))
   : B.tr)
@@ -101,3 +101,4 @@ Stdlib.ignore
 Stdlib.ignore
   ((fun x -> x) (fun f -> (f : ('a. 'a -> 'a) -> _) (fun x__1 -> x__1)) :
   B.te4)
+
