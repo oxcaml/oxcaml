@@ -353,9 +353,9 @@ module Solver = struct
                 Ldd.join acc contribution)
               base row
           else
-            (* Open row: conservative non-float value (boxed) intersected with
-               an unknown rigid so the solver treats it as an unknown
-               element. *)
+            (* CR ikinds: open rows get conservative non-float value (boxed)
+               intersected with an unknown rigid so the solver treats it as an
+               unknown element. This can be improved. Internal ticket 6205. *)
             let unknown = rigid_name ctx (Ldd.Name.fresh_unknown ()) in
             Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
         else
