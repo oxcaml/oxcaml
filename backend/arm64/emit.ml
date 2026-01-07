@@ -1203,22 +1203,21 @@ let assembly_code_for_local_allocation i ~n =
   emit_subimm r r n;
   A.ins2 STR r (H.addressing (Iindexed domain_local_sp) reg_domain_state_ptr);
   A.ins_cmp_reg r reg_x_tmp1 O.optional_none;
-  let lbl_call = L.create Text in
-  A.ins1 (B_cond LT) (local_label lbl_call);
-  let lbl_after_alloc = L.create Text in
-  D.define_label lbl_after_alloc;
+  let lr_lbl = L.create Text in
+  A.ins1 (B_cond LT) (local_label lr_lbl);
+  let lr_return_lbl = L.create Text in
+  D.define_label lr_return_lbl;
   A.ins2 LDR reg_x_tmp1
     (H.addressing (Iindexed domain_local_top) reg_domain_state_ptr);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
   A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
   local_realloc_sites
-    := { lr_lbl = lbl_call; lr_dbg = i.dbg; lr_return_lbl = lbl_after_alloc }
-       :: !local_realloc_sites
+    := { lr_lbl; lr_dbg = i.dbg; lr_return_lbl } :: !local_realloc_sites
 
 let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
-  let lbl_frame = record_frame_label i.live (Dbg_alloc dbginfo) in
-  let lbl_after_alloc = L.create Text in
-  let lbl_call_gc = L.create Text in
+  let gc_frame_lbl = record_frame_label i.live (Dbg_alloc dbginfo) in
+  let gc_return_lbl = L.create Text in
+  let gc_lbl = L.create Text in
   (* n is at most Max_young_whsize * 8, i.e. currently 0x808, so it is
      reasonable to assume n < 0x1_000. This makes the generated code simpler. *)
   assert (16 <= n && n < 0x1_000 && n land 0x7 = 0);
@@ -1227,21 +1226,16 @@ let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
   emit_subimm reg_x_alloc_ptr reg_x_alloc_ptr n;
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
-  then A.ins1 (B_cond CC) (local_label lbl_call_gc)
+  then A.ins1 (B_cond CC) (local_label gc_lbl)
   else
     let lbl = L.create Text in
     A.ins1 (B_cond CS) (local_label lbl);
-    A.ins1 B (local_label lbl_call_gc);
+    A.ins1 B (local_label gc_lbl);
     D.define_label lbl);
-  labeled_ins4 lbl_after_alloc ADD_immediate
+  labeled_ins4 gc_return_lbl ADD_immediate
     (H.reg_x i.res.(0))
     reg_x_alloc_ptr (O.imm 8) O.optional_none;
-  call_gc_sites
-    := { gc_lbl = lbl_call_gc;
-         gc_return_lbl = lbl_after_alloc;
-         gc_frame_lbl = lbl_frame
-       }
-       :: !call_gc_sites
+  call_gc_sites := { gc_lbl; gc_return_lbl; gc_frame_lbl } :: !call_gc_sites
 
 let assembly_code_for_slow_heap_allocation i ~n ~dbginfo =
   let lbl_frame = record_frame_label i.live (Dbg_alloc dbginfo) in
