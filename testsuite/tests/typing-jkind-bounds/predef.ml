@@ -75,6 +75,16 @@ type t_test = int option require_portable
 type t_test = int option require_many
 type t_test = int option require_contended
 type ('a : value mod portable) t_test = 'a option require_portable
+|}, Principal{|
+Line 1, characters 14-24:
+1 | type t_test = int option require_portable
+                  ^^^^^^^^^^
+Error: This type "int option" should be an instance of type
+         "('a : value mod portable)"
+       The kind of int option is immutable_data with int
+         because it's a boxed variant type.
+       But the kind of int option must be a subkind of value mod portable
+         because of the definition of require_portable at line 10, characters 0-47.
 |}]
 
 type t_test = (unit -> unit) option require_portable
@@ -184,6 +194,19 @@ type ('a : value mod portable) t_test = 'a ref require_portable
 type t_test = int ref require_portable
 type t_test = int ref require_many
 type ('a : value mod portable) t_test = 'a ref require_portable
+|}, Principal{|
+Line 1, characters 14-21:
+1 | type t_test = int ref require_portable
+                  ^^^^^^^
+Error: This type "int ref" should be an instance of type
+         "('a : value mod portable)"
+       The kind of int ref is
+           mutable_data with int @@ forkable unyielding many.
+       But the kind of int ref must be a subkind of value mod portable
+         because of the definition of require_portable at line 10, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with int ≰ mod portable
 |}]
 
 type t_test = int ref require_contended
@@ -273,6 +296,16 @@ type t_test = int list require_portable
 type t_test = int list require_many
 type t_test = int list require_contended
 type ('a : value mod portable) t_test = 'a list require_portable
+|}, Principal{|
+Line 1, characters 14-22:
+1 | type t_test = int list require_portable
+                  ^^^^^^^^
+Error: This type "int list" should be an instance of type
+         "('a : value mod portable)"
+       The kind of int list is immutable_data with int
+         because it's a boxed variant type.
+       But the kind of int list must be a subkind of value mod portable
+         because of the definition of require_portable at line 10, characters 0-47.
 |}]
 
 type t_test = (unit -> unit) list require_portable
@@ -379,6 +412,16 @@ type ('a : value mod portable) t_test = 'a array require_portable
 type t_test = int array require_portable
 type t_test = int array require_many
 type ('a : value mod portable) t_test = 'a array require_portable
+|}, Principal{|
+Line 1, characters 14-23:
+1 | type t_test = int array require_portable
+                  ^^^^^^^^^
+Error: This type "int array" should be an instance of type
+         "('a : value mod portable)"
+       The kind of int array is mutable_data with int
+         because it is the primitive value type array.
+       But the kind of int array must be a subkind of value mod portable
+         because of the definition of require_portable at line 10, characters 0-47.
 |}]
 
 type t_test = int array require_contended
@@ -464,6 +507,16 @@ type t_test = int iarray require_portable
 type t_test = int iarray require_many
 type t_test = int iarray require_contended
 type ('a : value mod portable) t_test = 'a iarray require_portable
+|}, Principal{|
+Line 1, characters 14-24:
+1 | type t_test = int iarray require_portable
+                  ^^^^^^^^^^
+Error: This type "int iarray" should be an instance of type
+         "('a : value mod portable)"
+       The kind of int iarray is immutable_data with int
+         because it is the primitive value type iarray.
+       But the kind of int iarray must be a subkind of value mod portable
+         because of the definition of require_portable at line 10, characters 0-47.
 |}]
 
 type t_test = (unit -> unit) iarray require_portable
