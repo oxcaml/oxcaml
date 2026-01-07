@@ -133,6 +133,13 @@ jobs:
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
 
+          - name: runtime5 x86-peephole (x86_64-linux)
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,x86-peephole-optimize=1'
+            ocamlparam: '_,w=-46,x86-peephole-optimize=1'
+            check_arch: true
+
           - name: runtime4 address-sanitizer (x86_64-linux)
             config: --disable-runtime5 --enable-address-sanitizer
             os: warp-ubuntu-latest-x64-8x
