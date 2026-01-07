@@ -824,8 +824,8 @@ val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
   level:int ->
-  Types.jkind_l ->
-  Types.jkind_r ->
+  (allowed * 'r) Types.jkind ->
+  ('l * allowed) Types.jkind ->
   bool
 
 type sub_or_intersect =

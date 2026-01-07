@@ -292,9 +292,7 @@ module Solver = struct
     let kind_poly =
       (* [ty] is expected to be representative: no links/substs/fields/nil. *)
       match Types.get_desc ty with
-      | Types.Tvar { name = _name; jkind } ->
-        (* Keep a rigid param, but cap it by its annotated jkind. *)
-        Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
+      | Types.Tvar { name = _name; jkind } 
       | Types.Tunivar { name = _name; jkind } ->
         (* Keep a rigid param, but cap it by its annotated jkind. *)
         Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
@@ -813,7 +811,7 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     (super : ('l2 * Allowance.allowed) Types.jkind) : bool =
   ignore origin;
   if not !Clflags.ikinds
-  then Result.is_ok (Jkind.sub_or_error ~type_equal ~context ~level sub super)
+  then Jkind.sub ~type_equal ~context ~level sub super
   else
     let ctx = make_ctx ~mode:Solver.Normal ~context in
     match
