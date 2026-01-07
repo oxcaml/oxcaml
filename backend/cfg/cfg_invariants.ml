@@ -133,7 +133,7 @@ let check_tailrec t _label block =
           Label.print l Label.print destination)
   | Call _ | Prim _ | Tailcall_func _ | Never | Always _ | Parity_test _
   | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-  | Call_no_return _ ->
+  | Call_no_return _ | Invalid _ ->
     ()
 
 let check_can_raise t label (block : Cfg.basic_block) =

@@ -421,7 +421,7 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
             add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
               ~phi:block substs to_unify predecessor_block.body
           | Switch _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-          | Call _ | Prim _ ->
+          | Call _ | Prim _ | Invalid _ ->
             let instrs = DLL.make_empty () in
             add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
               ~phi:block substs to_unify instrs;

@@ -573,6 +573,10 @@ and expression =
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
+  | Cinvalid of
+      { message : string;
+        symbol : symbol
+      }
 
 type codegen_option =
   | Reduce_code_size
@@ -658,7 +662,7 @@ let iter_shallow_tail f = function
     List.iter (fun { body = h; _ } -> f h) handlers;
     f body;
     true
-  | Cexit _ | Cop (Craise _, _, _) -> true
+  | Cexit _ | Cop (Craise _, _, _) | Cinvalid _ -> true
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _
@@ -691,7 +695,7 @@ let map_shallow_tail f = function
       { label; params; body = f handler; dbg; is_cold }
     in
     Ccatch (flag, List.map map_h handlers, f body)
-  | (Cexit _ | Cop (Craise _, _, _)) as cmm -> cmm
+  | (Cexit _ | Cop (Craise _, _, _) | Cinvalid _) as cmm -> cmm
   | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
     | Cvar _ | Ctuple _
@@ -718,7 +722,7 @@ let map_tail f =
       | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
       | Cvar _ | Ctuple _ | Cop _ ) as c ->
       f c
-    | ( Cexit _
+    | ( Cexit _ | Cinvalid _
       | Clet (_, _, _)
       | Cphantom_let (_, _, _)
       | Csequence (_, _)
@@ -751,7 +755,7 @@ let iter_shallow f = function
   | Cexit (_n, el, _traps) -> List.iter f el
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ ->
+  | Cvar _ | Cinvalid _ ->
     ()
 
 let map_shallow f = function
@@ -772,7 +776,7 @@ let map_shallow f = function
   | Cexit (n, el, traps) -> Cexit (n, List.map f el, traps)
   | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-    | Cvar _ ) as c ->
+    | Cvar _ | Cinvalid _ ) as c ->
     c
 
 let rank_machtype_component : machtype_component -> int = function

@@ -338,7 +338,6 @@ let function_bound_parameters env l =
   bound_parameters_aux ~f:machtype_of_kinded_parameter env l
 
 let invalid res ~message =
-  let dbg = Debuginfo.none in
   let message_sym, res =
     match To_cmm_result.invalid_message_symbol res ~message with
     | None ->
@@ -361,13 +360,8 @@ let invalid res ~message =
       message_sym, res
     | Some message_sym -> message_sym, res
   in
-  let call_expr =
-    extcall ~dbg ~alloc:false ~is_c_builtin:false ~effects:Arbitrary_effects
-      ~coeffects:Has_coeffects ~returns:false ~ty_args:[XInt]
-      Cmm.caml_flambda2_invalid Cmm.typ_void
-      [symbol ~dbg (To_cmm_result.symbol res message_sym)]
-  in
-  call_expr, res
+  let cmm_symbol = To_cmm_result.symbol res message_sym in
+  Cmm.Cinvalid { message; symbol = cmm_symbol }, res
 
 module Update_kind = struct
   type kind =

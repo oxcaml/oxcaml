@@ -179,6 +179,20 @@ let linearize_terminator cfg_with_layout (func : string) start
                 stack_ofs;
                 stack_align
               }))
+    | Invalid { message = _; stack_ofs; stack_align; label_after = None; _ } ->
+      single
+        (L.Lcall_op
+           (Lextcall
+              { func = Cmm.caml_flambda2_invalid;
+                alloc = false;
+                ty_args = (* Arg is a statically allocated symbol. *) [XInt];
+                ty_res = Cmm.typ_void;
+                returns = false;
+                stack_ofs;
+                stack_align
+              }))
+    | Invalid { label_after = Some _; _ } ->
+      Misc.fatal_error "Cannot linearize terminator: Invalid with a successor"
     | Call { op; label_after } ->
       let op : Linear.call_operation =
         match op with
@@ -374,7 +388,7 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
       | Switch _ -> true
       | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-      | Call _ | Prim _ ->
+      | Call _ | Prim _ | Invalid _ ->
         false
       | Return | Raise _ | Tailcall_func _ | Tailcall_self _ | Call_no_return _
         ->
