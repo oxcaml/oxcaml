@@ -16,30 +16,38 @@
 
 open Import
 
-let print_ast _ = ()
-
-let print_section_map _section_map = ()
-
 let write_bin_file ~filename content =
   let oc = open_out_bin filename in
   output_string oc content;
   close_out oc
 
-let save_binary_sections ~phrase_name binary_section_map =
+let save_binary_sections (type a r)
+    (module E : Binary_emitter_intf.S
+      with type Assembled_section.t = a
+       and type Relocation.t = r)
+    ~phrase_name binary_section_map =
   if !Globals.debug then
     String.Map.iter binary_section_map ~f:(fun ~key:section_name ~data:buffer ->
         let filename =
           Format.asprintf "%s.section%s.%a" phrase_name section_name Address.pp
             buffer.address
         in
-        write_bin_file ~filename (X86_binary_emitter.contents buffer.value))
+        write_bin_file ~filename (E.Assembled_section.contents buffer.value))
 
-let save_text_section ~phrase_name { address; value = text_section } =
+let save_text_section (type a r)
+    (module E : Binary_emitter_intf.S
+      with type Assembled_section.t = a
+       and type Relocation.t = r)
+    ~phrase_name { address; value = text_section } =
   if !Globals.debug then
     let filename =
       Format.asprintf "%s.section%s.%a" phrase_name Jit_text_section.name
         Address.pp address
     in
-    write_bin_file ~filename (Jit_text_section.content text_section)
+    write_bin_file ~filename (Jit_text_section.content (module E) text_section)
 
-let print_binary_section_map _binary_section_map = ()
+let print_binary_section_map (type a r)
+    (module _ : Binary_emitter_intf.S
+      with type Assembled_section.t = a
+       and type Relocation.t = r)
+    (_binary_section_map : a String.Map.t) = ()

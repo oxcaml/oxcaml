@@ -280,7 +280,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -309,7 +309,7 @@
  (modules basic)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -332,7 +332,7 @@
  (modules basic_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -358,7 +358,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -390,7 +390,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -422,7 +422,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -451,7 +451,7 @@
  (modules let_mutable)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -474,7 +474,7 @@
  (modules let_mutable_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -497,7 +497,7 @@
  (modules mixed_modules)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -520,7 +520,7 @@
  (modules ops_float32x4)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -543,7 +543,7 @@
  (modules ops_float32x4_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -566,7 +566,7 @@
  (modules ops_float64x2)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -589,7 +589,7 @@
  (modules ops_float64x2_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -612,7 +612,7 @@
  (modules ops_int64x2)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -635,7 +635,7 @@
  (modules ops_int64x2_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -658,7 +658,7 @@
  (modules ops_int32x4)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -681,7 +681,7 @@
  (modules ops_int32x4_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -704,7 +704,7 @@
  (modules ops_int16x8)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -727,7 +727,7 @@
  (modules ops_int16x8_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -750,7 +750,7 @@
  (modules ops_int8x16)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -773,7 +773,7 @@
  (modules ops_int8x16_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -796,7 +796,7 @@
  (modules ops)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -819,7 +819,7 @@
  (modules ops_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -845,7 +845,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -877,7 +877,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -909,7 +909,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -941,7 +941,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -973,7 +973,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1005,7 +1005,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1037,7 +1037,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1069,7 +1069,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1101,7 +1101,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1133,7 +1133,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1165,7 +1165,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1197,7 +1197,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1229,7 +1229,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1261,7 +1261,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1293,7 +1293,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1325,7 +1325,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1354,7 +1354,7 @@
  (modules arrays)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1377,7 +1377,7 @@
  (modules arrays_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1400,7 +1400,7 @@
  (modules scalar_ops)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1423,7 +1423,7 @@
  (modules consts)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1446,7 +1446,7 @@
  (modules consts_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1469,7 +1469,7 @@
  (modules callback)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1495,7 +1495,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1524,7 +1524,7 @@
  (modules test_callee_save_neon_regs)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1550,7 +1550,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1582,7 +1582,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1614,7 +1614,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1646,7 +1646,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1678,7 +1678,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1710,7 +1710,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1742,7 +1742,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1774,7 +1774,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1806,7 +1806,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1838,7 +1838,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1870,7 +1870,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1902,7 +1902,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1934,7 +1934,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1966,7 +1966,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1998,7 +1998,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2030,7 +2030,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2062,7 +2062,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2094,7 +2094,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta ))
+  (:standard -extension simd_beta -save-binary-sections ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2135,7 +2135,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2170,7 +2170,7 @@
  (modules basic_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2199,7 +2199,7 @@
  (modules basic_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2234,7 +2234,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2275,7 +2275,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2316,7 +2316,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2351,7 +2351,7 @@
  (modules let_mutable_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2380,7 +2380,7 @@
  (modules let_mutable_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2409,7 +2409,7 @@
  (modules mixed_modules_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2438,7 +2438,7 @@
  (modules ops_float32x4_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2467,7 +2467,7 @@
  (modules ops_float32x4_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2496,7 +2496,7 @@
  (modules ops_float64x2_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2525,7 +2525,7 @@
  (modules ops_float64x2_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2554,7 +2554,7 @@
  (modules ops_int64x2_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2583,7 +2583,7 @@
  (modules ops_int64x2_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2612,7 +2612,7 @@
  (modules ops_int32x4_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2641,7 +2641,7 @@
  (modules ops_int32x4_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2670,7 +2670,7 @@
  (modules ops_int16x8_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2699,7 +2699,7 @@
  (modules ops_int16x8_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2728,7 +2728,7 @@
  (modules ops_int8x16_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2757,7 +2757,7 @@
  (modules ops_int8x16_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2786,7 +2786,7 @@
  (modules ops_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2815,7 +2815,7 @@
  (modules ops_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2850,7 +2850,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2891,7 +2891,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2932,7 +2932,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2973,7 +2973,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3014,7 +3014,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3055,7 +3055,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3096,7 +3096,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3137,7 +3137,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3178,7 +3178,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3219,7 +3219,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3260,7 +3260,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3301,7 +3301,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3342,7 +3342,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3383,7 +3383,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3424,7 +3424,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3465,7 +3465,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3500,7 +3500,7 @@
  (modules arrays_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3529,7 +3529,7 @@
  (modules arrays_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3558,7 +3558,7 @@
  (modules scalar_ops_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3587,7 +3587,7 @@
  (modules consts_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3616,7 +3616,7 @@
  (modules consts_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3645,7 +3645,7 @@
  (modules callback_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3680,7 +3680,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3715,7 +3715,7 @@
  (modules test_callee_save_neon_regs_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3750,7 +3750,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3791,7 +3791,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3832,7 +3832,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3873,7 +3873,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3914,7 +3914,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3955,7 +3955,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -3996,7 +3996,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4037,7 +4037,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4078,7 +4078,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4119,7 +4119,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4160,7 +4160,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4201,7 +4201,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4242,7 +4242,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4283,7 +4283,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4324,7 +4324,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4365,7 +4365,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4406,7 +4406,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4447,7 +4447,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
+  (:standard -extension simd_beta -save-binary-sections -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4488,7 +4488,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4529,7 +4529,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4570,7 +4570,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4611,7 +4611,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4652,7 +4652,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4693,7 +4693,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4734,7 +4734,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4775,7 +4775,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4816,7 +4816,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4857,7 +4857,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4898,7 +4898,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4939,7 +4939,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -4980,7 +4980,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5021,7 +5021,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5062,7 +5062,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5103,7 +5103,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5144,7 +5144,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5185,7 +5185,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5226,7 +5226,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5267,7 +5267,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5308,7 +5308,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5349,7 +5349,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5390,7 +5390,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5431,7 +5431,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5472,7 +5472,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5513,7 +5513,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5554,7 +5554,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5595,7 +5595,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5636,7 +5636,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5677,7 +5677,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5718,7 +5718,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5759,7 +5759,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5800,7 +5800,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5841,7 +5841,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5882,7 +5882,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5923,7 +5923,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -5964,7 +5964,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6005,7 +6005,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6046,7 +6046,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6087,7 +6087,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6128,7 +6128,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6169,7 +6169,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6210,7 +6210,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6251,7 +6251,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6292,7 +6292,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6333,7 +6333,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6374,7 +6374,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6415,7 +6415,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6456,7 +6456,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6497,7 +6497,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6538,7 +6538,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6579,7 +6579,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6620,7 +6620,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6661,7 +6661,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6702,7 +6702,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6743,7 +6743,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6784,7 +6784,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6825,7 +6825,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6866,7 +6866,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6907,7 +6907,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6948,7 +6948,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -6989,7 +6989,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -7030,7 +7030,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -7071,7 +7071,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -7112,7 +7112,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
+  (:standard -extension simd_beta -save-binary-sections -internal-assembler))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 

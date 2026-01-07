@@ -76,12 +76,14 @@ type error =
   | Assembler_error of string
   | Mismatched_for_pack of Compilation_unit.Prefix.t
   | Asm_generation of string * Emitaux.error
+  | Binary_emitter_mismatch of string
 
 exception Error of error
 
 val report_error : Format.formatter -> error -> unit
 
 val compile_unit :
+  (module Compiler_owee.Unix_intf.S) ->
   output_prefix:string ->
   asm_filename:string ->
   keep_asm:bool ->

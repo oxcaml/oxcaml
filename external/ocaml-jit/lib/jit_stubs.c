@@ -39,6 +39,20 @@
 #include <unistd.h>
 #include <stdalign.h>
 
+/* ARM64 cache maintenance for JIT code */
+#if defined(__aarch64__)
+#if defined(__APPLE__)
+#include <libkern/OSCacheControl.h>
+#define JIT_FLUSH_ICACHE(addr, size) sys_icache_invalidate((addr), (size))
+#else
+/* Linux ARM64: use __builtin___clear_cache or inline assembly */
+#define JIT_FLUSH_ICACHE(addr, size) __builtin___clear_cache((char*)(addr), (char*)(addr) + (size))
+#endif
+#else
+/* x86_64 has coherent I-cache, no explicit flush needed */
+#define JIT_FLUSH_ICACHE(addr, size) ((void)0)
+#endif
+
 bool __attribute__((weak)) TCMalloc_MallocExtension_MallocIsTCMalloc(void) {
   return false;
 }
@@ -201,6 +215,11 @@ CAMLprim value jit_mprotect_rx(value caml_addr, value caml_size) {
 
   size = Int_val(caml_size);
   addr = (intnat*) Nativeint_val(caml_addr);
+
+  /* Flush instruction cache before making memory executable.
+     On ARM64, the instruction cache is not coherent with the data cache,
+     so we must explicitly invalidate the I-cache after writing code. */
+  JIT_FLUSH_ICACHE(addr, size);
 
   if (mprotect(addr, size, PROT_READ | PROT_EXEC)) {
     result = caml_alloc(1, 1);

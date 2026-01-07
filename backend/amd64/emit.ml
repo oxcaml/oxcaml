@@ -196,7 +196,12 @@ let pop r =
 
 (* Symbols *)
 
-let emit_symbol s = S.encode (S.create s)
+(* Convert Cmm.is_global to Asm_symbol.visibility *)
+let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
+  | Cmm.Global -> S.Global
+  | Cmm.Local -> S.Local
+
+let emit_symbol s = S.encode (S.create_global s)
 
 (* Record symbols used and defined - at the end generate extern for those used
    but not defined *)
@@ -223,12 +228,12 @@ let get_imp_symbol s =
 
 let emit_imp_table ~section () =
   let f s imps =
-    D.define_symbol_label ~section (S.create imps);
-    D.symbol (S.create s)
+    D.define_symbol_label ~section (S.create_global imps);
+    D.symbol (S.create_global s)
   in
   D.data ();
   D.comment "relocation table start";
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
+  D.align ~fill:Zero ~bytes:8;
   Hashtbl.iter f imp_table;
   D.comment "relocation table end"
 
@@ -258,7 +263,9 @@ let emit_jump s = I.jmp (rel_plt s)
 let domain_field f = mem64 QWORD (Domainstate.idx_of_field f * 8) (Scalar R14)
 
 let emit_cmm_symbol (s : Cmm.symbol) =
-  let sym = S.create s.sym_name in
+  let sym =
+    S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
+  in
   match (s.sym_global : Cmm.is_global) with
   | Global -> `Symbol sym
   (* This label is special in that it is not of the form "Lnumber". Instead, we
@@ -362,8 +369,7 @@ let emit_Llabel fallthrough lbl section_name =
         emit_function_or_basic_block_section_name ();
         D.cfi_startproc ())
     | None -> ());
-  if (not fallthrough) && !fastcode_flag
-  then D.align ~fill_x86_bin_emitter:Nop ~bytes:4;
+  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
   D.define_label lbl
 
 (* Output a pseudo-register *)
@@ -705,7 +711,7 @@ let emit_jump_table t =
   done
 
 let emit_jump_tables () =
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:4;
+  D.align ~fill:Zero ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
 
@@ -979,7 +985,7 @@ let global_maybe_protected (sym : S.t) =
 (* CR sspies: The naming of these functions is confusing. *)
 let emit_global_label_for_symbol ~section lbl =
   add_def_symbol lbl;
-  let lbl = S.create lbl in
+  let lbl = S.create_global lbl in
   global_maybe_protected lbl;
   D.define_symbol_label ~section lbl
 
@@ -1103,7 +1109,7 @@ let tailrec_entry_point = ref None
 
 let probe_handler_wrapper_name probe_label =
   let w = Printf.sprintf "probe_wrapper_%s" (Label.to_string probe_label) in
-  Cmm_helpers.make_symbol w |> S.create
+  Cmm_helpers.make_symbol w |> S.create_global
 
 let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
   assert !frame_required;
@@ -2172,19 +2178,19 @@ let emit_instr ~first ~fallthrough i =
     I.neg r0
   | Lop (Floatop (Float64, Inegf)) ->
     sse_or_avx_dst xorpd vxorpd_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_negf_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_negf_mask))
       (res i 0)
   | Lop (Floatop (Float64, Iabsf)) ->
     sse_or_avx_dst andpd vandpd_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_absf_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_absf_mask))
       (res i 0)
   | Lop (Floatop (Float32, Inegf)) ->
     sse_or_avx_dst xorps vxorps_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_negf32_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_negf32_mask))
       (res i 0)
   | Lop (Floatop (Float32, Iabsf)) ->
     sse_or_avx_dst andps vandps_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_absf32_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_absf32_mask))
       (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
     instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
@@ -2519,9 +2525,9 @@ let fundecl fundecl =
   current_basic_block_section
     := Option.value fundecl.fun_section_name ~default:"";
   emit_function_or_basic_block_section_name ();
-  D.align ~fill_x86_bin_emitter:Nop ~bytes:16;
+  D.align ~fill:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
-  let fundecl_sym = S.create fundecl.fun_name in
+  let fundecl_sym = S.create_global fundecl.fun_name in
   if is_macosx system
      && (not !Clflags.output_c_object)
      && is_generic_function fundecl.fun_name
@@ -2568,7 +2574,9 @@ let fundecl fundecl =
 (* CR sspies: Share the [emit_item] code with the Arm backend in emitaux. *)
 let emit_item : Cmm.data_item -> unit = function
   | Cdefine_symbol s -> (
-    let sym = S.create s.sym_name in
+    let sym =
+      S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
+    in
     match s.sym_global with
     | Local -> D.define_label (L.create_string_unchecked Data (S.encode sym))
     | Global ->
@@ -2619,11 +2627,11 @@ let emit_item : Cmm.data_item -> unit = function
       D.label_plus_offset l ~offset_in_bytes:(Targetint.of_int_exn o))
   | Cstring s -> D.string s
   | Cskip n -> D.space ~bytes:n
-  | Calign n -> D.align ~fill_x86_bin_emitter:Zero ~bytes:n
+  | Calign n -> D.align ~fill:Zero ~bytes:n
 
 let data l =
   D.data ();
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
+  D.align ~fill:Zero ~bytes:8;
   List.iter emit_item l
 
 (* Beginning / end of an assembly file *)
@@ -2678,11 +2686,11 @@ let begin_assembly unix =
   then (
     (* from amd64.S; could emit these constants on demand *)
     D.switch_to_section Sixteen_byte_literals;
-    D.align ~fill_x86_bin_emitter:Zero ~bytes:16;
+    D.align ~fill:Zero ~bytes:16;
     D.define_symbol_label ~section:Sixteen_byte_literals S.Predef.caml_negf_mask;
     D.int64 0x8000000000000000L;
     D.int64 0L;
-    D.align ~fill_x86_bin_emitter:Zero ~bytes:16;
+    D.align ~fill:Zero ~bytes:16;
     D.define_symbol_label ~section:Sixteen_byte_literals S.Predef.caml_absf_mask;
     D.int64 0x7FFFFFFFFFFFFFFFL;
     D.int64 0xFFFFFFFFFFFFFFFFL;
@@ -2690,7 +2698,7 @@ let begin_assembly unix =
       S.Predef.caml_negf32_mask;
     D.int64 0x80000000L;
     D.int64 0L;
-    D.align ~fill_x86_bin_emitter:Zero ~bytes:16;
+    D.align ~fill:Zero ~bytes:16;
     D.define_symbol_label ~section:Sixteen_byte_literals
       S.Predef.caml_absf32_mask;
     D.int64 0xFFFFFFFF7FFFFFFFL;
@@ -2828,7 +2836,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   (* Emit function entry code *)
   D.comment (Printf.sprintf "probe %s %s" probe_name handler_code_sym);
   emit_named_text_section (S.encode wrap_label);
-  D.align ~fill_x86_bin_emitter:Nop ~bytes:16;
+  D.align ~fill:Nop ~bytes:16;
   D.define_symbol_label ~section:Text wrap_label;
   D.cfi_startproc ();
   if fp
@@ -2952,22 +2960,22 @@ let end_assembly () =
   if not (Misc.Stdlib.List.is_empty !float_constants)
   then (
     D.switch_to_section Eight_byte_literals;
-    D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
+    D.align ~fill:Zero ~bytes:8;
     List.iter (fun (cst, lbl) -> emit_float_constant cst lbl) !float_constants);
   if not (Misc.Stdlib.List.is_empty !vec128_constants)
   then (
     D.switch_to_section Sixteen_byte_literals;
-    D.align ~fill_x86_bin_emitter:Zero ~bytes:16;
+    D.align ~fill:Zero ~bytes:16;
     List.iter (fun (cst, lbl) -> emit_vec128_constant cst lbl) !vec128_constants);
   if not (Misc.Stdlib.List.is_empty !vec256_constants)
   then (
     D.switch_to_section Thirtytwo_byte_literals;
-    D.align ~fill_x86_bin_emitter:Zero ~bytes:32;
+    D.align ~fill:Zero ~bytes:32;
     List.iter (fun (cst, lbl) -> emit_vec256_constant cst lbl) !vec256_constants);
   if not (Misc.Stdlib.List.is_empty !vec512_constants)
   then (
     D.switch_to_section Sixtyfour_byte_literals;
-    D.align ~fill_x86_bin_emitter:Zero ~bytes:64;
+    D.align ~fill:Zero ~bytes:64;
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
@@ -2986,16 +2994,14 @@ let end_assembly () =
   D.int64 0L;
   D.text ();
   (* We align to 8 bytes before the frame table. Perhaps somewhat
-     counterintuitively, we use [~fill_x86_bin_emitter:Zero] even though we are
-     now in the text section. The reason is that the additional padding will
-     never be executed, so there is no need to pad it with nops in the X86
-     binary emitter. *)
+     counterintuitively, we use [~fill:Zero] even though we are now in the text
+     section. The reason is that the additional padding will never be executed,
+     so there is no need to pad it with nops in the X86 binary emitter. *)
   (* CR sspies: We should just determine the filling based on the current
-     section for the binary emitter and then remove the argument
-     [fill_x86_bin_emitter]. This is the only place, where it does not seem to
-     match the current section, and it seems it does not matter whether we pad
-     with zeros or nops here. *)
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
+     section for the binary emitter and then remove the argument [fill]. This is
+     the only place, where it does not seem to match the current section, and it
+     seems it does not matter whether we pad with zeros or nops here. *)
+  D.align ~fill:Zero ~bytes:8;
   (* PR#7591 *)
   emit_global_label ~section:Text "frametable";
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
@@ -3015,7 +3021,7 @@ let end_assembly () =
       efa_u16 = (fun n -> D.uint16 n);
       efa_u32 = (fun n -> D.uint32 n);
       efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-      efa_align = (fun n -> D.align ~fill_x86_bin_emitter:Zero ~bytes:n);
+      efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
           let lbl = label_to_asm_label ~section:Text lbl in
@@ -3028,7 +3034,7 @@ let end_assembly () =
           D.define_label lbl);
       efa_string = (fun s -> D.string (s ^ "\000"))
     };
-  let frametable_sym = S.create (Cmm_helpers.make_symbol "frametable") in
+  let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
   D.data ();
   Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol;
@@ -3040,7 +3046,8 @@ let end_assembly () =
     D.comment "External functions";
     String.Set.iter
       (fun s ->
-        if not (String.Set.mem s !symbols_defined) then D.extrn (S.create s))
+        if not (String.Set.mem s !symbols_defined)
+        then D.extrn (S.create_global s))
       !symbols_used;
     symbols_used := String.Set.empty;
     symbols_defined := String.Set.empty);

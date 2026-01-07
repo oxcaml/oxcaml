@@ -416,6 +416,18 @@ let mk_ddissector_inputs f =
     Arg.String f,
     "<file>  Write dissector input analysis to <file>" )
 
+let mk_save_binary_sections f =
+  ( "-save-binary-sections",
+    Arg.Unit f,
+    "Save binary emitter section output to <prefix>.binary-sections/ directory \
+     (ARM64 only, for testing)" )
+
+let mk_verify_binary_emitter f =
+  ( "-verify-binary-emitter",
+    Arg.Unit f,
+    "Verify binary emitter output matches system assembler output. Implies \
+     -save-binary-sections. Exits with error on mismatch." )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -1174,6 +1186,8 @@ module type Oxcaml_options = sig
   val ddissector_verbose : unit -> unit
   val ddissector_partitions : unit -> unit
   val ddissector_inputs : string -> unit
+  val save_binary_sections : unit -> unit
+  val verify_binary_emitter : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -1333,6 +1347,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ddissector_verbose F.ddissector_verbose;
       mk_ddissector_partitions F.ddissector_partitions;
       mk_ddissector_inputs F.ddissector_inputs;
+      mk_save_binary_sections F.save_binary_sections;
+      mk_verify_binary_emitter F.verify_binary_emitter;
       mk_gc_timings F.gc_timings;
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
@@ -1583,6 +1599,13 @@ module Oxcaml_options_impl = struct
   let ddissector_verbose = set' Clflags.ddissector_verbose
   let ddissector_partitions = set' Clflags.ddissector_partitions
   let ddissector_inputs f = Clflags.ddissector_inputs := Some f
+  let save_binary_sections = set' Oxcaml_flags.save_binary_sections
+
+  let verify_binary_emitter () =
+    set' Oxcaml_flags.verify_binary_emitter ();
+    (* Verification requires saving binary sections *)
+    set' Oxcaml_flags.save_binary_sections ()
+
   let gc_timings = set' Oxcaml_flags.gc_timings
   let no_mach_ir () = ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
@@ -1956,6 +1979,11 @@ module Extra_params = struct
     in
     match name with
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
+    | "save-binary-sections" -> set' Oxcaml_flags.save_binary_sections
+    | "verify-binary-emitter" ->
+        Oxcaml_flags.verify_binary_emitter := true;
+        Oxcaml_flags.save_binary_sections := true;
+        true
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings
     | "no-mach-ir" ->
         Oxcaml_options_impl.no_mach_ir ();
