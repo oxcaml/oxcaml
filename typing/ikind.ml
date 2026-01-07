@@ -331,10 +331,8 @@ module Solver = struct
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tfield _ ->
         failwith "Tfield shouldn't appear in kind"
-        (* Ldd.const Axis_lattice.value *)
       | Types.Tnil ->
         failwith "Tnil shouldn't appear in kind"
-        (* Ldd.const Axis_lattice.value *)
       | Types.Tquote _ | Types.Tsplice _ ->
         (* Treat quoted/spliced types conservatively as boxed values. *)
         Ldd.const Axis_lattice.value
