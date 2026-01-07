@@ -147,7 +147,6 @@ COMPILERLIBS_SOURCES=\
   typing/ikinds/axis_lattice_conv.ml \
   typing/ikinds/axis_lattice_array.ml \
   typing/ikinds/axis_lattice_array_conv.ml \
-  typing/ikinds/ikind.ml \
   typing/ikinds/ikinds.ml \
   typing/btype.ml \
   typing/subst.ml \

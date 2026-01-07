@@ -30,9 +30,9 @@ let enable_sub_or_error = false
 
 let reset_constructor_ikind_on_substitution = false
 
-module Ldd = Ikind.Ldd
+module Ldd = Types.Ldd
 
-(** A kind solver specialized to [Ikind.Ldd] and [Types.type_expr].
+(** A kind solver specialized to [Types.Ldd] and [Types.type_expr].
 
       The solver computes LDD polynomials of the form
         base ⊔ Σ_i (arg_i ⊓ coeff_i)
@@ -455,7 +455,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
        treat those as abstract unknowns. *)
     (* Fallback for unknown constructors: treat them as abstract,
        non-recursive values. *)
-    let unknown = Ikind.Ldd.Name.fresh_unknown () in
+    let unknown = Ldd.Name.fresh_unknown () in
     let kind : Solver.ckind = fun _ctx -> Ldd.node_of_var (Ldd.rigid unknown) in
     Solver.Ty { args = []; kind; abstract = true }
   | Some type_decl ->
@@ -676,11 +676,11 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
         | Solver.Ty _ -> "Ty"
         | Solver.Poly (base, coeffs) ->
           let coeffs =
-            coeffs |> Array.map Ikind.Ldd.pp |> Array.to_list
+            coeffs |> Array.map Ldd.pp |> Array.to_list
             |> String.concat "; "
           in
-          Format.asprintf "Poly(base=%s; coeffs=[%s])" (Ikind.Ldd.pp base)
-            coeffs
+          Format.asprintf "Poly(base=%s; coeffs=[%s])"
+            (Ldd.pp base) coeffs
       in
       Format.eprintf "[ikind] %a: %s@." Path.print path ikind_msg);
     ikind
@@ -694,7 +694,7 @@ let make_ctx ~(context : Jkind.jkind_context) : Solver.ctx =
   make_ctx_with_mode ~mode:Solver.Normal ~context
 
 let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
-    Ikind.Ldd.node =
+    Ldd.node =
   let ctx = make_ctx ~context in
   Solver.normalize (ckind_of_jkind_l ctx jkind)
 
@@ -727,9 +727,9 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
       in
       Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@." Path.print
         path stored_jkind
-        (Ikind.Ldd.pp payload.base)
+        (Ldd.pp payload.base)
         (String.concat "; "
-           (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs))));
+           (Array.to_list (Array.map Ldd.pp payload.coeffs))));
     Types.Constructor_ikind ikind
 
 let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
@@ -750,9 +750,9 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
     if !Types.ikind_debug
     then
       Format.eprintf "[ikind] from jkind: base=%s; coeffs=[%s]@."
-        (Ikind.Ldd.pp payload.base)
+        (Ldd.pp payload.base)
         (String.concat "; "
-           (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs)));
+           (Array.to_list (Array.map Ldd.pp payload.coeffs)));
     Types.Constructor_ikind payload
 
 let sub_jkind_l ?allow_any_crossing ?origin

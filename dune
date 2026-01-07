@@ -253,7 +253,6 @@
   ldd
   axis_lattice
   axis_lattice_conv
-  ikind
   ikinds
   typetexp
   patterns
