@@ -1399,18 +1399,18 @@ and ldelayed ppf = function
 and slam ppf = function
   | SLquote lambda -> fprintf ppf "⟪ %a ⟫" lam lambda
   | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout
-  | SLvar id -> Ident.print ppf id
+  | SLvar id -> Slambdaident.print ppf id
   | SLrecord fields ->
     let print_fields ppf =
-      Ident.Map.iter
+      Slambdaident.Map.iter
         (fun ident value ->
-          fprintf ppf "@[<2>%a =@ %a;@]@ " Ident.print ident slam value)
+          fprintf ppf "@[<2>%a =@ %a;@]@ " Slambdaident.print ident slam value)
         fields
     in
     fprintf ppf "@[<hv 2>{@ %t}@]" print_fields
   | SLfield (container, field) ->
-     fprintf ppf "%a.%a" Ident.print container Ident.print field
-  | SLvalue { sval_comptime; sval_runtime } ->
+     fprintf ppf "%a.%a" Slambdaident.print container Slambdaident.print field
+  | SLhalves { sval_comptime; sval_runtime } ->
     fprintf ppf "@[<hv 2>(%a,@ %a)@]" slam sval_comptime slam sval_runtime
   | SLproj_comptime value -> fprintf ppf "%a.0" slam value
   | SLproj_runtime value -> fprintf ppf "%a.1" slam value
@@ -1420,11 +1420,11 @@ and slam ppf = function
   | SLinstantiate apply -> fprintf ppf "[%a]" slambda_apply apply
   | SLlet { slet_name; slet_value; slet_body } ->
     fprintf ppf "@[<hv 2>(let %a =@;<1 2>%a in@ %a)@]"
-      Ident.print slet_name slam slet_value slam slet_body
+      Slambdaident.print slet_name slam slet_value slam slet_body
 
 and slambda_function ppf { sfun_params; sfun_body } =
   let print_params ppf =
-    Array.iter (fun id -> fprintf ppf "%a@ " Ident.print id) sfun_params
+    Array.iter (fun id -> fprintf ppf "%a@ " Slambdaident.print id) sfun_params
   in
   fprintf ppf "@[<2>@[<2>%t->@]@ %a@]" print_params slam sfun_body
 

@@ -393,7 +393,7 @@ let reorder_rec_bindings bindings =
       (* CR layout poly: The following [free_variables] call means that
          recursive modules can't contain slambda, we should fix that. *)
       if Option.is_none (Slambdaeval.trivial_slambda (SLquote rhs)) then
-        Slambda.raise ~loc (Unsupported "recursive modules");
+        Lambda.error ~loc (Slambda_unsupported "recursive modules");
       rhs)
     bindings) in
   let fv = Array.map (fun rhs -> Lambda.free_variables rhs) rhs in

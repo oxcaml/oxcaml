@@ -859,10 +859,10 @@ and delayed =
 and slambda =
   | SLquote of lambda
   | SLlayout of layout
-  | SLvar of Ident.t
-  | SLrecord of slambda Ident.Map.t
-  | SLfield of Ident.t * Ident.t
-  | SLvalue of slambda_value
+  | SLvar of Slambdaident.t
+  | SLrecord of slambda Slambdaident.Map.t
+  | SLfield of Slambdaident.t * Slambdaident.t
+  | SLhalves of slambda_halves
   | SLproj_comptime of slambda
   | SLproj_runtime of slambda
   | SLfunction of slambda_function
@@ -871,13 +871,13 @@ and slambda =
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
 
-and slambda_value =
+and slambda_halves =
   { sval_comptime: slambda;
     sval_runtime: slambda
   }
 
 and slambda_function =
-  { sfun_params: Ident.t array;
+  { sfun_params: Slambdaident.t array;
     sfun_body: slambda
   }
 
@@ -887,7 +887,7 @@ and slambda_apply =
   }
 
 and slambda_let =
-  { slet_name: Ident.t;
+  { slet_name: Slambdaident.t;
     slet_value: slambda;
     slet_body: slambda
   }
@@ -1407,3 +1407,7 @@ val static_cast
   -> lambda
   -> loc:scoped_location
   -> lambda
+
+type error = Slambda_unsupported of string
+
+val error : ?loc:Location.t -> error -> 'a

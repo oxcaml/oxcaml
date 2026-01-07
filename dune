@@ -286,6 +286,7 @@
   simplif
   slambda
   slambdaeval
+  slambdaident
   switch
   value_rec_compiler
   translmode

@@ -787,7 +787,7 @@ let free_methods l =
     | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
     | Lsplice { splice_loc; _ } ->
       (* CR layout poly: we could definitely do better here. *)
-      Slambda.raise ~loc:(to_location splice_loc) (Unsupported "classes")
+      Lambda.error ~loc:(to_location splice_loc) (Slambda_unsupported "classes")
     | Ldelayed(Dletrec(bindings, _body)) ->
         List.iter (fun (id, _, _, _) -> fv := Ident.Set.remove id !fv) bindings
   in free l; !fv

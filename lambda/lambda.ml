@@ -886,10 +886,10 @@ and delayed =
 and slambda =
   | SLquote of lambda
   | SLlayout of layout
-  | SLvar of Ident.t
-  | SLrecord of slambda Ident.Map.t
-  | SLfield of Ident.t * Ident.t
-  | SLvalue of slambda_value
+  | SLvar of Slambdaident.t
+  | SLrecord of slambda Slambdaident.Map.t
+  | SLfield of Slambdaident.t * Slambdaident.t
+  | SLhalves of slambda_halves
   | SLproj_comptime of slambda
   | SLproj_runtime of slambda
   | SLfunction of slambda_function
@@ -898,13 +898,13 @@ and slambda =
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
 
-and slambda_value =
+and slambda_halves =
   { sval_comptime: slambda;
     sval_runtime: slambda
   }
 
 and slambda_function =
-  { sfun_params: Ident.t array;
+  { sfun_params: Slambdaident.t array;
     sfun_body: slambda
   }
 
@@ -914,7 +914,7 @@ and slambda_apply =
   }
 
 and slambda_let =
-  { slet_name: Ident.t;
+  { slet_name: Slambdaident.t;
     slet_value: slambda;
     slet_body: slambda
   }
@@ -991,7 +991,7 @@ let delayed_name = function
 let fail_with_delayed_constructor delayed =
   let name = delayed_name delayed in
   Misc.fatal_errorf
-    "$s in lambda should have been removed by [Simplif.undelay]" name
+    "%s in lambda should have been removed by [Simplif.undelay]" name
 
 type runtime_param =
   | Rp_argument_block of Global_module.t
@@ -1028,6 +1028,12 @@ type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
     arg_block_idx: int;
     main_repr: module_representation; }
+
+type error = Slambda_unsupported of string
+
+exception Error of Location.t option * error
+
+let error ?loc err = raise (Error (loc, err))
 
 let const_int n = Const_base (Const_int n)
 
@@ -1619,8 +1625,7 @@ let block_of_module_representation ~loc = function
              layout poly usecases, however it should be easy to move this assert
              to after slambdaeval (or maybe during?). *)
           | Splice_variable _ ->
-            Misc.fatal_error "Layout poly doesn't support mixed modules yet")
-            (* Slambda.raise ~loc (Unsupported "mixed modules")) *)
+            error ~loc (Slambda_unsupported "mixed modules"))
         0 shape
     in
     Typedecl.assert_mixed_product_support loc Module
@@ -3008,3 +3013,16 @@ let icmp cmp size x y ~loc = binary (Icmp (size, cmp)) x y ~loc
 let phys_equal x y ~loc = Lprim (Pphys_equal Eq, [x;y], loc)
 
 let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
+
+let report_error ppf = function
+  | Slambda_unsupported where ->
+    Format.fprintf ppf
+      "Static computation and layout polymorphism are not yet supported in %s."
+      where
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (Some loc, err) ->
+      Some (Location.error_of_printer ~loc report_error err)
+    | Error (None, err) -> Some (Location.error_of_printer report_error err)
+    | _ -> None)
