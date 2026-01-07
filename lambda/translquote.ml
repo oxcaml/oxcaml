@@ -2479,7 +2479,9 @@ let rec quote_module_path loc = function
     |> Identifier.Module.wrap
   | _ -> fatal_error "No support for Papply in quoting modules"
 
-let construct_spine ~env ~loc typ =
+(* Approximate the [core_type] for type annotation from a given [type_expr].
+   Used for annotating polymorphic applications with higher-rank types. *)
+let type_for_annotation ~env ~loc typ =
   let unwrap_univar ty =
     match get_desc ty with
     | Tunivar { name = Some name; jkind } -> Some (name, jkind.annotation)
@@ -2603,7 +2605,8 @@ and quote_pat_extra ~env pat_lam extra =
     |> maybe_constrain_pat_with_type loc
          (type_constraint_of_ambiguity loc ambiguity)
   | Tpat_inspected_type (Polymorphic_parameter (Param ty)) ->
-    Pat.constraint_ loc pat_lam (construct_spine ~env ~loc ty |> quote_core_type)
+    Pat.constraint_ loc pat_lam
+      (type_for_annotation ~env ~loc ty |> quote_core_type)
     |> Pat.wrap
 
 and quote_value_pattern p =
@@ -3083,7 +3086,7 @@ and quote_expression_extra ~env _ _ extra lambda =
     let cty =
       match poly_param with
       | Method (met, ty) ->
-        let met_cty = construct_spine ~env ~loc ty in
+        let met_cty = type_for_annotation ~env ~loc ty in
         let met_field =
           { of_desc = OTtag (met, met_cty); of_loc = loc; of_attributes = [] }
         in
@@ -3100,7 +3103,7 @@ and quote_expression_extra ~env _ _ extra lambda =
                 Ttyp_arrow
                   ( arg_lbl,
                     (match sch with
-                    | Some sch -> construct_spine ~env ~loc sch
+                    | Some sch -> type_for_annotation ~env ~loc sch
                     | None -> newcorevar ()),
                     spine );
               ctyp_type = newvar ();
