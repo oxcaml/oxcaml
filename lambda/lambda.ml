@@ -1455,6 +1455,10 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  (* CR layout poly: [Ldelayed] should fatal error here once we've moved
+     everything that uses it to after [Simplif.undelay] because it's not obvious
+     how easy it'll be to compute the free variables of a delayed thing and it's
+     probably not a reasonable operation anyway.  *)
   | Ldelayed (Dletrec (bindings, body)) ->
       let set =
         free_variables_list (free_variables body)
