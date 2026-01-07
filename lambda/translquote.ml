@@ -2539,7 +2539,7 @@ let construct_spine ~env ~loc typ =
           let fields =
             List.map
               (fun (l, p, tyl) ->
-                { rf_desc = Ttag (mkloc l loc, p || tyl = [], List.map go tyl);
+                { rf_desc = Ttag (mkloc l loc, p, List.map go tyl);
                   rf_loc = loc;
                   rf_attributes = []
                 })

@@ -1560,9 +1560,7 @@ module Ast = struct
     if with_or then pp fmt "@ |@ ";
     match rf with
     | Vinherit ty -> print_core_type env fmt ty
-    | Vtag (_, false, []) ->
-      () (* fatal_error "Invalid polymorphic variant type" *)
-    | Vtag (variant, true, []) -> pp fmt "%a" Variant.print variant
+    | Vtag (variant, _, []) -> pp fmt "%a" Variant.print variant
     | Vtag (variant, true, tys) ->
       pp fmt "%a@ of" Variant.print variant;
       List.iter
