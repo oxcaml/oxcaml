@@ -580,13 +580,11 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 (***********************************************************************)
 type 'a t : immutable_data = Flat | Nested of 'a t t
-(* CR layouts v2.8: This should work once we get proper subsumption. Internal ticket 4770 *)
 [%%expect {|
 type 'a t = Flat | Nested of 'a t t
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
-(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 val foo : 'a t @ contended -> unit = <fun>
 |}]
@@ -602,6 +600,7 @@ Error: This value is "aliased" but is expected to be "unique".
 (***********************************************************************)
 type ('a : immutable_data) t = Flat | Nested of 'a t t
 (* CR layouts v2.8: fix this. Internal ticket 4770 *)
+(* CR jujacobs: this fails due to the ('a : immutable_data) constraint *)
 [%%expect {|
 Line 1, characters 0-54:
 1 | type ('a : immutable_data) t = Flat | Nested of 'a t t
@@ -614,21 +613,16 @@ Error:
 |}]
 
 type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
-(* CR layouts v2.8: This should work once we get proper subsumption. Internal ticket 4770 *)
-(* CR layouts v2.8: If we can't get this accepted, investigate the terrible
-   /2 stuff in the error message. That scares me a bit. *)
 [%%expect {|
 type ('a : immutable_data) t = Flat | Nested of 'a t t
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
-(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 val foo : int t @ contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
-(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 |}]
@@ -691,7 +685,6 @@ type 'a t = None | Some of ('a * 'a) t u
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
-(* CR layouts v2.8: this should work when we get tuples working. Internal ticket 4770 *)
 [%%expect {|
 val foo : int t @ contended -> unit = <fun>
 |}]
@@ -723,8 +716,6 @@ val foo : 'a t @ contended -> unit = <fun>
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
-(* CR layouts v2.8: this should work, but the recursive expansion
-   of with-bounds presumably runs out of fuel and gives up. Internal ticket 4770 *)
 [%%expect {|
 val foo : int t @ contended -> unit = <fun>
 |}]
@@ -753,7 +744,6 @@ type 'a t = Leaf of 'a | Some of ('a * 'a) t
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
-(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 val foo : int t @ contended -> unit = <fun>
 |}]
