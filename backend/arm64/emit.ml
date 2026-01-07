@@ -612,41 +612,6 @@ let cond_for_comparison : integer_comparison -> Cond.t = function
   | Cult -> CC
   | Cugt -> HI
 
-let instr_for_bitwise_int_operation_shifted_register op : _ I.t =
-  match[@ocaml.warning "-4"] op with
-  | Iand -> AND_shifted_register
-  | Ior -> ORR_shifted_register
-  | Ixor -> EOR_shifted_register
-  | _ ->
-    Misc.fatal_errorf "instr_for_bitwise_int_operation: unexpected op %s"
-      (Operation.string_of_integer_operation op)
-
-let instr_for_bitwise_int_operation_immediate op : _ I.t =
-  match[@ocaml.warning "-4"] op with
-  | Iand -> AND_immediate
-  | Ior -> ORR_immediate
-  | Ixor -> EOR_immediate
-  | _ ->
-    Misc.fatal_errorf "instr_for_bitwise_int_operation: unexpected op %s"
-      (Operation.string_of_integer_operation op)
-
-let instr_for_shift_operation op : _ I.t =
-  match[@ocaml.warning "-4"] op with
-  | Ilsl -> LSLV
-  | Ilsr -> LSRV
-  | Iasr -> ASRV
-  | _ ->
-    Misc.fatal_errorf "instr_for_shift_operation: unexpected op %s"
-      (Operation.string_of_integer_operation op)
-
-let instr_for_arith_operation_shifted_register op : _ I.t =
-  match[@ocaml.warning "-4"] op with
-  | Iadd -> ADD_shifted_register
-  | Isub -> SUB_shifted_register
-  | _ ->
-    Misc.fatal_errorf "instr_for_arith_operation: unexpected op %s"
-      (Operation.string_of_integer_operation op)
-
 (* Decompose an integer constant into four 16-bit shifted fragments. Omit the
    fragments that are equal to "default" (16 zeros or 16 ones). *)
 
@@ -1815,34 +1780,46 @@ let emit_instr i =
       A.ins2 RBIT (H.reg_x i.res.(0), H.reg_x i.arg.(0));
       A.ins2 CLZ (H.reg_x i.res.(0), H.reg_x i.res.(0)))
   | Lop (Intop (Iclz _)) -> A.ins2 CLZ (H.reg_x i.res.(0), H.reg_x i.arg.(0))
-  | Lop (Intop ((Iand | Ior | Ixor) as op)) ->
-    let instr = instr_for_bitwise_int_operation_shifted_register op in
-    A.ins4 instr
+  | Lop (Intop Iand) ->
+    A.ins4 AND_shifted_register
       (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
-  | Lop (Intop ((Ilsl | Ilsr | Iasr) as op)) ->
-    let instr = instr_for_shift_operation op in
-    A.ins3 instr (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
-  | Lop (Intop ((Iadd | Isub) as op)) ->
-    let instr = instr_for_arith_operation_shifted_register op in
-    A.ins4 instr
+  | Lop (Intop Ior) ->
+    A.ins4 ORR_shifted_register
+      (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
+  | Lop (Intop Ixor) ->
+    A.ins4 EOR_shifted_register
+      (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
+  | Lop (Intop Ilsl) ->
+    A.ins3 LSLV (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
+  | Lop (Intop Ilsr) ->
+    A.ins3 LSRV (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
+  | Lop (Intop Iasr) ->
+    A.ins3 ASRV (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
+  | Lop (Intop Iadd) ->
+    A.ins4 ADD_shifted_register
+      (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
+  | Lop (Intop Isub) ->
+    A.ins4 SUB_shifted_register
       (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1), O.optional_none)
   | Lop (Intop Imul) ->
     A.ins_mul (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
   | Lop (Intop Idiv) ->
     A.ins3 SDIV (H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1))
-  | Lop (Intop_imm (((Iand | Ior | Ixor) as op), n)) ->
-    let instr = instr_for_bitwise_int_operation_immediate op in
-    A.ins3 instr
+  | Lop (Intop_imm (Iand, n)) ->
+    A.ins3 AND_immediate
       (H.reg_x i.res.(0), H.reg_x i.arg.(0), O.bitmask (Nativeint.of_int n))
-  | Lop (Intop_imm (((Ilsl | Ilsr | Iasr) as op), shift_in_bits)) ->
-    let insertion_fn =
-      match[@ocaml.warning "-4"] op with
-      | Ilsl -> A.ins_lsl_immediate
-      | Ilsr -> A.ins_lsr_immediate
-      | Iasr -> A.ins_asr_immediate
-      | _ -> assert false
-    in
-    insertion_fn (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
+  | Lop (Intop_imm (Ior, n)) ->
+    A.ins3 ORR_immediate
+      (H.reg_x i.res.(0), H.reg_x i.arg.(0), O.bitmask (Nativeint.of_int n))
+  | Lop (Intop_imm (Ixor, n)) ->
+    A.ins3 EOR_immediate
+      (H.reg_x i.res.(0), H.reg_x i.arg.(0), O.bitmask (Nativeint.of_int n))
+  | Lop (Intop_imm (Ilsl, shift_in_bits)) ->
+    A.ins_lsl_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
+  | Lop (Intop_imm (Ilsr, shift_in_bits)) ->
+    A.ins_lsr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
+  | Lop (Intop_imm (Iasr, shift_in_bits)) ->
+    A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop
       (Intop_imm
         ((Imul | Idiv | Iclz _ | Ictz _ | Ipopcnt | Imod | Imulh _), _)) ->
