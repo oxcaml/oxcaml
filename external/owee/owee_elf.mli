@@ -257,3 +257,25 @@ val iter_symbols :
      st_size:int64 ->
      unit) ->
   unit
+
+(** Extract section body as a string. *)
+val section_body_string : Owee_buf.t -> section -> string
+
+(** A resolved relocation with offset, symbol name, and addend. *)
+type relocation = {
+  r_offset : int;
+  r_symbol : string;
+  r_addend : int64;
+}
+
+(** Build a symbol name table from .symtab and .strtab sections.
+    Returns an array indexed by symbol index, or None if tables not found. *)
+val build_symbol_names : Owee_buf.t -> section array -> string array option
+
+(** Extract relocations from a RELA section by name (e.g., ".rela.text"). *)
+val extract_rela_relocations
+  : Owee_buf.t -> section array -> rela_section_name:string -> relocation list
+
+(** Extract relocations for a section (e.g., ".text" -> reads ".rela.text"). *)
+val extract_section_relocations
+  : Owee_buf.t -> section array -> section_name:string -> relocation list

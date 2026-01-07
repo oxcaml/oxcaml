@@ -1,6 +1,5 @@
 (* TEST
-  flags = "-extension runtime_metaprogramming";
-  arch_amd64;
+  flags = "-extension runtime_metaprogramming -gno-upstream-dwarf -g";
   native;
 *)
 
