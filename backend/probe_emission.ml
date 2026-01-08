@@ -131,7 +131,7 @@ let emit_probe_notes0 ~slot_offset =
     let semsym =
       find_or_add_semaphore probe_name (Some enabled_at_init) p.probe_insn.dbg
     in
-    let semaphore_label = S.create semsym in
+    let semaphore_label = S.create_global semsym in
     let emit_desc () =
       emit_probe_note_desc ~probe_label:(Some p.probe_label) ~semaphore_label
         ~probe_name ~probe_args:args
@@ -148,7 +148,7 @@ let emit_dummy_probe_notes () =
      notes to correctly toggle such semaphores. A dummy note has no associated
      probe site or probe handler. *)
   let describe_dummy_probe ~probe_name sym =
-    let semaphore_label = S.create sym in
+    let semaphore_label = S.create_global sym in
     let emit_desc () =
       emit_probe_note_desc ~probe_name ~probe_label:None ~semaphore_label
         ~probe_args:""

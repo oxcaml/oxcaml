@@ -48,7 +48,7 @@ module Rounding_mode = struct
 end
 
 module Float_cond = struct
-  type t = Arm64_ast.Instruction_name.Float_cond.t =
+  type t = Arm64_ast.Float_cond.t =
     | EQ
     | GT
     | LE
@@ -113,10 +113,10 @@ end
 
 (* CR-soon gyorsh: rename vector intrinsics to start with "v" to match the
    naming convention of arm64 intrinsics for C. *)
-(* CR-soon gyorsh: Consider factoring out operand types and eliminate simd_proc.
-   For example, Addq_s16, Addq_s32, Addq_s64 can be representated by the same
-   constructor with argument that determines [Simd_proc.t]. See also amd64
-   representation of simd instructions. *)
+(* CR-soon gyorsh: Consider factoring out operand types. For example, Addq_s16,
+   Addq_s32, Addq_s64 can be representated by the same constructor with argument
+   that determines element type. See also amd64 representation of simd
+   instructions. *)
 type operation =
   | Round_f32 of Rounding_mode.t
   | Round_f64 of Rounding_mode.t
