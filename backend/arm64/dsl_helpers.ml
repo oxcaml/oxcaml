@@ -60,7 +60,7 @@ let reg_index reg =
     let reg_class = Reg_class.of_machtype typ in
     let name_index = r - Reg_class.first_available_register reg_class in
     reg_name_to_arch_index reg_class name_index
-  | { loc = Stack _ | Unknown; _ } -> fatal_error "Emit.reg"
+  | { loc = Stack _ | Unknown; _ } -> fatal_error "Dsl_helpers.reg_index"
 
 let reg_v2s reg = Ast.DSL.reg_v2s (reg_index reg)
 
@@ -161,7 +161,8 @@ let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
     Ast.DSL.mem_offset ~base:Ast.Reg.sp (* SP *) ~offset:ofs
   | Reg _ | Unknown ->
-    Misc.fatal_errorf "Emit.stack: register %a not on stack" Printreg.reg r
+    Misc.fatal_errorf "Dsl_helpers.stack: register %a not on stack" Printreg.reg
+      r
 
 let reg_x reg =
   let index = reg_index reg in
