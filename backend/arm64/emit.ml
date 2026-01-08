@@ -1498,7 +1498,7 @@ let emit_named_text_section func_name =
        the new asm directives. *)
     D.switch_to_section_raw
       ~names:[".text.caml." ^ S.encode (S.create_global func_name)]
-      ~flags:(Some "ax") ~args:["%progbits"] ~is_delayed:false;
+      ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
     (* Warning: We set the internal section ref to Text here, because it
        currently does not supported named text sections. In the rest of this
        file, we pretend the section is called Text rather than the function
