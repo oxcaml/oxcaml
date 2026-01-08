@@ -495,7 +495,7 @@ and function_body i ppf (body : function_body) =
       alloc_mode_raw i ppf fc_arg_mode;
       line i ppf "%a\n" Jkind.Sort.format fc_arg_sort;
       attributes (i+1) ppf fc_attributes;
-      Option.iter (fun e -> expression_extra (i+1) ppf e []) fc_exp_extra;
+      List.iter (fun e -> expression_extra (i+1) ppf e []) fc_exp_extra;
       list (i+1) case ppf fc_cases
 
 and expression_extra i ppf x attrs =

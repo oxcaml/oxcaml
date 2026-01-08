@@ -2643,7 +2643,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
              (Tfunction_cases
                 { fc_cases = [case]; fc_param = param;
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
-                  fc_loc = ghost_loc; fc_exp_extra = None; fc_attributes = [];
+                  fc_loc = ghost_loc; fc_exp_extra = []; fc_attributes = [];
                   fc_arg_mode = Mode.Alloc.disallow_right Mode.Alloc.legacy;
                   fc_arg_sort = param_sort; fc_env = env;
                   fc_ret_type = case.c_rhs.exp_type;

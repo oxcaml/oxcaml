@@ -412,7 +412,7 @@ let function_body sub body =
       let fc_loc = sub.location sub fc_loc in
       let fc_attributes = sub.attributes sub fc_attributes in
       let fc_cases = List.map (sub.case sub) fc_cases in
-      let fc_exp_extra = Option.map (extra sub) fc_exp_extra in
+      let fc_exp_extra = List.map (extra sub) fc_exp_extra in
       let fc_env = sub.env sub fc_env in
       Tfunction_cases
         { fc_cases; fc_partial; fc_param; fc_param_debug_uid;

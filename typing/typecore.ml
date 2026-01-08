@@ -8401,7 +8401,7 @@ and type_function
           in
           let (cases, exp_type, fun_alloc_mode, ret_info), exp_extra =
             match ret_type_constraint with
-            | None -> type_cases_expect env expected_mode ty_expected, None
+            | None -> type_cases_expect env expected_mode ty_expected, []
             | Some constraint_ ->
               (* The typing of function case coercions/constraints is
                   analogous to the typing of expression coercions/constraints.
@@ -8434,15 +8434,18 @@ and type_function
                 type_constraint_expect function_cases_constraint_arg
                   env expected_mode loc type_mode constraint_ ty_expected ~loc_arg:loc
               in
-              (* CR lstevenson: There's nowhere to put type_modes_annot in the
-                 typedtree because fc_exp_extra is an option rather than a
-                 list. *)
-              (body, exp_type, fun_alloc_mode, ret_info), Some exp_extra
+              let exp_extra =
+                match type_modes_annot with
+                | [] -> [ exp_extra ]
+                | _ :: _ ->
+                  [ Texp_mode (type_mode, type_modes_annot) ; exp_extra ]
+              in
+              (body, exp_type, fun_alloc_mode, ret_info), exp_extra
           in
           let cases =
             match exp_extra with
-            | None -> cases
-            | Some _ as fc_exp_extra -> { cases with fc_exp_extra }
+            | [] -> cases
+            | _ :: _ as fc_exp_extra -> { cases with fc_exp_extra }
           in
           exp_type, Tfunction_cases cases, Some fun_alloc_mode, Some ret_info
      in
@@ -9028,7 +9031,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                   { fc_cases = cases; fc_partial = Total; fc_param = param;
                     fc_param_debug_uid = param_uid; fc_env = env;
                     fc_ret_type = ty_res; fc_loc = cases_loc;
-                    fc_exp_extra = None; fc_attributes = [];
+                    fc_exp_extra = []; fc_attributes = [];
                     fc_arg_mode = Alloc.disallow_right marg;
                     fc_arg_sort = arg_sort;
                   };
@@ -10014,7 +10017,7 @@ and type_function_cases_expect
         fc_param = param;
         fc_param_debug_uid = param_uid;
         fc_loc = loc;
-        fc_exp_extra = None;
+        fc_exp_extra = [];
         fc_env = env;
         fc_ret_type = ty_ret;
         fc_attributes = [];
