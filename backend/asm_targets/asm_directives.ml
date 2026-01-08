@@ -762,13 +762,9 @@ let switch_to_section ?(emit_label_on_first_occurrence = false) section =
     define_label (Asm_label.for_section section)
   | `First_occurrence | `Not_first_occurrence -> ()
 
-let switch_to_section_raw ~names ~flags:_ ~args:_ ~is_delayed:_ =
-  (* Convert names to Asm_section.t if possible *)
-  match Asm_section.of_names names with
-  | Some section -> switch_to_section section
-  | None ->
-    Misc.fatal_errorf "switch_to_section_raw: unknown section names: %s"
-      (String.concat ", " names)
+let switch_to_section_raw ~names ~flags ~args ~is_delayed =
+  let section = Asm_section.Custom { names; flags; args; is_delayed } in
+  switch_to_section section
 
 let unsafe_set_internal_section_ref section =
   current_section_ref := Some section

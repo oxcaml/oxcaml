@@ -57,6 +57,14 @@ type t =
   | Probes
   | Note_ocaml_eh
   | Note_gnu_stack
+  | Custom of
+      { names : string list;
+        flags : string option;
+        args : string list;
+        is_delayed : bool
+      }
+      (** A custom section with explicit details, for target-specific sections
+          not covered by the other variants. *)
 
 val to_string : t -> string
 

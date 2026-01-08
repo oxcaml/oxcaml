@@ -56,6 +56,12 @@ type t =
   | Probes
   | Note_ocaml_eh
   | Note_gnu_stack
+  | Custom of
+      { names : string list;
+        flags : string option;
+        args : string list;
+        is_delayed : bool
+      }
 
 let dwarf_sections_in_order () =
   let sections =
@@ -84,6 +90,7 @@ let is_delayed = function
   | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
   | Note_gnu_stack ->
     false
+  | Custom { is_delayed; _ } -> is_delayed
 
 let print ppf t =
   let str =
@@ -112,6 +119,8 @@ let print ppf t =
     | Probes -> "Probes"
     | Note_ocaml_eh -> "Note_ocaml_eh"
     | Note_gnu_stack -> "Note_gnu_stack"
+    | Custom { names; _ } ->
+      Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
   Format.pp_print_string ppf str
 
@@ -135,6 +144,11 @@ let section_is_text = function
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
   | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack ->
     false
+  | Custom { flags; _ } -> (
+    (* Check if the section is executable based on flags *)
+    match flags with
+    | Some f -> String.contains f 'x'
+    | None -> false)
 
 type section_details =
   { names : string list;
@@ -247,6 +261,7 @@ let details t first_occurrence =
     | Probes, _, _ -> [".probes"], Some "wa", ["\"progbits\""]
     | Note_ocaml_eh, _, _ -> [".note.ocaml_eh"], Some "?", ["\"note\""]
     | Note_gnu_stack, _, _ -> [".note.GNU-stack"], Some "", ["@progbits"]
+    | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in
   { names; flags; args; is_delayed }
