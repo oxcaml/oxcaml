@@ -195,15 +195,16 @@ let reg_d reg =
     Misc.fatal_errorf "reg_d: expected Float or Vec128/Valx2 register, got %a"
       Printreg.reg reg
 
-(* Like [reg_d] but accepts both Float and Float32 registers. Used for
-   reinterpret casts where we want to treat both as D registers. *)
+(* Like [reg_d] but accepts Float, Float32, Vec128 and Valx2 registers. Used for
+   reinterpret casts where we want to treat any of these as D registers. *)
 let reg_d_of_float_reg reg =
   let index = reg_index reg in
   match reg.typ with
   | Float | Float32 | Vec128 | Valx2 -> Ast.DSL.reg_op (Ast.Reg.reg_d index)
   | Val | Int | Addr | Vec256 | Vec512 ->
     Misc.fatal_errorf
-      "reg_d_of_float_reg: expected Float or Float32 register, got %a"
+      "reg_d_of_float_reg: expected Float, Float32, or Vec128/Valx2 register, \
+       got %a"
       Printreg.reg reg
 
 let reg_s reg =

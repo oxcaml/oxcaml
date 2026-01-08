@@ -45,8 +45,8 @@ val reg_x : Reg.t -> [`Reg of [`GP of [`X]]] Ast.Operand.t
 
 val reg_d : Reg.t -> [`Reg of [`Neon of [`Scalar of [`D]]]] Ast.Operand.t
 
-(** Like [reg_d] but accepts both Float and Float32 registers. Used for
-    reinterpret casts where we want to treat both as D registers. *)
+(** Like [reg_d] but accepts Float, Float32, Vec128 and Valx2 registers. Used
+    for reinterpret casts where we want to treat any of these as D registers. *)
 val reg_d_of_float_reg :
   Reg.t -> [`Reg of [`Neon of [`Scalar of [`D]]]] Ast.Operand.t
 
