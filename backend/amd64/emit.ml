@@ -2706,13 +2706,13 @@ let begin_assembly unix =
   (* PR#4690 *)
   Reg_class.Save_simd_regs.all
   |> List.iter (fun simd ->
-         (match emit_cmm_symbol (call_gc_local_sym ~simd) with
-         | `Symbol sym -> D.define_symbol_label ~section:Text sym
-         | `Label lbl -> D.define_label lbl);
-         D.cfi_startproc ();
-         let call_gc = global_gc_sym "caml_call_gc" ~simd in
-         I.jmp (rel_plt call_gc);
-         D.cfi_endproc ());
+      (match emit_cmm_symbol (call_gc_local_sym ~simd) with
+      | `Symbol sym -> D.define_symbol_label ~section:Text sym
+      | `Label lbl -> D.define_label lbl);
+      D.cfi_startproc ();
+      let call_gc = global_gc_sym "caml_call_gc" ~simd in
+      I.jmp (rel_plt call_gc);
+      D.cfi_endproc ());
   ()
 
 let make_stack_loc ~offset n (r : Reg.t) =
