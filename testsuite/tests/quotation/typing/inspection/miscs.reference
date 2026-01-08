@@ -1,0 +1,34 @@
+let x = ("abc" : string) in let _ : string = (x : string) in ()
+
+let p =
+(CamlinternalFormatBasics.Format
+ ((CamlinternalFormatBasics.String_literal
+   ("e_format6 says: ",
+    (CamlinternalFormatBasics.String
+     (CamlinternalFormatBasics.No_padding,
+      (CamlinternalFormatBasics.Char_literal
+       (' ',
+        (CamlinternalFormatBasics.String
+         (CamlinternalFormatBasics.No_padding,
+          (CamlinternalFormatBasics.String_literal
+           ("\n\n", CamlinternalFormatBasics.End_of_format)))))))))),
+  "e_format6 says: %s %s\n\n"))
+in Stdlib.Format.printf p "abc" "xyz"
+
+let f =
+(fun ?x:(x=0) y ->
+   Stdlib.Format.printf
+     (CamlinternalFormatBasics.Format
+      ((CamlinternalFormatBasics.Int
+        (CamlinternalFormatBasics.Int_d, CamlinternalFormatBasics.No_padding,
+         CamlinternalFormatBasics.No_precision,
+         (CamlinternalFormatBasics.Char_literal
+          ('\n', CamlinternalFormatBasics.End_of_format)))),
+       "%d\n"))
+     (x + y))
+in
+Stdlib.List.iter (let arg = f in function | eta -> exclave_ arg ?x:None eta)
+  ([1; 2; 3])
+
+e_format6 says: abc xyz
+
