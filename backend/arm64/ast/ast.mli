@@ -453,6 +453,17 @@ module Operand : sig
     | Bitmask : Bitmask.t -> [`Bitmask] t
     | Optional : 'a t option -> [`Optional of 'a option] t
     | Unit : unit t
+
+  (** {2 Convenience type aliases for common operand patterns} *)
+
+  (** GP register operand *)
+  type 'w gp = [`Reg of [`GP of 'w]] t
+
+  (** Neon scalar register operand *)
+  type 's neon_scalar = [`Reg of [`Neon of [`Scalar of 's]]] t
+
+  (** Neon vector register operand with arrangement and element width *)
+  type ('arr, 'w) neon_vector = [`Reg of [`Neon of [`Vector of 'arr * 'w]]] t
 end
 
 module Rounding_mode : sig

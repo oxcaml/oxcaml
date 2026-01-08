@@ -872,6 +872,15 @@ module Operand = struct
 
   type 'a operand = 'a t
 
+  (** GP register operand *)
+  type 'w gp = [`Reg of [`GP of 'w]] t
+
+  (** Neon scalar register operand *)
+  type 's neon_scalar = [`Reg of [`Neon of [`Scalar of 's]]] t
+
+  (** Neon vector register operand with arrangement and element width *)
+  type ('arr, 'w) neon_vector = [`Reg of [`Neon of [`Vector of 'arr * 'w]]] t
+
   let rec print : type a. Format.formatter -> a t -> unit =
    fun ppf t ->
     match t with
