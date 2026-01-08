@@ -159,7 +159,7 @@ let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
     mem_offset_reg reg_domain_state_ptr ofs
   | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
-    Ast.DSL.mem_offset ~base:Ast.Reg.sp ~offset:ofs
+    Ast.DSL.mem_offset ~base:Ast.Reg.sp (* SP *) ~offset:ofs
   | Reg _ | Unknown ->
     Misc.fatal_errorf "Emit.stack: register %a not on stack" Printreg.reg r
 
