@@ -84,17 +84,13 @@ type t = { foo : 'a. Abs.t * unit; }
 type t = { foo : 'a. Abs.t * unit; }
 val f : t -> unit = <fun>
 |}, Principal{|
-type t = { foo : 'a. Abs.t * unit; }
-type t = { foo : 'a. Abs.t * unit; }
-Line 7, characters 27-28:
-7 |     require_immutable_data t
-                               ^
-Error: This expression has type "t" but an expression was expected of type
-         "('a : immutable_data)"
-       The kind of t is immutable_data with Abs.t
-         because of the definition of t at line 3, characters 0-47.
-       But the kind of t must be a subkind of immutable_data
-         because of the definition of require_immutable_data at line 2, characters 27-58.
+Line 1, characters 0-75:
+1 | type t : immutable_data with Abs.t = { foo : 'a. (Abs.t * 'a ignore_type) }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with Abs.t
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data with Abs.t
+         because of the annotation on the declaration of the type t.
 |}]
 
 (******************************************)

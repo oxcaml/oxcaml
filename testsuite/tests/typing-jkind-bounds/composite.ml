@@ -160,8 +160,14 @@ type ('a : immutable_data) t = { x : 'a list; }
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
+|}, Principal{|
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
@@ -368,8 +374,14 @@ val foo : int t @ contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
+|}, Principal{|
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t

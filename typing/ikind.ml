@@ -112,6 +112,10 @@ module Solver = struct
     | Types.Tobject _ -> true
     | _ -> false
 
+  let is_principal_type (ty : Types.type_expr) : bool =
+    (not !Clflags.principal)
+    || Types.get_level ty = Btype.generic_level
+
   (* CR jujacobs: we could optimize the join with masks you see below 
      using a combined [Ldd.join_with_mask left mask right] operation. *)
 
@@ -261,6 +265,7 @@ module Solver = struct
 
   (** Compute the kind for [t]. *)
   and kind (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
+    if not (is_principal_type ty) then Ldd.const Axis_lattice.top else
     (* Memoize only potentially cyclic types; LFPs handle recursion. *)
     match TyTbl.find_opt ctx.ty_to_kind ty with
     | Some kind_poly -> kind_poly

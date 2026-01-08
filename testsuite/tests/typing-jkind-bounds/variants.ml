@@ -515,9 +515,16 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = Foo of { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
+|}, Principal{|
+type 'a t = Foo of { x : 'a; }
+Line 3, characters 15-16:
+3 |   use_portable t;
+                   ^
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
@@ -541,9 +548,16 @@ let foo (t : _ t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t = Foo of { x : 'a; } | Bar of 'a
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
+|}, Principal{|
+type ('a : immutable_data) t = Foo of { x : 'a; } | Bar of 'a
+Line 3, characters 15-16:
+3 |   use_portable t;
+                   ^
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
