@@ -357,40 +357,40 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
   (* Vector shift by immediate *)
   | Shlq_n_u64 n ->
     let rd, rn = v2d_v2d i in
-    ins3 SHL (rd, rn, O.imm_six n)
+    ins3 SHL (rd, rn, O.shift_by_element_width_d n)
   | Shlq_n_u32 n ->
     let rd, rn = v4s_v4s i in
-    ins3 SHL (rd, rn, O.imm_six n)
+    ins3 SHL (rd, rn, O.shift_by_element_width_s n)
   | Shlq_n_u16 n ->
     let rd, rn = v8h_v8h i in
-    ins3 SHL (rd, rn, O.imm_six n)
+    ins3 SHL (rd, rn, O.shift_by_element_width_h n)
   | Shlq_n_u8 n ->
     let rd, rn = v16b_v16b i in
-    ins3 SHL (rd, rn, O.imm_six n)
+    ins3 SHL (rd, rn, O.shift_by_element_width_b n)
   | Shrq_n_u64 n ->
     let rd, rn = v2d_v2d i in
-    ins3 USHR (rd, rn, O.imm_six n)
+    ins3 USHR (rd, rn, O.shift_by_element_width_d n)
   | Shrq_n_u32 n ->
     let rd, rn = v4s_v4s i in
-    ins3 USHR (rd, rn, O.imm_six n)
+    ins3 USHR (rd, rn, O.shift_by_element_width_s n)
   | Shrq_n_u16 n ->
     let rd, rn = v8h_v8h i in
-    ins3 USHR (rd, rn, O.imm_six n)
+    ins3 USHR (rd, rn, O.shift_by_element_width_h n)
   | Shrq_n_u8 n ->
     let rd, rn = v16b_v16b i in
-    ins3 USHR (rd, rn, O.imm_six n)
+    ins3 USHR (rd, rn, O.shift_by_element_width_b n)
   | Shrq_n_s64 n ->
     let rd, rn = v2d_v2d i in
-    ins3 SSHR (rd, rn, O.imm_six n)
+    ins3 SSHR (rd, rn, O.shift_by_element_width_d n)
   | Shrq_n_s32 n ->
     let rd, rn = v4s_v4s i in
-    ins3 SSHR (rd, rn, O.imm_six n)
+    ins3 SSHR (rd, rn, O.shift_by_element_width_s n)
   | Shrq_n_s16 n ->
     let rd, rn = v8h_v8h i in
-    ins3 SSHR (rd, rn, O.imm_six n)
+    ins3 SSHR (rd, rn, O.shift_by_element_width_h n)
   | Shrq_n_s8 n ->
     let rd, rn = v16b_v16b i in
-    ins3 SSHR (rd, rn, O.imm_six n)
+    ins3 SSHR (rd, rn, O.shift_by_element_width_b n)
   (* Sign-extend lane to X register *)
   | Getq_lane_s32 { lane } ->
     let lane_idx = Lane_index.create lane in

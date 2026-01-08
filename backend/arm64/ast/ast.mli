@@ -386,6 +386,23 @@ module Operand : sig
     val to_int : 'w t -> int
   end
 
+  (** Shift amount for vector shift instructions (SHL, SSHR, USHR).
+      The valid range depends on element width:
+      - B (8-bit):  0-7
+      - H (16-bit): 0-15
+      - S (32-bit): 0-31
+      - D (64-bit): 0-63
+      The GADT ties the shift amount to the element width. *)
+  module Shift_by_element_width : sig
+    type _ t =
+      | For_B : int -> [`B] t
+      | For_H : int -> [`H] t
+      | For_S : int -> [`S] t
+      | For_D : int -> [`D] t
+
+    val to_int : 'w t -> int
+  end
+
   type _ t = private
     | Imm : 'w Immediate.t -> [`Imm of 'w] t
     | Reg : 'a Reg.t -> [`Reg of 'a] t
@@ -394,6 +411,9 @@ module Operand : sig
     | Lsl_by_multiple_of_16_bits :
         'w Lsl_by_multiple_of_16_bits.t
         -> [`Lsl_by_multiple_of_16_bits of 'w] t
+    | Shift_by_element_width :
+        'w Shift_by_element_width.t
+        -> [`Shift_by_element_width of 'w] t
     | Cond : Cond.t -> [`Cond] t
     | Float_cond : Float_cond.t -> [`Float_cond] t
     | Mem : 'm Addressing_mode.t -> [`Mem of 'm] t
@@ -1197,17 +1217,13 @@ module Instruction_name : sig
             * [`Reg of [`GP of 'w]]
             * [`Reg of [`GP of 'w]] )
           t
-        (** Note: The shift immediate is modelled as a generic 6-bit value, but
-        architecturally the valid range depends on element width: 0-7 for B,
-        0-15 for H, 0-31 for S, 0-63 for D. The GADT could enforce this but
-        currently does not. *)
     | SHL
         : ( triple,
             [ `Reg of
               [ `Neon of
                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
-            * [`Imm of [`Six]] )
+            * [`Shift_by_element_width of 'w] )
           t
     | SMAX_vector
         : ( triple,
@@ -1298,7 +1314,7 @@ module Instruction_name : sig
               [ `Neon of
                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
-            * [`Imm of [`Six]] )
+            * [`Shift_by_element_width of 'w] )
           t
     | STP :
         ('w1, 'w2) LDP_STP_width.t
@@ -1497,7 +1513,7 @@ module Instruction_name : sig
               [ `Neon of
                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
-            * [`Imm of [`Six]] )
+            * [`Shift_by_element_width of 'w] )
           t
     | UXTL :
         ('src_arr, 'src_w, 'dst_arr, 'dst_w) Widen.t
@@ -1594,6 +1610,26 @@ module DSL : sig
 
   val optional_lsl_by_multiple_of_16_bits_w :
     int -> [`Optional of [`Lsl_by_multiple_of_16_bits of [`W]] option] Operand.t
+
+  (** Create a shift amount for SHL/SSHR/USHR on B (8-bit) elements.
+      Valid range: 0-7. *)
+  val shift_by_element_width_b :
+    int -> [`Shift_by_element_width of [`B]] Operand.t
+
+  (** Create a shift amount for SHL/SSHR/USHR on H (16-bit) elements.
+      Valid range: 0-15. *)
+  val shift_by_element_width_h :
+    int -> [`Shift_by_element_width of [`H]] Operand.t
+
+  (** Create a shift amount for SHL/SSHR/USHR on S (32-bit) elements.
+      Valid range: 0-31. *)
+  val shift_by_element_width_s :
+    int -> [`Shift_by_element_width of [`S]] Operand.t
+
+  (** Create a shift amount for SHL/SSHR/USHR on D (64-bit) elements.
+      Valid range: 0-63. *)
+  val shift_by_element_width_d :
+    int -> [`Shift_by_element_width of [`D]] Operand.t
 
   val optional_none : [`Optional of 'a option] Operand.t
 

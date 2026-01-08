@@ -804,6 +804,29 @@ module Operand = struct
     let print ppf t = Format.fprintf ppf "lsl #%d" (to_int t)
   end
 
+  (** Shift amount for vector shift instructions (SHL, SSHR, USHR).
+      The valid range depends on element width:
+      - B (8-bit):  0-7
+      - H (16-bit): 0-15
+      - S (32-bit): 0-31
+      - D (64-bit): 0-63
+      The GADT ties the shift amount to the element width. *)
+  module Shift_by_element_width = struct
+    type _ t =
+      | For_B : int -> [`B] t
+      | For_H : int -> [`H] t
+      | For_S : int -> [`S] t
+      | For_D : int -> [`D] t
+
+    let to_int : type w. w t -> int = function
+      | For_B n -> n
+      | For_H n -> n
+      | For_S n -> n
+      | For_D n -> n
+
+    let print ppf t = Format.fprintf ppf "#%d" (to_int t)
+  end
+
   let _print_separator ppf () = Format.fprintf ppf ", "
 
   type _ t =
@@ -814,6 +837,9 @@ module Operand = struct
     | Lsl_by_multiple_of_16_bits :
         'w Lsl_by_multiple_of_16_bits.t
         -> [`Lsl_by_multiple_of_16_bits of 'w] t
+    | Shift_by_element_width :
+        'w Shift_by_element_width.t
+        -> [`Shift_by_element_width of 'w] t
     | Cond : Cond.t -> [`Cond] t
     | Float_cond : Float_cond.t -> [`Float_cond] t
     | Mem : 'm Addressing_mode.t -> [`Mem of 'm] t
@@ -832,6 +858,7 @@ module Operand = struct
     | Lsl_by_twelve -> Format.fprintf ppf "lsr #12"
     | Shift s -> Shift.print ppf s
     | Lsl_by_multiple_of_16_bits s -> Lsl_by_multiple_of_16_bits.print ppf s
+    | Shift_by_element_width s -> Shift_by_element_width.print ppf s
     | Cond c -> Format.fprintf ppf "%s" (Cond.to_string c)
     | Float_cond c -> Format.fprintf ppf "%s" (Float_cond.to_string c)
     | Mem m -> Format.fprintf ppf "%a" Addressing_mode.print m
@@ -1587,7 +1614,7 @@ module Instruction_name = struct
               [ `Neon of
                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
-            * [`Imm of [`Six]] )
+            * [`Shift_by_element_width of 'w] )
           t
     | SMAX_vector
         : ( triple,
@@ -1678,7 +1705,7 @@ module Instruction_name = struct
               [ `Neon of
                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
-            * [`Imm of [`Six]] )
+            * [`Shift_by_element_width of 'w] )
           t
     | STP :
         ('w1, 'w2) LDP_STP_width.t
@@ -1865,7 +1892,7 @@ module Instruction_name = struct
               [ `Neon of
                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
-            * [`Imm of [`Six]] )
+            * [`Shift_by_element_width of 'w] )
           t
     | UXTL :
         ('src_arr, 'src_w, 'dst_arr, 'dst_w) Widen.t
@@ -2083,7 +2110,8 @@ module Instruction_name = struct
           | GP _ | Neon (Scalar _) | Neon (Lane _) ->
             failwith "vector_to_lane_operand: not a vector register")
         | Imm _ | Lsl_by_twelve | Shift _ | Lsl_by_multiple_of_16_bits _
-        | Cond _ | Float_cond _ | Mem _ | Bitmask _ | Optional _ | Unit ->
+        | Shift_by_element_width _ | Cond _ | Float_cond _ | Mem _ | Bitmask _
+        | Optional _ | Unit ->
           failwith "vector_to_lane_operand: not a register operand"
       in
       match instr with
@@ -2708,6 +2736,49 @@ module DSL = struct
   let optional_lsl_by_multiple_of_16_bits_w (amount : int) :
       [`Optional of [`Lsl_by_multiple_of_16_bits of [`W]] option] Operand.t =
     Operand.Optional (Some (lsl_by_multiple_of_16_bits_w amount))
+
+  (** Create a shift amount for SHL/SSHR/USHR on B (8-bit) elements.
+      Valid range: 0-7. *)
+  let shift_by_element_width_b (amount : int) :
+      [`Shift_by_element_width of [`B]] Operand.t =
+    if amount < 0 || amount > 7
+    then
+      Misc.fatal_errorf
+        "shift_by_element_width_b: invalid shift amount %d (must be 0-7)" amount
+    else Shift_by_element_width (For_B amount)
+
+  (** Create a shift amount for SHL/SSHR/USHR on H (16-bit) elements.
+      Valid range: 0-15. *)
+  let shift_by_element_width_h (amount : int) :
+      [`Shift_by_element_width of [`H]] Operand.t =
+    if amount < 0 || amount > 15
+    then
+      Misc.fatal_errorf
+        "shift_by_element_width_h: invalid shift amount %d (must be 0-15)"
+        amount
+    else Shift_by_element_width (For_H amount)
+
+  (** Create a shift amount for SHL/SSHR/USHR on S (32-bit) elements.
+      Valid range: 0-31. *)
+  let shift_by_element_width_s (amount : int) :
+      [`Shift_by_element_width of [`S]] Operand.t =
+    if amount < 0 || amount > 31
+    then
+      Misc.fatal_errorf
+        "shift_by_element_width_s: invalid shift amount %d (must be 0-31)"
+        amount
+    else Shift_by_element_width (For_S amount)
+
+  (** Create a shift amount for SHL/SSHR/USHR on D (64-bit) elements.
+      Valid range: 0-63. *)
+  let shift_by_element_width_d (amount : int) :
+      [`Shift_by_element_width of [`D]] Operand.t =
+    if amount < 0 || amount > 63
+    then
+      Misc.fatal_errorf
+        "shift_by_element_width_d: invalid shift amount %d (must be 0-63)"
+        amount
+    else Shift_by_element_width (For_D amount)
 
   let optional_none = Operand.Optional None
 
