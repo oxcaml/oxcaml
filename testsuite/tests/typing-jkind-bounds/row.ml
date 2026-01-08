@@ -505,3 +505,45 @@ Error: This pattern matches values of type "(M1.t, M1.t) eq"
          "(M1.t, [ `A of string | `B of int ]) eq"
        Type "M1.t" is not compatible with type "[ `A of string | `B of int ]"
 |}]
+
+type json : immutable_data =
+  [ `Null
+  | `False
+  | `True
+  | `String of string
+  | `Number of string
+  | `Object of (string * json) list
+  | `Array of json list
+  ]
+[%%expect {|
+type json =
+    [ `Array of json list
+    | `False
+    | `Null
+    | `Number of string
+    | `Object of (string * json) list
+    | `String of string
+    | `True ]
+|}]
+
+type json =
+  [ `Null
+  | `False
+  | `True
+  | `String of string
+  | `Number of string
+  | `Object of (string * json) list
+  | `Array of json list
+  ]
+let f (x : json @ nonportable) = use_portable x
+[%%expect {|
+type json =
+    [ `Array of json list
+    | `False
+    | `Null
+    | `Number of string
+    | `Object of (string * json) list
+    | `String of string
+    | `True ]
+val f : json -> unit = <fun>
+|}]
