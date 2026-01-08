@@ -457,6 +457,27 @@ module Cond = struct
     | LS -> LS
 end
 
+module Simd_int_cmp = struct
+  type t =
+    | EQ
+    | GE
+    | GT
+    | LE
+    | LT
+    | HI
+    | HS
+
+  let to_string t =
+    match t with
+    | EQ -> "eq"
+    | GE -> "ge"
+    | GT -> "gt"
+    | LE -> "le"
+    | LT -> "lt"
+    | HI -> "hi"
+    | HS -> "hs"
+end
+
 module Rounding_mode = struct
   type t =
     | M
@@ -951,7 +972,7 @@ module Instruction_name = struct
             [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]] )
           t
     | CM_register :
-        Cond.t
+        Simd_int_cmp.t
         -> ( triple,
              [ `Reg of
                [ `Neon of
@@ -961,7 +982,7 @@ module Instruction_name = struct
              * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
            t
     | CM_zero :
-        Cond.t
+        Simd_int_cmp.t
         -> ( pair,
              [ `Reg of
                [ `Neon of
@@ -1849,8 +1870,8 @@ module Instruction_name = struct
         | CBNZ -> "cbnz"
         | CBZ -> "cbz"
         | CLZ -> "clz"
-        | CM_register cond -> "cm" ^ Cond.to_string cond
-        | CM_zero cond -> "cm" ^ Cond.to_string cond
+        | CM_register cond -> "cm" ^ Simd_int_cmp.to_string cond
+        | CM_zero cond -> "cm" ^ Simd_int_cmp.to_string cond
         | CNT -> "cnt"
         | CNT_vector -> "cnt"
         | CSEL -> "csel"

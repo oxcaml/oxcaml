@@ -255,6 +255,23 @@ module Cond : sig
   val of_float_cond : Float_cond.t -> t
 end
 
+(** Condition codes for AdvSIMD integer compare instructions.
+    These map to CMEQ, CMGE, CMGT, CMLE, CMLT, CMHI, CMHS instructions.
+    Unlike [Cond.t], this excludes conditions that don't have corresponding
+    SIMD compare instructions (NE, CS, CC, MI, PL, VS, VC, LS). *)
+module Simd_int_cmp : sig
+  type t =
+    | EQ  (** equal *)
+    | GE  (** greater or equal, signed *)
+    | GT  (** greater than, signed *)
+    | LE  (** less or equal, signed *)
+    | LT  (** less than, signed *)
+    | HI  (** higher, unsigned *)
+    | HS  (** higher or same, unsigned *)
+
+  val to_string : t -> string
+end
+
 (** Immediates used in instruction operands. *)
 module Immediate : sig
   type 'width t = private
@@ -566,7 +583,7 @@ module Instruction_name : sig
             [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]] )
           t
     | CM_register :
-        Cond.t
+        Simd_int_cmp.t
         -> ( triple,
              [ `Reg of
                [ `Neon of
@@ -576,7 +593,7 @@ module Instruction_name : sig
              * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
            t
     | CM_zero :
-        Cond.t
+        Simd_int_cmp.t
         -> ( pair,
              [ `Reg of
                [ `Neon of

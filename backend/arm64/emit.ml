@@ -38,6 +38,7 @@ module A = Ast.DSL.Acc
 module R = Ast.Reg
 module Cond = Ast.Cond
 module Float_cond = Ast.Float_cond
+module Simd_int_cmp = Ast.Simd_int_cmp
 module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 module L = Asm_targets.Asm_label
@@ -160,8 +161,13 @@ let labelled_ins4 lbl instr ops =
 
 (* Simd condition/rounding mode conversion *)
 module Simd_cond = struct
-  let create (c : Simd.Cond.t) : Cond.t =
-    match c with EQ -> EQ | GE -> GE | GT -> GT | LE -> LE | LT -> LT
+  let create (c : Simd.Cond.t) : Simd_int_cmp.t =
+    match c with
+    | EQ -> Simd_int_cmp.EQ
+    | GE -> Simd_int_cmp.GE
+    | GT -> Simd_int_cmp.GT
+    | LE -> Simd_int_cmp.LE
+    | LT -> Simd_int_cmp.LT
 end
 
 module Simd_rounding_mode = struct
@@ -1315,9 +1321,9 @@ let emit_load_literal dst lbl =
   in
   let addr = H.mem_label reg_tmp1_base ~reloc lbl in
   (* ADRP always needs a PAGE relocation on both platforms - the assembler
-     cannot resolve page-aligned addresses until link time. On macOS this
-     prints "label@PAGE"; on ELF it prints just "label" since the GNU
-     assembler infers the relocation from the ADRP instruction. *)
+     cannot resolve page-aligned addresses until link time. On macOS this prints
+     "label@PAGE"; on ELF it prints just "label" since the GNU assembler infers
+     the relocation from the ADRP instruction. *)
   A.ins2 ADRP reg_x_tmp1 (label (Needs_reloc PAGE) lbl);
   match dst.typ with
   | Float -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addr
