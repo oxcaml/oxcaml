@@ -129,7 +129,7 @@ let addressing addr r =
   | Iindexed ofs -> mem_offset_reg r ofs
   | Ibased (s, ofs) ->
     assert (not !Clflags.dlcode);
-    (* see selection.ml *)
+    (* see cfg_selection.ml *)
     let base = gp_reg_of_reg r in
     if S.is_local s
     then
