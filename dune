@@ -793,8 +793,8 @@
   (backend bisect_ppx))
  ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
  ; to be built against the system compiler, which won't work.
- (ocamlc_flags unix.cma)
- (ocamlopt_flags unix.cmxa)
+ (ocamlc_flags (:standard -I +unix unix.cma))
+ (ocamlopt_flags (:standard -I +unix unix.cmxa))
  (libraries
   flambda2
   flambda2_ui
