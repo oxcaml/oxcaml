@@ -977,8 +977,7 @@ module Instruction_name : sig
         Neon_reg_name.Lane_index.t
         -> ( pair,
              [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
-             * [`Reg of [< `GP of [< `W | `X] | `Neon of [< `Scalar of [< `D]]]]
-           )
+             * [`Reg of [`GP of [< `W | `X]]] )
            t
     | INS_V :
         Neon_reg_name.Lane_index.Src_and_dest.t
