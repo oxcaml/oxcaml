@@ -3400,7 +3400,11 @@ and type_pat_aux
         let p =
           type_pat ~alloc_mode tps category sp_constrained expected_ty' sort
         in
-        let extra = (Tpat_constraint (cty, type_modes_annot), loc, sp_constrained.ppat_attributes) in
+        let extra =
+          Tpat_constraint (cty, type_modes_annot),
+          loc,
+          sp_constrained.ppat_attributes
+        in
         { p with pat_type = ty; pat_extra = extra::p.pat_extra }
       | None ->
         type_pat ~alloc_mode tps category sp_constrained expected_ty sort
@@ -4700,12 +4704,14 @@ let maybe_expansive e = not (is_nonexpansive e)
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
-    (fun {vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc; vb_modes_annot} ->
+    (fun {vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc;
+          vb_modes_annot} ->
        match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
        | None ->
          raise(Error(vb_expr.exp_loc, env, Illegal_letrec_expr))
        | Some vb_rec_kind ->
-         { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc; vb_modes_annot})
+         { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc;
+           vb_modes_annot})
     valbinds
 
 let check_recursive_class_bindings env ids exprs =
@@ -5117,7 +5123,8 @@ let check_partial_application ~statement exp =
 
 let pattern_needs_partial_application_check p =
   let rec check : type a. a general_pattern -> bool = fun p ->
-    not (List.exists (function (Tpat_constraint (_, _), _, _) -> true | _ -> false)
+    not (List.exists
+          (function (Tpat_constraint (_, _), _, _) -> true | _ -> false)
           p.pat_extra) &&
     match p.pat_desc with
     | Tpat_any -> true
@@ -8347,7 +8354,9 @@ and type_function
         body_constraint
       in
       let mode, modes_annot = Typemode.transl_mode_annots mode_annotations in
-      let ret_mode, ret_modes_annot = Typemode.transl_mode_annots ret_mode_annotations in
+      let ret_mode, ret_modes_annot =
+        Typemode.transl_mode_annots ret_mode_annotations
+      in
       let type_mode, type_modes_annot =
         match ret_mode_annotations with
         | _ :: _ ->

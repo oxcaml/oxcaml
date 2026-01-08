@@ -2084,7 +2084,9 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         incl_loc = sincl.pincl_loc;
       }
     in
-    mksig (Tsig_include (incl, modalities, modalities_annot)) env loc, sg, newenv
+    ( mksig (Tsig_include (incl, modalities, modalities_annot)) env loc
+    , sg
+    , newenv )
   in
 
   let transl_sig_item env sig_acc item =

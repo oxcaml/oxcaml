@@ -271,7 +271,7 @@ let jkind_annotation i ppf jkind =
   line i ppf "%a" Pprintast.jkind_annotation jkind
 
 let modes_annot i ppf modes_annot =
-  let print_mode_annot i ppf { txt = (Atom (ax, mode) : Mode.Alloc.atom); loc = _ } =
+  let print_mode_annot i ppf { txt = (Mode.Alloc.Atom (ax, mode)); loc = _ } =
     let (module Axis) = Mode.Alloc.Axis.get ax in
     line i ppf "%a: %a\n" Mode.Alloc.Axis.print ax Axis.print mode
   in
@@ -286,7 +286,7 @@ let modalities_annot i ppf modalities_annot =
   let as_modes_annot =
     List.map (Location.map modality_as_mode) modalities_annot
   in
-  let print_mode_annot i ppf { txt = (Atom (ax, mode) : Mode.Value.atom); loc = _ } =
+  let print_mode_annot i ppf { txt = (Mode.Value.Atom (ax, mode)); loc = _ } =
     let (module Axis) = Mode.Value.Axis.get ax in
     line i ppf "%a: %a\n" Mode.Value.Axis.print ax Axis.print mode
   in

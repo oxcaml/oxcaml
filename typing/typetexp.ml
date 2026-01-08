@@ -877,7 +877,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           let ty =
             newty (Tarrow(arrow_desc, arg_ty, ret_cty.ctyp_type, commu_ok))
           in
-          ctyp (Ttyp_arrow (l, arg_cty, arg_mode_annot, ret_cty, ret_mode_annot)) ty
+          ctyp
+            (Ttyp_arrow (l, arg_cty, arg_mode_annot, ret_cty, ret_mode_annot))
+            ty
         | [] -> transl_type env ~policy ~row_context ret_mode ret
       in
       loop mode args
