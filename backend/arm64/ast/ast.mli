@@ -179,6 +179,10 @@ module Reg : sig
 
   val sp : [`GP of [`SP]] t
 
+  val lr : [`GP of [`LR]] t
+
+  val fp : [`GP of [`FP]] t
+
   val xzr : [`GP of [`XZR]] t
 
   val wzr : [`GP of [`WZR]] t

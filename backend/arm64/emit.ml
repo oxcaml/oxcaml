@@ -1462,7 +1462,7 @@ let emit_instr i =
     if n > 0 then emit_stack_adjustment (-n);
     if !contains_calls
     then (
-      D.cfi_offset ~reg:30 (* return address *) ~offset:(-8);
+      D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
       A.ins2 STR O.lr (O.mem_offset ~base:R.sp ~offset:(n - 8)))
   | Lepilogue_open ->
     let n = frame_size () in
