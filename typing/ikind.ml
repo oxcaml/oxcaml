@@ -509,7 +509,12 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
              for arity = 1. *)
           let base_lat =
             if has_mutable_label lbls
-            then Axis_lattice.mutable_data
+            then
+              (* Unboxed record products disallow mutable labels in [typedecl.ml]
+                 (see [Unboxed_mutable_label]). Fail here to
+                 raise alarm if that restriction is removed. *)
+              failwith
+                "ikind: mutable fields in unboxed records are not supported"
             else Axis_lattice.immediate
           in
           let kind : Solver.ckind =
