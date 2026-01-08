@@ -195,8 +195,8 @@ let details t first_occurrence =
       in
       let args =
         match first_occurrence, dwarf with
-        | true, Debug_str -> ["%progbits,1"] (* #3078 *)
-        | true, _ -> ["%progbits"]
+        | true, Debug_str -> ["@progbits,1"] (* #3078 *)
+        | true, _ -> ["@progbits"]
         | false, _ -> []
       in
       [name], flags, args
@@ -246,7 +246,7 @@ let details t first_occurrence =
     | Probes, _, MacOS_like -> ["__TEXT"; "__probes"], None, ["regular"]
     | Probes, _, _ -> [".probes"], Some "wa", ["\"progbits\""]
     | Note_ocaml_eh, _, _ -> [".note.ocaml_eh"], Some "?", ["\"note\""]
-    | Note_gnu_stack, _, _ -> [".note.GNU-stack"], Some "", ["%progbits"]
+    | Note_gnu_stack, _, _ -> [".note.GNU-stack"], Some "", ["@progbits"]
   in
   let is_delayed = is_delayed t in
   { names; flags; args; is_delayed }
