@@ -741,9 +741,8 @@ module Instruction_name : sig
           t
     | FCVTL_vector
         : ( pair,
-            [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
-            * [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
-          )
+            [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]]
+            * [`Reg of [`Neon of [`Vector of [< `V2S | `V4S] * [`S]]]] )
           t
     | FCVTNS
         : ( pair,
@@ -760,9 +759,8 @@ module Instruction_name : sig
           t
     | FCVTN_vector
         : ( pair,
-            [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
-            * [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
-          )
+            [`Reg of [`Neon of [`Vector of [< `V2S | `V4S] * [`S]]]]
+            * [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] )
           t
     | FCVTZS
         : ( pair,
