@@ -79,6 +79,16 @@ static_assert(
     (Domain_state_num_fields - 1) * 8,
     "");
 
+/* GC entry points kept in the runtime state, used to avoid PLT indirection.
+   Declared here to initialize domain_state->gc_entry_point* fields. */
+#if defined(NATIVE_CODE)
+extern void caml_call_gc(void);
+# if defined(TARGET_amd64)
+extern void caml_call_gc_avx(void);
+extern void caml_call_gc_avx512(void);
+# endif /* defined(TARGET_amd64) */
+#endif /* defined(NATIVE_CODE) */
+
 /* The runtime can run stop-the-world (STW) sections, during which all
    active domains run the same callback in parallel (with a barrier
    mechanism to synchronize within the callback).
@@ -745,6 +755,17 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->gc_regs_buckets = NULL;
   domain_state->gc_regs = NULL;
+
+#if defined(NATIVE_CODE)
+  domain_state->gc_entry_point = caml_call_gc;
+# if defined(TARGET_amd64)
+  domain_state->gc_entry_point_avx = caml_call_gc_avx;
+  domain_state->gc_entry_point_avx512 = caml_call_gc_avx512;
+# else
+  domain_state->gc_entry_point_avx = NULL;
+  domain_state->gc_entry_point_avx512 = NULL;
+# endif /* defined(TARGET_amd64) */
+#endif /* defined(NATIVE_CODE) */
 
   domain_state->allocated_words = 0;
   domain_state->allocated_words_direct = 0;
