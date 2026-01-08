@@ -1,0 +1,16 @@
+let f = (fun f__1 x y -> f__1 ~y:y ~x:x) in
+Stdlib.ignore (f : (_, _, _) C.t1)
+
+let f = (fun f__1 x -> f__1 ?x:(Some x) ()) in
+Stdlib.ignore (f : (_, _) C.t21)
+
+let f = (fun f__1 x -> f__1 ?x:(Some x) ()) in
+Stdlib.ignore (f : (_, _) C.t22)
+
+let f = (fun f__1 -> f__1 ?x:None ()) in Stdlib.ignore (f : (_, _) C.t3)
+
+let f = (fun f__1 x -> f__1 ~x:x ()) in Stdlib.ignore (f : (_, _) C.t4)
+
+let f = (fun t -> match t with | (~y:_, ~x:x) -> x) in
+Stdlib.ignore (f : (_, _) C.tt)
+
