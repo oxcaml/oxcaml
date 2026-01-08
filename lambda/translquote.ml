@@ -2845,6 +2845,8 @@ and quote_expression_extra _ _ extra lambda =
     |> maybe_constrain_exp_desc_with_type loc
          (type_constraint_of_ambiguity loc ambiguity)
   | Texp_inspected_type Polymorphic_parameter -> lambda
+  | Texp_ghost_region -> lambda
+  | Texp_borrowed -> fatal_error "no support for borrowing"
 
 and update_env_with_extra extra =
   let extra, _, _ = extra in
@@ -2855,6 +2857,8 @@ and update_env_with_extra extra =
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type Polymorphic_parameter -> ()
+  | Texp_ghost_region -> ()
+  | Texp_borrowed -> fatal_error "no support for borrowing"
 
 and update_env_without_extra extra =
   let extra, _, _ = extra in
@@ -2865,6 +2869,8 @@ and update_env_without_extra extra =
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type Polymorphic_parameter -> ()
+  | Texp_ghost_region -> ()
+  | Texp_borrowed -> fatal_error "no support for borrowing"
 
 and quote_expression_desc transl stage e =
   let env = e.exp_env in
