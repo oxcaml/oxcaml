@@ -246,7 +246,7 @@ module Solver = struct
    fun ctx jkind ->
     (* Base is the modality bounds stored on this jkind. *)
     let base =
-      Ldd.const (Axis_lattice_conv.of_mod_bounds jkind.jkind.mod_bounds)
+      Ldd.const (Types.Jkind_mod_bounds.to_axis_lattice jkind.jkind.mod_bounds)
     in
     (* For each with-bound (ty, axes), contribute
        modality(axes_mask, kind ty). *)
@@ -831,7 +831,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   else
     let ctx = make_ctx ~mode:Solver.Round_up ~context in
     let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
-    let mb = Axis_lattice_conv.to_mod_bounds lat in
+    let mb = Types.Jkind_mod_bounds.of_axis_lattice lat in
     Jkind.Mod_bounds.to_mode_crossing mb
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
