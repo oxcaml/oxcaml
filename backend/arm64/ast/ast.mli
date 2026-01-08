@@ -687,7 +687,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -695,7 +696,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -709,8 +711,8 @@ module Instruction_name : sig
         -> ( triple,
              [ `Reg of
                [ `Neon of
-                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ]
-             ]
+                 [ `Vector of
+                   ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
              * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
              * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
            t
@@ -719,8 +721,8 @@ module Instruction_name : sig
         -> ( pair,
              [ `Reg of
                [ `Neon of
-                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ]
-             ]
+                 [ `Vector of
+                   ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
              * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
            t
     | FCSEL
@@ -750,7 +752,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FCVTN_vector
@@ -768,7 +771,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FDIV
@@ -781,7 +785,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -802,7 +807,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -816,7 +822,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -869,7 +876,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -882,7 +890,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FNMADD
@@ -909,7 +918,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FRINT :
@@ -923,15 +933,16 @@ module Instruction_name : sig
         -> ( pair,
              [ `Reg of
                [ `Neon of
-                 [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ]
-             ]
+                 [ `Vector of
+                   ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
              * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
            t
     | FRSQRTE_vector
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FSQRT
@@ -943,7 +954,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FSUB
@@ -956,7 +968,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
