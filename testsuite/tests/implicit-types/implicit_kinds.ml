@@ -113,6 +113,7 @@ module type S6 = sig
 
   val x : unit -> 'no
 end
+(* CR with-kinds: internal ticket 6215. *)
 [%%expect{|
 Line 2, characters 48-58:
 2 |   [@@@implicit_kind: ('no : immutable_data with int -> int)]
@@ -346,7 +347,7 @@ end
 module type S18 = sig val i : ('a : value mod immutable). 'a -> 'a end
 |}]
 
-(* Quantification overrides the default. *)
+(* Quantification can't override the default. *)
 
 module type S19 = sig
   [@@@implicit_kind: ('a : value mod immutable)]
@@ -430,7 +431,7 @@ module type S22 = sig
   val f : 'a t -> 'a
 end
 
-(* CR jkinds: this does not display that ['b : bits32]. *)
+(* CR jkinds: this does not display that ['b : bits32]. Internal ticket 6216. *)
 [%%expect{|
 module type S22 =
   sig
@@ -459,7 +460,7 @@ module type S24 = sig
   (* CR implicit-variables:
      This is allowed, since ['a = int] is still a [value_or_null],
      despite e.g. narrow ['a] to [immediate] being still disallowed.
-     Change this behavior? *)
+     Is this the right behavior? See also internal ticket 5122. *)
   type 'a t constraint 'a = int
 
   val f : 'null t -> unit
