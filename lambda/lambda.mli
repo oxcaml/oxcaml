@@ -1169,6 +1169,9 @@ val iter_head_constructor: (lambda -> unit) -> lambda -> unit
 (** [iter_head_constructor f lam] apply [f] to only the first level of
     sub expressions of [lam]. It does not recursively traverse the
     expression.
+
+    Callers should note that if calling this before static evaluation and
+    [Simplif.undelay] you will need to handle [Lsplice] and [Ldelayed].
 *)
 
 val shallow_iter:
@@ -1176,7 +1179,11 @@ val shallow_iter:
   non_tail:(lambda -> unit) ->
   lambda -> unit
 (** Same as [iter_head_constructor], but use a different callback for
-    sub-terms which are in tail position or not. *)
+    sub-terms which are in tail position or not.
+
+    Callers should note that if calling this before static evaluation and
+    [Simplif.undelay] you will need to handle [Lsplice] and [Ldelayed].
+*)
 
 val transl_prim: string -> string -> lambda
 (** Translate a value from a persistent module. For instance:
