@@ -145,7 +145,6 @@ COMPILERLIBS_SOURCES=\
   typing/ldd_intf.ml \
   typing/ldd.ml \
   typing/axis_lattice.ml \
-  typing/axis_lattice_conv.ml \
   typing/axis_lattice_array.ml \
   typing/axis_lattice_array_conv.ml \
   typing/ikind.ml \

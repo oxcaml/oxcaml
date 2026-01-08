@@ -134,7 +134,6 @@
   ldd_intf
   ldd
   axis_lattice
-  axis_lattice_conv
   ikind
   value_rec_types
   btype
@@ -642,7 +641,6 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Axis_lattice_conv.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scalar.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Primitive.cmo
@@ -747,7 +745,6 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Axis_lattice_conv.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scalar.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Primitive.cmx
