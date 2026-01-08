@@ -115,7 +115,8 @@ let mask_of_width n =
 let encode_logical_immediate_fields (x : nativeint) : int * int * int =
   if not (is_logical_immediate x)
   then
-    invalid_arg "encode_logical_immediate_fields: not a valid logical immediate";
+    Misc.fatal_error
+      "encode_logical_immediate_fields: not a valid logical immediate";
   let len = logical_imm_length x in
   let mask = mask_of_width len in
   let pattern = Nativeint.(logand x mask) in
@@ -228,7 +229,7 @@ let encode_logical_immediate_fields (x : nativeint) : int * int * int =
     | 8 -> 0b110000
     | 4 -> 0b111000
     | 2 -> 0b111100
-    | _ -> invalid_arg "invalid element size"
+    | size -> Misc.fatal_errorf "invalid element size: %d" size ()
   in
   let imms = size_encoding lor (ones - 1) in
   n, immr, imms
