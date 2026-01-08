@@ -32,16 +32,15 @@
  *             1          0          1
  *
  * The accepting states are 2, 3, 5 and 6. *)
-let auto_table =
+let[@ocamlformat "disable"] auto_table =
   [| (* accepting?, next on 0, next on 1 *)
-     (* state 0 *)
-     false, 1, 4;
+     (* state 0 *) false, 1, 4;
      (* state 1 *) false, 1, 2;
-     (* state 2 *) true, 3, 2;
-     (* state 3 *) true, 3, 7;
+     (* state 2 *) true,  3, 2;
+     (* state 3 *) true,  3, 7;
      (* state 4 *) false, 5, 4;
-     (* state 5 *) true, 5, 6;
-     (* state 6 *) true, 7, 6;
+     (* state 5 *) true,  5, 6;
+     (* state 6 *) true,  7, 6;
      (* state 7 *) false, 7, 7 (* error state *)
   |]
 
