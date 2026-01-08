@@ -1563,8 +1563,7 @@ let emit_instr i =
       then (
         A.ins_mov_from_sp ~dst:O.fp;
         D.cfi_remember_state ();
-        (* CR mshinwell: name this integer + fix the typing *)
-        D.cfi_def_cfa_register ~reg:(Int.to_string 29 (* fp *));
+        D.cfi_def_cfa_register ~reg:(Int.to_string (R.gp_encoding R.fp));
         let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
         A.ins2 LDR reg_x_tmp1
           (H.addressing (Iindexed offset) reg_domain_state_ptr);
