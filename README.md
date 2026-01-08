@@ -17,11 +17,12 @@ that it can be used to build OPAM packages.
 
 The supported platforms are x86-64 and arm64 Linux; and arm64 macOS.  x86 macOS may still work.
 
-One-time setup (you can also use other 4.14.x releases):
+One-time setup:
 ```
-$ opam switch 4.14.1  # or "opam switch create 4.14.1" if you haven't got that switch already
+$ opam switch 5.4.0  # or "opam switch create 5.4.0" if you haven't got that switch already
 $ eval $(opam env)
-$ opam install dune.3.17.2 menhir.20231231
+$ opam install dune.3.20.2 ocamlformat.0.28.1
+$ opam pin menhir 20231231
 ```
 
 You probably then want to fork the `oxcaml/oxcaml` repo to your own Github org.
