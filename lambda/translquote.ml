@@ -3392,6 +3392,8 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
       (Type_constraint.constraint_ loc (quote_core_type ~scopes cty)
       |> Type_constraint.wrap)
     |> Exp_desc.wrap
+  | Texp_ghost_region -> lambda
+  | Texp_borrowed -> fatal_error "no support for borrowing"
 
 and update_env_with_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3404,6 +3406,8 @@ and update_env_with_extra ~loc extra =
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type (Polymorphic_parameter _) -> ()
+  | Texp_ghost_region -> ()
+  | Texp_borrowed -> fatal_error "no support for borrowing"
 
 and update_env_without_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3416,6 +3420,8 @@ and update_env_without_extra ~loc extra =
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type (Polymorphic_parameter _) -> ()
+  | Texp_ghost_region -> ()
+  | Texp_borrowed -> fatal_error "no support for borrowing"
 
 and quote_expression_desc ~scopes ~transl stage e =
   let env = e.exp_env in

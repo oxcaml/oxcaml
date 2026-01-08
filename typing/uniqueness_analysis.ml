@@ -391,6 +391,9 @@ module Usage : sig
         (** A borrowed usage with an arbitrary occurrence. The occurrence is
             only for future error messages. Currently not used, because we don't
             have explicit borrowing *)
+    | Borrowing of Occurrence.t
+        (** The usage of being borrowed; will be confined to [Borrowed] by the
+            surrounding [Texp_ghost_region] *)
     | Maybe_aliased of Maybe_aliased.t
         (** A usage that could be either borrowed or aliased. *)
     | Aliased of Aliased.t  (** A aliased usage *)
@@ -440,13 +443,19 @@ end = struct
 
       - Unused means unused
       - Borrowed means read-only usage confined to a region
+      - Borrowing means the value is being borrowed in the current region. For
+        example, the [let y = borrow_ x in] syntax counts as a [Borrowing] usage
+        of [x]. Usages of [y] are not tracked by UA, but by the type checker,
+        who prevents [y] from escaping the borrow region. When the region ends,
+        the UA believes [y] didn't escape and lifts the [Borrowing] usage of [x]
+        into [Borrowed].
       - Aliased means read-only usage that may escape a region. For example,
       storing the value in a cell that can be used later.
       - Unique means using the value as if it's the only usage. Example includes
         overwriting.
       - Error means error happens when composing usage.
 
-     And we have Unused (top) > Borrowed > Aliased > Unique > Error (bot). Lower
+     And we have Unused (top) > Borrowed > Borrowing > Aliased > Unique > Error (bot). Lower
      usage is stronger.
 
      It is sound for the analysis to infer a use site to have a weaker usage,
@@ -494,6 +503,7 @@ end = struct
   type t =
     | Unused
     | Borrowed of Occurrence.t
+    | Borrowing of Occurrence.t
     | Maybe_aliased of Maybe_aliased.t
     | Aliased of Aliased.t
     | Maybe_unique of Maybe_unique.t
@@ -507,6 +517,7 @@ end = struct
   let rec extract_occurrence = function
     | Unused -> None
     | Borrowed occ -> Some occ
+    | Borrowing occ -> Some occ
     | Maybe_aliased t -> Some (Maybe_aliased.extract_occurrence t)
     | Aliased t -> Some (Aliased.extract_occurrence t)
     | Maybe_unique t -> Some (Maybe_unique.extract_occurrence t)
@@ -518,6 +529,7 @@ end = struct
     match m0, m1 with
     | Unused, m | m, Unused -> m
     | Borrowed _, t | t, Borrowed _ -> t
+    | Borrowing _, t | t, Borrowing _ -> t
     | Maybe_aliased l0, Maybe_aliased l1 ->
       Maybe_aliased (Maybe_aliased.meet l0 l1)
     | Maybe_aliased _, t | t, Maybe_aliased _ ->
@@ -552,6 +564,24 @@ end = struct
     | Borrowed _, Aliased t | Aliased t, Borrowed _ -> Aliased t
     | Borrowed occ, Maybe_unique t | Maybe_unique t, Borrowed occ ->
       force_aliased_multiuse t Par (Borrowed occ);
+      aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
+    | Borrowing occ, Borrowed _ | Borrowed _, Borrowing occ -> Borrowing occ
+    | Borrowing _, Borrowing _ -> m0
+    | Borrowing _, Maybe_aliased t | Maybe_aliased t, Borrowing _ ->
+      (* two choices:
+      - Borrowing par Borrowed = Borrowing. The result can lift to [Borrowed]
+        but disallows code motion
+      - Borrowing par Aliased = Aliased, which is the oppsite.
+
+      This is rare case anyway, we choose the latter. *)
+      let occ = Maybe_aliased.extract_occurrence t in
+      aliased occ Aliased.Forced
+    | Borrowing _, Aliased t | Aliased t, Borrowing _ -> Aliased t
+    | Borrowing _, Maybe_unique t ->
+      force_aliased_multiuse t Par m0;
+      aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
+    | Maybe_unique t, Borrowing _ ->
+      force_aliased_multiuse t Par m1;
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Maybe_aliased t0, Maybe_aliased t1 ->
       Maybe_aliased (Maybe_aliased.meet t0 t1)
@@ -638,6 +668,46 @@ end = struct
       let occ = Maybe_aliased.extract_occurrence l1 in
       force_aliased_multiuse l0 Seq_before m1;
       aliased occ Aliased.Forced
+    | Borrowing _, Borrowed _ ->
+      (* [ let y = borrow_ x in
+          ( let z = borrow_ x in ...);
+      ] *)
+      m0
+    | Borrowing _, Borrowing _ ->
+      (* [ let y = borrow_ x, borrow_ x in ] *)
+      m0
+    | Borrowing _, Maybe_aliased t ->
+      (* two choices:
+      - Borrowing seq Borrowed = Borrowing. The result can lift to [Borrowed] but [m1] disallows code motion
+      - Borrowing seq Aliased = Aliased, which is the oppsite.
+
+      This is rare case anyway, we choose the latter. *)
+      let occ = Maybe_aliased.extract_occurrence t in
+      aliased occ Aliased.Forced
+    | Maybe_aliased t, Borrowing _ ->
+      (* two choices:
+      - Borrowed seq Borrowing = Borrowing
+      - Aliased seq Borrowing = Aliased
+
+      This is rare case anyway, we choose the latter. *)
+      let occ = Maybe_aliased.extract_occurrence t in
+      aliased occ Aliased.Forced
+    | Borrowing _, Aliased _ ->
+      (* [ (let y = borrow_ x in
+            leaky_aliased_use x);
+           unique_use x ] *)
+      m1
+    | Aliased _, Borrowing _ -> m0
+    | Borrowing _, Maybe_unique t ->
+      (* - [Borrowing `seq` Unique] should be rejected; For example:
+     [ let y = borrow_ x in
+       unique_use x; aliased_use y
+     ] *)
+      force_aliased_multiuse t Seq_after m0;
+      aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
+    | Maybe_unique t, Borrowing _ ->
+      force_aliased_multiuse t Seq_before m1 ;
+      aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Aliased _, Aliased _ -> m0
     | Maybe_unique l, Aliased _ ->
       force_aliased_multiuse l Seq_before m1;
@@ -668,6 +738,7 @@ end = struct
     function
     | Unused -> fprintf ppf "Unused"
     | Borrowed occ -> fprintf ppf "Borrowed(%a)" Occurrence.print occ
+    | Borrowing occ -> fprintf ppf "Borrowing(%a)" Occurrence.print occ
     | Maybe_aliased ma -> fprintf ppf "Maybe_aliased(%a)" Maybe_aliased.print ma
     | Aliased a -> fprintf ppf "Aliased(%a)" Aliased.print a
     | Maybe_unique mu -> fprintf ppf "Maybe_unique(%a)" Maybe_unique.print mu
@@ -1572,6 +1643,8 @@ module Paths : sig
 
   val mark_aliased : Occurrence.t -> Aliased.reason -> t -> UF.t
 
+  val mark_borrowing : Occurrence.t -> t -> UF.t
+
   val invalidate_tag : t -> UF.t
 
   val overwrite_tag : Tag.t -> t -> UF.t
@@ -1627,6 +1700,9 @@ end = struct
 
   let mark_aliased occ reason paths =
     mark (Usage.aliased occ reason) Learned_tags.empty Overwrites.empty paths
+
+  let mark_borrowing occ paths =
+    mark (Usage.Borrowing occ) Learned_tags.empty Overwrites.empty paths
 
   let invalidate_tag paths =
     mark Usage.empty Learned_tags.empty Overwrites.mutate_tag paths
@@ -1686,6 +1762,8 @@ module Value : sig
   val mark_implicit_borrow_memory_address : Maybe_aliased.access -> t -> UF.t
 
   val mark_aliased : reason:boundary_reason -> t -> UF.t
+
+  val mark_borrowing : Occurrence.t -> t -> UF.t
 
   val invalidate_tag : t -> UF.t
 
@@ -1749,6 +1827,12 @@ end = struct
       force_aliased_boundary unique_use occ ~reason;
       let aliased = Usage.aliased occ Aliased.Forced in
       Paths.mark aliased Learned_tags.empty Overwrites.empty paths
+
+  let mark_borrowing occ = function
+    | Fresh -> UF.unused
+    | Existing { paths; _ } ->
+      let borrowing = Usage.Borrowing occ in
+      Paths.mark borrowing Learned_tags.empty Overwrites.empty paths
 
   let invalidate_tag = function
     | Fresh -> UF.unused
@@ -2165,6 +2249,24 @@ let lift_implicit_borrowing uf =
     (fun t -> t)
     uf
 
+let is_borrowed exp_extra =
+  List.exists (function Texp_borrowed, _, _ -> true | _ -> false) exp_extra
+
+let has_ghost_region exp_extra =
+  List.exists
+    (function Texp_ghost_region, _, _ -> true | _ -> false)
+    exp_extra
+
+let confine_explicit_borrowing uf =
+  UF.map
+    (function Borrowing occ -> Borrowed occ | m -> m)
+    (fun t -> t)
+    (fun t -> t)
+    uf
+
+let maybe_confine_explicit_borrowing exp_extra uf =
+  if has_ghost_region exp_extra then confine_explicit_borrowing uf else uf
+
 let descend proj overwrite =
   match overwrite with
   | None -> None
@@ -2182,10 +2284,10 @@ let descend proj overwrite =
    using a.x.y. This mode is used in most occasions. *)
 
 (** Corresponds to the second mode *)
-let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
-  match exp.exp_desc with
-  | Texp_ident _ ->
-    let value, uf = check_uniqueness_exp_as_value ienv exp in
+let rec check_uniqueness_exp_desc ~overwrite (ienv : Ienv.t) ~loc : _ -> UF.t =
+  function
+  | Texp_ident _ as exp_desc ->
+    let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
   | Texp_constant _ -> UF.unused
   | Texp_let (_, vbs, body) ->
@@ -2339,11 +2441,11 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
         fields
     in
     UF.par uf_ext (UF.pars (Array.to_list uf_fields))
-  | Texp_field _ ->
-    let value, uf = check_uniqueness_exp_as_value ienv exp in
+  | Texp_field _ as exp_desc ->
+    let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
-  | Texp_unboxed_field (_, _, _, _, _) ->
-    let value, uf = check_uniqueness_exp_as_value ienv exp in
+  | Texp_unboxed_field (_, _, _, _, _) as exp_desc ->
+    let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
   | Texp_setfield (rcd, _, _, _, arg) ->
     (* Ideally, we should treat this as creating a new alias of [arg], and
@@ -2454,7 +2556,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
        which invokes uniqueness check.*)
     mark_aliased_open_variables ienv
       (fun iter -> iter.class_structure iter cls_struc)
-      exp.exp_loc
+      loc
   | Texp_pack mod_expr ->
     (* the module will be type-checked by Typemod which invokes uniqueness
        analysis. *)
@@ -2501,7 +2603,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     match overwrite with
     | None -> assert false
     | Some p ->
-      let occ = Occurrence.mk exp.exp_loc in
+      let occ = Occurrence.mk loc in
       Paths.mark
         (Usage.maybe_unique use occ)
         Learned_tags.empty Overwrites.empty p)
@@ -2517,15 +2619,27 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     (* CR metaprogramming mshinwell: Make sure this is correct *)
     UF.unused
 
+and check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
+  let loc = exp.exp_loc in
+  let desc = exp.exp_desc in
+  let uf =
+    if is_borrowed exp.exp_extra
+    then
+      let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc desc in
+      let occ = Occurrence.mk loc in
+      UF.seq uf (Value.mark_borrowing occ value)
+    else check_uniqueness_exp_desc ~overwrite ienv ~loc desc
+  in
+  maybe_confine_explicit_borrowing exp.exp_extra uf
+
 (** Corresponds to the first mode.
 
     Look at exp and see if it can be treated as an alias. Currently only
     [Texp_ident] and [Texp_field] (and recursively so) are treated so. If it
     returns [Some Value.t], the caller is responsible to mark it as used as
     needed *)
-and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
-  let loc = exp.exp_loc in
-  match exp.exp_desc with
+and check_uniqueness_exp_desc_as_value ienv ~loc : _ -> Value.t * UF.t =
+  function
   | Texp_ident (p, _, _, _, unique_use, _) ->
     let occ = Occurrence.mk loc in
     let value =
@@ -2575,25 +2689,51 @@ and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
       let value = Value.existing paths unique_use occ in
       value, uf)
   (* CR-someday anlorenzen: This could also support let-bindings. *)
-  | _ -> Value.fresh, check_uniqueness_exp ~overwrite:None ienv exp
+  | desc ->
+    Value.fresh, check_uniqueness_exp_desc ~overwrite:None ienv ~loc desc
+
+and check_uniqueness_exp_as_value (ienv : Ienv.t) exp : Value.t * UF.t =
+  let loc = exp.exp_loc in
+  let desc = exp.exp_desc in
+  let value, uf =
+    if is_borrowed exp.exp_extra
+    then Value.fresh, check_uniqueness_exp_desc ~overwrite:None ienv ~loc desc
+    else check_uniqueness_exp_desc_as_value ienv ~loc desc
+  in
+  let uf = maybe_confine_explicit_borrowing exp.exp_extra uf in
+  value, uf
 
 (** take typed expression, do some parsing and returns [value_to_match] *)
-and check_uniqueness_exp_for_match ienv exp : value_to_match * UF.t =
-  match exp.exp_desc with
+and check_uniqueness_exp_desc_for_match ienv ~loc : _ -> value_to_match * UF.t =
+  function
   | Texp_tuple (es, _) ->
     let values, ufs =
       List.split
         (List.map (fun (_, e) -> check_uniqueness_exp_as_value ienv e) es)
     in
     Match_tuple values, UF.pars ufs
-  | _ ->
-    let value, uf = check_uniqueness_exp_as_value ienv exp in
+  | desc ->
+    let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc desc in
     let paths =
       match Value.paths value with
       | None -> Paths.fresh ()
       | Some paths -> paths
     in
     Match_single paths, uf
+
+and check_uniqueness_exp_for_match ienv exp : value_to_match * UF.t =
+  let loc = exp.exp_loc in
+  let desc = exp.exp_desc in
+  let value_to_match, uf =
+    if is_borrowed exp.exp_extra
+    then
+      let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc desc in
+      let occ = Occurrence.mk loc in
+      Match_single (Paths.fresh ()), UF.seq uf (Value.mark_borrowing occ value)
+    else check_uniqueness_exp_desc_for_match ienv ~loc desc
+  in
+  let uf = maybe_confine_explicit_borrowing exp.exp_extra uf in
+  value_to_match, uf
 
 (** Returns [ienv] and [uf]. [ienv] is the new bindings introduced; [uf] is the
     usage forest caused by the binding *)
@@ -2703,6 +2843,8 @@ let check_uniqueness_value_bindings vbs =
   UF.check_no_remaining_overwritten_as uf;
   ()
 
+(* CR-someday zqian: improve error message wrt borrowing. In particular, say
+"being borrowed" or "borrowed" instead of "used". *)
 let report_multi_use inner first_is_of_second =
   let { Usage.cannot_force = { occ; axis }; there; order } = inner in
   let here_usage = "used" in

@@ -537,6 +537,11 @@ and expression_desc =
   | Pexp_quote of expression (** runtime metaprogramming quotations <[E]> *)
   | Pexp_splice of expression (** runtime metaprogramming splicing $(E) *)
   | Pexp_hole (** _ *)
+  | Pexp_borrow of expression * bool
+    (** borrow_ exp. The boolean should be set to [false] by the parser. It will
+      be set to [true] by the type checker once the borrowing has been linked to
+      a borrowing context. This is dirty (parsetree not reflecting user syntax)
+      and should be removed once finer regionality is supported. *)
 
 and case =
     {

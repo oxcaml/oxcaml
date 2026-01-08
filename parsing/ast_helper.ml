@@ -282,6 +282,8 @@ module Exp = struct
       pbop_exp = exp;
       pbop_loc = loc;
     }
+
+  let borrow ?loc ?attrs a = mk ?loc ?attrs (Pexp_borrow (a, false))
 end
 
 module Mty = struct

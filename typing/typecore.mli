@@ -342,6 +342,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Borrow_out_of_context
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

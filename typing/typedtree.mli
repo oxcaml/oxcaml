@@ -350,6 +350,13 @@ and exp_extra =
             during inference. Generally, elaborated to a type constraint.
 
             See specific [type_inspection] cases for details. *)
+  | Texp_borrowed
+        (** This expression is borrowed. *)
+  | Texp_ghost_region
+        (** This expression is wrapped inside a ghost region. *)
+        (* NB. If an expression has both [Texp_borrowed] and
+        [Texp_ghost_region], we assume the [Texp_borrowed] is inner than
+        [Texp_ghost_region]. Currently it's impossible. *)
 
 and arg_label = Types.arg_label =
   | Nolabel

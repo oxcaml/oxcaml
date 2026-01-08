@@ -1335,6 +1335,29 @@ val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 |}]
 
+module Borrow = struct
+  let f () =
+    let x = "hello" in
+    let y = borrow_ x in
+    ()
+
+  let g x y =
+    String.concat (borrow_ x) (borrow_ y)
+
+  let h x =
+    match borrow_ x with
+    | true -> ()
+    | false -> ()
+end
+[%%expect{|
+Line 8, characters 18-29:
+8 |     String.concat (borrow_ x) (borrow_ y)
+                      ^^^^^^^^^^^
+Error: This value is "local"
+       because it is borrowed.
+       However, the highlighted expression is expected to be "global".
+|}]
+
 (***************)
 (* Modal kinds *)
 

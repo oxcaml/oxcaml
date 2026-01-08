@@ -229,6 +229,7 @@ module Exp:
 
     val case: pattern -> ?guard:expression -> expression -> case
     val binding_op: str -> pattern -> expression -> loc -> binding_op
+    val borrow : ?loc:loc -> ?attrs:attrs -> expression -> expression
   end
 
 (** Value declarations *)
