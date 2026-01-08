@@ -677,7 +677,8 @@ and signature_item_desc =
   | Tsig_modtype of module_type_declaration
   | Tsig_modtypesubst of module_type_declaration
   | Tsig_open of open_description
-  | Tsig_include of include_description * Mode.Modality.Const.t * modalities_annot
+  | Tsig_include of include_description * Mode.Modality.Const.t *
+                    modalities_annot
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute

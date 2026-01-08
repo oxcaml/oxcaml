@@ -548,7 +548,8 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
     let gf, gf_annot =
       Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
     in
-    {ca_modalities = gf; ca_modalities_annot = gf_annot; ca_type = cty; ca_loc = arg.pca_loc}
+    {ca_modalities = gf; ca_modalities_annot = gf_annot; ca_type = cty;
+     ca_loc = arg.pca_loc}
   in
   let tyl_gfl = List.map mk cal in
   let tyl_gfl' = List.mapi (fun idx (ca : Typedtree.constructor_argument) ->

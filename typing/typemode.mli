@@ -8,7 +8,8 @@ type modality_annot = Mode.Modality.atom Location.loc
 
 type modalities_annot = modality_annot list
 
-(** Interpret mode syntax as mode annotation, where axes can be left unspecified *)
+(** Interpret mode syntax as mode annotation, where axes can be left unspecified
+*)
 val transl_mode_annots :
   Parsetree.modes -> Mode.Alloc.Const.Option.t * modes_annot
 

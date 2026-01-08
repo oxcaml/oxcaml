@@ -556,7 +556,10 @@ let expression sub exp =
                 | None -> None, []
               in
               let constraint_ =
-                { ret_type_constraint; mode_annotations=[]; ret_mode_annotations }
+                { ret_type_constraint
+                ; mode_annotations=[]
+                ; ret_mode_annotations
+                }
               in
               Pfunction_cases (cases, loc, attributes), constraint_
         in
@@ -796,7 +799,9 @@ let module_type_declaration sub mtd =
 
 let signature sub {sig_items; sig_modalities_annot; sig_sloc} =
   let psg_items = List.map (sub.signature_item sub) sig_items in
-  let psg_modalities = Typemode.untransl_modalities_annot sig_modalities_annot in
+  let psg_modalities =
+    Typemode.untransl_modalities_annot sig_modalities_annot
+  in
   let psg_loc = sub.location sub sig_sloc in
   {psg_items; psg_modalities; psg_loc}
 
