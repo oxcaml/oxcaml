@@ -45,12 +45,7 @@ module Map = struct
         Some dll')
 
   let section_name (section, first_occurrence) =
-    let first_occurrence =
-      match first_occurrence with
-      | `First_occurrence -> true
-      | `Not_first_occurrence -> false
-    in
-    let details = Asm_targets.Asm_section.details section ~first_occurrence in
+    let details = Asm_targets.Asm_section.details section first_occurrence in
     name details.names details.flags details.args
 
   let from_program prog =

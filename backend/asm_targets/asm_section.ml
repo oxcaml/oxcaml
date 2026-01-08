@@ -143,7 +143,12 @@ type section_details =
     is_delayed : bool
   }
 
-let details t ~first_occurrence =
+let details t first_occurrence =
+  let first_occurrence =
+    match first_occurrence with
+    | `First_occurrence -> true
+    | `Not_first_occurrence -> false
+  in
   let text () = [".text"], None, [] in
   let data () = [".data"], None, [] in
   let rodata () = [".rodata"], None, [] in
@@ -299,6 +304,6 @@ let of_names names =
 
 let to_string t =
   let { names; flags = _; args = _; is_delayed = _ } =
-    details t ~first_occurrence:true
+    details t `First_occurrence
   in
   String.concat " " names

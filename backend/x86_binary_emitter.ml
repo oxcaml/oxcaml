@@ -1399,8 +1399,8 @@ let assemble_instr b loc = function
 
 
 let[@warning "+4"] constant b cst
-      (width: D.Constant_with_width.width_in_bytes) =
-  let open D.Constant_with_width in
+      (width : D.Constant_with_width.Width_in_bytes.t) =
+  let open D.Constant_with_width.Width_in_bytes in
   match cst, width with
   | C.Signed_int n, Eight -> buf_int8L b n
   | C.Signed_int n, Sixteen -> buf_int16L b n

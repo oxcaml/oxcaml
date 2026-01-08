@@ -365,15 +365,17 @@ module Directive : sig
 
     val constant : t -> Constant.t
 
-    type width_in_bytes = private
-      | Eight
-      | Sixteen
-      | Thirty_two
-      | Sixty_four
+    module Width_in_bytes : sig
+      type t = private
+        | Eight
+        | Sixteen
+        | Thirty_two
+        | Sixty_four
 
-    val width_in_bytes : t -> width_in_bytes
+      val to_int : t -> int
+    end
 
-    val width_in_bytes_int : width_in_bytes -> int
+    val width_in_bytes : t -> Width_in_bytes.t
   end
 
   type thing_after_label = private
