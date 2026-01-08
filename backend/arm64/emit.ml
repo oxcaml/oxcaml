@@ -42,12 +42,6 @@ module Simd_int_cmp = Ast.Simd_int_cmp
 module Branch_cond = Ast.Branch_cond
 module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
-module L = Asm_targets.Asm_label
-open! Int_replace_polymorphic_compare
-module H = Dsl_helpers
-
-(* Scratch FP register S7 used for float32 load/store conversions *)
-let reg_s7 = O.reg_op (R.reg_s 7)
 
 (* Convert Cmm.is_global to Asm_symbol.visibility *)
 let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
@@ -57,6 +51,13 @@ let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
 (* Create symbol from Cmm.symbol, preserving visibility *)
 let symbol_of_cmm_symbol (s : Cmm.symbol) : S.t =
   S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
+
+module L = Asm_targets.Asm_label
+open! Int_replace_polymorphic_compare
+module H = Dsl_helpers
+
+(* Scratch FP register S7 used for float32 load/store conversions *)
+let reg_s7 = O.reg_op (R.reg_s 7)
 
 (* Tradeoff between code size and code speed *)
 
