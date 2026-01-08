@@ -580,8 +580,9 @@ module Instruction_name : sig
     | ADR : (pair, [`Reg of [`GP of [`X]]] * [`Imm of [`Sym of [`Nineteen]]]) t
     | ADRP
         : (pair, [`Reg of [`GP of [`X]]] * [`Imm of [`Sym of [`Twenty_one]]]) t
-        (** Note: It is claimed that a W-form of AND_immediate exists but is not
-            modelled here. *)
+        (** Note: A W-form of AND_immediate exists but is not modelled here.
+            W-form logical immediates use a different bitmask encoding (N=0, 6-bit
+            immr/imms) than X-form (N can be 0 or 1, different valid patterns). *)
     | AND_immediate
         : ( triple,
             [`Reg of [`GP of [< `X]]] * [`Reg of [`GP of [< `X]]] * [< `Bitmask]
@@ -679,8 +680,9 @@ module Instruction_name : sig
              ]
              * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
            t
-        (** Note: It is claimed that a W-form of EOR_immediate exists but is not
-            modelled here. *)
+        (** Note: A W-form of EOR_immediate exists but is not modelled here.
+            W-form logical immediates use a different bitmask encoding (N=0, 6-bit
+            immr/imms) than X-form (N can be 0 or 1, different valid patterns). *)
     | EOR_immediate
         : ( triple,
             [`Reg of [`GP of [< `X]]] * [`Reg of [`GP of [< `X]]] * [< `Bitmask]
@@ -1130,8 +1132,9 @@ module Instruction_name : sig
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | NOP : (singleton, unit) t
-        (** Note: It is claimed that a W-form of ORR_immediate exists but is not
-            modelled here. *)
+        (** Note: A W-form of ORR_immediate exists but is not modelled here.
+            W-form logical immediates use a different bitmask encoding (N=0, 6-bit
+            immr/imms) than X-form (N can be 0 or 1, different valid patterns). *)
     | ORR_immediate
         : ( triple,
             [`Reg of [`GP of [< `X]]]
@@ -1366,15 +1369,19 @@ module Instruction_name : sig
              [`Reg of [`Neon of [`Vector of 'dst_arr * 'dst_w]]]
              * [`Reg of [`Neon of [`Vector of 'src_arr * 'src_w]]] )
            t
-        (** Note: It is claimed that a W-form of TBNZ exists (with bit positions
-            0-31) but is not modelled here. *)
+        (** Note: A W-form of TBNZ exists (with bit positions 0-31) but is not
+            modelled here. Currently uses generic 6-bit immediate; when W-form
+            is added, the bit position should be width-dependent (0-31 for W,
+            0-63 for X). *)
     | TBNZ
         : ( triple,
             [`Reg of [`GP of [`X]]] * [`Imm of [`Six]] * [`Imm of [`Sym of _]]
           )
           t
-        (** Note: It is claimed that a W-form of TBZ exists (with bit positions
-            0-31) but is not modelled here. *)
+        (** Note: A W-form of TBZ exists (with bit positions 0-31) but is not
+            modelled here. Currently uses generic 6-bit immediate; when W-form
+            is added, the bit position should be width-dependent (0-31 for W,
+            0-63 for X). *)
     | TBZ
         : ( triple,
             [`Reg of [`GP of [`X]]] * [`Imm of [`Six]] * [`Imm of [`Sym of _]]
