@@ -355,9 +355,14 @@ module Addressing_mode : sig
     | Offset_sym :
         [`GP of [< `X | `SP]] Reg.t * [`Twelve] Symbol.t
         -> [> `Offset_sym] t
-    | Literal :
-        [`GP of [< `X | `SP]] Reg.t * [`Nineteen] Symbol.t
-        -> [> `Literal] t
+        (** PC-relative literal load addressing. Architecturally,
+            [LDR Xt, <label>] encodes a 19-bit signed offset from PC to the
+            label (±1MB range).  No base register is involved.
+
+            Note: The emitter currently uses ADRP+LDR sequences instead of true
+            literal loads, which allows arbitrary distances. This addressing
+            mode is available for future use if needed. *)
+    | Literal : [`Nineteen] Symbol.t -> [> `Literal] t
     | Pre :
         [`GP of [< `X | `SP]] Reg.t * [`Nine_signed_unscaled] Offset.t
         -> [> `Pre] t

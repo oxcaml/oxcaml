@@ -736,9 +736,7 @@ module Addressing_mode = struct
     | Offset_sym :
         [`GP of [< `X | `SP]] Reg.t * [`Twelve] Symbol.t
         -> [> `Offset_sym] t
-    | Literal :
-        [`GP of [< `X | `SP]] Reg.t * [`Nineteen] Symbol.t
-        -> [> `Literal] t
+    | Literal : [`Nineteen] Symbol.t -> [> `Literal] t
     | Pre :
         [`GP of [< `X | `SP]] Reg.t * [`Nine_signed_unscaled] Offset.t
         -> [> `Pre] t
@@ -768,7 +766,7 @@ module Addressing_mode = struct
       fprintf ppf "[%s, %a]" (Reg.name r) Addressing_offset.print off
     | Offset_sym (r, sym) ->
       fprintf ppf "[%s, %a]" (Reg.name r) Symbol.print sym
-    | Literal (r, sym) -> fprintf ppf "[%s, %a]" (Reg.name r) Symbol.print sym
+    | Literal sym -> fprintf ppf "%a" Symbol.print sym
     | Pre (r, off) -> fprintf ppf "[%s, %a]!" (Reg.name r) Offset.print off
     | Post (r, off) -> fprintf ppf "[%s], %a" (Reg.name r) Offset.print off
     | Offset_pair (r, off) ->
