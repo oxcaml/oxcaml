@@ -167,10 +167,10 @@ end
 module Simd_rounding_mode = struct
   let create (rm : Simd.Rounding_mode.t) : Ast.Rounding_mode.t =
     match rm with
-    | Current -> X
     | Neg_inf -> M
     | Pos_inf -> P
     | Zero -> Z
+    | Current -> X
     | Nearest -> N
 end
 
