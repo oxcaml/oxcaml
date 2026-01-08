@@ -56,17 +56,18 @@ In the event that one needs to rebase a patch over formatting changes, here is a
 Assuming a specific formatting commit:
 ```shell
 # main formatting commit for flambda2/ in the repository
-format_commit=331c16734636a218261d4835fb77b38c5788f50a
+format_commit=first-ocamlformat.0.28.1
+previous_commit=last-ocamlformat.0.24.1 # or $format_commit~1
 ```
 
 Rebase as usual until its parent:
 ```shell
-git rebase $format_commit~1
+git rebase $previous_commit
 ```
 
 Then rebase once more on the commit itself:
 ```shell
-git rebase $format_commit -Xtheirs --exec 'make fmt && git commit -a --amend --no-edit'
+git rebase $format_commit -Xtheirs --exec 'make fmt || git commit -a --amend --no-edit'
 ```
 Each commit will be amended with formatting. Any conflict appearing can be resolved automatically by choosing our side (hence, `theirs` on a rebase, surprisingly enough). This is correct assuming the commit contains no semantic changes.
 
