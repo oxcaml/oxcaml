@@ -503,7 +503,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
               }
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
-         let modalities =
+         let modalities, modalities_annot =
           Typemode.transl_modalities ~maturity:Stable mut modalities
          in
          let arg = Ast_helper.Typ.force_poly arg in
@@ -513,6 +513,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           ld_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
           ld_mutable = mut;
           ld_modalities = modalities;
+          ld_modalities_annot = modalities_annot;
           ld_type = cty; ld_loc = loc; ld_attributes = attrs}
       )
   in
@@ -544,10 +545,10 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
       transl_simple_type ~new_var_jkind env ?univars ~closed
         Mode.Alloc.Const.legacy arg.pca_type
     in
-    let gf =
+    let gf, gf_annot =
       Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
     in
-    {ca_modalities = gf; ca_type = cty; ca_loc = arg.pca_loc}
+    {ca_modalities = gf; ca_modalities_annot = gf_annot; ca_type = cty; ca_loc = arg.pca_loc}
   in
   let tyl_gfl = List.map mk cal in
   let tyl_gfl' = List.mapi (fun idx (ca : Typedtree.constructor_argument) ->
@@ -3865,28 +3866,31 @@ type transl_value_decl_modal =
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
-  let mode, val_modalities =
+  let mode, val_modalities, val_modalities_annot =
     match modal with
     | Str_primitive ->
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
+        let mode, modes_annot = Typemode.transl_mode_annots modes in
         let mode =
-          modes
-          |> Typemode.transl_mode_annots
+          mode
           |> Mode.Alloc.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
-        mode, Mode.Modality.undefined
+        let modalities_annot =
+          List.map Typemode.mode_annot_to_modality_annot modes_annot
+        in
+        mode, Mode.Modality.undefined, modalities_annot
     | Sig_value (md_mode, sig_modalities) ->
-        let modalities =
+        let modalities, modalities_annot =
           match valdecl.pval_modalities with
-          | [] -> sig_modalities
+          | [] -> sig_modalities, []
           | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
         in
         let modalities = Mode.Modality.of_const modalities in
-        md_mode, modalities
+        md_mode, modalities, modalities_annot
   in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
@@ -4002,6 +4006,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
      val_id = id;
      val_name = valdecl.pval_name;
      val_desc = cty; val_val = v;
+     val_modalities_annot;
      val_prim = valdecl.pval_prim;
      val_loc = valdecl.pval_loc;
      val_attributes = valdecl.pval_attributes;

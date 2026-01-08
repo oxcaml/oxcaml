@@ -61,7 +61,7 @@ let count_language_extensions typing_input =
         signature_item =
           (fun sub ({ sig_desc; _ } as si) ->
             (match sig_desc with
-            | Tsig_include (include_declaration, _) -> (
+            | Tsig_include (include_declaration, _, _) -> (
               match include_declaration.incl_kind with
               | Tincl_functor _ | Tincl_gen_functor _ -> incr Include_functor
               | Tincl_structure -> ())

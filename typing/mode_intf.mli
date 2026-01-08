@@ -580,6 +580,8 @@ module type S = sig
         | Comonadic : 'a Comonadic.Axis.t -> 'a t
 
       include Axis with type 'a t := 'a t
+
+      val get : 'a t -> (module Const with type t = 'a)
     end
 
     type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
@@ -662,6 +664,9 @@ module type S = sig
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
+
+    (** Existentially holds a mode together with its axis. *)
+    type atom = Atom : 'a Axis.t * 'a -> atom
 
     type error =
       | Monadic of Monadic.error

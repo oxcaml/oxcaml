@@ -107,7 +107,8 @@ let (foo : 'a -> 'a) = ((fun x -> x : 'a -> 'a) : _ @ portable) in foo
 run {| let foo : 'a . ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let foo : ('a : value) . 'a -> 'a = fun x -> x in foo
+let foo : ('a : value) . ('a -> 'a) @ portable = (fun x -> x : _ @ portable) in
+foo
 - : unit = ()
 |}];;
 

@@ -1470,7 +1470,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
 
   let diff = {diff with forkable; yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
-  let l = Typemode.untransl_mode_annots diff in
+  let l = Typemode.untransl_mode diff in
   List.map tree_of_mode l
 
 (** The modal context on a type when printing it. This is to reproduce the mode
