@@ -1314,6 +1314,10 @@ let emit_load_literal dst lbl =
     if macosx then Needs_reloc PAGE_OFF else Needs_reloc LOWER_TWELVE
   in
   let addr = H.mem_label reg_tmp1_base ~reloc lbl in
+  (* ADRP always needs a PAGE relocation on both platforms - the assembler
+     cannot resolve page-aligned addresses until link time. On macOS this
+     prints "label@PAGE"; on ELF it prints just "label" since the GNU
+     assembler infers the relocation from the ADRP instruction. *)
   A.ins2 ADRP reg_x_tmp1 (label (Needs_reloc PAGE) lbl);
   match dst.typ with
   | Float -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addr
