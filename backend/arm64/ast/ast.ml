@@ -1458,7 +1458,9 @@ module Instruction_name = struct
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
+                [ `Vector of
+                  ([< `V8B | `V16B | `V4H | `V8H | `V2S | `V4S] as 'v)
+                  * ([< `B | `H | `S] as 'w) ] ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
