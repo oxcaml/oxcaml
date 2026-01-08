@@ -73,16 +73,14 @@ val reset_asm_code : unit -> unit
 
 (** Code emission *)
 
-(** Post-process the stream of instructions.  Dump it (using
-      the provided syntax emitter) in a file (if provided) and
-      compile it with an internal assembler (if registered
-      through [register_internal_assembler]). *)
+(** Post-process the stream of instructions. Dump it (using the provided syntax
+    emitter) in a file (if provided) and compile it with an internal assembler
+    (if registered through [register_internal_assembler]). *)
 val generate_code : (X86_ast.asm_program -> unit) option -> unit
 
-(** Generate an object file corresponding to the last call to
-    [generate_code].  An internal assembler is used if available (and
-    the input file is ignored). Otherwise, the source asm file with an
-    external assembler. *)
+(** Generate an object file corresponding to the last call to [generate_code].
+    An internal assembler is used if available (and the input file is ignored).
+    Otherwise, the source asm file with an external assembler. *)
 val assemble_file : (*infile*) string -> (*outfile*) string -> (*retcode*) int
 
 (** System detection *)

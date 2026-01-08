@@ -331,9 +331,10 @@ let apply_renaming
   in
   let args' = Simple.List.apply_renaming args renaming in
   let call_kind' = Call_kind.apply_renaming call_kind renaming in
-  if continuation == continuation'
-     && exn_continuation == exn_continuation'
-     && callee == callee' && args == args' && call_kind == call_kind'
+  if
+    continuation == continuation'
+    && exn_continuation == exn_continuation'
+    && callee == callee' && args == args' && call_kind == call_kind'
   then t
   else
     { callee = callee';

@@ -67,8 +67,9 @@ let invariant_doms : Cfg.t -> doms -> unit =
             Label.format n Label.format idom_n;
         Label.Tbl.iter
           (fun m _ ->
-            if is_strictly_dominating doms idom_n m
-               && is_strictly_dominating doms m n
+            if
+              is_strictly_dominating doms idom_n m
+              && is_strictly_dominating doms m n
             then
               fatal
                 "Cfg_dominators.invariant_doms: there is a strict dominator, \
@@ -139,8 +140,9 @@ end = struct
    fun cfg ~components ->
     try
       Cfg.iter_blocks cfg ~f:(fun label block ->
-          if (not (Label.Tbl.mem components label))
-             && Label.Set.is_empty block.predecessors
+          if
+            (not (Label.Tbl.mem components label))
+            && Label.Set.is_empty block.predecessors
           then raise (Found label));
       Misc.fatal_error "did not find a block with no predecessors"
     with Found label -> label

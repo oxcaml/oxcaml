@@ -185,12 +185,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let provenance = VP.provenance v in
     (if Option.is_some provenance
-    then
-      let naming_op =
-        SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
-          ~provenance ~regs:r1
-      in
-      SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
+     then
+       let naming_op =
+         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
+           ~provenance ~regs:r1
+       in
+       SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
     env
 
   (* Add an Iop opcode. Can be augmented by the processor description to insert
@@ -1261,8 +1261,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
         let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
-        if String.equal func.sym_name !SU.current_function_name
-           && SU.trap_stack_is_empty env
+        if
+          String.equal func.sym_name !SU.current_function_name
+          && SU.trap_stack_is_empty env
         then (
           let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
           let loc_arg' =

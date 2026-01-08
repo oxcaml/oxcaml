@@ -177,8 +177,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
         max_int T.Cond_branch.all
     in
     let code_size, map = label_map code in
-    if code_size >= min_of_max_branch_offsets
-       && fixup_branches ~code_size ~max_out_of_line_code_offset map code
+    if
+      code_size >= min_of_max_branch_offsets
+      && fixup_branches ~code_size ~max_out_of_line_code_offset map code
     then relax code ~max_out_of_line_code_offset
     else ()
 end

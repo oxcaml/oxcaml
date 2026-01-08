@@ -301,9 +301,9 @@ let rec subkind :
     let non_consts =
       non_consts
       |> List.map (fun (tag, sk) ->
-             ( tag_scannable tag,
-               ( Flambda_kind.Block_shape.Scannable Value_only,
-                 List.map value_kind_with_subkind sk ) ))
+          ( tag_scannable tag,
+            ( Flambda_kind.Block_shape.Scannable Value_only,
+              List.map value_kind_with_subkind sk ) ))
       |> Tag.Scannable.Map.of_list
     in
     Variant { consts; non_consts }
@@ -608,24 +608,24 @@ let apply_cont env ({ cont; args; trap_action } : Fexpr.apply_cont) =
   let trap_action : Trap_action.t option =
     trap_action
     |> Option.map (fun (ta : Fexpr.trap_action) : Trap_action.t ->
-           match ta with
-           | Push { exn_handler } ->
-             let exn_handler, _ = find_cont env exn_handler in
-             Push { exn_handler }
-           | Pop { exn_handler; raise_kind } ->
-             let exn_handler, _ = find_cont env exn_handler in
-             Pop { exn_handler; raise_kind })
+        match ta with
+        | Push { exn_handler } ->
+          let exn_handler, _ = find_cont env exn_handler in
+          Push { exn_handler }
+        | Pop { exn_handler; raise_kind } ->
+          let exn_handler, _ = find_cont env exn_handler in
+          Pop { exn_handler; raise_kind })
   in
   let c, arity = find_cont env cont in
   (if List.length args <> arity
-  then
-    let cont_str =
-      match cont with
-      | Special Done -> "done"
-      | Special Error -> "error"
-      | Named { txt = cont_id; _ } -> cont_id
-    in
-    Misc.fatal_errorf "wrong continuation arity %s" cont_str);
+   then
+     let cont_str =
+       match cont with
+       | Special Done -> "done"
+       | Special Error -> "error"
+       | Named { txt = cont_id; _ } -> cont_id
+     in
+     Misc.fatal_errorf "wrong continuation arity %s" cont_str);
   let args = List.map (simple env) args in
   Flambda.Apply_cont.create c ~args ~dbg:Debuginfo.none ?trap_action
 

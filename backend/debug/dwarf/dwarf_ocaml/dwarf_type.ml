@@ -928,7 +928,8 @@ let create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
   in
   let simple_constructors, complex_constructors =
     List.partition_map
-      (fun ({ pv_constr_name; pv_constr_args } : _ S.poly_variant_constructor) ->
+      (fun ({ pv_constr_name; pv_constr_args } : _ S.poly_variant_constructor)
+         ->
         match pv_constr_args with
         | [] -> Left pv_constr_name
         | _ :: _ -> Right (pv_constr_name, pv_constr_args))
@@ -1384,8 +1385,8 @@ let find_in_cache (type_shape : Shape.t) (type_layout : Layout.t) ~rec_env =
   else None
 
 (** This second cache is for named type shapes. Every type name should be
-    associated with at most one DWARF die, so this cache maps type names to
-    type shapes and DWARF dies. *)
+    associated with at most one DWARF die, so this cache maps type names to type
+    shapes and DWARF dies. *)
 let name_cache = String.Tbl.create 16
 
 (* CR sspies: We have to be careful here, because LLDB currently disambiguates

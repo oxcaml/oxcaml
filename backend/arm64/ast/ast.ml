@@ -61,8 +61,8 @@ module Neon_reg_name = struct
   end
 
   module Lane = struct
-    (** Support representation with and without the optional number of lanes, for
-        example Vn.4S[1] and Vn.S[1]. *)
+    (** Support representation with and without the optional number of lanes,
+        for example Vn.4S[1] and Vn.S[1]. *)
     type r =
       | V of Vector.t
       | S of Scalar.t

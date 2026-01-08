@@ -64,9 +64,9 @@ val not_local_field_has_source : result -> Code_id_or_name.t -> Field.t -> bool
 (** Color of node when producing the graph as a .dot *)
 val print_color : result -> Code_id_or_name.t -> string
 
-(** [rewrite_kind_with_subkind result var kind_with_subkind]
-    For [kind_with_subkind] the kind associated to variable [var],
-    removes the subkinds on the parts that are not used in [result]. *)
+(** [rewrite_kind_with_subkind result var kind_with_subkind] For
+    [kind_with_subkind] the kind associated to variable [var], removes the
+    subkinds on the parts that are not used in [result]. *)
 val rewrite_kind_with_subkind :
   result -> Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t
 (* CR pchambart: rename to remove_unused_part_of_subkind or something like

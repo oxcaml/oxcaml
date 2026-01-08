@@ -904,7 +904,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           k_exn)
       k_exn
   | Ltrywith (body, id, duid, handler, kind) ->
-    let dbg = Debuginfo.none (* CR mshinwell: fix [Lambda] *) in
+    let dbg =
+      Debuginfo.none
+      (* CR mshinwell: fix [Lambda] *)
+    in
     let body_result = Ident.create_local "body_result" in
     let body_result_lambda_duid = L.debug_uid_none in
     let region = Ident.create_local "try_region" in

@@ -5,11 +5,11 @@ include Builtins.Int64x2
 
 external low_of : int64 -> t
   = "caml_vec128_unreachable" "caml_int64x2_low_of_int64"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 external low_to : t -> int64
   = "caml_vec128_unreachable" "caml_int64x2_low_to_int64"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 let () =
   let v1 = low_of 1L in

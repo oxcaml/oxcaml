@@ -47,26 +47,27 @@ let create ~return_continuation ~exn_continuation ~params ~my_closure ~my_region
     ~my_ghost_region ~my_depth =
   Bound_parameters.check_no_duplicates params;
   (if Flambda_features.check_invariants ()
-  then
-    let params_set = Bound_parameters.var_set params in
-    let my_set, expected_size =
-      let regions, num_regions =
-        match my_region, my_ghost_region with
-        | None, None -> [], 0
-        | Some region, Some ghost_region -> [region; ghost_region], 2
-        | None, Some _ | Some _, None ->
-          Misc.fatal_errorf
-            "[my_region] and [my_ghost_region] must be both present or both \
-             absent"
-      in
-      Variable.Set.of_list (my_closure :: my_depth :: regions), 2 + num_regions
-    in
-    if Variable.Set.cardinal my_set <> expected_size
+   then
+     let params_set = Bound_parameters.var_set params in
+     let my_set, expected_size =
+       let regions, num_regions =
+         match my_region, my_ghost_region with
+         | None, None -> [], 0
+         | Some region, Some ghost_region -> [region; ghost_region], 2
+         | None, Some _ | Some _, None ->
+           Misc.fatal_errorf
+             "[my_region] and [my_ghost_region] must be both present or both \
+              absent"
+       in
+       Variable.Set.of_list (my_closure :: my_depth :: regions), 2 + num_regions
+     in
+     if
+       Variable.Set.cardinal my_set <> expected_size
        || not (Variable.Set.is_empty (Variable.Set.inter my_set params_set))
-    then
-      Misc.fatal_errorf
-        "[my_closure], [my_region], [my_ghost_region] and [my_depth] must be \
-         disjoint from themselves and the other parameters");
+     then
+       Misc.fatal_errorf
+         "[my_closure], [my_region], [my_ghost_region] and [my_depth] must be \
+          disjoint from themselves and the other parameters");
   { return_continuation;
     exn_continuation;
     params;

@@ -25,7 +25,8 @@
  **********************************************************************************)
 [@@@ocaml.warning "+a-40-41-42"]
 
-(** Check that functions do not allocate on the heap (local allocations are ignored). *)
+(** Check that functions do not allocate on the heap (local allocations are
+    ignored). *)
 
 (** Maintains shared state per compilation unit *)
 
@@ -41,8 +42,8 @@ val cfg :
   Cfg_with_layout.t ->
   Cfg_with_layout.t
 
-(** When the check fails, [Witness.t] represents an instruction that does
-    not satisfy the property. *)
+(** When the check fails, [Witness.t] represents an instruction that does not
+    satisfy the property. *)
 module Witness : sig
   type kind =
     | Alloc of
@@ -77,23 +78,22 @@ module Witnesses : sig
 
   val iter : t -> f:(Witness.t -> unit) -> unit
 
-  (** The witnesses are classified into which path they may appear on. If a witness
-      appears on both a path to a normal and an excpetional return, it will only appear in
-      [nor] component. *)
+  (** The witnesses are classified into which path they may appear on. If a
+      witness appears on both a path to a normal and an excpetional return, it
+      will only appear in [nor] component. *)
   type components =
-    { nor : t;  (** on a path from function entry to a normal return  *)
-      exn : t;  (** on a path from function entry to an exceptionall return  *)
+    { nor : t;  (** on a path from function entry to a normal return *)
+      exn : t;  (** on a path from function entry to an exceptionall return *)
       div : t  (** on a path from function entry that may diverge *)
     }
 end
 
-(**   Iterate over all function symbols with their witnesses. This function can be called
-      at any time, but the complete information is only available after a call to
-      [record_unit_info].  To get all witnesses for all functions, and not only for
-      functions annotated with [@zero_alloc], set
-      [Oxcaml_flags.zero_alloc_checker_details_cutoff]
-      to a negative value before calls to
-      [fundecl].  Used by compiler_hooks. *)
+(** Iterate over all function symbols with their witnesses. This function can be
+    called at any time, but the complete information is only available after a
+    call to [record_unit_info]. To get all witnesses for all functions, and not
+    only for functions annotated with [@zero_alloc], set
+    [Oxcaml_flags.zero_alloc_checker_details_cutoff] to a negative value before
+    calls to [fundecl]. Used by compiler_hooks. *)
 type iter_witnesses = (string -> Witnesses.components -> unit) -> unit
 
 val iter_witnesses : iter_witnesses

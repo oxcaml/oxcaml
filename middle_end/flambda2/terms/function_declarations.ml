@@ -49,10 +49,10 @@ let find ({ funs; _ } : t) function_slot =
 let print ppf { in_order; _ } =
   Format.fprintf ppf "@[<hov 1>(%a)@]"
     (Function_slot.Lmap.print (fun ppf -> function
-       | Deleted _ -> Format.fprintf ppf "[deleted]"
-       | Code_id { code_id; only_full_applications } ->
-         Format.fprintf ppf "%a%s" Code_id.print code_id
-           (if only_full_applications then "[only_full_applications]" else "")))
+      | Deleted _ -> Format.fprintf ppf "[deleted]"
+      | Code_id { code_id; only_full_applications } ->
+        Format.fprintf ppf "%a%s" Code_id.print code_id
+          (if only_full_applications then "[only_full_applications]" else "")))
     in_order
 
 let free_names { funs; _ } =

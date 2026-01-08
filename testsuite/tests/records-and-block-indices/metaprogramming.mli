@@ -17,12 +17,11 @@ module Tree : sig
       [enumerate_shapes ~max_num_nodes:(n + 1)] for small [n], but has
       subjectively more interesting tree shapes.
 
-      For example, let [es4] = [enumerate_shapes ~max_num_nodes:4]
-      and let [es'3] = [enumerate_shapes' ~max_leaves_and_singleton_branches:3].
+      For example, let [es4] = [enumerate_shapes ~max_num_nodes:4] and let
+      [es'3] = [enumerate_shapes' ~max_leaves_and_singleton_branches:3].
       - Both contain the trees [L (L) (LL) (LLL) ((L)) ((L)L) (L(L)) ((LL))].
       - Only [es4] contains [(((L)))].
-      - Only [es'3] contains [((LL)L) (L(LL))].
-  *)
+      - Only [es'3] contains [((LL)L) (L(LL))]. *)
   val enumerate_shapes' : max_leaves_and_singleton_branches:int -> unit t list
 
   val enumerate : shape:unit t -> leaves:'a list -> 'a t list
@@ -94,7 +93,7 @@ module Type_structure : sig
   val layout : t -> Layout.t
 
   (** This differs from composing [layout] and [Layout.contains_vec128] because
-     this function considers the fields of boxed values *)
+      this function considers the fields of boxed values *)
   val contains_vec128 : t -> bool
 
   val contains_unit_u : t -> bool
@@ -173,8 +172,9 @@ module Type : sig
   val value_code : t -> int -> string
 
   (** The number of subvalues of this type, which we only use to generate
-      non-overlapping values with [value_code]. E.g. [int option * #(float *
-      float)] has three. We consider an [int64x2#] to have two. *)
+      non-overlapping values with [value_code]. E.g.
+      [int option * #(float * float)] has three. We consider an [int64x2#] to
+      have two. *)
   val num_subvals : t -> int
 
   (** Code that dynamically implements [value_code], creating a value from an
@@ -187,11 +187,8 @@ module Type : sig
   val eq_code : t -> string
 
   (** Enumerate all paths into a nested unboxed record type. E.g. for an unboxed
-      record with the structure:
-      [#{ a : #{ b : int; c : int } }]
-      produces:
-      [(0, [<empty path>]), (1, [.#a]); (2, [[.#a.#b]; [.#a.#c]])]
-  *)
+      record with the structure: [#{ a : #{ b : int; c : int } }] produces:
+      [(0, [<empty path>]), (1, [.#a]); (2, [[.#a.#b]; [.#a.#c]])] *)
   val unboxed_paths_by_depth : t -> (int * Path.t list) list
 end
 

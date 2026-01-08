@@ -27,13 +27,12 @@ type forbidden_modality_kind =
       (** [@@ global unique] must be forbidden, with [global] implying
           [aliased]. Otherwise, borrowing would be unsound:
 
-  {v
+          {v
       type 'a t = { x : 'a @@ global unique }
 
       let clone (x @ unique) =
         borrow {x} ~f:(fun (t @ local) -> t.x : 'a @ global) (* leak *)
-  v}
-  *)
+          v} *)
 
 type error =
   | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
@@ -589,10 +588,10 @@ let untransl_mod_bounds (bounds : Jkind.Mod_bounds.t) : Parsetree.modes =
   let modality_annots =
     least_modalities_implying Types.Immutable modality
     |> List.map (fun atom ->
-           let { Location.txt = Parsetree.Modality s; _ } =
-             untransl_modality atom
-           in
-           { Location.txt = Parsetree.Mode s; loc = Location.none })
+        let { Location.txt = Parsetree.Modality s; _ } =
+          untransl_modality atom
+        in
+        { Location.txt = Parsetree.Mode s; loc = Location.none })
   in
   let nonmodal_annots =
     let open Jkind.Mod_bounds in

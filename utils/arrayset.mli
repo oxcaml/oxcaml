@@ -1,4 +1,4 @@
-(** Set implemented as an array.  *)
+(** Set implemented as an array. *)
 
 [@@@ocaml.warning "+a-40-41-42"]
 
