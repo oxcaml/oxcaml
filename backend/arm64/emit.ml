@@ -39,6 +39,7 @@ module R = Ast.Reg
 module Cond = Ast.Cond
 module Float_cond = Ast.Float_cond
 module Simd_int_cmp = Ast.Simd_int_cmp
+module Branch_cond = Ast.Branch_cond
 module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 module L = Asm_targets.Asm_label
@@ -1210,7 +1211,7 @@ let assembly_code_for_local_allocation i ~n =
   A.ins2 STR r (H.addressing (Iindexed domain_local_sp) reg_domain_state_ptr);
   A.ins_cmp_reg r reg_x_tmp1 O.optional_none;
   let lr_lbl = L.create Text in
-  A.ins1 (B_cond LT) (local_label lr_lbl);
+  A.ins1 (B_cond (Branch_cond.Int LT)) (local_label lr_lbl);
   let lr_return_lbl = L.create Text in
   D.define_label lr_return_lbl;
   A.ins2 LDR reg_x_tmp1
@@ -1232,10 +1233,10 @@ let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
   emit_subimm reg_x_alloc_ptr reg_x_alloc_ptr n;
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
-  then A.ins1 (B_cond CC) (local_label gc_lbl)
+  then A.ins1 (B_cond (Branch_cond.Int CC)) (local_label gc_lbl)
   else
     let lbl = L.create Text in
-    A.ins1 (B_cond CS) (local_label lbl);
+    A.ins1 (B_cond (Branch_cond.Int CS)) (local_label lbl);
     A.ins1 B (local_label gc_lbl);
     D.define_label lbl);
   labelled_ins4 gc_return_lbl ADD_immediate
@@ -1278,20 +1279,20 @@ let assembly_code_for_poll i ~far ~return_label =
   then (
     match return_label with
     | None ->
-      A.ins1 (B_cond LS) (local_label gc_lbl);
+      A.ins1 (B_cond (Branch_cond.Int LS)) (local_label gc_lbl);
       D.define_label gc_return_lbl
     | Some return_label ->
-      A.ins1 (B_cond HI) (local_label return_label);
+      A.ins1 (B_cond (Branch_cond.Int HI)) (local_label return_label);
       A.ins1 B (local_label gc_lbl))
   else
     match return_label with
     | None ->
-      A.ins1 (B_cond HI) (local_label gc_return_lbl);
+      A.ins1 (B_cond (Branch_cond.Int HI)) (local_label gc_return_lbl);
       A.ins1 B (local_label gc_lbl);
       D.define_label gc_return_lbl
     | Some return_label ->
       let lbl = L.create Text in
-      A.ins1 (B_cond LS) (local_label lbl);
+      A.ins1 (B_cond (Branch_cond.Int LS)) (local_label lbl);
       A.ins1 B (local_label return_label);
       labelled_ins1 lbl B (local_label gc_lbl));
   call_gc_sites := { gc_lbl; gc_return_lbl; gc_frame_lbl } :: !call_gc_sites
@@ -1956,17 +1957,17 @@ let emit_instr i =
     | Ifalsetest -> A.ins2 CBZ (H.reg_x i.arg.(0)) lbl
     | Iinttest cmp ->
       A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
-      A.ins1 (B_cond (cond_for_comparison cmp)) lbl
+      A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
     | Iinttest_imm (cmp, n) ->
       emit_cmpimm (H.reg_x i.arg.(0)) n;
-      A.ins1 (B_cond (cond_for_comparison cmp)) lbl
+      A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
     | Ifloattest (Float64, cmp) ->
       A.ins2 FCMP (H.reg_d i.arg.(0)) (H.reg_d i.arg.(1));
-      A.ins1 (B_cond_float (cond_for_float_comparison cmp)) lbl
+      A.ins1 (B_cond (Branch_cond.Float (cond_for_float_comparison cmp))) lbl
     | Ifloattest (Float32, cmp) ->
       let cond = cond_for_float_comparison cmp in
       A.ins2 FCMP (H.reg_s i.arg.(0)) (H.reg_s i.arg.(1));
-      A.ins1 (B_cond_float cond) lbl
+      A.ins1 (B_cond (Branch_cond.Float cond)) lbl
     | Ioddtest -> A.ins3 TBNZ (H.reg_x i.arg.(0)) (O.imm_six 0) lbl
     | Ieventest -> A.ins3 TBZ (H.reg_x i.arg.(0)) (O.imm_six 0) lbl)
   | Lcondbranch3 (lbl0, lbl1, lbl2) ->
@@ -1974,7 +1975,9 @@ let emit_instr i =
     let ins_cond cond lbl =
       Option.iter
         (fun lbl ->
-          A.ins1 (B_cond cond) (local_label (label_to_asm_label ~section lbl)))
+          A.ins1
+            (B_cond (Branch_cond.Int cond))
+            (local_label (label_to_asm_label ~section lbl)))
         lbl
     in
     A.ins_cmp (H.reg_x i.arg.(0)) (O.imm 1) O.optional_none;
@@ -2047,7 +2050,7 @@ let emit_instr i =
     A.ins2 LDR reg_x_tmp1 (H.addressing (Iindexed offset) reg_domain_state_ptr);
     emit_addimm reg_x_tmp1 reg_x_tmp1 f;
     A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
-    A.ins1 (B_cond CC) (local_label sc_label);
+    A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label);
     D.define_label sc_return;
     stack_realloc := Some { sc_label; sc_return; sc_max_frame_size_in_bytes }
   | Lop (Specific (Illvm_intrinsic intr)) ->

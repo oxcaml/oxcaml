@@ -457,6 +457,19 @@ module Cond = struct
     | LS -> LS
 end
 
+(** Condition codes for B.cond instruction. Unifies integer and floating-point
+    conditions - architecturally it's the same instruction, but we preserve the
+    distinction for semantic clarity. *)
+module Branch_cond = struct
+  type t =
+    | Int of Cond.t
+    | Float of Float_cond.t
+
+  let to_string = function
+    | Int c -> Cond.to_string c
+    | Float c -> Float_cond.to_string c
+end
+
 module Simd_int_cmp = struct
   type t =
     | EQ
@@ -975,8 +988,7 @@ module Instruction_name = struct
     | BL : (singleton, [`Imm of [`Sym of _]]) t
     | BLR : (singleton, [`Reg of [`GP of [`X]]]) t
     | BR : (singleton, [`Reg of [`GP of [`X]]]) t
-    | B_cond : Cond.t -> (singleton, [`Imm of [`Sym of _]]) t
-    | B_cond_float : Float_cond.t -> (singleton, [`Imm of [`Sym of _]]) t
+    | B_cond : Branch_cond.t -> (singleton, [`Imm of [`Sym of _]]) t
     | CBNZ : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Imm of [`Sym of _]]) t
     | CBZ : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Imm of [`Sym of _]]) t
     | CLZ
@@ -1886,8 +1898,7 @@ module Instruction_name = struct
         | AND_immediate | AND_shifted_register | AND_vector -> "and"
         | ASRV -> "asrv"
         | B -> "b"
-        | B_cond c -> "b." ^ Cond.to_string c
-        | B_cond_float c -> "b." ^ Float_cond.to_string c
+        | B_cond c -> "b." ^ Branch_cond.to_string c
         | BL -> "bl"
         | BLR -> "blr"
         | BR -> "br"
@@ -2112,9 +2123,6 @@ module Instruction_name = struct
         let (Singleton rn) = ops in
         [| o rn |]
       | B_cond _ ->
-        let (Singleton target) = ops in
-        [| o target |]
-      | B_cond_float _ ->
         let (Singleton target) = ops in
         [| o target |]
       | CBNZ ->

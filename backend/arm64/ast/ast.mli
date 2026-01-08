@@ -255,6 +255,17 @@ module Cond : sig
   val of_float_cond : Float_cond.t -> t
 end
 
+(** Condition codes for B.cond instruction. Unifies integer and floating-point
+    conditions - architecturally it's the same instruction, but we preserve the
+    distinction for semantic clarity. *)
+module Branch_cond : sig
+  type t =
+    | Int of Cond.t
+    | Float of Float_cond.t
+
+  val to_string : t -> string
+end
+
 (** Condition codes for AdvSIMD integer compare instructions.
     These map to CMEQ, CMGE, CMGT, CMLE, CMLT, CMHI, CMHS instructions.
     Unlike [Cond.t], this excludes conditions that don't have corresponding
@@ -579,8 +590,7 @@ module Instruction_name : sig
     | BL : (singleton, [`Imm of [`Sym of _]]) t
     | BLR : (singleton, [`Reg of [`GP of [`X]]]) t
     | BR : (singleton, [`Reg of [`GP of [`X]]]) t
-    | B_cond : Cond.t -> (singleton, [`Imm of [`Sym of _]]) t
-    | B_cond_float : Float_cond.t -> (singleton, [`Imm of [`Sym of _]]) t
+    | B_cond : Branch_cond.t -> (singleton, [`Imm of [`Sym of _]]) t
     | CBNZ : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Imm of [`Sym of _]]) t
     | CBZ : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Imm of [`Sym of _]]) t
     | CLZ
