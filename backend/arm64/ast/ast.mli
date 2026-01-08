@@ -372,10 +372,11 @@ module Operand : sig
       }
   end
 
-  (** Halfword shift positions for MOVK/MOVN/MOVZ instructions.
+  (** LSL shift positions for MOVK/MOVN/MOVZ instructions.
+      These position a 16-bit immediate within the register.
       Architecturally constrained to \{0,16,32,48\} for X-form and \{0,16\} for
       W-form. The GADT encodes this: S32 and S48 are only valid for X. *)
-  module Hw_shift : sig
+  module Lsl_by_multiple_of_16_bits : sig
     type _ t =
       | S0 : [< `X | `W] t
       | S16 : [< `X | `W] t
@@ -390,7 +391,9 @@ module Operand : sig
     | Reg : 'a Reg.t -> [`Reg of 'a] t
     | Lsl_by_twelve : [`Fixed_shift of [`Lsl_by_twelve]] t
     | Shift : ('op, 'amount) Shift.t -> [`Shift of 'op * 'amount] t
-    | Hw_shift : 'w Hw_shift.t -> [`Hw_shift of 'w] t
+    | Lsl_by_multiple_of_16_bits :
+        'w Lsl_by_multiple_of_16_bits.t
+        -> [`Lsl_by_multiple_of_16_bits of 'w] t
     | Cond : Cond.t -> [`Cond] t
     | Float_cond : Float_cond.t -> [`Float_cond] t
     | Mem : 'm Addressing_mode.t -> [`Mem of 'm] t
@@ -1081,19 +1084,19 @@ module Instruction_name : sig
         : ( triple,
             [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Hw_shift of 'w] )
+            * [`Lsl_by_multiple_of_16_bits of 'w] )
           t
     | MOVN
         : ( triple,
             [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Optional of [`Hw_shift of 'w] option] )
+            * [`Optional of [`Lsl_by_multiple_of_16_bits of 'w] option] )
           t
     | MOVZ
         : ( triple,
             [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Optional of [`Hw_shift of 'w] option] )
+            * [`Optional of [`Lsl_by_multiple_of_16_bits of 'w] option] )
           t
     | MSUB
         : ( quad,
@@ -1569,19 +1572,21 @@ module DSL : sig
     amount:int ->
     [`Optional of [`Shift of 'op * [`Six]] option] Operand.t
 
-  (** Create a halfword shift for MOVK/MOVN/MOVZ. The amount must be one of
+  (** Create an LSL shift for MOVK/MOVN/MOVZ. The amount must be one of
       0, 16, 32, or 48. Returns X-typed shift since 32 and 48 are X-only.
-      For W-form, use [hw_shift_w] which only accepts 0 and 16. *)
-  val hw_shift : int -> [`Hw_shift of [`X]] Operand.t
+      For W-form, use [lsl_by_multiple_of_16_bits_w] which only accepts 0 and 16. *)
+  val lsl_by_multiple_of_16_bits :
+    int -> [`Lsl_by_multiple_of_16_bits of [`X]] Operand.t
 
-  (** Create a halfword shift for W-form MOVK/MOVN/MOVZ. Only accepts 0 or 16. *)
-  val hw_shift_w : int -> [`Hw_shift of [`W]] Operand.t
+  (** Create an LSL shift for W-form MOVK/MOVN/MOVZ. Only accepts 0 or 16. *)
+  val lsl_by_multiple_of_16_bits_w :
+    int -> [`Lsl_by_multiple_of_16_bits of [`W]] Operand.t
 
-  val optional_hw_shift :
-    int -> [`Optional of [`Hw_shift of [`X]] option] Operand.t
+  val optional_lsl_by_multiple_of_16_bits :
+    int -> [`Optional of [`Lsl_by_multiple_of_16_bits of [`X]] option] Operand.t
 
-  val optional_hw_shift_w :
-    int -> [`Optional of [`Hw_shift of [`W]] option] Operand.t
+  val optional_lsl_by_multiple_of_16_bits_w :
+    int -> [`Optional of [`Lsl_by_multiple_of_16_bits of [`W]] option] Operand.t
 
   val optional_none : [`Optional of 'a option] Operand.t
 

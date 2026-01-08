@@ -784,10 +784,11 @@ module Operand = struct
       Format.fprintf ppf "%s %a" (Kind.to_string kind) Immediate.print amount
   end
 
-  (** Halfword shift positions for MOVK/MOVN/MOVZ instructions.
+  (** LSL shift positions for MOVK/MOVN/MOVZ instructions.
+      These position a 16-bit immediate within the register.
       Architecturally constrained to {0,16,32,48} for X-form and {0,16} for
       W-form. The GADT encodes this: S32 and S48 are only valid for X. *)
-  module Hw_shift = struct
+  module Lsl_by_multiple_of_16_bits = struct
     type _ t =
       | S0 : [< `X | `W] t
       | S16 : [< `X | `W] t
@@ -810,7 +811,9 @@ module Operand = struct
     | Reg : 'a Reg.t -> [`Reg of 'a] t
     | Lsl_by_twelve : [`Fixed_shift of [`Lsl_by_twelve]] t
     | Shift : ('op, 'amount) Shift.t -> [`Shift of 'op * 'amount] t
-    | Hw_shift : 'w Hw_shift.t -> [`Hw_shift of 'w] t
+    | Lsl_by_multiple_of_16_bits :
+        'w Lsl_by_multiple_of_16_bits.t
+        -> [`Lsl_by_multiple_of_16_bits of 'w] t
     | Cond : Cond.t -> [`Cond] t
     | Float_cond : Float_cond.t -> [`Float_cond] t
     | Mem : 'm Addressing_mode.t -> [`Mem of 'm] t
@@ -828,7 +831,7 @@ module Operand = struct
     | Reg r -> Format.fprintf ppf "%s" (Reg.name r)
     | Lsl_by_twelve -> Format.fprintf ppf "lsr #12"
     | Shift s -> Shift.print ppf s
-    | Hw_shift s -> Hw_shift.print ppf s
+    | Lsl_by_multiple_of_16_bits s -> Lsl_by_multiple_of_16_bits.print ppf s
     | Cond c -> Format.fprintf ppf "%s" (Cond.to_string c)
     | Float_cond c -> Format.fprintf ppf "%s" (Float_cond.to_string c)
     | Mem m -> Format.fprintf ppf "%a" Addressing_mode.print m
@@ -1472,19 +1475,19 @@ module Instruction_name = struct
         : ( triple,
             [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Hw_shift of 'w] )
+            * [`Lsl_by_multiple_of_16_bits of 'w] )
           t
     | MOVN
         : ( triple,
             [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Optional of [`Hw_shift of 'w] option] )
+            * [`Optional of [`Lsl_by_multiple_of_16_bits of 'w] option] )
           t
     | MOVZ
         : ( triple,
             [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Optional of [`Hw_shift of 'w] option] )
+            * [`Optional of [`Lsl_by_multiple_of_16_bits of 'w] option] )
           t
     | MSUB
         : ( quad,
@@ -2079,8 +2082,8 @@ module Instruction_name = struct
               (Operand.Reg (Reg.create lane_reg_name index))
           | GP _ | Neon (Scalar _) | Neon (Lane _) ->
             failwith "vector_to_lane_operand: not a vector register")
-        | Imm _ | Lsl_by_twelve | Shift _ | Hw_shift _ | Cond _ | Float_cond _
-        | Mem _ | Bitmask _ | Optional _ | Unit ->
+        | Imm _ | Lsl_by_twelve | Shift _ | Lsl_by_multiple_of_16_bits _
+        | Cond _ | Float_cond _ | Mem _ | Bitmask _ | Optional _ | Unit ->
           failwith "vector_to_lane_operand: not a register operand"
       in
       match instr with
@@ -2671,34 +2674,40 @@ module DSL = struct
   let optional_shift ~kind ~amount =
     Operand.Optional (Some (shift ~kind ~amount))
 
-  (** Create a halfword shift for MOVK/MOVN/MOVZ. The amount must be one of
+  (** Create an LSL shift for MOVK/MOVN/MOVZ. The amount must be one of
       0, 16, 32, or 48. Returns X-typed shift since 32 and 48 are X-only. *)
-  let hw_shift (amount : int) : [`Hw_shift of [`X]] Operand.t =
+  let lsl_by_multiple_of_16_bits (amount : int) :
+      [`Lsl_by_multiple_of_16_bits of [`X]] Operand.t =
     match amount with
-    | 0 -> Hw_shift S0
-    | 16 -> Hw_shift S16
-    | 32 -> Hw_shift S32
-    | 48 -> Hw_shift S48
+    | 0 -> Lsl_by_multiple_of_16_bits S0
+    | 16 -> Lsl_by_multiple_of_16_bits S16
+    | 32 -> Lsl_by_multiple_of_16_bits S32
+    | 48 -> Lsl_by_multiple_of_16_bits S48
     | _ ->
-      Misc.fatal_errorf "hw_shift: invalid shift amount %d (must be 0,16,32,48)"
+      Misc.fatal_errorf
+        "lsl_by_multiple_of_16_bits: invalid shift amount %d (must be \
+         0,16,32,48)"
         amount
 
-  (** Create a halfword shift for W-form MOVK/MOVN/MOVZ. Only accepts 0 or 16. *)
-  let hw_shift_w (amount : int) : [`Hw_shift of [`W]] Operand.t =
+  (** Create an LSL shift for W-form MOVK/MOVN/MOVZ. Only accepts 0 or 16. *)
+  let lsl_by_multiple_of_16_bits_w (amount : int) :
+      [`Lsl_by_multiple_of_16_bits of [`W]] Operand.t =
     match amount with
-    | 0 -> Hw_shift S0
-    | 16 -> Hw_shift S16
+    | 0 -> Lsl_by_multiple_of_16_bits S0
+    | 16 -> Lsl_by_multiple_of_16_bits S16
     | _ ->
-      Misc.fatal_errorf "hw_shift_w: invalid shift amount %d (must be 0 or 16)"
+      Misc.fatal_errorf
+        "lsl_by_multiple_of_16_bits_w: invalid shift amount %d (must be 0 or \
+         16)"
         amount
 
-  let optional_hw_shift (amount : int) :
-      [`Optional of [`Hw_shift of [`X]] option] Operand.t =
-    Operand.Optional (Some (hw_shift amount))
+  let optional_lsl_by_multiple_of_16_bits (amount : int) :
+      [`Optional of [`Lsl_by_multiple_of_16_bits of [`X]] option] Operand.t =
+    Operand.Optional (Some (lsl_by_multiple_of_16_bits amount))
 
-  let optional_hw_shift_w (amount : int) :
-      [`Optional of [`Hw_shift of [`W]] option] Operand.t =
-    Operand.Optional (Some (hw_shift_w amount))
+  let optional_lsl_by_multiple_of_16_bits_w (amount : int) :
+      [`Optional of [`Lsl_by_multiple_of_16_bits of [`W]] option] Operand.t =
+    Operand.Optional (Some (lsl_by_multiple_of_16_bits_w amount))
 
   let optional_none = Operand.Optional None
 
