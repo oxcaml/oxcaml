@@ -636,7 +636,7 @@ and function_cases =
     fc_param: Ident.t;
     fc_param_debug_uid : Shape.Uid.t;
     fc_loc: Location.t;
-    fc_exp_extra: exp_extra option;
+    fc_exp_extra: exp_extra list;
     fc_attributes: attributes;
     (** [fc_attributes] is just used in untypeast. *)
   }

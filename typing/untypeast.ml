@@ -538,22 +538,36 @@ let expression sub exp =
                 fc_attributes = attributes; _ }
             ->
               let cases = List.map (sub.case sub) cases in
-              let ret_type_constraint, ret_mode_annotations =
-                match exp_extra with
-                | Some (Texp_coerce (ty1, ty2)) ->
-                    Some
-                      (Pcoerce (Option.map (sub.typ sub) ty1, sub.typ sub ty2)),
-                    []
-                | Some (Texp_constraint ty) ->
-                  Some (Pconstraint (sub.typ sub ty)), []
-                | Some (Texp_mode (_, modes)) ->
-                  (* CR lstevenson: todo *)
-                  let modes = Typemode.untransl_mode_annots modes in
-                  None, modes
-                | Some (Texp_poly _ | Texp_newtype _)
-                | Some Texp_stack
-                | Some (Texp_inspected_type _)
-                | None -> None, []
+              let ret_type_constraints, ret_mode_annotations =
+                List.fold_right
+                  (fun extra (ret_type_constraints, ret_mode_annotations) ->
+                    let new_type_constraints, new_mode_annotations =
+                      match extra with
+                      | Texp_coerce (ty1, ty2) ->
+                        let ty1 = Option.map (sub.typ sub) ty1 in
+                        let ty2 = sub.typ sub ty2 in
+                        let coercion = Pcoerce (ty1, ty2) in
+                        [ coercion ], []
+                      | Texp_constraint ty ->
+                        [ Pconstraint (sub.typ sub ty) ], []
+                      | Texp_mode (_, modes) ->
+                        let modes = Typemode.untransl_mode_annots modes in
+                        [], modes
+                      | Texp_poly _ | Texp_newtype _ | Texp_stack
+                      | Texp_inspected_type _ -> [], []
+                    in
+                    new_type_constraints @ ret_type_constraints,
+                    new_mode_annotations @ ret_mode_annotations)
+                  exp_extra
+                  ([], [])
+              in
+              let ret_type_constraint =
+                match ret_type_constraints with
+                | [] -> None
+                | hd :: _ ->
+                  (* In practice, typecore never puts two type constraints in
+                     this list. *)
+                  Some hd
               in
               let constraint_ =
                 { ret_type_constraint

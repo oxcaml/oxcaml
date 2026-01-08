@@ -320,7 +320,7 @@ let function_body sub body =
         fc_partial = _; fc_param = _; fc_param_debug_uid = _;
       } ->
       List.iter (sub.case sub) fc_cases;
-      Option.iter (extra sub) fc_exp_extra;
+      List.iter (extra sub) fc_exp_extra;
       sub.location sub fc_loc;
       sub.attributes sub fc_attributes;
       sub.env sub fc_env

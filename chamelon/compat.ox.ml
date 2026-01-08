@@ -96,7 +96,7 @@ type texp_function_param = {
 type texp_function_cases_identifier = {
   last_arg_mode : Alloc.l;
   last_arg_sort : Jkind.Sort.t;
-  last_arg_exp_extra : exp_extra option;
+  last_arg_exp_extra : exp_extra list;
   last_arg_attributes : attributes;
   env : Env.t;
   ret_type : Types.type_expr;
@@ -128,7 +128,7 @@ let texp_function_cases_identifier_defaults =
   {
     last_arg_mode = Alloc.disallow_right Alloc.legacy;
     last_arg_sort = Jkind.Sort.value;
-    last_arg_exp_extra = None;
+    last_arg_exp_extra = [];
     last_arg_attributes = [];
     env = Env.empty;
     ret_type = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind);
