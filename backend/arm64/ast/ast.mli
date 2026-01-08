@@ -376,11 +376,13 @@ end
 
 module Rounding_mode : sig
   type t =
-    | M
-    | P
-    | Z
-    | X
-    | N
+    | A  (** ties Away *)
+    | I  (** current mode - use FPCR rounding mode *)
+    | M  (** towards Minus infinity *)
+    | N  (** to Nearest, ties to even *)
+    | P  (** towards Plus infinity *)
+    | X  (** to nearest, eXact - may signal inexact *)
+    | Z  (** towards Zero *)
 end
 
 module Memory_barrier : sig

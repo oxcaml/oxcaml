@@ -480,14 +480,23 @@ end
 
 module Rounding_mode = struct
   type t =
-    | M
-    | P
-    | Z
-    | X
-    | N
+    | A  (** ties Away *)
+    | I  (** current mode - use FPCR rounding mode *)
+    | M  (** towards Minus infinity *)
+    | N  (** to Nearest, ties to even *)
+    | P  (** towards Plus infinity *)
+    | X  (** to nearest, eXact - may signal inexact *)
+    | Z  (** towards Zero *)
 
   let to_string t =
-    match t with M -> "m" | P -> "p" | Z -> "z" | X -> "x" | N -> "n"
+    match t with
+    | A -> "a"
+    | I -> "i"
+    | M -> "m"
+    | N -> "n"
+    | P -> "p"
+    | X -> "x"
+    | Z -> "z"
 end
 
 module Memory_barrier = struct
