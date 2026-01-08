@@ -903,8 +903,11 @@ module Instruction_name = struct
           t
     | ADDV
         : ( pair,
-            [`Reg of [`Neon of [< `Scalar of [< `B]]]]
-            * [`Reg of [`Neon of [`Vector of _]]] )
+            [`Reg of [`Neon of [< `Scalar of ([< `B | `H | `S] as 'w)]]]
+            * [ `Reg of
+                [ `Neon of
+                  [`Vector of [< `V8B | `V16B | `V4H | `V8H | `V2S | `V4S] * 'w]
+                ] ] )
           t
     | ADD_immediate
         : ( quad,
