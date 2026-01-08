@@ -647,7 +647,7 @@ let decompose_int default n =
 (* Load an integer constant into a register *)
 
 let emit_movk dst (f, p) =
-  A.ins3 MOVK dst (O.imm_sixteen_of_nativeint f) (O.shift ~kind:LSL ~amount:p)
+  A.ins3 MOVK dst (O.imm_sixteen_of_nativeint f) (O.hw_shift p)
 
 let emit_intconst dst n =
   if Arm64_ast.Logical_immediates.is_logical_immediate n
@@ -659,18 +659,14 @@ let emit_intconst dst n =
       match dz with
       | [] -> A.ins_mov_reg dst O.xzr
       | (f, p) :: l ->
-        A.ins3 MOVZ dst
-          (O.imm_sixteen_of_nativeint f)
-          (O.optional_shift ~kind:LSL ~amount:p);
+        A.ins3 MOVZ dst (O.imm_sixteen_of_nativeint f) (O.optional_hw_shift p);
         List.iter (emit_movk dst) l)
     else
       match dn with
       | [] -> A.ins3 MOVN dst (O.imm_sixteen 0) O.optional_none
       | (f, p) :: l ->
         let nf = Nativeint.logxor f 0xFFFFn in
-        A.ins3 MOVN dst
-          (O.imm_sixteen_of_nativeint nf)
-          (O.optional_shift ~kind:LSL ~amount:p);
+        A.ins3 MOVN dst (O.imm_sixteen_of_nativeint nf) (O.optional_hw_shift p);
         List.iter (emit_movk dst) l
 
 let num_instructions_for_intconst n =

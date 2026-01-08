@@ -372,11 +372,25 @@ module Operand : sig
       }
   end
 
+  (** Halfword shift positions for MOVK/MOVN/MOVZ instructions.
+      Architecturally constrained to \{0,16,32,48\} for X-form and \{0,16\} for
+      W-form. The GADT encodes this: S32 and S48 are only valid for X. *)
+  module Hw_shift : sig
+    type _ t =
+      | S0 : [< `X | `W] t
+      | S16 : [< `X | `W] t
+      | S32 : [`X] t
+      | S48 : [`X] t
+
+    val to_int : 'w t -> int
+  end
+
   type _ t = private
     | Imm : 'w Immediate.t -> [`Imm of 'w] t
     | Reg : 'a Reg.t -> [`Reg of 'a] t
     | Lsl_by_twelve : [`Fixed_shift of [`Lsl_by_twelve]] t
     | Shift : ('op, 'amount) Shift.t -> [`Shift of 'op * 'amount] t
+    | Hw_shift : 'w Hw_shift.t -> [`Hw_shift of 'w] t
     | Cond : Cond.t -> [`Cond] t
     | Float_cond : Float_cond.t -> [`Float_cond] t
     | Mem : 'm Addressing_mode.t -> [`Mem of 'm] t
@@ -1065,21 +1079,21 @@ module Instruction_name : sig
           t
     | MOVK
         : ( triple,
-            [`Reg of [`GP of [< `X | `W]]]
+            [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Shift of [`Lsl] * [`Six]] )
+            * [`Hw_shift of 'w] )
           t
     | MOVN
         : ( triple,
-            [`Reg of [`GP of [< `X | `W]]]
+            [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Optional of [`Shift of [`Lsl] * [`Six]] option] )
+            * [`Optional of [`Hw_shift of 'w] option] )
           t
     | MOVZ
         : ( triple,
-            [`Reg of [`GP of [< `X | `W]]]
+            [`Reg of [`GP of ([< `X | `W] as 'w)]]
             * [`Imm of [`Sixteen_unsigned]]
-            * [`Optional of [`Shift of [`Lsl] * [`Six]] option] )
+            * [`Optional of [`Hw_shift of 'w] option] )
           t
     | MSUB
         : ( quad,
@@ -1177,6 +1191,10 @@ module Instruction_name : sig
             * [`Reg of [`GP of 'w]]
             * [`Reg of [`GP of 'w]] )
           t
+        (** Note: The shift immediate is modelled as a generic 6-bit value, but
+        architecturally the valid range depends on element width: 0-7 for B,
+        0-15 for H, 0-31 for S, 0-63 for D. The GADT could enforce this but
+        currently does not. *)
     | SHL
         : ( triple,
             [ `Reg of
@@ -1550,6 +1568,20 @@ module DSL : sig
     kind:'op Operand.Shift.Kind.t ->
     amount:int ->
     [`Optional of [`Shift of 'op * [`Six]] option] Operand.t
+
+  (** Create a halfword shift for MOVK/MOVN/MOVZ. The amount must be one of
+      0, 16, 32, or 48. Returns X-typed shift since 32 and 48 are X-only.
+      For W-form, use [hw_shift_w] which only accepts 0 and 16. *)
+  val hw_shift : int -> [`Hw_shift of [`X]] Operand.t
+
+  (** Create a halfword shift for W-form MOVK/MOVN/MOVZ. Only accepts 0 or 16. *)
+  val hw_shift_w : int -> [`Hw_shift of [`W]] Operand.t
+
+  val optional_hw_shift :
+    int -> [`Optional of [`Hw_shift of [`X]] option] Operand.t
+
+  val optional_hw_shift_w :
+    int -> [`Optional of [`Hw_shift of [`W]] option] Operand.t
 
   val optional_none : [`Optional of 'a option] Operand.t
 
