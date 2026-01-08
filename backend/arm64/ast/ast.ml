@@ -1577,7 +1577,7 @@ module Instruction_name = struct
     | SMOV :
         Neon_reg_name.Lane_index.t
         -> ( pair,
-             [`Reg of [< `GP of [< `W | `X] | `Neon of [< `Scalar of [< `D]]]]
+             [`Reg of [`GP of [< `W | `X]]]
              * [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
            )
            t
@@ -1764,7 +1764,7 @@ module Instruction_name = struct
     | UMOV :
         Neon_reg_name.Lane_index.t
         -> ( pair,
-             [`Reg of [< `GP of [< `W | `X] | `Neon of [< `Scalar of [< `D]]]]
+             [`Reg of [`GP of [< `W | `X]]]
              * [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
            )
            t
