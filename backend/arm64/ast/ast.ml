@@ -1097,8 +1097,8 @@ module Instruction_name = struct
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -1106,8 +1106,8 @@ module Instruction_name = struct
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -1161,8 +1161,8 @@ module Instruction_name = struct
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FCVTN_vector
@@ -1179,8 +1179,8 @@ module Instruction_name = struct
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FDIV
@@ -1193,8 +1193,8 @@ module Instruction_name = struct
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -1215,8 +1215,8 @@ module Instruction_name = struct
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -1230,8 +1230,8 @@ module Instruction_name = struct
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -1282,8 +1282,8 @@ module Instruction_name = struct
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -1296,8 +1296,8 @@ module Instruction_name = struct
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FNMADD
@@ -1324,8 +1324,8 @@ module Instruction_name = struct
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FRINT :
@@ -1347,8 +1347,8 @@ module Instruction_name = struct
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FSQRT
@@ -1360,8 +1360,8 @@ module Instruction_name = struct
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FSUB
@@ -1374,8 +1374,8 @@ module Instruction_name = struct
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t

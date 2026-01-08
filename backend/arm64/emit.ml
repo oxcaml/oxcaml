@@ -1975,8 +1975,7 @@ let emit_instr i =
     let ins_cond cond lbl =
       Option.iter
         (fun lbl ->
-          A.ins1
-            (B_cond (Branch_cond.Int cond))
+          A.ins1 (B_cond (Branch_cond.Int cond))
             (local_label (label_to_asm_label ~section lbl)))
         lbl
     in

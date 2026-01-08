@@ -518,6 +518,8 @@ module Instruction_name : sig
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
+        (** Note: It is claimed that a W-form of ADDS exists but is not modelled
+            here. *)
     | ADDS
         : ( quad,
             [`Reg of [`GP of [< `X | `XZR]]]
@@ -533,6 +535,8 @@ module Instruction_name : sig
                   [`Vector of [< `V8B | `V16B | `V4H | `V8H | `V2S | `V4S] * 'w]
                 ] ] )
           t
+        (** Note: It is claimed that a W-form of ADD_immediate exists but is not
+            modelled here. *)
     | ADD_immediate
         : ( quad,
             [`Reg of [`GP of [< `X | `SP | `FP]]]
@@ -559,6 +563,8 @@ module Instruction_name : sig
     | ADR : (pair, [`Reg of [`GP of [`X]]] * [`Imm of [`Sym of [`Nineteen]]]) t
     | ADRP
         : (pair, [`Reg of [`GP of [`X]]] * [`Imm of [`Sym of [`Twenty_one]]]) t
+        (** Note: It is claimed that a W-form of AND_immediate exists but is not
+            modelled here. *)
     | AND_immediate
         : ( triple,
             [`Reg of [`GP of [< `X]]] * [`Reg of [`GP of [< `X]]] * [< `Bitmask]
@@ -656,6 +662,8 @@ module Instruction_name : sig
              ]
              * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
            t
+        (** Note: It is claimed that a W-form of EOR_immediate exists but is not
+            modelled here. *)
     | EOR_immediate
         : ( triple,
             [`Reg of [`GP of [< `X]]] * [`Reg of [`GP of [< `X]]] * [< `Bitmask]
@@ -699,8 +707,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -708,8 +716,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -754,6 +762,8 @@ module Instruction_name : sig
             [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]]
             * [`Reg of [`Neon of [`Vector of [< `V2S | `V4S] * [`S]]]] )
           t
+        (** Note: It is claimed that a W destination form of FCVTNS exists but is
+            not modelled here. *)
     | FCVTNS
         : ( pair,
             [`Reg of [`GP of [< `X]]]
@@ -763,8 +773,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FCVTN_vector
@@ -772,6 +782,8 @@ module Instruction_name : sig
             [`Reg of [`Neon of [`Vector of [< `V2S | `V4S] * [`S]]]]
             * [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] )
           t
+        (** Note: It is claimed that a W destination form of FCVTZS exists but is
+            not modelled here. *)
     | FCVTZS
         : ( pair,
             [`Reg of [`GP of [< `X]]]
@@ -781,8 +793,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FDIV
@@ -795,8 +807,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -817,8 +829,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -832,8 +844,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -886,8 +898,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -900,8 +912,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FNMADD
@@ -928,8 +940,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FRINT :
@@ -951,8 +963,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FSQRT
@@ -964,8 +976,8 @@ module Instruction_name : sig
         : ( pair,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | FSUB
@@ -978,8 +990,8 @@ module Instruction_name : sig
         : ( triple,
             [ `Reg of
               [ `Neon of
-                [ `Vector of
-                  ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w) ] ] ]
+                [`Vector of ([< `V2S | `V4S | `V2D] as 'v) * ([< `S | `D] as 'w)]
+              ] ]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
@@ -1101,6 +1113,8 @@ module Instruction_name : sig
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | NOP : (singleton, unit) t
+        (** Note: It is claimed that a W-form of ORR_immediate exists but is not
+            modelled here. *)
     | ORR_immediate
         : ( triple,
             [`Reg of [`GP of [< `X]]]
@@ -1143,6 +1157,8 @@ module Instruction_name : sig
             * [`Imm of [`Six]]
             * [`Imm of [`Six]] )
           t
+        (** Note: It is claimed that a W source form of SCVTF exists but is not
+            modelled here. *)
     | SCVTF
         : ( pair,
             [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
@@ -1288,6 +1304,8 @@ module Instruction_name : sig
             * [`Imm of [< `Twelve]]
             * [`Optional of [`Fixed_shift of [`Lsl_by_twelve]] option] )
           t
+        (** Note: It is claimed that a W-form of SUBS_shifted_register exists but
+            is not modelled here. *)
     | SUBS_shifted_register
         : ( quad,
             [`Reg of [`GP of [< `X | `XZR]]]
@@ -1296,6 +1314,8 @@ module Instruction_name : sig
             * [`Optional of [`Shift of [< `Lsl | `Lsr | `Asr] * [`Six]] option]
           )
           t
+        (** Note: It is claimed that a W-form of SUB_immediate exists but is not
+            modelled here. *)
     | SUB_immediate
         : ( quad,
             [`Reg of [`GP of [< `X | `SP]]]
@@ -1325,11 +1345,15 @@ module Instruction_name : sig
              [`Reg of [`Neon of [`Vector of 'dst_arr * 'dst_w]]]
              * [`Reg of [`Neon of [`Vector of 'src_arr * 'src_w]]] )
            t
+        (** Note: It is claimed that a W-form of TBNZ exists (with bit positions
+            0-31) but is not modelled here. *)
     | TBNZ
         : ( triple,
             [`Reg of [`GP of [`X]]] * [`Imm of [`Six]] * [`Imm of [`Sym of _]]
           )
           t
+        (** Note: It is claimed that a W-form of TBZ exists (with bit positions
+            0-31) but is not modelled here. *)
     | TBZ
         : ( triple,
             [`Reg of [`GP of [`X]]] * [`Imm of [`Six]] * [`Imm of [`Sym of _]]
