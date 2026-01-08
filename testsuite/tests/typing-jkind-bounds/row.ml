@@ -481,7 +481,6 @@ module M2 : S2 with type t = [ `A of string | `B of int ] = struct
   type t = [ `A of string | `B of int ]
 end
 type t3 : immediate with M2.t = C of string (* should be accepted *)
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 module type S2 = sig type t = private [< `A of string | `B of int ] end
 module M2 : sig type t = [ `A of string | `B of int ] end
