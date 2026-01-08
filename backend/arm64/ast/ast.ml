@@ -55,6 +55,30 @@ type any_width =
   | `S
   | `D ]
 
+(** Constraint tying vector element width to GP register width for INS and UMOV.
+    - B/H/S elements use W (32-bit GP)
+    - D elements use X (64-bit GP) *)
+module Element_to_GP = struct
+  type (_, _) t =
+    | B : ([`B], [`W]) t
+    | H : ([`H], [`W]) t
+    | S : ([`S], [`W]) t
+    | D : ([`D], [`X]) t
+end
+
+(** Constraint tying vector element width to GP register width for SMOV.
+    - B/H elements can use W or X (sign-extending to 32 or 64 bits)
+    - S elements must use X (sign-extending 32 to 64 bits)
+    - D elements are not valid for SMOV (no sign extension needed) *)
+module Smov_element_to_GP = struct
+  type (_, _) t =
+    | B_to_W : ([`B], [`W]) t
+    | B_to_X : ([`B], [`X]) t
+    | H_to_W : ([`H], [`W]) t
+    | H_to_X : ([`H], [`X]) t
+    | S_to_X : ([`S], [`X]) t
+end
+
 (* Float/SIMD register description *)
 module Neon_reg_name = struct
   module Vector = struct
@@ -1431,10 +1455,10 @@ module Instruction_name = struct
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | INS :
-        Neon_reg_name.Lane_index.t
+        ('elem, 'gp) Element_to_GP.t * Neon_reg_name.Lane_index.t
         -> ( pair,
-             [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
-             * [`Reg of [`GP of [< `W | `X]]] )
+             [`Reg of [`Neon of [`Vector of [< any_vector] * 'elem]]]
+             * [`Reg of [`GP of 'gp]] )
            t
     | INS_V :
         Neon_reg_name.Lane_index.Src_and_dest.t
@@ -1637,11 +1661,10 @@ module Instruction_name = struct
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | SMOV :
-        Neon_reg_name.Lane_index.t
+        ('elem, 'gp) Smov_element_to_GP.t * Neon_reg_name.Lane_index.t
         -> ( pair,
-             [`Reg of [`GP of [< `W | `X]]]
-             * [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
-           )
+             [`Reg of [`GP of 'gp]]
+             * [`Reg of [`Neon of [`Vector of [< any_vector] * 'elem]]] )
            t
     | SMULH
         : ( triple,
@@ -1824,11 +1847,10 @@ module Instruction_name = struct
             * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
           t
     | UMOV :
-        Neon_reg_name.Lane_index.t
+        ('elem, 'gp) Element_to_GP.t * Neon_reg_name.Lane_index.t
         -> ( pair,
-             [`Reg of [`GP of [< `W | `X]]]
-             * [`Reg of [`Neon of [`Vector of [< any_vector] * [< any_width]]]]
-           )
+             [`Reg of [`GP of 'gp]]
+             * [`Reg of [`Neon of [`Vector of [< any_vector] * 'elem]]] )
            t
     | UMULH
         : ( triple,
@@ -2358,7 +2380,7 @@ module Instruction_name = struct
       | FSUB_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
-      | INS lane ->
+      | INS (_, lane) ->
         let (Pair (rd, rs)) = ops in
         [| vector_to_lane_operand rd lane; o rs |]
       | INS_V lanes ->
@@ -2475,7 +2497,7 @@ module Instruction_name = struct
       | SMIN_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
-      | SMOV lane ->
+      | SMOV (_, lane) ->
         let (Pair (rd, rs)) = ops in
         [| o rd; vector_to_lane_operand rs lane |]
       | SMULH ->
@@ -2567,7 +2589,7 @@ module Instruction_name = struct
       | UMIN_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
-      | UMOV lane ->
+      | UMOV (_, lane) ->
         let (Pair (rd, rs)) = ops in
         [| o rd; vector_to_lane_operand rs lane |]
       | UMULH ->

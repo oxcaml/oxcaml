@@ -34,6 +34,8 @@ open Arch
 open Reg
 open! Int_replace_polymorphic_compare
 module Ast = Arm64_ast.Ast
+module Element_to_GP = Ast.Element_to_GP
+module Smov_element_to_GP = Ast.Smov_element_to_GP
 module L = Asm_targets.Asm_label
 module S = Asm_targets.Asm_symbol
 

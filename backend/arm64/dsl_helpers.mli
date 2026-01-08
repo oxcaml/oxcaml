@@ -32,6 +32,8 @@
 *)
 
 module Ast = Arm64_ast.Ast
+module Element_to_GP = Ast.Element_to_GP
+module Smov_element_to_GP = Ast.Smov_element_to_GP
 
 (** {1 GP register operands} *)
 

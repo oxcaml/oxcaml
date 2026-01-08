@@ -394,17 +394,17 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
   (* Sign-extend lane to X register *)
   | Getq_lane_s32 { lane } ->
     let lane_idx = Lane_index.create lane in
-    ins2 (SMOV lane_idx) (reg_x res.(0), reg_v4s arg.(0))
+    ins2 (SMOV (S_to_X, lane_idx)) (reg_x res.(0), reg_v4s arg.(0))
   | Getq_lane_s16 { lane } ->
     let lane_idx = Lane_index.create lane in
-    ins2 (SMOV lane_idx) (reg_x res.(0), reg_v8h arg.(0))
+    ins2 (SMOV (H_to_X, lane_idx)) (reg_x res.(0), reg_v8h arg.(0))
   | Getq_lane_s8 { lane } ->
     let lane_idx = Lane_index.create lane in
-    ins2 (SMOV lane_idx) (reg_x res.(0), reg_v16b arg.(0))
+    ins2 (SMOV (B_to_X, lane_idx)) (reg_x res.(0), reg_v16b arg.(0))
   (* Extract 64-bit lane *)
   | Getq_lane_s64 { lane } ->
     let lane_idx = Lane_index.create lane in
-    ins2 (UMOV lane_idx) (reg_x res.(0), reg_v2d arg.(0))
+    ins2 (UMOV (D, lane_idx)) (reg_x res.(0), reg_v2d arg.(0))
   (* Extract bytes from two vectors *)
   | Extq_u8 n ->
     ins4 EXT (reg_v16b res.(0), reg_v16b arg.(0), reg_v16b arg.(1), O.imm_six n)
@@ -452,16 +452,16 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
   (* Lane operations - insert from GP register *)
   | Setq_lane_s8 { lane } ->
     let lane_idx = Lane_index.create lane in
-    ins2 (INS lane_idx) (reg_v16b res.(0), reg_w arg.(1))
+    ins2 (INS (B, lane_idx)) (reg_v16b res.(0), reg_w arg.(1))
   | Setq_lane_s16 { lane } ->
     let lane_idx = Lane_index.create lane in
-    ins2 (INS lane_idx) (reg_v8h res.(0), reg_w arg.(1))
+    ins2 (INS (H, lane_idx)) (reg_v8h res.(0), reg_w arg.(1))
   | Setq_lane_s32 { lane } ->
     let lane_idx = Lane_index.create lane in
-    ins2 (INS lane_idx) (reg_v4s res.(0), reg_w arg.(1))
+    ins2 (INS (S, lane_idx)) (reg_v4s res.(0), reg_w arg.(1))
   | Setq_lane_s64 { lane } ->
     let lane_idx = Lane_index.create lane in
-    ins2 (INS lane_idx) (reg_v2d res.(0), reg_x arg.(1))
+    ins2 (INS (D, lane_idx)) (reg_v2d res.(0), reg_x arg.(1))
   (* Copy lane to lane *)
   | Copyq_laneq_s64 { src_lane; dst_lane } ->
     let lanes =
