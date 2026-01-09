@@ -249,7 +249,8 @@ module Directive = struct
     | Reloc of
         { offset : Constant.t;
           name : reloc_type;
-          expr : Constant.t
+          target_symbol : Asm_symbol.t;
+          addend : int64
         }
 
   let bprintf = Printf.bprintf
@@ -467,10 +468,11 @@ module Directive = struct
     | Weak sym -> bprintf buf "\t.weak\t%s" (Asm_symbol.encode sym)
     (* masm only *)
     | External _ -> assert false
-    | Reloc { offset; name; expr } ->
-      bprintf buf "\t.reloc\t%a, %s, %a" Constant.print offset
+    | Reloc { offset; name; target_symbol; addend } ->
+      bprintf buf "\t.reloc\t%a, %s, %s - %Ld" Constant.print offset
         (reloc_type_to_string name)
-        Constant.print expr
+        (Asm_symbol.encode target_symbol)
+        addend
 
   let print_masm buf t =
     let unsupported name =
@@ -1158,10 +1160,11 @@ let offset_into_dwarf_section_symbol ?comment:_comment
   | Thirty_two -> const expr Thirty_two
   | Sixty_four -> const expr Sixty_four
 
-let reloc_x86_64_plt32 ~offset_from_this ~target_symbol ~rel_offset_from_next =
+let reloc_x86_64_plt32 ~offset_from_this ~target_symbol ~addend =
   emit
     (Reloc
        { offset = Sub (This, Signed_int offset_from_this);
          name = R_X86_64_PLT32;
-         expr = Sub (Symbol target_symbol, Signed_int rel_offset_from_next)
+         target_symbol;
+         addend
        })

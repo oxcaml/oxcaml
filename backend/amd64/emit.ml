@@ -1139,7 +1139,7 @@ let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
     let rel_size = 4L in
     let rel_offset_from_next = 4L in
     D.reloc_x86_64_plt32 ~offset_from_this:rel_size ~target_symbol:wrap_label
-      ~rel_offset_from_next)
+      ~addend:rel_offset_from_next)
   else
     (* Emit absolute value, no relocation. The immediate operand of cmp is the
        offset of the wrapper from the current instruction's address "." minus

@@ -337,10 +337,7 @@ val offset_into_dwarf_section_symbol :
   unit
 
 val reloc_x86_64_plt32 :
-  offset_from_this:int64 ->
-  target_symbol:Asm_symbol.t ->
-  rel_offset_from_next:int64 ->
-  unit
+  offset_from_this:int64 -> target_symbol:Asm_symbol.t -> addend:int64 -> unit
 
 module Directive : sig
   module Constant : sig
@@ -460,7 +457,8 @@ module Directive : sig
     | Reloc of
         { offset : Constant.t;
           name : reloc_type;
-          expr : Constant.t
+          target_symbol : Asm_symbol.t;
+          addend : int64
         }
 
   (** Translate the given directive to textual form. This produces output

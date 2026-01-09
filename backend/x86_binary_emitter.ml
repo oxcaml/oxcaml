@@ -1511,11 +1511,16 @@ let assemble_line b loc ins =
           buf_int8 b 0
         done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
-    | Directive (D.Reloc { name = D.R_X86_64_PLT32;
-              expr = C.Sub (C.Symbol wrap_sym, C.Signed_int 4L);
-              offset = C.Sub (C.This, C.Signed_int 4L);
-            })  when String.Tbl.mem local_labels (Asm_symbol.encode wrap_sym) ->
-      record_local_reloc b ~offset:(-4) (RelocCall (Asm_symbol.encode wrap_sym))
+    | Directive
+        (D.Reloc
+          { name = D.R_X86_64_PLT32;
+            target_symbol;
+            addend = 4L;
+            offset = C.Sub (C.This, C.Signed_int 4L)
+          })
+      when String.Tbl.mem local_labels (Asm_symbol.encode target_symbol) ->
+      let sym = Asm_symbol.encode target_symbol in
+      record_local_reloc b ~offset:(-4) (RelocCall sym)
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->
