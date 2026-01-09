@@ -5192,14 +5192,14 @@ let run_stack ~dbg ~stack ~f ~arg =
       [Cconst_symbol (sym, dbg); stack; f; arg],
       dbg )
 
-let resume ~dbg ~stack ~f ~arg ~last_fiber =
+let resume ~dbg ~cont ~f ~arg =
   (* Rc_normal is required here, because there are some uses of effects with
      repeated resumes, and these should consume O(1) stack space by tail-calling
      caml_resume. *)
   let sym = Cmm.global_symbol "caml_resume" in
   Cop
     ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [Cconst_symbol (sym, dbg); stack; f; arg; last_fiber],
+      [Cconst_symbol (sym, dbg); cont; f; arg],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber =

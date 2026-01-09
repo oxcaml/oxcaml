@@ -1352,9 +1352,15 @@ ENDFUNCTION(G(caml_reperform))
 
 FUNCTION(G(caml_resume))
 CFI_STARTPROC
-    /* %rax -> fiber, %rbx -> fun, %rdi -> arg, %rsi -> last_fiber */
+    /* %rax -> continuation, %rbx -> fun, %rdi -> arg */
+        movq   0x8(%rax), %r12  /* %r12 := last_fiber */
+        movq   %rdi, %r13 /* move arg to callee-saved %r13 */
+        movq   %rax, C_ARG_1
+        SWITCH_OCAML_TO_C
+        C_call (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
+        SWITCH_C_TO_OCAML
         leaq    -1(%rax), %r10  /* %r10 (new stack) = Ptr_val(%rax) */
-        movq    %rdi, %rax      /* %rax := argument to the function in %rbx */
+        movq    %r13, %rax      /* %rax := argument to the function in %rbx */
     /*  check if stack null, then already used */
         testq   %r10, %r10
         jz      1f
@@ -1382,7 +1388,7 @@ CFI_STARTPROC
         LEAVE_FUNCTION
 #endif
     /* Add current stack to the last fiber */
-        movq    (Stack_handler-1)(%rsi), %rdi
+        movq    (Stack_handler-1)(%r12), %rdi
         movq    Caml_state(current_stack), %rsi
         movq    %rsi, Handler_parent(%rdi)
      /* Need to update the oldest saved frame pointer here as the current fiber

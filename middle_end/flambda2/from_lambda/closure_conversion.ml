@@ -1115,8 +1115,8 @@ let close_effect_primitive acc env ~dbg exn_continuation
   | Prunstack, [[stack]; [f]; [arg]] ->
     let call_kind = C.effect_ (E.run_stack ~stack ~f ~arg) in
     close call_kind
-  | Presume, [[stack]; [f]; [arg]; [last_fiber]] ->
-    let call_kind = C.effect_ (E.resume ~stack ~f ~arg ~last_fiber) in
+  | Presume, [[cont]; [f]; [arg]] ->
+    let call_kind = C.effect_ (E.resume ~cont ~f ~arg) in
     close call_kind
   | Preperform, [[eff]; [cont]; [last_fiber]] ->
     let call_kind = C.effect_ (E.reperform ~eff ~cont ~last_fiber) in

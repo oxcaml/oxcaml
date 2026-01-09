@@ -223,11 +223,11 @@ struct c_stack_link {
  *  by setting up the required registers then jumping into caml_perform which
  *  does the switch to the parent and execution of the handle_effect function.
  *
- * caml_resume new_fiber function argument
- *  caml_resume resumes execution on new_fiber by making the current stack
+ * caml_resume continuation function argument
+ *  caml_resume resumes execution of continuation by making the current stack
  *  the parent of the new_fiber and then switching to the stack for new_fiber.
  *  The function with argument is then executed on the new stack. Care is taken
- *  to check if the new_fiber argument has already been resumed and so is null.
+ *  to check if the continuation has already been resumed and so its stack null.
  *
  *
  *  Bytecode
@@ -238,11 +238,11 @@ struct c_stack_link {
  * and exception raise. In particular:
  *
  *  Presume | Prunstack -> RESUME (& RESUMETERM if a tail call)
- *   RESUME checks that the stack is valid (a NULL stack indicates a
- *   continuation that has already been resumed). The stacks are then switched
- *   with the old stack becoming the parent of the new stack. Care is taken
- *   to setup the exception handler for the new stack. Execution continues
- *   on the new OCaml stack with the passed function and argument.
+ *   RESUME checks that the continuation has not already been resumed. The
+ *   stacks are then switched with the old stack becoming the parent of the new
+ *   stack. Care is taken to setup the exception handler for the new stack.
+ *   Execution continues on the new OCaml stack with the passed function and
+ *   argument.
  *
  *  Pperform -> PERFORM
  *   PERFORM captures the current stack in a continuation object it allocates.

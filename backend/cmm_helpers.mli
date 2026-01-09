@@ -1229,10 +1229,9 @@ val run_stack :
 
 val resume :
   dbg:Debuginfo.t ->
-  stack:expression ->
+  cont:expression ->
   f:expression ->
   arg:expression ->
-  last_fiber:expression ->
   expression
 
 val reperform :
