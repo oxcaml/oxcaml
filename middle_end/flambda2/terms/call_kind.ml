@@ -75,22 +75,22 @@ module Effect = struct
   let print ppf t =
     match t with
     | Perform { eff } ->
-      fprintf ppf "@[<hov 1>(%tPerform%t@ %a)@]" Flambda_colours.effect
+      fprintf ppf "@[<hov 1>(%tPerform%t@ %a)@]" Flambda_colours.effect_
         Flambda_colours.pop Simple.print eff
     | Reperform { eff; cont; last_fiber } ->
       fprintf ppf
         "@[<hov 1>(%tReperform%t@ (eff@ %a)@ (cont@ %a)@ (last_fiber@ %a))@]"
-        Flambda_colours.effect Flambda_colours.pop Simple.print eff Simple.print
-        cont Simple.print last_fiber
+        Flambda_colours.effect_ Flambda_colours.pop Simple.print eff
+        Simple.print cont Simple.print last_fiber
     | Run_stack { stack; f; arg } ->
       fprintf ppf "@[<hov 1>(%tRun_stack%t (stack@ %a)@ (f@ %a)@ (arg@ %a))@]"
-        Flambda_colours.effect Flambda_colours.pop Simple.print stack
+        Flambda_colours.effect_ Flambda_colours.pop Simple.print stack
         Simple.print f Simple.print arg
     | Resume { stack; f; arg; last_fiber } ->
       fprintf ppf
         "@[<hov 1>(%tResume%t (stack@ %a)@ (f@ %a)@ (arg@ %a) (last_fiber@ \
          %a))@]"
-        Flambda_colours.effect Flambda_colours.pop Simple.print stack
+        Flambda_colours.effect_ Flambda_colours.pop Simple.print stack
         Simple.print f Simple.print arg Simple.print last_fiber
 
   let perform ~eff = Perform { eff }
@@ -237,7 +237,7 @@ let method_call kind ~obj alloc_mode = Method { kind; obj; alloc_mode }
 let c_call ~needs_caml_c_call ~is_c_builtin ~effects ~coeffects alloc_mode =
   C_call { needs_caml_c_call; is_c_builtin; effects; coeffects; alloc_mode }
 
-let effect eff = Effect eff
+let effect_ eff = Effect eff
 
 let free_names t =
   match t with

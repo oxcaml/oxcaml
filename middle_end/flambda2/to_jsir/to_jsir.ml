@@ -362,12 +362,12 @@ and apply_expr ~env ~res e =
         To_jsir_env.get_code_id_exn env code_id
       in
       apply_fn ~res ~f:closure ~args ~exact:false
-    | None, Effect effect ->
+    | None, Effect effect_ ->
       if List.length args <> 0
       then Misc.fatal_error "Found non-empty argument list for effects";
       let prim_name, args, res =
         let open Jsir in
-        match effect with
+        match effect_ with
         | Perform { eff } ->
           let eff, res = To_jsir_shared.simple ~env ~res eff in
           "%perform", [Pv eff], res

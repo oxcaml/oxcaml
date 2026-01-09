@@ -363,7 +363,7 @@ module Effect_and_coeffect : sig
 
   val arbitrary : t
 
-  val effect : t -> Effect.t
+  val effect_ : t -> Effect.t
 
   val coeffect : t -> Coeffect.t
 
@@ -385,7 +385,7 @@ end = struct
 
   let arbitrary = Effect.Arbitrary, Coeffect.Arbitrary
 
-  let effect (e, _ce) = e
+  let effect_ (e, _ce) = e
 
   let coeffect (_e, ce) = ce
 
