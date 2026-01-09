@@ -73,8 +73,11 @@ let minimize should_remove map cur_name =
                     let rep_map = replace_mapper id e_match.exp_desc in
                     rep_map.expr rep_map c_rhs
                 | _ when should_remove () ->
-                    (* Note: we get rid of the guard, if any, so this will fail
-                       if the bug is due to the guard. *)
+                    let add_guard e =
+                      match c_guard with
+                      | None -> e
+                      | Some guard -> E.list [ E.ignore guard; e ]
+                    in
                     let pat_desc = (tva :> pattern) in
                     let pat_desc =
                       {
@@ -91,7 +94,7 @@ let minimize should_remove map cur_name =
                         ~vb_expr:e_match ~vb_attributes:c_lhs.pat_attributes ()
                     in
                     let texp_let =
-                      Texp_let (Nonrecursive, [ value_binding ], c_rhs)
+                      Texp_let (Nonrecursive, [ value_binding ], add_guard c_rhs)
                     in
                     { e with exp_desc = texp_let }
                 | _ -> e)
