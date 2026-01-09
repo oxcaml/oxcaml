@@ -805,51 +805,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       emit_expr_catch env sub_cfg bound_name rec_flag handlers body
     | Cexit (lbl, args, traps) -> emit_expr_exit env sub_cfg lbl args traps
     | Cinvalid { message; symbol } ->
-      (* Set up the argument for the call to caml_flambda2_invalid *)
-      let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
-      let loc_arg, stack_ofs, stack_align =
-        match
-          emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
-        with
-        | Or_never_returns.Ok result -> result
-        | Or_never_returns.Never_returns ->
-          (* This shouldn't happen for a constant symbol *)
-          assert false
-      in
-      let keep_for_checking = !SU.current_function_is_check_enabled in
-      if keep_for_checking
-      then (
-        (* When zero-alloc checking is enabled, emit as Prim External so the
-           checker can see the invalid block *)
-        let label = Cmm.new_label () in
-        let ext : Cfg.external_call_operation =
-          { func_symbol = Cmm.caml_flambda2_invalid;
-            alloc = false;
-            ty_args = [Cmm.XInt];
-            ty_res = Cmm.typ_int;
-            stack_ofs;
-            stack_align;
-            effects = Arbitrary_effects
-          }
-        in
-        let rd = Reg.createv Cmm.typ_int in
-        let (_ : Reg.t array) =
-          SU.insert_op_debug' env sub_cfg
-            (Cfg.Prim { op = External ext; label_after = label })
-            Debuginfo.none loc_arg
-            (Proc.loc_external_results (Reg.typv rd))
-        in
-        SU.set_traps_for_raise env;
-        Sub_cfg.add_never_block sub_cfg ~label;
-        Ok rd)
-      else
-        let (_ : Reg.t array) =
-          SU.insert_op_debug' env sub_cfg
-            (Cfg.Invalid { message; symbol; stack_ofs; stack_align })
-            Debuginfo.none loc_arg [||]
-        in
-        SU.set_traps_for_raise env;
-        Never_returns
+      emit_invalid env sub_cfg message symbol
 
   (* Emit an expression in tail position of a function. *)
   and emit_tail env sub_cfg (exp : Cmm.expression) =
@@ -874,53 +830,33 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccatch (rec_flag, handlers, e1) ->
       emit_tail_catch env sub_cfg rec_flag handlers e1
     | Cinvalid { message; symbol } ->
-      (* Set up the argument for the call to caml_flambda2_invalid *)
-      let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
-      let loc_arg, stack_ofs, stack_align =
-        match
-          emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
-        with
-        | Or_never_returns.Ok result -> result
-        | Or_never_returns.Never_returns ->
-          (* This shouldn't happen for a constant symbol *)
-          assert false
-      in
-      let keep_for_checking = !SU.current_function_is_check_enabled in
-      if keep_for_checking
-      then (
-        (* When zero-alloc checking is enabled, emit as Prim External so the
-           checker can see the invalid block *)
-        let label = Cmm.new_label () in
-        let ext : Cfg.external_call_operation =
-          { func_symbol = Cmm.caml_flambda2_invalid;
-            alloc = false;
-            ty_args = [Cmm.XInt];
-            ty_res = Cmm.typ_int;
-            stack_ofs;
-            stack_align;
-            effects = Arbitrary_effects
-          }
-        in
-        let rd = Reg.createv Cmm.typ_int in
-        let (_ : Reg.t array) =
-          SU.insert_op_debug' env sub_cfg
-            (Cfg.Prim { op = External ext; label_after = label })
-            Debuginfo.none loc_arg
-            (Proc.loc_external_results (Reg.typv rd))
-        in
-        SU.set_traps_for_raise env;
-        Sub_cfg.add_never_block sub_cfg ~label)
-      else
-        let (_ : Reg.t array) =
-          SU.insert_op_debug' env sub_cfg
-            (Cfg.Invalid { message; symbol; stack_ofs; stack_align })
-            Debuginfo.none loc_arg [||]
-        in
-        SU.set_traps_for_raise env
+      let ok = emit_invalid env sub_cfg message symbol in
+      insert_return env sub_cfg ok (SU.pop_all_traps env)
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
+
+  and emit_invalid env sub_cfg message symbol =
+    (* Set up the argument for the call to caml_flambda2_invalid *)
+    assert (Sub_cfg.exit_has_never_terminator sub_cfg);
+    let label = Cmm.new_label () in
+    let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
+    let* loc_arg, stack_ofs, stack_align =
+      emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
+    in
+    let ty = Cmm.typ_int in
+    let rd = Reg.createv ty in
+    let op = Cfg.{ message; symbol; stack_ofs; stack_align } in
+    let term = Cfg.Invalid { op; label_after = label } in
+    let loc_res =
+      SU.insert_op_debug' env sub_cfg term Debuginfo.none loc_arg
+        (Proc.loc_external_results (Reg.typv rd))
+    in
+    Sub_cfg.add_never_block sub_cfg ~label;
+    SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+    SU.set_traps_for_raise env;
+    Ok rd
 
   and emit_expr_raise (env : SU.environment) sub_cfg k
       (args : Cmm.expression list) dbg : _ Or_never_returns.t =
@@ -1025,35 +961,21 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.set_traps_for_raise env;
         Sub_cfg.add_never_block sub_cfg ~label:label_after;
         Ok rd
-      | Terminator (Call_no_return ({ func_symbol; ty_args; _ } as r)) ->
+      | Terminator (Call_no_return ({ ty_args; _ } as r)) ->
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
-        let keep_for_checking =
-          !SU.current_function_is_check_enabled
-          && String.equal func_symbol Cmm.caml_flambda2_invalid
-        in
-        let returns, ty =
-          if keep_for_checking then true, Cmm.typ_int else false, ty
-        in
         let rd = Reg.createv ty in
-        let label = Cmm.new_label () in
         let r = { r with stack_ofs; stack_align } in
         let term : Cfg.terminator =
-          if keep_for_checking
-          then Prim { op = External r; label_after = label }
-          else Call_no_return r
+          Call_no_return r
         in
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg term dbg loc_arg
             (Proc.loc_external_results (Reg.typv rd))
         in
         SU.set_traps_for_raise env;
-        if returns
-        then (
-          Sub_cfg.add_never_block sub_cfg ~label;
-          Ok rd)
-        else Never_returns
+        Never_returns
       | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
         let rd = Reg.createv Cmm.typ_val in
         let bytes = SU.size_expr env (Ctuple new_args) in

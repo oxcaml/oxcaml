@@ -4210,19 +4210,7 @@ let fail_if_called_indirectly_function () =
   in
   let string_data = emit_string_constant message_symbol message [] in
   let fun_body =
-    Cop
-      ( Cextcall
-          { func = Cmm.caml_flambda2_invalid;
-            ty = Cmm.typ_void;
-            alloc = false;
-            ty_args = [XInt];
-            returns = false;
-            builtin = false;
-            effects = Arbitrary_effects;
-            coeffects = Has_coeffects
-          },
-        [Cconst_symbol (message_symbol, Debuginfo.none)],
-        Debuginfo.none )
+    Cinvalid { message; symbol = message_symbol }
   in
   let fn : Cmm.fundecl =
     { fun_name = fail_if_called_indirectly_sym;

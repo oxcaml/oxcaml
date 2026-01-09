@@ -119,6 +119,13 @@ module S = struct
       label_after : Label.t
     }
 
+  type invalid =
+    { message : string;
+      symbol : Cmm.symbol;
+      stack_ofs : int;
+      stack_align : Cmm.stack_align
+    }
+
   (* Properties of the representation of successors:
    * - Tests of different types are not mixed. For example, a test that
    *   compares between variables of type int cannot be combined with a
@@ -145,12 +152,7 @@ module S = struct
     | Tailcall_func of func_call_operation
     | Call_no_return of external_call_operation
     (* CR mshinwell: [Call_no_return] should have "external" in the name *)
-    | Invalid of
-        { message : string;
-          symbol : Cmm.symbol;
-          stack_ofs : int;
-          stack_align : Cmm.stack_align
-        }
+    | Invalid of invalid with_label_after
     | Call of func_call_operation with_label_after
     | Prim of prim_call_operation with_label_after
 

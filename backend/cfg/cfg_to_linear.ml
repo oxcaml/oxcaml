@@ -179,7 +179,9 @@ let linearize_terminator cfg_with_layout (func : string) start
                 stack_ofs;
                 stack_align
               }))
-    | Invalid { message = _; symbol = _; stack_ofs; stack_align } ->
+    | Invalid
+        { op = { message = _; symbol = _; stack_ofs; stack_align };
+          label_after = _ } ->
       single
         (L.Lcall_op
            (Lextcall
@@ -386,10 +388,10 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
       | Switch _ -> true
       | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-      | Call _ | Prim _ ->
+      | Call _ | Prim _ | Invalid _ ->
         false
       | Return | Raise _ | Tailcall_func _ | Tailcall_self _ | Call_no_return _
-      | Invalid _ ->
+        ->
         assert false)
 
 let adjust_stack_offset body (block : Cfg.basic_block)

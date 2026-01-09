@@ -131,7 +131,7 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
     false
   | Raise _ -> false
   | Tailcall_self _ | Tailcall_func _ | Return -> true
-  | Call_no_return _ | Invalid _ | Call _ | Prim _ -> false
+  | Call_no_return _ | Call _ | Prim _ | Invalid _ -> false
 
 let is_safe_block : Cfg.basic_block -> bool =
  fun block ->
@@ -226,8 +226,7 @@ module Polls_before_prtc_transfer = struct
       then Ok Might_not_poll
       else Ok Always_polls
     | Return -> Ok Always_polls
-    | Invalid _ -> Ok dom
-    | Call_no_return _ | Call _ | Prim _ ->
+    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
       if Cfg.can_raise_terminator term.desc
       then Ok (Polls_before_prtc_domain.join dom exn)
       else Ok dom
