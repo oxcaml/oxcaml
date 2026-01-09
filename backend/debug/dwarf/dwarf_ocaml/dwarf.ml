@@ -53,7 +53,7 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_begin
       ()
   in
   let start_of_code_symbol =
-    Cmm_helpers.make_symbol "code_begin" |> Asm_symbol.create
+    Cmm_helpers.make_symbol "code_begin" |> Asm_symbol.create_global
   in
   let debug_loc_table = Debug_loc_table.create () in
   let debug_ranges_table = Debug_ranges_table.create () in

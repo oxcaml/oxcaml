@@ -36,7 +36,11 @@
     Note: Labels are not symbols in the usual sense---they are a construct in
     the assembler's metalanguage and not accessible in the object
     file---although on macOS the terminology for labels appears to be "assembler
-    local symbols". *)
+    local symbols".
+
+    Comparison and hashing of labels is performed on their encoded string form,
+    so [create_int section 42] and [create_string section "42"] are considered
+    equal. *)
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
