@@ -231,12 +231,14 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
   | Product sorts ->
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
 
-let rec ignorable_product_array_kind loc sorts =
-  List.map (sort_to_ignorable_product_element_kind loc) sorts
+exception Value_in_ignorable_product
 
-and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
+let rec ignorable_product_array_kind loc sorts ~value =
+  List.map (sort_to_ignorable_product_element_kind loc ~value) sorts
+
+and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) ~value =
   match s with
-  | Base Value -> Pint_ignorable
+  | Base Value -> value ()
   | Base Float64 -> Punboxedfloat_ignorable Unboxed_float64
   | Base Float32 -> Punboxedfloat_ignorable Unboxed_float32
   | Base Bits8 -> Punboxedoruntaggedint_ignorable Untagged_int8
@@ -248,7 +250,8 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   | Base (Vec128 | Vec256 | Vec512) ->
     raise (Error (loc, Unsupported_vector_in_product_array))
   | Base Void -> raise (Error (loc, Unsupported_void_in_array))
-  | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
+  | Product sorts ->
+    Pproduct_ignorable (ignorable_product_array_kind loc sorts ~value)
 
 let array_kind_of_elt ~elt_sort env loc ty =
   let elt_sort =
@@ -261,8 +264,15 @@ let array_kind_of_elt ~elt_sort env loc ty =
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
     if Ctype.is_always_gc_ignorable env ty then
-      Pgcignorableproductarray (ignorable_product_array_kind loc sorts)
-    else
+      Pgcignorableproductarray
+        (ignorable_product_array_kind loc sorts ~value:(fun () ->
+           Pint_ignorable))
+    else try
+      Pgcignorableproductarray
+        (ignorable_product_array_kind loc sorts ~value:(fun () ->
+           raise Value_in_ignorable_product))
+    with
+    | Value_in_ignorable_product -> 
       Pgcscannableproductarray
         (scannable_product_array_kind elt_ty_for_error loc sorts)
   in
