@@ -1,0 +1,7 @@
+(library
+ (name binary_emitter_intf)
+ (wrapped false)
+ (libraries asm_targets)
+ (ocamlopt_flags
+  (:standard -w +4
+   (:include %{project_root}/ocamlopt_flags.sexp))))

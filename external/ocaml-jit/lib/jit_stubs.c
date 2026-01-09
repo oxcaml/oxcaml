@@ -39,6 +39,20 @@
 #include <unistd.h>
 #include <stdalign.h>
 
+/* ARM64 cache maintenance for JIT code */
+#if defined(__aarch64__)
+#if defined(__APPLE__)
+#include <libkern/OSCacheControl.h>
+#define JIT_FLUSH_ICACHE(addr, size) sys_icache_invalidate((addr), (size))
+#else
+/* Linux ARM64: use __builtin___clear_cache or inline assembly */
+#define JIT_FLUSH_ICACHE(addr, size) __builtin___clear_cache((char*)(addr), (char*)(addr) + (size))
+#endif
+#else
+/* x86_64 has coherent I-cache, no explicit flush needed */
+#define JIT_FLUSH_ICACHE(addr, size) ((void)0)
+#endif
+
 bool __attribute__((weak)) TCMalloc_MallocExtension_MallocIsTCMalloc(void) {
   return false;
 }
@@ -70,6 +84,9 @@ CAMLprim value jit_dlsym(value symbol) {
 
 #define SBRK_FAILED ((void*)-1)
 
+#if !defined(__APPLE__)
+/* sbrk is deprecated on macOS; we only use this on Linux where we may need
+   to get memory in the lower address range when running under ASAN or TCMalloc. */
 static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
   assert(size % page_size == 0);
   uint8_t* brk = sbrk(0);
@@ -85,6 +102,7 @@ static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
   assert((uintptr_t)brk % page_size == 0);
   return next_page_start;
 }
+#endif /* !__APPLE__ */
 
 #if defined(__has_feature)
   // For clang
@@ -140,12 +158,19 @@ CAMLprim value jit_memalign(value section_size) {
        to make the tests pass. For serious usage of this under [musl], we'll need to
        do better. */
     addr = alloc_page_aligned_statically(page_size, size);
+#if defined(__APPLE__)
+  } else if (ASAN_IS_ENABLED) {
+    /* On macOS, sbrk is deprecated, so we use a static buffer for ASAN.
+       TCMalloc is not used on macOS. */
+    addr = alloc_page_aligned_statically(page_size, size);
+#else
   } else if (ASAN_IS_ENABLED || TCMalloc_MallocExtension_MallocIsTCMalloc()) {
     /* AddressSanitizer and TCMalloc use [mmap], not [sbrk], which results in
        addresses which are too large to apply relocations to against other
        sections (e.g. [.rodata]), so we manually use [sbrk] when linked against
        either. */
     addr = alloc_page_aligned_using_sbrk(page_size, size);
+#endif
   } else {
     addr = aligned_alloc(page_size, size);
   }
@@ -201,6 +226,11 @@ CAMLprim value jit_mprotect_rx(value caml_addr, value caml_size) {
 
   size = Int_val(caml_size);
   addr = (intnat*) Nativeint_val(caml_addr);
+
+  /* Flush instruction cache before making memory executable.
+     On ARM64, the instruction cache is not coherent with the data cache,
+     so we must explicitly invalidate the I-cache after writing code. */
+  JIT_FLUSH_ICACHE(addr, size);
 
   if (mprotect(addr, size, PROT_READ | PROT_EXEC)) {
     result = caml_alloc(1, 1);

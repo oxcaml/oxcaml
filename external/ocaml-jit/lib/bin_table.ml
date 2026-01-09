@@ -20,85 +20,65 @@ type empty
 
 type filled
 
-module type S = sig
-  type _ t
+type _ t = {
+  index_map : int String.Map.t;
+  content : Address.t array;
+  name : string;
+  entry_size : int;
+  write_entry : Buffer.t -> Address.t -> unit;
+}
 
-  val from_binary_section : X86_binary_emitter.buffer -> empty t
-  (** Creates a table with all the entries needed for the given binary section.
-      The table will have the right size, i.e. one entry per corresponding relative
-      relocations in the given section. You need to use [fill] to write the actual
-      addresses of the pointed symbols. *)
+let from_binary_section (type a r)
+    (module E : Binary_emitter_intf.S
+      with type Assembled_section.t = a
+       and type Relocation.t = r)
+    ~name ~entry_size ~is_relevant_reloc ~write_entry (section : a) =
+  let relocs = E.Assembled_section.relocations section in
+  let _, index_map =
+    List.fold_left relocs ~init:(0, String.Map.empty)
+      ~f:(fun (index, map) reloc ->
+        if is_relevant_reloc reloc then
+          let target = E.Relocation.target_symbol reloc in
+          let label = Symbols.target_to_string target in
+          if String.Map.mem label map then (index, map)
+          else (index + 1, String.Map.add ~key:label ~data:index map)
+        else (index, map))
+  in
+  { index_map; content = [||]; name; entry_size; write_entry }
 
-  val fill : Symbols.t -> empty t -> filled t
-  (** Fills the table with the absolute addresses of the symbols it holds *)
+let in_memory_size t = String.Map.cardinal t.index_map * t.entry_size
 
-  val in_memory_size : _ t -> int
-  (** Returns the size (in bytes) the table will take up in the memory *)
+let fill symbols t =
+  let size = String.Map.cardinal t.index_map in
+  let content = Array.make size Address.placeholder in
+  String.Map.iter t.index_map ~f:(fun ~key:symbol_name ~data:index ->
+      match Symbols.find symbols symbol_name with
+      | Some addr ->
+        (match Sys.getenv_opt "OCAML_JIT_DEBUG" with
+        | Some ("true" | "1") ->
+          Printf.eprintf "%s entry[%d] = %s -> %Lx\n%!"
+            t.name index symbol_name (Address.to_int64 addr)
+        | _ -> ());
+        content.(index) <- addr
+      | None ->
+          failwithf "Symbol %s refered to by the %s is unknown" symbol_name
+            t.name);
+  { t with content }
 
-  val content : filled t -> string
-  (** Returns the table in binary form, as it should be written at the end of the text section *)
+let content t =
+  let size = in_memory_size t in
+  if size = 0 then ""
+  else
+    let buf = Buffer.create size in
+    Array.iter t.content ~f:(t.write_entry buf);
+    Buffer.contents buf
 
-  val symbol_address : _ t addressed -> string -> Address.t option
-  (** [symbol_address table symbol] returns the absolute address at which the address
-      or jump for [symbol] is stored within the given table. *)
-end
+let symbol_offset t symbol =
+  let open Option.Op in
+  let+ index = String.Map.find_opt symbol t.index_map in
+  index * t.entry_size
 
-module type IN = sig
-  val name : string
-
-  val entry_size : int
-
-  val entry_from_relocation : Relocation.t -> string option
-
-  val write_entry : Buffer.t -> Address.t -> unit
-end
-
-module Make (X : IN) : S = struct
-  type _ t = { index_map : int String.Map.t; content : Address.t array }
-
-  let from_binary_section binary_section =
-    let raw_relocations = X86_binary_emitter.relocations binary_section in
-    let relocations =
-      List.filter_map ~f:Relocation.from_x86_relocation raw_relocations
-    in
-    let _, index_map =
-      List.fold_left relocations ~init:(0, String.Map.empty)
-        ~f:(fun (index, map) reloc ->
-          match X.entry_from_relocation reloc with
-          | Some label when String.Map.mem label map -> (index, map)
-          | Some label -> (index + 1, String.Map.add ~key:label ~data:index map)
-          | None -> (index, map))
-    in
-    { index_map; content = [||] }
-
-  let in_memory_size t = String.Map.cardinal t.index_map * X.entry_size
-
-  let fill symbols t =
-    let size = String.Map.cardinal t.index_map in
-    let content = Array.make size Address.placeholder in
-    String.Map.iter t.index_map ~f:(fun ~key:symbol_name ~data:index ->
-        match Symbols.find symbols symbol_name with
-        | Some addr -> content.(index) <- addr
-        | None ->
-            failwithf "Symbol %s refered to by the %s is unknown" symbol_name
-              X.name);
-    { t with content }
-
-  let content t =
-    let size = in_memory_size t in
-    if size = 0 then ""
-    else
-      let buf = Buffer.create size in
-      Array.iter t.content ~f:(X.write_entry buf);
-      Buffer.contents buf
-
-  let symbol_offset t symbol =
-    let open Option.Op in
-    let+ index = String.Map.find_opt symbol t.index_map in
-    index * X.entry_size
-
-  let symbol_address { address; value = t } symbol =
-    let open Option.Op in
-    let+ offset = symbol_offset t symbol in
-    Address.add_int address offset
-end
+let symbol_address { address; value = t } symbol =
+  let open Option.Op in
+  let+ offset = symbol_offset t symbol in
+  Address.add_int address offset
