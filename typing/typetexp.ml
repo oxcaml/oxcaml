@@ -265,6 +265,12 @@ end = struct
   type used_info = {
     ty : type_expr;
     loc : Location.t;
+    (* Rigid variables are set at a given jkind.
+
+       Note that a rigid variable can still be unified; if it's unified
+       with a non-variable type expression like [int], it stays valid as long as
+       the final expression checks against the rigid jkind.
+    *)
     rigid : jkind_lr option;
     stage : Env.stage
   }
@@ -560,8 +566,7 @@ end = struct
       (fun name { ty; rigid; loc; stage = s } ->
         (match rigid with
         | Some original_jkind ->
-          let v = Btype.proxy ty in
-          check_jkind env loc name v { original_jkind; defaulted = false }
+          check_jkind env loc name ty { original_jkind; defaulted = false }
         |  None -> ());
         if flavor = Unification || is_in_scope name then
           let v = new_global_var (Jkind.Builtin.any ~why:Dummy_jkind) in
@@ -681,7 +686,7 @@ let transl_type_param env path jkind_default styp =
           Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind_annot
         in
         jkind, Some jkind_annot
-    | Some _, None, Some _ -> assert false
+    | Some _, None, Some _ -> assert false  (* no implicit jkinds for underscores *)
   in
   let attrs = styp.ptyp_attributes in
   match styp.ptyp_desc with
