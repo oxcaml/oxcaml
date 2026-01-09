@@ -52,16 +52,16 @@ module Map = struct
     let open X86_ast in
     match DLL.hd prog with
     | None -> String.Map.empty
-    | Some (Directive (Section section)) ->
-      let initial_section = section_name section in
+    | Some (Directive (Section (section, first_occurrence))) ->
+      let initial_section = section_name (section, first_occurrence) in
       let acc = ref String.Map.empty in
       let current_section = ref initial_section in
       let current_instrs = ref (DLL.make_empty ()) in
       DLL.iter prog ~f:(fun instr ->
         match instr with
-        | Directive (Section section) ->
+        | Directive (Section (section, first_occurrence)) ->
           acc := append !current_section !current_instrs !acc;
-          current_section := section_name section;
+          current_section := section_name (section, first_occurrence);
           current_instrs := DLL.make_empty ()
         | _ -> DLL.add_end !current_instrs instr);
       acc := append !current_section !current_instrs !acc;
