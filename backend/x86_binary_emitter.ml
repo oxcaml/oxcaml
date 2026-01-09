@@ -1736,8 +1736,9 @@ module For_jit = struct
              PC points after fetching), so we add rel_size to place_address.
              Note: relocation_entry.ml subtracts 4 from the addend when creating
              ELF relocations because ELF's R_X86_64_PLT32 semantics compute
-             S + A - P (where P is the relocation site, not PC). That subtraction
-             is only for ELF object file generation, not for JIT linking. *)
+             S + A - P (where P is the relocation site, not PC). That
+             subtraction is only for ELF object file generation, not for JIT
+             linking. *)
           let rel_size = 4L in
           let src_addr = Int64.add place_address rel_size in
           let value = Int64.sub target_addr src_addr in
