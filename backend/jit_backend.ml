@@ -29,6 +29,7 @@
    module allows jit.ml to register a callback without knowing about
    architecture-specific emitters (X86_binary_emitter, Arm64_binary_emitter). *)
 
+module DLL = Oxcaml_utils.Doubly_linked_list
 module String_map = Map.Make (String)
 
 (* Packed sections with their Binary_emitter.S module, hiding the
@@ -45,17 +46,12 @@ type packed_sections =
 
 type callback = packed_sections -> unit
 
-let current_callback : callback option ref = ref None
-
-(* For x86, we need to save/restore the old internal_assembler *)
-let saved_x86_internal_assembler = ref None
-
-let register callback =
-  current_callback := Some callback;
+(* Execute [f] with a JIT callback installed, ensuring the internal assembler
+   is properly restored afterwards. *)
+let with_jit callback f =
   match Target_system.architecture () with
   | X86_64 ->
-    (* Save old x86 internal assembler and register our hook *)
-    saved_x86_internal_assembler := !X86_proc.internal_assembler;
+    let saved = !X86_proc.internal_assembler in
     X86_proc.register_internal_assembler (fun ~delayed:_ sections _filename ->
         (* Assemble each section *)
         let sections_map =
@@ -64,7 +60,7 @@ let register callback =
               let name_str = X86_proc.Section_name.to_string name in
               let section =
                 { X86_binary_emitter.sec_name = name_str;
-                  sec_instrs = Array.of_list instrs
+                  sec_instrs = DLL.to_array instrs
                 }
               in
               let binary_section =
@@ -81,19 +77,9 @@ let register callback =
               sections = sections_map
             }
         in
-        callback packed)
+        callback packed);
+    Fun.protect ~finally:(fun () -> X86_proc.internal_assembler := saved) f
   | AArch64 ->
     (* ARM64 binary emitter JIT support not yet available *)
     Misc.fatal_error "JIT not yet supported on AArch64"
-  | _ -> Misc.fatal_error "JIT not supported on this architecture"
-
-let unregister () =
-  current_callback := None;
-  match Target_system.architecture () with
-  | X86_64 ->
-    X86_proc.internal_assembler := !saved_x86_internal_assembler;
-    saved_x86_internal_assembler := None
-  | AArch64 ->
-    (* ARM64 binary emitter JIT support not yet available *)
-    ()
   | _ -> Misc.fatal_error "JIT not supported on this architecture"

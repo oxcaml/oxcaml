@@ -1668,17 +1668,19 @@ module For_jit = struct
       | [sym; suffix] -> sym, Some suffix
       | _ -> label, None
 
+    (* Extract label and addend from a relocation kind *)
+    let label_and_addend (r : Reloc.t) =
+      match r.Reloc.kind with
+      | Kind.REL32 (label, addend)
+      | Kind.DIR32 (label, addend)
+      | Kind.DIR64 (label, addend) ->
+        label, addend
+
     let string_to_target name : Binary_emitter_intf.target =
       Binary_emitter_intf.Symbol (Asm_symbol.create_global name)
 
     let target_symbol (r : Reloc.t) : Binary_emitter_intf.target =
-      let label =
-        match r.Reloc.kind with
-        | Kind.REL32 (label, _)
-        | Kind.DIR32 (label, _)
-        | Kind.DIR64 (label, _) ->
-          label
-      in
+      let label, _ = label_and_addend r in
       let sym, _ = parse_label label in
       string_to_target sym
 
@@ -1688,35 +1690,17 @@ module For_jit = struct
     (* x86 doesn't have paired relocations, so this just returns a singleton
        with the addend from the relocation *)
     let target_symbols_with_addends (r : Reloc.t) =
-      let label, addend =
-        match r.Reloc.kind with
-        | Kind.REL32 (label, addend)
-        | Kind.DIR32 (label, addend)
-        | Kind.DIR64 (label, addend) ->
-          label, addend
-      in
+      let label, addend = label_and_addend r in
       let sym, _ = parse_label label in
       [string_to_target sym, Int64.to_int addend]
 
     let is_got_reloc (r : Reloc.t) =
-      let label =
-        match r.Reloc.kind with
-        | Kind.REL32 (label, _)
-        | Kind.DIR32 (label, _)
-        | Kind.DIR64 (label, _) ->
-          label
-      in
+      let label, _ = label_and_addend r in
       let _, suffix = parse_label label in
       match suffix with Some "GOTPCREL" -> true | _ -> false
 
     let is_plt_reloc (r : Reloc.t) =
-      let label =
-        match r.Reloc.kind with
-        | Kind.REL32 (label, _)
-        | Kind.DIR32 (label, _)
-        | Kind.DIR64 (label, _) ->
-          label
-      in
+      let label, _ = label_and_addend r in
       let _, suffix = parse_label label in
       match suffix with Some "PLT" -> true | _ -> false
 
@@ -1725,15 +1709,19 @@ module For_jit = struct
       | Binary_emitter_intf.Symbol sym -> Asm_symbol.print ppf sym
       | Binary_emitter_intf.Label lbl -> Asm_label.print ppf lbl
 
+    (* Check if a value fits in a signed 32-bit range *)
+    let fits_in_signed_32 value =
+      let min_val = Int64.neg 0x80000000L in
+      let max_val = 0x7FFFFFFFL in
+      Int64.compare value min_val >= 0 && Int64.compare value max_val <= 0
+
+    (* Check if a value fits in an unsigned 32-bit range *)
+    let fits_in_unsigned_32 value =
+      Int64.compare value 0L >= 0 && Int64.compare value 0xFFFFFFFFL <= 0
+
     let compute_value (r : Reloc.t) ~place_address ~lookup_target
         ~read_instruction:_ =
-      let label, addend =
-        match r.Reloc.kind with
-        | Kind.REL32 (label, addend)
-        | Kind.DIR32 (label, addend)
-        | Kind.DIR64 (label, addend) ->
-          label, addend
-      in
+      let label, addend = label_and_addend r in
       let sym, _ = parse_label label in
       let target = string_to_target sym in
       match lookup_target target with
@@ -1743,13 +1731,34 @@ module For_jit = struct
         let target_addr = Int64.add target_addr addend in
         (match r.Reloc.kind with
         | Kind.REL32 _ ->
-          (* Relative: compute offset from place to target *)
+          (* Relative: compute offset from place to target. The addend stored
+             in the relocation is relative to the end of the instruction (where
+             PC points after fetching), so we add rel_size to place_address.
+             Note: relocation_entry.ml subtracts 4 from the addend when creating
+             ELF relocations because ELF's R_X86_64_PLT32 semantics compute
+             S + A - P (where P is the relocation site, not PC). That subtraction
+             is only for ELF object file generation, not for JIT linking. *)
           let rel_size = 4L in
-          (* REL32 is 4 bytes *)
           let src_addr = Int64.add place_address rel_size in
-          Ok (Int64.sub target_addr src_addr)
-        | Kind.DIR32 _ | Kind.DIR64 _ ->
-          (* Absolute: just use the target address *)
+          let value = Int64.sub target_addr src_addr in
+          if fits_in_signed_32 value then Ok value
+          else
+            Error
+              (Format.asprintf
+                 "REL32 relocation value 0x%Lx doesn't fit in signed 32-bit \
+                  range for symbol %a"
+                 value print_target target)
+        | Kind.DIR32 _ ->
+          (* Absolute 32-bit: must fit in unsigned 32-bit range *)
+          if fits_in_unsigned_32 target_addr then Ok target_addr
+          else
+            Error
+              (Format.asprintf
+                 "DIR32 relocation value 0x%Lx doesn't fit in unsigned 32-bit \
+                  range for symbol %a"
+                 target_addr print_target target)
+        | Kind.DIR64 _ ->
+          (* Absolute 64-bit: any value fits *)
           Ok target_addr)
   end
 

@@ -24,6 +24,14 @@ let out_of_text_error ~got_or_plt ~section_name =
 
 type table_lookup = string -> Address.t option
 
+(* Note: The old x86-specific code had an "unauthorized_absolute_reloc" check
+   for GOT/PLT relocations. In the architecture-independent code, this is no
+   longer needed because:
+   - On x86, is_got_reloc/is_plt_reloc only return true for REL32 relocations
+     (which are always relative) since they check for @GOTPCREL/@PLT suffixes
+   - On ARM64, GOT/PLT-like relocations are handled differently with page+offset
+   The validation of relocation types is now done by E.Relocation.compute_value
+   which returns an error if the computed value doesn't fit. *)
 let one (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a

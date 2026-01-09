@@ -305,14 +305,9 @@ let jit_load_lambda ~phrase_name ppf (program : Lambda.program) =
 
 let jit_load_program ~phrase_name ppf program =
   set_debug ();
-  Jit_backend.register (jit_callback ~phrase_name ~outcome_ref:outcome_global);
-  match jit_load_lambda ~phrase_name ppf program with
-  | result ->
-    Jit_backend.unregister ();
-    result
-  | exception exn ->
-    Jit_backend.unregister ();
-    raise exn
+  Jit_backend.with_jit
+    (jit_callback ~phrase_name ~outcome_ref:outcome_global)
+    (fun () -> jit_load_lambda ~phrase_name ppf program)
 
 let jit_lookup_symbol symbol =
   (* Try with symbol prefix first (e.g., "_" on macOS) *)

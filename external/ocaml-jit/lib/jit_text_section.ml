@@ -55,7 +55,8 @@ let in_memory_size (type a r)
        and type Relocation.t = r)
     (t : (a, _) t) =
   let section_size = E.Assembled_section.size t.binary_section in
-  (* Round up to 8-byte alignment for GOT entries *)
+  (* Round up to 8-byte alignment for GOT entries. This is required for ARM64's
+     LDR instruction which needs 8-byte aligned addresses. Harmless on x86. *)
   let aligned_section_size = (section_size + 7) land (lnot 7) in
   aligned_section_size
   + Bin_table.in_memory_size t.got
@@ -68,7 +69,7 @@ let relocate (type a r)
     ~symbols (t : (a, need_reloc) t addressed) =
   let open Result.Op in
   let section_size = E.Assembled_section.size t.value.binary_section in
-  (* Round up to 8-byte alignment for GOT entries (required for LDR x) *)
+  (* Round up to 8-byte alignment for GOT entries. Required for ARM64's LDR. *)
   let aligned_section_size = (section_size + 7) land (lnot 7) in
   let got_address = Address.add_int t.address aligned_section_size in
   let got = Bin_table.fill symbols t.value.got in
@@ -98,7 +99,7 @@ let content (type a r)
     (t : (a, relocated) t) =
   let section_content = E.Assembled_section.contents t.binary_section in
   let section_size = String.length section_content in
-  (* Add padding bytes to align GOT to 8 bytes *)
+  (* Add padding bytes to align GOT to 8 bytes. Required for ARM64's LDR. *)
   let aligned_section_size = (section_size + 7) land (lnot 7) in
   let padding_size = aligned_section_size - section_size in
   let padding = String.make padding_size '\x00' in

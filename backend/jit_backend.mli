@@ -45,10 +45,9 @@ type packed_sections =
 
 type callback = packed_sections -> unit
 
-(** Register a JIT callback. When code is generated, the callback will be
-    invoked with the assembled sections packed with their emitter module.
+(** Execute [f] with a JIT callback installed. When code is generated during
+    the execution of [f], the callback will be invoked with the assembled
+    sections packed with their emitter module. The internal assembler state
+    is properly restored after [f] completes (even if it raises an exception).
     This handles architecture dispatch internally. *)
-val register : callback -> unit
-
-(** Unregister the JIT callback and restore previous state. *)
-val unregister : unit -> unit
+val with_jit : callback -> (unit -> 'a) -> 'a
