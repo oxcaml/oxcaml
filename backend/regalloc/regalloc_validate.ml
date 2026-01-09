@@ -600,6 +600,11 @@ end = struct
     (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
       when Stdlib.compare prim1 prim2 = 0 ->
       compare_label l1 l2
+    | ( Invalid { op = inv1; label_after = l1 },
+        Invalid { op = inv2; label_after = l2 } )
+    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
+      when Stdlib.compare inv1 inv2 = 0 ->
+      compare_label l1 l2
     | _ ->
       Regalloc_utils.fatal
         "The desc of terminator with id %a changed, before: %a, after: %a."

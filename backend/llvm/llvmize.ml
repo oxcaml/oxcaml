@@ -808,6 +808,12 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
     | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
       extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
       br_label t label_after)
+  | Invalid
+      { op = { message = _; symbol = _; stack_ofs; stack_align };
+        label_after = _ } ->
+    extcall t i ~func_symbol:Cmm.caml_flambda2_invalid ~alloc:false ~stack_ofs
+      ~stack_align;
+    emit_ins_no_res t I.unreachable
 
 (* Basic instructions *)
 

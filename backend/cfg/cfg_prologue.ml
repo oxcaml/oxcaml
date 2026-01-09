@@ -68,7 +68,7 @@ module Instruction_requirements = struct
          need a prologue. *)
       | Call _ | Call_no_return _
       | Raise (Raise_regular | Raise_reraise)
-      | Prim { op = External _ | Probe _; _ } ->
+      | Prim { op = External _ | Probe _; _ } | Invalid _ ->
         Requires_prologue
       | Tailcall_func (Direct _)
       | Tailcall_self _
