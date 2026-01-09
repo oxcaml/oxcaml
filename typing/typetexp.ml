@@ -174,8 +174,7 @@ module TyVarEnv : sig
     poly_univars -> (string * Parsetree.jkind_annotation option) list
   (* something suitable as an argument to [Ttyp_poly] *)
 
-  val ttyp_repr_arg :
-    poly_univars -> string list
+  val ttyp_repr_arg : poly_univars -> string list
   (* something suitable as an argument to [Ttyp_repr] *)
 
   val make_poly_univars :
@@ -375,6 +374,10 @@ end = struct
       (fun (name, pending_univar, _stage) ->
         name,
         Jkind.get_annotation pending_univar.jkind_info.original_jkind)
+      poly_univars
+
+  let ttyp_repr_arg (poly_univars : poly_univars) = List.map
+      (fun (name, _pending_univar, _stage) -> name)
       poly_univars
 
   let mk_pending_univar name jkind jkind_info =
@@ -1297,7 +1300,7 @@ and transl_type_repr env ~policy ~row_context mode loc vars st =
     with_local_level begin fun () ->
       let vars = List.map (fun n -> (n, Env.stage env)) vars in
       let new_univars = transl_bound_repr_vars vars in
-      let typed_vars = TyVarEnv.ttyp_poly_arg new_univars in
+      let typed_vars = TyVarEnv.ttyp_repr_arg new_univars in
       let cty = TyVarEnv.with_univars new_univars begin fun () ->
         transl_type env ~policy ~row_context mode st
       end in
