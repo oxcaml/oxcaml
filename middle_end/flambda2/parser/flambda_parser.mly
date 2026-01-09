@@ -64,47 +64,24 @@ let make_boxed_const_int (i, m) : static_data =
 %token COMMA [@symbol ","]
 %token DOT   [@symbol "."]
 %token EQUAL [@symbol "="]
-%token EQUALDOT [@symbol "=."]
 %token <float> FLOAT
-%token GREATER [@symbol ">"]
-%token GREATEREQUAL [@symbol ">="]
-%token GREATERDOT [@symbol ">."]
-%token GREATEREQUALDOT [@symbol ">"]
 %token <string> IDENT
 %token <string * char option> INT
 %token LBRACE [@symbol "{"]
 %token LBRACK [@symbol "["]
 %token LBRACKPIPE [@symbol "[|"]
-%token LESS   [@symbol "<"]
-%token LESSDOT [@symbol "<."]
-%token LESSEQUAL [@symbol "<="]
-%token LESSEQUALDOT [@symbol "<=."]
-%token LESSMINUS [@symbol "<-"]
 %token LPAREN [@symbol "("]
-%token MINUS    [@symbol "-"]
-%token MINUSDOT [@symbol "-."]
 %token MINUSGREATER [@symbol "->"]
-%token NOTEQUAL [@symbol "<>"]
-%token NOTEQUALDOT [@symbol "<>."]
-%token QMARK [@symbol "?"]
-%token QMARKDOT [@symbol "?."]
 %token PIPE [@symbol "|"]
-%token PERCENT [@symbol "%"]
-%token PLUS     [@symbol "+"]
-%token PLUSDOT  [@symbol "+."]
 %token RBRACE [@symbol "}"]
 %token RBRACK [@symbol "]"]
 %token RBRACKPIPE [@symbol "|]"]
 %token RPAREN [@symbol ")"]
 %token SEMICOLON [@symbol ";"]
-%token SLASH  [@symbol "/"]
-%token SLASHDOT [@symbol "/."]
 %token STAR   [@symbol "*"]
-%token STARDOT [@symbol "*."]
 %token<string> STRING
 %token<Fexpr.compilation_unit option * string> SYMBOL
 %token TILDE [@symbol "~"]
-%token TILDEMINUS [@symbol "~-"]
 %token EOF
 
 %token KWD_ALWAYS [@symbol "always"]
@@ -113,10 +90,8 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_ANY   [@symbol "any"]
 %token KWD_APPLY [@symbol "apply"]
 %token KWD_ARRAY [@symbol "array"]
-%token KWD_ASR   [@symbol "asr"]
 %token KWD_AVAILABLE [@symbol "available"]
 %token KWD_BOXED [@symbol "boxed"]
-%token KWD_BSWAP [@symbol "bswap"]
 %token KWD_CCALL  [@symbol "ccall"]
 %token KWD_CLOSURE  [@symbol "closure"]
 %token KWD_CODE  [@symbol "code"]
@@ -133,10 +108,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_EXN   [@symbol "exn"]
 %token KWD_REGION [@symbol "region"]
 %token KWD_FLOAT [@symbol "float"]
-%token KWD_GENERIC [@symbol "generic"]
 %token KWD_HCF   [@symbol "halt_and_catch_fire"]
-%token KWD_GC_IGNORABLE [@symbol "gc_ignorable"]
-%token KWD_HEAP_OR_LOCAL [@symbol "heap_or_local"]
 %token KWD_HINT  [@symbol "hint"]
 %token KWD_ID    [@symbol "id"]
 %token KWD_IMM   [@symbol "imm" ]
@@ -149,14 +121,9 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_INT32 [@symbol "int32"]
 %token KWD_INT64 [@symbol "int64"]
 %token KWD_INVALID [@symbol "invalid"]
-%token KWD_LAND  [@symbol "land"]
 %token KWD_LET   [@symbol "let"]
 %token KWD_LOCAL [@symbol "local"]
 %token KWD_LOOPIFY [@symbol "loopify"]
-%token KWD_LOR   [@symbol "lor"]
-%token KWD_LSL   [@symbol "lsl"]
-%token KWD_LSR   [@symbol "lsr"]
-%token KWD_LXOR  [@symbol "lxor"]
 %token KWD_MUTABLE [@symbol "mutable"]
 %token KWD_NATIVEINT [@symbol "nativeint"]
 %token KWD_NEVER  [@symbol "never"]
@@ -174,7 +141,6 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_SIZE   [@symbol "size"]
 %token KWD_SUCC   [@symbol "succ"]
 %token KWD_SWITCH [@symbol "switch"]
-%token KWD_TAG    [@symbol "tag"]
 %token KWD_TAGGED [@symbol "tagged"]
 %token KWD_TAILREC [@symbol "tailrec"]
 %token KWD_TOPLEVEL [@symbol "toplevel"]
@@ -182,57 +148,11 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_UNIT   [@symbol "unit"]
 %token KWD_UNREACHABLE [@symbol "unreachable"]
 %token KWD_UNROLL [@symbol "unroll"]
-%token KWD_UNSIGNED [@symbol "unsigned"]
 %token KWD_VAL    [@symbol "val"]
 %token KWD_WHERE  [@symbol "where"]
 %token KWD_WITH   [@symbol "with"]
-%token KWD_VEC128 [@symbol "vec128"]
 
-%token PRIM_ARRAY_LENGTH [@symbol "%array_length"]
-%token PRIM_ARRAY_LOAD [@symbol "%array_load"]
-%token PRIM_ARRAY_SET [@symbol "%array_set"]
-%token PRIM_BEGIN_REGION [@symbol "%begin_region"]
-%token PRIM_BEGIN_GHOST_REGION [@symbol "%begin_ghost_region"]
-%token PRIM_BEGIN_TRY_REGION [@symbol "%begin_try_region"]
-%token PRIM_BEGIN_GHOST_TRY_REGION [@symbol "%begin_ghost_try_region"]
-%token PRIM_BIGSTRING_LOAD [@symbol "%bigstring_load"]
-%token PRIM_BIGSTRING_SET [@symbol "%bigstring_set"]
-%token PRIM_BLOCK [@symbol "%Block"]
-%token PRIM_BLOCK_LOAD [@symbol "%block_load"]
-%token PRIM_BLOCK_SET [@symbol "%block_set"]
-%token PRIM_BOOLEAN_NOT [@symbol "%not"]
-%token PRIM_BOX_FLOAT [@symbol "%Box_float"]
-%token PRIM_BOX_INT32 [@symbol "%Box_int32"]
-%token PRIM_BOX_INT64 [@symbol "%Box_int64"]
-%token PRIM_BOX_NATIVEINT [@symbol "%Box_nativeint"]
-%token PRIM_BYTES_LENGTH [@symbol "%bytes_length"]
-%token PRIM_BYTES_LOAD [@symbol "%bytes_load"]
-%token PRIM_BYTES_SET [@symbol "%bytes_set"]
-%token PRIM_END_REGION [@symbol "%end_region"]
-%token PRIM_END_GHOST_REGION [@symbol "%end_ghost_region"]
-%token PRIM_END_TRY_REGION [@symbol "%end_try_region"]
-%token PRIM_END_GHOST_TRY_REGION [@symbol "%end_ghost_try_region"]
-%token PRIM_GET_TAG [@symbol "%get_tag"]
-%token PRIM_INT_ARITH [@symbol "%int_arith"]
-%token PRIM_INT_COMP [@symbol "%int_comp"]
-%token PRIM_INT_SHIFT [@symbol "%int_shift"]
-%token PRIM_IS_FLAT_FLOAT_ARRAY [@symbol "%is_flat_float_array"]
-%token PRIM_IS_INT [@symbol "%is_int"]
-%token PRIM_NUM_CONV [@symbol "%num_conv"]
-%token PRIM_OPAQUE [@symbol "%Opaque"]
-%token PRIM_PHYS_EQ [@symbol "%phys_eq"]
-%token PRIM_PHYS_NE [@symbol "%phys_ne"]
-%token PRIM_PROJECT_VALUE_SLOT [@symbol "%project_value_slot"]
-%token PRIM_PROJECT_FUNCTION_SLOT [@symbol "%project_function_slot"]
-%token PRIM_STRING_LENGTH [@symbol "%string_length"]
-%token PRIM_STRING_LOAD [@symbol "%string_load"]
-%token PRIM_TAG_IMM [@symbol "%tag_imm"]
-%token PRIM_UNBOX_FLOAT [@symbol "%unbox_float"]
-%token PRIM_UNBOX_INT32 [@symbol "%unbox_int32"]
-%token PRIM_UNBOX_INT64 [@symbol "%unbox_int64"]
-%token PRIM_UNBOX_NATIVEINT [@symbol "%unbox_nativeint"]
-%token PRIM_UNBOX_VEC128 [@symbol "%unbox_vec128"]
-%token PRIM_UNTAG_IMM [@symbol "%untag_imm"]
+%token<string> PRIM
 
 %token STATIC_CONST_BLOCK [@symbol "Block"]
 %token STATIC_CONST_VALUE_ARRAY [@symbol "Value_array"]
@@ -243,24 +163,14 @@ let make_boxed_const_int (i, m) : static_data =
 %start flambda_unit expect_test_spec
 %type <Fexpr.alloc_mode_for_allocations> alloc_mode_for_allocations_opt
 %type <Fexpr.alloc_mode_for_applications> alloc_mode_for_applications_opt
-%type <Fexpr.array_kind> array_kind
-%type <Fexpr.array_kind_for_length> array_kind_for_length
 %type <Fexpr.empty_array_kind> empty_array_kind
-%type <Fexpr.binary_float_arith_op> binary_float_arith_op
-%type <Fexpr.binary_int_arith_op> binary_int_arith_op
-%type <Fexpr.block_access_field_kind> block_access_field_kind
 %type <Fexpr.const> const
 %type <Fexpr.continuation> continuation
-%type <Fexpr.standard_int_or_float> convertible_type
 %type <Fexpr.expect_test_spec> expect_test_spec
 %type <Fexpr.field_of_block> field_of_block
 %type <Fexpr.flambda_unit> flambda_unit
-%type <unit Fexpr.comparison_behaviour> float_comp
 %type <Fexpr.continuation_sort option> continuation_sort
 %type <float Fexpr.or_variable> float_or_variable
-%type <Fexpr.infix_binop> infix_binop
-%type <Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour> int_comp
-(* %type <Fexpr.kind> kind *)
 %type <Fexpr.kind_with_subkind> kind_with_subkind
 %type <Fexpr.kind_with_subkind list> kinds_with_subkinds
 %type <Fexpr.loopify_attribute> loopify
@@ -271,15 +181,12 @@ let make_boxed_const_int (i, m) : static_data =
 %type <Fexpr.rec_info> rec_info_atom
 %type <Fexpr.region> region
 %type <Fexpr.special_continuation> special_continuation
-%type <Fexpr.standard_int> standard_int
 %type <Fexpr.static_data> static_data
 %type <Fexpr.static_data_binding> static_data_binding
 %type <Fexpr.subkind> subkind
 %type <Fexpr.kind_with_subkind list> kinds_with_subkinds_nonempty
 %type <Fexpr.variable -> Fexpr.static_data> static_data_kind
 %type <Fexpr.symbol_binding> symbol_binding
-%type <Fexpr.unary_int_arith_op> unary_int_arith_op
-%type <Fexpr.unop> unop
 %type <Fexpr.is_recursive> recursive
 %type <Fexpr.is_cont_recursive> cont_recursive
 %%
@@ -388,147 +295,13 @@ recursive:
   | KWD_REC { Recursive }
 ;
 
-unary_int_arith_op:
-  | KWD_BSWAP { Swap_byte_endianness }
-
-unop:
-  | PRIM_ARRAY_LENGTH; kind = array_kind_for_length { Array_length kind }
-  | PRIM_BOOLEAN_NOT { Boolean_not }
-  | PRIM_BOX_FLOAT; alloc = alloc_mode_for_allocations_opt
-    { Box_number (Naked_float, alloc) }
-  | PRIM_BOX_INT32; alloc = alloc_mode_for_allocations_opt
-    { Box_number (Naked_int32, alloc) }
-  | PRIM_BOX_INT64; alloc = alloc_mode_for_allocations_opt
-    { Box_number (Naked_int64, alloc) }
-  | PRIM_BOX_NATIVEINT; alloc = alloc_mode_for_allocations_opt
-    { Box_number (Naked_nativeint, alloc) }
-  | PRIM_BYTES_LENGTH { String_length Bytes }
-  | PRIM_END_REGION { End_region { ghost = false } }
-  | PRIM_END_GHOST_REGION { End_region { ghost = true } }
-  | PRIM_END_TRY_REGION { End_try_region { ghost = false } }
-  | PRIM_END_GHOST_TRY_REGION { End_try_region { ghost = true } }
-  | PRIM_GET_TAG { Get_tag }
-  | PRIM_IS_FLAT_FLOAT_ARRAY { Is_flat_float_array }
-  | PRIM_IS_INT { Is_int }
-  | PRIM_INT_ARITH; i = standard_int; o = unary_int_arith_op
-    { Int_arith (i, o) }
-  | PRIM_NUM_CONV; LPAREN;
-      src = convertible_type; MINUSGREATER; dst = convertible_type;
-    RPAREN
-    { Num_conv { src; dst } }
-  | PRIM_OPAQUE { Opaque_identity }
-  | PRIM_PROJECT_VALUE_SLOT; project_from = function_slot; DOT; value_slot = value_slot_for_projection
-    { Project_value_slot { project_from; value_slot } }
-  | PRIM_PROJECT_FUNCTION_SLOT; LPAREN;
-      move_from = function_slot; MINUSGREATER; move_to = function_slot;
-    RPAREN
-    { Project_function_slot { move_from; move_to } }
-  | PRIM_STRING_LENGTH { String_length String }
-  | PRIM_TAG_IMM { Tag_immediate }
-  | PRIM_UNBOX_FLOAT { Unbox_number Naked_float }
-  | PRIM_UNBOX_INT32 { Unbox_number Naked_int32 }
-  | PRIM_UNBOX_INT64 { Unbox_number Naked_int64 }
-  | PRIM_UNBOX_NATIVEINT { Unbox_number Naked_nativeint }
-  | PRIM_UNBOX_VEC128 { Unbox_number Naked_vec128 }
-  | PRIM_UNTAG_IMM { Untag_immediate }
-  | PRIM_BLOCK_LOAD;
-    mut = mutability;
-    kind = block_access_kind;
-    LPAREN; field = tag; RPAREN;
-    { (* CR mshinwell: Should get machine_width from fexpr context when
-         available *)
-      let mw = Target_system.Machine_width.Sixty_four in
-      Block_load { kind; mut; field = Target_ocaml_int.of_int mw field } }
-
-infix_binop:
-  | o = binary_int_arith_op { Int_arith o }
-  | c = int_comp { Int_comp (c Signed) }
-  | s = int_shift { Int_shift s }
-  | o = binary_float_arith_op { Float_arith (Float64, o) }
-  | c = float_comp { Float_comp (Float64, c) }
-;
-
-prefix_binop:
-  | PRIM_BIGSTRING_LOAD;
-    saw = string_accessor_width;
-    { String_or_bigstring_load (Bigstring, saw) }
-  | PRIM_BYTES_LOAD;
-    saw = string_accessor_width;
-    { String_or_bigstring_load (Bytes, saw) }
-  | PRIM_STRING_LOAD;
-    saw = string_accessor_width;
-    { String_or_bigstring_load (String, saw) }
-  | PRIM_PHYS_EQ { Phys_equal Eq }
-  | PRIM_PHYS_NE { Phys_equal Neq }
-
 mutability:
   | KWD_MUTABLE { Mutable }
   | KWD_IMMUTABLE_UNIQUE { Immutable_unique }
   | { Immutable }
 
-string_accessor_width:
-  | i = INT
-    { let (i,c) = i in
-      match int_of_string i, c with
-      | 8, None -> Eight
-      | 16, None -> Sixteen
-      | 32, None -> Thirty_two
-      | 64, None -> Sixty_four
-      | 128, Some 'a' -> One_twenty_eight {aligned = true}
-      | 128, Some 'u' -> One_twenty_eight {aligned = false}
-      | 256, Some 'a' -> Two_fifty_six {aligned = true}
-      | 256, Some 'u' -> Two_fifty_six {aligned = false}
-      | 512, Some 'a' -> Five_twelve {aligned = true}
-      | 512, Some 'u' -> Five_twelve {aligned = false}
-      | _, _ -> Misc.fatal_error "invalid string accessor width" }
-
-array_kind:
-  | { (Values : array_kind) }
-  | KWD_IMM { (Immediates : array_kind) }
-  | KWD_FLOAT { (Naked_floats : array_kind) }
-  | KWD_GC_IGNORABLE { (Gc_ignorable_values : array_kind) }
-
-array_kind_for_length:
-  | kind = array_kind { Array_kind kind }
-  | KWD_GENERIC { Float_array_opt_dynamic }
-
 empty_array_kind:
   | { Values_or_immediates_or_naked_floats }
-
-block_access_kind:
-  | field_kind = block_access_field_kind; tag = tag_opt; size = size_opt
-    { (Values { field_kind; tag; size } : block_access_kind) }
-  | KWD_FLOAT; size = size_opt
-    { (Naked_floats { size } : block_access_kind) }
-;
-
-block_access_field_kind:
-  | { Any_value }
-  | KWD_IMM { Immediate }
-
-size_opt:
-  | { None }
-  | KWD_SIZE; LPAREN; size = targetint; RPAREN { Some size }
-
-standard_int:
-  | { Tagged_immediate }
-  | KWD_IMM { Naked_immediate }
-  | KWD_INT32 { Naked_int32 }
-  | KWD_INT64 { Naked_int64 }
-  | KWD_NATIVEINT { Naked_nativeint }
-
-convertible_type:
-  | KWD_IMM KWD_TAGGED { Tagged_immediate }
-  | KWD_IMM { Naked_immediate }
-  | KWD_FLOAT { Naked_float }
-  | KWD_INT32 { Naked_int32 }
-  | KWD_INT64 { Naked_int64 }
-  | KWD_NATIVEINT { Naked_nativeint }
-
-init_or_assign:
-  | EQUAL { Initialization }
-  | LESSMINUS { Assignment Heap }
-  | LESSMINUS AMP { Assignment Local }
 
 alloc_mode_for_allocations_opt:
   | { Heap }
@@ -538,158 +311,22 @@ alloc_mode_for_applications_opt:
   | { Heap }
   | AMP; region = region; AMP; ghost_region = region { Local { region; ghost_region } }
 
-signed_or_unsigned:
-  | { Signed }
-  | KWD_UNSIGNED { Unsigned }
+prim_param_val:
+  | i = IDENT { make_located i ($startpos, $endpos) }
+  | i = INT { make_located (fst i) ($startpos, $endpos)}
 
-binary_int_arith_op:
-  | PLUS { Add }
-  | MINUS { Sub }
-  | STAR { Mul }
-  | SLASH { Div }
-  | PERCENT { Mod }
-  | KWD_LAND { And }
-  | KWD_LOR { Or }
-  | KWD_LXOR { Xor }
+prim_param:
+  | DOT flag = IDENT { Flag flag }
+  | DOT LBRACK p = prim_param_val RBRACK
+    { Positional p }
+  | DOT label = IDENT LBRACK value = prim_param_val RBRACK
+    { Labeled { label; value } }
 
-binary_float_arith_op:
-  | PLUSDOT { Add }
-  | MINUSDOT { Sub }
-  | STARDOT { Mul }
-  | SLASHDOT { Div }
-
-int_comp:
-  | LESS { fun s -> Yielding_bool (Lt s) }
-  | GREATER { fun s -> Yielding_bool (Gt s) }
-  | LESSEQUAL { fun s -> Yielding_bool (Le s) }
-  | GREATEREQUAL { fun s -> Yielding_bool (Ge s) }
-  | EQUAL { fun _ -> Yielding_bool Eq }
-  | NOTEQUAL { fun _ -> Yielding_bool Neq }
-  | QMARK { fun s -> Yielding_int_like_compare_functions s }
-
-float_comp:
-  | EQUALDOT { Yielding_bool Eq }
-  | NOTEQUALDOT { Yielding_bool Neq }
-  | LESSDOT { Yielding_bool ( Lt ()) }
-  | GREATERDOT { Yielding_bool ( Gt ()) }
-  | LESSEQUALDOT { Yielding_bool (Le()) }
-  | GREATEREQUALDOT { Yielding_bool (Ge ()) }
-  | QMARKDOT { (Yielding_int_like_compare_functions ()) }
-;
-
-int_shift:
-  | KWD_LSL { Lsl }
-  | KWD_LSR { Lsr }
-  | KWD_ASR { Asr }
-;
-
-binop_app:
-  | PRIM_BLOCK_SET;
-    kind = block_access_kind;
-    block = simple; DOT;
-    LPAREN; field = tag; RPAREN;
-    init = init_or_assign;
-    v = simple;
-    { (* CR mshinwell: pass machine width through properly *)
-      let mw = Target_system.Machine_width.Sixty_four in
-      let field = Target_ocaml_int.of_int mw field in
-      Binary (Block_set { kind; init; field }, block, v) }
-           (* TODO: Should get machine_width from fexpr context *)
-  | op = prefix_binop; LPAREN; arg1 = simple; COMMA; arg2 = simple; RPAREN
-    { Binary (op, arg1, arg2) }
-  | arg1 = simple; op = infix_binop; arg2 = simple
-    { Binary (Infix op, arg1, arg2) }
-  | PRIM_ARRAY_LOAD; ak = array_kind; mut = mutability;
-    arg1 = simple; DOT;
-    LPAREN; arg2 = simple; RPAREN
-    {
-    let array_load_kind : array_load_kind =
-      match ak with
-      | Immediates -> Immediates
-      | Gc_ignorable_values -> Gc_ignorable_values
-      | Values -> Values
-      | Naked_floats -> Naked_floats
-      | Naked_float32s -> Naked_float32s
-      | Naked_ints -> Naked_ints
-      | Naked_int8s -> Naked_int8s
-      | Naked_int16s -> Naked_int16s
-      | Naked_int32s -> Naked_int32s
-      | Naked_int64s -> Naked_int64s
-      | Naked_nativeints -> Naked_nativeints
-      | Naked_vec128s -> Naked_vec128s
-      | Naked_vec256s -> Naked_vec256s
-      | Naked_vec512s -> Naked_vec512s
-      | Unboxed_product _ ->
-        Misc.fatal_error "Unboxed product array ops not supported"
-    in
-    Binary (Array_load (ak, array_load_kind, mut), arg1, arg2) }
-  | PRIM_INT_ARITH; i = standard_int;
-    arg1 = simple; c = binary_int_arith_op; arg2 = simple
-    { Binary (Int_arith (i, c), arg1, arg2) }
-  | PRIM_INT_COMP;
-    i = standard_int; s = signed_or_unsigned;
-    arg1 = simple; c = int_comp; arg2 = simple
-    { Binary (Int_comp (i, c s), arg1, arg2) }
-  | PRIM_INT_SHIFT;
-    i = standard_int; arg1 = simple; s = int_shift; arg2 = simple
-    { Binary (Int_shift (i, s), arg1, arg2) }
-;
-
-bytes_or_bigstring_set:
-  | PRIM_BYTES_SET { Bytes }
-  | PRIM_BIGSTRING_SET { Bigstring }
-
-ternop_app:
-  | PRIM_ARRAY_SET; ak = array_kind;
-    arr = simple; DOT LPAREN; ix = simple; RPAREN; ia = init_or_assign;
-    v = simple
-    {
-      let array_set_kind : array_set_kind =
-        match ak with
-        | Immediates -> Immediates
-        | Gc_ignorable_values -> Gc_ignorable_values
-        | Values -> Values ia
-        | Naked_floats -> Naked_floats
-        | Naked_float32s -> Naked_float32s
-        | Naked_ints -> Naked_ints
-        | Naked_int8s -> Naked_int8s
-        | Naked_int16s -> Naked_int16s
-        | Naked_int32s -> Naked_int32s
-        | Naked_int64s -> Naked_int64s
-        | Naked_nativeints -> Naked_nativeints
-        | Naked_vec128s -> Naked_vec128s
-        | Naked_vec256s -> Naked_vec256s
-        | Naked_vec512s -> Naked_vec512s
-        | Unboxed_product _ ->
-          Misc.fatal_error "Unboxed product array ops not supported"
-      in
-      Ternary (Array_set (ak, array_set_kind), arr, ix, v)
-    }
-  | blv = bytes_or_bigstring_set; saw = string_accessor_width;
-    block = simple; DOT LPAREN; ix = simple; RPAREN; v = simple
-    { Ternary (Bytes_or_bigstring_set (blv, saw), block, ix, v) }
-;
-
-begin_region:
-  | PRIM_BEGIN_REGION { Begin_region { ghost = false } }
-  | PRIM_BEGIN_GHOST_REGION { Begin_region { ghost = true } }
-  | PRIM_BEGIN_TRY_REGION { Begin_try_region { ghost = false } }
-  | PRIM_BEGIN_GHOST_TRY_REGION { Begin_try_region { ghost = true } }
-;
-
-block:
-  | r = begin_region { Variadic (r, []) }
-  | PRIM_BLOCK; m = mutability; t = tag; alloc = alloc_mode_for_allocations_opt;
-    LPAREN; elts = separated_list(COMMA, simple); RPAREN
-    { Variadic (Make_block (t, m, alloc), elts) }
-;
+prim_op: prim = PRIM params = prim_param* { { prim; params} }
 
 named:
   | s = simple { Simple s }
-  | u = unop a = simple { Prim (Unary (u, a)) }
-  | b = binop_app { Prim b }
-  | t = ternop_app { Prim t }
-  | b = block { Prim b }
+  | p = prim_op args = simple_args { Prim (p, args) }
   | c = fun_decl { Closure c }
   (* CR lmaurer: This strikes me as a bit ugly, but it's necessary because
      [let x = y] could be assigning either a simple or a rec_info. We could
@@ -1038,11 +675,6 @@ tag:
   tag = INT { make_tag ~loc:(make_loc ($startpos, $endpos)) tag }
 ;
 
-tag_opt:
-  | KWD_TAG LPAREN; tag = tag; RPAREN { Some tag }
-  | { None }
-;
-
 plain_int:
   i = INT { make_plain_int i }
 ;
@@ -1063,7 +695,7 @@ kind_with_subkind_opt:
 
 simple_args:
   | { [] }
-  | LPAREN s = separated_nonempty_list(COMMA, simple); RPAREN { s }
+  | LPAREN s = separated_list(COMMA, simple); RPAREN { s }
 ;
 
 const:

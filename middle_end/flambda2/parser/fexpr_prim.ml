@@ -609,6 +609,7 @@ let array_kind =
            match k with
            | Immediates | Values | Naked_floats | Gc_ignorable_values -> assert false
            | Naked_float32s
+           | Naked_ints | Naked_int8s | Naked_int16s
            | Naked_int32s
            | Naked_int64s
            | Naked_nativeints
@@ -779,6 +780,9 @@ let array_load =
                   | Values -> Values
                   | Naked_floats -> Naked_floats
                   | Naked_float32s -> Naked_float32s
+                  | Naked_ints -> Naked_ints
+                  | Naked_int8s -> Naked_int8s
+                  | Naked_int16s -> Naked_int16s
                   | Naked_int32s -> Naked_int32s
                   | Naked_int64s -> Naked_int64s
                   | Naked_nativeints -> Naked_nativeints
@@ -876,6 +880,9 @@ let array_set =
                   | Gc_ignorable_values -> Gc_ignorable_values
                   | Naked_floats -> Naked_floats
                   | Naked_float32s -> Naked_float32s
+                  | Naked_ints -> Naked_ints
+                  | Naked_int8s -> Naked_int8s
+                  | Naked_int16s -> Naked_int16s
                   | Naked_int32s -> Naked_int32s
                   | Naked_int64s -> Naked_int64s
                   | Naked_nativeints -> Naked_nativeints
@@ -896,7 +903,7 @@ let array_set =
                 | Gc_ignorable_values
                 | Naked_floats
                 | Naked_float32s
-                | Naked_int32s
+                | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
                 | Naked_int64s
                 | Naked_nativeints
                 | Naked_vec128s

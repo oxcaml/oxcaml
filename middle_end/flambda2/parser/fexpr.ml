@@ -106,8 +106,6 @@ type static_data =
   | Mutable_string of { initial_value : string }
   | Immutable_string of string
 
-type kind = Flambda_kind.t
-
 type subkind =
   | Anything
   | Boxed_float32
@@ -182,75 +180,6 @@ type simple =
   | Const of const
   | Coerce of simple * coercion
 
-type array_kind = Flambda_primitive.Array_kind.t =
-  | Immediates
-  | Gc_ignorable_values
-  | Values
-  | Naked_floats
-  | Naked_float32s
-  | Naked_ints
-  | Naked_int8s
-  | Naked_int16s
-  | Naked_int32s
-  | Naked_int64s
-  | Naked_nativeints
-  | Naked_vec128s
-  | Naked_vec256s
-  | Naked_vec512s
-  | Unboxed_product of array_kind list
-
-type box_kind = Flambda_kind.Boxable_number.t =
-  | Naked_float32
-  | Naked_float
-  | Naked_int32
-  | Naked_int64
-  | Naked_nativeint
-  | Naked_vec128
-  | Naked_vec256
-  | Naked_vec512
-
-type generic_array_specialisation =
-  | No_specialisation
-  | Full_of_naked_floats
-  | Full_of_immediates
-  | Full_of_arbitrary_values_but_not_floats
-
-type block_access_field_kind = Flambda_primitive.Block_access_field_kind.t =
-  | Any_value
-  | Immediate
-
-type block_access_kind =
-  | Values of
-      { tag : tag_scannable option;
-        size : targetint option;
-        field_kind : block_access_field_kind
-      }
-  | Naked_floats of { size : targetint option }
-
-type standard_int = Flambda_kind.Standard_int.t =
-  | Tagged_immediate
-  | Naked_immediate
-  | Naked_int8
-  | Naked_int16
-  | Naked_int32
-  | Naked_int64
-  | Naked_nativeint
-
-type standard_int_or_float = Flambda_kind.Standard_int_or_float.t =
-  | Tagged_immediate
-  | Naked_immediate
-  | Naked_float32
-  | Naked_float
-  | Naked_int8
-  | Naked_int16
-  | Naked_int32
-  | Naked_int64
-  | Naked_nativeint
-
-type string_or_bytes = Flambda_primitive.string_or_bytes =
-  | String
-  | Bytes
-
 type alloc_mode_for_allocations =
   | Heap
   | Local of { region : region }
@@ -266,182 +195,14 @@ type alloc_mode_for_assignments =
   | Heap
   | Local
 
-type init_or_assign =
-  | Initialization
-  | Assignment of alloc_mode_for_assignments
+type prim_param =
+  | Labeled of { label : string; value : string located }
+  | Positional of string located
+  | Flag of string
 
-type 'signed_or_unsigned comparison =
-      'signed_or_unsigned Flambda_primitive.comparison =
-  | Eq
-  | Neq
-  | Lt of 'signed_or_unsigned
-  | Gt of 'signed_or_unsigned
-  | Le of 'signed_or_unsigned
-  | Ge of 'signed_or_unsigned
+type prim_op = { prim : string; params: prim_param list }
 
-type equality_comparison = Flambda_primitive.equality_comparison =
-  | Eq
-  | Neq
-
-type signed_or_unsigned = Flambda_primitive.signed_or_unsigned =
-  | Signed
-  | Unsigned
-
-type unary_int_arith_op = Flambda_primitive.unary_int_arith_op =
-  | Swap_byte_endianness
-
-type array_kind_for_length = Flambda_primitive.Array_kind_for_length.t =
-  | Array_kind of array_kind
-  | Float_array_opt_dynamic
-
-type unop =
-  | Block_load of
-      { kind : block_access_kind;
-        mut : mutability;
-        field : Target_ocaml_int.t
-      }
-  | Array_length of array_kind_for_length
-  | Boolean_not
-  | Box_number of box_kind * alloc_mode_for_allocations
-  | End_region of { ghost : bool }
-  | End_try_region of { ghost : bool }
-  | Get_tag
-  | Int_arith of standard_int * unary_int_arith_op
-  | Is_flat_float_array
-  | Is_int
-  | Num_conv of
-      { src : standard_int_or_float;
-        dst : standard_int_or_float
-      }
-  | Opaque_identity
-  | Project_value_slot of
-      { project_from : function_slot;
-        value_slot : value_slot
-      }
-  | Project_function_slot of
-      { move_from : function_slot;
-        move_to : function_slot
-      }
-  | String_length of string_or_bytes
-  | Unbox_number of box_kind
-  | Untag_immediate
-  | Tag_immediate
-
-type 'signed_or_unsigned comparison_behaviour =
-      'signed_or_unsigned Flambda_primitive.comparison_behaviour =
-  | Yielding_bool of 'signed_or_unsigned comparison
-  | Yielding_int_like_compare_functions of 'signed_or_unsigned
-
-type binary_int_arith_op = Flambda_primitive.binary_int_arith_op =
-  | Add
-  | Sub
-  | Mul
-  | Div
-  | Mod
-  | And
-  | Or
-  | Xor
-
-type int_shift_op = Flambda_primitive.int_shift_op =
-  | Lsl
-  | Lsr
-  | Asr
-
-type binary_float_arith_op = Flambda_primitive.binary_float_arith_op =
-  | Add
-  | Sub
-  | Mul
-  | Div
-
-type string_accessor_width = Flambda_primitive.string_accessor_width =
-  | Eight
-  | Sixteen
-  | Thirty_two
-  | Single
-  | Sixty_four
-  | One_twenty_eight of { aligned : bool }
-  | Two_fifty_six of { aligned : bool }
-  | Five_twelve of { aligned : bool }
-
-type array_load_kind = Flambda_primitive.Array_load_kind.t =
-  | Immediates
-  | Gc_ignorable_values
-  | Values
-  | Naked_floats
-  | Naked_float32s
-  | Naked_ints
-  | Naked_int8s
-  | Naked_int16s
-  | Naked_int32s
-  | Naked_int64s
-  | Naked_nativeints
-  | Naked_vec128s
-  | Naked_vec256s
-  | Naked_vec512s
-
-type array_set_kind =
-  | Immediates
-  | Gc_ignorable_values
-  | Values of init_or_assign
-  | Naked_floats
-  | Naked_float32s
-  | Naked_ints
-  | Naked_int8s
-  | Naked_int16s
-  | Naked_int32s
-  | Naked_int64s
-  | Naked_nativeints
-  | Naked_vec128s
-  | Naked_vec256s
-  | Naked_vec512s
-
-type string_like_value = Flambda_primitive.string_like_value =
-  | String
-  | Bytes
-  | Bigstring
-
-type bytes_like_value = Flambda_primitive.bytes_like_value =
-  | Bytes
-  | Bigstring
-
-type float_bitwidth = Flambda_primitive.float_bitwidth
-
-type infix_binop =
-  | Int_arith of binary_int_arith_op (* on tagged immediates *)
-  | Int_shift of int_shift_op (* on tagged immediates *)
-  | Int_comp of signed_or_unsigned comparison_behaviour (* on tagged imms *)
-  | Float_arith of float_bitwidth * binary_float_arith_op
-  | Float_comp of float_bitwidth * unit comparison_behaviour
-
-type binop =
-  | Block_set of
-      { kind : block_access_kind;
-        init : init_or_assign;
-        field : Target_ocaml_int.t
-      }
-  | Array_load of array_kind * array_load_kind * mutability
-  | Phys_equal of equality_comparison
-  | Int_arith of standard_int * binary_int_arith_op
-  | Int_comp of standard_int * signed_or_unsigned comparison_behaviour
-  | Int_shift of standard_int * int_shift_op
-  | Infix of infix_binop
-  | String_or_bigstring_load of string_like_value * string_accessor_width
-  | Bigarray_get_alignment of int
-
-type ternop =
-  | Array_set of array_kind * array_set_kind
-  | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
-
-type varop =
-  | Begin_region of { ghost : bool }
-  | Begin_try_region of { ghost : bool }
-  | Make_block of tag_scannable * mutability * alloc_mode_for_allocations
-
-type prim =
-  | Unary of unop * simple
-  | Binary of binop * simple * simple
-  | Ternary of ternop * simple * simple * simple
-  | Variadic of varop * simple list
+type prim = prim_op * simple list
 
 type arity = kind_with_subkind list
 
