@@ -34,8 +34,8 @@ open Typedtree
 open Tast_mapper
 open Compat
 
-(** [remove_module id] is a mapper that replaces every occurence of the module [id] in names,
-    such that [id].name becomes "id_"^name*)
+(** [remove_module id] is a mapper that replaces every occurence of the module
+    [id] in names, such that [id].name becomes "id_"^name*)
 let remove_module id =
   {
     Tast_mapper.default with
@@ -95,7 +95,8 @@ let remove_module id =
         | _ -> Tast_mapper.default.typ mapper ct);
   }
 
-(** [replace_in_pat mod_name pat] replace every name in [pat] by mod_name^"_"^name*)
+(** [replace_in_pat mod_name pat] replace every name in [pat] by
+    mod_name^"_"^name*)
 let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
  fun mod_name pat ->
   {
@@ -148,8 +149,9 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
           assert false);
   }
 
-(** [add_module_name_mapper mod_name l] is a mapper which stores in [l] type and value variables defined
-   at top level, while replacing their name by mod_name^"_"^name *)
+(** [add_module_name_mapper mod_name l] is a mapper which stores in [l] type and
+    value variables defined at top level, while replacing their name by
+    mod_name^"_"^name *)
 let add_module_name_mapper mod_name l =
   {
     Tast_mapper.default with
@@ -201,9 +203,10 @@ let rec find_structure mb =
   | Tmod_constraint (me, _, _, _) -> find_structure me
   | _ -> None
 
-(** [flatten_modules_mapper is_modified bounds id vars] finds a module to suppress in [bounds]
-    set [id] to the suppressed module name, [vars] to the set of variables from the suppressed module.
-    [!is_modified] is false if such a module does not exist.  *)
+(** [flatten_modules_mapper is_modified bounds id vars] finds a module to
+    suppress in [bounds] set [id] to the suppressed module name, [vars] to the
+    set of variables from the suppressed module. [!is_modified] is false if such
+    a module does not exist. *)
 let flatten_modules_mapper should_remove id vars =
   {
     Tast_mapper.default with

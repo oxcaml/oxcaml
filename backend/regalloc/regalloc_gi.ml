@@ -142,8 +142,9 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
   then
     fatal "register allocation was not succesful after %d rounds (%s)"
       max_rounds (Cfg_with_infos.cfg cfg_with_infos).fun_name;
-  if State.introduced_temporary_count state
-     > State.initial_temporary_count state * max_temp_multiplier
+  if
+    State.introduced_temporary_count state
+    > State.initial_temporary_count state * max_temp_multiplier
   then
     fatal "register allocation introduced %d temporaries after starting with %d"
       (State.introduced_temporary_count state)
@@ -191,11 +192,11 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
           Hardware_register.print_location hardware_reg.location;
       List.iter evicted_regs
         ~f:(fun
-             { Hardware_register.pseudo_reg = evict_reg;
-               interval = evict_interval;
-               evictable
-             }
-           ->
+            { Hardware_register.pseudo_reg = evict_reg;
+              interval = evict_interval;
+              evictable
+            }
+          ->
           if not evictable
           then
             fatal

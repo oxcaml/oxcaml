@@ -220,7 +220,7 @@ let cse_with_eligible_lhs ~typing_env_at_fork ~cse_at_each_use ~params prev_cse
                     TE.aliases_of_simple env_at_use ~min_name_mode:NM.normal
                       bound_to
                     |> TE.Alias_set.filter ~f:(fun simple ->
-                           not (is_param simple))
+                        not (is_param simple))
                   in
                   (* CR-someday lmaurer: Do we need to make sure there's only
                      one alias? If not, we can use [Aliases.Alias_set.find_best]
@@ -367,9 +367,9 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
       List.fold_left sorted_extra_bindings
         ~init:(EPA.empty, typing_env_with_extra_params)
         ~f:(fun
-             (extra_bindings, typing_env_with_extra_params)
-             (_, { extra_param; extra_args })
-           ->
+            (extra_bindings, typing_env_with_extra_params)
+            (_, { extra_param; extra_args })
+          ->
           let extra_bindings =
             EPA.add extra_bindings ~extra_param ~extra_args
               ~invalids:Apply_cont_rewrite_id.Set.empty

@@ -84,8 +84,9 @@ module Int32_base = struct
     let t_as_int64 = Int64.of_int32 t in
     let min_int64 = Int64.of_int Stdlib.min_int in
     let max_int64 = Int64.of_int Stdlib.max_int in
-    if Stdlib.( >= ) (Int64.compare t_as_int64 min_int64) 0
-       && Stdlib.( <= ) (Int64.compare t_as_int64 max_int64) 0
+    if
+      Stdlib.( >= ) (Int64.compare t_as_int64 min_int64) 0
+      && Stdlib.( <= ) (Int64.compare t_as_int64 max_int64) 0
     then Some (Int32.to_int t)
     else None
 
@@ -200,8 +201,9 @@ module Int64_base = struct
   let to_int_option t =
     let min_int64 = Int64.of_int Stdlib.min_int in
     let max_int64 = Int64.of_int Stdlib.max_int in
-    if Stdlib.( >= ) (Int64.compare t min_int64) 0
-       && Stdlib.( <= ) (Int64.compare t max_int64) 0
+    if
+      Stdlib.( >= ) (Int64.compare t min_int64) 0
+      && Stdlib.( <= ) (Int64.compare t max_int64) 0
     then Some (Int64.to_int t)
     else None
 

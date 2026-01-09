@@ -388,8 +388,9 @@ let create_let_symbols uacc lifted_constant ~body =
                 match Flambda_kind.With_subkind.kind kind with
                 | Value ->
                   let field_kind : P.Block_access_field_kind.t =
-                    if Flambda_kind.With_subkind.equal kind
-                         Flambda_kind.With_subkind.tagged_immediate
+                    if
+                      Flambda_kind.With_subkind.equal kind
+                        Flambda_kind.With_subkind.tagged_immediate
                     then Immediate
                     else Any_value
                   in

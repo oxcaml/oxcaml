@@ -101,16 +101,16 @@ let is_empty { defined_vars; binding_times; equations; symbol_projections } =
 
 let create ~defined_vars ~binding_times ~equations ~symbol_projections =
   (if Flambda_features.check_invariants ()
-  then
-    let all_defined_vars = Variable.Map.keys defined_vars in
-    let all_vars_with_binding_times =
-      Binding_time.Map.data binding_times |> Variable.Set.union_list
-    in
-    if not (Variable.Set.equal all_defined_vars all_vars_with_binding_times)
-    then
-      Misc.fatal_error
-        "[defined_vars] and [binding_times] disagree on the set of variables \
-         involved");
+   then
+     let all_defined_vars = Variable.Map.keys defined_vars in
+     let all_vars_with_binding_times =
+       Binding_time.Map.data binding_times |> Variable.Set.union_list
+     in
+     if not (Variable.Set.equal all_defined_vars all_vars_with_binding_times)
+     then
+       Misc.fatal_error
+         "[defined_vars] and [binding_times] disagree on the set of variables \
+          involved");
   { defined_vars; binding_times; equations; symbol_projections }
 
 let equations t = t.equations
@@ -199,9 +199,10 @@ let as_extension_without_bindings
     ({ defined_vars; binding_times; equations; symbol_projections } as t) =
   if Flambda_features.check_light_invariants ()
   then
-    if Variable.Map.is_empty defined_vars
-       && Binding_time.Map.is_empty binding_times
-       && Variable.Map.is_empty symbol_projections
+    if
+      Variable.Map.is_empty defined_vars
+      && Binding_time.Map.is_empty binding_times
+      && Variable.Map.is_empty symbol_projections
     then ()
     else
       Misc.fatal_errorf

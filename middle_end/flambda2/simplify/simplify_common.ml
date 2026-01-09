@@ -364,8 +364,9 @@ let clear_demoted_trap_action uacc apply_cont : AC.t =
   match AC.trap_action apply_cont with
   | None -> apply_cont
   | Some (Push { exn_handler } | Pop { exn_handler; _ }) ->
-    if UE.mem_continuation (UA.uenv uacc) exn_handler
-       && not (UA.is_demoted_exn_handler uacc exn_handler)
+    if
+      UE.mem_continuation (UA.uenv uacc) exn_handler
+      && not (UA.is_demoted_exn_handler uacc exn_handler)
     then apply_cont
     else AC.clear_trap_action apply_cont
 

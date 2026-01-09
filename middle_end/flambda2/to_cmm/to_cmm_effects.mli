@@ -76,7 +76,7 @@ val classify_continuation_handler :
   is_applied_with_traps:bool ->
   continuation_handler_classification
 
-(** Effects and coeffects of C calls  *)
+(** Effects and coeffects of C calls *)
 
 val transl_c_call_effects : Effects.t -> Cmm.effects
 

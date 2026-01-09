@@ -62,8 +62,8 @@ module S = struct
 
   (** [int_test] represents all possible outcomes of a comparison between two
       integers. When [imm] field is [None], compare variables x and y, specified
-      by the arguments of the enclosing [instruction]. When [imm] field is [Some
-      n], compare variable x and immediate [n]. This corresponds to
+      by the arguments of the enclosing [instruction]. When [imm] field is
+      [Some n], compare variable x and immediate [n]. This corresponds to
       [Mach.Iinttest] and [Mach.Iinttest_imm] in the compiler. *)
   type int_test =
     { lt : Label.t;  (** if x < y (resp. x < n) goto [lt] label *)

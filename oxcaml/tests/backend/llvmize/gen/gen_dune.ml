@@ -231,10 +231,10 @@ let () =
     print_test ~extra_subst:[] ~buf ~run:(Some name)
       ~tasks:
         ([ (if extra_dep_with_llvm_backend
-           then
-             Ocaml_llvm
-               { filename = extra_dep_name; stop_after_llvmize = false }
-           else Ocaml_default extra_dep_name) ]
+            then
+              Ocaml_llvm
+                { filename = extra_dep_name; stop_after_llvmize = false }
+            else Ocaml_default extra_dep_name) ]
         @ ocaml_llvm_and_output_ir name
         @ [Ocaml_default main_name])
   in

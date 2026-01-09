@@ -55,8 +55,9 @@ let get_flags debuginfo =
   match debuginfo with
   | Dbg_other d | Dbg_raise d -> if is_none_dbg d then 0 else 1
   | Dbg_alloc dbgs ->
-    if !Clflags.debug
-       && List.exists (fun d -> not (is_none_dbg d.Cmm.alloc_dbg)) dbgs
+    if
+      !Clflags.debug
+      && List.exists (fun d -> not (is_none_dbg d.Cmm.alloc_dbg)) dbgs
     then 3
     else 2
 

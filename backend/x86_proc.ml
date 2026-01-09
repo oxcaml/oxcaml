@@ -132,9 +132,10 @@ let string_of_substring_literal k n s =
       if !last_was_escape
       then Printf.bprintf b "\\%o" (Char.code c)
       else Buffer.add_char b c
-    else if between c ' ' '~'
-            && (not (Char.equal c '"'))
-            (* '"' *) && not (Char.equal c '\\')
+    else if
+      between c ' ' '~'
+      && (not (Char.equal c '"'))
+      (* '"' *) && not (Char.equal c '\\')
     then (
       Buffer.add_char b c;
       last_was_escape := false)
@@ -414,7 +415,7 @@ let directive dir =
   match[@warning "-4"] dir with
   | Directive
       (Asm_targets.Asm_directives.Directive.Section
-        { names = name; flags; args; is_delayed }) -> (
+         { names = name; flags; args; is_delayed }) -> (
     let name = Section_name.make name flags args in
     let where = if is_delayed then delayed_sections else asm_code_by_section in
     match Section_name.Tbl.find_opt where name with

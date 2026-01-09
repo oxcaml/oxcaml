@@ -87,15 +87,13 @@ end
       away via [shape_reduce]. (For (mutually-)recursive types, the next step
       handles the instantiation.)
 
-    + After shape reduction, the type declaration can still contain recursive
-      or mutually-recursive declarations, which have not been unfolded. Since
-      we cannot directly emit these into DWARF, we then unfold recursive
+    + After shape reduction, the type declaration can still contain recursive or
+      mutually-recursive declarations, which have not been unfolded. Since we
+      cannot directly emit these into DWARF, we then unfold recursive
       declarations applied to type shape arguments into recursive types with
       [unfold_and_evaluate]. For example,
-      [type 'a list = [] | :: of 'a * 'a list]
-      applied to [int] becomes the type shape
-      [Mu (Variant [] | :: of int * #0)].
-  *)
+      [type 'a list = [] | :: of 'a * 'a list] applied to [int] becomes the type
+      shape [Mu (Variant [] | :: of int * #0)]. *)
 val unfold_and_evaluate :
   ?diagnostics:Evaluation_diagnostics.t -> Shape.t -> Shape.t
 

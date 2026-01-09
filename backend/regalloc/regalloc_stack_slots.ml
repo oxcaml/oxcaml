@@ -56,16 +56,16 @@ let[@inline] update_cfg_with_layout t cfg_with_layout =
   Stack_class.Tbl.copy_values ~from:t.num_stack_slots ~to_:fun_num_stack_slots
 
 (** The optimization below is conceptually fairly close to what linscan does:
-   - for each stack slot class / stack slot couple, we compute the interval of
-     uses;
-   - we re-assign slots by putting in the same "bucket" slots whose
-     intervals do not overlap.
+    - for each stack slot class / stack slot couple, we compute the interval of
+      uses;
+    - we re-assign slots by putting in the same "bucket" slots whose intervals
+      do not overlap.
 
-   It is also considerably simpler than linscan:
-   - we do not distinguish the different kinds of uses (arg/res/live);
-   - we do not track "holes" in the intervals;
-   - we know that, by definition, we have enough slots to store
-     everything and hence have no need to "restart" the computation. *)
+    It is also considerably simpler than linscan:
+    - we do not distinguish the different kinds of uses (arg/res/live);
+    - we do not track "holes" in the intervals;
+    - we know that, by definition, we have enough slots to store everything and
+      hence have no need to "restart" the computation. *)
 
 (* CR-someday xclerc for xclerc: see whether parts could actually be shared with
    linscan. *)

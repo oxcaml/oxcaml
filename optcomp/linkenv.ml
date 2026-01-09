@@ -148,8 +148,8 @@ let extract_crc_interfaces t =
 let extract_crc_implementations t =
   Cmx_consistbl.extract t.implementations t.crc_implementations
   |> List.map (fun (cu, crc) ->
-         let crc = Option.map (fun ((), crc) -> crc) crc in
-         Import_info.create_normal cu ~crc)
+      let crc = Option.map (fun ((), crc) -> crc) crc in
+      Import_info.create_normal cu ~crc)
 
 (* Add C objects and options and "custom" info from a library descriptor. See
    bytecomp/bytelink.ml for comments on the order of C objects. *)

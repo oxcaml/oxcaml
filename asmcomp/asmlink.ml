@@ -344,9 +344,10 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
     | Fission_dsymutil ->
       if not (Target_system.is_macos ())
       then raise (Error Dwarf_fission_dsymutil_not_macos)
-      else if not_output_to_dev_null output_name
-              && mode = Ccomp.Exe
-              && not !Dwarf_flags.restrict_to_upstream_dwarf
+      else if
+        not_output_to_dev_null output_name
+        && mode = Ccomp.Exe
+        && not !Dwarf_flags.restrict_to_upstream_dwarf
       then
         (* Run dsymutil on the executable *)
         let dsymutil_cmd =

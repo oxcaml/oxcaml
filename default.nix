@@ -223,7 +223,7 @@ stdenv.mkDerivation {
       pkgs.which
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
-      pkgs.ocaml-ng.ocamlPackages_4_14.ocamlformat # required for make fmt
+      ocamlformat # required for make fmt
       pkgs.removeReferencesTo
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS

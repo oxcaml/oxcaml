@@ -19,14 +19,13 @@
 
     In Flambda 2, variables are always assigned kinds, which are at most
     register width (e.g. 64-bit integer machine word width, or 128-bit SIMD
-    machine word width).  Variables from Lambda which cannot be accommodated in
+    machine word width). Variables from Lambda which cannot be accommodated in
     one register, for example if they are of an unboxed product layout, are
     split by a process called unarization.
 
     Despite this, [`Complex] arities preserve the information about any unboxed
     products, for later use (e.g. during Cmm translation to optimize
-    caml_apply).
-*)
+    caml_apply). *)
 
 type _ t
 
@@ -55,19 +54,19 @@ val create : 'uc Component_for_creation.t list -> 'uc t
     product layout. *)
 val create_singletons : Flambda_kind.With_subkind.t list -> [> ] t
 
-(** "No parameters".  (Not e.g. "one parameter of type void".) *)
+(** "No parameters". (Not e.g. "one parameter of type void".) *)
 val nullary : [> ] t
 
-(** How many parameters, potentially of unboxed product layout, the given
-    arity describes. *)
+(** How many parameters, potentially of unboxed product layout, the given arity
+    describes. *)
 val num_params : _ t -> int
 
 (** Comparison of arities, but ignoring subkind information. *)
 val equal_ignoring_subkinds : 'a t -> 'a t -> bool
 
-(** It's usually a mistake to use this function, but it's needed for
-    [Compare].  This is like [equal_ignoring_subkinds] but also insists on
-    equality of subkind information. *)
+(** It's usually a mistake to use this function, but it's needed for [Compare].
+    This is like [equal_ignoring_subkinds] but also insists on equality of
+    subkind information. *)
 val equal_exact : 'a t -> 'a t -> bool
 
 (** Returns [true] iff the given arity describes one parameter of kind [Value].
@@ -101,15 +100,15 @@ val cardinal_unarized : _ t -> int
 
 val group_by_parameter : [`Complex] t -> 'a list -> 'a list list
 
-(** Take a list of Lambda layouts, one per parameter, and form the
-    corresponding arity. *)
+(** Take a list of Lambda layouts, one per parameter, and form the corresponding
+    arity. *)
 val from_lambda_list :
   Lambda.layout list ->
   machine_width:Target_system.Machine_width.t ->
   [`Complex] t
 
-(** Remove the first portion of an arity to correspond to a partial
-    application (or other similar situation). *)
+(** Remove the first portion of an arity to correspond to a partial application
+    (or other similar situation). *)
 val partially_apply :
   [`Complex] t -> num_non_unarized_params_provided:int -> [`Complex] t
 

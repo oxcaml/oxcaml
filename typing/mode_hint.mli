@@ -11,11 +11,11 @@ type ident =
   { category : lock_item;
     lid : Longident.t
         (** Sometimes we want the ident to represent [M.x] but the loc can only
-        point to [M]. This field would store [M.x]. *)
+            point to [M]. This field would store [M.x]. *)
   }
 
 (** Description of pinpoints to accompany the location. The constructors are not
-mutually exclusive - some might be more precise than others *)
+    mutually exclusive - some might be more precise than others *)
 type pinpoint_desc =
   | Unknown
   | Ident of ident  (** An identifier *)
@@ -30,7 +30,8 @@ type pinpoint_desc =
   | Letop  (** let op *)
   | Cases_result  (** the result of cases *)
 
-(** A pinpoint is a location in the source code, accompanied by additional description *)
+(** A pinpoint is a location in the source code, accompanied by additional
+    description *)
 type pinpoint = Location.t * pinpoint_desc
 
 type mutable_part =
@@ -41,7 +42,8 @@ type always_dynamic =
   | Application
   | Try_with
 
-(** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
+(** Hint for a constant bound. See [Mode.Report.print_const] for what each
+    non-trivial constructor means. *)
 type 'd const =
   | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
   | Lazy_allocated_on_heap : (disallowed * 'r) pos const
@@ -59,7 +61,7 @@ type 'd const =
   | Branching : ('l * disallowed) neg const
   | Is_used_in : pinpoint -> (disallowed * 'r) const
       (** A variant of [Is_closed_by] where the closure mode is constant.
-        INVARIANT: The [pinpoint] cannot be [Unknown]. *)
+          INVARIANT: The [pinpoint] cannot be [Unknown]. *)
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
@@ -105,17 +107,18 @@ type allocation_desc =
 type allocation = allocation_desc Location.loc
 
 (** Hint for morphisms. When acompanied by a destination [pinpoint], [morph]
-   gives a source [pinpoint] and explains the relation between them. See
-   [Mode.Report.print_morph] for what each non-trivial constructor means. *)
+    gives a source [pinpoint] and explains the relation between them. See
+    [Mode.Report.print_morph] for what each non-trivial constructor means. *)
 type 'd morph =
   | Unknown : ('l * 'r) morph  (** The morphism is not explained. *)
   | Unknown_non_rigid : ('l * 'r) morph
-      (** Similiar to [Unknown], but in the special case where the morph doesn't change the
-    bound, it can be skipped. *)
+      (** Similiar to [Unknown], but in the special case where the morph doesn't
+          change the bound, it can be skipped. *)
   (* CR-soon zqian: usages of [Unknown_non_rigid] should be replaced with
      corresponding proper hints *)
   | Skip : ('l * 'r) morph
-      (** The morphism doesn't change the bound and should be skipped in printing. *)
+      (** The morphism doesn't change the bound and should be skipped in
+          printing. *)
   | Close_over :
       ('d, 'l * disallowed) polarity * closure_details
       -> ('l * disallowed) morph

@@ -75,8 +75,8 @@ end = struct
         in
         let destroyed = Reg.Set.union destroyed destroyed_here in
         let block = Cfg.get_block_exn cfg label in
-        let[@inline] update_occuring :
-            type a. Reg.Set.t -> a Cfg.instruction -> Reg.Set.t =
+        let[@inline] update_occuring : type a.
+            Reg.Set.t -> a Cfg.instruction -> Reg.Set.t =
          fun occurring instr ->
           let occurring = Reg.add_set_array occurring instr.arg in
           let occurring = Reg.add_set_array occurring instr.res in
@@ -115,8 +115,8 @@ end = struct
       if debug
       then
         Reg.Set.iter (fun reg -> log "%a can be moved" Printreg.reg reg) to_move;
-      let (destructions_at_end, definitions_at_beginning)
-            : destructions_at_end * definitions_at_beginning =
+      let (destructions_at_end, definitions_at_beginning) :
+          destructions_at_end * definitions_at_beginning =
         Label.Set.fold
           (fun label (destructions_at_end, definitions_at_beginning) ->
             let destructions_at_end =
@@ -215,11 +215,11 @@ module MoveSpillsAndReloads : sig
 end = struct
   (** A definition at the begin of a block can be moved down if:
 
-     - the block does neither raise nor end with a destruction point;
-     - the block has only one normal successor and no exceptional successor;
-     - the successor has only one predecessor;
-     - the block and its successor are different;
-     - the defined register has no occurrences in the block. *)
+      - the block does neither raise nor end with a destruction point;
+      - the block has only one normal successor and no exceptional successor;
+      - the successor has only one predecessor;
+      - the block and its successor are different;
+      - the defined register has no occurrences in the block. *)
   let move_definitions_at_beginning_down :
       Cfg_with_infos.t ->
       definitions_at_beginning:definitions_at_beginning ->
@@ -239,8 +239,9 @@ end = struct
         match Label.Map.find_opt label !definitions_at_beginning with
         | None -> ()
         | Some (definitions : Reg.Set.t) -> (
-          if Option.is_none (destruction_point_at_end block)
-             && Option.is_none block.exn
+          if
+            Option.is_none (destruction_point_at_end block)
+            && Option.is_none block.exn
           then
             let successor_labels =
               Cfg.successor_labels ~normal:true ~exn:false block
@@ -253,8 +254,9 @@ end = struct
                   (Cfg_with_infos.cfg cfg_with_infos)
                   successor_label
               in
-              if (not (Label.equal label successor_label))
-                 && Label.Set.cardinal successor_block.predecessors = 1
+              if
+                (not (Label.equal label successor_label))
+                && Label.Set.cardinal successor_block.predecessors = 1
               then
                 let to_move : Reg.Set.t =
                   (* CR-soon xclerc for xclerc: consider ignoring `res` to speed
@@ -294,8 +296,8 @@ end = struct
       - the predecessor has only one (normal) successor;
       - the predecessor does neither raise nor end with a destruction point;
       - the block and the predecessor are different;
-      - the destroyed register has no occurrences in the block
-        (including definitions). *)
+      - the destroyed register has no occurrences in the block (including
+        definitions). *)
   let move_destructions_at_end_up :
       Cfg_with_infos.t ->
       Label.t Stack.t ->
@@ -314,8 +316,9 @@ end = struct
       match Label.Map.find_opt label !destructions_at_end with
       | None -> ()
       | Some (destruction_kind, destructions) ->
-        if (not block.is_trap_handler)
-           && Label.Set.cardinal block.predecessors = 1
+        if
+          (not block.is_trap_handler)
+          && Label.Set.cardinal block.predecessors = 1
         then
           let predecessor_label = Label.Set.choose block.predecessors in
           let predecessor_block =
@@ -323,13 +326,13 @@ end = struct
               (Cfg_with_infos.cfg cfg_with_infos)
               predecessor_label
           in
-          if (not (Label.equal label predecessor_label))
-             && Option.is_none predecessor_block.exn
-             && Option.is_none (destruction_point_at_end predecessor_block)
-             && Label.Set.cardinal
-                  (Cfg.successor_labels ~normal:true ~exn:false
-                     predecessor_block)
-                = 1
+          if
+            (not (Label.equal label predecessor_label))
+            && Option.is_none predecessor_block.exn
+            && Option.is_none (destruction_point_at_end predecessor_block)
+            && Label.Set.cardinal
+                 (Cfg.successor_labels ~normal:true ~exn:false predecessor_block)
+               = 1
           then
             let to_move : Reg.Set.t =
               Reg.Set.filter
@@ -512,9 +515,10 @@ end = struct
                       | Some spilled_at ->
                         if debug && Lazy.force invariants
                         then
-                          if not
-                               (Cfg_dominators.is_strictly_dominating doms
-                                  spilled_at tree.label)
+                          if
+                            not
+                              (Cfg_dominators.is_strictly_dominating doms
+                                 spilled_at tree.label)
                           then fatal "inconsistent dominator tree";
                         if debug
                         then (
@@ -692,27 +696,28 @@ let compute_definitions :
             Label.Set.fold
               (fun successor_label definitions_at_beginning ->
                 (if debug && Lazy.force invariants
-                then
-                  let successor_block =
-                    Cfg_with_infos.get_block_exn cfg_with_infos successor_label
-                  in
-                  let predecessor_labels = successor_block.predecessors in
-                  let all_predecessors_end_with_destruction_point : bool =
-                    Label.Set.for_all
-                      (fun predecessor_label ->
-                        let predecessor_block =
-                          Cfg_with_infos.get_block_exn cfg_with_infos
-                            predecessor_label
-                        in
-                        Option.equal equal_destruction_kind
-                          (destruction_point_at_end predecessor_block)
-                          (Some Destruction_on_all_paths))
-                      predecessor_labels
-                  in
-                  (* Should not happen since destruction points currently only
-                     have one normal successor. *)
-                  if not all_predecessors_end_with_destruction_point
-                  then fatal "not all predecessors end with a destruction point");
+                 then
+                   let successor_block =
+                     Cfg_with_infos.get_block_exn cfg_with_infos successor_label
+                   in
+                   let predecessor_labels = successor_block.predecessors in
+                   let all_predecessors_end_with_destruction_point : bool =
+                     Label.Set.for_all
+                       (fun predecessor_label ->
+                         let predecessor_block =
+                           Cfg_with_infos.get_block_exn cfg_with_infos
+                             predecessor_label
+                         in
+                         Option.equal equal_destruction_kind
+                           (destruction_point_at_end predecessor_block)
+                           (Some Destruction_on_all_paths))
+                       predecessor_labels
+                   in
+                   (* Should not happen since destruction points currently only
+                      have one normal successor. *)
+                   if not all_predecessors_end_with_destruction_point
+                   then
+                     fatal "not all predecessors end with a destruction point");
                 Label.Map.add successor_label
                   (live_at_block_beginning cfg_with_infos successor_label)
                   definitions_at_beginning)
