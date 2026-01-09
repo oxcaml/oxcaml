@@ -66,6 +66,19 @@ let minimize should_remove map cur_name =
                       e with
                       exp_desc = mkTexp_match ~id (e_match, cc_l, partial);
                     })
+            | O (Texp_ifthenelse (e_if, e_then, e_else_opt)) ->
+                if should_remove () then
+                  (* if e1 then e2 [else e3] -> __ignore__ e1; e2 *)
+                  E.list [ E.ignore e_if; e_then ]
+                else if should_remove () then
+                  match e_else_opt with
+                  | None ->
+                      (* if e1 then e2 -> __ignore__ e1 *)
+                      E.ignore e_if
+                  | Some e_else ->
+                      (* if e1 then e2 else e3 -> __ignore__ e1; e3 *)
+                      E.list [ E.ignore e_if; e_else ]
+                else e
             | _ -> e));
     }
   in

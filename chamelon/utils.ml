@@ -303,3 +303,20 @@ let update_output map = Smap.iter update_single (Smap.map add_def map)
 
 let save_outputs map =
   Smap.iter (fun name str -> update_single (name ^ ".tmp") (add_def str)) map
+
+module E = struct
+  let view e = view_texp e.exp_desc
+  let desc = exp_desc_to_exp
+
+  let app fn args =
+    desc
+      (mkTexp_apply (fn, List.map (fun e -> (Asttypes.Nolabel, mkArg e)) args))
+
+  let ignore e = app Dummy.ignore [ e ]
+  let unit = desc (mkTexp_tuple [])
+
+  let rec list = function
+    | [] -> unit
+    | [ e ] -> e
+    | e :: es -> desc (mkTexp_sequence (e, list es))
+end
