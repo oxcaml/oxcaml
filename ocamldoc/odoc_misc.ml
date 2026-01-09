@@ -499,6 +499,7 @@ let remove_option typ =
     | Tvar _
     | Tunivar _
     | Tpoly _
+    | Trepr _
     | Tarrow _
     | Ttuple _
     | Tunboxed_tuple _

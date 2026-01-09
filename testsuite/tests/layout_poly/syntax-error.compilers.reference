@@ -1,0 +1,22 @@
+exception Force_type
+Line 2, characters 9-14:
+2 | let _ : (repr_ 'a : any). 'a -> unit = raise Force_type
+             ^^^^^
+Error: Syntax error
+Line 2, characters 9-14:
+2 | let _ : (repr_ 'a). (repr_ 'b). 'a -> 'b -> 'a * 'b = raise Force_type
+             ^^^^^
+Error: Syntax error
+Line 2, characters 9-14:
+2 | let _ : (repr_ 'a) 'b. 'a -> 'b -> 'a * 'b = raise Force_type
+             ^^^^^
+Error: Syntax error
+Line 2, characters 11-12:
+2 | let _ : 'a (repr_ 'b). 'a -> 'b -> 'a * 'b = raise Force_type
+               ^
+Error: Syntax error
+Line 2, characters 10-11:
+2 | let _ : 'a. (repr_ 'b). 'a -> 'b -> 'a * 'b = raise Force_type
+              ^
+Error: Syntax error
+
