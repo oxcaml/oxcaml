@@ -18,7 +18,7 @@ let code loopify(never) size(11) newer_version_of(list_to_array_0)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : any array =
-  let prim = %is_int param in
+  let prim = %is_int (param) in
   switch prim
     | 0 -> k1 pop(regular k1) ($camlTests15__Pmakeblock23)
     | 1 -> k ($camlTests15__empty_array14)
@@ -34,8 +34,8 @@ let code loopify(never) size(14) newer_version_of(is_c_1)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %get_tag param in
-  let eq = %int_comp imm prim = 2i in
+  let prim = %get_tag (param) in
+  let eq = %int_comp.`imm`.`eq` (prim, 2i) in
   switch eq
     | 0 -> k (0)
     | 1 -> k (1)
@@ -46,8 +46,8 @@ let code loopify(never) size(5) newer_version_of(set_to_x_2)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %num_conv (imm tagged -> imm) i in
-  let Pbytessetu = %bytes_set 8 b.(prim) 120i in
+  let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+  let Pbytessetu = %bytes_or_bigstring_set.`bytes`.[`8`] (b, prim, 120i) in
   cont k (0)
 in
 let $camlTests15__set_to_x_9 = closure set_to_x_2_1 @set_to_x in
@@ -56,8 +56,8 @@ let code loopify(never) size(3) newer_version_of(classical_id_3)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pnot = %not b in
-  let Pnot_1 = %not Pnot in
+  let Pnot = %boolean_not (b) in
+  let Pnot_1 = %boolean_not (Pnot) in
   cont k (Pnot_1)
 in
 let $camlTests15__classical_id_10 = closure classical_id_3_1 @classical_id in
@@ -74,7 +74,7 @@ let code loopify(never) size(2) newer_version_of(negate_5)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pnegint = 0 - x in
+  let Pnegint = %int_barith.`sub` (0, x) in
   cont k (Pnegint)
 in
 let $camlTests15__negate_12 = closure negate_5_1 @negate in
@@ -83,7 +83,7 @@ let code loopify(never) size(2) newer_version_of(foo_6)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Porint = x lor 42 in
+  let Porint = %int_barith.`or` (x, 42) in
   cont k (Porint)
 in
 let $camlTests15__foo_13 = closure foo_6_1 @foo in

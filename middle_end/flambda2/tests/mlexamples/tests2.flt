@@ -5,30 +5,30 @@ let code rec size(24)
         -> k * k1
         : imm tagged =
   let next_depth = rec_info (succ my_depth) in
-  let prim = %int_comp x > 0 in
-  let Pintcomp = %Tag_imm prim in
-  (let untagged = %untag_imm Pintcomp in
+  let prim = %int_comp.`gt` (x, 0) in
+  let Pintcomp = %tag_imm (prim) in
+  (let untagged = %untag_imm (Pintcomp) in
    switch untagged
      | 0 -> k (42)
      | 1 -> k2)
     where k2 =
-      ((let Psubint = x - 1 in
+      ((let Psubint = %int_barith.`sub` (x, 1) in
         apply direct(f_0)
           (my_closure ~ depth my_depth -> next_depth : _ -> imm tagged)
             (Psubint)
             -> k2 * k1)
          where k2 (apply_result : imm tagged) =
-           let Paddint = 1 + apply_result in
+           let Paddint = %int_barith.`add` (1, apply_result) in
            cont k (Paddint))
 in
 (let f = closure f_0 @f in
  apply direct(f_0) unroll(10) (f : _ -> imm tagged) (5) -> k1 * error
    where k1 (n : imm tagged) =
-     let Pmakeblock = %Block 0 (f, n) in
+     let Pmakeblock = %block.[`0`] (f, n) in
      cont k (Pmakeblock))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load tag(0) size(2) (0) module_block in
-    let field_1 = %block_load tag(0) size(2) (1) module_block in
+    let field_0 = %block_load.`tag`[`0`].`size`[`2`].[`0`] (module_block) in
+    let field_1 = %block_load.`tag`[`0`].`size`[`2`].[`1`] (module_block) in
     let $camlTests2 = Block 0 (field_0, field_1) in
     cont done ($camlTests2)
 ===>
@@ -40,19 +40,19 @@ and code rec loopify(never) size(21) newer_version_of(f_0)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %int_comp x > 0 in
+  let prim = %int_comp.`gt` (x, 0) in
   switch prim
     | 0 -> k (42)
     | 1 -> k2
     where k2 =
-      ((let Psubint = x - 1 in
+      ((let Psubint = %int_barith.`sub` (x, 1) in
         apply direct(f_0_1)
           ($camlTests2__f_1 ~ depth my_depth -> succ my_depth
            : _ -> imm tagged)
             (Psubint)
             -> k2 * k1)
          where k2 (apply_result : imm tagged) =
-           let Paddint = 1 + apply_result in
+           let Paddint = %int_barith.`add` (1, apply_result) in
            cont k (Paddint))
 in
 let $camlTests2 = Block 0 ($camlTests2__f_1, 47) in

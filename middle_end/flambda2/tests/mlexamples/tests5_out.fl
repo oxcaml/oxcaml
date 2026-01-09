@@ -4,12 +4,12 @@ let code rec loopify(never) size(18) newer_version_of(g_1)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %int_comp y > 3 in
+  let prim = %int_comp.`gt` (y, 3) in
   switch prim
     | 0 -> k (7)
     | 1 -> k2
     where k2 =
-      let Psubint = y - 1 in
+      let Psubint = %int_barith.`sub` (y, 1) in
       apply direct(f_0_1)
         ($camlTests5__f_2 ~ depth my_depth -> succ my_depth : _ -> imm tagged
          )
@@ -24,12 +24,12 @@ and code rec loopify(never) size(18) newer_version_of(f_0)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %int_comp x < 4 in
+  let prim = %int_comp.`lt` (x, 4) in
   switch prim
     | 0 -> k (42)
     | 1 -> k2
     where k2 =
-      let Psubint = x - 1 in
+      let Psubint = %int_barith.`sub` (x, 1) in
       apply direct(g_1_1)
         ($camlTests5__g_3 ~ depth my_depth -> succ my_depth : _ -> imm tagged
          )
