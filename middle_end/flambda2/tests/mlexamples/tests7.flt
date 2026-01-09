@@ -6,18 +6,18 @@ let code size(37)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %string_length str in
-  let Pstringlength = %Tag_imm prim in
-  let prim_1 = %string_length str in
-  let Pstringlength_1 = %Tag_imm prim_1 in
-  let prim_2 = %string_length $camlTests7__immstring10 in
-  let Pstringlength_2 = %Tag_imm prim_2 in
-  let prim_3 = %string_length $camlTests7__immstring7 in
-  let Pstringlength_3 = %Tag_imm prim_3 in
-  let Paddint = x + Pstringlength_3 in
-  let Paddint_1 = Paddint + Pstringlength_2 in
-  let Paddint_2 = Paddint_1 + Pstringlength_1 in
-  let Paddint_3 = Paddint_2 + Pstringlength in
+  let prim = %string_length (str) in
+  let Pstringlength = %tag_imm (prim) in
+  let prim_1 = %string_length (str) in
+  let Pstringlength_1 = %tag_imm (prim_1) in
+  let prim_2 = %string_length ($camlTests7__immstring10) in
+  let Pstringlength_2 = %tag_imm (prim_2) in
+  let prim_3 = %string_length ($camlTests7__immstring7) in
+  let Pstringlength_3 = %tag_imm (prim_3) in
+  let Paddint = %int_barith.`add` (x, Pstringlength_3) in
+  let Paddint_1 = %int_barith.`add` (Paddint, Pstringlength_2) in
+  let Paddint_2 = %int_barith.`add` (Paddint_1, Pstringlength_1) in
+  let Paddint_3 = %int_barith.`add` (Paddint_2, Pstringlength) in
   cont k (Paddint_3)
 in
 let code size(31)
@@ -25,24 +25,24 @@ let code size(31)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : float boxed =
-  let prim = %block_load float (1) af in
-  let Pfloatfield = %Box_float prim in
-  let prim_1 = %block_load float (0) af in
-  let Pfloatfield_1 = %Box_float prim_1 in
-  let prim_2 = %unbox_float Pfloatfield in
-  let prim_3 = %unbox_float Pfloatfield_1 in
-  let prim_4 = prim_3 *. prim_2 in
-  let x = %Box_float prim_4 in
-  let prim_5 = %unbox_float y in
-  let prim_6 = %unbox_float x in
-  let prim_7 = prim_6 +. prim_5 in
-  let Paddfloat = %Box_float prim_7 in
+  let prim = %block_load.`floaf`.[`1`] (af) in
+  let Pfloatfield = %box_num.`float` (prim) in
+  let prim_1 = %block_load.`floaf`.[`0`] (af) in
+  let Pfloatfield_1 = %box_num.`float` (prim_1) in
+  let prim_2 = %unbox_num.`float` (Pfloatfield) in
+  let prim_3 = %unbox_num.`float` (Pfloatfield_1) in
+  let prim_4 = %float_arith.`mul` (prim_3, prim_2) in
+  let x = %box_num.`float` (prim_4) in
+  let prim_5 = %unbox_num.`float` (y) in
+  let prim_6 = %unbox_num.`float` (x) in
+  let prim_7 = %float_arith.`add` (prim_6, prim_5) in
+  let Paddfloat = %box_num.`float` (prim_7) in
   cont k (Paddfloat)
 in
 (let f = closure f_0 @f in
  let foo = closure foo_1 @foo in
  let Pmakeblock =
-   %Block 0
+   %block.[`0`]
      ($camlTests7__empty_block4,
       $camlTests7__immstring7,
       $camlTests7__immstring10,
@@ -54,8 +54,8 @@ in
     let field_0 = $camlTests7__empty_block4 in
     let field_1 = $camlTests7__immstring7 in
     let field_2 = $camlTests7__immstring10 in
-    let field_3 = %block_load tag(0) size(5) (3) module_block in
-    let field_4 = %block_load tag(0) size(5) (4) module_block in
+    let field_3 = %block_load.`tag`[`0`].`size`[`5`].[`3`] (module_block) in
+    let field_4 = %block_load.`tag`[`0`].`size`[`5`].[`4`] (module_block) in
     let $camlTests7 = Block 0 (field_0, field_1, field_2, field_3, field_4)
     in
     cont done ($camlTests7)
@@ -70,12 +70,12 @@ let code loopify(never) size(16) newer_version_of(f_0)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %string_length str in
-  let Pstringlength = %Tag_imm prim in
-  let Paddint = x + 3 in
-  let Paddint_1 = Paddint + 5 in
-  let Paddint_2 = Paddint_1 + Pstringlength in
-  let Paddint_3 = Paddint_2 + Pstringlength in
+  let prim = %string_length (str) in
+  let Pstringlength = %tag_imm (prim) in
+  let Paddint = %int_barith.`add` (x, 3) in
+  let Paddint_1 = %int_barith.`add` (Paddint, 5) in
+  let Paddint_2 = %int_barith.`add` (Paddint_1, Pstringlength) in
+  let Paddint_3 = %int_barith.`add` (Paddint_2, Pstringlength) in
   cont k (Paddint_3)
 in
 let $camlTests7__f_2 = closure f_0_1 @f in
@@ -84,12 +84,12 @@ let code loopify(never) size(13) newer_version_of(foo_1)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : float boxed =
-  let prim = %block_load float (1) af in
-  let prim_1 = %block_load float (0) af in
-  let prim_2 = prim_1 *. prim in
-  let prim_3 = %unbox_float y in
-  let prim_4 = prim_2 +. prim_3 in
-  let Paddfloat = %Box_float prim_4 in
+  let prim = %block_load.`floaf`.[`1`] (af) in
+  let prim_1 = %block_load.`floaf`.[`0`] (af) in
+  let prim_4 = %float_arith.`mul` (prim_1, prim) in
+  let prim_5 = %unbox_num.`float` (y) in
+  let prim_7 = %float_arith.`add` (prim_4, prim_5) in
+  let Paddfloat = %box_num.`float` (prim_7) in
   cont k (Paddfloat)
 in
 let $camlTests7__foo_3 = closure foo_1_1 @foo in

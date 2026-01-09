@@ -7,20 +7,20 @@ let code size(120)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  (let prim = %array_length generic arr in
-   let prim_1 = %untag_imm prim in
-   let prim_2 = %int_arith imm prim_1 - 0i in
-   let prim_3 = %num_conv (imm -> nativeint) prim_2 in
-   let prim_4 = %array_length generic arr in
-   let prim_5 = %untag_imm prim_4 in
-   let prim_6 = %int_arith imm prim_5 - 0i in
-   let prim_7 = %num_conv (imm -> nativeint) prim_6 in
-   let prim_8 = %int_shift nativeint prim_7 asr 63i in
-   let prim_9 = %int_arith nativeint prim_8 lxor -1n in
-   let prim_10 = %int_arith nativeint prim_9 land prim_3 in
-   let prim_11 = %num_conv (nativeint -> imm) prim_10 in
-   let prim_12 = %untag_imm i in
-   let prim_13 = %int_comp imm prim_12 < prim_11 in
+  (let prim = %array_length.`generic` (arr) in
+   let prim_1 = %untag_imm (prim) in
+   let prim_2 = %int_barith.`imm`.`sub` (prim_1, 0i) in
+   let prim_3 = %num_conv.[`imm`].[`nativeint`] (prim_2) in
+   let prim_4 = %array_length.`generic` (arr) in
+   let prim_5 = %untag_imm (prim_4) in
+   let prim_6 = %int_barith.`imm`.`sub` (prim_5, 0i) in
+   let prim_7 = %num_conv.[`imm`].[`nativeint`] (prim_6) in
+   let prim_8 = %int_shift.`nativeint`.`asr` (prim_7, 63i) in
+   let prim_9 = %int_barith.`nativeint`.`xor` (prim_8, -1n) in
+   let prim_10 = %int_barith.`nativeint`.`and` (prim_9, prim_3) in
+   let prim_11 = %num_conv.[`nativeint`].[`imm`] (prim_10) in
+   let prim_12 = %untag_imm (i) in
+   let prim_13 = %int_comp.`imm`.`lt` (prim_12, prim_11) in
    switch prim_13
      | 0 -> k4
      | 1 -> k5)
@@ -29,34 +29,34 @@ let code size(120)
     where k4 =
       cont k1 pop(regular k1) ($camlTests3__block30)
     where k3 =
-      ((let cond_result = %is_flat_float_array arr in
+      ((let cond_result = %is_flat_float_array (arr) in
         switch cond_result
           | 0 -> k5
           | 1 -> k4)
          where k5 =
-           let ifnot_result = %array_load mutable arr.(i) in
+           let ifnot_result = %array_load.`mut` (arr, i) in
            cont k3 (ifnot_result)
          where k4 =
-           let prim = %array_load float mutable arr.(i) in
-           let ifso_result = %Box_float prim in
+           let prim = %array_load.`float`.`mut` (arr, i) in
+           let ifso_result = %box_num.`float` (prim) in
            cont k3 (ifso_result)
          where k3 (if_then_else_result) =
            apply f (if_then_else_result) -> k2 * k1)
     where k2 (apply_result) =
-      ((let prim = %array_length generic arr in
-        let prim_1 = %untag_imm prim in
-        let prim_2 = %int_arith imm prim_1 - 0i in
-        let prim_3 = %num_conv (imm -> nativeint) prim_2 in
-        let prim_4 = %array_length generic arr in
-        let prim_5 = %untag_imm prim_4 in
-        let prim_6 = %int_arith imm prim_5 - 0i in
-        let prim_7 = %num_conv (imm -> nativeint) prim_6 in
-        let prim_8 = %int_shift nativeint prim_7 asr 63i in
-        let prim_9 = %int_arith nativeint prim_8 lxor -1n in
-        let prim_10 = %int_arith nativeint prim_9 land prim_3 in
-        let prim_11 = %num_conv (nativeint -> imm) prim_10 in
-        let prim_12 = %untag_imm i in
-        let prim_13 = %int_comp imm prim_12 < prim_11 in
+      ((let prim = %array_length.`generic` (arr) in
+        let prim_1 = %untag_imm (prim) in
+        let prim_2 = %int_barith.`imm`.`sub` (prim_1, 0i) in
+        let prim_3 = %num_conv.[`imm`].[`nativeint`] (prim_2) in
+        let prim_4 = %array_length.`generic` (arr) in
+        let prim_5 = %untag_imm (prim_4) in
+        let prim_6 = %int_barith.`imm`.`sub` (prim_5, 0i) in
+        let prim_7 = %num_conv.[`imm`].[`nativeint`] (prim_6) in
+        let prim_8 = %int_shift.`nativeint`.`asr` (prim_7, 63i) in
+        let prim_9 = %int_barith.`nativeint`.`xor` (prim_8, -1n) in
+        let prim_10 = %int_barith.`nativeint`.`and` (prim_9, prim_3) in
+        let prim_11 = %num_conv.[`nativeint`].[`imm`] (prim_10) in
+        let prim_12 = %untag_imm (i) in
+        let prim_13 = %int_comp.`imm`.`lt` (prim_12, prim_11) in
         switch prim_13
           | 0 -> k3
           | 1 -> k4)
@@ -65,16 +65,16 @@ let code size(120)
          where k3 =
            cont k1 pop(regular k1) ($camlTests3__block30)
          where k2 =
-           ((let cond_result = %is_flat_float_array arr in
+           ((let cond_result = %is_flat_float_array (arr) in
              switch cond_result
                | 0 -> k4
                | 1 -> k3)
               where k4 =
-                let ifnot_result = %array_set arr.(i) <- apply_result in
+                let ifnot_result = %array_set (arr, i, apply_result) in
                 cont k2 (ifnot_result)
               where k3 =
-                let prim = %unbox_float apply_result in
-                let ifso_result = %array_set float arr.(i) = prim in
+                let prim = %unbox_num.`float` (apply_result) in
+                let ifso_result = %array_set.`float` (arr, i, prim) in
                 cont k2 (ifso_result)
               where k2 (if_then_else_result : imm tagged) =
                 cont k (if_then_else_result)))
@@ -84,35 +84,35 @@ let code size(39)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  (let prim = %int_comp c < 0 in
-   let Pintcomp = %Tag_imm prim in
-   (let untagged = %untag_imm Pintcomp in
+  (let prim = %int_comp.`lt` (c, 0) in
+   let Pintcomp = %tag_imm (prim) in
+   (let untagged = %untag_imm (Pintcomp) in
     switch untagged
       | 0 -> k3
       | 1 -> k2 (x'))
      where k3 =
-       let Paddint = x' + 10 in
+       let Paddint = %int_barith.`add` (x', 10) in
        cont k2 (Paddint))
     where k2 (x : imm tagged) =
-      ((let prim = %int_comp c < 0 in
-        let Pintcomp = %Tag_imm prim in
-        (let untagged = %untag_imm Pintcomp in
+      ((let prim = %int_comp.`lt` (c, 0) in
+        let Pintcomp = %tag_imm (prim) in
+        (let untagged = %untag_imm (Pintcomp) in
          switch untagged
            | 0 -> k3
            | 1 -> k2 (y'))
           where k3 =
-            let Paddint = y' + 20 in
+            let Paddint = %int_barith.`add` (y', 20) in
             cont k2 (Paddint))
          where k2 (y : imm tagged) =
-           let Paddint = x + y in
+           let Paddint = %int_barith.`add` (x, y) in
            cont k (Paddint))
 in
 (let foo = closure foo_0 @foo in
  let f = closure f_1 @f in
- let Pmakeblock = %Block 0 (foo, f) in
+ let Pmakeblock = %block.[`0`] (foo, f) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load tag(0) size(2) (0) module_block in
-    let field_1 = %block_load tag(0) size(2) (1) module_block in
+    let field_0 = %block_load.`tag`[`0`].`size`[`2`].[`0`] (module_block) in
+    let field_1 = %block_load.`tag`[`0`].`size`[`2`].[`1`] (module_block) in
     let $camlTests3 = Block 0 (field_0, field_1) in
     cont done ($camlTests3)

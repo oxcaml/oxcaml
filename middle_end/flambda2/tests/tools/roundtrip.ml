@@ -58,7 +58,7 @@ let () =
     in
     match Compare.flambda_units unit unit' with
     | Equivalent ->
-      if false then
+      if true then
         let corrected_file = file ^ ".corrected" in
         Printf.eprintf "Roundtrip test: %s: SUCCESS\nSaving transpiled file as %s\n"
           file corrected_file;
