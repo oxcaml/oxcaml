@@ -30,7 +30,8 @@ module Scoped_location : sig
   type scopes = private
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
-               assume_zero_alloc: ZA.Assume_info.t}
+               assume_zero_alloc: ZA.Assume_info.t;
+               mangling_path: Structured_mangling.path}
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
@@ -53,7 +54,7 @@ module Scoped_location : sig
   val enter_class_definition : scopes:scopes -> Ident.t -> scopes
   val enter_method_definition : scopes:scopes -> Asttypes.label -> scopes
   val enter_lazy : scopes:scopes -> scopes
-  val enter_partial_or_eta_wrapper : scopes:scopes -> scopes
+  val enter_partial_or_eta_wrapper : scopes:scopes -> loc:Location.t -> scopes
   val update_assume_zero_alloc :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
   val get_assume_zero_alloc : scopes:scopes -> ZA.Assume_info.t
@@ -68,7 +69,7 @@ module Scoped_location : sig
   val to_location : t -> Location.t
   val string_of_scoped_location : include_zero_alloc:bool -> t -> string
 
-  val map_scopes : (scopes:scopes -> scopes) -> t -> t
+  val map_scopes : (scopes:scopes -> loc:Location.t -> scopes) -> t -> t
 end
 
 type item = private {
@@ -122,6 +123,13 @@ val print_compact_extended : Format.formatter -> t -> unit
 val merge : into:t -> t -> t
 
 val assume_zero_alloc : t -> ZA.Assume_info.t
+
+(** [to_structured_mangling_path] converts the debug info into a mangling path.
+      If the debug info is empty, the fallback name is used to populate the
+      path. *)
+val to_structured_mangling_path :
+  fallback_name:string -> t -> Structured_mangling.path
+
 
 module Dbg : sig
   type t

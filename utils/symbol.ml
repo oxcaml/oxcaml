@@ -91,35 +91,12 @@ let compilation_unit t = t.compilation_unit
    [Linkage_name.for_current_unit] *)
 
 let linkage_name_for_compilation_unit comp_unit =
-  (* CR-someday lmaurer: If at all possible, just use square brackets instead of
-     this unholy underscore encoding. For now I'm following the original
-     practice of avoiding non-identifier characters. *)
-  let for_pack_prefix, name, flattened_instance_args = CU.flatten comp_unit in
-  let name = CU.Name.to_string name in
-  let suffix =
-    if not (CU.Prefix.is_empty for_pack_prefix)
-    then begin
-      assert (flattened_instance_args = []);
-      let pack_names =
-        CU.Prefix.to_list for_pack_prefix |> List.map CU.Name.to_string
-      in
-      String.concat (pack_separator ()) (pack_names @ [name])
-    end else begin
-      let arg_segments =
-        List.map
-          (fun (depth, _param, value) ->
-             let extra_separators =
-               String.make depth instance_separator_depth_char
-             in
-             let value = value |> CU.Name.to_string in
-             String.concat "" [instance_separator; extra_separators; value])
-          flattened_instance_args
-      in
-      String.concat "" arg_segments
-    end
+  let name_and_suffix =
+    String.concat (pack_separator ())
+      (CU.full_path_with_arguments_as_strings ~instance_separator
+         ~instance_separator_depth_char comp_unit)
   in
-  caml_symbol_prefix ^ name ^ suffix
-  |> Linkage_name.of_string
+  caml_symbol_prefix ^ name_and_suffix |> Linkage_name.of_string
 
 let for_predef_ident id =
   assert (Ident.is_predef id);

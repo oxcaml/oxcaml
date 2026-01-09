@@ -546,6 +546,33 @@ let base_filename t =
   String.concat "" ((name |> Name.to_string) :: arg_segments)
   |> String.uncapitalize_ascii
 
+let full_path_with_arguments_as_strings ~instance_separator
+    ~instance_separator_depth_char t =
+  (* CR-someday lmaurer: If at all possible, just use square brackets instead of
+     this unholy underscore encoding. For now I'm following the original
+     practice of avoiding non-identifier characters. *)
+  let for_pack_prefix, name, flattened_instance_args = flatten t in
+  let name = Name.to_string name in
+  if not (Prefix.is_empty for_pack_prefix)
+  then (
+    assert (match flattened_instance_args with [] -> true | _ -> false);
+    let pack_names =
+      Prefix.to_list for_pack_prefix |> List.map Name.to_string
+    in
+    pack_names @ [name])
+  else
+    let arg_segments =
+      List.map
+        (fun (depth, _param, value) ->
+          let extra_separators =
+            String.make depth instance_separator_depth_char
+          in
+          let value = value |> Name.to_string in
+          String.concat "" [instance_separator; extra_separators; value])
+        flattened_instance_args
+    in
+    [String.concat "" (name :: arg_segments)]
+
 let is_parent t ~child =
   List.equal Name.equal (full_path t) (Prefix.to_list (for_pack_prefix child))
 

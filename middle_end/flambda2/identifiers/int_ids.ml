@@ -319,8 +319,8 @@ module Code_id_data = struct
       Linkage_name.print linkage_name
 
   let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
-    (* As per comment above, just looking at the linkage name suffices (same
-       below), rather than the compilation unit as well. *)
+    (* Linkage names are unique across a whole project, so there's no need to
+       hash the other fields. *)
     Linkage_name.hash linkage_name
 
   let equal
@@ -833,12 +833,29 @@ module Code_id = struct
       !previous_name_stamp
     in
     let linkage_name =
-      let name =
-        if Flambda_features.Expert.shorten_symbol_names ()
-        then Printf.sprintf "%s_%d" name name_stamp
-        else Printf.sprintf "%s_%d_code" name name_stamp
-      in
-      Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
+      match Config.name_mangling_version with
+      | Flat ->
+        let name =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "%s_%d" name name_stamp
+          else Printf.sprintf "%s_%d_code" name name_stamp
+        in
+        Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
+      | Structured ->
+        let suffix =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "_%d" name_stamp
+          else Printf.sprintf "_%d_code" name_stamp
+        in
+        (* CR sspies: Note that the fallback name still contains the additional
+           stamp. *)
+        let path =
+          Debuginfo.to_structured_mangling_path ~fallback_name:name debug
+        in
+        (* Note: Compilation unit no longer separated from the rest of the
+           mangled name via the separator in this mangling scheme. *)
+        Structured_mangling.mangle_ident compilation_unit path ^ suffix
+        |> Linkage_name.of_string
     in
     let data : Code_id_data.t =
       { compilation_unit; name; debug_info = debug; linkage_name }

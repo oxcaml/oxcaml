@@ -235,6 +235,15 @@ val full_path : t -> Name.t list
     conventions. *)
 val full_path_as_string : t -> string
 
+(** Returns the full path of the compilation unit, as a list of strings,
+    encoding arguments in the last string of the list using the given
+    [instance_separator] and [instance_separator_depth_char] *)
+val full_path_with_arguments_as_strings :
+  instance_separator:string ->
+  instance_separator_depth_char:char ->
+  t ->
+  string list
+
 (** Returns the string that should form the base of the .cmx/o file for this
     unit. Usually just [name_as_string t] uncapitalized, but if there are
     instance arguments, they're encoded in a Bash-friendly but otherwise
