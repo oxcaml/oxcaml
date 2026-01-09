@@ -278,7 +278,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
     && !Clflags.dwarf_fission = Clflags.Fission_objcopy
     && (not (Target_system.is_macos ()))
     && mode = Ccomp.Exe
-    && not !Dwarf_flags.restrict_to_upstream_dwarf
+    && not !Clflags.restrict_to_upstream_dwarf
   in
   let link_output_name =
     if needs_objcopy_workflow
@@ -347,7 +347,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
       else if
         not_output_to_dev_null output_name
         && mode = Ccomp.Exe
-        && not !Dwarf_flags.restrict_to_upstream_dwarf
+        && not !Clflags.restrict_to_upstream_dwarf
       then
         (* Run dsymutil on the executable *)
         let dsymutil_cmd =

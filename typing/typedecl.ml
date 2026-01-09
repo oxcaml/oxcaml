@@ -3114,7 +3114,9 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
   (* Save the type shapes of the declarations in [Type_shape] for debug info. *)
-  if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
+  if !Clflags.debug && not (!Clflags.restrict_to_upstream_dwarf)
+    && !Clflags.shape_format = Clflags.Debugging_shapes
+  then
     List.iter (fun (sh, (_, decl)) ->
       (* CR sspies: Adding the shapes to the table below is obsolete. The
          information is now contained in the shapes themselves. Remove it in a

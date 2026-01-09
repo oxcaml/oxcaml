@@ -83,12 +83,12 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
   if
     not
       (!Clflags.debug
-      && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
+      && ((not !Clflags.restrict_to_upstream_dwarf)
          || !Dwarf_flags.dwarf_inlined_frames))
   then { fun_end_label; fundecl }
   else
     let available_ranges_vars, fundecl =
-      if not !Dwarf_flags.restrict_to_upstream_dwarf
+      if not !Clflags.restrict_to_upstream_dwarf
       then
         Profile.record "debug_available_ranges_vars"
           (fun fundecl -> Available_ranges_vars.create ~ppf_dump fundecl)
@@ -144,7 +144,9 @@ let emit_stats_file t =
     Json.object_
       [ Json.field "compilation_parameters"
           (Json.object_
-             [ Json.field "gdwarf_config_shape_reduce_depth"
+             [ Json.field "type_to_shape_max_depth"
+                 (Json.option Json.int !Clflags.type_to_shape_max_depth);
+               Json.field "gdwarf_config_shape_reduce_depth"
                  (Json.option Json.int
                     !Clflags.gdwarf_config_shape_reduce_depth);
                Json.field "gdwarf_config_shape_eval_depth"
@@ -155,9 +157,6 @@ let emit_stats_file t =
                Json.field "gdwarf_config_max_cms_files_per_variable"
                  (Json.option Json.int
                     !Clflags.gdwarf_config_max_cms_files_per_variable);
-               Json.field "gdwarf_config_max_type_to_shape_depth"
-                 (Json.option Json.int
-                    !Clflags.gdwarf_config_max_type_to_shape_depth);
                Json.field "gdwarf_config_max_shape_reduce_steps_per_variable"
                  (Json.option Json.int
                     !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable);

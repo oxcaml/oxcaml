@@ -352,7 +352,7 @@ let gen_variable ~debug_uid v =
   let name = Variable.name v in
   let v = Backend_var.create_local name in
   let provenance =
-    if not (!Clflags.debug && not !Dwarf_flags.restrict_to_upstream_dwarf)
+    if not (!Clflags.debug && not !Clflags.restrict_to_upstream_dwarf)
     then None
     else if not user_visible
     then None

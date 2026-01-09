@@ -259,6 +259,11 @@ let read_one_param ppf position name v =
   if not handled then
   match name with
   | "g" -> set "g" [ Clflags.debug ] v
+  | "gupstream-dwarf" ->
+      (match v with
+      | "0" -> Clflags.no_restrict_to_upstream_dwarf ()
+      | "1" -> Clflags.set_restrict_to_upstream_dwarf ()
+      | _ -> Printf.ksprintf (print_error ppf) "bad value %s for %s" v name)
   | "bin-annot" -> set "bin-annot" [ Clflags.binary_annotations ] v
   | "bin-annot-cms" -> set "bin-annot-cms" [ Clflags.binary_annotations_cms ] v
   | "afl-instrument" -> set "afl-instrument" [ Clflags.afl_instrument ] v
@@ -378,6 +383,9 @@ let read_one_param ppf position name v =
     Int_arg_helper.parse v
       "Bad syntax in OCAMLPARAM for 'inline-max-depth'"
       inline_max_depth
+  | "type-to-shape-max-depth" ->
+    int_option_with_none ppf "type-to-shape-max-depth"
+      type_to_shape_max_depth v
   | "gdwarf-config-shape-reduce-depth" ->
     int_option_with_none ppf "gdwarf-config-shape-reduce-depth"
       gdwarf_config_shape_reduce_depth v
@@ -390,9 +398,6 @@ let read_one_param ppf position name v =
   | "gdwarf-config-max-cms-files-per-variable" ->
     int_option_with_none ppf "gdwarf-config-max-cms-files-per-variable"
       gdwarf_config_max_cms_files_per_variable v
-  | "gdwarf-config-max-type-to-shape-depth" ->
-    int_option_with_none ppf "gdwarf-config-max-type-to-shape-depth"
-      gdwarf_config_max_type_to_shape_depth v
   | "gdwarf-config-max-shape-reduce-steps-per-variable" ->
     int_option_with_none ppf
       "gdwarf-config-max-shape-reduce-steps-per-variable"
