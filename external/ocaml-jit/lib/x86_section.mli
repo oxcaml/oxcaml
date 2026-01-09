@@ -16,12 +16,15 @@
 
 open Import
 
-type t = { name : string; instructions : X86_ast.asm_line list }
+type t =
+  { name : string;
+    instructions : X86_ast.asm_program
+  }
 
 val assemble : arch:X86_ast.arch -> t -> X86_binary_emitter.buffer
 
 module Map : sig
-  type t = X86_ast.asm_line list String.Map.t
+  type t = X86_ast.asm_program String.Map.t
 
   val from_program : X86_ast.asm_program -> t
 end
