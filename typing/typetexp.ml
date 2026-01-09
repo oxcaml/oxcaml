@@ -686,7 +686,8 @@ let transl_type_param env path jkind_default styp =
           Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind_annot
         in
         jkind, Some jkind_annot
-    | Some _, None, Some _ -> assert false  (* no implicit jkinds for underscores *)
+    | Some _, None, Some _ -> assert false
+      (* no implicit jkinds for underscores *)
   in
   let attrs = styp.ptyp_attributes in
   match styp.ptyp_desc with
