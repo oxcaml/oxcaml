@@ -45,30 +45,15 @@ type visibility =
   | Global
   | Local
 
-module Thing = struct
-  type t =
-    { name : string;
-      already_encoded : bool;
-      visibility : visibility
-    }
+type t =
+  { name : string;
+    already_encoded : bool;
+    visibility : visibility
+  }
 
-  (* Compare and hash on name only - visibility doesn't affect identity *)
-  let compare { name = name1; already_encoded = already_encoded1; _ }
-      { name = name2; already_encoded = already_encoded2; _ } =
-    let cmp = String.compare name1 name2 in
-    if cmp = 0 then Bool.compare already_encoded1 already_encoded2 else cmp
+let output chan { name; _ } = Printf.fprintf chan "%s" name
 
-  let equal t1 t2 = compare t1 t2 = 0
-
-  let hash t = Hashtbl.hash t.name
-
-  let output chan { name; _ } = Printf.fprintf chan "%s" name
-
-  let print fmt { name; _ } = Format.pp_print_string fmt name
-end
-
-include Thing
-include Identifiable.Make (Thing)
+let print fmt { name; _ } = Format.pp_print_string fmt name
 
 let create ~visibility name = { name; already_encoded = false; visibility }
 
@@ -116,6 +101,29 @@ let encode { name; already_encoded } =
   else
     let symbol_prefix = symbol_prefix () in
     to_escaped_string ~symbol_prefix name
+
+(* Comparison and hashing are based on the encoded form, so two symbols that
+   produce the same assembly output are considered equal regardless of how they
+   were constructed. *)
+let compare t1 t2 = String.compare (encode t1) (encode t2)
+
+let equal t1 t2 = compare t1 t2 = 0
+
+let hash t = Hashtbl.hash (encode t)
+
+include Identifiable.Make (struct
+  type nonrec t = t
+
+  let compare = compare
+
+  let equal = equal
+
+  let hash = hash
+
+  let output = output
+
+  let print = print
+end)
 
 (* We predefine several common symbols that violate the standard escaping done
    by [encode]. All predefined symbols are global (runtime functions). *)

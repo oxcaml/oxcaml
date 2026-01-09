@@ -34,6 +34,9 @@ type visibility =
   | Global
   | Local
 
+(** Comparison and hashing of symbols is based on their encoded form (as
+    returned by [encode]), so two symbols that produce the same assembly output
+    are considered equal regardless of how they were constructed. *)
 include Identifiable.S
 
 (** [create] creates a new symbol with the given visibility. *)
