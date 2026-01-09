@@ -108,6 +108,27 @@ Caml_inline status caml_allocation_status(void) {
     : caml_global_heap_state.UNMARKED;
 }
 
+/* Return the array of free lists for the given heap. One free list
+ * per sizeclass. This allows the promoting allocations during a minor
+ * GC to avoid calling into the shared_heap module during the common
+ * case. */
+
+value ***caml_shared_free_lists(struct caml_heap_state *);
+
+/* Update the shared-heap data structures because a free list
+ * (for the sizeclass of objects of the given whsize) has become full. */
+
+void caml_shared_empty_free_list(struct caml_heap_state *,
+                                 mlsize_t /* whsize */);
+
+/* Update shared-heap stats at the end of a minor GC, to account for
+ * some number of free-list allocations. */
+
+void caml_shared_add_pool_stats(struct caml_heap_state *,
+                                uintnat /* pool_live_blocks */,
+                                uintnat /* pool_live_words */,
+                                uintnat /* pool_frag_words */);
+
 void caml_redarken_pool(struct pool*, scanning_action, void*);
 
 intnat caml_sweep(struct caml_heap_state*, intnat);
