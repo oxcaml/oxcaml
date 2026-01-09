@@ -120,12 +120,6 @@ type functor_dependency_error =
 type legacy_module =
   | Compilation_unit
   | Toplevel
-  | Functor_body
-
-(** Places where modes annotations are not supported *)
-type unsupported_modal_module =
-  | Functor_param
-  | Functor_res
 
 type error =
     Cannot_apply of module_type
@@ -180,7 +174,6 @@ type error =
   | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Submode_failed of Mode.Value.error
   | Item_weaker_than_structure of Mode.Value.error
-  | Unsupported_modal_module of unsupported_modal_module
   | Legacy_module of legacy_module * Mode.Value.error
 
 exception Error of Location.t * Env.t * error
