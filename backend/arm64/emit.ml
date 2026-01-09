@@ -893,6 +893,59 @@ let is_immediate_float32 bits =
   let mant = Int32.logand bits 0x7F_FFFFl in
   exp >= -3 && exp <= 4 && Int32.equal (Int32.logand mant 0x78_0000l) mant
 
+(* Check if an offset is valid for ARM64 load/store instructions *)
+
+let is_offset_in_range ~size_in_bytes n =
+  (n >= -256 && n <= 255)
+  || n >= 0
+     && n land (size_in_bytes - 1) = 0
+     &&
+     let shift =
+       match size_in_bytes with
+       | 1 -> 0
+       | 2 -> 1
+       | 4 -> 2
+       | 8 -> 3
+       | 16 -> 4
+       | _ -> fatal_error "is_offset_in_range: unexpected size"
+     in
+     n lsr shift < 0x1000
+
+let emit_load_store_sp_offset ~instr ~operand ~offset ~size_in_bytes =
+  if is_offset_in_range ~size_in_bytes offset
+  then DSL.ins instr [| operand; DSL.emit_mem_sp_offset offset |]
+  else (
+    emit_intconst reg_tmp1 (Nativeint.of_int offset);
+    DSL.ins I.ADD [| DSL.emit_reg reg_tmp1; DSL.sp; DSL.emit_reg reg_tmp1 |];
+    DSL.ins instr [| operand; DSL.emit_mem reg_tmp1 |])
+
+let emit_load_store_stack ~instr ~operand ~size_in_bytes (r : Reg.t) =
+  match r.loc with
+  | Stack (Domainstate _) -> DSL.ins instr [| operand; DSL.emit_stack r |]
+  | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
+    let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
+    emit_load_store_sp_offset ~instr ~operand ~offset:ofs ~size_in_bytes
+  | Reg _ | Unknown ->
+    fatal_error "emit_load_store_stack: invalid register location"
+
+let emit_ldr_sp_offset ~dst ~offset =
+  emit_load_store_sp_offset ~instr:I.LDR ~operand:dst ~offset ~size_in_bytes:8
+
+let emit_str_sp_offset ~src ~offset =
+  emit_load_store_sp_offset ~instr:I.STR ~operand:src ~offset ~size_in_bytes:8
+
+let emit_ldr_stack ~dst (r : Reg.t) =
+  emit_load_store_stack ~instr:I.LDR ~operand:dst ~size_in_bytes:8 r
+
+let emit_str_stack ~src (r : Reg.t) =
+  emit_load_store_stack ~instr:I.STR ~operand:src ~size_in_bytes:8 r
+
+let emit_ldr_w_stack ~dst (r : Reg.t) =
+  emit_load_store_stack ~instr:I.LDR ~operand:dst ~size_in_bytes:4 r
+
+let emit_str_w_stack ~src (r : Reg.t) =
+  emit_load_store_stack ~instr:I.STR ~operand:src ~size_in_bytes:4 r
+
 (* Adjust sp (up or down) by the given byte amount *)
 
 let emit_stack_adjustment n =
@@ -1532,10 +1585,8 @@ let move (src : Reg.t) (dst : Reg.t) =
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
       DSL.ins I.MOV [| DSL.emit_reg dst; DSL.emit_reg src |]
-    | _, Reg _, _, Stack _ ->
-      DSL.ins I.STR [| DSL.emit_reg src; DSL.emit_stack dst |]
-    | _, Stack _, _, Reg _ ->
-      DSL.ins I.LDR [| DSL.emit_reg dst; DSL.emit_stack src |]
+    | _, Reg _, _, Stack _ -> emit_str_stack ~src:(DSL.emit_reg src) dst
+    | _, Stack _, _, Reg _ -> emit_ldr_stack ~dst:(DSL.emit_reg dst) src
     | _, Stack _, _, Stack _ ->
       Misc.fatal_errorf "Illegal move between registers (%a to %a)\n"
         Printreg.reg src Printreg.reg dst
@@ -1669,11 +1720,10 @@ let emit_instr i =
     if !contains_calls
     then (
       D.cfi_offset ~reg:30 (* return address *) ~offset:(-8);
-      DSL.ins I.STR [| DSL.reg_x_30; DSL.emit_mem_sp_offset (n - 8) |])
+      emit_str_sp_offset ~src:DSL.reg_x_30 ~offset:(n - 8))
   | Lepilogue_open ->
     let n = frame_size () in
-    if !contains_calls
-    then DSL.ins I.LDR [| DSL.reg_x_30; DSL.emit_mem_sp_offset (n - 8) |];
+    if !contains_calls then emit_ldr_sp_offset ~dst:DSL.reg_x_30 ~offset:(n - 8);
     if n > 0 then emit_stack_adjustment n
   | Lepilogue_close ->
     let n = frame_size () in
@@ -1691,10 +1741,8 @@ let emit_instr i =
       match src.loc, dst.loc with
       | Reg _, Reg _ ->
         DSL.ins I.MOV [| DSL.emit_reg_w dst; DSL.emit_reg_w src |]
-      | Reg _, Stack _ ->
-        DSL.ins I.STR [| DSL.emit_reg_w src; DSL.emit_stack dst |]
-      | Stack _, Reg _ ->
-        DSL.ins I.LDR [| DSL.emit_reg_w dst; DSL.emit_stack src |]
+      | Reg _, Stack _ -> emit_str_w_stack ~src:(DSL.emit_reg_w src) dst
+      | Stack _, Reg _ -> emit_ldr_w_stack ~dst:(DSL.emit_reg_w dst) src
       | Stack _, Stack _ | _, Unknown | Unknown, _ -> assert false)
   | Lop (Const_int n) -> emit_intconst i.res.(0) n
   | Lop (Const_float32 f) ->
