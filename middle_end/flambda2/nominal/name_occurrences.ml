@@ -809,6 +809,10 @@ let all_value_slots_at_normal_mode t =
       then Value_slot.Set.add value_slot acc
       else acc)
 
+let contains_function_or_value_slots t =
+  (not (all_function_slots t |> Function_slot.Set.is_empty))
+  || not (all_value_slots t |> Value_slot.Set.is_empty)
+
 let variables t = For_names.keys t.names |> Name.set_to_var_set
 
 let symbols t = For_names.keys t.names |> Name.set_to_symbol_set
