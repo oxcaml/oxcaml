@@ -47,6 +47,9 @@ let replace_mapper id to_replace =
         | _ -> Tast_mapper.default.expr mapper e);
   }
 
+let ignore_guard ~c_guard e =
+  match c_guard with None -> e | Some guard -> E.list [ E.ignore guard; e ]
+
 let minimize should_remove map cur_name =
   let simplify_match_mapper =
     (* match e1 with x -> e2 => e2[x->e1] *)
@@ -57,6 +60,15 @@ let minimize should_remove map cur_name =
         (fun mapper e ->
           Tast_mapper.default.expr mapper
             (match view_texp e.exp_desc with
+            | O (Texp_try (e_try, [ { c_lhs; c_guard; c_rhs } ])) ->
+                (* try e1 with p -> e2 => e1 *)
+                (* try e1 with p -> e2 => let p = __dummy2__ () in e2 *)
+                if should_remove () then e_try
+                else if should_remove () then
+                  E.let_
+                    [ E.bind c_lhs Dummy.apply_dummy2 ]
+                    (ignore_guard ~c_guard c_rhs)
+                else e
             | Texp_match
                 ( e_match,
                   [
@@ -73,11 +85,6 @@ let minimize should_remove map cur_name =
                     let rep_map = replace_mapper id e_match.exp_desc in
                     rep_map.expr rep_map c_rhs
                 | _ when should_remove () ->
-                    let add_guard e =
-                      match c_guard with
-                      | None -> e
-                      | Some guard -> E.list [ E.ignore guard; e ]
-                    in
                     let pat_desc = (tva :> pattern) in
                     let pat_desc =
                       {
@@ -85,18 +92,16 @@ let minimize should_remove map cur_name =
                         pat_extra = c_lhs.pat_extra @ pat_desc.pat_extra;
                       }
                     in
-                    let value_binding =
-                      mk_value_binding
-                        ~id:
-                          (value_binding_identifier_from_texp_match_identifier
-                             id)
-                        ~vb_pat:(pat_desc :> pattern)
-                        ~vb_expr:e_match ~vb_attributes:c_lhs.pat_attributes ()
+                    let id =
+                      value_binding_identifier_from_texp_match_identifier id
                     in
-                    let texp_let =
-                      Texp_let (Nonrecursive, [ value_binding ], add_guard c_rhs)
-                    in
-                    { e with exp_desc = texp_let }
+                    E.let_
+                      [
+                        E.bind ~attrs:c_lhs.pat_attributes ~id
+                          (pat_desc :> pattern)
+                          e_match;
+                      ]
+                      (ignore_guard ~c_guard c_rhs)
                 | _ -> e)
             | _ -> e));
     }

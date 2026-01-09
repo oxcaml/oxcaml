@@ -319,4 +319,16 @@ module E = struct
     | [] -> unit
     | [ e ] -> e
     | e :: es -> desc (mkTexp_sequence (e, list es))
+
+  let bind ?(attrs = []) ?id p e =
+    mk_value_binding ?id () ~vb_pat:p ~vb_expr:e ~vb_attributes:attrs
+
+  let let_ value_bindings expr =
+    desc (Texp_let (Nonrecursive, value_bindings, expr))
+
+  let match_ ?id e = function
+    | [] -> list [ ignore e; Dummy.apply_dummy2 ]
+    | cases -> desc (mkTexp_match ?id (e, cases, Partial))
+
+  let try_ e = function [] -> e | cases -> desc (Texp_try (e, cases))
 end
