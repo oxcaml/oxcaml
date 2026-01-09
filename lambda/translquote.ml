@@ -110,9 +110,7 @@ let bind id def body =
 
 (* Utility for loop/comprehension direction *)
 
-let for_dir_as_bool = function
-  | Upto -> true
-  | Downto -> false
+let for_dir_as_bool = function Upto -> true | Downto -> false
 
 (* Typed representation of complex lambdas *)
 
