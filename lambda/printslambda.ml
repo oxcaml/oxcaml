@@ -1,3 +1,3 @@
-let slambda = Printslambda0.slambda0 Printlambda.lambda
+let slambda = Printlambda.slambda
 
 let program ppf { Slambda.code; _ } = slambda ppf code
