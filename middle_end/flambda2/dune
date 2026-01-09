@@ -21,8 +21,6 @@
    -open
    Flambda2_parser
    -open
-   Flambda2_newparser
-   -open
    Flambda2_simplify
    -open
    Flambda2_simplify_shared
@@ -47,7 +45,6 @@
   flambda2_cmx
   flambda2_from_lambda
   flambda2_parser
-  flambda2_newparser
   flambda2_simplify
   flambda2_simplify_shared
   flambda2_terms

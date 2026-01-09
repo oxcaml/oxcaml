@@ -7,13 +7,11 @@ type location = Lexing.position * Lexing.position
 type error =
   | Illegal_character of char
   | Invalid_literal of string
-  | No_such_primitive of string
 ;;
 
 let pp_error ppf = function
   | Illegal_character c -> Format.fprintf ppf "Illegal character %c" c
   | Invalid_literal s -> Format.fprintf ppf "Invalid literal %s" s
-  | No_such_primitive s -> Format.fprintf ppf "No such primitive %%%s" s
 
 exception Error of error * location;;
 
@@ -36,10 +34,8 @@ let keyword_table =
     "any", KWD_ANY;
     "apply", KWD_APPLY;
     "array", KWD_ARRAY;
-    "asr", KWD_ASR;
     "available", KWD_AVAILABLE;
     "boxed", KWD_BOXED;
-    "bswap", KWD_BSWAP;
     "ccall", KWD_CCALL;
     "closure", KWD_CLOSURE;
     "code", KWD_CODE;
@@ -55,10 +51,7 @@ let keyword_table =
     "error", KWD_ERROR;
     "exn", KWD_EXN;
     "float", KWD_FLOAT;
-    "generic", KWD_GENERIC;
-    "gc_ignorable", KWD_GC_IGNORABLE;
     "halt_and_catch_fire", KWD_HCF;
-    "heap_or_local", KWD_HEAP_OR_LOCAL;
     "hint", KWD_HINT;
     "id", KWD_ID;
     "imm", KWD_IMM;
@@ -71,14 +64,9 @@ let keyword_table =
     "int32", KWD_INT32;
     "int64", KWD_INT64;
     "invalid", KWD_INVALID;
-    "land", KWD_LAND;
     "let", KWD_LET;
     "local", KWD_LOCAL;
     "loopify", KWD_LOOPIFY;
-    "lor", KWD_LOR;
-    "lxor", KWD_LXOR;
-    "lsl", KWD_LSL;
-    "lsr", KWD_LSR;
     "mutable", KWD_MUTABLE;
     "nativeint", KWD_NATIVEINT;
     "never", KWD_NEVER;
@@ -97,7 +85,6 @@ let keyword_table =
     "size", KWD_SIZE;
     "succ", KWD_SUCC;
     "switch", KWD_SWITCH;
-    "tag", KWD_TAG;
     "tagged", KWD_TAGGED;
     "tailrec", KWD_TAILREC;
     "toplevel", KWD_TOPLEVEL;
@@ -105,7 +92,6 @@ let keyword_table =
     "unit", KWD_UNIT;
     "unreachable", KWD_UNREACHABLE;
     "unroll", KWD_UNROLL;
-    "unsigned", KWD_UNSIGNED;
     "val", KWD_VAL;
     "where", KWD_WHERE;
     "with", KWD_WITH;
@@ -124,59 +110,6 @@ let ident_or_keyword str =
 
 let is_keyword str =
   Hashtbl.mem keyword_table str
-
-let prim_table =
-  create_hashtable [
-    "array_length", PRIM_ARRAY_LENGTH;
-    "array_load", PRIM_ARRAY_LOAD;
-    "array_set", PRIM_ARRAY_SET;
-    "begin_region", PRIM_BEGIN_REGION;
-    "begin_ghost_region", PRIM_BEGIN_GHOST_REGION;
-    "begin_try_region", PRIM_BEGIN_TRY_REGION;
-    "begin_ghost_try_region", PRIM_BEGIN_GHOST_TRY_REGION;
-    "bigstring_load", PRIM_BIGSTRING_LOAD;
-    "bigstring_set", PRIM_BIGSTRING_SET;
-    "Block", PRIM_BLOCK;
-    "block_load", PRIM_BLOCK_LOAD;
-    "block_set", PRIM_BLOCK_SET;
-    "not", PRIM_BOOLEAN_NOT;
-    "Box_float", PRIM_BOX_FLOAT;
-    "Box_int32", PRIM_BOX_INT32;
-    "Box_int64", PRIM_BOX_INT64;
-    "Box_nativeint", PRIM_BOX_NATIVEINT;
-    "bytes_length", PRIM_BYTES_LENGTH;
-    "bytes_load", PRIM_BYTES_LOAD;
-    "bytes_set", PRIM_BYTES_SET;
-    "end_region", PRIM_END_REGION;
-    "end_ghost_region", PRIM_END_GHOST_REGION;
-    "end_try_region", PRIM_END_TRY_REGION;
-    "end_ghost_try_region", PRIM_END_GHOST_TRY_REGION;
-    "get_tag", PRIM_GET_TAG;
-    "int_arith", PRIM_INT_ARITH;
-    "int_comp", PRIM_INT_COMP;
-    "int_shift", PRIM_INT_SHIFT;
-    "is_flat_float_array", PRIM_IS_FLAT_FLOAT_ARRAY;
-    "is_int", PRIM_IS_INT;
-    "num_conv", PRIM_NUM_CONV;
-    "Opaque", PRIM_OPAQUE;
-    "phys_eq", PRIM_PHYS_EQ;
-    "phys_ne", PRIM_PHYS_NE;
-    "project_value_slot", PRIM_PROJECT_VALUE_SLOT;
-    "project_function_slot", PRIM_PROJECT_FUNCTION_SLOT;
-    "string_length", PRIM_STRING_LENGTH;
-    "string_load", PRIM_STRING_LOAD;
-    "Tag_imm", PRIM_TAG_IMM;
-    "unbox_float", PRIM_UNBOX_FLOAT;
-    "unbox_int32", PRIM_UNBOX_INT32;
-    "unbox_int64", PRIM_UNBOX_INT64;
-    "unbox_nativeint", PRIM_UNBOX_NATIVEINT;
-    "unbox_vec128", PRIM_UNBOX_VEC128;
-    "untag_imm", PRIM_UNTAG_IMM;
-]
-
-let prim ~lexbuf str =
-  try Hashtbl.find prim_table str
-  with Not_found -> error ~lexbuf (No_such_primitive str)
 
 let unquote_ident str =
   match str with
@@ -265,32 +198,11 @@ rule token = parse
       { LBRACKPIPE }
   | "|]"
       { RBRACKPIPE }
-  | "+"  { PLUS }
-  | "-"  { MINUS }
   | "*"  { STAR }
-  | "/"  { SLASH }
-  | "%"  { PERCENT }
-  | "<"  { LESS }
-  | ">"  { GREATER }
-  | "<=" { LESSEQUAL }
-  | ">=" { GREATEREQUAL }
-  | "<>" { NOTEQUAL }
-  | "?"  { QMARK }
-  | "+." { PLUSDOT }
-  | "-." { MINUSDOT }
-  | "*." { STARDOT }
-  | "/." { SLASHDOT }
-  | "=." { EQUALDOT }
-  | "<>." { NOTEQUALDOT }
-  | "<." { LESSDOT }
-  | "<=." { LESSEQUALDOT }
-  | "?." { QMARKDOT }
-  | "<-" { LESSMINUS }
   | "->" { MINUSGREATER }
   | "@" { AT }
   | "|"  { PIPE }
   | "~"  { TILDE }
-  | "~-"  { TILDEMINUS }
   | "&"  { AMP }
   | "^"  { CARET }
   | "===>" { BIGARROW }
@@ -304,8 +216,8 @@ rule token = parse
      '.')?
     ((identchar+ | quoted_ident) as ident)
          { symbol cunit_ident cunit_linkage_name ident }
-  | '%' (identchar+ as p)
-         { prim ~lexbuf p }
+  | '%' identchar+ as p
+         { PRIM p }
   | (int_literal as lit) (int_modifier as modif)?
          { INT (lit, modif) }
   | float_literal | hex_float_literal as lit

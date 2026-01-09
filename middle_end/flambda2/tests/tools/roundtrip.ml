@@ -7,8 +7,8 @@ let save unit filename =
     ~exceptionally:(fun () -> Misc.remove_file filename)
     (fun () ->
       let ppf = out |> Format.formatter_of_out_channel in
-      let fexpr = unit |> Flambda2_newparser.Flambda_to_fexpr.conv in
-      Flambda2_newparser.Print_fexpr.flambda_unit ppf fexpr;
+      let fexpr = unit |> Flambda_to_fexpr.conv in
+      Print_fexpr.flambda_unit ppf fexpr;
       Format.pp_print_flush ppf ())
 
 let dump_text filename =
@@ -48,23 +48,16 @@ let () =
       Misc.try_finally
         ~always:(fun () -> Sys.remove temp_file)
         (fun () ->
-          match Flambda2_newparser.Parse_flambda.parse temp_file with
+          match Parse_flambda.parse temp_file with
           | Ok unit' -> unit'
           | Error e ->
-            Test_utils.dump_error (Obj.magic e);
+            Test_utils.dump_error e;
             dump_text temp_file;
             Out_channel.flush stderr;
             raise Test_utils.Failure)
     in
     match Compare.flambda_units unit unit' with
-    | Equivalent ->
-      if true then
-        let corrected_file = file ^ ".corrected" in
-        Printf.eprintf "Roundtrip test: %s: SUCCESS\nSaving transpiled file as %s\n"
-          file corrected_file;
-        save unit corrected_file
-      else
-        Printf.eprintf "Roundtrip test: %s: PASS\n" file
+    | Equivalent -> Printf.eprintf "Roundtrip test: %s: PASS\n" file
     | Different { approximant } ->
       let corrected_file = file ^ ".corrected" in
       Printf.eprintf "Roundtrip test: %s: FAIL\nSaving corrected file as %s\n"

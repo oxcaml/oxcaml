@@ -28,8 +28,8 @@ end
 
 module Test_outcome = struct
   type t =
-    (* | Pass *)
-    | Fail of { corrected : Flambda2_newparser.Fexpr.expect_test_spec }
+    | Pass
+    | Fail of { corrected : Fexpr.expect_test_spec }
 end
 
 let run_expect_test ~get_module_info ~extension ~filename
@@ -49,13 +49,9 @@ let run_expect_test ~get_module_info ~extension ~filename
   in
   let expected_fl = Fexpr_to_flambda.conv comp_unit expected in
   match Compare.flambda_units actual_fl expected_fl with
-  | Equivalent ->
-      let before = Flambda2_newparser.Flambda_to_fexpr.conv before_fl in
-      let actual_fexpr = Flambda2_newparser.Flambda_to_fexpr.conv actual_fl in
-      Fail { corrected = { before; after = actual_fexpr } }
+  | Equivalent -> Pass
   | Different { approximant = actual' } ->
-    let before = Flambda2_newparser.Flambda_to_fexpr.conv before_fl in
-    let actual_fexpr = Flambda2_newparser.Flambda_to_fexpr.conv actual' in
+    let actual_fexpr = Flambda_to_fexpr.conv actual' in
     Fail { corrected = { before; after = actual_fexpr } }
 
 let show_diff a b =
@@ -81,12 +77,12 @@ let run_flt_file filename : Outcome.t =
     match
       run_expect_test ~get_module_info ~extension:".flt" ~filename test_spec
     with
-    (* | Pass -> *)
-    (*   Format.eprintf "%s: PASS@." filename; *)
-    (*   Success *)
+    | Pass ->
+      Format.eprintf "%s: PASS@." filename;
+      Success
     | Fail { corrected } ->
       Format.eprintf "%s: FAIL@." filename;
-      save_corrected corrected ~desc:"test" ~print:Flambda2_newparser.Print_fexpr.expect_test_spec
+      save_corrected corrected ~desc:"test" ~print:Print_fexpr.expect_test_spec
         ~orig_filename:filename;
       Failure)
   | Error e ->
@@ -107,13 +103,13 @@ let run_mdflx_file filename : Outcome.t =
               run_expect_test test_spec ~get_module_info ~extension:".mdflx"
                 ~filename
             with
-            (* | Pass -> *)
-            (*   Format.eprintf "PASS@."; *)
-            (*   node *)
+            | Pass ->
+              Format.eprintf "PASS@.";
+              node
             | Fail { corrected } ->
               all_passed := false;
               Format.eprintf "FAIL@.";
-              Expect (Obj.magic corrected)))
+              Expect corrected))
         doc
     in
     if !all_passed
