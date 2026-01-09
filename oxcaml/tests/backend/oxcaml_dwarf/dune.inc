@@ -6,7 +6,8 @@
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -55,7 +56,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -104,7 +106,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -153,7 +156,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -202,7 +206,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -251,7 +256,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -300,7 +306,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -349,7 +356,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -398,7 +406,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -447,7 +456,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -496,7 +506,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
@@ -545,7 +556,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections))
  (foreign_archives simd_stubs))
 
 (rule
