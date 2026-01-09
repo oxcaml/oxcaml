@@ -14,6 +14,7 @@ type cpu_type = [
   | `X86
   | `X86_64
   | `ARM
+  | `ARM64
   | `POWERPC
   | `POWERPC64
   | unknown
@@ -164,6 +165,17 @@ type reloc_type = [
   | `PPC_RELOC_HA16_SECTDIFF
   | `PPC_RELOC_JBSR
   | `PPC_RELOC_LO14_SECTDIFF
+  | `ARM64_RELOC_UNSIGNED
+  | `ARM64_RELOC_SUBTRACTOR
+  | `ARM64_RELOC_BRANCH26
+  | `ARM64_RELOC_PAGE21
+  | `ARM64_RELOC_PAGEOFF12
+  | `ARM64_RELOC_GOT_LOAD_PAGE21
+  | `ARM64_RELOC_GOT_LOAD_PAGEOFF12
+  | `ARM64_RELOC_POINTER_TO_GOT
+  | `ARM64_RELOC_TLVP_LOAD_PAGE21
+  | `ARM64_RELOC_TLVP_LOAD_PAGEOFF12
+  | `ARM64_RELOC_ADDEND
   | unknown
 ]
 
@@ -531,3 +543,29 @@ type command =
 val read : Owee_buf.t -> header * command list
 
 val section_body : Owee_buf.t -> segment -> section -> Owee_buf.t
+
+(** Find a segment by name in the load commands. *)
+val find_segment : command list -> string -> segment option
+
+(** Find a section by name within a segment. *)
+val find_section : segment -> string -> section option
+
+(** Find a section by name in any segment (useful for object files). *)
+val find_section_any_segment : command list -> string -> (segment * section) option
+
+(** Extract section body as a string. *)
+val section_body_string : Owee_buf.t -> segment -> section -> string
+
+(** Get the symbol table from load commands. *)
+val get_symbol_table : command list -> (symbol array * Owee_buf.t) option
+
+(** A resolved relocation with offset, symbol name, and addend.
+    For Mach-O, addend is always 0 since it uses REL format. *)
+type resolved_relocation = {
+  r_offset : int;
+  r_symbol : string;
+  r_addend : int64;
+}
+
+(** Extract relocations from a section, resolving symbol names. *)
+val extract_section_relocations : symbol array -> section -> resolved_relocation list
