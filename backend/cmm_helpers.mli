@@ -1220,19 +1220,31 @@ val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 
 val perform : dbg:Debuginfo.t -> expression -> expression
 
-val run_stack :
+val with_stack :
   dbg:Debuginfo.t ->
-  stack:expression ->
+  valuec:expression ->
+  exnc:expression ->
+  effc:expression ->
+  f:expression ->
+  arg:expression ->
+  expression
+
+val with_stack_bind :
+  dbg:Debuginfo.t ->
+  valuec:expression ->
+  exnc:expression ->
+  effc:expression ->
+  dyn:expression ->
+  bind:expression ->
   f:expression ->
   arg:expression ->
   expression
 
 val resume :
   dbg:Debuginfo.t ->
-  stack:expression ->
+  cont:expression ->
   f:expression ->
   arg:expression ->
-  last_fiber:expression ->
   expression
 
 val reperform :

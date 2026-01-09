@@ -564,6 +564,7 @@ static uintnat fresh_domain_unique_id(void) {
 }
 
 static inline void domain_root_register(value *root, value t);
+static inline void domain_root_set(value *root, value t);
 static inline void domain_root_remove(value *root);
 
 /* must be run on the domain's thread */
@@ -769,6 +770,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
   domain_state->requested_external_interrupt = 0;
+  domain_root_register(&domain_state->preemption, Val_unit);
 
   domain_state->parser_trace = 0;
 
@@ -1798,6 +1800,27 @@ int caml_try_run_on_all_domains_async(
 void caml_interrupt_self(void)
 {
   interrupt_domain_local(Caml_state);
+}
+
+/* Request that a preemption occur at the next possible time.
+ *
+ * XXX aspsmith: This function will almost definitely not last long - it's here
+ * basically entirely to test preemption while it's under active development.
+ * Importantly, eventually the "thing" that gets preempted will be a fiber, not
+ * a domain
+ */
+CAMLprim value caml_domain_preempt_self(value unit) {
+  CAMLnoalloc;
+  domain_root_set(&Caml_state->preemption, Val_long(1));
+  caml_interrupt_self();
+  return Val_unit;
+}
+
+void caml_domain_setup_preemption(void) {
+  CAMLparam0();
+  value cont = caml_alloc_3(Cont_tag, Val_long(0), Val_long(0), Val_long(0));
+  domain_root_set(&Caml_state->preemption, cont);
+  CAMLreturn0;
 }
 
 /*  This function is async-signal-safe as [all_domains] and

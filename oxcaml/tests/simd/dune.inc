@@ -7135,3 +7135,117 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected ops_int8x32_u_internal_assembler.out)))
+
+(executable
+ (name preemption256)
+ (modules preemption256)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries unix simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   preemption256.out
+   (run ./preemption256.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected preemption256.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy preemption256.ml preemption256_nodynlink.ml)))
+
+(executable
+ (name preemption256_nodynlink)
+ (modules preemption256_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries unix simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   preemption256_nodynlink.out
+   (run ./preemption256_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected preemption256_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy preemption256.ml preemption256_internal_assembler.ml)))
+
+(executable
+ (name preemption256_internal_assembler)
+ (modules preemption256_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries unix simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   preemption256_internal_assembler.out
+   (run ./preemption256_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected preemption256_internal_assembler.out)))

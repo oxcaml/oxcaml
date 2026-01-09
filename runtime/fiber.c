@@ -658,6 +658,17 @@ void caml_scan_stack(
   }
 }
 
+void caml_ensure_gc_regs(void)
+{
+  if (Caml_state->gc_regs_buckets == NULL) {
+    /* Ensure there is at least one gc_regs bucket available before
+       running any OCaml code. See fiber.h for documentation. */
+    value* bucket = caml_stat_alloc(sizeof(value) * Wosize_gc_regs);
+    bucket[0] = 0; /* no next bucket */
+    Caml_state->gc_regs_buckets = bucket;
+  }
+}
+
 void caml_maybe_expand_stack (void)
 {
   struct stack_info* stk = Caml_state->current_stack;
@@ -674,13 +685,7 @@ void caml_maybe_expand_stack (void)
     }
   }
 
-  if (Caml_state->gc_regs_buckets == NULL) {
-    /* Ensure there is at least one gc_regs bucket available before
-       running any OCaml code. See fiber.h for documentation. */
-    value* bucket = caml_stat_alloc(sizeof(value) * Wosize_gc_regs);
-    bucket[0] = 0; /* no next bucket */
-    Caml_state->gc_regs_buckets = bucket;
-  }
+  caml_ensure_gc_regs();
 }
 
 #else /* End NATIVE_CODE, begin BYTE_CODE */
@@ -1053,6 +1058,9 @@ void caml_free_gc_regs_buckets(value *gc_regs_buckets)
   }
 }
 
+void assert_is_cont(value cont) {
+  CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
+}
 
 CAMLprim value caml_continuation_use_noexc (value cont)
 {
@@ -1062,7 +1070,7 @@ CAMLprim value caml_continuation_use_noexc (value cont)
 
   fiber_debug_log("cont: is_block(%d) tag_val(%ul) is_young(%d)",
                   Is_block(cont), Tag_val(cont), Is_young(cont));
-  CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
+  assert_is_cont(cont);
 
   /* this forms a barrier between execution and any other domains
      that might be marking this continuation */
@@ -1091,9 +1099,33 @@ CAMLprim value caml_continuation_use (value cont)
   return v;
 }
 
-CAMLprim value caml_continuation_use_and_update_handler_noexc
+bool caml_continuation_is_preemption(value cont) {
+  assert_is_cont(cont);
+  return Wosize_val(cont) == 3;
+}
+
+value* caml_continuation_gc_regs(value cont) {
+  assert_is_cont(cont);
+  if (caml_continuation_is_preemption(cont)) {
+    return (value*)Field(cont, 2);
+  } else {
+    return NULL;
+  }
+}
+
+void caml_continuation_replace(value cont, struct stack_info* stk)
+{
+  assert_is_cont(cont);
+  value n = Val_ptr(NULL);
+  int b = atomic_compare_exchange_strong(Op_atomic_val(cont), &n, Val_ptr(stk));
+  CAMLassert(b);
+  (void)b; /* squash unused warning */
+}
+
+CAMLprim value caml_continuation_update_handler_noexc
   (value cont, value hval, value hexn, value heff)
 {
+  CAMLnoalloc;
   value stack;
   struct stack_info* stk;
 
@@ -1101,21 +1133,15 @@ CAMLprim value caml_continuation_use_and_update_handler_noexc
   stk = Ptr_val(stack);
   if (stk == NULL) {
     /* The continuation has already been taken */
-    return stack;
+    return cont;
   }
   while (Stack_parent(stk) != NULL) stk = Stack_parent(stk);
   Stack_handle_value(stk) = hval;
   Stack_handle_exception(stk) = hexn;
   Stack_handle_effect(stk) = heff;
-  return stack;
-}
+  caml_continuation_replace(cont, Ptr_val(stack));
 
-void caml_continuation_replace(value cont, struct stack_info* stk)
-{
-  value n = Val_ptr(NULL);
-  int b = atomic_compare_exchange_strong(Op_atomic_val(cont), &n, Val_ptr(stk));
-  CAMLassert(b);
-  (void)b; /* squash unused warning */
+  return cont;
 }
 
 CAMLprim value caml_drop_continuation (value cont)
@@ -1137,6 +1163,22 @@ static const value * cache_named_exception(const value * _Atomic * cache,
     exn = caml_named_value(name);
     if (exn == NULL) {
       fprintf(stderr, "Fatal error: exception %s\n", name);
+      exit(2);
+    }
+    atomic_store_release(cache, exn);
+  }
+  return exn;
+}
+
+static const value * cache_named_effect(const value * _Atomic * cache,
+                                        const char * name)
+{
+  const value * exn;
+  exn = atomic_load_acquire(cache);
+  if (exn == NULL) {
+    exn = caml_named_value(name);
+    if (exn == NULL) {
+      fprintf(stderr, "Fatal error: effect %s\n", name);
       exit(2);
     }
     atomic_store_release(cache, exn);
@@ -1167,6 +1209,15 @@ value caml_make_unhandled_effect_exn (value effect)
 CAMLexport void caml_raise_unhandled_effect (value effect)
 {
   caml_raise(caml_make_unhandled_effect_exn(effect));
+}
+
+static const value * _Atomic caml_preemption_effect = NULL;
+
+CAMLexport value caml_get_preemption_effect(void) {
+  CAMLparam0();
+  const value *eff =
+    cache_named_effect(&caml_preemption_effect, "Effect.Preemption");
+  CAMLreturn(*eff);
 }
 
 /**** Dynamic Binding ****/
