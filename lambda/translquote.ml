@@ -2405,7 +2405,7 @@ let rec quote_computation_pattern p =
 and quote_pat_extra loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
-  | Tpat_constraint ty ->
+  | Tpat_constraint (ty, _) ->
     Pat.constraint_ loc pat_lam (quote_core_type ty) |> Pat.wrap
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
@@ -2518,7 +2518,7 @@ and quote_core_type ty =
         var
     in
     Type.var loc (Some var) |> Type.wrap
-  | Ttyp_arrow (arg_lab, ty1, ty2) ->
+  | Ttyp_arrow (arg_lab, ty1, _, ty2, _) ->
     let lab = quote_arg_label loc arg_lab
     and ty1 = quote_core_type ty1
     and ty2 = quote_core_type ty2 in
@@ -2885,7 +2885,7 @@ and quote_expression_desc transl stage e =
             (fun vb ->
               let cstr =
                 match vb.vb_pat.pat_extra with
-                | [(Tpat_constraint ct, _, _)] -> Some ct
+                | [(Tpat_constraint (ct, _), _, _)] -> Some ct
                 | [] -> None
                 | _ ->
                   fatal_errorf

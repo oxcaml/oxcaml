@@ -413,7 +413,7 @@ let rec split_external_type (ct : core_type) :
     (core_type * bool) list * core_type =
   match ct.ctyp_desc with
   | Ttyp_poly (_, ct) -> split_external_type ct
-  | Ttyp_arrow (lab, arg, cont) -> (
+  | Ttyp_arrow (lab, arg, _, cont, _) -> (
     let args, ret = split_external_type cont in
     match lab with
     | Nolabel | Labelled _ -> (arg, false) :: args, ret
