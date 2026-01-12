@@ -362,17 +362,16 @@ let prim_param ppf = function
 
 let prim_params ppf params =
   Format.fprintf ppf "%a"
-    (Format.pp_print_list ~pp_sep:(fun _ () -> ()) prim_param) params
+    (Format.pp_print_list ~pp_sep:(fun _ () -> ()) prim_param)
+    params
 
 let prim_op ppf ({ prim; params } : prim_op) =
-  Format.fprintf ppf "@[<2>%s%a@]"
-    prim
-    prim_params params
+  Format.fprintf ppf "@[<2>%s%a@]" prim prim_params params
 
-let prim ppf (op, args : prim) =
-  Format.fprintf ppf "@[<2>%a%a@]"
-    prim_op op
-    (simple_args ~space:Before ~omit_if_empty:false) args
+let prim ppf ((op, args) : prim) =
+  Format.fprintf ppf "@[<2>%a%a@]" prim_op op
+    (simple_args ~space:Before ~omit_if_empty:false)
+    args
 
 let parameter ppf { param; kind = k } = kinded_variable ppf (param, k)
 

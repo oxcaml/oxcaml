@@ -165,7 +165,7 @@ let alloc_mode_for_applications env (alloc : Fexpr.alloc_mode_for_applications)
     let r' = find_region env r' in
     Alloc_mode.For_applications.local ~region:r ~ghost_region:r'
 
-let prim env (p, args : Fexpr.prim) : Flambda_primitive.t =
+let prim env ((p, args) : Fexpr.prim) : Flambda_primitive.t =
   let args = List.map (simple env) args in
   Fexpr_prim.ToFlambda.prim env p args
 
