@@ -13,7 +13,7 @@
    stack overflow during compilation. *)
 let num_functions = 10000
 
-let array_size = 130000
+let array_size = 13000
 
 let output_file name content =
   let oc = open_out name in

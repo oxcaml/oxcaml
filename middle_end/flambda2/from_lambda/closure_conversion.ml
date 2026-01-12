@@ -616,13 +616,19 @@ let unarize_extern_repr ~machine_width alloc_mode
   match extern_repr with
   | Same_as_ocaml_repr (Base Void) -> []
   | Same_as_ocaml_repr (Base _ as sort) ->
-    let kind =
-      Typeopt.layout_of_non_void_sort sort
-      |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
-           ~machine_width
-      |> K.With_subkind.kind
+    (* Unboxed products are unarized into one argument per component. *)
+    let rec flatten layout =
+      match layout with
+      | Lambda.Punboxed_product layouts -> List.concat_map flatten layouts
+      | layout ->
+        let kind =
+          K.With_subkind.from_lambda_values_and_unboxed_numbers_only
+            ~machine_width layout
+          |> K.With_subkind.kind
+        in
+        [{ kind; arg_transformer = None; return_transformer = None }]
     in
-    [{ kind; arg_transformer = None; return_transformer = None }]
+    flatten (Typeopt.layout_of_non_void_sort sort)
   | Same_as_ocaml_repr (Product sorts) ->
     List.concat_map unarize_const_sort_for_extern_repr sorts
   | Unboxed_float Boxed_float64 ->
