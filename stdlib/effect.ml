@@ -71,14 +71,16 @@ external update_cont_handler_noexc :
    [f x] using it. *)
 let with_handler cont valuec exnc effc f x =
   resume
-    (* FIXME: There's a race condition here - if multiple threads call [with_handler] on
-       the same continuation at once, they could be interleaved, causing a segfault rather
+    (* FIXME: There's a race condition here - if multiple threads call
+       [with_handler] on the same continuation at once, they could be
+       interleaved, causing a segfault rather
        than an exception. *)
     (update_cont_handler_noexc cont valuec exnc effc) f x
 
 module Deep = struct
 
-  type ('a,'b) continuation = Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
+  type ('a,'b) continuation =
+    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
 
   let continue (Cont k) v = resume k (fun x-> x) v
 
@@ -125,7 +127,8 @@ end
 
 module Shallow = struct
 
-  type ('a,'b) continuation = Cont : ('a,'b,'x) cont -> ('a,'b) continuation [@@unboxed]
+  type ('a,'b) continuation =
+    | Cont : ('a,'b,'x) cont -> ('a,'b) continuation [@@unboxed]
 
   let fiber : type a b. (a -> b) -> (a, b) continuation = fun f ->
     let module M = struct type _ t += Initial_setup__ : a t end in
