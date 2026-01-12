@@ -90,7 +90,8 @@ let is_logical_immediate x =
   && (not (Nativeint.equal x (-1n)))
   && run_automata (logical_imm_length x) 0 x
 
-(* XXX mshinwell: this needs checking carefully *)
+(* CR mshinwell: The following will be reviewed separately (PR5201) *)
+
 (* Encode a logical immediate into N, immr, imms fields for ARM64 instructions.
    Returns (N, immr, imms) tuple.
 
