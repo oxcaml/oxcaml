@@ -616,7 +616,7 @@ let unarize_extern_repr ~machine_width alloc_mode
   match extern_repr with
   | Same_as_ocaml_repr (Base Void) -> []
   | Same_as_ocaml_repr (Base _ as sort) ->
-    (* Unboxed products are unarized into one argument per component. *)
+    (* Unboxed products are unarized. *)
     let rec flatten layout =
       match layout with
       | Lambda.Punboxed_product layouts -> List.concat_map flatten layouts

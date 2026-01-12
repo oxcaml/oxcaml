@@ -610,15 +610,19 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       cps_non_tail_list acc env ccenv args
         (fun acc env ccenv args _arity ->
           let env, ids_with_kinds =
-            let single layout =
+            match layout with
+            | Ptop | Pbottom ->
+              Misc.fatal_error "Cannot bind layout [Ptop] or [Pbottom]"
+            | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+            | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
+            | Punboxed_vector _ ->
               ( env,
                 [ ( id,
                     Flambda_debug_uid.of_lambda_debug_uid duid,
                     Flambda_kind.With_subkind
                     .from_lambda_values_and_unboxed_numbers_only layout
                       ~machine_width:(Acc.machine_width acc) ) ] )
-            in
-            let product layouts =
+            | Punboxed_product layouts ->
               let arity_component =
                 Flambda_arity.Component_for_creation.Unboxed_product
                   (List.map
@@ -636,31 +640,6 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                   ~before_unarization:arity_component ~fields
               in
               env, fields
-            in
-            match layout with
-            | Ptop | Pbottom ->
-              Misc.fatal_error "Cannot bind layout [Ptop] or [Pbottom]"
-            | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
-            | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
-            | Punboxed_vector Unboxed_vec128 ->
-              single layout
-            | Punboxed_vector Unboxed_vec256 ->
-              if String.equal Config.architecture "amd64"
-              then single layout
-              else
-                product
-                  [ Punboxed_vector Unboxed_vec128;
-                    Punboxed_vector Unboxed_vec128 ]
-            | Punboxed_vector Unboxed_vec512 ->
-              if String.equal Config.architecture "amd64"
-              then single layout
-              else
-                product
-                  [ Punboxed_vector Unboxed_vec128;
-                    Punboxed_vector Unboxed_vec128;
-                    Punboxed_vector Unboxed_vec128;
-                    Punboxed_vector Unboxed_vec128 ]
-            | Punboxed_product layouts -> product layouts
           in
           let body acc ccenv = cps acc env ccenv body k k_exn in
           let current_region = Env.current_region env in

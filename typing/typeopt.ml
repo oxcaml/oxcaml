@@ -1047,18 +1047,10 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_vector Unboxed_vec128
   | Base Vec256 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Stable) ->
-    if Config.architecture = "amd64"
-    then Lambda.Punboxed_vector Unboxed_vec256
-    else Lambda.Punboxed_product [Punboxed_vector Unboxed_vec128;
-                                  Punboxed_vector Unboxed_vec128]
+    Lambda.layout_unboxed_vector Unboxed_vec256
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Alpha) ->
-    if Config.architecture = "amd64"
-    then Lambda.Punboxed_vector Unboxed_vec512
-    else Lambda.Punboxed_product [Punboxed_vector Unboxed_vec128;
-                                  Punboxed_vector Unboxed_vec128;
-                                  Punboxed_vector Unboxed_vec128;
-                                  Punboxed_vector Unboxed_vec128]
+    Lambda.layout_unboxed_vector Unboxed_vec512
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
