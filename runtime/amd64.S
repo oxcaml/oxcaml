@@ -752,7 +752,9 @@ CFI_STARTPROC
            Caml_state->preemption points to a freshly allocated preemption
            continuation. */
         cmpq    $3, Caml_state(preemption)
-        ja      G(caml_preempt)
+        jbe     LBL(preempt_unhandled)
+        LEAVE_FUNCTION
+        jmp     G(caml_preempt)
 LBL(preempt_unhandled): /* caml_preempt will jump back here if the preemption is
                            unhandled */
         /* We're not preempting, so restore registers and return back to the
@@ -1512,6 +1514,9 @@ CFI_STARTPROC
         /* Before restoring registers, redo whatever allocation was interrupted
            by preemption. This ensures r15 will point to a valid allocation in
            the (possibly new) young heap. */
+        ENTER_FUNCTION /* Push frame pointer so that
+                          caml_redo_preempted_allocation sees the expected stack
+                          layout, and resume_from_preempt can pop it. */
         SWITCH_OCAML_TO_C
         C_call  (GCALL(caml_redo_preempted_allocation))
         SWITCH_C_TO_OCAML
