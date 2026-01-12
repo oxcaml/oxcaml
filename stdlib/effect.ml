@@ -53,19 +53,19 @@ external cont_set_last_fiber :
 external resume : ('a, _, 'b) cont -> ('c -> 'a) -> 'c -> 'b = "%resume"
 
 external with_stack :
-  ('a -> 'b) ->
+  ('x -> 'b) ->
   (exn -> 'b) ->
-  ('c t -> ('c, 'a, 'b) cont -> last_fiber -> 'b) ->
-  ('d -> 'a) ->
+  ('a t -> ('a, 'x, 'b) cont -> last_fiber -> 'b) ->
+  ('d -> 'x) ->
   'd ->
   'b = "%with_stack"
 
 external update_cont_handler_noexc :
-  ('a, 'b, _) cont ->
-  ('b -> 'c) ->
-  (exn -> 'c) ->
-  ('d t -> ('d,'b,'c) cont -> last_fiber -> 'c) ->
-  ('a, 'b, 'c) cont = "caml_continuation_update_handler_noexc"
+  ('a, 'x, _) cont ->
+  ('x -> 'b) ->
+  (exn -> 'b) ->
+  ('a2 t -> ('a2, 'x, 'b) cont -> last_fiber -> 'b) ->
+  ('a, 'x, 'b) cont = "caml_continuation_update_handler_noexc"
 
 (* Retrieve the stack from a [cont]inuation, update its handlers, and run
    [f x] using it. *)
