@@ -68,7 +68,11 @@ external update_cont_handler_noexc :
 (* Retrieve the stack from a [cont]inuation, update its handlers, and run
    [f x] using it. *)
 let with_handler cont valuec exnc effc f x =
-  resume (update_cont_handler_noexc cont valuec exnc effc) f x
+  resume
+    (* FIXME: There's a race condition here - if multiple threads call [with_handler] on
+       the same continuation at once, they could be interleaved, causing a segfault rather
+       than an exception. *)
+    (update_cont_handler_noexc cont valuec exnc effc) f x
 
 module Deep = struct
 
