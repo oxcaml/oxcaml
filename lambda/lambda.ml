@@ -889,9 +889,6 @@ and slambda =
   | SLvar of Slambdaident.t
   | SLrecord of slambda Slambdaident.Map.t
   | SLfield of Slambdaident.t * Slambdaident.t
-  | SLhalves of slambda_halves
-  | SLproj_comptime of slambda
-  | SLproj_runtime of slambda
   | SLfunction of slambda_function
   | SLapply of slambda_apply
   | SLtemplate of slambda_function
@@ -899,8 +896,8 @@ and slambda =
   | SLlet of slambda_let
 
 and slambda_halves =
-  { sval_comptime: slambda;
-    sval_runtime: slambda
+  { sl_comptime: slambda;
+    sl_runtime: slambda
   }
 
 and slambda_function =
