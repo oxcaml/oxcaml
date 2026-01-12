@@ -745,9 +745,9 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
     | Fixed_size, Punboxedvectorarray Unboxed_vec128 ->
       Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
     | Fixed_size, Punboxedvectorarray Unboxed_vec256 ->
-      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
+      Immutable StrictOpt, make_unboxed_vec256_vect ~loc array_size.var
     | Fixed_size, Punboxedvectorarray Unboxed_vec512 ->
-      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
+      Immutable StrictOpt, make_unboxed_vec512_vect ~loc array_size.var
     (* Case 3: Unknown size, known array kind *)
     | Dynamic_size, (Pintarray | Paddrarray | Pgcignorableaddrarray) ->
       Mutable, Resizable_array.make ~loc array_kind (int 0)
