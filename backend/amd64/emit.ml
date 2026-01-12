@@ -1946,21 +1946,22 @@ let emit_instr ~first ~fallthrough i =
            via a regular call, and restores r15 itself, thus avoiding the code
            size increase. *)
         I.mov (domain_field Domainstate.Domain_young_ptr) r15)
-    else (
-      if Config.runtime5
+    else
+      let switch_stacks = Config.runtime5 && not Config.no_stack_checks in
+      if switch_stacks
       then (
-        I.mov rsp rbx;
+        I.mov rsp r13;
         D.cfi_remember_state ();
-        D.cfi_def_cfa_register ~reg:"rbx";
+        D.cfi_def_cfa_register ~reg:"r13";
         (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
            through this unless we were to tag this calling frame with
            cfi_signal_frame in it's definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
       emit_call (Cmm.global_symbol func);
-      if Config.runtime5
+      if switch_stacks
       then (
-        I.mov rbx rsp;
-        D.cfi_restore_state ()))
+        I.mov r13 rsp;
+        D.cfi_restore_state ())
   | Lop (Stackoffset n) -> emit_stack_offset n
   | Lop (Load { memory_chunk; addressing_mode; _ }) -> (
     let[@inline always] load ~dest data_type instruction =
