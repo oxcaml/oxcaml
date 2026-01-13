@@ -200,10 +200,6 @@ module Lambda_utils = struct
 
     let make_unboxed_vec128_vect = unary "caml_make_unboxed_vec128_vect"
 
-    let make_unboxed_vec256_vect = unary "caml_make_unboxed_vec256_vect"
-
-    let make_unboxed_vec512_vect = unary "caml_make_unboxed_vec512_vect"
-
     let array_append = binary "caml_array_append"
 
     let array_sub =

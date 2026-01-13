@@ -16,6 +16,10 @@
 
 (** SIMD vector numeric type layouts. *)
 
+(** Whether wide vectors are supported (amd64 only). Otherwise, wide vectors are
+    translated into products in [from_lambda]. *)
+val wide : bool
+
 module Kind : sig
   type t =
     | Vec128

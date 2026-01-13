@@ -1075,26 +1075,7 @@ let layout_unboxed_int8 = Punboxed_or_untagged_integer Untagged_int8
 let layout_string = non_null_value Pgenval
 let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
-
-let layout_unboxed_vector v =
-  match v with
-  | Unboxed_vec128 -> Punboxed_vector Unboxed_vec128
-  | Unboxed_vec256 ->
-    if Config.architecture = "amd64"
-    then Punboxed_vector Unboxed_vec256
-    else
-      Punboxed_product
-        [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
-  | Unboxed_vec512 ->
-    if Config.architecture = "amd64"
-    then Punboxed_vector Unboxed_vec512
-    else
-      Punboxed_product
-        [ Punboxed_vector Unboxed_vec128;
-          Punboxed_vector Unboxed_vec128;
-          Punboxed_vector Unboxed_vec128;
-          Punboxed_vector Unboxed_vec128 ]
-
+let layout_unboxed_vector v = Punboxed_vector v
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
 let layout_predef_value = nullable_value Pgenval
 
@@ -2486,9 +2467,9 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Bits16 -> Punboxed_or_untagged_integer Untagged_int16
   | Bits8 -> Punboxed_or_untagged_integer Untagged_int8
   | Word -> Punboxed_or_untagged_integer Unboxed_nativeint
-  | Vec128 -> layout_unboxed_vector Unboxed_vec128
-  | Vec256 -> layout_unboxed_vector Unboxed_vec256
-  | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Vec128 -> Punboxed_vector Unboxed_vec128
+  | Vec256 -> Punboxed_vector Unboxed_vec256
+  | Vec512 -> Punboxed_vector Unboxed_vec512
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
   | Splice_variable id -> Psplicevar id
 

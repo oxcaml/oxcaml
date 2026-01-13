@@ -135,8 +135,7 @@ type 'a classification =
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
-let classify ~(classify_product : _ -> Jkind.Sort.Const.t list -> _) env ty sort
-    : _ classification =
+let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   match (sort : Jkind.Sort.Const.t) with
   | Base Value -> begin
@@ -207,15 +206,8 @@ let classify ~(classify_product : _ -> Jkind.Sort.Const.t list -> _) env ty sort
   | Base Bits32 -> Unboxed_int Unboxed_int32
   | Base Bits64 -> Unboxed_int Unboxed_int64
   | Base Vec128 -> Unboxed_vector Unboxed_vec128
-  | Base Vec256 ->
-    if Config.architecture = "amd64"
-    then Unboxed_vector Unboxed_vec256
-    else Product (classify_product ty [Base Vec128; Base Vec128])
-  | Base Vec512 ->
-    if Config.architecture = "amd64"
-    then Unboxed_vector Unboxed_vec256
-    else Product (classify_product ty [Base Vec128; Base Vec128;
-                                       Base Vec128; Base Vec128])
+  | Base Vec256 -> Unboxed_vector Unboxed_vec256
+  | Base Vec512 -> Unboxed_vector Unboxed_vec512
   | Base Word -> Unboxed_int Unboxed_nativeint
   | Base Untagged_immediate -> Unboxed_int Untagged_int
   | Base Void -> Void
@@ -1047,10 +1039,10 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_vector Unboxed_vec128
   | Base Vec256 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Stable) ->
-    Lambda.layout_unboxed_vector Unboxed_vec256
+    Lambda.Punboxed_vector Unboxed_vec256
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Alpha) ->
-    Lambda.layout_unboxed_vector Unboxed_vec512
+    Lambda.Punboxed_vector Unboxed_vec512
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->

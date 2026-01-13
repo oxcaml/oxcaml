@@ -1058,7 +1058,6 @@ val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout
 val layout_boxed_int : boxed_integer -> layout
 val layout_boxed_vector : boxed_vector -> layout
-val layout_unboxed_vector : unboxed_vector -> layout
 (* A layout that is Pgenval because it is the field of a tuple *)
 val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)

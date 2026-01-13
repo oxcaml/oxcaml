@@ -14,6 +14,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let wide = String.equal Config.architecture "amd64"
+
 module Kind = struct
   type t =
     | Vec128

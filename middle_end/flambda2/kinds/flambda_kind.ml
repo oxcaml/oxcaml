@@ -1023,35 +1023,45 @@ module With_subkind = struct
                           _
                           Mixed_block_lambda_shape.Singleton_mixed_block_element
                           .t ->
-                          t = function
+                          t list = function
                         | Value (value_kind : Lambda.value_kind) ->
-                          from_lambda_value_kind value_kind ~machine_width
-                        | Float_boxed _ | Float64 -> naked_float
-                        | Float32 -> naked_float32
-                        | Bits8 -> naked_int8
-                        | Bits16 -> naked_int16
-                        | Bits32 -> naked_int32
-                        | Bits64 -> naked_int64
-                        | Vec128 -> naked_vec128
-                        | Vec256 -> naked_vec256
-                        | Vec512 -> naked_vec512
-                        | Word -> naked_nativeint
-                        | Untagged_immediate -> naked_immediate
+                          [from_lambda_value_kind value_kind ~machine_width]
+                        | Float_boxed _ | Float64 -> [naked_float]
+                        | Float32 -> [naked_float32]
+                        | Bits8 -> [naked_int8]
+                        | Bits16 -> [naked_int16]
+                        | Bits32 -> [naked_int32]
+                        | Bits64 -> [naked_int64]
+                        | Vec128 -> [naked_vec128]
+                        | Vec256 ->
+                          if Vector_types.wide
+                          then [naked_vec256]
+                          else [naked_vec128; naked_vec128]
+                        | Vec512 ->
+                          if Vector_types.wide
+                          then [naked_vec512]
+                          else
+                            [ naked_vec128;
+                              naked_vec128;
+                              naked_vec128;
+                              naked_vec128 ]
+                        | Word -> [naked_nativeint]
+                        | Untagged_immediate -> [naked_immediate]
                       in
-                      let fields : t array =
+                      let fields =
                         let flattened_reordered_shape =
                           Mixed_block_lambda_shape.flattened_reordered_shape
                             mixed_block_shape
+                          |> Array.to_list
                         in
-                        Array.map from_mixed_block_element
+                        List.concat_map from_mixed_block_element
                           flattened_reordered_shape
                       in
                       let mixed_block_shape =
                         Mixed_block_shape.from_mixed_block_shape
                           mixed_block_shape
                       in
-                      ( Scannable (Mixed_record mixed_block_shape),
-                        Array.to_list fields )
+                      Scannable (Mixed_record mixed_block_shape), fields
                   in
                   Tag.Scannable.Map.add tag shape_and_fields non_consts
                 | None ->
