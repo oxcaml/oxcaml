@@ -52,10 +52,12 @@ external cont_set_last_fiber :
 
 external resume : ('a, _, 'b) cont -> ('c -> 'a) -> 'c -> 'b = "%resume"
 
+type ('a,'x,'b) effc = 'a t -> ('a, 'x, 'b) cont -> last_fiber -> 'b
+
 external with_stack :
   ('x -> 'b) ->
   (exn -> 'b) ->
-  ('a t -> ('a, 'x, 'b) cont -> last_fiber -> 'b) ->
+  ('a . ('a,'x,'b) effc) ->
   ('d -> 'x) ->
   'd ->
   'b = "%with_stack"
@@ -64,12 +66,12 @@ external update_cont_handler_noexc :
   ('a, 'x, _) cont ->
   ('x -> 'b) ->
   (exn -> 'b) ->
-  ('a2 t -> ('a2, 'x, 'b) cont -> last_fiber -> 'b) ->
+  ('a2 . ('a2, 'x, 'b) effc) ->
   ('a, 'x, 'b) cont = "caml_continuation_update_handler_noexc"
 
 (* Retrieve the stack from a [cont]inuation, update its handlers, and run
    [f x] using it. *)
-let with_handler cont valuec exnc effc f x =
+let with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) f x =
   resume
     (* FIXME: There's a race condition here - if multiple threads call
        [with_handler] on the same continuation at once, they could be
@@ -135,7 +137,7 @@ module Shallow = struct
     let exception E of (a,b) continuation in
     let f' () = f (perform M.Initial_setup__) in
     let error _ = failwith "impossible" in
-    let effc eff k last_fiber =
+    let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) last_fiber =
       match eff with
       | M.Initial_setup__ ->
           cont_set_last_fiber k last_fiber;
