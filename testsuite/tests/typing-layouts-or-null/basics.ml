@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension comprehensions";
  expect;
 *)
 
@@ -478,4 +479,106 @@ Line 2, characters 10-11:
 Warning 26 [unused-var]: unused variable x.
 
 val u : unit -> unit = <fun>
+|}]
+
+(* [or_null] is allowed as a function argument in a recursive module *)
+
+module rec M : sig
+  val x : string or_null -> string or_null
+end = struct
+  let x = M.x
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let x = M.x
+5 | end
+Error: Cannot safely evaluate the definition of the following cycle
+       of recursively-defined modules: M -> M.
+       There are no safe modules in this cycle (see manual section 12.2).
+Line 2, characters 2-42:
+2 |   val x : string or_null -> string or_null
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Module "M" defines a function whose first argument is not a value, "x" .
+|}]
+
+(* [or_null] arguments work for polymorphic variants *)
+
+let x = `A Null
+let y = `B (This "idea")
+
+[%%expect{|
+val x : ('a : value_or_null mod non_null). [> `A of 'a or_null ] = `A Null
+val y : [> `B of string or_null ] = `B (This "idea")
+|}]
+
+(* [or_null] arguments work for parameterized #-patterns *)
+
+type ('a : value_or_null) t = [ `A of 'a | `B ]
+
+let f1 : string t -> _ = function
+  | #t -> 42
+
+let f2 : string or_null t -> _ = function
+  | #t -> 42
+
+[%%expect{|
+type ('a : value_or_null) t = [ `A of 'a | `B ]
+val f1 : string t -> int = <fun>
+Line 7, characters 4-6:
+7 |   | #t -> 42
+        ^^
+Error: This pattern matches values of type "[? `A of 'a | `B > `B ]"
+       but a pattern was expected which matches values of type
+         "string or_null t"
+       The kind of string or_null is
+           value_or_null mod forkable unyielding many stateless immutable
+         because it is the primitive type or_null.
+       But the kind of string or_null must be a subkind of value
+         because the type argument of t has kind value.
+|}, Principal{|
+type ('a : value_or_null) t = [ `A of 'a | `B ]
+val f1 : string t -> int = <fun>
+Line 7, characters 4-6:
+7 |   | #t -> 42
+        ^^
+Error: This pattern matches values of type "[? `A of 'a | `B > `B ]"
+       but a pattern was expected which matches values of type
+         "string or_null t"
+       The kind of string or_null is value_or_null mod everything with string
+         because it is the primitive type or_null.
+       But the kind of string or_null must be a subkind of value
+         because the type argument of t has kind value.
+|}]
+
+(* [or_null] works in array comprehensions *)
+
+let f arr = [| This x for x in arr |]
+
+[%%expect{|
+Line 1, characters 15-21:
+1 | let f arr = [| This x for x in arr |]
+                   ^^^^^^
+Error: This expression has type "'a or_null"
+       but an expression was expected of type "('b : value)"
+       The kind of 'a or_null is value_or_null mod everything with 'a
+         because it is the primitive type or_null.
+       But the kind of 'a or_null must be a subkind of value
+         because it's the element type of array comprehension.
+|}]
+
+
+let x = [| "stutter" for y in [| This 1; This 2; Null |] |]
+
+[%%expect{|
+Line 1, characters 33-39:
+1 | let x = [| "stutter" for y in [| This 1; This 2; Null |] |]
+                                     ^^^^^^
+Error: This expression has type "'a or_null"
+       but an expression was expected of type "('b : value)"
+       The kind of 'a or_null is value_or_null mod everything with 'a
+         because it is the primitive type or_null.
+       But the kind of 'a or_null must be a subkind of value
+         because it's the element type of an array that is iterated over in a comprehension.
 |}]
