@@ -7616,12 +7616,13 @@ let exn_constructor_crossing env lid ~args locks =
      axes. *)
   let monadic_mode = vmode.monadic in
   let monadic =
-    [ monadic_mode
-      |> Mode.Value.Monadic.proj Contention
-      |> Mode.Value.Monadic.min_with Contention;
+    [
       monadic_mode
       |> Mode.Value.Monadic.proj Visibility
-      |> Mode.Value.Monadic.min_with Visibility
+      |> Mode.Value.Monadic.min_with Visibility;
+      monadic_mode
+      |> Mode.Value.Monadic.proj Contention
+      |> Mode.Value.Monadic.min_with Contention
     ]
     |> Mode.Value.Monadic.join
   in
@@ -7629,12 +7630,13 @@ let exn_constructor_crossing env lid ~args locks =
     Mode.Value.monadic_to_comonadic_max monadic_mode
   in
   let comonadic =
-    [ comonadic_source
-      |> Mode.Value.Comonadic.proj Portability
-      |> Mode.Value.Comonadic.max_with Portability;
-      comonadic_source
+    [       comonadic_source
       |> Mode.Value.Comonadic.proj Statefulness
-      |> Mode.Value.Comonadic.max_with Statefulness
+      |> Mode.Value.Comonadic.max_with Statefulness;
+      comonadic_source
+      |> Mode.Value.Comonadic.proj Portability
+      |> Mode.Value.Comonadic.max_with Portability
+
     ]
     |> Mode.Value.Comonadic.meet
   in
