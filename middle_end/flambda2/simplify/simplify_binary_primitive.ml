@@ -398,8 +398,9 @@ end = struct
       then Invalid
       else if Num.equal rhs (Num.one machine_width)
       then The_other_side
-      else if Num.equal rhs (Num.minus_one machine_width)
-              && match signedness with Signed -> true | Unsigned -> false
+      else if
+        Num.equal rhs (Num.minus_one machine_width)
+        && match signedness with Signed -> true | Unsigned -> false
       then
         Negation_of_the_other_side (* CR mshinwell: Add 0 / x = 0 when x <> 0 *)
       else Cannot_simplify
@@ -409,8 +410,9 @@ end = struct
       then Invalid
       else if Num.equal rhs (Num.one machine_width)
       then Exactly (Num.zero machine_width)
-      else if Num.equal rhs (Num.minus_one machine_width)
-              && match signedness with Signed -> true | Unsigned -> false
+      else if
+        Num.equal rhs (Num.minus_one machine_width)
+        && match signedness with Signed -> true | Unsigned -> false
       then Exactly (Num.zero machine_width)
       else Cannot_simplify
 

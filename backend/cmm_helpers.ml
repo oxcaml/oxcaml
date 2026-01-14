@@ -1206,8 +1206,9 @@ let udivimm_parameters d =
         a, q2', succ r2'
     in
     let delta = sub (pred d) r2 in
-    if p < 128
-       && (unsigned_compare q1 delta < 0 || (equal q1 delta && equal r1 0n))
+    if
+      p < 128
+      && (unsigned_compare q1 delta < 0 || (equal q1 delta && equal r1 0n))
     then loop ~p ~a (q1, r1) (q2, r2)
     else succ q2, a, p - 64
   in
