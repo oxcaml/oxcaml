@@ -104,8 +104,8 @@ module Modality_axis_pair = struct
     match[@warning "-18"]
       Mode_axis_pair.to_value (Mode_axis_pair.of_string s)
     with
-    | Atom (Monadic ax, mode) -> Atom (Monadic ax, Join_with mode)
-    | Atom (Comonadic ax, mode) -> Atom (Comonadic ax, Meet_with mode)
+    | Atom (Monadic ax, mode) -> Atom (Monadic ax, Join_const mode)
+    | Atom (Comonadic ax, mode) -> Atom (Comonadic ax, Meet_const mode)
 end
 
 module Modifier_axis_pair = struct
@@ -213,7 +213,7 @@ end
    [global] must imply [aliased] for soundness of borrowing. *)
 let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   match[@warning "-18"] ax, a with
-  | Comonadic Areality, Meet_with a ->
+  | Comonadic Areality, Meet_const a ->
     let f, y, u =
       match a with
       | Global ->
@@ -223,25 +223,25 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       | Local -> Forkable.Const.Unforkable, Yielding.Const.Yielding, []
       | Regional -> assert false
     in
-    [ Modality.Atom (Comonadic Forkable, Meet_with f);
-      Atom (Comonadic Yielding, Meet_with y) ]
-    @ List.map (fun x -> Modality.Atom (Monadic Uniqueness, Join_with x)) u
-  | Monadic Visibility, Join_with a ->
+    [ Modality.Atom (Comonadic Forkable, Meet_const f);
+      Atom (Comonadic Yielding, Meet_const y) ]
+    @ List.map (fun x -> Modality.Atom (Monadic Uniqueness, Join_const x)) u
+  | Monadic Visibility, Join_const a ->
     let b : Contention.Const.t =
       match a with
       | Immutable -> Contended
       | Read -> Shared
       | Read_write -> Uncontended
     in
-    [Atom (Monadic Contention, Join_with b)]
-  | Comonadic Statefulness, Meet_with a ->
+    [Atom (Monadic Contention, Join_const b)]
+  | Comonadic Statefulness, Meet_const a ->
     let b : Portability.Const.t =
       match a with
       | Stateless -> Portable
       | Observing -> Shareable
       | Stateful -> Nonportable
     in
-    [Atom (Comonadic Portability, Meet_with b)]
+    [Atom (Comonadic Portability, Meet_const b)]
   | _ -> []
 
 let enforce_forbidden_modalities ~loc annot_type m =
@@ -249,8 +249,8 @@ let enforce_forbidden_modalities ~loc annot_type m =
     ( Modality.Const.proj (Comonadic Areality) m,
       Modality.Const.proj (Monadic Uniqueness) m )
   with
-  | ( Meet_with Global,
-      Modality.Monadic.Atom.Join_with Mode.Uniqueness.Const.Unique ) ->
+  | ( Meet_const Global,
+      Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Unique ) ->
     raise (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
   | _ -> ()
 
@@ -431,8 +431,8 @@ let mode_annot_to_modality_annot mode_annot =
     (fun mode : Modality.atom ->
       let (Atom (ax, mode)) = Mode_axis_pair.to_value mode in
       match[@warning "-18"] ax with
-      | Comonadic ax -> Atom (Comonadic ax, Meet_with mode)
-      | Monadic ax -> Atom (Monadic ax, Join_with mode))
+      | Comonadic ax -> Atom (Comonadic ax, Meet_const mode)
+      | Monadic ax -> Atom (Monadic ax, Join_const mode))
     mode_annot
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
@@ -461,16 +461,16 @@ let untransl_modality =
 (* CR zqian: remove [1] and [2] *)
 let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   let comonadic : Modality.atom list =
-    [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
-      Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
-      Atom (Comonadic Forkable, Meet_with Forkable.Const.legacy);
-      Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy) ]
+    [ Atom (Comonadic Areality, Meet_const Regionality.Const.legacy);
+      Atom (Comonadic Linearity, Meet_const Linearity.Const.legacy);
+      Atom (Comonadic Forkable, Meet_const Forkable.Const.legacy);
+      Atom (Comonadic Yielding, Meet_const Yielding.Const.legacy) ]
   in
   let monadic : Modality.atom list =
-    [ Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);
-      Atom (Monadic Contention, Join_with Contention.Const.legacy);
-      Atom (Monadic Visibility, Join_with Visibility.Const.legacy);
-      Atom (Monadic Staticity, Join_with Staticity.Const.legacy) ]
+    [ Atom (Monadic Uniqueness, Join_const Uniqueness.Const.legacy);
+      Atom (Monadic Contention, Join_const Contention.Const.legacy);
+      Atom (Monadic Visibility, Join_const Visibility.Const.legacy);
+      Atom (Monadic Staticity, Join_const Staticity.Const.legacy) ]
   in
   if mut
   then if for_mutable_variable then monadic else monadic @ comonadic
@@ -502,12 +502,12 @@ let idx_expected_modalities ~(mut : bool) =
       (* If this list is updated, the external bindings in the [Idx_imm] and
          [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
       modality_of_list
-        [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
-          Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
-          Atom (Comonadic Forkable, Meet_with Forkable.Const.legacy);
-          Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
-          Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);
-          Atom (Monadic Staticity, Join_with Staticity.Const.legacy) ]
+        [ Atom (Comonadic Areality, Meet_const Regionality.Const.legacy);
+          Atom (Comonadic Linearity, Meet_const Linearity.Const.legacy);
+          Atom (Comonadic Forkable, Meet_const Forkable.Const.legacy);
+          Atom (Comonadic Yielding, Meet_const Yielding.Const.legacy);
+          Atom (Monadic Uniqueness, Join_const Uniqueness.Const.legacy);
+          Atom (Monadic Staticity, Join_const Staticity.Const.legacy) ]
       [@warning "-18"]
     else Mode.Modality.Const.id
   in
