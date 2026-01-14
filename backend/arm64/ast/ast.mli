@@ -886,6 +886,9 @@ module Instruction_name : sig
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
+    (* CR mshinwell: FMADD, FNMADD, FMSUB, FNMSUB should also allow `H
+       (half-precision) - the system assembler accepts H registers for all of
+       them. *)
     | FMADD :
         ( quad,
           [`Reg of [`Neon of [`Scalar of ([< `S | `D] as 'p)]]]
