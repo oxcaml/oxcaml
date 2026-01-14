@@ -503,7 +503,7 @@ let must_save_simd_regs live : Reg_class.Save_simd_regs.t =
   else if !v256
   then (
     I.require_vec256 ();
-    Save_zmm)
+    Save_ymm)
   else if !v128
   then Save_xmm
   else Save_none
