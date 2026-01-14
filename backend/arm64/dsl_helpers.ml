@@ -62,19 +62,40 @@ let reg_index reg =
     reg_name_to_arch_index reg_class name_index
   | { loc = Stack _ | Unknown; _ } -> fatal_error "Dsl_helpers.reg_index"
 
-let reg_v2s reg = Ast.DSL.reg_v2s (reg_index reg)
+let assert_vec128_or_valx2 ~fname reg =
+  match reg.typ with
+  | Vec128 | Valx2 -> ()
+  | Val | Int | Addr | Float | Float32 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "%s: expected Vec128/Valx2 register, got %a" fname
+      Printreg.reg reg
 
-let reg_v4s reg = Ast.DSL.reg_v4s (reg_index reg)
+let reg_v2s reg =
+  assert_vec128_or_valx2 ~fname:"reg_v2s" reg;
+  Ast.DSL.reg_v2s (reg_index reg)
 
-let reg_v2d reg = Ast.DSL.reg_v2d (reg_index reg)
+let reg_v4s reg =
+  assert_vec128_or_valx2 ~fname:"reg_v4s" reg;
+  Ast.DSL.reg_v4s (reg_index reg)
 
-let reg_v16b reg = Ast.DSL.reg_v16b (reg_index reg)
+let reg_v2d reg =
+  assert_vec128_or_valx2 ~fname:"reg_v2d" reg;
+  Ast.DSL.reg_v2d (reg_index reg)
 
-let reg_v8h reg = Ast.DSL.reg_v8h (reg_index reg)
+let reg_v16b reg =
+  assert_vec128_or_valx2 ~fname:"reg_v16b" reg;
+  Ast.DSL.reg_v16b (reg_index reg)
 
-let reg_v8b reg = Ast.DSL.reg_v8b (reg_index reg)
+let reg_v8h reg =
+  assert_vec128_or_valx2 ~fname:"reg_v8h" reg;
+  Ast.DSL.reg_v8h (reg_index reg)
 
-let reg_v4h reg = Ast.DSL.reg_v4h (reg_index reg)
+let reg_v8b reg =
+  assert_vec128_or_valx2 ~fname:"reg_v8b" reg;
+  Ast.DSL.reg_v8b (reg_index reg)
+
+let reg_v4h reg =
+  assert_vec128_or_valx2 ~fname:"reg_v4h" reg;
+  Ast.DSL.reg_v4h (reg_index reg)
 
 (* Operand tuple helpers for SIMD instructions *)
 let v4s_v4s_v4s i =

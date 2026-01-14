@@ -230,15 +230,17 @@ let select_simd_instr op args dbg =
   | "caml_neon_float32x4_cmeq" -> Some (Cmp_f32 EQ, args)
   | "caml_neon_float32x4_cmge" -> Some (Cmp_f32 GE, args)
   | "caml_neon_float32x4_cmgt" -> Some (Cmp_f32 GT, args)
-  (* FCMLE/FCMLT are not supported; use FCMGE/FCMGT with swapped operands. This
-     matches the weird semantics of amd64 "minss" even when the flag [FPCR.AH]
-     is not set. *)
+  (* FCMLE/FCMLT are not supported; use FCMGE/FCMGT with swapped operands. *)
+  (* CR mshinwell: the comment about "minss" semantics was here before; it
+     doesn't seem to make sense for compares.  Also consider deleting float
+     conditions that are never supported from the Simd.float_cond type. *)
   | "caml_neon_float32x4_cmle" -> Some (Cmp_f32 GE, swap_args args)
   | "caml_neon_float32x4_cmlt" -> Some (Cmp_f32 GT, swap_args args)
   | "caml_neon_float64x2_cmeq" -> Some (Cmp_f64 EQ, args)
   | "caml_neon_float64x2_cmge" -> Some (Cmp_f64 GE, args)
   | "caml_neon_float64x2_cmgt" -> Some (Cmp_f64 GT, args)
-  (* FCMLE/FCMLT are not supported; use FCMGE/FCMGT with swapped operands *)
+  (* FCMLE/FCMLT are not supported; use FCMGE/FCMGT with swapped operands. See
+     CR above about this. *)
   | "caml_neon_float64x2_cmle" -> Some (Cmp_f64 GE, swap_args args)
   | "caml_neon_float64x2_cmlt" -> Some (Cmp_f64 GT, swap_args args)
   | "caml_neon_int32x4_cmpeqz" -> Some (Cmpz_s32 EQ, args)

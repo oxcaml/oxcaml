@@ -184,12 +184,16 @@ end
 
 (* SIMD instruction handling *)
 
+(* CR mshinwell for TheNumbat: consider making simd_selection generate the AST
+   types directly, as was done for amd64. *)
 let simd_instr (op : Simd.operation) (i : Linear.instruction) =
   let module Lane_index = Ast.Neon_reg_name.Lane_index in
   (* Check register constraints for instructions that require res = arg0 *)
   (match[@ocaml.warning "-4"] op with
   | Copyq_laneq_s64 _ | Setq_lane_s8 _ | Setq_lane_s16 _ | Setq_lane_s32 _
-  | Setq_lane_s64 _ ->
+  | Setq_lane_s64 _ | Movn_high_s64 | Qmovn_high_s64 | Qmovn_high_s32
+  | Qmovn_high_u32 | Movn_high_s32 | Qmovn_high_s16 | Qmovn_high_u16
+  | Movn_high_s16 ->
     if not (Reg.same_loc i.res.(0) i.arg.(0))
     then
       Misc.fatal_errorf
@@ -271,6 +275,8 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
   | Rsqrteq_f64 -> ins2 FRSQRTE_vector (v2d_v2d i)
   | Recpeq_f32 -> ins2 FRECPE_vector (v4s_v4s i)
   (* Vector conversions *)
+  (* CR mshinwell for TheNumbat: convert manual indexing (e.g. res.(0),
+     arg.(0)) to helper functions for consistency with other operations. *)
   | Cvtq_s32_f32 -> ins2 FCVTZS_vector (v4s_v4s i)
   | Cvtq_s64_f64 -> ins2 FCVTZS_vector (v2d_v2d i)
   | Cvtnq_s32_f32 -> ins2 FCVTNS_vector (v4s_v4s i)
@@ -403,6 +409,8 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
     let lane_idx = Lane_index.create lane in
     ins2 (SMOV (B_to_X, lane_idx)) (reg_x res.(0), reg_v16b arg.(0))
   (* Extract 64-bit lane *)
+  (* CR mshinwell: investigate whether MOV could be used here instead of UMOV.
+     This was present before the typed DSL refactoring. *)
   | Getq_lane_s64 { lane } ->
     let lane_idx = Lane_index.create lane in
     ins2 (UMOV (D, lane_idx)) (reg_x res.(0), reg_v2d arg.(0))
@@ -496,6 +504,9 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
   (* Two special cases for min/max scalar: generate a sequence that matches the
      weird semantics of amd64 instruction "minss", even when the flag [FPCR.AH]
      is not set. *)
+  (* CR mshinwell for TheNumbat: the Min_scalar_f32/f64 and Max_scalar_f32/f64
+     constructors should have more descriptive names to distinguish them from
+     Fmin_f32/f64 and Fmax_f32/f64. *)
   | Min_scalar_f32 ->
     let rd = reg_s res.(0) in
     let rn = reg_s arg.(0) in
