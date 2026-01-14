@@ -428,7 +428,7 @@ module Analysis = Cfg_dataflow.Forward (Domain) (Transfer)
 
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
-  if !Clflags.debug && not !Dwarf_flags.restrict_to_upstream_dwarf
+  if !Clflags.debug && not !Clflags.restrict_to_upstream_dwarf
   then (
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     let fun_args = R.set_of_array cfg.fun_args in

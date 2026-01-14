@@ -141,8 +141,8 @@ end) = struct
     | NLeaf
     | NComp_unit of string
     | NError of string
-    | NMu of nf
-    | NRec_var of Shape.DeBruijn_index.t
+    | NMu of Shape.Rec_var_ident.t * nf
+    | NRec_var of Shape.Rec_var_ident.t
     | NMutrec of nf Ident.Map.t
     | NProj_decl of nf * Ident.t
     | NConstr of Ident.t * nf list
@@ -164,6 +164,8 @@ end) = struct
         { fields : (string * Uid.t option * delayed_nf * Layout.t) list;
           kind : record_kind
         }
+    | NUnknown_type
+    | NAt_layout of nf * Layout.t
 
   (* A type of normal forms for strong call-by-need evaluation.
      The normal form of an abstraction
@@ -196,8 +198,9 @@ end) = struct
   let approx_nf nf = { nf with approximated = true }
 
   let rec equal_local_env t1 t2 =
-    t1.depth = t2.depth &&
-    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst
+    t1 == t2 ||
+    (t1.depth = t2.depth &&
+    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst)
 
   and equal_delayed_nf t1 t2 =
     match t1, t2 with
@@ -218,17 +221,18 @@ end) = struct
       else false
     | NLeaf, NLeaf -> true
     | NStruct t1, NStruct t2 ->
-      Item.Map.equal equal_delayed_nf t1 t2
+      t1 == t2 || Item.Map.equal equal_delayed_nf t1 t2
     | NProj (t1, i1), NProj (t2, i2) ->
       if Item.compare i1 i2 <> 0 then false
       else equal_nf t1 t2
     | NComp_unit c1, NComp_unit c2 -> String.equal c1 c2
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
-    | NMu (nf1), NMu (nf2) -> equal_nf nf1 nf2
-    | NRec_var i1, NRec_var i2 -> DeBruijn_index.equal i1 i2
+    | NMu (rv1, nf1), NMu (rv2, nf2) ->
+      Shape.Rec_var_ident.equal rv1 rv2 && equal_nf nf1 nf2
+    | NRec_var rv1, NRec_var rv2 -> Shape.Rec_var_ident.equal rv1 rv2
     | NMutrec defs1, NMutrec defs2 ->
-      Ident.Map.equal equal_nf defs1 defs2
+      defs1 == defs2 || Ident.Map.equal equal_nf defs1 defs2
     | NProj_decl (nf1, id1), NProj_decl (nf2, id2) ->
       Ident.equal id1 id2 && equal_nf nf1 nf2
     | NConstr (id1, args1), NConstr (id2, args2) ->
@@ -271,15 +275,18 @@ end) = struct
           Layout.equal ly1 ly2 &&
           equal_delayed_nf dnf1 dnf2)
         f1 f2
+    | NUnknown_type, NUnknown_type -> true
+    | NAt_layout (nf1, layout1), NAt_layout (nf2, layout2) ->
+      equal_nf nf1 nf2 && Layout.equal layout1 layout2
     | ( ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ | NMutrec _ | NProj_decl _ | NMu _
-        | NRec_var _ ), _ ) -> false
+        | NRec_var _ | NUnknown_type | NAt_layout _ ), _ ) -> false
 
   and equal_nf t1 t2 =
-    if not (Option.equal Uid.equal t1.uid t2.uid) then false
-    else equal_nf_desc t1.desc t2.desc
+    t1 == t2 ||
+    (Option.equal Uid.equal t1.uid t2.uid && equal_nf_desc t1.desc t2.desc)
 
   module ReduceMemoTable = Hashtbl.Make(struct
       type nonrec t = local_env * t
@@ -415,7 +422,7 @@ end) = struct
     if MB.is_depleted fuel
     then approx_nf (return (NError "NoFuelLeft"))
     else if MB.is_depleted max_steps_per_variable
-    then return NLeaf
+    then return NUnknown_type
     else (
       MB.decr max_steps_per_variable;
       match t.desc with
@@ -550,8 +557,8 @@ end) = struct
               reduce env res
           end
       | Leaf -> return NLeaf
-      | Mu t_body -> return (NMu (reduce env t_body))
-      | Rec_var n -> return (NRec_var n)
+      | Mu (rv, t_body) -> return (NMu (rv, reduce env t_body))
+      | Rec_var rv -> return (NRec_var rv)
       | Struct m ->
           let mnf = Item.Map.map (delay_reduce env) m in
           return (NStruct mnf)
@@ -599,6 +606,11 @@ end) = struct
                           (name, uid_opt, delay_reduce env t, ly)) fields
           in
           return (NRecord { fields = dnf_fields; kind })
+      | Unknown_type ->
+          return NUnknown_type
+      | At_layout (shape, layout) ->
+          let nf = reduce env shape in
+          return (NAt_layout (nf, layout))
     )
 
   and read_back env (nf : nf) : t =
@@ -634,10 +646,10 @@ end) = struct
     | NComp_unit s -> comp_unit ?uid s
     | NAlias nf -> alias ?uid (read_back_force nf)
     | NError t -> error ?uid t
-    | NMu (t_body) ->
-      mu ?uid (read_back t_body)
-    | NRec_var n ->
-      rec_var ?uid n
+    | NMu (rv, t_body) ->
+      mu ?uid rv (read_back t_body)
+    | NRec_var rv ->
+      rec_var ?uid rv
     | NMutrec defs ->
       let t_defs = Ident.Map.map read_back defs in
       mutrec ?uid t_defs
@@ -678,6 +690,11 @@ end) = struct
         (name, uid_opt, read_back_force dnf, ly)) fields
       in
       record ?uid kind t_fields
+    | NUnknown_type ->
+      unknown_type ?uid ()
+    | NAt_layout (nf, layout) ->
+      let shape = read_back nf in
+      at_layout ?uid shape layout
 
   (* Sharing the memo tables is safe at the level of a compilation unit since
     idents should be unique *)
@@ -724,7 +741,7 @@ end) = struct
     | NRec_var _ -> false
     | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
     | NPredef _ | NArrow | NPoly_variant _ | NVariant _ | NVariant_unboxed _
-    | NRecord _ -> false
+    | NRecord _ | NUnknown_type | NAt_layout _ -> false
 
   let rec reduce_aliases_for_uid env (nf : nf) =
     match nf with

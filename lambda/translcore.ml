@@ -1674,7 +1674,9 @@ and transl_tupled_function
 *)
 
 and add_type_shapes_of_pattern ~env pattern =
-  if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
+  if !Clflags.debug && not (!Clflags.restrict_to_upstream_dwarf)
+    && !Clflags.shape_format = Clflags.Debugging_shapes
+  then
     let var_list = Typedtree.pat_bound_idents_full pattern in
     List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
       let type_name = Format.asprintf "%a" Printtyp.type_expr type_expr in

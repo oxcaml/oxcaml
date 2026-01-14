@@ -961,6 +961,12 @@ let parse_int_option ~parameter s =
       in
       raise (Arg.Bad msg)
 
+let mk_type_to_shape_max_depth f =
+  "-type-to-shape-max-depth", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum depth for computing type shapes \
+  (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.max_type_to_shape_depth)
+
 let mk_gdwarf_config_shape_reduce_depth f =
   "-gdwarf-config-shape-reduce-depth", Arg.String f,
   Printf.sprintf "<n|none>  Maximum depth for shape reduction in DWARF debug \
@@ -984,12 +990,6 @@ let mk_gdwarf_config_max_cms_files_per_variable f =
   Printf.sprintf "<n|none>  Maximum CMS files per variable in DWARF debug info \
   (default: %s, use 'none' for unlimited)"
     (format_int_option Clflags.Dwarf_config_defaults.max_cms_files_per_variable)
-
-let mk_gdwarf_config_max_type_to_shape_depth f =
-  "-gdwarf-config-max-type-to-shape-depth", Arg.String f,
-  Printf.sprintf "<n|none>  Maximum type-to-shape depth for generating DWARF \
-  debug info (default: %s, use 'none' for unlimited)"
-    (format_int_option Clflags.Dwarf_config_defaults.max_type_to_shape_depth)
 
 let mk_gdwarf_config_max_shape_reduce_steps_per_variable f =
   "-gdwarf-config-max-shape-reduce-steps-per-variable", Arg.String f,
@@ -1024,6 +1024,15 @@ let mk_gdwarf_fidelity f =
       declarations (including finding them through functor application)\n\
   \t- high and above should provide good debugging information at increased \
       compilation times"
+
+let mk_restrict_to_upstream_dwarf f =
+  "-gupstream-dwarf", Arg.Unit f,
+  " Only emit the same DWARF information as the upstream compiler"
+
+let mk_no_restrict_to_upstream_dwarf f =
+  "-gno-upstream-dwarf", Arg.Unit f,
+  " Emit potentially more DWARF information than the upstream compiler. \
+   Implies -shape-format debugging-shapes."
 
 let mk_opaque f =
   "-opaque", Arg.Unit f,
@@ -1153,6 +1162,7 @@ module type Compiler_options = sig
   val _binannot : unit -> unit
   val _binannot_cms : unit -> unit
   val _shape_format : string -> unit
+  val _type_to_shape_max_depth : string -> unit
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -1299,6 +1309,8 @@ module type Optcommon_options = sig
   val _dcse : unit -> unit
   val _dlinear :  unit -> unit
   val _dstartup :  unit -> unit
+  val _restrict_to_upstream_dwarf : unit -> unit
+  val _no_restrict_to_upstream_dwarf : unit -> unit
 end;;
 
 module type Optcomp_options = sig
@@ -1323,7 +1335,6 @@ module type Optcomp_options = sig
   val _gdwarf_config_shape_eval_depth : string -> unit
   val _gdwarf_config_max_cms_files_per_unit : string -> unit
   val _gdwarf_config_max_cms_files_per_variable : string -> unit
-  val _gdwarf_config_max_type_to_shape_depth : string -> unit
   val _gdwarf_config_max_shape_reduce_steps_per_variable : string -> unit
   val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
   val _gdwarf_config_shape_reduce_fuel : string -> unit
@@ -1507,6 +1518,7 @@ struct
     mk_match_context_rows F._match_context_rows;
     mk_use_prims F._use_prims;
     mk_shape_format F._shape_format;
+    mk_type_to_shape_max_depth F._type_to_shape_max_depth;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
     mk_dno_locations F._dno_locations;
@@ -1813,6 +1825,7 @@ struct
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
     mk_shape_format F._shape_format;
+    mk_type_to_shape_max_depth F._type_to_shape_max_depth;
     mk_gdwarf_config_shape_reduce_depth
       F._gdwarf_config_shape_reduce_depth;
     mk_gdwarf_config_shape_eval_depth
@@ -1821,14 +1834,14 @@ struct
       F._gdwarf_config_max_cms_files_per_unit;
     mk_gdwarf_config_max_cms_files_per_variable
       F._gdwarf_config_max_cms_files_per_variable;
-    mk_gdwarf_config_max_type_to_shape_depth
-      F._gdwarf_config_max_type_to_shape_depth;
     mk_gdwarf_config_max_shape_reduce_steps_per_variable
       F._gdwarf_config_max_shape_reduce_steps_per_variable;
     mk_gdwarf_config_max_evaluation_steps_per_variable
       F._gdwarf_config_max_evaluation_steps_per_variable;
     mk_gdwarf_config_shape_reduce_fuel F._gdwarf_config_shape_reduce_fuel;
     mk_gdwarf_fidelity F._gdwarf_fidelity;
+    mk_restrict_to_upstream_dwarf F._restrict_to_upstream_dwarf;
+    mk_no_restrict_to_upstream_dwarf F._no_restrict_to_upstream_dwarf;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -1945,6 +1958,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_dstartup F._dstartup;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
+    mk_restrict_to_upstream_dwarf F._restrict_to_upstream_dwarf;
+    mk_no_restrict_to_upstream_dwarf F._no_restrict_to_upstream_dwarf;
 
     mk_eval F._eval;
   ]
@@ -2397,6 +2412,8 @@ module Default = struct
     let _unbox_closures = set unbox_closures
     let _unbox_closures_factor f = unbox_closures_factor := f
     let _verbose = set verbose
+    let _restrict_to_upstream_dwarf = Clflags.set_restrict_to_upstream_dwarf
+    let _no_restrict_to_upstream_dwarf = Clflags.no_restrict_to_upstream_dwarf
   end
 
   module Compiler = struct
@@ -2413,6 +2430,9 @@ module Default = struct
       | "old-merlin" -> shape_format := Old_merlin
       | "debugging-shapes" -> shape_format := Debugging_shapes
       | _ -> ()
+    let _type_to_shape_max_depth s =
+      type_to_shape_max_depth :=
+        parse_int_option ~parameter:"-type-to-shape-max-depth" s
     let _binannot_occurrences = set store_occurrences
     let _c = set compile_only
     let _cc s = c_compiler := (Some s)
@@ -2566,9 +2586,6 @@ module Default = struct
       gdwarf_config_max_cms_files_per_variable :=
         parse_int_option
           ~parameter:"-gdwarf-config-max-cms-files-per-variable" s
-    let _gdwarf_config_max_type_to_shape_depth s =
-      gdwarf_config_max_type_to_shape_depth :=
-        parse_int_option ~parameter:"-gdwarf-config-max-type-to-shape-depth" s
     let _gdwarf_config_max_shape_reduce_steps_per_variable s =
       gdwarf_config_max_shape_reduce_steps_per_variable :=
         parse_int_option

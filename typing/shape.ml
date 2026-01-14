@@ -112,32 +112,34 @@ module Uid = struct
     | _ -> false
 end
 
-module DeBruijn_index = struct
+module Rec_var_ident = struct
   type t = int
 
-  let create n =
-    if n < 0
-    then Misc.fatal_errorf "De_bruijn_index.create: negative index %d" n
-    else n
+  let counter = ref 0
 
-  let move_under_binder n = n + 1
+  let mk_fresh () =
+    let n = !counter in
+    incr counter;
+    n
 
-  let equal n1 n2 = Int.equal n1 n2
+  let equal = Int.equal
 
-  let print fmt n = Format.fprintf fmt "%d" n
+  let compare = Int.compare
+
+  let hash n = n
+
+  let print fmt n = Format.fprintf fmt "rv%d" n
 end
 
+module Rec_var_env = struct
+  include Map.Make (Rec_var_ident)
 
-module DeBruijn_env = struct
-  type 'a t = 'a list
+  let hash hash_value m =
+    fold
+      (fun k v acc -> Hashtbl.hash (Rec_var_ident.hash k, hash_value v, acc))
+      m 0
 
-  let empty = []
-
-  let get_opt t ~de_bruijn_index = List.nth_opt t de_bruijn_index
-
-  let push t x = x :: t
-
-  let is_empty = function [] -> true | _ -> false
+  let equal eq_value m1 m2 = m1 == m2 || equal eq_value m1 m2
 end
 
 module Sig_component_kind = struct
@@ -423,25 +425,15 @@ module Predef = struct
       | Unboxed_int8 -> Bits8
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
-    let to_layout : t -> Layout.t = function
-      | Array -> Base Value
-      | Bytes -> Base Value
-      | Char -> Base Value
-      | Extension_constructor -> Base Value
-      | Float -> Base Value
-      | Float32 -> Base Value
-      | Floatarray -> Base Value
-      | Int -> Base Value
-      | Int8 -> Base Value
-      | Int16 -> Base Value
-      | Int32 -> Base Value
-      | Int64 -> Base Value
-      | Lazy_t -> Base Value
-      | Nativeint -> Base Value
-      | String -> Base Value
-      | Simd _ -> Base Value
-      | Exception -> Base Value
-      | Unboxed u -> Base (unboxed_type_to_base_layout u)
+    let to_base_layout : t -> base_layout =
+      function
+      | Array | Bytes | Char | Extension_constructor | Float | Float32
+      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
+      | String | Simd _ | Exception ->
+        Value
+      | Unboxed u -> unboxed_type_to_base_layout u
+
+    let to_layout (t: t) : Layout.t = Base (to_base_layout t)
 
     let equal_simd_vec_split s1 s2 =
       match s1, s2 with
@@ -531,8 +523,8 @@ and desc =
   | Predef of Predef.t * t list
   | Arrow
   | Poly_variant of t poly_variant_constructors
-  | Mu of t
-  | Rec_var of int
+  | Mu of Rec_var_ident.t * t
+  | Rec_var of Rec_var_ident.t
 
   (* constructors for type declarations *)
   | Variant of (t * Layout.t) complex_constructors
@@ -550,6 +542,8 @@ and desc =
       }
   | Mutrec of t Ident.Map.t
   | Proj_decl of t * Ident.t
+  | Unknown_type
+  | At_layout of t * Layout.t
 
 and 'a poly_variant_constructors = 'a poly_variant_constructor list
 
@@ -625,11 +619,11 @@ let rec equal_desc0 d1 d2 =
     if not (equal t1 t2) then false
     else equal v1 v2
   | Leaf, Leaf -> true
-  | Mu (t1_body), Mu (t2_body) ->
-    equal t1_body t2_body
-  | Rec_var i1, Rec_var i2 -> Int.equal i1 i2
+  | Mu (rv1, t1_body), Mu (rv2, t2_body) ->
+    Rec_var_ident.equal rv1 rv2 && equal t1_body t2_body
+  | Rec_var rv1, Rec_var rv2 -> Rec_var_ident.equal rv1 rv2
   | Struct t1, Struct t2 ->
-    Item.Map.equal equal t1 t2
+    t1 == t2 || Item.Map.equal equal t1 t2
   | Proj (t1, i1), Proj (t2, i2) ->
     if Item.compare i1 i2 <> 0 then false
     else equal t1 t2
@@ -638,7 +632,7 @@ let rec equal_desc0 d1 d2 =
     Ident.equal c1 c2
     && List.equal equal ts1 ts2
   | Mutrec t1, Mutrec t2 ->
-    Ident.Map.equal equal t1 t2
+    t1 == t2 || Ident.Map.equal equal t1 t2
   | Proj_decl (t1, i1), Proj_decl (t2, i2) ->
     if Ident.equal i1 i2 then
       equal t1 t2
@@ -664,10 +658,14 @@ let rec equal_desc0 d1 d2 =
   | Record r1, Record r2 ->
     equal_record_kind r1.kind r2.kind
     && List.equal equal_field r1.fields r2.fields
+  | Unknown_type, Unknown_type -> true
+  | At_layout (t1, layout1), At_layout (t2, layout2) ->
+    equal t1 t2 && Layout.equal layout1 layout2
   | (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _
     | Alias _ | Error _ | Variant _ | Variant_unboxed _ | Record _
     | Predef _ | Arrow | Poly_variant _ | Tuple _ | Unboxed_tuple _
-    | Constr _ | Mutrec _ | Proj_decl _ | Mu _ | Rec_var _), _
+    | Constr _ | Mutrec _ | Proj_decl _ | Mu _ | Rec_var _ | Unknown_type
+    | At_layout _), _
     -> false
 
 and equal_desc d1 d2 =
@@ -737,14 +735,15 @@ let rec print fmt t =
         Format.fprintf fmt "@[%a(@,%a)%a@]" aux t1 aux t2 print_uid_opt uid
     | Leaf ->
         Format.fprintf fmt "<%a>" (Format.pp_print_option Uid.print) uid
-    | Mu (t_body) ->
-      Format.fprintf fmt "Rec@[%a %a@]"
+    | Mu (rv, t_body) ->
+      Format.fprintf fmt "Mu@[%a %a.%a@]"
         print_uid_opt uid
+        Rec_var_ident.print rv
         print_nested t_body
-    | Rec_var id ->
-      Format.fprintf fmt "#%d%a"
-      id
-      print_uid_opt uid
+    | Rec_var rv ->
+      Format.fprintf fmt "#%a%a"
+        Rec_var_ident.print rv
+        print_uid_opt uid
     | Proj (t, item) ->
         begin match uid with
         | None ->
@@ -848,6 +847,9 @@ let rec print fmt t =
     Format.fprintf fmt "%a.%a"
       print_nested t
       Ident.print id
+  | Unknown_type -> Format.fprintf fmt "?"
+  | At_layout (shape, layout) ->
+    Format.fprintf fmt "(%a : %a)" print_nested shape Layout.format layout
 
   in
   if t.approximated then
@@ -925,6 +927,8 @@ let hash_record = 19
 let hash_constr = 20
 let hash_mutrec = 21
 let hash_proj_decl = 22
+let hash_unknown_type = 23
+let hash_at_layout = 24
 
 let fresh_var ?(name="shape-var") uid =
   let var = Ident.create_local name in
@@ -1001,14 +1005,14 @@ let comp_unit ?uid s =
     hash = Hashtbl.hash (hash_comp_unit, uid, s);
     approximated = false }
 
-let mu ?uid t_body =
-  { uid; desc = Mu (t_body);
-    hash = Hashtbl.hash (hash_mu, uid, t_body.hash);
+let mu ?uid rv t_body =
+  { uid; desc = Mu (rv, t_body);
+    hash = Hashtbl.hash (hash_mu, uid, Rec_var_ident.hash rv, t_body.hash);
     approximated = false }
 
-let rec_var ?uid n =
-  { uid; desc = Rec_var n;
-    hash = Hashtbl.hash (hash_rec_var, uid, n);
+let rec_var ?uid rv =
+  { uid; desc = Rec_var rv;
+    hash = Hashtbl.hash (hash_rec_var, uid, Rec_var_ident.hash rv);
     approximated = false }
 
 let app_list (base_shape : t) (args : t list) : t =
@@ -1086,6 +1090,16 @@ let proj_decl ?uid t id =
     hash = Hashtbl.hash (hash_proj_decl, uid, t.hash, id);
     approximated = false }
 
+let unknown_type ?uid () =
+  { uid; desc = Unknown_type;
+    hash = Hashtbl.hash (hash_unknown_type, uid);
+    approximated = false }
+
+let at_layout ?uid shape layout =
+  { uid; desc = At_layout (shape, layout);
+    hash = Hashtbl.hash (hash_at_layout, uid, shape.hash, layout);
+    approximated = false }
+
 
 let decompose_abs t =
   match t.desc with
@@ -1152,8 +1166,8 @@ let set_uid_if_none t uid =
   | Proj (t, i) -> proj ~uid t i
   | Comp_unit c -> comp_unit ~uid c
   | Error s -> error ~uid s
-  | Mu t -> mu ~uid t
-  | Rec_var i -> rec_var ~uid i
+  | Mu (rv, t) -> mu ~uid rv t
+  | Rec_var rv -> rec_var ~uid rv
   | Constr (c, ts) -> constr ~uid c ts
   | Tuple ts -> tuple ~uid ts
   | Unboxed_tuple ts -> unboxed_tuple ~uid ts
@@ -1167,6 +1181,8 @@ let set_uid_if_none t uid =
   | Record t -> record ~uid t.kind t.fields
   | Mutrec ts -> mutrec ~uid ts
   | Proj_decl (t, i) -> proj_decl ~uid t i
+  | Unknown_type -> unknown_type ~uid ()
+  | At_layout (shape, layout) -> at_layout ~uid shape layout
 
 
 module Map = struct

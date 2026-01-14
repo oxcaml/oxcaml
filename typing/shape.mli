@@ -82,23 +82,39 @@ module Uid : sig
   include Identifiable.S with type t := t
 end
 
-(** We use de Bruijn indices for some binders in [Shape.t] below to increase
-    sharing. That is, de Bruijn indices ensure that alpha-equivalent terms are
-    actually equal. This reduces redundancy when we emit shape information into
-    the debug information in later stages of the compiler (see [dwarf_type.ml]),
-    since equal shapes produce the same debug information. *)
-module DeBruijn_index : sig
+module Rec_var_ident : sig
   type t
 
-  (* Initial index, pick [0] for the top-level index. Cannot be negative. *)
-  val create : int -> t
+  val mk_fresh : unit -> t
 
-  val move_under_binder : t -> t
+  val equal : t -> t -> bool
 
-  val equal: t -> t -> bool
+  val compare : t -> t -> int
 
-  val print: Format.formatter -> t -> unit
+  val hash : t -> int
 
+  val print : Format.formatter -> t -> unit
+end
+
+(** Environment for mapping [Rec_var_ident.t] to values. Used to track
+    bindings when converting from named recursive variables to De Bruijn
+    indices. *)
+module Rec_var_env : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val is_empty : 'a t -> bool
+
+  val add : Rec_var_ident.t -> 'a -> 'a t -> 'a t
+
+  val find_opt : Rec_var_ident.t -> 'a t -> 'a option
+
+  val map : ('a -> 'b) -> 'a t -> 'b t
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val hash : ('a -> int) -> 'a t -> int
 end
 
 module Sig_component_kind : sig
@@ -220,6 +236,8 @@ module Predef : sig
 
   val unboxed_type_to_base_layout : unboxed -> base_layout
 
+  val to_base_layout : t -> base_layout
+
   val to_layout : t -> Layout.t
 
   val simd_vec_split_to_byte_size : simd_vec_split -> int
@@ -245,11 +263,10 @@ and desc =
   | Predef of Predef.t * t list (* predef type with arguments *)
   | Arrow
   | Poly_variant of t poly_variant_constructors
-  | Mu of t
-  (** [Mu t] represents a binder for a recursive type with body [t]. Its
-      variables are [Rec_var n] below, where [n] is a DeBruijn-index to maximize
-      sharing between alpha-equivalent shapes.  *)
-  | Rec_var of DeBruijn_index.t
+  | Mu of Rec_var_ident.t * t
+  (** [Mu (rv, t)] represents a binder for a recursive type with body [t],
+      binding the recursive variable [rv]. *)
+  | Rec_var of Rec_var_ident.t
 
   (* constructors for type declarations *)
   | Variant of (t * Layout.t) complex_constructors
@@ -277,6 +294,10 @@ and desc =
         abstractions inside. To project out a declaration, [Proj_decl] can be
         used. *)
   | Proj_decl of t * Ident.t
+  | Unknown_type
+    (** [Unknown_type] represents an unknown type. *)
+  | At_layout of t * Layout.t
+    (** [At_layout (shape, layout)] represents a shape with a known layout. *)
 
 (** For DWARF type emission to work as expected, we store the layouts in the
     declaration alongside the shapes in those cases where the layout "expands"
@@ -364,8 +385,8 @@ val unboxed_tuple : ?uid:Uid.t -> t list -> t
 val predef : ?uid:Uid.t -> Predef.t -> t list -> t
 val arrow : ?uid:Uid.t -> unit -> t
 val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
-val mu : ?uid:Uid.t -> t -> t
-val rec_var : ?uid:Uid.t -> DeBruijn_index.t -> t
+val mu : ?uid:Uid.t -> Rec_var_ident.t -> t -> t
+val rec_var : ?uid:Uid.t -> Rec_var_ident.t -> t
 
 (* constructors for type declarations *)
 val variant :
@@ -377,6 +398,8 @@ val record : ?uid:Uid.t -> record_kind ->
   (string * Uid.t option * t * Layout.t) list -> t
 val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
 val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
+val unknown_type : ?uid:Uid.t -> unit -> t
+val at_layout : ?uid:Uid.t -> t -> Layout.t -> t
 
 
 val set_approximated : approximated:bool -> t -> t
@@ -451,16 +474,3 @@ val of_path :
 val set_uid_if_none : t -> Uid.t -> t
 
 module Cache : Hashtbl.S with type key = t
-
-(** DeBruijn Environment for working with the recursive binders. *)
-module DeBruijn_env : sig
-  type 'a t
-
-  val empty : 'a t
-
-  val is_empty : 'a t -> bool
-
-  val push : 'a t -> 'a -> 'a t
-
-  val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
-end
