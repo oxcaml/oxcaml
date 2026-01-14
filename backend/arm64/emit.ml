@@ -1103,8 +1103,8 @@ module BR = Branch_relaxation.Make (struct
       1
     | Lop
         (Intop_imm
-           ( ( Iadd | Isub | Imul | Idiv _ | Imod | Imulh _ | Iand | Ior | Ixor
-             | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
+           ( ( Iadd | Isub | Imul | Idiv _ | Imod _ | Imulh _ | Iand | Ior
+             | Ixor | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
              _ )) ->
       1
     | Lop (Floatop (Float64, (Iabsf | Inegf))) -> 1
