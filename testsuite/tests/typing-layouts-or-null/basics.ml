@@ -522,15 +522,20 @@ val f2 : string or_null t -> int = <fun>
 (* [or_null] works in array comprehensions *)
 
 let f arr = [| This x for x in arr |]
+let g arr = [: This x for x in arr :]
 
 [%%expect{|
 val f : ('a : value_or_null mod non_null). 'a array -> 'a or_null array =
+  <fun>
+val g : ('a : value_or_null mod non_null). 'a iarray -> 'a or_null iarray =
   <fun>
 |}]
 
 
 let x = [| "stutter" for _y in [| This 1; This 2; Null |] |]
+let y = [: "stutter" for _x in [: This 1; This 2; Null :] :]
 
 [%%expect{|
 val x : string array = [|"stutter"; "stutter"; "stutter"|]
+val y : string iarray = [:"stutter"; "stutter"; "stutter":]
 |}]
