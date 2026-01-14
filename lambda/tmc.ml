@@ -923,12 +923,11 @@ let rec choice ctx t =
     (* we don't handle { foo with x = ...; y = recursive-call } *)
     | Pduprecord _
 
-    (* we don't handle all-float records or mixed blocks. If we
+    (* we don't handle all-float records. If we
        did, we'd need to remove references to Lambda.layout_tmc_field
     *)
     | Pmakefloatblock _
     | Pmakeufloatblock _
-    | Pmakemixedblock _
 
     (* nor unboxed products *)
     | Pmake_unboxed_product _ | Punboxed_product_field _

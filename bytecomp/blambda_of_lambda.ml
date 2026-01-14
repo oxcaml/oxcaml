@@ -395,14 +395,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       (* In bytecode, float# is boxed, so we can treat these two primitives the
          same. *)
       pseudo_event (variadic Makefloatblock)
-    | Pmakemixedblock (tag, _, shape, _) ->
-      (* There is no notion of a mixed block at runtime in bytecode. Further,
-         source-level unboxed types are represented as boxed in bytecode, so
-         no ceremony is needed to box values before inserting them into
-         the (normal, unmixed) block.
-      *)
-      let total_len = Array.length shape in
-      pseudo_event (variadic (Make_faux_mixedblock { total_len; tag }))
     | Pmakearray (kind, _, _) ->
       pseudo_event
         (match kind with
@@ -500,8 +492,18 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         assert (kind = kind');
         comp_expr (Lambda.Lprim (Pmakearray (kind, mutability, m), args, loc))
       | _ -> unary (Ccall "caml_obj_dup"))
-    | Pmakeblock (tag, _mut, _, _) ->
-      pseudo_event (variadic (Makeblock { tag }))
+    | Pmakeblock (tag, _mut, shape, _) -> (
+      match shape with
+      | None -> pseudo_event (variadic (Makeblock { tag }))
+      | Some _ when Lambda.is_uniform_block_shape shape ->
+        pseudo_event (variadic (Makeblock { tag }))
+      | Some shape ->
+        (* There is no notion of a mixed block at runtime in bytecode.
+              Further, source-level unboxed types are represented as boxed in
+              bytecode, so no ceremony is needed to box values before inserting
+              them into the (normal, unmixed) block. *)
+        let total_len = Array.length shape in
+        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal cu -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)

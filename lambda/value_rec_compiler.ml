@@ -246,14 +246,16 @@ let compute_static_size lam =
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
         end
-    | Pmakeblock _ | Pmakelazyblock _ ->
-        (* The block shape is unfortunately an option, so we rely on the
-           number of arguments instead.
-           Note that flat float arrays/records use Pmakearray, so we don't need
+    | Pmakeblock (_, _, shape, _) ->
+        (* Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
+        (match shape with
+         | None -> Block (Regular_block (List.length args))
+         | Some _ when Lambda.is_uniform_block_shape shape ->
+             Block (Regular_block (List.length args))
+         | Some arr -> Block (Mixed_record arr))
+    | Pmakelazyblock _ ->
         Block (Regular_block (List.length args))
-    | Pmakemixedblock (_, _, shape, _) ->
-        Block (Mixed_record (shape))
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with

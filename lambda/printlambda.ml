@@ -322,18 +322,6 @@ let record_rep ppf r = match r with
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
 
-let block_shape ppf shape = match shape with
-  | None | Some [] -> ()
-  | Some l when List.for_all ((=) Lambda.generic_value) l -> ()
-  | Some [elt] ->
-      Format.fprintf ppf " (%a)" field_kind elt
-  | Some (h :: t) ->
-      Format.fprintf ppf " (%a" field_kind h;
-      List.iter (fun elt ->
-          Format.fprintf ppf ",%a" field_kind elt)
-        t;
-      Format.fprintf ppf ")"
-
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
   fun print_mode ppf elt ->
@@ -370,6 +358,31 @@ and mixed_block_shape
       shape;
     fprintf ppf ")"
   end
+
+let block_shape ppf shape = match shape with
+  | None | Some [||] -> ()
+  | Some arr when Lambda.is_uniform_block_shape shape ->
+      (* Print uniform shapes as value kinds *)
+      let vks = Array.to_list (Array.map (function
+        | Lambda.Value vk -> vk
+        | _ -> assert false) arr)
+      in
+      if List.for_all ((=) Lambda.generic_value) vks then ()
+      else begin
+        match vks with
+        | [elt] ->
+            Format.fprintf ppf " (%a)" field_kind elt
+        | h :: t ->
+            Format.fprintf ppf " (%a" field_kind h;
+            List.iter (fun elt ->
+                Format.fprintf ppf ",%a" field_kind elt)
+              t;
+            Format.fprintf ppf ")"
+        | [] -> ()
+      end
+  | Some arr ->
+      (* Mixed shape - use mixed block printer *)
+      mixed_block_shape (fun _ _ -> ()) ppf arr
 
 let field_read_semantics ppf sem =
   match sem with
@@ -432,15 +445,6 @@ let primitive ppf = function
   | Pmakeufloatblock (Mutable, mode) ->
      fprintf ppf "make%sufloatblock Mutable"
         (locality_mode_if_local mode)
-  | Pmakemixedblock (tag, Immutable, abs, mode) ->
-      fprintf ppf "make%amixedblock %i Immutable%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
-  | Pmakemixedblock (tag, Immutable_unique, abs, mode) ->
-     fprintf ppf "make%amixedblock %i Immutable_unique%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
-  | Pmakemixedblock (tag, Mutable, abs, mode) ->
-     fprintf ppf "make%amixedblock %i Mutable%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
   | Pmakelazyblock Lazy_tag ->
       fprintf ppf "makelazyblock"
   | Pmakelazyblock Forward_tag ->
@@ -891,7 +895,6 @@ let name_of_primitive = function
   | Pmakeblock _ -> "Pmakeblock"
   | Pmakefloatblock _ -> "Pmakefloatblock"
   | Pmakeufloatblock _ -> "Pmakeufloatblock"
-  | Pmakemixedblock _ -> "Pmakemixedblock"
   | Pmakelazyblock _ -> "Pmakelazyblock"
   | Pfield _ -> "Pfield"
   | Pfield_computed _ -> "Pfield_computed"

@@ -1674,7 +1674,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       in
       let useful = List.exists (fun knd -> knd <> Lambda.generic_value) shape in
       if useful then
-        Some (Primitive (Pmakeblock(tag, mut, Some shape, mode),arity))
+        Some (Primitive (Pmakeblock(tag, mut,
+                           Lambda.block_shape_of_value_kinds (Some shape),
+                           mode), arity))
       else None
     end
   | Comparison(comp, Compare_generic), p1 :: _ ->
@@ -2347,7 +2349,7 @@ let lambda_primitive_needs_event_after = function
   | Parray_to_iarray | Parray_of_iarray
   | Pignore
   | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
-  | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
+  | Pmakeufloatblock _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
