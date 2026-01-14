@@ -114,7 +114,7 @@ module Identifier : sig
   module Module : sig
     type t
 
-    val compilation_unit : string -> t
+    val global_module : string -> t
 
     val dot : t -> string -> t
 
@@ -288,7 +288,7 @@ module Method : sig
   val of_string : string -> t
 end
 
-module Fragment : sig
+module Modtype_path : sig
   type t
 
   val name : string -> t
@@ -385,7 +385,7 @@ and Type : sig
 
   val poly : Loc.t -> Name.t list -> (Var.Type_var.t list -> t) lam -> t
 
-  val package : Module_type.t -> (Fragment.t * t) list -> t
+  val package : Module_type.t -> (Modtype_path.t * t) list -> t
 
   val quote : t -> t
 
@@ -452,8 +452,6 @@ module Exp_attribute : sig
   val loop : t
 
   val tail_mod_cons : t
-
-  val quotation : t
 end
 
 module rec Case : sig
@@ -517,17 +515,22 @@ and Function : sig
 end
 
 and Comprehension : sig
+  module Iterator : sig
+    type t
+
+    val range : Var.Value.t -> Exp.t -> Exp.t -> bool -> t
+
+    val in_ : Loc.t -> Var.Value.t list -> Pat.t -> Exp.t -> t
+  end
+
   type t
 
   val body : Exp.t -> t
 
-  val when_clause : Exp.t -> t -> t
+  val when_ : Exp.t -> t -> t
 
-  val for_range :
-    Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> t) lam -> t
-
-  val for_in :
-    Loc.t -> Exp.t -> Name.t list -> (Var.Value.t list -> Pat.t * t) lam -> t
+  val for_ :
+    Loc.t -> Name.t list -> (Var.Value.t list -> Iterator.t list * t) lam -> t
 end
 
 and Exp_desc : sig
@@ -618,6 +621,8 @@ and Exp_desc : sig
   val list_comprehension : Comprehension.t -> t
 
   val array_comprehension : Comprehension.t -> t
+
+  val immutable_array_comprehension : Comprehension.t -> t
 
   val unboxed_tuple : (Label.Nonoptional.t * Exp.t) list -> t
 

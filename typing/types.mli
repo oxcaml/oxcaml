@@ -1006,7 +1006,15 @@ module type Wrapped = sig
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities: Mode.Modality.t;      (* Modalities on the value *)
+      val_modalities: Mode.Modality.t;
+   (** The modalities on the value in a signature. It is [undefined] in several
+      cases:
+    - The value is not in a structure, so there is no modalities
+      to talk about. For example, adding [let x = ... in] to the environment
+      will have [val_modalities] set to [undefined].
+    - The value was from a structure, but the original modalities
+      have been applied and we have the real mode of the value. The original
+      modalities shouldn't be looked again and is replaced by [undefined]. *)
       val_kind: value_kind;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
@@ -1042,6 +1050,7 @@ module type Wrapped = sig
   {
     md_type: module_type;
     md_modalities : Mode.Modality.t;
+    (** Similiar to [val_modalities]; see comments there. *)
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;

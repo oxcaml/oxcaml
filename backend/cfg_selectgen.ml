@@ -504,7 +504,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let module EC = SU.Effect_and_coeffect in
     let may_defer_evaluation =
       let ec = effects_of exp in
-      match EC.effect ec with
+      match EC.effect_ ec with
       | Arbitrary | Raise ->
         (* Preserve the ordering of effectful expressions by evaluating them
            early (in the correct order) and assigning their results to
@@ -526,13 +526,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              every [exp'] (for [exp'] as in the comment above) has no effects
              "worse" (in the sense of the ordering in [t]) than raising an
              exception. *)
-          match EC.effect effects_after with
+          match EC.effect_ effects_after with
           | None | Raise -> true
           | Arbitrary -> false)
         | Arbitrary -> (
           (* Arbitrary expressions may only be deferred if evaluation of every
              [exp'] (for [exp'] as in the comment above) has no effects. *)
-          match EC.effect effects_after with
+          match EC.effect_ effects_after with
           | None -> true
           | Arbitrary | Raise -> false))
     in

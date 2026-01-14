@@ -416,12 +416,7 @@ let directive dir =
   | Directive
       (Asm_targets.Asm_directives.Directive.Section (section, first_occurrence))
     -> (
-    let first_occurrence =
-      match first_occurrence with
-      | `First_occurrence -> true
-      | `Not_first_occurrence -> false
-    in
-    let details = Asm_targets.Asm_section.details section ~first_occurrence in
+    let details = Asm_targets.Asm_section.details section first_occurrence in
     let name = Section_name.make details.names details.flags details.args in
     let where =
       if details.is_delayed then delayed_sections else asm_code_by_section

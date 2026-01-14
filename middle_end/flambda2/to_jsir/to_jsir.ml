@@ -362,12 +362,12 @@ and apply_expr ~env ~res e =
         To_jsir_env.get_code_id_exn env code_id
       in
       apply_fn ~res ~f:closure ~args ~exact:false
-    | None, Effect effect ->
+    | None, Effect effect_ ->
       if List.length args <> 0
       then Misc.fatal_error "Found non-empty argument list for effects";
       let prim_name, args, res =
         let open Jsir in
-        match effect with
+        match effect_ with
         | Perform { eff } ->
           let eff, res = To_jsir_shared.simple ~env ~res eff in
           "%perform", [Pv eff], res
@@ -376,18 +376,31 @@ and apply_expr ~env ~res e =
           let cont, res = To_jsir_shared.simple ~env ~res cont in
           let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
           "%reperform", [Pv eff; Pv cont; Pv last_fiber], res
-        | Run_stack { stack; f; arg } ->
-          let stack, res = To_jsir_shared.simple ~env ~res stack in
+        | With_stack { valuec; exnc; effc; f; arg } ->
+          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+          let effc, res = To_jsir_shared.simple ~env ~res effc in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
           let unit = Pc (Int Targetint.zero) in
-          "%resume", [Pv stack; Pv f; Pv arg; unit], res
-        | Resume { stack; f; arg; last_fiber } ->
-          let stack, res = To_jsir_shared.simple ~env ~res stack in
+          "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg; unit], res
+        | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+          let effc, res = To_jsir_shared.simple ~env ~res effc in
+          let dyn, res = To_jsir_shared.simple ~env ~res dyn in
+          let bind, res = To_jsir_shared.simple ~env ~res bind in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
-          let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
-          "%resume", [Pv stack; Pv f; Pv arg; Pv last_fiber], res
+          let unit = Pc (Int Targetint.zero) in
+          ( "%with_stack_bind",
+            [Pv valuec; Pv exnc; Pv effc; Pv dyn; Pv bind; Pv f; Pv arg; unit],
+            res )
+        | Resume { cont; f; arg } ->
+          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let f, res = To_jsir_shared.simple ~env ~res f in
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          "%resume", [Pv cont; Pv f; Pv arg], res
       in
       let prim : Jsir.expr = Prim (Extern prim_name, args) in
       let var = Jsir.Var.fresh () in

@@ -34,6 +34,9 @@ type visibility =
   | Global
   | Local
 
+(** Comparison and hashing of symbols is based on their encoded form (as
+    returned by [encode]), so two symbols that produce the same assembly output
+    are considered equal regardless of how they were constructed. *)
 include Identifiable.S
 
 (** [create] creates a new symbol with the given visibility. *)
@@ -67,6 +70,8 @@ val is_local : t -> bool
 module Predef : sig
   val caml_call_gc : t
 
+  val caml_call_gc_sse : t
+
   val caml_call_gc_avx : t
 
   val caml_call_gc_avx512 : t
@@ -75,11 +80,15 @@ module Predef : sig
 
   val caml_allocN : t
 
+  val caml_allocN_sse : t
+
   val caml_allocN_avx : t
 
   val caml_allocN_avx512 : t
 
   val caml_alloc1 : t
+
+  val caml_alloc1_sse : t
 
   val caml_alloc1_avx : t
 
@@ -87,11 +96,15 @@ module Predef : sig
 
   val caml_alloc2 : t
 
+  val caml_alloc2_sse : t
+
   val caml_alloc2_avx : t
 
   val caml_alloc2_avx512 : t
 
   val caml_alloc3 : t
+
+  val caml_alloc3_sse : t
 
   val caml_alloc3_avx : t
 

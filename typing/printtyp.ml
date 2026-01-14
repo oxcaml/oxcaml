@@ -2777,7 +2777,12 @@ and tree_of_modtype_declaration ?abbrev id decl =
   Osig_modtype (Ident.name id, mty)
 
 and tree_of_module ?abbrev id md rs = wrap_mutation (fun () ->
-  let moda = Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities in
+  let moda =
+    if Mode.Modality.is_undefined md.md_modalities then
+      Mode.Modality.Const.id
+    else
+      Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities
+  in
     Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
     tree_of_modalities Immutable moda,
     tree_of_rec rs)

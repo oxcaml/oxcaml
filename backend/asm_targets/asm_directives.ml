@@ -151,15 +151,23 @@ module Directive = struct
   end
 
   module Constant_with_width = struct
-    type width_in_bytes =
-      | Eight
-      | Sixteen
-      | Thirty_two
-      | Sixty_four
+    module Width_in_bytes = struct
+      type t =
+        | Eight
+        | Sixteen
+        | Thirty_two
+        | Sixty_four
+
+      let to_int = function
+        | Eight -> 1
+        | Sixteen -> 2
+        | Thirty_two -> 4
+        | Sixty_four -> 8
+    end
 
     type t =
       { constant : Constant.t;
-        width_in_bytes : width_in_bytes
+        width_in_bytes : Width_in_bytes.t
       }
 
     let create constant width_in_bytes = { constant; width_in_bytes }
@@ -167,13 +175,6 @@ module Directive = struct
     let constant t = t.constant
 
     let width_in_bytes t = t.width_in_bytes
-
-    let width_in_bytes_int w =
-      match w with
-      | Eight -> 1
-      | Sixteen -> 2
-      | Thirty_two -> 4
-      | Sixty_four -> 8
   end
 
   type thing_after_label =
@@ -248,7 +249,8 @@ module Directive = struct
     | Reloc of
         { offset : Constant.t;
           name : reloc_type;
-          expr : Constant.t
+          target_symbol : Asm_symbol.t;
+          addend : int64
         }
 
   let bprintf = Printf.bprintf
@@ -382,24 +384,17 @@ module Directive = struct
     | New_label (Label lbl, _typ) -> bprintf buf "%s:" (Asm_label.encode lbl)
     | New_label (Symbol sym, _typ) -> bprintf buf "%s:" (Asm_symbol.encode sym)
     | New_line -> ()
+    | Section (Data, _) -> bprintf buf "\t.data"
+    | Section (Text, _) -> bprintf buf "\t.text"
     | Section (section, first_occurrence) -> (
-      let first_occurrence =
-        match first_occurrence with
-        | `First_occurrence -> true
-        | `Not_first_occurrence -> false
-      in
-      let details = Asm_section.details section ~first_occurrence in
-      match details.names with
-      | [".data"] -> bprintf buf "\t.data"
-      | [".text"] -> bprintf buf "\t.text"
-      | names -> (
-        bprintf buf "\t.section %s" (String.concat "," names);
-        (match details.flags with
-        | None -> ()
-        | Some flags -> bprintf buf ",%S" flags);
-        match details.args with
-        | [] -> ()
-        | args -> bprintf buf ",%s" (String.concat "," args)))
+      let details = Asm_section.details section first_occurrence in
+      bprintf buf "\t.section %s" (String.concat "," details.names);
+      (match details.flags with
+      | None -> ()
+      | Some flags -> bprintf buf ",%S" flags);
+      match details.args with
+      | [] -> ()
+      | args -> bprintf buf ",%s" (String.concat "," args))
     | Space { bytes } -> (
       match TS.system () with
       | Solaris -> bprintf buf "\t.zero\t%d" bytes
@@ -473,10 +468,11 @@ module Directive = struct
     | Weak sym -> bprintf buf "\t.weak\t%s" (Asm_symbol.encode sym)
     (* masm only *)
     | External _ -> assert false
-    | Reloc { offset; name; expr } ->
-      bprintf buf "\t.reloc\t%a, %s, %a" Constant.print offset
+    | Reloc { offset; name; target_symbol; addend } ->
+      bprintf buf "\t.reloc\t%a, %s, %s - %Ld" Constant.print offset
         (reloc_type_to_string name)
-        Constant.print expr
+        (Asm_symbol.encode target_symbol)
+        addend
 
   let print_masm buf t =
     let unsupported name =
@@ -682,7 +678,7 @@ let protected symbol = emit (Protected symbol)
 let direct_assignment var cst = emit (Direct_assignment (var, lower_expr cst))
 
 let const ?comment constant
-    (width : Directive.Constant_with_width.width_in_bytes) =
+    (width : Directive.Constant_with_width.Width_in_bytes.t) =
   let constant = lower_expr constant in
   let constant = Directive.Constant_with_width.create constant width in
   emit (Const { constant; comment })
@@ -768,13 +764,9 @@ let switch_to_section ?(emit_label_on_first_occurrence = false) section =
     define_label (Asm_label.for_section section)
   | `First_occurrence | `Not_first_occurrence -> ()
 
-let switch_to_section_raw ~names ~flags:_ ~args:_ ~is_delayed:_ =
-  (* Convert names to Asm_section.t if possible *)
-  match Asm_section.of_names names with
-  | Some section -> switch_to_section section
-  | None ->
-    Misc.fatal_errorf "switch_to_section_raw: unknown section names: %s"
-      (String.concat ", " names)
+let switch_to_section_raw ~names ~flags ~args ~is_delayed =
+  let section = Asm_section.Custom { names; flags; args; is_delayed } in
+  switch_to_section section
 
 let unsafe_set_internal_section_ref section =
   current_section_ref := Some section
@@ -862,7 +854,7 @@ let define_data_symbol symbol =
   (* check_symbol_for_definition_in_current_section symbol; *)
   emit (New_label (Symbol symbol, Machine_width_data));
   match TS.assembler (), TS.windows () with
-  | GAS_like, false -> type_ (Directive.Symbol symbol) ~type_:Object
+  | GAS_like, false -> type_ (Symbol symbol) ~type_:Object
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
 (* CR mshinwell: Rename to [define_text_symbol]? *)
@@ -872,7 +864,7 @@ let define_function_symbol symbol =
   (* CR mshinwell: This shouldn't be called "New_label" *)
   emit (New_label (Symbol symbol, Code));
   match TS.assembler (), TS.windows () with
-  | GAS_like, false -> type_ (Directive.Symbol symbol) ~type_:Function
+  | GAS_like, false -> type_ (Symbol symbol) ~type_:Function
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
 let define_symbol_label ~section symbol =
@@ -883,12 +875,12 @@ let define_symbol_label ~section symbol =
 
 let type_symbol symbol ~ty =
   match TS.assembler (), TS.windows () with
-  | GAS_like, false -> type_ (Directive.Symbol symbol) ~type_:ty
+  | GAS_like, false -> type_ (Symbol symbol) ~type_:ty
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
 let type_label label ~ty =
   match TS.assembler (), TS.windows () with
-  | GAS_like, false -> type_ (Directive.Label label) ~type_:ty
+  | GAS_like, false -> type_ (Label label) ~type_:ty
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
 let define_joint_label_and_symbol ~section symbol =
@@ -1168,10 +1160,11 @@ let offset_into_dwarf_section_symbol ?comment:_comment
   | Thirty_two -> const expr Thirty_two
   | Sixty_four -> const expr Sixty_four
 
-let reloc_x86_64_plt32 ~offset_from_this ~target_symbol ~rel_offset_from_next =
+let reloc_x86_64_plt32 ~offset_from_this ~target_symbol ~addend =
   emit
     (Reloc
        { offset = Sub (This, Signed_int offset_from_this);
          name = R_X86_64_PLT32;
-         expr = Sub (Symbol target_symbol, Signed_int rel_offset_from_next)
+         target_symbol;
+         addend
        })

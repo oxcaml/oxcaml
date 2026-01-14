@@ -57,6 +57,14 @@ type t =
   | Probes
   | Note_ocaml_eh
   | Note_gnu_stack
+  | Custom of
+      { names : string list;
+        flags : string option;
+        args : string list;
+        is_delayed : bool
+      }
+      (** A custom section with explicit details, for target-specific sections
+          not covered by the other variants. *)
 
 val to_string : t -> string
 
@@ -76,9 +84,10 @@ val dwarf_sections_in_order : unit -> t list
 val is_delayed : t -> bool
 
 (** The necessary information for a section directive. [first_occurrence] should
-    be [true] iff the corresponding directive will be the first such in the
-    relevant assembly file for the given section. *)
-val details : t -> first_occurrence:bool -> section_details
+    be [`First_occurrence] iff the corresponding directive will be the first
+    such in the relevant assembly file for the given section. *)
+val details :
+  t -> [`First_occurrence | `Not_first_occurrence] -> section_details
 
 val print : Format.formatter -> t -> unit
 

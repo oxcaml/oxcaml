@@ -643,12 +643,14 @@ type t = {
   unboxed_labels: (stage_lock, unboxed_label_description) TycompTbl.t;
   types: (stage_lock, type_data, type_data) IdTbl.t;
   modules: (lock_or_stage, module_entry, module_data) IdTbl.t;
+  (* INVARIANT: modules always have its mode normalized *)
   modtypes: (stage_lock, modtype_data, modtype_data) IdTbl.t;
   classes: (lock_or_stage, class_data, class_data) IdTbl.t;
   cltypes: (empty, cltype_data, cltype_data) IdTbl.t;
   functor_args: unit Ident.tbl;
   summary: summary;
   local_constraints: type_declaration Path.Map.t;
+  implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
 }
@@ -855,6 +857,11 @@ type lookup_error =
 type error =
   | Missing_module of Location.t * Path.t * Path.t
   | Illegal_value_name of Location.t * string
+  | Implicit_jkind_already_defined of {
+      loc : Location.t;
+      name : string;
+      defined_at : Location.t;
+    }
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
   | Toplevel_splice of Location.t
@@ -938,6 +945,7 @@ let empty = {
   modules = IdTbl.empty; modtypes = IdTbl.empty;
   classes = IdTbl.empty; cltypes = IdTbl.empty;
   summary = Env_empty; local_constraints = Path.Map.empty;
+  implicit_jkinds = String.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
   stage = 0;
@@ -1010,7 +1018,7 @@ let scrape_alias =
         t -> Subst.Lazy.module_type -> Subst.Lazy.module_type)
 
 let md md_type =
-  {md_type; md_modalities = Mode.Modality.id; md_attributes=[];
+  {md_type; md_modalities = Mode.Modality.undefined; md_attributes=[];
    md_loc=Location.none; md_uid = Uid.internal_not_actually_unique}
 
 (** The caller is not interested in modes, and thus [val_modalities] is
@@ -1019,25 +1027,43 @@ let vda_description vda =
   let vda_description = vda.vda_description in
   {vda_description with val_modalities = Mode.Modality.undefined}
 
-let normalize_mode modality mode =
-  let vda_mode = Mode.Modality.apply modality mode in
-  Mode.Modality.id, vda_mode
+module Normalize_mode = struct
+  type t =
+    | Normalize_exn (** Normalize a mode; raise if already normalized. *)
+    | Assert_normalized
+      (** Assert that the mode is already normalized, and return the mode *)
+    | Normalize
+      (** Normalize a mode; do nothing if already normalized.
+          Use the other two instead whenever possible *)
 
-let normalize_vda_mode vda =
-  let vda_description = vda.vda_description in
-  let val_modalities, vda_mode =
-    normalize_mode vda_description.val_modalities vda.vda_mode
-  in
-  let vda_description = {vda_description with val_modalities} in
-  vda_description, vda_mode
+  let modality t modality mode =
+    let normalized = Mode.Modality.is_undefined modality in
+    match t, normalized with
+    | Normalize, true -> modality, mode
+    | Normalize_exn, true ->
+        Misc.fatal_error "mode is already normalized but expected otherwise"
+    | Assert_normalized, true -> modality, mode
+    | (Normalize | Normalize_exn), false ->
+        Mode.Modality.undefined,
+        Mode.Modality.apply ~hint:{monadic = Unknown; comonadic = Unknown}
+          modality mode
+    | Assert_normalized, false ->
+        Misc.fatal_error "mode is not already normalized but expected otherwise"
 
-let normalize_md_mode (md : Subst.Lazy.module_declaration) mode =
-  let md_modalities, mode = normalize_mode md.md_modalities mode in
-  let md = {md with md_modalities} in
-  md, mode
+  let vd t (vd : Subst.Lazy.value_description) mode =
+    let val_modalities, mode = modality t vd.val_modalities mode in
+    let vd = {vd with val_modalities} in
+    vd, mode
 
-let normalize_mda_mode mda =
-  normalize_md_mode mda.mda_declaration mda.mda_mode
+  let vda norm vda = vd norm vda.vda_description vda.vda_mode
+
+  let md t (md : Subst.Lazy.module_declaration) mode =
+    let md_modalities, mode = modality t md.md_modalities mode in
+    let md = {md with md_modalities} in
+    md, mode
+
+  let mda norm mda = md norm mda.mda_declaration mda.mda_mode
+end
 
 (* Print addresses *)
 
@@ -1175,7 +1201,7 @@ let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   in
   let md =
     { Subst.Lazy.md_type = Mty_signature sign;
-      md_modalities = Mode.Modality.id;
+      md_modalities = Mode.Modality.undefined;
       md_loc = Location.none;
       md_attributes = [];
       md_uid = uid;
@@ -1600,7 +1626,7 @@ let find_value path env =
 let find_value_no_locks_exn id env =
   match IdTbl.find_same_and_locks id env.values with
   | Val_bound _, _ :: _ -> Misc.fatal_error "locks encountered"
-  | Val_bound data, [] -> normalize_vda_mode data
+  | Val_bound data, [] -> Normalize_mode.vda Normalize data
   | Val_unbound _, _ -> raise Not_found
 
 let find_class path env =
@@ -1675,6 +1701,11 @@ let find_hash_type path env =
       let cltda = NameMap.find name c.comp_cltypes in
       cltda.cltda_declaration.clty_hash_type
   | Papply _ | Pextra_ty _ -> raise Not_found
+
+let find_implicit_jkind name env =
+  match String.Map.find_opt name env.implicit_jkinds with
+  | Some { txt = jkind; loc = _ } -> Some jkind
+  | None -> None
 
 let global_of_instance_compilation_unit cu =
   let global_name = Compilation_unit.to_global_name_exn cu in
@@ -2311,7 +2342,7 @@ let rec components_of_module_maker
             in
             c.comp_constrs <- add_to_tbl (Ident.name id) cda c.comp_constrs
         | Sig_module(id, pres, md, _, _) ->
-            let md, mode = normalize_md_mode md cm_mode in
+            let md, mode = Normalize_mode.md Normalize_exn md cm_mode in
             let md' =
               (* The prefixed items get the same scope as [cm_path], which is
                  the prefix. *)
@@ -2658,7 +2689,7 @@ and store_module ?(update_summary=true) ~check
     (fun f -> check_usage loc id md.md_uid f !module_declarations) check;
   Builtin_attributes.mark_alerts_used md.md_attributes;
   let alerts = Builtin_attributes.alerts_of_attrs md.md_attributes in
-  let md, mode = normalize_md_mode md mode in
+  let md, mode = Normalize_mode.md Normalize md mode in
   let comps =
     components_of_module ~alerts ~uid:md.md_uid
       env Subst.identity (Pident id) addr md.md_type mode shape
@@ -2812,7 +2843,7 @@ and add_cltype ?shape id ty env =
 
 let add_module_lazy ~update_summary id presence mty ?mode env =
   let md = Subst.Lazy.{md_type = mty;
-                       md_modalities = Mode.Modality.id;
+                       md_modalities = Mode.Modality.undefined;
                        md_attributes = [];
                        md_loc = Location.none;
                        md_uid = Uid.internal_not_actually_unique}
@@ -2826,6 +2857,19 @@ let add_module ?arg ?shape id presence mty ?mode env =
 let add_local_constraint path info env =
   { env with
     local_constraints = Path.Map.add path info env.local_constraints }
+
+let add_implicit_jkind ~loc name jkind env =
+  match String.Map.find_opt name env.implicit_jkinds with
+  | Some { loc = defined_loc; txt = _ } ->
+      error
+        (Implicit_jkind_already_defined { loc; name; defined_at = defined_loc })
+  | None ->
+      { env with
+        implicit_jkinds =
+          String.Map.add name { txt = jkind; loc } env.implicit_jkinds }
+
+let clear_implicit_jkinds env =
+  { env with implicit_jkinds = String.Map.empty }
 
 (* Insertion of bindings by name *)
 
@@ -3431,7 +3475,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   match data with
   | Mod_local (mda, alias_locks) -> begin
       use_module ~use ~loc path mda;
-      let _, mode = normalize_mda_mode mda in
+      let _, mode = Normalize_mode.mda Assert_normalized mda in
       let locks = alias_locks @ locks in
       match load with
       (* CR-soon zqian: duplication of information. Should move modes out of
@@ -3806,7 +3850,7 @@ and lookup_module_lazy ~errors ~use ~loc lid env =
       path, data.mda_declaration, mode_with_locks
   | Ldot(l, s) ->
       let path, locks, data = lookup_dot_module ~errors ~use ~loc l s env in
-      let md, mode = normalize_mda_mode data in
+      let md, mode = Normalize_mode.mda Assert_normalized data in
       path, md, (mode, locks)
   | Lapply _ as lid ->
       let path_f, comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
@@ -4107,7 +4151,7 @@ let lookup_module_path ~errors ~use ~loc ~load lid env =
         path, mode_with_locks
   | Ldot(l, s) ->
       let path, locks, data = lookup_dot_module ~errors ~use ~loc l s env in
-      let _, mode = normalize_mda_mode data in
+      let _, mode = Normalize_mode.mda Assert_normalized data in
       path, (mode, locks)
   | Lapply _ as lid ->
       let path_f, _comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
@@ -4141,7 +4185,7 @@ let lookup_value_lazy ~errors ~use ~loc lid env =
     | Ldot(l, s) -> lookup_dot_value ~errors ~use ~loc l s env
     | Lapply _ -> assert false
   in
-  let vd, mode = normalize_vda_mode vda in
+  let vd, mode = Normalize_mode.vda Normalize vda in
   path, vd, (mode, locks)
 
 let lookup_value ~errors ~use ~loc lid env =
@@ -4570,7 +4614,7 @@ let fold_values f =
        match ve with
        | Val_unbound _ -> acc
        | Val_bound vda ->
-          let vd, mode = normalize_vda_mode vda in
+          let vd, mode = Normalize_mode.vda Normalize vda in
           f k p vd mode acc)
 and fold_constructors f =
   find_all_simple_list (fun env -> env.constrs) (fun sc -> sc.comp_constrs)
@@ -5067,6 +5111,11 @@ let report_error ~level ppf = function
   | Illegal_value_name(_loc, name) ->
       fprintf ppf "%a is not a valid value identifier."
        Style.inline_code name
+  | Implicit_jkind_already_defined { name; defined_at; loc = _ } ->
+      fprintf ppf
+        "@[<hov>The implicit kind for %a is already defined at %a.@]"
+        Style.inline_code name
+        Location.print_loc defined_at
   | Lookup_error(loc, t, err) -> report_lookup_error ~level loc t ppf err
   | Incomplete_instantiation { unset_param } ->
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
@@ -5093,6 +5142,7 @@ let () =
             match err with
             | Missing_module (loc, _, _)
             | Illegal_value_name (loc, _)
+            | Implicit_jkind_already_defined { loc; _ }
             | Toplevel_splice loc
             | Unsupported_inside_quotation (loc, _)
             | Lookup_error(loc, _, _) -> loc

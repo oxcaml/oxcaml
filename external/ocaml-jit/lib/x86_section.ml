@@ -44,23 +44,16 @@ module Map = struct
         DLL.transfer ~to_:dll' ~from:dll ();
         Some dll')
 
+  let section_name (section, first_occurrence) =
+    let details = Asm_targets.Asm_section.details section first_occurrence in
+    name details.names details.flags details.args
+
   let from_program prog =
     let open X86_ast in
-    let section_name section first_occurrence =
-      let first_occurrence =
-        match first_occurrence with
-        | `First_occurrence -> true
-        | `Not_first_occurrence -> false
-      in
-      let details =
-        Asm_targets.Asm_section.details section ~first_occurrence
-      in
-      name details.names details.flags details.args
-    in
     match DLL.hd prog with
     | None -> String.Map.empty
     | Some (Directive (Section (section, first_occurrence))) ->
-      let initial_section = section_name section first_occurrence in
+      let initial_section = section_name (section, first_occurrence) in
       let acc = ref String.Map.empty in
       let current_section = ref initial_section in
       let current_instrs = ref (DLL.make_empty ()) in
@@ -68,10 +61,9 @@ module Map = struct
         match instr with
         | Directive (Section (section, first_occurrence)) ->
           acc := append !current_section !current_instrs !acc;
-          current_section := section_name section first_occurrence;
+          current_section := section_name (section, first_occurrence);
           current_instrs := DLL.make_empty ()
-        | _ ->
-          DLL.add_end !current_instrs instr);
+        | _ -> DLL.add_end !current_instrs instr);
       acc := append !current_section !current_instrs !acc;
       !acc
     | Some _ -> failwithf "Invalid program, should start with section"

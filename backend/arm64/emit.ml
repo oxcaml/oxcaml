@@ -90,8 +90,8 @@ let reg_stack_arg_begin = H.reg_x (phys_reg Int 17)
 
 let reg_stack_arg_end = H.reg_x (phys_reg Int 18)
 
-(** Turn a Linear label into an assembly label. The section is checked against
-    the section tracked by [D] when emitting label definitions. *)
+(** Turn a Linear label into an assembly label. The section is checked against the
+    section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
     =
   L.create_int section (Label.to_int l)
@@ -871,10 +871,10 @@ let num_call_gc_points instr =
     | Lop (Alloc { mode = Local | Heap; _ })
     | Lop
         (Specific
-           ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-           | Inegmulsubf | Isqrtf | Imove32
-           | Ishiftarith (_, _)
-           | Ibswap _ | Isignext _ | Isimd _ ))
+          ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
+          | Inegmulsubf | Isqrtf | Imove32
+          | Ishiftarith (_, _)
+          | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
         | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
@@ -1013,14 +1013,14 @@ module BR = Branch_relaxation.Make (struct
       if String.equal func.sym_name !function_name then 1 else epilogue_size ()
     | Lcall_op
         (Lextcall
-           { alloc;
-             stack_ofs;
-             stack_align = _;
-             func = _;
-             ty_res = _;
-             ty_args = _;
-             returns = _
-           }) ->
+          { alloc;
+            stack_ofs;
+            stack_align = _;
+            func = _;
+            ty_res = _;
+            ty_args = _;
+            returns = _
+          }) ->
       if Config.runtime5 && stack_ofs > 0 then 5 else if alloc then 3 else 5
     | Lop (Stackoffset _) -> 2
     | Lop (Load { memory_chunk; addressing_mode; is_atomic; mutability = _ }) ->
@@ -1070,51 +1070,51 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Intop Ipopcnt) -> if !Arch.feat_cssc then 1 else 4
     | Lop
         (Intop
-           (Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
+          (Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
       ->
       1
     | Lop
         (Intop_imm
-           ( ( Iadd | Isub | Imul | Idiv | Imod | Imulh _ | Iand | Ior | Ixor
-             | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
-             _ )) ->
+          ( ( Iadd | Isub | Imul | Idiv | Imod | Imulh _ | Iand | Ior | Ixor
+            | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
+            _ )) ->
       1
     | Lop (Floatop (Float64, (Iabsf | Inegf))) -> 1
     | Lop (Floatop (Float32, (Iabsf | Inegf))) -> 1
     | Lop (Specific Isqrtf) -> 1
     | Lop
         (Reinterpret_cast
-           (Value_of_int | Int_of_value | Float_of_int64 | Int64_of_float)) ->
+          (Value_of_int | Int_of_value | Float_of_int64 | Int64_of_float)) ->
       1
     | Lop
         (Reinterpret_cast
-           ( Float32_of_float | Float_of_float32 | Float32_of_int32
-           | Int32_of_float32 )) ->
+          ( Float32_of_float | Float_of_float32 | Float32_of_int32
+          | Int32_of_float32 )) ->
       1
     | Lop (Reinterpret_cast (V128_of_vec Vec128)) -> 1
     | Lop
         (Reinterpret_cast
-           (V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _)) ->
+          (V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _)) ->
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Static_cast (Float_of_int Float64 | Int_of_float Float64)) -> 1
     | Lop
         (Static_cast
-           ( Float_of_int Float32
-           | Int_of_float Float32
-           | Float_of_float32 | Float32_of_float )) ->
+          ( Float_of_int Float32
+          | Int_of_float Float32
+          | Float_of_float32 | Float32_of_float )) ->
       1
     | Lop (Static_cast (Scalar_of_v128 Float16x8 | V128_of_scalar Float16x8)) ->
       Misc.fatal_error "float16 scalar type not supported"
     | Lop (Static_cast (Scalar_of_v128 (Int8x16 | Int16x8))) -> 2
     | Lop
         (Static_cast
-           (Scalar_of_v128 (Int32x4 | Int64x2 | Float32x4 | Float64x2))) ->
+          (Scalar_of_v128 (Int32x4 | Int64x2 | Float32x4 | Float64x2))) ->
       1
     | Lop (Static_cast (V128_of_scalar _)) -> 1
     | Lop
         (Static_cast
-           ( V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _
-           | Scalar_of_v512 _ )) ->
+          ( V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _
+          | Scalar_of_v512 _ )) ->
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Floatop (Float64, (Iaddf | Isubf | Imulf | Idivf))) -> 1
     | Lop (Floatop (Float32, (Iaddf | Isubf | Imulf | Idivf))) -> 1
@@ -1236,12 +1236,12 @@ let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
   emit_subimm reg_x_alloc_ptr reg_x_alloc_ptr n;
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
-   then A.ins1 (B_cond (Branch_cond.Int CC)) (local_label gc_lbl)
-   else
-     let lbl = L.create Text in
-     A.ins1 (B_cond (Branch_cond.Int CS)) (local_label lbl);
-     A.ins1 B (local_label gc_lbl);
-     D.define_label lbl);
+  then A.ins1 (B_cond (Branch_cond.Int CC)) (local_label gc_lbl)
+  else
+    let lbl = L.create Text in
+    A.ins1 (B_cond (Branch_cond.Int CS)) (local_label lbl);
+    A.ins1 B (local_label gc_lbl);
+    D.define_label lbl);
   labelled_ins4 gc_return_lbl ADD_immediate
     (H.reg_x i.res.(0))
     reg_x_alloc_ptr (O.imm 8) O.optional_none;
@@ -1279,25 +1279,25 @@ let assembly_code_for_poll i ~far ~return_label =
   A.ins2 LDR reg_x_tmp1 (H.addressing (Iindexed offset) reg_domain_state_ptr);
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
-   then (
-     match return_label with
-     | None ->
-       A.ins1 (B_cond (Branch_cond.Int LS)) (local_label gc_lbl);
-       D.define_label gc_return_lbl
-     | Some return_label ->
-       A.ins1 (B_cond (Branch_cond.Int HI)) (local_label return_label);
-       A.ins1 B (local_label gc_lbl))
-   else
-     match return_label with
-     | None ->
-       A.ins1 (B_cond (Branch_cond.Int HI)) (local_label gc_return_lbl);
-       A.ins1 B (local_label gc_lbl);
-       D.define_label gc_return_lbl
-     | Some return_label ->
-       let lbl = L.create Text in
-       A.ins1 (B_cond (Branch_cond.Int LS)) (local_label lbl);
-       A.ins1 B (local_label return_label);
-       labelled_ins1 lbl B (local_label gc_lbl));
+  then (
+    match return_label with
+    | None ->
+      A.ins1 (B_cond (Branch_cond.Int LS)) (local_label gc_lbl);
+      D.define_label gc_return_lbl
+    | Some return_label ->
+      A.ins1 (B_cond (Branch_cond.Int HI)) (local_label return_label);
+      A.ins1 B (local_label gc_lbl))
+  else
+    match return_label with
+    | None ->
+      A.ins1 (B_cond (Branch_cond.Int HI)) (local_label gc_return_lbl);
+      A.ins1 B (local_label gc_lbl);
+      D.define_label gc_return_lbl
+    | Some return_label ->
+      let lbl = L.create Text in
+      A.ins1 (B_cond (Branch_cond.Int LS)) (local_label lbl);
+      A.ins1 B (local_label return_label);
+      labelled_ins1 lbl B (local_label gc_lbl));
   call_gc_sites := { gc_lbl; gc_return_lbl; gc_frame_lbl } :: !call_gc_sites
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
@@ -1799,8 +1799,8 @@ let emit_instr i =
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop
-      (Intop_imm ((Imul | Idiv | Iclz _ | Ictz _ | Ipopcnt | Imod | Imulh _), _))
-    ->
+      (Intop_imm
+        ((Imul | Idiv | Iclz _ | Ictz _ | Ipopcnt | Imod | Imulh _), _)) ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i
   | Lop (Specific Isqrtf) -> (
@@ -2133,9 +2133,8 @@ let fundecl fundecl =
 (* Emission of data *)
 
 let nativeint_to_int32 n =
-  if
-    Nativeint.compare n (Nativeint.of_int32 Int32.min_int) < 0
-    || Nativeint.compare n (Nativeint.of_int32 Int32.max_int) > 0
+  if Nativeint.compare n (Nativeint.of_int32 Int32.min_int) < 0
+     || Nativeint.compare n (Nativeint.of_int32 Int32.max_int) > 0
   then Misc.fatal_errorf "nativeint_to_int32: value %nd out of int32 range" n;
   Nativeint.to_int32 n
 

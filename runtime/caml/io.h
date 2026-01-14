@@ -25,10 +25,6 @@
 #include "mlvalues.h"
 #include "platform.h"
 
-#ifndef IO_BUFFER_SIZE
-#define IO_BUFFER_SIZE 65536
-#endif
-
 #if defined(_WIN32)
 typedef __int64 file_offset;
 #else

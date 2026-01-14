@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension runtime_metaprogramming";
+ flags = "-extension runtime_metaprogramming -extension comprehensions";
  expect;
 *)
 
@@ -696,6 +696,12 @@ end;;
 module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
+<[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> int -> unit]> expr =
+<[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
+|}];;
+
 <[ fun (module _ : S) x -> 42 ]>;;
 [%%expect {|
 Line 1, characters 19-20:
@@ -741,6 +747,44 @@ let x = <[ 123 ]> in <[ $x ]>;;
 - : <[int]> expr = <[123]>
 |}];;
 
+let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 for b = a to 10 ]]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 and b = 1 to 10 ]]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
+[%%expect {|
+- : <[int list]> expr =
+<[[ a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 ]]>
+|}];;
+
+let _ = <[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
+[%%expect {|
+- : <[int array]> expr =
+<[[| a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 |]]>
+|}];;
+
+let _ = <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
+[%%expect {|
+- : <[string array]> expr = <[[| a ^ "!" for a in [|"foo"; "bar"|] |]]>
+|}];;
+
+let _ = <[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
+[%%expect {|
+- : <[string iarray]> expr = <[[: a ^ "!" for a in [|"foo"; "bar"|] :]]>
+|}];;
+
+let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
+[%%expect {|
+- : <[string list]> expr =
+<[[ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ]]>
+|}];;
+
 <[ let o = object method f = 1 end in o#f ]>;;
 [%%expect {|
 Line 1, characters 11-34:
@@ -764,12 +808,11 @@ module M = struct
   let foo = 42
 end;;
 
-<[ let open M in M.foo ]>
-;;
+<[ let open M in M.foo ]>;;
 [%%expect {|
 module M : sig val foo : int end
 Line 5, characters 3-22:
-5 | <[ let open M in M.foo ]>
+5 | <[ let open M in M.foo ]>;;
        ^^^^^^^^^^^^^^^^^^^
 Error: Opening modules is not supported inside quoted expressions,
        as seen at Line 5, characters 3-22.

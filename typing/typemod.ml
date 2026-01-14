@@ -54,20 +54,10 @@ type functor_dependency_error =
 type legacy_module =
   | Compilation_unit
   | Toplevel
-  | Functor_body
 
 let print_legacy_module ppf = function
   | Compilation_unit -> Format.fprintf ppf "compilation unit"
-  | Functor_body -> Format.fprintf ppf "functor body"
   | Toplevel -> Format.fprintf ppf "toplevel"
-
-type unsupported_modal_module =
-  | Functor_param
-  | Functor_res
-
-let print_unsupported_modal_module ppf = function
-  | Functor_param -> Format.fprintf ppf "functor parameters"
-  | Functor_res -> Format.fprintf ppf "functor return"
 
 type error =
     Cannot_apply of module_type
@@ -122,7 +112,6 @@ type error =
   | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Submode_failed of Mode.Value.error
   | Item_weaker_than_structure of Mode.Value.error
-  | Unsupported_modal_module of unsupported_modal_module
   | Legacy_module of legacy_module * Mode.Value.error
 
 exception Error of Location.t * Env.t * error
@@ -1090,7 +1079,9 @@ module Merge = struct
               remove_modality_and_zero_alloc_variables_mty sig_env
                 ~zap_modality:Mode.Modality.zap_to_id mty
             in
-            let md'' = { md' with md_type = mty } in
+            assert (Modality.is_undefined md'.md_modalities);
+            let modalities = Modality.(Const.id |> of_const) in
+            let md'' = { md' with md_type = mty; md_modalities = modalities} in
             let newmd =
               Mtype.strengthen_decl ~aliasable:false md'' path in
             (* Inclusion check with the original signature *)
@@ -1306,8 +1297,10 @@ let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
   We still don't support [pmd_modalities] on functors.
   *)
   match Mode.Modality.Const.is_id modalities with
-  | true -> mty, Mode.Modality.id
-  | false -> apply_modalities_module_type env modalities mty, Mode.Modality.id
+  | true -> mty, Mode.Modality.(Const.id |> of_const)
+  | false ->
+      apply_modalities_module_type env modalities mty,
+      Mode.Modality.(Const.id |> of_const)
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
@@ -1393,7 +1386,7 @@ let rec approx_modtype env smty =
 and approx_module_declaration env pmd =
   {
     Types.md_type = approx_modtype env pmd.pmd_type;
-    md_modalities = Mode.Modality.id;
+    md_modalities = Mode.Modality.(Const.id |> of_const);
     md_attributes = pmd.pmd_attributes;
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
@@ -1928,7 +1921,7 @@ and transl_modtype_aux env smty =
               let id, newenv =
                 let arg_md =
                   { md_type = arg.mty_type;
-                    md_modalities = Mode.Modality.id;
+                    md_modalities = Mode.Modality.undefined;
                     md_attributes = [];
                     md_loc = param.loc;
                     md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2227,7 +2220,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
             md
           else
             { md_type = Mty_alias path;
-              md_modalities = Mode.Modality.id;
+              md_modalities = Mode.Modality.(Const.id |> of_const);
               md_attributes = pms.pms_attributes;
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2362,7 +2355,19 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         typedtree, tsg, newenv
     | Psig_attribute attr ->
         Builtin_attributes.parse_standard_interface_attributes attr;
-        mksig (Tsig_attribute attr) env loc, [], env
+        let newenv =
+          let register_default env (var_name, jkind_annot) =
+            let context =
+              Jkind.History.Implicit_jkind var_name
+            in
+            Env.add_implicit_jkind
+              ~loc:jkind_annot.pjkind_loc var_name
+              (Jkind.of_annotation ~context jkind_annot) env
+          in
+          List.fold_left register_default env
+            (Builtin_attributes.get_implicit_jkind_attr attr)
+        in
+        mksig (Tsig_attribute attr) env loc, [], newenv
     | Psig_extension (ext, _attrs) ->
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
     | Psig_kind_abbrev _ ->
@@ -2977,7 +2982,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
               let md_uid =  Uid.mk ~current_unit:(Env.get_unit_name ()) in
               let arg_md =
                 { md_type = mty.mty_type;
-                  md_modalities = Modality.id;
+                  md_modalities = Modality.undefined;
                   md_attributes = [];
                   md_loc = param.loc;
                   md_uid;
@@ -3370,6 +3375,8 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
 
 and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
   sstr =
+  (* CR implicit-types: implement implicit variable jkinds in structures. *)
+  let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
   Option.iter (fun x -> Value.submode md_mode x |> ignore)
@@ -3490,10 +3497,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           Typedecl.transl_value_decl env ~modal:Str_primitive
             ~why:Structure_item loc sdesc
         in
-        assert
-          (desc.val_val.val_modalities
-           |> Modality.to_const_exn
-           |> Modality.Const.is_id);
+        assert (desc.val_val.val_modalities |> Modality.is_undefined);
         let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let val_val = {desc.val_val with val_modalities} in
         let desc = {desc with val_val} in
@@ -3666,7 +3670,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                    let mdecl =
                      {
                        md_type = mty.mty_type;
-                       md_modalities = Modality.id;
+                       md_modalities = Modality.undefined;
                        md_attributes = attrs;
                        md_loc = loc;
                        md_uid = uid;
@@ -4390,7 +4394,7 @@ let package_signatures units =
       let sg = Subst.signature Make_local subst sg in
       let md =
         { md_type=Mty_signature sg;
-          md_modalities=Modality.id;
+          md_modalities=Modality.(Const.id |> of_const);
           md_attributes=[];
           md_loc=Location.none;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -4810,10 +4814,6 @@ let report_error ~loc _env = function
         "This is %a, but expected to be %a."
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
-  | Unsupported_modal_module e ->
-      Location.errorf ~loc
-        "Mode annotations on %a are not supported yet."
-        print_unsupported_modal_module e
   | Legacy_module (reason, e) ->
       let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
       Location.errorf ~loc

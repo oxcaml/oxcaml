@@ -896,11 +896,14 @@ module type S = sig
         individual fields can be [set] or [proj]. *)
     type t
 
-    (** The identity modality. *)
-    val id : t
+    (* CR-someday zqian: [undefined] is only used for [val_modalities] and
+       [md_modalities]. Consider moving the logic there. *)
 
     (** The undefined modality. *)
     val undefined : t
+
+    (** Check if the given modality is [undefined]. *)
+    val is_undefined : t -> bool
 
     (* CR zqian: note that currently, [apply] and [sub] and [zap] are NOT
        coherent for comonadic axes. That is, we do NOT have
@@ -909,7 +912,14 @@ module type S = sig
     (** Apply a modality on a left mode. The calller should ensure that
         [apply t m] is only called for [m >= md_mode] for inferred modalities.
     *)
-    val apply : t -> (allowed * 'r) Value.t -> Value.l
+    val apply :
+      ?hint:
+        ( (allowed * 'r) neg Hint.morph,
+          (allowed * 'r) pos Hint.morph )
+        monadic_comonadic ->
+      t ->
+      (allowed * 'r) Value.t ->
+      Value.l
 
     (** [sub t0 t1] checks that [t0 <= t1]. Definition: [t0 <= t1] iff
         [forall a. t0(a) <= t1(a)].

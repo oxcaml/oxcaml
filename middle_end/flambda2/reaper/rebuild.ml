@@ -864,21 +864,27 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
     Call_kind.method_call kind ~obj:(rewrite_simple obj) alloc_mode
   | C_call _ as ck -> ck
   | Effect (Perform { eff }) ->
-    Call_kind.effect (Call_kind.Effect.perform ~eff:(rewrite_simple eff))
+    Call_kind.effect_ (Call_kind.Effect.perform ~eff:(rewrite_simple eff))
   | Effect (Reperform { eff; cont; last_fiber }) ->
-    Call_kind.effect
+    Call_kind.effect_
       (Call_kind.Effect.reperform ~eff:(rewrite_simple eff)
          ~cont:(rewrite_simple cont)
          ~last_fiber:(rewrite_simple last_fiber))
-  | Effect (Run_stack { stack; f; arg }) ->
-    Call_kind.effect
-      (Call_kind.Effect.run_stack ~stack:(rewrite_simple stack)
+  | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.with_stack ~valuec:(rewrite_simple valuec)
+         ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
          ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
-  | Effect (Resume { stack; f; arg; last_fiber }) ->
-    Call_kind.effect
-      (Call_kind.Effect.resume ~stack:(rewrite_simple stack)
-         ~f:(rewrite_simple f) ~arg:(rewrite_simple arg)
-         ~last_fiber:(rewrite_simple last_fiber))
+  | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.with_stack_bind ~valuec:(rewrite_simple valuec)
+         ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
+         ~dyn:(rewrite_simple dyn) ~bind:(rewrite_simple bind)
+         ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
+  | Effect (Resume { cont; f; arg }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.resume ~cont:(rewrite_simple cont) ~f:(rewrite_simple f)
+         ~arg:(rewrite_simple arg))
 
 let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in

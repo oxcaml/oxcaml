@@ -110,11 +110,7 @@ external is_regular_file : string -> bool @@ portable = "caml_sys_is_regular_fil
 external remove: string -> unit @@ portable = "caml_sys_remove"
 external rename : string -> string -> unit @@ portable = "caml_sys_rename"
 external getenv: string -> string @@ portable = "caml_sys_getenv"
-
-let getenv_opt s =
-  (* TODO: expose a non-raising primitive directly. *)
-  try Some (getenv s)
-  with Not_found -> None
+external getenv_opt: string -> string option @@ portable = "caml_sys_getenv_opt"
 
 external command: string -> int @@ portable = "caml_sys_system_command"
 external time: unit -> (float [@unboxed]) @@ portable =
@@ -124,6 +120,9 @@ external mkdir: string -> int -> unit @@ portable = "caml_sys_mkdir"
 external rmdir: string -> unit @@ portable = "caml_sys_rmdir"
 external getcwd: unit -> string @@ portable = "caml_sys_getcwd"
 external readdir : string -> string array @@ portable = "caml_sys_read_directory"
+
+external io_buffer_size: unit -> int = "caml_sys_io_buffer_size"
+let io_buffer_size = io_buffer_size ()
 
 let interactive = ref false
 
