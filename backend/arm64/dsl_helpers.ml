@@ -62,6 +62,7 @@ let reg_index reg =
     reg_name_to_arch_index reg_class name_index
   | { loc = Stack _ | Unknown; _ } -> fatal_error "Dsl_helpers.reg_index"
 
+(* 128-bit vector types require Vec128 or Valx2 *)
 let assert_vec128_or_valx2 ~fname reg =
   match reg.typ with
   | Vec128 | Valx2 -> ()
@@ -69,10 +70,29 @@ let assert_vec128_or_valx2 ~fname reg =
     Misc.fatal_errorf "%s: expected Vec128/Valx2 register, got %a" fname
       Printreg.reg reg
 
+(* 64-bit vector types can also use Float registers since they share the same
+   physical register file (D registers = lower 64 bits of V registers) *)
+let assert_float_vec128_or_valx2 ~fname reg =
+  match reg.typ with
+  | Float | Float32 | Vec128 | Valx2 -> ()
+  | Val | Int | Addr | Vec256 | Vec512 ->
+    Misc.fatal_errorf "%s: expected Float/Float32/Vec128/Valx2 register, got %a"
+      fname Printreg.reg reg
+
+(* 64-bit vector register types *)
 let reg_v2s reg =
-  assert_vec128_or_valx2 ~fname:"reg_v2s" reg;
+  assert_float_vec128_or_valx2 ~fname:"reg_v2s" reg;
   Ast.DSL.reg_v2s (reg_index reg)
 
+let reg_v8b reg =
+  assert_float_vec128_or_valx2 ~fname:"reg_v8b" reg;
+  Ast.DSL.reg_v8b (reg_index reg)
+
+let reg_v4h reg =
+  assert_float_vec128_or_valx2 ~fname:"reg_v4h" reg;
+  Ast.DSL.reg_v4h (reg_index reg)
+
+(* 128-bit vector register types *)
 let reg_v4s reg =
   assert_vec128_or_valx2 ~fname:"reg_v4s" reg;
   Ast.DSL.reg_v4s (reg_index reg)
@@ -88,14 +108,6 @@ let reg_v16b reg =
 let reg_v8h reg =
   assert_vec128_or_valx2 ~fname:"reg_v8h" reg;
   Ast.DSL.reg_v8h (reg_index reg)
-
-let reg_v8b reg =
-  assert_vec128_or_valx2 ~fname:"reg_v8b" reg;
-  Ast.DSL.reg_v8b (reg_index reg)
-
-let reg_v4h reg =
-  assert_vec128_or_valx2 ~fname:"reg_v4h" reg;
-  Ast.DSL.reg_v4h (reg_index reg)
 
 (* Operand tuple helpers for SIMD instructions *)
 let v4s_v4s_v4s i =
