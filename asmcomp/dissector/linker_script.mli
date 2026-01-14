@@ -29,19 +29,20 @@
 
 (** Generate linker scripts for the dissector.
 
-    This module generates a linker script that places partition sections
-    in the correct output sections. It optionally incorporates an existing
-    linker script provided via --script= on the linker command line. *)
+    This module generates a linker script that places partition sections in the
+    correct output sections. It optionally incorporates an existing linker
+    script provided via --script= on the linker command line. *)
 
 (** [generate ~existing_script ~partitions] generates a linker script string.
 
-    @param existing_script Optional path to an existing linker script to
-      include. This is extracted from -Wl,-T,<path> or -Wl,--script=<path>
-      in Clflags.all_ccopts by the dissector.
+    @param existing_script
+      Optional path to an existing linker script to include. This is extracted
+      from -Wl,-T,<path> or -Wl,--script=<path> in Clflags.all_ccopts by the
+      dissector.
 
-    @param partitions List of linked partitions. The first partition (Main)
-      is skipped. Subsequent partitions get sections named .caml.p1.*,
-      .caml.p2.*, etc. *)
+    @param partitions
+      List of linked partitions. The first partition (Main) is skipped.
+      Subsequent partitions get sections named .caml.p1.*, .caml.p2.*, etc. *)
 val generate :
   existing_script:string option -> partitions:Partition.Linked.t list -> string
 

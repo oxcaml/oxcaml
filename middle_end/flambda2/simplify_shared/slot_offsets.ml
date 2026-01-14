@@ -347,7 +347,7 @@ end = struct
   end = struct
     type t = Offset of words
     (* This is the offset as exported, i.e. for function slots it points
-       **after** the header word. *)
+     **after** the header word. *)
     [@@unboxed]
 
     let print fmt (Offset pos) = Format.fprintf fmt "%d" pos
@@ -584,9 +584,10 @@ end = struct
           <- max set.first_slot_after_function_slots last;
         set.first_slot_after_unboxed_slots
           <- max set.first_slot_after_unboxed_slots last));
-    if set.first_slot_used_by_value_slots < set.first_slot_after_unboxed_slots
-       || set.first_slot_used_by_unboxed_slots
-          < set.first_slot_after_function_slots
+    if
+      set.first_slot_used_by_value_slots < set.first_slot_after_unboxed_slots
+      || set.first_slot_used_by_unboxed_slots
+         < set.first_slot_after_function_slots
     then Misc.fatal_errorf "Set of closures invariant (slot ordering) is broken"
 
   (* Slots *)
@@ -722,8 +723,9 @@ end = struct
 
   let create_function_slot set state get_code_metadata function_slot
       (code_id : Function_declarations.code_id_in_function_declaration) =
-    if Compilation_unit.is_current
-         (Function_slot.get_compilation_unit function_slot)
+    if
+      Compilation_unit.is_current
+        (Function_slot.get_compilation_unit function_slot)
     then (
       let size =
         match code_id with
@@ -1088,8 +1090,9 @@ end = struct
     let live_function_slots =
       Function_slot.Set.filter
         (fun function_slot ->
-          if Compilation_unit.is_current
-               (Function_slot.get_compilation_unit function_slot)
+          if
+            Compilation_unit.is_current
+              (Function_slot.get_compilation_unit function_slot)
           then (
             match find_function_slot state function_slot with
             | Some _ -> true
@@ -1104,8 +1107,9 @@ end = struct
     let live_value_slots =
       Value_slot.Set.filter
         (fun value_slot ->
-          if Compilation_unit.is_current
-               (Value_slot.get_compilation_unit value_slot)
+          if
+            Compilation_unit.is_current
+              (Value_slot.get_compilation_unit value_slot)
           then
             (* a value slot appears in a set of closures iff it has a slot *)
             match

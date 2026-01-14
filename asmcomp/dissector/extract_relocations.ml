@@ -108,9 +108,9 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
              (i.e., with dynamic linking support enabled)."
             symbol_name entry.r_offset
         | _ -> ()
-      else if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-              || Rela.Reloc_type.equal entry.r_type
-                   Rela.Reloc_type.rex_gotpcrelx
+      else if
+        Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
+        || Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
       then
         (* Only process relocations for undefined symbols *)
         match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
@@ -156,7 +156,7 @@ let find_section sections name =
 let find_sections_with_prefix sections prefix =
   Array.to_list sections
   |> List.filter (fun (section : Elf.section) ->
-         String.starts_with ~prefix section.sh_name_str)
+      String.starts_with ~prefix section.sh_name_str)
 
 (* Find the symbol table section *)
 let find_symtab_section sections =

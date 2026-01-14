@@ -99,8 +99,9 @@ let replace_concrete_equation t name ty =
          constant. *)
       Misc.fatal_error "Unexpected failure while adding alias to constant"
     | Ok { canonical_element; demoted_name; t } ->
-      if (not (Name.equal demoted_name name))
-         || not (Simple.equal canonical_element (Simple.const const))
+      if
+        (not (Name.equal demoted_name name))
+        || not (Simple.equal canonical_element (Simple.const const))
       then Misc.fatal_error "Unexpected demotion of constant.";
       let kind = MTC.kind_for_const const in
       let ty = TG.alias_type_of kind canonical_element in
@@ -164,13 +165,13 @@ let record_demotion ~raise_on_bottom t kind demoted canonical ~meet_type =
      information that was only stored on the type of [demoted]. *)
   let ty_of_demoted = TE.find (typing_env t) demoted (Some kind) in
   (if Flambda_features.check_light_invariants ()
-  then
-    match TG.get_alias_opt ty_of_demoted with
-    | None -> ()
-    | Some alias ->
-      Misc.fatal_errorf
-        "Expected %a to have a concrete type, not an alias type to %a"
-        Name.print demoted Simple.print alias);
+   then
+     match TG.get_alias_opt ty_of_demoted with
+     | None -> ()
+     | Some alias ->
+       Misc.fatal_errorf
+         "Expected %a to have a concrete type, not an alias type to %a"
+         Name.print demoted Simple.print alias);
   let t =
     map_typing_env t ~f:(fun t ->
         TE.replace_equation t demoted (TG.alias_type_of kind canonical))
@@ -302,8 +303,9 @@ let add_env_extension t env_extension ~meet_type =
   with Bottom_equation -> map_typing_env ~f:TE.make_bottom t
 
 let check_params_and_types ~params ~param_types =
-  if Flambda_features.check_invariants ()
-     && List.compare_lengths (Bound_parameters.to_list params) param_types <> 0
+  if
+    Flambda_features.check_invariants ()
+    && List.compare_lengths (Bound_parameters.to_list params) param_types <> 0
   then
     Misc.fatal_errorf
       "Mismatch between number of [params] and [param_types]:@ (%a)@ and@ %a"

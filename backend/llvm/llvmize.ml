@@ -1831,7 +1831,10 @@ let define_wrap_try t =
       ~attrs:[Returns_twice; Noinline] ~dbg:Debuginfo.none ~private_:true
   in
   reset_fun_info t emitter;
-  let runtime_args = E.get_args_as_values emitter (* All are runtime regs *) in
+  let runtime_args =
+    E.get_args_as_values emitter
+    (* All are runtime regs *)
+  in
   let try_res = V.of_int ~typ:T.i64 0 in
   let res =
     assemble_struct t res_type
@@ -1842,7 +1845,8 @@ let define_wrap_try t =
 
 let define_restore_rbp t =
   List.iter
-    (fun ({ recover_rbp_asm_ident; recover_rbp_var_ident; _ } : trap_block_info) ->
+    (fun ({ recover_rbp_asm_ident; recover_rbp_var_ident; _ } : trap_block_info)
+       ->
       let recover_rbp_asm = LL.Ident.to_string_encoded recover_rbp_asm_ident in
       let recover_rbp_var = LL.Ident.to_string_encoded recover_rbp_var_ident in
       add_module_asm t

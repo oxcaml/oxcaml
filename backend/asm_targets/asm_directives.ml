@@ -114,16 +114,18 @@ module Directive = struct
         match TS.assembler (), force_decimal with
         | _, true -> Buffer.add_string buf (Int64.to_string n)
         | MASM, _ ->
-          if Int64.compare n 0x7FFF_FFFFL <= 0
-             && Int64.compare n (-0x8000_0000L) >= 0
-             (* This constant was changed from 0x8000_0000L (in the original
-                code for these directives) to -0x8000_0000L, matching what we do
-                for GAS below. See #3948. *)
+          if
+            Int64.compare n 0x7FFF_FFFFL <= 0
+            && Int64.compare n (-0x8000_0000L) >= 0
+            (* This constant was changed from 0x8000_0000L (in the original code
+               for these directives) to -0x8000_0000L, matching what we do for
+               GAS below. See #3948. *)
           then Buffer.add_string buf (Int64.to_string n)
           else bprintf buf "0%LxH" n
         | _, false ->
-          if Int64.compare n 0x7FFF_FFFFL <= 0
-             && Int64.compare n (-0x8000_0000L) >= 0
+          if
+            Int64.compare n 0x7FFF_FFFFL <= 0
+            && Int64.compare n (-0x8000_0000L) >= 0
           then Buffer.add_string buf (Int64.to_string n)
           else bprintf buf "0x%Lx" n)
       | Unsigned_int n ->
@@ -272,9 +274,10 @@ module Directive = struct
         if !last_was_escape
         then Printf.bprintf b "\\%o" (Char.code c)
         else Buffer.add_char b c
-      else if between c ' ' '~'
-              && (not (Char.equal c '"'))
-              (* '"' *) && not (Char.equal c '\\')
+      else if
+        between c ' ' '~'
+        && (not (Char.equal c '"'))
+        (* '"' *) && not (Char.equal c '\\')
       then (
         Buffer.add_char b c;
         last_was_escape := false)
@@ -1056,12 +1059,12 @@ let offset_into_dwarf_section_label ?comment:_comment ~width section upper =
       Asm_label.print upper Asm_section.print upper_section Asm_section.print
       expected_section;
   (if !Clflags.keep_asm_file
-  then
-    let expected_section = Asm_section.to_string expected_section in
-    match _comment with
-    | None -> comment (Format.asprintf "offset into %s" expected_section)
-    | Some _comment ->
-      comment (Format.asprintf "%s (offset into %s)" _comment expected_section));
+   then
+     let expected_section = Asm_section.to_string expected_section in
+     match _comment with
+     | None -> comment (Format.asprintf "offset into %s" expected_section)
+     | Some _comment ->
+       comment (Format.asprintf "%s (offset into %s)" _comment expected_section));
   (* macOS does not use relocations in DWARF sections in places, such as here,
      where they might be expected. Instead dsymutil and other tools parse DWARF
      sections properly and adjust offsets manually. *)

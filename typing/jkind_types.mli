@@ -12,9 +12,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** You should use the types defined in [Jkind] (which redefines the
-   types in this file) rather than using this file directly, unless you
-   are in [Types] or [Primitive]. *)
+(** You should use the types defined in [Jkind] (which redefines the types in
+    this file) rather than using this file directly, unless you are in [Types]
+    or [Primitive]. *)
 
 (* This module defines types used in the module Jkind. This is to avoid a mutual
    dependencies between jkind.ml(i) and types.ml(i) and bewteen jkind.ml(i) and
@@ -85,12 +85,13 @@ module Sort : sig
 
   val equate_tracking_mutation : t -> t -> equate_result
 
-  (** Post-condition (which holds deeply within the sort): If the
-      result is a [Var v], then [!v] is [None]. *)
+  (** Post-condition (which holds deeply within the sort): If the result is a
+      [Var v], then [!v] is [None]. *)
   val get : t -> t
 
-  (** Decompose a sort into a list (of the given length) of fresh sort variables,
-      equating the input sort with the product of the output sorts. *)
+  (** Decompose a sort into a list (of the given length) of fresh sort
+      variables, equating the input sort with the product of the output sorts.
+  *)
   val decompose_into_product : level:int -> t -> int -> t list option
 
   module Flat : sig

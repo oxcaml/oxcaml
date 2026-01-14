@@ -4,11 +4,11 @@ include Builtins.Float32x8
 (* Creation / Destruction *)
 external low_of : float32 -> t
   = "caml_vec256_unreachable" "caml_float32x8_low_of_float32"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 external low_to : t -> float32
   = "caml_vec256_unreachable" "caml_float32x8_low_to_float32"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 let () =
   let v1 = low_of 1.s in
@@ -200,7 +200,8 @@ let () =
       let expect = Float32.to_float32x8 dp 0l 0l 0l dp 0l 0l 0l in
       (* When both are NaN, AMD returns the first argument and Intel returns the
          second argument. Hence we do not test this case. *)
-      if f0 |> Int32.float_of_bits |> Float.is_nan
-         && f1 |> Int32.float_of_bits |> Float.is_nan
+      if
+        f0 |> Int32.float_of_bits |> Float.is_nan
+        && f1 |> Int32.float_of_bits |> Float.is_nan
       then ()
       else eq_float32x8 ~result ~expect)

@@ -152,7 +152,10 @@ let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
     | Bytes_relative_to_domainstate_pointer _ ->
       Misc.fatal_errorf "Not a stack slot"
   in
-  let reg_domain_state_ptr = Proc.phys_reg Int 25 (* x28 *) in
+  let reg_domain_state_ptr =
+    Proc.phys_reg Int 25
+    (* x28 *)
+  in
   match r.loc with
   | Stack (Domainstate n) ->
     let ofs = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in

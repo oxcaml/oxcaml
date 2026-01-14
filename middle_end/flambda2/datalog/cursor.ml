@@ -256,8 +256,7 @@ let apply_actions actions instruction =
 
 (* NB: the variables must be passed in reverse order, i.e. deepest variable
    first. *)
-let rec open_rev_vars :
-    type a s.
+let rec open_rev_vars : type a s.
     (a -> s) Level.hlist ->
     (vm_action, a -> s) VM.instruction ->
     (vm_action, nil) VM.instruction =
@@ -379,14 +378,16 @@ let with_bound_cursor ?callback cursor db f =
 
 let evaluate = function
   | Unless (is_trie, cell, args, _cell_name, _args_names) ->
-    if Option.is_some
-         (Trie.find_opt is_trie (Option_receiver.recv args) (Channel.recv cell))
+    if
+      Option.is_some
+        (Trie.find_opt is_trie (Option_receiver.recv args) (Channel.recv cell))
     then Virtual_machine.Skip
     else Virtual_machine.Accept
   | Unless_eq (cell1, cell2, _cell1_name, _cell2_name, repr) ->
-    if Value.equal_repr repr
-         (Option.get (Channel.recv cell1))
-         (Option.get (Channel.recv cell2))
+    if
+      Value.equal_repr repr
+        (Option.get (Channel.recv cell1))
+        (Option.get (Channel.recv cell2))
     then Virtual_machine.Skip
     else Virtual_machine.Accept
   | Filter (f, args, _args_names) ->

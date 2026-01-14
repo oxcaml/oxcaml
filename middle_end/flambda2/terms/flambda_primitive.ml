@@ -1624,7 +1624,9 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
         (* Local allocations have coeffects, to avoid them being moved past a
            begin/end region. Hence, it is not safe to force the allocation to be
            moved, so we cannot use the `Delay` mode for those. *)
-        match alloc_mode with Heap -> Delay | Local _ -> Strict
+        match alloc_mode with
+        | Heap -> Delay
+        | Local _ -> Strict
       else Strict
     in
     ( Only_generative_effects Immutable,
@@ -3043,8 +3045,8 @@ end = struct
             match f arg4 with
             | None -> None
             | Some arg4' ->
-              if arg1 == arg1' && arg2 == arg2' && arg3 == arg3'
-                 && arg4 == arg4'
+              if
+                arg1 == arg1' && arg2 == arg2' && arg3 == arg3' && arg4 == arg4'
               then Some t
               else Some (Quaternary (prim, arg1', arg2', arg3', arg4'))))))
     | Variadic (prim, args) ->
@@ -3118,13 +3120,13 @@ let is_begin_or_end_region t =
   | Unary ((End_region _ | End_try_region _), _) ->
     true
   | _ -> false
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]
 
 let is_begin_region t =
   match t with
   | Variadic ((Begin_region _ | Begin_try_region _), _) -> true
   | _ -> false
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]
 
 let is_end_region t =
   match t with
@@ -3135,4 +3137,4 @@ let is_end_region t =
       Misc.fatal_errorf "End_region with non-Variable argument:@ %a"
         Simple.print region)
   | _ -> None
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]

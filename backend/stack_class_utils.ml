@@ -5,9 +5,10 @@ module List = ListLabels
 
 (** Definition of stack classes for a given backend.
 
-    The number of stack slot classes may differ from the number of register classes.
-    On x86, we use the same register class for floating point and SIMD vector registers,
-    but they take up different amounts of space on the stack. *)
+    The number of stack slot classes may differ from the number of register
+    classes. On x86, we use the same register class for floating point and SIMD
+    vector registers, but they take up different amounts of space on the stack.
+*)
 module type T = sig
   (** The "enum" representing the different classes. *)
   type t

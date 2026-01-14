@@ -2010,45 +2010,45 @@ let name_of_ident loc id = Name.mk loc (Ident.name id) |> Name.wrap
 let quote_attributes e =
   let quoted_attr (attr : Typedtree.attribute) =
     (match attr.attr_name.txt with
-    | "inline" -> Exp_attribute.inline
-    | "inlined" -> Exp_attribute.inlined
-    | "specialise" -> Exp_attribute.specialise
-    | "specialised" -> Exp_attribute.specialised
-    | "unrolled" -> Exp_attribute.unrolled
-    | "nontail" -> Exp_attribute.nontail
-    | "tail" -> Exp_attribute.tail
-    | "poll" -> Exp_attribute.poll
-    | "loop" -> Exp_attribute.loop
-    | "tail_mod_cons" -> Exp_attribute.tail_mod_cons
-    | "quotation" -> Exp_attribute.quotation
-    | _ -> fatal_error "Unknown attribute")
+      | "inline" -> Exp_attribute.inline
+      | "inlined" -> Exp_attribute.inlined
+      | "specialise" -> Exp_attribute.specialise
+      | "specialised" -> Exp_attribute.specialised
+      | "unrolled" -> Exp_attribute.unrolled
+      | "nontail" -> Exp_attribute.nontail
+      | "tail" -> Exp_attribute.tail
+      | "poll" -> Exp_attribute.poll
+      | "loop" -> Exp_attribute.loop
+      | "tail_mod_cons" -> Exp_attribute.tail_mod_cons
+      | "quotation" -> Exp_attribute.quotation
+      | _ -> fatal_error "Unknown attribute")
     |> Exp_attribute.wrap
   in
   List.map quoted_attr e.exp_attributes
 
 let quote_constant loc (const : Typedtree.constant) =
   (match const with
-  | Const_int x -> Constant.int loc x
-  | Const_char x -> Constant.char loc x
-  | Const_string (x, loc, lopt) -> Constant.string loc x lopt
-  | Const_float x -> Constant.float loc x
-  | Const_float32 x -> Constant.float32 loc x
-  | Const_int32 x -> Constant.int32 loc x
-  | Const_int64 x -> Constant.int64 loc x
-  | Const_nativeint x -> Constant.nativeint loc x
-  | Const_unboxed_float x -> Constant.unboxed_float loc x
-  | Const_unboxed_float32 x -> Constant.unboxed_float32 loc x
-  | Const_unboxed_int32 x -> Constant.unboxed_int32 loc x
-  | Const_unboxed_int64 x -> Constant.unboxed_int64 loc x
-  | Const_unboxed_nativeint x -> Constant.unboxed_nativeint loc x
-  (* TODO: add support for these in CamlinternalQuote *)
-  | Const_untagged_char x -> Constant.char loc x
-  | Const_int8 x
-  | Const_int16 x
-  | Const_untagged_int x
-  | Const_untagged_int8 x
-  | Const_untagged_int16 x ->
-    Constant.int loc x)
+    | Const_int x -> Constant.int loc x
+    | Const_char x -> Constant.char loc x
+    | Const_string (x, loc, lopt) -> Constant.string loc x lopt
+    | Const_float x -> Constant.float loc x
+    | Const_float32 x -> Constant.float32 loc x
+    | Const_int32 x -> Constant.int32 loc x
+    | Const_int64 x -> Constant.int64 loc x
+    | Const_nativeint x -> Constant.nativeint loc x
+    | Const_unboxed_float x -> Constant.unboxed_float loc x
+    | Const_unboxed_float32 x -> Constant.unboxed_float32 loc x
+    | Const_unboxed_int32 x -> Constant.unboxed_int32 loc x
+    | Const_unboxed_int64 x -> Constant.unboxed_int64 loc x
+    | Const_unboxed_nativeint x -> Constant.unboxed_nativeint loc x
+    (* TODO: add support for these in CamlinternalQuote *)
+    | Const_untagged_char x -> Constant.char loc x
+    | Const_int8 x
+    | Const_int16 x
+    | Const_untagged_int x
+    | Const_untagged_int8 x
+    | Const_untagged_int16 x ->
+      Constant.int loc x)
   |> Constant.wrap
 
 let quote_loc (loc : Location.t) =
@@ -2082,11 +2082,11 @@ let quote_arg_label loc = function
 let rec module_for_path loc = function
   | Path.Pident id ->
     (match Hashtbl.find_opt vars_env.env_mod id with
-    | Some m -> Identifier.Module.var loc m (quote_loc loc)
-    | None -> (
-      match Ident.to_global id with
-      | Some global -> Identifier.Module.compilation_unit loc global
-      | None -> raise Exit))
+      | Some m -> Identifier.Module.var loc m (quote_loc loc)
+      | None -> (
+        match Ident.to_global id with
+        | Some global -> Identifier.Module.compilation_unit loc global
+        | None -> raise Exit))
     |> Identifier.Module.wrap
   | Path.Pdot (p, s) ->
     Identifier.Module.dot loc (module_for_path loc p) s
@@ -2106,41 +2106,41 @@ let module_type_for_path loc = function
 let type_for_path loc = function
   | Path.Pident id ->
     (match Hashtbl.find_opt vars_env.env_tys id with
-    | Some t -> Identifier.Type.var loc t (quote_loc loc)
-    | None -> (
-      match Ident.name id with
-      | "int" -> Identifier.Type.int
-      | "char" -> Identifier.Type.char
-      | "string" -> Identifier.Type.string
-      | "bytes" -> Identifier.Type.bytes
-      | "float" -> Identifier.Type.float
-      | "float32" -> Identifier.Type.float32
-      | "bool" -> Identifier.Type.bool
-      | "unit" -> Identifier.Type.unit
-      | "exn" -> Identifier.Type.exn
-      | "array" -> Identifier.Type.array
-      | "iarray" -> Identifier.Type.iarray
-      | "list" -> Identifier.Type.list
-      | "option" -> Identifier.Type.option
-      | "nativeint" -> Identifier.Type.nativeint
-      | "int32" -> Identifier.Type.int32
-      | "int64" -> Identifier.Type.int64
-      | "lazy_t" -> Identifier.Type.lazy_t
-      | "extension_constructor" -> Identifier.Type.extension_constructor
-      | "floatarray" -> Identifier.Type.floatarray
-      | "lexing_position" -> Identifier.Type.lexing_position
-      | "expr" -> Identifier.Type.code
-      | "unboxed_float" -> Identifier.Type.unboxed_float
-      | "unboxed_nativeint" -> Identifier.Type.unboxed_nativeint
-      | "unboxed_int32" -> Identifier.Type.unboxed_int32
-      | "unboxed_int64" -> Identifier.Type.unboxed_int64
-      | "int8x16" -> Identifier.Type.int8x16
-      | "int16x8" -> Identifier.Type.int16x8
-      | "int32x4" -> Identifier.Type.int32x4
-      | "int64x2" -> Identifier.Type.int64x2
-      | "float32x4" -> Identifier.Type.float32x4
-      | "float62x2" -> Identifier.Type.float64x2
-      | _ -> raise Exit))
+      | Some t -> Identifier.Type.var loc t (quote_loc loc)
+      | None -> (
+        match Ident.name id with
+        | "int" -> Identifier.Type.int
+        | "char" -> Identifier.Type.char
+        | "string" -> Identifier.Type.string
+        | "bytes" -> Identifier.Type.bytes
+        | "float" -> Identifier.Type.float
+        | "float32" -> Identifier.Type.float32
+        | "bool" -> Identifier.Type.bool
+        | "unit" -> Identifier.Type.unit
+        | "exn" -> Identifier.Type.exn
+        | "array" -> Identifier.Type.array
+        | "iarray" -> Identifier.Type.iarray
+        | "list" -> Identifier.Type.list
+        | "option" -> Identifier.Type.option
+        | "nativeint" -> Identifier.Type.nativeint
+        | "int32" -> Identifier.Type.int32
+        | "int64" -> Identifier.Type.int64
+        | "lazy_t" -> Identifier.Type.lazy_t
+        | "extension_constructor" -> Identifier.Type.extension_constructor
+        | "floatarray" -> Identifier.Type.floatarray
+        | "lexing_position" -> Identifier.Type.lexing_position
+        | "expr" -> Identifier.Type.code
+        | "unboxed_float" -> Identifier.Type.unboxed_float
+        | "unboxed_nativeint" -> Identifier.Type.unboxed_nativeint
+        | "unboxed_int32" -> Identifier.Type.unboxed_int32
+        | "unboxed_int64" -> Identifier.Type.unboxed_int64
+        | "int8x16" -> Identifier.Type.int8x16
+        | "int16x8" -> Identifier.Type.int16x8
+        | "int32x4" -> Identifier.Type.int32x4
+        | "int64x2" -> Identifier.Type.int64x2
+        | "float32x4" -> Identifier.Type.float32x4
+        | "float62x2" -> Identifier.Type.float64x2
+        | _ -> raise Exit))
     |> Identifier.Type.wrap
   | Path.Pdot (p, s) ->
     Identifier.Type.dot loc (module_for_path loc p) s |> Identifier.Type.wrap
@@ -2671,14 +2671,14 @@ and case_value_pattern_binding transl stage case =
 
 and quote_case_binding loc cb =
   (match cb with
-  | Non_binding (pat, exp) -> Case.nonbinding loc (quote_loc loc) pat exp
-  | Simple (name, body) -> Case.simple loc (quote_loc loc) name body
-  | Pattern (names_vals, names_mods, body) ->
-    Case.pattern loc (quote_loc loc) names_vals names_mods body
-  | Guarded (names_vals, names_mods, body) ->
-    Case.guarded loc (quote_loc loc) names_vals names_mods body
-  | Refutation (names_vals, names_mods, body) ->
-    Case.refutation loc (quote_loc loc) names_vals names_mods body)
+    | Non_binding (pat, exp) -> Case.nonbinding loc (quote_loc loc) pat exp
+    | Simple (name, body) -> Case.simple loc (quote_loc loc) name body
+    | Pattern (names_vals, names_mods, body) ->
+      Case.pattern loc (quote_loc loc) names_vals names_mods body
+    | Guarded (names_vals, names_mods, body) ->
+      Case.guarded loc (quote_loc loc) names_vals names_mods body
+    | Refutation (names_vals, names_mods, body) ->
+      Case.refutation loc (quote_loc loc) names_vals names_mods body)
   |> Case.wrap
 
 and quote_case transl stage loc case =

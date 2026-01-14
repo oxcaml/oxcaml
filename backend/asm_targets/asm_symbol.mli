@@ -28,8 +28,8 @@
 val should_be_escaped : char -> bool
 
 (** Symbol visibility for linking. [Global] symbols are exported and can be
-    referenced from other compilation units. [Local] symbols are file-scope
-    and can only be referenced within the same file. *)
+    referenced from other compilation units. [Local] symbols are file-scope and
+    can only be referenced within the same file. *)
 type visibility =
   | Global
   | Local
@@ -39,10 +39,12 @@ include Identifiable.S
 (** [create] creates a new symbol with the given visibility. *)
 val create : visibility:visibility -> string -> t
 
-(** [create_global] creates a global symbol. Shorthand for [create ~visibility:Global]. *)
+(** [create_global] creates a global symbol. Shorthand for
+    [create ~visibility:Global]. *)
 val create_global : string -> t
 
-(** [create_local] creates a local symbol. Shorthand for [create ~visibility:Local]. *)
+(** [create_local] creates a local symbol. Shorthand for
+    [create ~visibility:Local]. *)
 val create_local : string -> t
 
 (** [create_without_encoding] creates a symbol from an already-encoded string.

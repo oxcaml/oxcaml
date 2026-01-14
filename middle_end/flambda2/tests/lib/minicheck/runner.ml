@@ -127,8 +127,7 @@ let check0 ?(n = default_attempts) ?(seed = default_seed)
   Outcome.report !outcome ~attempts:n ~duration;
   t.outcomes_rev <- !outcome :: t.outcomes_rev
 
-let check :
-    type a reprs.
+let check : type a reprs.
     ?n:int ->
     ?seed:int ->
     ?verbose:bool ->

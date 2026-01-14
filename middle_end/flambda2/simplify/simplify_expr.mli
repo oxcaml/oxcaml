@@ -46,6 +46,6 @@
 val simplify_expr : Flambda.Expr.t Simplify_common.expr_simplifier
 
 (** Simplify a whole program body or a whole function body. This deals with the
-    setting up of the [Data_flow] module and the return/exception
-    continuations. *)
+    setting up of the [Data_flow] module and the return/exception continuations.
+*)
 val simplify_toplevel : Simplify_common.simplify_toplevel

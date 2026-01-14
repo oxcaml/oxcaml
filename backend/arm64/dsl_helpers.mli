@@ -28,8 +28,8 @@
 (** Helper functions that convert compiler [Reg.t] values to ARM64 operands.
 
     This module provides the bridge between the compiler's register allocator
-    (which uses [Reg.t]) and the ARM64 AST (which uses integer register indices).
-*)
+    (which uses [Reg.t]) and the ARM64 AST (which uses integer register
+    indices). *)
 
 module Ast = Arm64_ast.Ast
 module Element_to_GP = Ast.Element_to_GP
@@ -177,9 +177,9 @@ val addressing :
   [`Mem of [> `Offset_imm | `Offset_unscaled | `Offset_sym]] Ast.Operand.t
 
 (** [stack] returns a memory operand for accessing a stack slot. The
-    [stack_offset] and [contains_calls] parameters are refs because their
-    values are computed during emission and may change. The refs are
-    dereferenced when this function is called. *)
+    [stack_offset] and [contains_calls] parameters are refs because their values
+    are computed during emission and may change. The refs are dereferenced when
+    this function is called. *)
 val stack :
   stack_offset:int ref ->
   contains_calls:bool ref ->

@@ -118,11 +118,11 @@ module Id = struct
     let send_value, recv_value = Channel.create default_value in
     let iterator = Trie.Iterator.create is_trie recv_trie send_value in
     let rec get_names : type a. a Trie.Iterator.hlist -> int -> string list =
-      fun (type a) (iterators : a Trie.Iterator.hlist) i : string list ->
-       match iterators with
-       | [] -> []
-       | _ :: iterators ->
-         (name ^ "." ^ string_of_int i) :: get_names iterators (i + 1)
+     fun (type a) (iterators : a Trie.Iterator.hlist) i : string list ->
+      match iterators with
+      | [] -> []
+      | _ :: iterators ->
+        (name ^ "." ^ string_of_int i) :: get_names iterators (i + 1)
     in
     send_trie, { values = iterator; names = get_names iterator 0 }, recv_value
 end

@@ -381,83 +381,74 @@ let rel3 name schema =
   let tbl = Datalog.create_relation ~name schema in
   fun x y z -> tbl % [x; y; z]
 
-(**
-   [usages] and [sources] are dual. They build the same relation
-   from [accessor] and [rev_constructor].
-   [any_usage] and [any_source] are the tops.
-   [field_usages] and [field_sources]
-   [field_usages_top] and [field_sources_top]
-   [cofield_usages] and [cofield_sources]
-*)
+(** [usages] and [sources] are dual. They build the same relation from
+    [accessor] and [rev_constructor]. [any_usage] and [any_source] are the tops.
+    [field_usages] and [field_sources] [field_usages_top] and
+    [field_sources_top] [cofield_usages] and [cofield_sources] *)
 
 (** [usages x y] y is an alias of x, and there is an actual use for y.
 
-    For performance reasons, we don't want to represent [usages x y] when
-    x is top ([any_usage x] is valid). If x is top the any_usage predicate subsumes
+    For performance reasons, we don't want to represent [usages x y] when x is
+    top ([any_usage x] is valid). If x is top the any_usage predicate subsumes
     this property.
 
-    We avoid building this relation in that case, but it is possible to have both
-    [usages x y] and [any_usage x] depending on the resolution order.
+    We avoid building this relation in that case, but it is possible to have
+    both [usages x y] and [any_usage x] depending on the resolution order.
 
-    [usages x x] is used to represent the actual use of x.
-*)
+    [usages x x] is used to represent the actual use of x. *)
 let usages = rel2 "usages" Cols.[n; n]
 
-(** [field_usages x f y] y is an use of the field f of x
-    and there is an actual use for y.
-    Exists only if [accessor y f x].
-    (this avoids the quadratic blowup of building the complete alias graph)
+(** [field_usages x f y] y is an use of the field f of x and there is an actual
+    use for y. Exists only if [accessor y f x]. (this avoids the quadratic
+    blowup of building the complete alias graph)
 
-    We avoid building this relation if [field_usages_top x f], but it is possible to have both
-    [field_usages x f _] and [field_usages_top x f] depending on the resolution order.
-*)
+    We avoid building this relation if [field_usages_top x f], but it is
+    possible to have both [field_usages x f _] and [field_usages_top x f]
+    depending on the resolution order. *)
 let field_usages = rel3 "field_usages" Cols.[n; f; n]
 
 (** [any_usage x] x is used in an uncontrolled way *)
 let any_usage = any_usage
 
-(** [field_usages_top x f] the field f of x is used in an uncontrolled way.
-    It could be for instance, a value escaping the current compilation unit,
-    or passed as argument to an non axiomatized function or primitive.
-    Exists only if [accessor y f x] for some y (this avoids propagating large
-    number of fields properties on many variables).
+(** [field_usages_top x f] the field f of x is used in an uncontrolled way. It
+    could be for instance, a value escaping the current compilation unit, or
+    passed as argument to an non axiomatized function or primitive. Exists only
+    if [accessor y f x] for some y (this avoids propagating large number of
+    fields properties on many variables).
 
-    For local fields, this relation is not used.
-*)
+    For local fields, this relation is not used. *)
 let field_usages_top = rel2 "field_usages_top" Cols.[n; f]
 
 (** [sources x y] y is a source of x, and there is an actual source for y.
 
-    For performance reasons, we don't want to represent [sources x y] when
-    x is top ([any_source x] is valid). If x is top the any_source predicate subsumes
+    For performance reasons, we don't want to represent [sources x y] when x is
+    top ([any_source x] is valid). If x is top the any_source predicate subsumes
     this property.
 
-    We avoid building this relation in that case, but it is possible to have both
-    [sources x y] and [any_source x] depending on the resolution order.
+    We avoid building this relation in that case, but it is possible to have
+    both [sources x y] and [any_source x] depending on the resolution order.
 
-    [sources x x] is used to represent the actual source of x.
-*)
+    [sources x x] is used to represent the actual source of x. *)
 let sources = rel2 "sources" Cols.[n; n]
 
-(** [any_source x] the special extern value 'any_source' is a source of x
-    it represents the top for the sources.
-    It can be produced for instance by an argument from an escaping function
-    or the result of non axiomatized primitives and external symbols.
-    Right now functions coming from other files are considered unknown *)
+(** [any_source x] the special extern value 'any_source' is a source of x it
+    represents the top for the sources. It can be produced for instance by an
+    argument from an escaping function or the result of non axiomatized
+    primitives and external symbols. Right now functions coming from other files
+    are considered unknown *)
 let any_source = any_source
 
-(** [field_sources x f y] y is a source of the field f of x,
-    and there is an actual source for y.
-    Exists only if [constructor x f y].
-    (this avoids the quadratic blowup of building the complete alias graph)
+(** [field_sources x f y] y is a source of the field f of x, and there is an
+    actual source for y. Exists only if [constructor x f y]. (this avoids the
+    quadratic blowup of building the complete alias graph)
 
-    We avoid building this relation if [field_sources_top x f], but it is possible to have both
-    [field_sources x f _] and [field_sources_top x f] depending on the resolution order.
-
-*)
+    We avoid building this relation if [field_sources_top x f], but it is
+    possible to have both [field_sources x f _] and [field_sources_top x f]
+    depending on the resolution order. *)
 let field_sources = rel3 "field_sources" Cols.[n; f; n]
 
-(** [field_sources_top x f] the special extern value is a source for the field f of x *)
+(** [field_sources_top x f] the special extern value is a source for the field f
+    of x *)
 let field_sources_top = rel2 "field_sources_top" Cols.[n; f]
 (* CR pchambart: is there a reason why this is called top an not any source ? *)
 
@@ -878,8 +869,7 @@ end = struct
         let columns = Datalog.columns table in
         local "fix" columns :: locals tables
 
-    let rec copy :
-        type a b.
+    let rec copy : type a b.
         (a, b) hlist -> (a, b) hlist -> Datalog.database -> Datalog.database =
      fun from_tables to_tables db ->
       match from_tables, to_tables with
@@ -890,8 +880,8 @@ end = struct
         in
         copy from_tables to_tables db
 
-    let rec get :
-        type a b. (a, b) hlist -> Datalog.database -> a Datalog.Constant.hlist =
+    let rec get : type a b.
+        (a, b) hlist -> Datalog.database -> a Datalog.Constant.hlist =
      fun tables db ->
       match tables with
       | [] -> []
@@ -932,8 +922,7 @@ end = struct
         ('x, 'y, 'j) stmt * (Datalog.database -> 'a -> Datalog.database)
         -> ('x, 'y, 'a -> 'j) stmt
 
-  let rec run :
-      type d f e.
+  let rec run : type d f e.
       (d, f, e) stmt -> (Datalog.database -> d -> f) -> Datalog.database -> e =
    fun stmt k db ->
     match stmt with
@@ -1085,25 +1074,25 @@ let () = ignore (One.top, Fixit.fix, Fixit.seq, Fixit.fix1, Fixit.return)
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 
-(** Computes all usages of a set of variables (input).
-    Sets are represented as unit maps for convenience with datalog.
-    Usages is represented as a set of variables: those are the variables
-    where the input variables flow with live accessor.
+(** Computes all usages of a set of variables (input). Sets are represented as
+    unit maps for convenience with datalog. Usages is represented as a set of
+    variables: those are the variables where the input variables flow with live
+    accessor.
 
     [follow_known_arity_calls] specifies that if the set of variables
-    corresponds to a closure that is called by an known arity call, we
-    should look at the [my_closure] value of the corresponding code_id as well.
-    This is only necessary if the set of variables can correspond to a closure
-    *and* the set of variables contains variables that are not the allocation
-    point of the set of closures.
+    corresponds to a closure that is called by an known arity call, we should
+    look at the [my_closure] value of the corresponding code_id as well. This is
+    only necessary if the set of variables can correspond to a closure *and* the
+    set of variables contains variables that are not the allocation point of the
+    set of closures.
 
-    The reason for this is that for a given closure that is called, the
-    [usages] do not usually include the uses of the closure inside the code of
-    the closure itself. However, when we allocate a set of closures, we include
-    an alias between the allocated closures and their [my_closure] variable
-    inside the corresponding code. As such, the usages at an allocation point
-    are always representative of all the uses, and as such, do not require to
-    follow the calls.
+    The reason for this is that for a given closure that is called, the [usages]
+    do not usually include the uses of the closure inside the code of the
+    closure itself. However, when we allocate a set of closures, we include an
+    alias between the allocated closures and their [my_closure] variable inside
+    the corresponding code. As such, the usages at an allocation point are
+    always representative of all the uses, and as such, do not require to follow
+    the calls.
 
     Function slots are considered as aliases for this analysis. *)
 let get_all_usages :
@@ -1165,10 +1154,9 @@ type field_usage =
   | Used_as_top
   | Used_as_vars of unit Code_id_or_name.Map.t
 
-(** For an usage set (coaccessor s), compute the way its fields are used.
-    As function slots are transparent for [get_usages], functions slot
-    usages are ignored here.
-*)
+(** For an usage set (coaccessor s), compute the way its fields are used. As
+    function slots are transparent for [get_usages], functions slot usages are
+    ignored here. *)
 let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
   (* CR-someday ncourant: likewise here; I find this function particulartly
      ugly. *)
@@ -2178,11 +2166,13 @@ module Rewriter = struct
     Function_slot.Map.map
       (fun closure ->
         ( Single_source closure,
-          if field_used db closure
-               (Field.code_of_closure Unknown_arity_code_pointer)
+          if
+            field_used db closure
+              (Field.code_of_closure Unknown_arity_code_pointer)
           then Any_call
-          else if field_used db closure
-                    (Field.code_of_closure Known_arity_code_pointer)
+          else if
+            field_used db closure
+              (Field.code_of_closure Known_arity_code_pointer)
           then Only_called_with_known_arity
           else Never_called ))
       set_of_closures
@@ -2537,9 +2527,10 @@ module Rewriter = struct
 
   let follow_field_for_set_of_closures result set_of_closures value_slot =
     let field = Field.value_slot value_slot in
-    if Function_slot.Map.for_all
-         (fun _ closure -> not (field_used result.db closure field))
-         set_of_closures
+    if
+      Function_slot.Map.for_all
+        (fun _ closure -> not (field_used result.db closure field))
+        set_of_closures
     then No_usages
     else
       let sources =
@@ -2580,13 +2571,14 @@ module Rewriter = struct
     let db = result.db in
     let[@local] forget_type () =
       (* CR ncourant: we should preserve the nullability of the type here. *)
-      if Lazy.force debug_types
-         && (not (Flambda2_types.is_unknown typing_env flambda_type))
-         && not
-              (List.mem
-                 (Flambda_colours.without_colours ~f:(fun () ->
-                      Format.asprintf "%a" Flambda2_types.print flambda_type))
-                 ["(Val? ⊤)"; "(Val! ⊤)"])
+      if
+        Lazy.force debug_types
+        && (not (Flambda2_types.is_unknown typing_env flambda_type))
+        && not
+             (List.mem
+                (Flambda_colours.without_colours ~f:(fun () ->
+                     Format.asprintf "%a" Flambda2_types.print flambda_type))
+                ["(Val? ⊤)"; "(Val! ⊤)"])
       then
         Format.eprintf "Forgetting: %a@.Usages = %a@." Flambda2_types.print
           flambda_type print_t0 usages;
@@ -2794,10 +2786,11 @@ module Rewriter = struct
           Rule.rewrite Pattern.any
             (Expr.bottom (Flambda2_types.kind flambda_type))
         | From_set_of_closures set_of_closures ->
-          if Function_slot.Map.exists
-               (fun _ clos ->
-                 Code_id_or_name.Map.mem clos result.changed_representation)
-               set_of_closures
+          if
+            Function_slot.Map.exists
+              (fun _ clos ->
+                Code_id_or_name.Map.mem clos result.changed_representation)
+              set_of_closures
           then (
             assert (
               Function_slot.Map.for_all
@@ -2855,10 +2848,11 @@ module Rewriter = struct
                  value_slot_types)
               usages_of_function_slots
         | Value_slots_usages usages_for_value_slots ->
-          if Code_id_or_name.Map.exists
-               (fun clos () ->
-                 Code_id_or_name.Map.mem clos result.changed_representation)
-               usages_for_value_slots
+          if
+            Code_id_or_name.Map.exists
+              (fun clos () ->
+                Code_id_or_name.Map.mem clos result.changed_representation)
+              usages_for_value_slots
           then (
             assert (
               Code_id_or_name.Map.for_all
@@ -2916,19 +2910,22 @@ module Rewriter = struct
           let is_local_function_slot fs _ =
             Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
           in
-          if Value_slot.Map.exists is_local_value_slot value_slot_types
-             || Function_slot.Map.exists is_local_function_slot
-                  function_slot_types
+          if
+            Value_slot.Map.exists is_local_value_slot value_slot_types
+            || Function_slot.Map.exists is_local_function_slot
+                 function_slot_types
           then (
-            if not
-                 (Value_slot.Map.for_all is_local_value_slot value_slot_types
-                 && Function_slot.Map.for_all is_local_function_slot
-                      function_slot_types)
+            if
+              not
+                (Value_slot.Map.for_all is_local_value_slot value_slot_types
+                && Function_slot.Map.for_all is_local_function_slot
+                     function_slot_types)
             then
               Misc.fatal_errorf
                 "Some slots in this closure are local while other are not:@\n\
                  Value slots: %a@\n\
-                 Function slots: %a@." Value_slot.Set.print
+                 Function slots: %a@."
+                Value_slot.Set.print
                 (Value_slot.Map.keys value_slot_types)
                 Function_slot.Set.print
                 (Function_slot.Map.keys function_slot_types);
@@ -2952,10 +2949,11 @@ module Rewriter = struct
               Format.eprintf "COULD NOT IDENTIFY@.";
               forget_type ()
             | Some set_of_closures ->
-              if Function_slot.Map.exists
-                   (fun _ clos ->
-                     Code_id_or_name.Map.mem clos result.changed_representation)
-                   set_of_closures
+              if
+                Function_slot.Map.exists
+                  (fun _ clos ->
+                    Code_id_or_name.Map.mem clos result.changed_representation)
+                  set_of_closures
               then (
                 assert (
                   Function_slot.Map.for_all
@@ -3257,9 +3255,10 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
           | Used_as_vars flow_to ->
             if Code_id_or_name.Map.is_empty flow_to
             then Misc.fatal_errorf "Empty set in [get_fields]";
-            if Code_id_or_name.Map.for_all
-                 (fun k () -> has_to_be_unboxed k)
-                 flow_to
+            if
+              Code_id_or_name.Map.for_all
+                (fun k () -> has_to_be_unboxed k)
+                flow_to
             then
               let new_unboxed_block =
                 match field_source with
@@ -3278,9 +3277,10 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
               if false && Field.Map.is_empty unboxed_fields
               then None
               else Some (Unboxed unboxed_fields)
-            else if Code_id_or_name.Map.exists
-                      (fun k () -> has_to_be_unboxed k)
-                      flow_to
+            else if
+              Code_id_or_name.Map.exists
+                (fun k () -> has_to_be_unboxed k)
+                flow_to
             then
               Misc.fatal_errorf
                 "Field %a of %s flows to both unboxed and non-unboxed variables"
@@ -3320,8 +3320,9 @@ let fixpoint (graph : Global_flow_graph.graph) =
       (fun db rule -> Datalog.Schedule.run ~stats rule db)
       db datalog_rules
   in
-  if Flambda_features.debug_reaper "stats"
-     || Flambda_features.debug_reaper "prov"
+  if
+    Flambda_features.debug_reaper "stats"
+    || Flambda_features.debug_reaper "prov"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"
   then Format.eprintf "%a@." Datalog.print db;
@@ -3430,8 +3431,9 @@ let fixpoint (graph : Global_flow_graph.graph) =
            Format.fprintf ff "[from %a]%a" Code_id_or_name.print alloc_point
              pp_changed_representation repr))
       !changed_representation;
-  if Flambda_features.reaper_unbox ()
-     && Flambda_features.reaper_change_calling_conventions ()
+  if
+    Flambda_features.reaper_unbox ()
+    && Flambda_features.reaper_change_calling_conventions ()
   then
     { db;
       unboxed_fields = unboxed;

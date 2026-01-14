@@ -30,10 +30,9 @@
 (** Build linker arguments from dissector results.
 
     After the dissector runs, OCaml object files have been partitioned and
-    partially linked into partition object files. Passthrough files (C stubs
-    and runtime libraries) are passed directly without partial linking because
-    they may have sections like .gcc_except_table that don't work well with
-    ld -r.
+    partially linked into partition object files. Passthrough files (C stubs and
+    runtime libraries) are passed directly without partial linking because they
+    may have sections like .gcc_except_table that don't work well with ld -r.
 
     The original linker invocation combines:
     - startup_obj (the startup code)
@@ -52,8 +51,8 @@
 type t
 
 (** Returns the object files for the final linker. This includes:
-    - Rewritten partition .o files (containing startup_obj and ml_objfiles
-      that were partially linked)
+    - Rewritten partition .o files (containing startup_obj and ml_objfiles that
+      were partially linked)
     - Passthrough files (ccobjs and runtime_libs that bypass partial linking)
 
     The caller should pass these files to the linker and NOT add ccobjs or

@@ -885,8 +885,9 @@ let pop_if_in_top_effect_stage ?consider_inlining_effectful_expressions env var
       | Some consider -> consider
       | None -> Flambda_features.Expert.inline_effects_in_cmm ()
     in
-    if Variable.equal var var_from_stage
-       && consider_inlining_effectful_expressions
+    if
+      Variable.equal var var_from_stage
+      && consider_inlining_effectful_expressions
     then Some { env with effect_stages = prev_stages }
     else None
   | Coeffect_only vars_from_stage :: prev_stages ->
@@ -1126,9 +1127,10 @@ let flush_bindings order_map flushed_symbol_inits e free_vars symbol_inits =
       | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
         let v = Backend_var.With_provenance.var b.cmm_var in
         let inits, symbol_inits = pop_symbol_inits symbol_inits v in
-        if can_be_removed b.effs
-           && Misc.Stdlib.List.is_empty inits
-           && not (Backend_var.Set.mem v acc_free_vars)
+        if
+          can_be_removed b.effs
+          && Misc.Stdlib.List.is_empty inits
+          && not (Backend_var.Set.mem v acc_free_vars)
         then acc, acc_free_vars, symbol_inits
         else
           let body =

@@ -145,17 +145,17 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
     let params_and_body = Code.params_and_body code in
     Function_params_and_body.pattern_match params_and_body
       ~f:(fun
-           ~return_continuation
-           ~exn_continuation
-           params
-           ~body
-           ~my_closure
-           ~is_my_closure_used:_
-           ~my_region
-           ~my_ghost_region
-           ~my_depth
-           ~free_names_of_body:_
-         ->
+          ~return_continuation
+          ~exn_continuation
+          params
+          ~body
+          ~my_closure
+          ~is_my_closure_used:_
+          ~my_region
+          ~my_ghost_region
+          ~my_depth
+          ~free_names_of_body:_
+        ->
         let make_inlined_body () =
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)
             ~region_inlined_into ~unroll_to

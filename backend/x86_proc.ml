@@ -132,9 +132,10 @@ let string_of_substring_literal k n s =
       if !last_was_escape
       then Printf.bprintf b "\\%o" (Char.code c)
       else Buffer.add_char b c
-    else if between c ' ' '~'
-            && (not (Char.equal c '"'))
-            (* '"' *) && not (Char.equal c '\\')
+    else if
+      between c ' ' '~'
+      && (not (Char.equal c '"'))
+      (* '"' *) && not (Char.equal c '\\')
     then (
       Buffer.add_char b c;
       last_was_escape := false)

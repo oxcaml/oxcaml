@@ -459,17 +459,15 @@ let rec named_must_be_static_consts (named : named) =
       named
 
 and match_against_bound_static_pattern_static_const_or_code :
-      'a.
-      static_const_or_code ->
-      Bound_static.Pattern.t ->
-      code:(Code_id.t -> function_params_and_body Code0.t -> 'a) ->
-      deleted_code:(Code_id.t -> 'a) ->
-      set_of_closures:
-        (closure_symbols:Symbol.t Function_slot.Lmap.t ->
-        Set_of_closures.t ->
-        'a) ->
-      block_like:(Symbol.t -> Static_const.t -> 'a) ->
-      'a =
+    'a.
+    static_const_or_code ->
+    Bound_static.Pattern.t ->
+    code:(Code_id.t -> function_params_and_body Code0.t -> 'a) ->
+    deleted_code:(Code_id.t -> 'a) ->
+    set_of_closures:
+      (closure_symbols:Symbol.t Function_slot.Lmap.t -> Set_of_closures.t -> 'a) ->
+    block_like:(Symbol.t -> Static_const.t -> 'a) ->
+    'a =
  fun static_const_or_code (pat : Bound_static.Pattern.t) ~code:code_callback
      ~deleted_code:deleted_code_callback ~set_of_closures ~block_like ->
   match static_const_or_code, pat with
@@ -491,22 +489,23 @@ and match_against_bound_static_pattern_static_const_or_code :
       static_const_or_code
 
 and match_against_bound_static__static_const_group :
-      'a.
-      static_const_group ->
-      Bound_static.t ->
-      init:'a ->
-      code:('a -> Code_id.t -> function_params_and_body Code0.t -> 'a) ->
-      deleted_code:('a -> Code_id.t -> 'a) ->
-      set_of_closures:
-        ('a ->
-        closure_symbols:Symbol.t Function_slot.Lmap.t ->
-        Set_of_closures.t ->
-        'a) ->
-      block_like:('a -> Symbol.t -> Static_const.t -> 'a) ->
-      'a =
+    'a.
+    static_const_group ->
+    Bound_static.t ->
+    init:'a ->
+    code:('a -> Code_id.t -> function_params_and_body Code0.t -> 'a) ->
+    deleted_code:('a -> Code_id.t -> 'a) ->
+    set_of_closures:
+      ('a ->
+      closure_symbols:Symbol.t Function_slot.Lmap.t ->
+      Set_of_closures.t ->
+      'a) ->
+    block_like:('a -> Symbol.t -> Static_const.t -> 'a) ->
+    'a =
  fun t bound_static ~init ~code:code_callback
      ~deleted_code:deleted_code_callback
-     ~set_of_closures:set_of_closures_callback ~block_like:block_like_callback ->
+     ~set_of_closures:set_of_closures_callback
+     ~block_like:block_like_callback ->
   let bound_static_pats = Bound_static.to_list bound_static in
   if List.compare_lengths t bound_static_pats <> 0
   then
@@ -701,9 +700,11 @@ and flatten_for_printing0 bound_static defining_exprs =
         }
       in
       flattened_acc @ [flattened], true)
-    ~set_of_closures:
-      (fun (flattened_acc, second_or_later_rec_binding) ~closure_symbols
-           set_of_closures ->
+    ~set_of_closures:(fun
+        (flattened_acc, second_or_later_rec_binding)
+        ~closure_symbols
+        set_of_closures
+      ->
       let flattened =
         if Set_of_closures.is_empty set_of_closures
         then []
@@ -715,8 +716,8 @@ and flatten_for_printing0 bound_static defining_exprs =
             } ]
       in
       flattened_acc @ flattened, true)
-    ~block_like:
-      (fun (flattened_acc, second_or_later_rec_binding) symbol defining_expr ->
+    ~block_like:(fun
+        (flattened_acc, second_or_later_rec_binding) symbol defining_expr ->
       let flattened =
         { second_or_later_binding_within_one_set = false;
           second_or_later_rec_binding;
@@ -952,10 +953,10 @@ module Continuation_handler = struct
             then
               A.pattern_match_pair t1.cont_handler_abst t2.cont_handler_abst
                 ~f:(fun
-                     params
-                     ({ handler = handler1; _ } : T0.t)
-                     ({ handler = handler2; _ } : T0.t)
-                   -> Ok (f params ~handler1 ~handler2))
+                    params
+                    ({ handler = handler1; _ } : T0.t)
+                    ({ handler = handler2; _ } : T0.t)
+                  -> Ok (f params ~handler1 ~handler2))
             else
               Error
                 Pattern_match_pair_error.Parameter_lists_have_different_lengths))
@@ -1028,10 +1029,10 @@ module Function_params_and_body = struct
   let pattern_match_pair t1 t2 ~f =
     A.pattern_match_pair t1.abst t2.abst
       ~f:(fun
-           bound_for_function
-           { expr = body1; free_names = _ }
-           { expr = body2; free_names = _ }
-         ->
+          bound_for_function
+          { expr = body1; free_names = _ }
+          { expr = body2; free_names = _ }
+        ->
         f
           ~return_continuation:
             (Bound_for_function.return_continuation bound_for_function)
@@ -1239,10 +1240,10 @@ module Recursive_let_cont_handlers = struct
   let pattern_match_pair t1 t2 ~f =
     A1.pattern_match_pair t1 t2
       ~f:(fun
-           _
-           (handlers0_1 : recursive_let_cont_handlers_t0)
-           (handlers0_2 : recursive_let_cont_handlers_t0)
-         ->
+          _
+          (handlers0_1 : recursive_let_cont_handlers_t0)
+          (handlers0_2 : recursive_let_cont_handlers_t0)
+        ->
         let body1 = handlers0_1.body in
         let body2 = handlers0_2.body in
         A0.pattern_match_pair handlers0_1.handlers handlers0_2.handlers

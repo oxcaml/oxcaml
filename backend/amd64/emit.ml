@@ -92,8 +92,8 @@ module I = struct
     I.simd simd args
 end
 
-(** Turn a Linear label into an assembly label. The section is checked against the
-    section tracked by [D] when emitting label definitions. *)
+(** Turn a Linear label into an assembly label. The section is checked against
+    the section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
     =
   L.create_int section (Label.to_int l)
@@ -305,8 +305,9 @@ let emit_named_text_section ?(suffix = "") func_name =
      [Cfg.codegen_option], and at that point we could add a constructor for
      module-entry-functions too so that we don't have to inspect [func_name]
      like we do now. *)
-  if !Oxcaml_flags.module_entry_functions_section
-     && String.ends_with func_name ~suffix:"__entry"
+  if
+    !Oxcaml_flags.module_entry_functions_section
+    && String.ends_with func_name ~suffix:"__entry"
   then (
     match[@ocaml.warning "-4"] system with
     | S_macosx
@@ -359,16 +360,16 @@ let emit_function_or_basic_block_section_name () =
 
 let emit_Llabel fallthrough lbl section_name =
   (if !Oxcaml_flags.basic_block_sections
-  then
-    match section_name with
-    | Some name ->
-      if not (String.equal name !current_basic_block_section)
-      then (
-        current_basic_block_section := name;
-        D.cfi_endproc ();
-        emit_function_or_basic_block_section_name ();
-        D.cfi_startproc ())
-    | None -> ());
+   then
+     match section_name with
+     | Some name ->
+       if not (String.equal name !current_basic_block_section)
+       then (
+         current_basic_block_section := name;
+         D.cfi_endproc ();
+         emit_function_or_basic_block_section_name ();
+         D.cfi_startproc ())
+     | None -> ());
   if (not fallthrough) && !fastcode_flag
   then D.align ~fill_x86_bin_emitter:Nop ~bytes:4;
   D.define_label lbl
@@ -1191,7 +1192,9 @@ module Address_sanitizer : sig
     | Store_initialize
     | Store_modify
 
-  (** Implements [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping]. *)
+  (** Implements
+      [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping].
+  *)
   val emit_sanitize :
     ?dependencies:X86_ast.arg array ->
     instr:instruction ->
@@ -1739,8 +1742,9 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
 (* Only used for instructions that have an implicit memory operand. Explicit
    load/store operations are sanitized automatically by [emit_simd_instr]. *)
 let emit_implicit_simd_sanitize (op : Simd.operation) instr =
-  if Config.with_address_sanitizer && !Arch.is_asan_enabled
-     && Simd.is_memory_operation op
+  if
+    Config.with_address_sanitizer && !Arch.is_asan_enabled
+    && Simd.is_memory_operation op
   then
     let simd = Simd.Pseudo_instr.instr op.instr in
     match[@warning "-4"] simd.id with
@@ -1924,8 +1928,9 @@ let emit_instr ~first ~fallthrough i =
       emit_jump func)
   | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
     add_used_symbol func;
-    if stack_ofs > 0
-       && (Config.runtime5 || not (Cmm.equal_stack_align stack_align Align_16))
+    if
+      stack_ofs > 0
+      && (Config.runtime5 || not (Cmm.equal_stack_align stack_align Align_16))
     then (
       I.mov rsp r13;
       I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
@@ -2420,7 +2425,10 @@ let emit_instr ~first ~fallthrough i =
   | Lentertrap ->
     if fp
     then
-      let delta = frame_size () - 16 (* retaddr + rbp *) in
+      let delta =
+        frame_size () - 16
+        (* retaddr + rbp *)
+      in
       I.lea (mem64 NONE delta (Scalar RSP)) rbp
   | Ladjust_stack_offset { delta_bytes } ->
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
@@ -2529,9 +2537,10 @@ let fundecl fundecl =
   D.align ~fill_x86_bin_emitter:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
   let fundecl_sym = S.create_global fundecl.fun_name in
-  if is_macosx system
-     && (not !Clflags.output_c_object)
-     && is_generic_function fundecl.fun_name
+  if
+    is_macosx system
+    && (not !Clflags.output_c_object)
+    && is_generic_function fundecl.fun_name
   then (* PR#4690 *)
     D.private_extern fundecl_sym
   else global_maybe_protected fundecl_sym;
@@ -2550,9 +2559,10 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
-  if Config.runtime5
-     && (not Config.no_stack_checks)
-     && String.equal !Clflags.runtime_variant "d"
+  if
+    Config.runtime5
+    && (not Config.no_stack_checks)
+    && String.equal !Clflags.runtime_variant "d"
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   List.iter emit_call_gc !call_gc_sites;
@@ -2560,9 +2570,9 @@ let fundecl fundecl =
   emit_call_safety_errors ();
   emit_stack_realloc ();
   (if !frame_required
-  then
-    let n = frame_size () - 8 - if fp then 8 else 0 in
-    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
+   then
+     let n = frame_size () - 8 - if fp then 8 else 0 in
+     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
   (match fun_end_label with
   | Some l -> D.define_label (label_to_asm_label ~section:Text l)
   | None -> ());
@@ -2852,7 +2862,10 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   in
   let live_offset = size_of_regs live in
   (* Compute the size of stack slots for spilling all arguments of the probe. *)
-  let aux_offset = 8 (* for saving r15 *) in
+  let aux_offset =
+    8
+    (* for saving r15 *)
+  in
   let tmp_offset = size_of_regs p.probe_insn.arg in
   let loc_args, loc_offset = Proc.loc_arguments (Reg.typv p.probe_insn.arg) in
   (*= Ensure the stack is aligned.
@@ -2866,9 +2879,10 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if Config.runtime5
-     && (not Config.no_stack_checks)
-     && n >= Stack_check.stack_threshold_size
+  if
+    Config.runtime5
+    && (not Config.no_stack_checks)
+    && n >= Stack_check.stack_threshold_size
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
       ~save_simd:(must_save_simd_regs p.probe_insn.live);
@@ -2946,8 +2960,9 @@ let emit_trap_notes () =
     emit_labels traps.push_traps;
     emit_labels traps.pop_traps
   in
-  if is_system_supported && !Arch.trap_notes
-     && not (L.Set.is_empty traps.enter_traps)
+  if
+    is_system_supported && !Arch.trap_notes
+    && not (L.Set.is_empty traps.enter_traps)
   then (
     D.switch_to_section Note_ocaml_eh;
     Emitaux.emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l

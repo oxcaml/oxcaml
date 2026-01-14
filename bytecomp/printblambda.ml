@@ -118,7 +118,7 @@ let rec blambda ppf = function
     let matching_cases cases i =
       ListLabels.mapi cases ~f:(fun n j -> n, j)
       |> ListLabels.filter_map ~f:(fun (n, j) ->
-             if i <> j then None else Some n)
+          if i <> j then None else Some n)
     in
     let or_pattern ppf = function
       | [] -> ()

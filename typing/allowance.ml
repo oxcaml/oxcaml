@@ -43,20 +43,20 @@ module Magic_allow_disallow (X : Allow_disallow) :
   Allow_disallow with type ('a, 'b, 'd) sided = ('a, 'b, 'd) X.sided = struct
   type ('a, 'b, 'd) sided = ('a, 'b, 'd) X.sided
 
-  let disallow_right :
-      type a b l r. (a, b, l * r) sided -> (a, b, l * disallowed) sided =
+  let disallow_right : type a b l r.
+      (a, b, l * r) sided -> (a, b, l * disallowed) sided =
     Obj.magic
 
-  let disallow_left :
-      type a b l r. (a, b, l * r) sided -> (a, b, disallowed * r) sided =
+  let disallow_left : type a b l r.
+      (a, b, l * r) sided -> (a, b, disallowed * r) sided =
     Obj.magic
 
-  let allow_right :
-      type a b l r. (a, b, l * allowed) sided -> (a, b, l * r) sided =
+  let allow_right : type a b l r.
+      (a, b, l * allowed) sided -> (a, b, l * r) sided =
     Obj.magic
 
-  let allow_left :
-      type a b l r. (a, b, allowed * r) sided -> (a, b, l * r) sided =
+  let allow_left : type a b l r.
+      (a, b, allowed * r) sided -> (a, b, l * r) sided =
     Obj.magic
 end
 [@@inline]
