@@ -457,3 +457,29 @@ let _ = bar foo
 [%%expect{|
 - : string = "foo"
 |}]
+
+(* Regression test for internal ticket 6242. *)
+
+exception R of int ref
+
+let r = ref 42
+
+module M : sig @@ portable
+  val wrap : unit -> exn
+  val unwrap : exn -> int ref
+end = struct
+  let wrap () = R r
+  let unwrap = function
+    | R r -> r
+    | _ -> assert false
+end
+
+[%%expect{|
+exception R of int ref
+val r : int ref = {contents = 42}
+module M :
+  sig
+    val wrap : unit -> exn @@ portable
+    val unwrap : exn -> int ref @@ portable
+  end
+|}]
