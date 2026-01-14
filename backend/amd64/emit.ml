@@ -480,8 +480,39 @@ let addressing addr typ i n =
 
 (* A global symbol that maybe calls the GC, suffixed by the class of simd
    register which should be saved *)
-let global_gc_sym ~simd name =
-  Cmm.global_symbol (name ^ Reg_class.Save_simd_regs.symbol_suffix simd)
+let global_gc_sym ~(simd : Reg_class.Save_simd_regs.t) name =
+  let field : Domainstate.t =
+    match name, simd with
+    | `Caml_call_gc, Save_none -> Domain_caml_call_gc
+    | `Caml_call_gc, Save_xmm  -> Domain_caml_call_gc_simd0
+    | `Caml_call_gc, Save_ymm  -> Domain_caml_call_gc_simd1
+    | `Caml_call_gc, Save_zmm  -> Domain_caml_call_gc_simd2
+    | `Caml_alloc1, Save_none -> Domain_caml_alloc1
+    | `Caml_alloc1, Save_xmm  -> Domain_caml_alloc1_simd0
+    | `Caml_alloc1, Save_ymm  -> Domain_caml_alloc1_simd1
+    | `Caml_alloc1, Save_zmm  -> Domain_caml_alloc1_simd2
+    | `Caml_alloc2, Save_none -> Domain_caml_alloc2
+    | `Caml_alloc2, Save_xmm  -> Domain_caml_alloc2_simd0
+    | `Caml_alloc2, Save_ymm  -> Domain_caml_alloc2_simd1
+    | `Caml_alloc2, Save_zmm  -> Domain_caml_alloc2_simd2
+    | `Caml_alloc3, Save_none -> Domain_caml_alloc3
+    | `Caml_alloc3, Save_xmm  -> Domain_caml_alloc3_simd0
+    | `Caml_alloc3, Save_ymm  -> Domain_caml_alloc3_simd1
+    | `Caml_alloc3, Save_zmm  -> Domain_caml_alloc3_simd2
+    | `Caml_allocN, Save_none -> Domain_caml_allocN
+    | `Caml_allocN, Save_xmm  -> Domain_caml_allocN_simd0
+    | `Caml_allocN, Save_ymm  -> Domain_caml_allocN_simd1
+    | `Caml_allocN, Save_zmm  -> Domain_caml_allocN_simd2
+    | `Caml_call_realloc_stack, Save_none -> Domain_caml_call_realloc_stack
+    | `Caml_call_realloc_stack, Save_xmm  -> Domain_caml_call_realloc_stack_simd0
+    | `Caml_call_realloc_stack, Save_ymm  -> Domain_caml_call_realloc_stack_simd1
+    | `Caml_call_realloc_stack, Save_zmm  -> Domain_caml_call_realloc_stack_simd2
+    | `Caml_call_local_realloc, Save_none -> Domain_caml_call_local_realloc
+    | `Caml_call_local_realloc, Save_xmm  -> Domain_caml_call_local_realloc_simd0
+    | `Caml_call_local_realloc, Save_ymm  -> Domain_caml_call_local_realloc_simd1
+    | `Caml_call_local_realloc, Save_zmm  -> Domain_caml_call_local_realloc_simd2
+  in
+  domain_field field
 
 let must_save_simd_regs live : Reg_class.Save_simd_regs.t =
   let v128, v256, v512 = ref false, ref false, ref false in
@@ -588,7 +619,7 @@ let local_realloc_sites = ref ([] : local_realloc_call list)
 let emit_local_realloc lr =
   D.define_label lr.lr_lbl;
   emit_debug_info lr.lr_dbg;
-  emit_call (global_gc_sym "caml_call_local_realloc" ~simd:lr.lr_save_simd);
+  I.call (global_gc_sym `Caml_call_local_realloc ~simd:lr.lr_save_simd);
   I.jmp (emit_asm_label_arg lr.lr_return_lbl)
 
 (* Record calls to caml_ml_array_bound_error and caml_ml_array_align_error. In
@@ -665,7 +696,7 @@ let emit_stack_realloc () =
       I.push (int (Config.stack_threshold + (sc_size_in_bytes / 8)));
       D.cfi_adjust_cfa_offset ~bytes:8;
       (* measured in words *)
-      emit_call (global_gc_sym "caml_call_realloc_stack" ~simd:sc_save_simd);
+      I.call (global_gc_sym `Caml_call_realloc_stack ~simd:sc_save_simd);
       I.add (int 8) rsp;
       D.cfi_adjust_cfa_offset ~bytes:(-8);
       I.jmp (emit_asm_label_arg sc_return))
@@ -2066,12 +2097,12 @@ let emit_instr ~first ~fallthrough i =
            :: !call_gc_sites)
     else (
       (match n with
-      | 16 -> emit_call (global_gc_sym "caml_alloc1" ~simd:gc_save_simd)
-      | 24 -> emit_call (global_gc_sym "caml_alloc2" ~simd:gc_save_simd)
-      | 32 -> emit_call (global_gc_sym "caml_alloc3" ~simd:gc_save_simd)
+      | 16 -> I.call (global_gc_sym `Caml_alloc1 ~simd:gc_save_simd)
+      | 24 -> I.call (global_gc_sym `Caml_alloc2 ~simd:gc_save_simd)
+      | 32 -> I.call (global_gc_sym `Caml_alloc3 ~simd:gc_save_simd)
       | _ ->
         I.sub (int n) r15;
-        emit_call (global_gc_sym "caml_allocN" ~simd:gc_save_simd));
+        I.call (global_gc_sym `Caml_allocN ~simd:gc_save_simd));
       let label = record_frame_label i.live (Dbg_alloc dbginfo) in
       D.define_label label;
       I.lea (mem64 NONE 8 (Scalar R15)) (res i 0))
@@ -2662,27 +2693,7 @@ let begin_assembly unix =
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter;
   if is_win64 system
   then (
-    D.extrn S.Predef.caml_call_gc;
-    D.extrn S.Predef.caml_call_gc_sse;
-    D.extrn S.Predef.caml_call_gc_avx;
-    D.extrn S.Predef.caml_call_gc_avx512;
     D.extrn S.Predef.caml_c_call;
-    D.extrn S.Predef.caml_allocN;
-    D.extrn S.Predef.caml_allocN_sse;
-    D.extrn S.Predef.caml_allocN_avx;
-    D.extrn S.Predef.caml_allocN_avx512;
-    D.extrn S.Predef.caml_alloc1;
-    D.extrn S.Predef.caml_alloc1_sse;
-    D.extrn S.Predef.caml_alloc1_avx;
-    D.extrn S.Predef.caml_alloc1_avx512;
-    D.extrn S.Predef.caml_alloc2;
-    D.extrn S.Predef.caml_alloc2_sse;
-    D.extrn S.Predef.caml_alloc2_avx;
-    D.extrn S.Predef.caml_alloc2_avx512;
-    D.extrn S.Predef.caml_alloc3;
-    D.extrn S.Predef.caml_alloc3_sse;
-    D.extrn S.Predef.caml_alloc3_avx;
-    D.extrn S.Predef.caml_alloc3_avx512;
     D.extrn S.Predef.caml_ml_array_bound_error;
     D.extrn S.Predef.caml_ml_array_align_error;
     D.extrn S.Predef.caml_raise_exn);
@@ -2719,8 +2730,8 @@ let begin_assembly unix =
       | `Symbol sym -> D.define_symbol_label ~section:Text sym
       | `Label lbl -> D.define_label lbl);
       D.cfi_startproc ();
-      let call_gc = global_gc_sym "caml_call_gc" ~simd in
-      I.jmp (rel_plt call_gc);
+      let call_gc = global_gc_sym `Caml_call_gc ~simd in
+      I.jmp call_gc;
       D.cfi_endproc ());
   ()
 

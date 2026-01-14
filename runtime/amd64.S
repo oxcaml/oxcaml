@@ -674,6 +674,7 @@ G(caml_system__code_begin):
 
 #define Make_call_realloc_stack(suffix, simd)        \
     FUNCTION(G(caml_call_realloc_stack ## suffix))   \
+    LBL(caml_call_realloc_stack ## suffix):          \
     CFI_STARTPROC                                  ; \
         CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
@@ -705,10 +706,11 @@ Make_call_realloc_stack(_avx512, ZMM)
 
 #define Make_call_gc(suffix, simd)                   \
     FUNCTION(G(caml_call_gc##suffix)) ;              \
+    LBL(caml_call_gc ## suffix):                     \
     CFI_STARTPROC                     ;              \
         CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
-LBL(caml_call_gc ## suffix):                         \
+LBL(_caml_call_gc ## suffix):                        \
         SAVE_ALL_REGS(simd);                         \
         movq    %r15, Caml_state(gc_regs);           \
         TSAN_ENTER_FUNCTION(0);                      \
@@ -750,11 +752,12 @@ ENDFUNCTION(G(caml_raise_stack_overflow_nat))
 
 #define Make_alloc_fun(base_name, words, simd) \
 FUNCTION(G(base_name ## simd))                 \
+LBL(base_name ## simd):                        \
 CFI_STARTPROC;                                 \
         ENTER_FUNCTION;                        \
         r15_sub_ ## words ;                    \
         cmpq    Caml_state(young_limit), %r15; \
-        jb      LBL(caml_call_gc ## simd);     \
+        jb      LBL(_caml_call_gc ## simd);     \
         LEAVE_FUNCTION;                        \
         ret;                                   \
 CFI_ENDPROC ;                                  \
@@ -773,6 +776,7 @@ Make_alloc_funs(N) /* caml_allocN* */
 
 #define Make_call_local_realloc(suffix, simd)        \
     FUNCTION(G(caml_call_local_realloc ## suffix)) ; \
+    LBL(caml_call_local_realloc ## suffix):          \
     CFI_STARTPROC               ;                    \
         CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
@@ -1558,6 +1562,31 @@ CFI_STARTPROC
 1:      ret
 CFI_ENDPROC
 ENDFUNCTION(G(caml_assert_stack_invariants))
+
+FUNCTION(G(caml_init_gc_entrypoints))
+CFI_STARTPROC
+        ENTER_FUNCTION
+#define Init_one(name, simd, vec) \
+        leaq LBL(name ## simd)(%rip), %rax; \
+        movq %rax, (8*domain_field_caml_##name##vec)(C_ARG_1)
+#define Init(name) \
+        Init_one(name, ,); \
+        Init_one(name, _sse, _simd0); \
+        Init_one(name, _avx, _simd1); \
+        Init_one(name, _avx512, _simd2)
+        Init(caml_call_gc)
+        Init(caml_alloc1)
+        Init(caml_alloc2)
+        Init(caml_alloc3)
+        Init(caml_allocN)
+        Init(caml_call_realloc_stack)
+        Init(caml_call_local_realloc)
+#undef  Init
+#undef  Init_one
+        LEAVE_FUNCTION
+        ret
+CFI_ENDPROC
+ENDFUNCTION(G(caml_init_gc_entrypoints))
 
         TEXT_SECTION(caml_system__code_end)
         .globl  G(caml_system__code_end)

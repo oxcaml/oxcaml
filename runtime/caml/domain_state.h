@@ -25,6 +25,8 @@
 #define NUM_EXTRA_PARAMS 64
 typedef value extra_params_area[NUM_EXTRA_PARAMS];
 
+typedef void (*caml_gc_entrypoint)(void);
+
 /* This structure sits in the TLS area and is also accessed efficiently
  * via native code, which is why the indices are important */
 typedef struct {

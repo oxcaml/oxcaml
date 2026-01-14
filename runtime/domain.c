@@ -692,6 +692,11 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->young_ptr = NULL;
   domain_state->young_trigger = NULL;
 
+#ifdef NATIVE_CODE
+  extern void caml_init_gc_entrypoints(caml_domain_state*);
+  caml_init_gc_entrypoints(domain_state);
+#endif
+
   domain_state->minor_tables = caml_alloc_minor_tables();
   if(domain_state->minor_tables == NULL) {
     goto fail_minor_tables;
