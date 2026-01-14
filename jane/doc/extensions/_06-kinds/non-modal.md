@@ -32,12 +32,12 @@ Writes of types with non-`value` (i.e. unboxed) base layouts never require a
 write barrier, as values of such types must never be seen by the garbage
 collector. However, since externality is tracked as a non-modal property of
 kinds, as opposed to part of its layout, it is possible to express types with
-layout e.g. `float64` which do not cross externality. This is very rarely
-desirable; it is typically far more convenient to preserve externality-crossing
-information than it is to enforce some semantic property of an unboxed type by
-hiding it. For this reason, the kinds `bits8`, `bits16`, `bits32`, `bits64`,
-`float32`, `float64`, `untagged_immediate`, `vec128`, `vec256`, `vec512`,
-`void`, and `word` all imply `mod external_` by default.
+layout e.g. `float64` which are not external. This is very rarely desirable; it
+is typically far more convenient to preserve externality information than it is
+to enforce some semantic property of an unboxed type by hiding it. For this
+reason, the kinds `bits8`, `bits16`, `bits32`, `bits64`, `float32`, `float64`,
+`untagged_immediate`, `vec128`, `vec256`, `vec512`, `void`, and `word` all imply
+`mod external_` by default.
 
 To refer to the kinds of these base layouts _without_ externality crossing, one
 may append the suffix `_internal`, e.g. `bits8_internal`. In other words,
