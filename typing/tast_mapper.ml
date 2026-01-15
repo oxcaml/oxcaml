@@ -211,7 +211,7 @@ let label_decl sub x =
 let field_decl sub x =
   let ca_type = sub.typ sub x.ca_type in
   let ca_loc = sub.location sub x.ca_loc in
-  { ca_type; ca_loc; ca_modalities = x.ca_modalities }
+  { ca_type; ca_loc; ca_modalities = x.ca_modalities; ca_modalities_annot = x.ca_modalities_annot }
 
 let constructor_args sub = function
   | Cstr_tuple l -> Cstr_tuple (List.map (field_decl sub) l)
@@ -294,7 +294,7 @@ let pat_extra sub = function
   | Tpat_type (path,loc) -> Tpat_type (path, map_loc sub loc)
   | Tpat_open (path,loc,env) ->
       Tpat_open (path, map_loc sub loc, sub.env sub env)
-  | Tpat_constraint ct -> Tpat_constraint (sub.typ sub ct)
+  | Tpat_constraint (ct, ma) -> Tpat_constraint (sub.typ sub ct, ma)
   | Tpat_inspected_type (Label_disambiguation _) as d -> d
   | Tpat_inspected_type Polymorphic_parameter as d -> d
 
@@ -355,6 +355,7 @@ let function_param sub
       fp_newtypes;
       fp_sort;
       fp_mode;
+      fp_modes_annot;
       fp_loc;
     }
   =
@@ -382,6 +383,7 @@ let function_param sub
     fp_newtypes;
     fp_sort;
     fp_mode;
+    fp_modes_annot;
     fp_loc;
   }
 
@@ -490,11 +492,11 @@ let expr sub x =
         Texp_let (rec_flag, list, sub.expr sub exp)
     | Texp_letmutable (vb, exp) ->
         Texp_letmutable (sub.value_binding sub vb, sub.expr sub exp)
-    | Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
+    | Texp_function { params; body; alloc_mode; ret_mode; ret_modes_annot; ret_sort;
                       zero_alloc } ->
         let params = List.map (function_param sub) params in
         let body = function_body sub body in
-        Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
+        Texp_function { params; body; alloc_mode; ret_mode; ret_modes_annot; ret_sort;
                         zero_alloc }
     | Texp_apply (exp, list, pos, am, za) ->
         Texp_apply (
@@ -731,8 +733,8 @@ let signature_item sub x =
         Tsig_modtype (sub.module_type_declaration sub x)
     | Tsig_modtypesubst x ->
         Tsig_modtypesubst (sub.module_type_declaration sub x)
-    | Tsig_include (incl, moda) ->
-        Tsig_include (sig_include_infos sub incl, moda)
+    | Tsig_include (incl, moda, annot) ->
+        Tsig_include (sig_include_infos sub incl, moda, annot)
     | Tsig_class list ->
         Tsig_class (List.map (sub.class_description sub) list)
     | Tsig_class_type list ->
@@ -834,11 +836,11 @@ let module_expr sub x =
     | Tmod_constraint (mexpr, mt, Tmodtype_implicit, c) ->
         Tmod_constraint (sub.module_expr sub mexpr, mt, Tmodtype_implicit,
                          sub.module_coercion sub c)
-    | Tmod_constraint (mexpr, mt, Tmodtype_explicit mtype, c) ->
+    | Tmod_constraint (mexpr, mt, Tmodtype_explicit (mtype, annot), c) ->
         Tmod_constraint (
           sub.module_expr sub mexpr,
           mt,
-          Tmodtype_explicit (sub.module_type sub mtype),
+          Tmodtype_explicit (sub.module_type sub mtype, annot),
           sub.module_coercion sub c
         )
     | Tmod_unpack (exp, mty) ->
@@ -962,8 +964,8 @@ let typ sub x =
     | (Ttyp_var (_,None) | Ttyp_call_pos) as d -> d
     | Ttyp_var (s, Some jkind) ->
         Ttyp_var (s, Some (sub.jkind_annotation sub jkind))
-    | Ttyp_arrow (label, ct1, ct2) ->
-        Ttyp_arrow (label, sub.typ sub ct1, sub.typ sub ct2)
+    | Ttyp_arrow (label, ct1, annot1, ct2, annot2) ->
+        Ttyp_arrow (label, sub.typ sub ct1, annot1, sub.typ sub ct2, annot2)
     | Ttyp_tuple list ->
         Ttyp_tuple (List.map (fun (label, t) -> label, sub.typ sub t) list)
     | Ttyp_unboxed_tuple list ->
@@ -1068,7 +1070,7 @@ let value_binding sub x =
   let vb_expr = sub.expr sub x.vb_expr in
   let vb_attributes = sub.attributes sub x.vb_attributes in
   let vb_rec_kind = x.vb_rec_kind in
-  {vb_loc; vb_pat; vb_expr; vb_attributes; vb_sort = x.vb_sort; vb_rec_kind}
+  {vb_loc; vb_pat; vb_expr; vb_attributes; vb_sort = x.vb_sort; vb_rec_kind; vb_modes_annot = x.vb_modes_annot}
 
 let env _sub x = x
 

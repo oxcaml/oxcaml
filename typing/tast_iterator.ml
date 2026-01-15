@@ -244,7 +244,7 @@ let pat_extra sub (e, loc, attrs) =
   | Tpat_type (_, lid) -> iter_loc sub lid
   | Tpat_unpack -> ()
   | Tpat_open (_, lid, env) -> iter_loc sub lid; sub.env sub env
-  | Tpat_constraint ct -> sub.typ sub ct
+  | Tpat_constraint (ct, _) -> sub.typ sub ct
   | Tpat_inspected_type (Label_disambiguation _) -> ()
   | Tpat_inspected_type Polymorphic_parameter -> ()
 
@@ -514,7 +514,7 @@ let signature_item sub {sig_loc; sig_desc; sig_env; _} =
   | Tsig_recmodule list -> List.iter (sub.module_declaration sub) list
   | Tsig_modtype x -> sub.module_type_declaration sub x
   | Tsig_modtypesubst x -> sub.module_type_declaration sub x
-  | Tsig_include (incl, _) -> sig_include_infos sub incl
+  | Tsig_include (incl, _, _) -> sig_include_infos sub incl
   | Tsig_class list -> List.iter (sub.class_description sub) list
   | Tsig_class_type list -> List.iter (sub.class_type_declaration sub) list
   | Tsig_open od -> sub.open_description sub od
@@ -601,7 +601,7 @@ let module_expr sub {mod_loc; mod_desc; mod_env; mod_attributes; _} =
   | Tmod_constraint (mexpr, _, Tmodtype_implicit, c) ->
       sub.module_expr sub mexpr;
       sub.module_coercion sub c
-  | Tmod_constraint (mexpr, _, Tmodtype_explicit mtype, c) ->
+  | Tmod_constraint (mexpr, _, Tmodtype_explicit (mtype, _), c) ->
       sub.module_expr sub mexpr;
       sub.module_type sub mtype;
       sub.module_coercion sub c
@@ -683,7 +683,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   match ctyp_desc with
   | Ttyp_var (_, jkind) ->
       Option.iter (sub.jkind_annotation sub) jkind
-  | Ttyp_arrow (_, ct1, ct2) ->
+  | Ttyp_arrow (_, ct1, _, ct2, _) ->
       sub.typ sub ct1;
       sub.typ sub ct2
   | Ttyp_tuple list -> List.iter (fun (_, t) -> sub.typ sub t) list

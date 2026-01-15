@@ -1270,12 +1270,14 @@ and apply_modalities_module_type env modalities = function
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
   match modalities with
-  | [] -> default_modalities
+  | [] -> default_modalities, []
   | _ :: _ ->
     Typemode.transl_modalities ~maturity:Stable Immutable modalities
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
-  let modalities = transl_modalities ~default_modalities pmd_modalities in
+  let modalities, modalities_annot =
+    transl_modalities ~default_modalities pmd_modalities
+  in
   (*
   Workaround for pmd_modalities
 
@@ -1297,10 +1299,11 @@ let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
   We still don't support [pmd_modalities] on functors.
   *)
   match Mode.Modality.Const.is_id modalities with
-  | true -> mty, Mode.Modality.(Const.id |> of_const)
+  | true -> mty, Mode.Modality.(Const.id |> of_const), modalities_annot
   | false ->
       apply_modalities_module_type env modalities mty,
-      Mode.Modality.(Const.id |> of_const)
+      Mode.Modality.(Const.id |> of_const),
+      modalities_annot
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
@@ -1328,7 +1331,7 @@ let rec approx_modtype env smty =
         match param with
         | Unit -> Types.Unit, env
         | Named (param, sarg, marg) ->
-          let _, marg = Typemode.transl_alloc_mode marg in
+          let marg, _ = Typemode.transl_alloc_mode marg in
           let marg = Alloc.of_const marg in
           let arg = approx_modtype env sarg in
           match param.txt with
@@ -1343,7 +1346,7 @@ let rec approx_modtype env smty =
             Types.Named (Some id, arg, marg), newenv
       in
       let res = approx_modtype newenv sres in
-      let _, mres = Typemode.transl_alloc_mode mres in
+      let mres, _ = Typemode.transl_alloc_mode mres in
       let mres = Alloc.of_const mres in
       Mty_functor(param, res, mres)
   | Pmty_with(sbody, constraints) ->
@@ -1493,7 +1496,7 @@ and approx_sig_items env ssg=
                 match moda with
                 | [] -> sg
                 | _ ->
-                  let modalities =
+                  let modalities, _ =
                     Typemode.transl_modalities ~maturity:Stable Immutable moda
                   in
                   let recursive =
@@ -1903,13 +1906,13 @@ and transl_modtype_aux env smty =
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
   | Pmty_functor(sarg_opt, sres, mres) ->
-      let tmres, mres = Typemode.transl_alloc_mode mres in
+      let mres, tmres = Typemode.transl_alloc_mode mres in
       let mres = mres |> Alloc.of_const in
       let t_arg, ty_arg, newenv =
         match sarg_opt with
         | Unit -> Unit, Types.Unit, env
         | Named (param, sarg, marg) ->
-          let tmarg, marg = Typemode.transl_alloc_mode marg in
+          let marg, tmarg = Typemode.transl_alloc_mode marg in
           let marg = marg |> Alloc.of_const in
           let mode = marg |> alloc_as_value in
           let arg = transl_modtype_functor_arg env sarg in
@@ -2026,7 +2029,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
   (* CR-soon zqian: make it a parameter instead *)
   let md_mode = Value.legacy in
 
-  let sig_modalities = transl_modalities psg_modalities in
+  let sig_modalities, sig_modalities_annot = transl_modalities psg_modalities in
 
   let transl_include ~loc env sig_acc sincl modalities =
     let smty = sincl.pincl_mod in
@@ -2055,7 +2058,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       | Structure ->
         Tincl_structure, extract_sig env smty.pmty_loc mty
     in
-    let modalities =
+    let modalities, modalities_annot =
       transl_modalities ~default_modalities:sig_modalities modalities
     in
     let recursive =
@@ -2081,7 +2084,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         incl_loc = sincl.pincl_loc;
       }
     in
-    mksig (Tsig_include (incl, modalities)) env loc, sg, newenv
+    mksig (Tsig_include (incl, modalities, modalities_annot)) env loc, sg, newenv
   in
 
   let transl_sig_item env sig_acc item =
@@ -2165,7 +2168,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env pmd.pmd_type)
         in
-        let mty_type, md_modalities =
+        let mty_type, md_modalities, md_modalities_annot =
           apply_pmd_modalities env ~default_modalities:sig_modalities
             pmd.pmd_modalities tmty.mty_type
         in
@@ -2199,6 +2202,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
                               md_uid=md.md_uid; md_presence=pres;
                               md_type=tmty;
                               md_modalities=md.md_modalities;
+                              md_modalities_annot;
                               md_loc=pmd.pmd_loc;
                               md_attributes=pmd.pmd_attributes})
             env loc
@@ -2391,7 +2395,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
        let rem = Signature_names.simplify final_env names rem in
        let sg =
          { sig_items = trem; sig_type = rem; sig_final_env = final_env;
-           sig_modalities; sig_sloc = psg_loc }
+           sig_modalities; sig_modalities_annot; sig_sloc = psg_loc }
        in
        Cmt_format.set_saved_types
          ((Cmt_format.Partial_signature sg) :: previous_saved_types);
@@ -2446,7 +2450,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env_c pmd.pmd_type)
         in
-        let mty_type, md_modalities =
+        let mty_type, md_modalities, _ =
           apply_pmd_modalities env ~default_modalities:sig_modalities
             pmd.pmd_modalities tmty.mty_type
         in
@@ -2481,7 +2485,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.map2
       (fun id (pmd, smmode) ->
          let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
-         let md_type, md_modalities =
+         let md_type, md_modalities, _ =
           approx_modtype (approx_env pmd.pmd_name.txt) pmd.pmd_type
           |> apply_pmd_modalities env ~default_modalities:sig_modalities
               pmd.pmd_modalities
@@ -2500,6 +2504,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
            Option.map (fun smmode ->
             smmode
             |> Typemode.transl_mode_annots
+            |> fst
             (* CR zqian: mode annotations on rec modules default to legacy for
             now. We can remove this workaround once [module type of] doesn't
             require zapping. *)
@@ -2531,6 +2536,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
       let tmd =
         {md_id=Option.map fst id_shape; md_name=id_loc; md_type=mty;
          md_modalities = md.Types.md_modalities;
+         md_modalities_annot = [];
          md_uid=md.Types.md_uid; md_presence=Mp_present;
          md_loc=pmd.pmd_loc;
          md_attributes=pmd.pmd_attributes}
@@ -2759,7 +2765,7 @@ let check_recmodule_inclusion env bindings =
             raise(Error(modl.mod_loc, env, Not_included msg)) in
         let modl' =
             { mod_desc = Tmod_constraint(modl, mty_decl.mty_type,
-                Tmodtype_explicit mty_decl, coercion);
+                Tmodtype_explicit (mty_decl, []), coercion);
               mod_type = mty_decl.mty_type;
               mod_mode = Value.disallow_right mode_decl, None;
               mod_env = env;
@@ -2971,7 +2977,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
           Unit, Types.Unit, newenv, Shape.for_unnamed_functor_param, false
         | Named (param, smty, smode) ->
           (* unspecified mode axes defaults to legacy *)
-          let smode, mode = Typemode.transl_alloc_mode smode in
+          let mode, smode = Typemode.transl_alloc_mode smode in
           let mode = Alloc.of_const mode in
           let mty = transl_modtype_functor_arg env smty in
           let scope = Ctype.create_scope () in
@@ -3018,10 +3024,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
   | Pmod_constraint(sarg, smty, smode) ->
       (* Only hold locks if coercion *)
       let hold_locks = Option.is_some smty in
-      let mode = smode
-        |> Typemode.transl_mode_annots
-        |> new_mode_var_from_annots
-      in
+      let mode, modes_annot = Typemode.transl_mode_annots smode in
+      let mode = new_mode_var_from_annots mode in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
           anchor env ~expected_mode:(mode |> Value.disallow_left) sarg
@@ -3041,7 +3045,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         | Some smty ->
             let mty = transl_modtype env smty in
             wrap_constraint_with_shape env true arg mty.mty_type mode
-              arg_shape (Tmodtype_explicit mty)
+              arg_shape (Tmodtype_explicit (mty, modes_annot))
       in
       { md with
         mod_loc = smod.pmod_loc;

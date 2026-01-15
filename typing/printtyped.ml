@@ -270,6 +270,28 @@ let attributes i ppf l =
 let jkind_annotation i ppf jkind =
   line i ppf "%a" Pprintast.jkind_annotation jkind
 
+let modes_annot i ppf modes_annot =
+  let print_mode_annot i ppf { txt = (Atom (ax, mode) : Mode.Alloc.atom); loc = _ } =
+    let (module Axis) = Mode.Alloc.Axis.get ax in
+    line i ppf "%a: %a\n" Mode.Alloc.Axis.print ax Axis.print mode
+  in
+  list i print_mode_annot ppf modes_annot
+
+let modalities_annot i ppf modalities_annot =
+  let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.Value.atom =
+    match ax, modality with
+    | Comonadic ax, Meet_with mode -> Atom (Comonadic ax, mode)
+    | Monadic ax, Join_with mode -> Atom (Monadic ax, mode)
+  in
+  let as_modes_annot =
+    List.map (Location.map modality_as_mode) modalities_annot
+  in
+  let print_mode_annot i ppf { txt = (Atom (ax, mode) : Mode.Value.atom); loc = _ } =
+    let (module Axis) = Mode.Value.Axis.get ax in
+    line i ppf "%a: %a\n" Mode.Value.Axis.print ax Axis.print mode
+  in
+  list i print_mode_annot ppf as_modes_annot
+
 let zero_alloc_assume i ppf : Zero_alloc.assume -> unit = function
     { strict; never_returns_normally; never_raises; arity; loc = _ } ->
     line i ppf "assume_zero_alloc arity=%d%s%s%s\n"
@@ -286,11 +308,13 @@ let rec core_type i ppf x =
   | Ttyp_var (s, jkind) ->
       line i ppf "Ttyp_var %s\n" (Option.value ~default:"_" s);
       option i jkind_annotation ppf jkind
-  | Ttyp_arrow (l, ct1, ct2) ->
+  | Ttyp_arrow (l, ct1, modes1, ct2, modes2) ->
       line i ppf "Ttyp_arrow\n";
       arg_label i ppf l;
       core_type i ppf ct1;
+      modes_annot i ppf modes1;
       core_type i ppf ct2;
+      modes_annot i ppf modes2;
   | Ttyp_tuple l ->
       line i ppf "Ttyp_tuple\n";
       list i labeled_core_type ppf l;
@@ -439,10 +463,11 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
   | Tpat_unpack ->
      line i ppf "Tpat_extra_unpack\n";
      attributes i ppf attrs;
-  | Tpat_constraint cty ->
+  | Tpat_constraint (cty, modes) ->
      line i ppf "Tpat_extra_constraint\n";
      attributes i ppf attrs;
      core_type i ppf cty;
+     modes_annot i ppf modes;
   | Tpat_type (id, _) ->
      line i ppf "Tpat_extra_type %a\n" fmt_path id;
      attributes i ppf attrs;
@@ -494,10 +519,11 @@ and expression_extra i ppf x attrs =
   | Texp_stack ->
       line i ppf "Texp_stack\n";
       attributes i ppf attrs
-  | Texp_mode m ->
+  | Texp_mode (m, modes) ->
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;
-      alloc_const_option_mode i ppf m
+      alloc_const_option_mode i ppf m;
+      modes_annot i ppf modes;
   | Texp_inspected_type ti ->
       line i ppf "Texp_inspected_type\n";
       attributes i ppf attrs;
@@ -1007,16 +1033,16 @@ and module_type i ppf x =
   | Tmty_signature (s) ->
       line i ppf "Tmty_signature\n";
       signature i ppf s;
-  | Tmty_functor (Unit, mt2, mm2) ->
+  | Tmty_functor (Unit, mt2, ma2) ->
       line i ppf "Tmty_functor ()\n";
       module_type i ppf mt2;
-      alloc_const_option_mode i ppf mm2
-  | Tmty_functor (Named (s, _, mt1, mm1), mt2, mm2) ->
+      modes_annot i ppf ma2;
+  | Tmty_functor (Named (s, _, mt1, ma1), mt2, ma2) ->
       line i ppf "Tmty_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt1;
-      alloc_const_option_mode i ppf mm1;
+      modes_annot i ppf ma1;
       module_type i ppf mt2;
-      alloc_const_option_mode i ppf mm2
+      modes_annot i ppf ma2;
   | Tmty_with (mt, l) ->
       line i ppf "Tmty_with\n";
       module_type i ppf mt;
@@ -1029,7 +1055,9 @@ and module_type i ppf x =
     module_type i ppf mt;
     line i ppf "%a\n" fmt_path li;
 
-and signature i ppf x = list i signature_item ppf x.sig_items
+and signature i ppf x =
+  list i signature_item ppf x.sig_items;
+  modalities_annot i ppf x.sig_modalities_annot
 
 and signature_item i ppf x =
   line i ppf "signature_item %a\n" fmt_location x.sig_loc;
@@ -1074,10 +1102,11 @@ and signature_item i ppf x =
         fmt_override_flag od.open_override
         fmt_path (fst od.open_expr);
       attributes i ppf od.open_attributes
-  | Tsig_include (incl, _) ->
+  | Tsig_include (incl, _, modalities) ->
       line i ppf "Tsig_include\n";
       attributes i ppf incl.incl_attributes;
-      module_type i ppf incl.incl_mod
+      module_type i ppf incl.incl_mod;
+      modalities_annot i ppf modalities;
   | Tsig_class (l) ->
       line i ppf "Tsig_class\n";
       list i class_description ppf l;
@@ -1130,11 +1159,11 @@ and module_expr i ppf x =
   | Tmod_functor (Unit, me) ->
       line i ppf "Tmod_functor ()\n";
       module_expr i ppf me;
-  | Tmod_functor (Named (s, _, mt, mm), me) ->
+  | Tmod_functor (Named (s, _, mt, ma), me) ->
       line i ppf "Tmod_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt;
-      alloc_const_option_mode i ppf mm;
       module_expr i ppf me;
+      modes_annot i ppf ma;
   | Tmod_apply (me1, me2, _) ->
       line i ppf "Tmod_apply\n";
       module_expr i ppf me1;
@@ -1142,10 +1171,11 @@ and module_expr i ppf x =
   | Tmod_apply_unit me1 ->
       line i ppf "Tmod_apply_unit\n";
       module_expr i ppf me1;
-  | Tmod_constraint (me, _, Tmodtype_explicit mt, _) ->
+  | Tmod_constraint (me, _, Tmodtype_explicit (mt, modes), _) ->
       line i ppf "Tmod_constraint\n";
       module_expr i ppf me;
       module_type i ppf mt;
+      modes_annot i ppf modes;
   | Tmod_constraint (me, _, Tmodtype_implicit, _) -> module_expr i ppf me
   | Tmod_unpack (e, _) ->
       line i ppf "Tmod_unpack\n";
