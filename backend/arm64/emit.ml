@@ -131,8 +131,10 @@ let slot_offset loc stack_class =
   | Bytes_relative_to_domainstate_pointer _ ->
     Misc.fatal_errorf "Not a stack slot"
 
-(* Local wrapper for stack that provides the emit.ml-local refs *)
-let stack r = H.stack ~stack_offset ~contains_calls ~num_stack_slots r
+(* Local wrapper for stack that provides the emit.ml-local values *)
+let stack r =
+  H.stack ~stack_offset:!stack_offset ~contains_calls:!contains_calls
+    ~num_stack_slots r
 
 (* Convenience functions for symbols and labels *)
 let symbol ?offset reloc s = O.symbol (Ast.Symbol.create_symbol reloc ?offset s)

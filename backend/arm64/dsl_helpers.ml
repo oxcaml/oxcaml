@@ -201,8 +201,8 @@ let addressing addr r =
 let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
   let slot_offset loc stack_class =
     let offset =
-      Proc.slot_offset loc ~stack_class ~stack_offset:!stack_offset
-        ~fun_contains_calls:!contains_calls ~fun_num_stack_slots:num_stack_slots
+      Proc.slot_offset loc ~stack_class ~stack_offset
+        ~fun_contains_calls:contains_calls ~fun_num_stack_slots:num_stack_slots
     in
     match offset with
     | Bytes_relative_to_stack_pointer n -> n

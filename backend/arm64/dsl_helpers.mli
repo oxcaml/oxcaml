@@ -149,13 +149,10 @@ val addressing :
   Reg.t ->
   [`Mem of [> `Offset_imm | `Offset_unscaled | `Offset_sym]] Ast.Operand.t
 
-(** [stack] returns a memory operand for accessing a stack slot. The
-    [stack_offset] and [contains_calls] parameters are refs because their values
-    are computed during emission and may change. The refs are dereferenced when
-    this function is called. *)
+(** [stack] returns a memory operand for accessing a stack slot. *)
 val stack :
-  stack_offset:int ref ->
-  contains_calls:bool ref ->
+  stack_offset:int ->
+  contains_calls:bool ->
   num_stack_slots:int Stack_class.Tbl.t ->
   Reg.t ->
   [`Mem of [> `Offset_imm | `Offset_unscaled]] Ast.Operand.t
