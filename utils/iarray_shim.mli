@@ -1,4 +1,4 @@
-type 'a iarray
+type 'a iarray = 'a array
 
 val (.:()) : 'a iarray -> int -> 'a
 
@@ -35,4 +35,5 @@ module Iarray : sig
     ('acc -> 'a -> 'acc * 'b) -> 'acc -> 'a iarray -> 'acc * 'b iarray
 
   val split : ('a * 'b) t -> 'a t * 'b t
+  val combine : 'a t -> 'b t -> ('a * 'b) t
 end

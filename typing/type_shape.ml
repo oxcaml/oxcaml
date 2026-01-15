@@ -387,7 +387,8 @@ module Type_decl_shape = struct
     let constructor_repr : Types.constructor_representation =
       match arg_layout with
       | Some (constructor_repr, _) -> constructor_repr
-      | None -> failwith "TODO after merge"
+      | None ->
+        failwith "TODO after merge: Type_decl_shape.of_complex_constructor 1"
     in
     let args =
       match cstr_args.cd_args with
@@ -398,7 +399,9 @@ module Type_decl_shape = struct
             let type_layout =
               match type_layout with
               | Some type_layout -> type_layout
-              | None -> failwith "TODO after merge"
+              | None ->
+                failwith
+                  "TODO after merge: Type_decl_shape.of_complex_constructor 2"
             in
             { Shape.field_name = None;
               field_uid = None;
@@ -414,7 +417,9 @@ module Type_decl_shape = struct
             let sort =
               match lbl.ld_sort with
               | Some sort -> sort
-              | None -> failwith "TODO after merge"
+              | None ->
+                failwith
+                  "TODO after merge: Type_decl_shape.of_complex_constructor 3"
             in
             { Shape.field_name = Some (Ident.name lbl.ld_id);
               field_uid = Some lbl.ld_uid;
@@ -483,7 +488,7 @@ module Type_decl_shape = struct
            let sort =
              match lbl.ld_sort with
              | Some sort -> sort
-             | None -> failwith "TODO after merge"
+             | None -> failwith "TODO after merge: record_of_labels"
            in
            ( Ident.name lbl.ld_id,
              Some lbl.ld_uid,
@@ -539,7 +544,8 @@ module Type_decl_shape = struct
           let layout =
             match layout with
             | Some layout -> layout
-            | None -> failwith "TODO after merge"
+            | None ->
+              failwith "TODO after merge: of_type_declaration_go/Type_variant"
           in
           Shape.variant_unboxed ~variant_uid:(Some cstr_uid) ~arg_uid:field_uid
             name field_name
@@ -590,7 +596,8 @@ module Type_decl_shape = struct
                  [Foo { a : int; b : int }], then [r] is an inline record in \
                  [match e with Foo r -> ...]."
             else unknown_shape
-          | None -> failwith "TODO after merge")
+          | None ->
+            failwith "TODO after merge: of_type_declaration_go/Type_record")
         | Type_abstract _ -> unknown_shape
         | Type_open -> unknown_shape
         | Type_record_unboxed_product (lbl_list, _, _) ->

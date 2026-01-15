@@ -240,18 +240,9 @@ val instance_label:
         (* Same, for a label *)
 val instance_labels:
         fixed:bool ->
-        _ gen_label_description list ->
-        type_expr ->
-        (type_expr list * type_expr) list * type_expr
+        _ gen_label_description iarray ->
+        (type_expr list * type_expr) iarray * type_expr
         (* Same, for a whole list of labels *)
-val instance_label_update:
-        fixed:bool -> 'a gen_label_description -> 'a gen_label_description
-        (* Take an instance of a label, updating the label data *)
-val instance_labels_update:
-        fixed:bool ->
-        'a gen_label_description iarray ->
-        'a gen_label_description iarray
-        (* Same, for a whole iarray of labels *)
 val prim_mode :
         (Mode.allowed * 'r) Mode.Locality.t option -> (Primitive.mode * Primitive.native_repr)
         -> (Mode.allowed * 'r) Mode.Locality.t
@@ -763,6 +754,12 @@ val check_and_update_generalized_ty_jkind :
 (* False if running in principal mode and the type is not principal.
    True otherwise. *)
 val is_principal : type_expr -> bool
+
+(* XXX Probably delete this *)
+
+(* False if running in principal mode and the type is a non-principal
+   variable. True otherwise. *)
+val is_structurally_principal : type_expr -> bool
 
 (* For use with ocamldebug *)
 type global_state

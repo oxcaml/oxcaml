@@ -1476,7 +1476,8 @@ let layout_of_ty_for_idx_set env loc ty =
   let mbe =
     match mbe with
     | Some mbe -> mbe
-    | None -> failwith "TODO after merge"
+    | None ->
+      Misc.fatal_errorf "layout_of_ty_for_idx_set %a" Printtyp.type_expr ty
   in
   let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
   let context = Ctype.mk_jkind_context_check_principal env in

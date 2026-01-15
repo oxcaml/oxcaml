@@ -3507,3 +3507,5 @@ let tree_of_type_declaration ident td rs =
 let () = Btype.printtyp_type_expr_fwd := raw_type_expr
 
 let () = type_expr_fwd := raw_type_expr
+
+let () = Types.print_type_fwd := raw_type_expr

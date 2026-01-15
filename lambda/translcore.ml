@@ -659,7 +659,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let repres =
         match lbl.lbl_repres with
         | Some repres -> repres
-        | None -> failwith "TODO after merge"
+        | None -> failwith "TODO after merge: Texp_atomic_loc"
       in
       let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl repres in
       let loc = of_location ~scopes e.exp_loc in
@@ -2050,8 +2050,7 @@ and transl_setinstvar ~scopes loc self var expr =
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
 and transl_record ~scopes loc env mode fields repres opt_init_expr =
   begin match Sys.getenv_opt "NOISY" with
-  | None -> ()
-  | Some _ ->
+  | Some "please" ->
     let pp_mode ppf (mode : locality_mode option) =
       let open Format in
       match mode with
@@ -2063,6 +2062,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       pp_mode mode
       (Printtyped.record_representation 0) repres
       Location.print_loc loc
+  | _ -> ()
   end;
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
@@ -2399,7 +2399,7 @@ and transl_idx ~scopes loc env ba uas =
       let base_sort =
         match base_sort with
         | Some base_sort -> base_sort
-        | None -> failwith "TODO after merge"
+        | None -> failwith "TODO after merge: Uaccess_unboxed_field"
       in
       (* CR layouts v8: this might unnecessarily compute the value kind, which
          shouldn't be needed for deepening *)
@@ -2412,7 +2412,7 @@ and transl_idx ~scopes loc env ba uas =
     let repres =
       match lbl.lbl_repres with
       | Some repres -> repres
-      | None -> failwith "TODO after merge"
+      | None -> failwith "TODO after merge: Baccess_field"
     in
     begin match repres with
     | Record_boxed _

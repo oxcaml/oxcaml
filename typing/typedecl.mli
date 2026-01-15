@@ -81,15 +81,9 @@ type unrepresentable_record =
 
 val update_record_representation:
     Env.t -> Location.t -> 'rep Types.record_form ->
-    Types.label_declaration list ->
+    (Types.label_declaration * Types.type_expr) list ->
     'rep option ->
-    Types.label_declaration list * ('rep, unrepresentable_record) Result.t
-
-val update_record_representation_in_label_descriptions:
-    Env.t -> Location.t -> 'rep Types.record_form ->
-    'rep Types.gen_label_description list ->
-    'rep option ->
-    'rep Types.gen_label_description list * ('rep, unrepresentable_record) Result.t
+    (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
 
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option

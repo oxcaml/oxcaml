@@ -877,7 +877,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       let all_void_opt sort =
         match sort with
         | Some sort -> Jkind.Sort.Const.all_void sort
-        | None -> failwith "TODO after merge"
+        | None -> (* TODO Nicely handle [any] things resolving to void *) false
       in
       match cstr.cd_args with
       | Cstr_tuple [] -> true

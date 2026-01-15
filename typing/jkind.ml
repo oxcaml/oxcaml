@@ -2576,42 +2576,51 @@ let jkind_of_mutability mutability ~why =
 let all_void_sort_option sort =
   match sort with Some sort -> Sort.Const.all_void sort | None -> false
 
+let all_void_labels_with_updates lbls_updated =
+  List.for_all (fun (_, _, sort) -> all_void_sort_option sort) lbls_updated
+
 let all_void_labels lbls =
-  List.for_all
-    (fun (lbl : Types.label_declaration) -> all_void_sort_option lbl.ld_sort)
-    lbls
+  List.for_all (fun lbl -> all_void_sort_option lbl.ld_sort) lbls
 
 let add_labels_as_with_bounds lbls jkind =
   List.fold_right
-    (fun (lbl : Types.label_declaration) ->
-      add_with_bounds ~type_expr:lbl.ld_type ~modality:lbl.ld_modalities)
+    (fun ((lbl : Types.label_declaration), ld_type, _sort) ->
+      add_with_bounds ~type_expr:ld_type ~modality:lbl.ld_modalities)
     lbls jkind
 
-let for_boxed_record lbls =
-  if all_void_labels lbls
+let for_boxed_record_with_updates lbls =
+  if all_void_labels_with_updates lbls
   then Builtin.immediate ~why:Empty_record
   else
     let base =
       lbls
-      |> List.map (fun (ld : Types.label_declaration) -> ld.ld_mutable)
+      |> List.map (fun ((ld : Types.label_declaration), _, _) -> ld.ld_mutable)
       |> List.fold_left combine_mutability Immutable
       |> jkind_of_mutability ~why:Boxed_record
       |> mark_best
     in
     add_labels_as_with_bounds lbls base
 
-let for_unboxed_record lbls =
+let for_boxed_record lbls =
+  for_boxed_record_with_updates
+    (List.map (fun lbl -> lbl, lbl.ld_type, lbl.ld_sort) lbls)
+
+let for_unboxed_record_with_updates lbls =
   let open Types in
   let tys_modalities =
-    List.map (fun lbl -> lbl.ld_type, lbl.ld_modalities) lbls
+    List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
   in
   let layouts =
     List.map
-      (fun lbl ->
-        lbl.ld_sort |> Layout.Const.of_sort_const_option |> Layout.of_const)
+      (fun (_, _, ld_sort) ->
+        ld_sort |> Layout.Const.of_sort_const_option |> Layout.of_const)
       lbls
   in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
+
+let for_unboxed_record lbls =
+  for_unboxed_record_with_updates
+    (List.map (fun lbl -> lbl, lbl.ld_type, lbl.ld_sort) lbls)
 
 let for_non_float ~(why : History.value_creation_reason) =
   let mod_bounds =
@@ -2718,7 +2727,9 @@ let for_boxed_variant ~loc cstrs =
           (fun arg ->
             add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
           args jkind
-      | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
+      | Cstr_record lbls ->
+        let lbls = List.map (fun lbl -> lbl, lbl.ld_type, lbl.ld_sort) lbls in
+        add_labels_as_with_bounds lbls jkind
     in
     List.fold_right add_cstr_args cstrs base
 

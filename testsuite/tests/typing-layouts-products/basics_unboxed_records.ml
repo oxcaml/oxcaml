@@ -738,7 +738,7 @@ Error: This definition has type "'b -> 'b t" which is less general than
          "('a : any). 'a -> 'a t"
        The layout of 'a is any
          because of the annotation on the universal variable 'a.
-       But the layout of 'a must be a sublayout of value
+       But the layout of 'a must be representable
          because we must know concretely how to pass a function argument.
 |}]
 

@@ -1730,55 +1730,16 @@ let instance_label' copy_scope ~fixed lbl =
 let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope -> instance_label' copy_scope ~fixed lbl)
 
-let instance_labels ~fixed lbls ty_res =
+let instance_labels ~fixed lbls =
   For_copy.with_scope (fun copy_scope ->
     let vars_and_ty_args =
-      List.map
+      Iarray.map
         (fun lbl -> instance_label_type' copy_scope ~fixed lbl.lbl_arg)
         lbls
     in
-    let ty_res = copy copy_scope ty_res in
+    let ty_res = copy copy_scope lbls.:(0).lbl_res in
     (vars_and_ty_args, ty_res)
   )
-
-let instance_label_update' copy_scope ~fixed ~all lbl =
-  let _, ty_arg, ty_res = instance_label' copy_scope ~fixed lbl in
-  { lbl with lbl_arg = ty_arg; lbl_res = ty_res; lbl_all = all }
-
-let instance_all_labels_update ~fixed lbls =
-  begin fun f ->
-    if false && Sys.getenv_opt "NOISY" |> Option.is_some then begin
-      let pp_lbl ppf lbl =
-        Format.fprintf ppf "%s : %a" lbl.lbl_name !Btype.printtyp_type_expr_fwd lbl.lbl_arg
-      in
-      let pp_lbls ppf lbls =
-        Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@.")
-          pp_lbl ppf (lbls |> Iarray.to_list)
-      in
-      Format.eprintf "OH BOY SO MANY LABELS!!@.%a@.%!" pp_lbls lbls;
-      let ans = f () in
-      Format.eprintf "WELL THAT WAS FUN@.%a@.%!" pp_lbls ans;
-      ans
-    end else f ()
-  end @@ fun () ->
-  For_copy.with_scope (fun copy_scope ->
-    let rec new_lbls = lazy (
-      Iarray.map
-        (fun lbl -> instance_label_update' copy_scope ~fixed lbl ~all:new_lbls)
-        lbls)
-    in
-    Lazy.force new_lbls
-  )
-
-let instance_labels_update ~fixed lbls =
-  let all_lbls =
-    instance_all_labels_update ~fixed (Lazy.force lbls.:(0).lbl_all)
-  in
-  Iarray.map (fun lbl -> all_lbls.:(lbl.lbl_pos)) lbls
-
-let instance_label_update ~fixed lbl =
-  let lbls = instance_all_labels_update ~fixed (Lazy.force lbl.lbl_all) in
-  lbls.:(lbl.lbl_pos)
 
 (* CR dkalinichenko: we must vary yieldingness together with locality to get
    sane behavior around [@local_opt]. Remove once we have mode polymorphism. *)
@@ -2929,6 +2890,14 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
 
 let is_principal ty =
   not !Clflags.principal || get_level ty = generic_level
+
+let get_structure_level t =
+  match get_desc t with
+  | Tvar _ -> get_level t
+  | _ -> generic_level
+
+let is_structurally_principal ty =
+  not !Clflags.principal || get_structure_level ty = generic_level
 
 (* Recursively expand the head of a type.
    Also expand #-types.

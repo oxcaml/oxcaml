@@ -1397,7 +1397,9 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
     | [], [] -> body acc env
     | (id, uid, kind) :: ids_with_kinds, defining_expr :: defining_exprs -> (
       let body_env, var = Env.add_var_like env id user_visible kind in
-      let body acc env = cont ids_with_kinds env acc defining_exprs in
+      let body acc env =
+        (cont ids_with_kinds env acc defining_exprs [@nontail])
+      in
       match defining_expr with
       | Simple simple ->
         let body_env = Env.add_simple_to_substitute env id simple kind in
@@ -1632,9 +1634,22 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
             bind acc body_env)
         | _ -> bind acc body_env))
     | _, _ ->
+      let pp_id ppf (id, _, _) = Ident.print ppf id in
+      let pp_sep ppf () = Format.fprintf ppf ";@ " in
+      let pp_ids ppf ids =
+        Format.fprintf ppf "[ @[<hv>%a@] ]"
+          (Format.pp_print_list ~pp_sep pp_id)
+          ids
+      in
+      let pp_exprs ppf exprs =
+        Format.fprintf ppf "[ @[<v>%a@] ]"
+          (Format.pp_print_list ~pp_sep Named.print)
+          exprs
+      in
       Misc.fatal_errorf
-        "CC.close_let: defining_exprs should have the same length as number of \
-         variables"
+        "@[<v>CC.close_let: defining_exprs should have the same length as \
+         number of variables@ %a@ %a@]"
+        pp_ids ids_with_kinds pp_exprs defining_exprs
   in
   close_named acc env ~let_bound_ids_with_kinds defining_expr
     (cont let_bound_ids_with_kinds env)
@@ -2652,7 +2667,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     let acc, body =
       (* XXX seems like this needs to know what [my_region] is *)
       try body acc closure_env
-      with Misc.Fatal_error ->
+      with Misc.Fatal_error when false ->
         let bt = Printexc.get_raw_backtrace () in
         Format.eprintf
           "\n\
