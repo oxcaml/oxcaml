@@ -1153,8 +1153,6 @@ val block_shape_of_value_kinds : value_kind list option -> block_shape
 
 val is_uniform_block_shape : block_shape -> bool
 
-val value_kinds_of_uniform_block_shape : block_shape -> value_kind list option
-
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> Types.mixed_product_shape

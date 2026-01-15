@@ -1192,16 +1192,12 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
           Misc.fatal_error
             "Non-zero tag on empty block allocation in [Closure_conversion]"
         else begin
-          match shape with
-          | None | Some [||] ->
+          if Lambda.is_uniform_block_shape shape
+          then
             register_const0 acc
               (Static_const.block Tag.Scannable.zero Immutable Value_only [])
               "empty_block"
-          | Some _ when Lambda.is_uniform_block_shape shape ->
-            register_const0 acc
-              (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-              "empty_block"
-          | Some _ ->
+          else
             Misc.fatal_error
               "Unexpected empty mixed block in [Closure_conversion]"
         end

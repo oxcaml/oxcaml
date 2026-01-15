@@ -632,17 +632,13 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
 let is_uniform_block_shape (shape : block_shape) : bool =
   match shape with
   | None -> true
-  | Some arr -> Array.for_all (function Value _ -> true | _ -> false) arr
-
-let value_kinds_of_uniform_block_shape (shape : block_shape)
-    : value_kind list option =
-  match shape with
-  | None -> None
   | Some arr ->
-    Some (Array.to_list (Array.map (function
-      | Value vk -> vk
-      | _ -> Misc.fatal_error "value_kinds_of_uniform_block_shape: \
-                              non-uniform shape") arr))
+    Array.for_all
+      (function
+        | Value _ -> true
+        | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+        | _ -> false)
+      arr
 
 let equal_layout x y =
   match x, y with

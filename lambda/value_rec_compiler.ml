@@ -247,7 +247,9 @@ let compute_static_size lam =
             Misc.fatal_error "size_of_primitive"
         end
     | Pmakeblock (_, _, shape, _) ->
-        (* Note that flat float arrays/records use Pmakearray, so we don't need
+        (* The block shape is unfortunately an option, so we rely on the
+           number of arguments instead.
+           Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
         (match shape with
          | None -> Block (Regular_block (List.length args))

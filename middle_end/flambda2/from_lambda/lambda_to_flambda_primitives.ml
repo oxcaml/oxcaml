@@ -1783,35 +1783,29 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ -> (
-    let args_flat = List.flatten args in
+  | Pmakeblock (tag, mutability, shape, mode), _ ->
+    let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let tag = Tag.Scannable.create_exn tag in
     let mutability = Mutability.from_lambda mutability in
-    match shape with
-    | None ->
+    if L.is_uniform_block_shape shape
+    then
       let shape =
-        List.init (List.length args_flat) (fun _ -> K.With_subkind.any_value)
+        convert_block_shape ~machine_width shape ~num_fields:(List.length args)
       in
-      [Variadic (Make_block (Values (tag, shape), mutability, mode), args_flat)]
-    | Some _ when L.is_uniform_block_shape shape ->
-      let shape =
-        convert_block_shape ~machine_width shape
-          ~num_fields:(List.length args_flat)
-      in
-      [Variadic (Make_block (Values (tag, shape), mutability, mode), args_flat)]
-    | Some arr ->
+      [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
+    else
       (* Mixed block *)
       let shape =
         Mixed_block_shape.of_mixed_block_elements
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          arr
+          (Option.get shape)
       in
       let args =
         let new_indexes_to_old_indexes =
           Mixed_block_shape.new_indexes_to_old_indexes shape
         in
-        let args = Array.of_list args_flat in
+        let args = Array.of_list args in
         Array.init (Array.length args) (fun new_index ->
             args.(new_indexes_to_old_indexes.(new_index)))
         |> Array.to_list
@@ -1837,7 +1831,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           args
       in
       let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
-      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
+      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
     (* CR mshinwell: this should check the unarized lengths of [layouts] and

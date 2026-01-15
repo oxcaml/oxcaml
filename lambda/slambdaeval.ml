@@ -35,10 +35,8 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
-  | Pmakeblock (_, _, shape, _) -> (
-    match shape with
-    | None -> ()
-    | Some shape -> assert_mixed_block_shape_contains_no_splices shape)
+  | Pmakeblock (_, _, Some shape, _) ->
+    assert_mixed_block_shape_contains_no_splices shape
   | Pmixedfield (_, shape, _) ->
     Array.iter assert_mixed_block_element_contains_no_splices shape
   | Psetmixedfield (_, shape, _) ->

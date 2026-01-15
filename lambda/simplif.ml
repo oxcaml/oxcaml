@@ -659,7 +659,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
             with Real_reference ->
               mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody)
         | Some _ ->
-            (* Mixed block or multi-field block - don't optimize *)
+            (* Non-value layout - this plausibly could also be optimised *)
             mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody
       end
   | Llet(Alias, kind, v, duid, l1, l2) ->
