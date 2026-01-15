@@ -298,23 +298,389 @@ module M :
   end
 |}]
 
-(* CR-soon zqian: the inner functor should be forced to once as well*)
+(* Test currying constraints on modes.
+
+   This section compares functions and functors in similar situations. *)
+
+(* Partial application: given [f : (A -> B -> C) @ mode], we assume that the
+   the closure for [f x] contains a pointer to [f] and therfore must close over the [mode].
+   Only relevant for comonadic axes since functions cross monadic axes. *)
+
+let f (k : (unit -> unit -> unit) @ once ) =
+  let (k' @ many) = k () in
+  k' ()
+[%%expect{|
+Line 2, characters 20-24:
+2 |   let (k' @ many) = k () in
+                        ^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+(* However, for [f : (A -> (B -> C)) @ once], we presume that [f] itself returns
+   a new closure which can be applied [many] times. *)
+
+let f' (k : (unit -> (unit -> unit)) @ once ) =
+  let (k' @ many) = k () in
+  k' ()
+[%%expect{|
+val f' : (unit -> (unit -> unit)) @ once -> unit = <fun>
+|}]
+
+(* Functors don't have syntactic arity, and for them we must pick one single behavior.
+
+   We pick the former, more restrictive behavior, for reasons given below. *)
+
+module F (K : (functor () () -> sig end) @ once) = struct
+  module (K' @ many) = K ()
+end
+[%%expect{|
+Line 2, characters 23-27:
+2 |   module (K' @ many) = K ()
+                           ^^^^
+Error: This is "once", but expected to be "many".
+|}]
+
+(* For functions we can infer the more permissive choice. *)
+
 let () =
-    let module (F @ once) () @ many = (functor () -> struct end) in
-    ()
+  let (f @ once) () @ many = fun () -> () in
+  let (_f @ many) = f () in
+  ()
 [%%expect{|
 |}]
 
-(* CR-soon zqian: the inner functor should be forced to once as well *)
+let () =
+  let (f @ once) : (unit -> unit -> unit) = fun () () -> () in
+  let (_f @ many) = f () in
+  ()
+[%%expect{|
+Line 3, characters 20-24:
+3 |   let (_f @ many) = f () in
+                        ^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+(* Functor behavior here is stricter. *)
+
+let () =
+  let module (F @ once) () @ many = (functor () -> struct end) in
+  let module (M' @ many) = F () in
+  ()
+[%%expect{|
+Line 3, characters 27-31:
+3 |   let module (M' @ many) = F () in
+                               ^^^^
+Error: This is "once", but expected to be "many".
+|}]
+
+(* Closing over arguments: given [f : A -> B -> C] and [a : A @ mode], [f a] must close
+   over [a]. The multi-argument function syntax handles this implicitly.  *)
+
+let f_once (x @ once) () = ()
+[%%expect{|
+val f_once : 'a @ once -> unit -> unit = <fun>
+|}]
+
+(* For functor, the behavior is the same but explicit. *)
+
 module F (M : S @ once) () = struct end
 [%%expect{|
-module F : functor (M : S @ once) () -> sig end @@ stateless
+module F : functor (M : S @ once) -> (functor () -> sig end) @ once @@
+  stateless
 |}]
 
-(* CR-soon zqian: the inner functor should be forced to once as well *)
+(* Demonstration. *)
+
+let f_once_app (x @ once) =
+  let (f_app @ many) = f_once x in
+  f_app ()
+[%%expect{|
+Line 2, characters 23-31:
+2 |   let (f_app @ many) = f_once x in
+                           ^^^^^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+module F_once_app (M : S @ once) = struct
+  module (F_app @ many) = F (M)
+end
+[%%expect{|
+Line 2, characters 26-31:
+2 |   module (F_app @ many) = F (M)
+                              ^^^^^
+Error: This is "once", but expected to be "many".
+|}]
+
+module F : functor (M : S @ once) () -> sig end @ many =
+  functor (M : S @ once) () -> struct end
+[%%expect{|
+Line 2, characters 10-41:
+2 |   functor (M : S @ once) () -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (M : S @ once) -> (functor () -> sig end) @ once
+       is not included in
+         functor (M : S @ once) () -> sig end
+       Got "once"
+       but expected "many".
+|}]
+
+let f_once_app2 (x @ once) =
+  let f_app = f_once x in
+  let (f_app' @ many) = f_app in
+  f_app' ()
+[%%expect{|
+Line 3, characters 24-29:
+3 |   let (f_app' @ many) = f_app in
+                            ^^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+module F_once_app2 (M : S @ once) = struct
+  module F_app = F (M)
+  module (F_app' @ many) = F_app
+end
+[%%expect{|
+Line 3, characters 27-32:
+3 |   module (F_app' @ many) = F_app
+                               ^^^^^
+Error: This is "once", but expected to be "many".
+|}]
+
+module F : functor (M : S @ once) -> (functor () -> sig end) @ many =
+  functor (M : S @ once) () -> struct end
+[%%expect{|
+Line 2, characters 10-41:
+2 |   functor (M : S @ once) () -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (M : S @ once) -> (functor () -> sig end) @ once
+       is not included in
+         functor (M : S @ once) () -> sig end
+       Got "once"
+       but expected "many".
+|}]
+
+let f_unique (x @ unique) () = ()
+[%%expect{|
+val f_unique : 'a @ unique -> unit -> unit = <fun>
+|}]
+
 module F (M : S @ unique) () = struct end
 [%%expect{|
-module F : functor (M : S @ unique) () -> sig end @@ stateless
+module F : functor (M : S @ unique) -> (functor () -> sig end) @ once @@
+  stateless
+|}]
+
+let f_unique_app (x @ unique) =
+  let (f_app @ many) = f_unique x in
+  f_app ()
+[%%expect{|
+Line 2, characters 23-33:
+2 |   let (f_app @ many) = f_unique x in
+                           ^^^^^^^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+module F_unique_app (M : S @ unique) = struct
+  module (F_app @ many) = F (M)
+end
+[%%expect{|
+Line 2, characters 26-31:
+2 |   module (F_app @ many) = F (M)
+                              ^^^^^
+Error: This is "once", but expected to be "many".
+|}]
+
+module F : functor (M : S @ unique) () -> sig end @ many =
+  functor (M : S @ unique) () -> struct end
+[%%expect{|
+Line 2, characters 10-43:
+2 |   functor (M : S @ unique) () -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (M : S @ unique) -> (functor () -> sig end) @ once
+       is not included in
+         functor (M : S @ unique) () -> sig end
+       Got "once"
+       but expected "many".
+|}]
+
+let f_unique_app2 (x @ unique) =
+  let f_app = f_unique x in
+  let (f_app' @ many) = f_app in
+  f_app' ()
+[%%expect{|
+Line 3, characters 24-29:
+3 |   let (f_app' @ many) = f_app in
+                            ^^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+module F_unique_app2 (M : S @ unique) = struct
+  module F_app = F (M)
+  module (F_app' @ many) = F_app
+end
+[%%expect{|
+Line 3, characters 27-32:
+3 |   module (F_app' @ many) = F_app
+                               ^^^^^
+Error: This is "once", but expected to be "many".
+|}]
+
+module F : functor (_ : S @ unique) -> (functor () -> sig end) @ many =
+  functor (_ : S @ unique) () -> struct end
+[%%expect{|
+Line 2, characters 10-43:
+2 |   functor (_ : S @ unique) () -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         S @ unique -> (functor () -> sig end) @ once
+       is not included in
+         S @ unique -> functor () -> sig end
+       Got "once"
+       but expected "many".
+|}]
+
+let f_unique_ret (_x @ unique) =
+  ((fun () -> ()) : (unit -> unit) @ many)
+[%%expect{|
+val f_unique_ret : 'a @ unique -> (unit -> unit) = <fun>
+|}]
+
+(* Here, the inner [many] value is submoded into a [once] value. *)
+module F (M : S @ unique) =
+  ((functor () -> struct end) : (functor () -> sig end) @ many)
+[%%expect{|
+module F : functor (M : S @ unique) -> (functor () -> sig end) @ once @@
+  stateless
+|}]
+
+let f1 (x1 @ once) x2 x3 =
+  x1 (); x2 (); x3 ()
+[%%expect{|
+val f1 : (unit -> 'a) @ once -> (unit -> 'b) -> (unit -> 'c) -> 'c = <fun>
+|}]
+
+module F1 (M1 : S @ unique) (M2 : S) (M3 : S) = struct
+  let () = M1.f ()
+  let () = M2.f ()
+  let () = M3.f ()
+end
+[%%expect{|
+module F1 :
+  functor (M1 : S @ unique) -> (functor (M2 : S) (M3 : S) -> sig end) @ once
+  @@ stateless
+|}]
+
+let f1_flip x2 (x1 @ once) = f1 x1 x2
+[%%expect{|
+val f1_flip : (unit -> 'a) -> (unit -> 'b) @ once -> (unit -> 'c) -> 'c =
+  <fun>
+|}]
+
+module F1_flip (M2 : S) (M1 : S @ unique) = F1 (M1) (M2)
+[%%expect{|
+module F1_flip :
+  functor (M2 : S) (M1 : S @ unique) -> (functor (M3 : S) -> sig end) @ once
+  @@ stateless
+|}]
+
+(* This example explains why we need the stricter partial application
+   behavior for functors. [(functor (M2 : S) (M3 : S) -> sig end) @ once],
+   returned by [F1], should be still [once] when partially applied for soundness. *)
+
+let a (x1 @ once) x2 x3 =
+  let f1_app = f1 x1 in
+  let (f1_app_2 @ many) = f1_app x2 in
+  f1_app_2 x3
+[%%expect{|
+Line 3, characters 26-35:
+3 |   let (f1_app_2 @ many) = f1_app x2 in
+                              ^^^^^^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+module A (M1 : S @ unique) (M2 : S) (M3 : S) = struct
+  module F1_applied = F1 (M1)
+  module (F1_applied_2 @ many) = F1_applied (M2)
+end
+[%%expect{|
+Line 3, characters 33-48:
+3 |   module (F1_applied_2 @ many) = F1_applied (M2)
+                                     ^^^^^^^^^^^^^^^
+Error: This is "once", but expected to be "many".
+|}]
+
+let f2 x1 (x2 @ once) x3 =
+  x1 (); x2 (); x3 ()
+[%%expect{|
+val f2 : (unit -> 'a) -> (unit -> 'b) @ once -> (unit -> 'c) -> 'c = <fun>
+|}]
+
+module F2 (M1 : S) (M2 : S @ unique) (M3 : S) = struct
+  let () = M1.f ()
+  let () = M2.f ()
+  let () = M3.f ()
+end
+[%%expect{|
+module F2 :
+  functor (M1 : S) (M2 : S @ unique) -> (functor (M3 : S) -> sig end) @ once
+  @@ stateless
+|}]
+
+let f3 x1 x2 (x3 @ once) =
+  x1 (); x2 (); x3 ()
+[%%expect{|
+val f3 : (unit -> 'a) -> (unit -> 'b) -> (unit -> 'c) @ once -> 'c = <fun>
+|}]
+
+module F3 (M1 : S) (M2 : S) (M3 : S @ unique) = struct
+  let () = M1.f ()
+  let () = M2.f ()
+  let () = M3.f ()
+end
+[%%expect{|
+module F3 : functor (M1 : S) (M2 : S) (M3 : S @ unique) -> sig end @@
+  stateless
+|}]
+
+let test1 (_x @ once) : (unit -> unit) @ many = fun () -> ()
+[%%expect{|
+val test1 : 'a @ once -> (unit -> unit) = <fun>
+|}]
+
+module F1 (M1 : S @ once) : (functor () -> sig end) @ many =
+  functor () -> struct end
+[%%expect{|
+module F1 : functor (M1 : S @ once) -> (functor () -> sig end) @ once @@
+  stateless
+|}]
+
+let test2 (x @ once) : (unit -> unit) @ many =
+  fun () -> let _x = x in ()
+[%%expect{|
+Line 2, characters 21-22:
+2 |   fun () -> let _x = x in ()
+                         ^
+Error: The value "x" is "once" but is expected to be "many"
+       because it is used inside the function at Line 2, characters 2-28
+       which is expected to be "many".
+|}]
+
+module F2 (M1 : S @ once) : (functor () -> sig end) @ many =
+  functor () -> struct module M2 = M1 end
+[%%expect{|
+Line 2, characters 35-37:
+2 |   functor () -> struct module M2 = M1 end
+                                       ^^
+Error: The module "M1" is "once" but is expected to be "many"
+       because it is used inside the functor at Line 2, characters 10-41
+       which is expected to be "many".
 |}]
 
 (* testing functor type inclusion *)
