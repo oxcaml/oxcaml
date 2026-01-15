@@ -73,7 +73,8 @@ allows you to store a `portable` component of an arbitrary structure.
 
 ## Modalities and mode-crossing
 
-Some types are allowed to *mode cross* along certain mode axes. For example,
+Some types are allowed to *mode cross* along certain mode axes, as described on 
+the [intro page](../intro). For example,
 portability affects only functions; a type that contains no functions (even after
 looking deeply through it) does not care about its portability. We say it
 *mode-crosses portability*. A type like `string option list` has this property,
@@ -96,6 +97,10 @@ As a consequence of this, the modality types all mode-cross along the relevant
 axis. That is, `Mode.Portability.t` mode-crosses portability. If you have a
 scenario where you need a type to mode-cross but it contains a field whose type
 does not cross that mode, a modality type might be the answer to your problem.
+
+On axes with more than two elements, mode crossing has some subtleties; you may
+wish to read the "Advanced mode crossing" section of the [reference](../reference)
+page.
 
 ## Modalities and mutable fields
 
@@ -123,7 +128,7 @@ we cannot assume that we can write a `nonportable` function into `t.f`.
 
 To prevent examples like this from being allowed, mutable fields have
 *implied modalities*. Every mutable field has the modalities derived from
-the legacy modes (as described in the [intro](intro.md) page).
+the legacy modes (as described in the [intro](../intro) page).
 
 In the example above, that means that `f` has the `nonportable` modality
 (among others); accordingly, the call `spawn t.f` would fail, because `spawn`
