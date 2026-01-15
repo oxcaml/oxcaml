@@ -26,11 +26,11 @@ will be `nonportable` (this is the usual deep behavior), while `trib.scurry`
 will be `portable` (this is the new behavior, enabled by the `@@ portable`
 modality).
 
-Modalities can appear on elements of structures (records, constructors, modules,
-etc). The full description is in our [syntax page](../syntax), but modalities
+Modalities can appear in places such as record fields, constructor arguments, and values/submodules in structures.
+The full description is in our [syntax page](../syntax), but modalities
 are always introduced with a `@@` herald. (This is in contrast to *modes* which
 are introduced with a `@` herald.) A modality describes the relationship between
-the mode of the structure itself and the mode of its element. We can think of a
+the mode of the container itself and the mode of its element. We can think of a
 modality as a function from a mode to a mode: the input is the mode of the
 structure and the output is the mode of the element. Right now, all modalities
 are modes (whose interpretation is described in the next paragraph), but that
@@ -61,8 +61,8 @@ writes.
 ## Modality types
 
 It is sometimes convenient to apply a modality at a time other than when you are
-defining a record. The `base` library thus provides *modality types*, such as
-[`Modes.Portable.t`](https://github.com/janestreet/base/blob/26c2f4df29a76e792cabfceb53963b3538ba6dc1/src/modes_intf.ml#L519):
+defining a record. The [`base` library](https://github.com/janestreet/base) thus provides *modality types*, such as
+`Modes.Portable.t`:
 
 ```ocaml
 type 'a t = { portable : 'a @@ portable } [@@unboxed]
@@ -90,9 +90,7 @@ type t = {
 
 Without the modality, it would be unsound for `t` to mode-cross portability: it
 might contain a nonportable function. However, the modality means that `f` will
-always be portable. Because the other field of `t` contains no functions, we can
-be sure that all values of type `t` do not have functions in them, and thus it
-is safe for `t` to mode-cross portability.
+always be portable. Because the other field of `t` contains no functions, a value of type `t` at `nonportable` is just as good as a value of type `t` at `portable`. In other words, `t` crosses portability.
 
 As a consequence of this, the modality types all mode-cross along the relevant
 axis. That is, `Mode.Portability.t` mode-crosses portability. If you have a
@@ -116,7 +114,7 @@ let bad_news () =
   spawn t.f
 ```
 
-This creates a `portable` `t`, uses submoding to turn it into a `nonportable`
+This creates a `t @ portable`, uses submoding to turn it into a `nonportable`
 `t` (this is safe; it's just locally forgetting the capability to send `t` to
 another thread), and then calls `set` to put a nonportable function into `t`.
 Then it takes the `portable` reference to `t` and sends it to another thread.
@@ -125,12 +123,7 @@ we cannot assume that we can write a `nonportable` function into `t.f`.
 
 To prevent examples like this from being allowed, mutable fields have
 *implied modalities*. Every mutable field has the modalities derived from
-the legacy modes (the modes that describe OCaml values that existed before
-we had modes), as given here:
-
-```
-global aliased many nonportable uncontended unyielding stateful read_write
-```
+the legacy modes (as described in the [intro](intro.md) page).
 
 In the example above, that means that `f` has the `nonportable` modality
 (among others); accordingly, the call `spawn t.f` would fail, because `spawn`
