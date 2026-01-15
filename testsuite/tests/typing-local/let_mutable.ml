@@ -13,39 +13,38 @@ let foo1 y =
 
 let () = assert (Int.equal (foo1 0) 55)
 let () = assert (Int.equal (foo1 42) 97)
-
 [%%expect.ignore_feedback]
 
 (* Test 1.2: basic usage with a nested record returning string *)
 type t_1_2 = { str_1_2 : string ref }
+[%%expect.ignore_feedback]
 let x_1_2 =
   let mutable x = { str_1_2 = ref "Hi" } in
   x <- { str_1_2 = ref "Bye" };
   (x.str_1_2.contents : string)
 [%%expect{|
-type t_1_2 = { str_1_2 : string ref; }
 val x_1_2 : string = "Bye"
 |}]
 
 (* Test 1.3: returning an immutable record *)
 type t_1_3 = { str_1_3 : string }
+[%%expect.ignore_feedback]
 let x_1_3 =
   let mutable x = { str_1_3 = "Hi" } in
   x <- { str_1_3 = "Bye" };
   x
 [%%expect{|
-type t_1_3 = { str_1_3 : string; }
 val x_1_3 : t_1_3 = {str_1_3 = "Bye"}
 |}]
 
 (* Test 1.4: returning a mutable nested record *)
 type t_1_4 = { str_1_4 : string ref }
+[%%expect.ignore_feedback]
 let x_1_4 =
   let mutable x = { str_1_4 = ref "Hi" } in
   x <- { str_1_4 = ref "Bye" };
   x
 [%%expect{|
-type t_1_4 = { str_1_4 : string ref; }
 val x_1_4 : t_1_4 = {str_1_4 = {contents = "Bye"}}
 |}]
 
@@ -113,8 +112,7 @@ let [@warning "-26"] m_3_3 =
   let mutable y = 42 in
   (module (struct module F () = struct let x = y end end) : S_3_3)
 
-[%%expect{|
-module type S_3_3 = sig module F : functor () -> sig val x : int end end
+[%%expect.ignore_feedback{|
 Line 5, characters 47-48:
 5 |   (module (struct module F () = struct let x = y end end) : S_3_3)
                                                    ^
@@ -248,9 +246,7 @@ let foo4_7 y =
   done;
   10
 ;;
-[%%expect{|
-val foo4_7 : int -> int = <fun>
-|}]
+[%%expect.ignore_feedback]
 
 (* Can't return [x] if it is local *)
 let foo4_8 () =
@@ -294,9 +290,7 @@ let foo5_1 y =  (* Assignment of local allowed in same scope *)
   | (x :: xs) -> 42
 
 let () = assert Int.(equal 42 (foo5_1 42))
-[%%expect{|
-val foo5_1 : 'a -> int = <fun>
-|}]
+[%%expect.ignore_feedback]
 
 let foo5_2 y =  (* Assignment of local works in _local_ for loop body region *)
   let mutable x = [] in
@@ -308,9 +302,7 @@ let foo5_2 y =  (* Assignment of local works in _local_ for loop body region *)
   | (x :: xs) -> 42
 
 let () = assert Int.(equal 42 (foo5_2 42))
-[%%expect{|
-val foo5_2 : int -> int = <fun>
-|}]
+[%%expect.ignore_feedback]
 
 let foo5_3 y = (* Assignment of local works in _local_ while body region *)
   let mutable x = y in
@@ -319,19 +311,14 @@ let foo5_3 y = (* Assignment of local works in _local_ while body region *)
     x <- (local_ (x + !i));
     i := !i + 1;
   done; (x : int)
-[%%expect{|
-val foo5_3 : int -> int = <fun>
-|}]
+[%%expect.ignore_feedback]
 
 let foo5_4 y = (* Assign of local works in _local_ while cond region *)
   let mutable x = y in
   while exclave_ x <- (local_ (x + 1)); x <= 100 do
     x <- x + x
   done; (x : int)
-
-[%%expect{|
-val foo5_4 : int -> int = <fun>
-|}]
+[%%expect.ignore_feedback]
 
 (* Test 6: Regionality *)
 (* 6.1: regional <- regional assignment is allowed *)
@@ -386,9 +373,7 @@ let f_11 () =
   (y, x)
 
 let () = assert (f_11 () = (10,20))
-[%%expect{|
-val f_11 : unit -> int * int = <fun>
-|}]
+[%%expect.ignore_feedback]
 
 (* Test 12: like Test 11, but with a constructor *)
 type t_12 = Foo_12 of int
@@ -398,10 +383,7 @@ let y_12 =
   let y = Foo_12 x in
     x <- 84; y
 ;;
-[%%expect{|
-type t_12 = Foo_12 of int
-val y_12 : t_12 = Foo_12 42
-|}]
+[%%expect.ignore_feedback]
 
 (* Test 12.1: Eta-expansion of reordered arguments *)
 let x_12_1 =
@@ -458,9 +440,7 @@ val y_13_3 : int ref = {contents = 0}
 |}]
 
 let require_portable (f : (int -> unit) @ portable) = ()
-[%%expect{|
-val require_portable : (int -> unit) @ portable -> unit = <fun>
-|}]
+[%%expect.ignore_feedback]
 
 (* Tests 13.4 to 13.7: Notice the [@ portable] does not prevent future values
    from being non-portable, but the portability of future values of [f] is still

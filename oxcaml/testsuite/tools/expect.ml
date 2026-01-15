@@ -28,6 +28,11 @@
      output with -principal
      |}]
    ]}
+
+   By default, REPL feedback like [val - : int = 5] is included in the expect
+   output. To disable this, use [[%%expect.ignore_feedback ..]]
+   (see examples in testsuite/tests/typing-local/let_mutable.ml).
+   Warnings, errors, and stdout are still captured with ignore_feedback.
 *)
 
 [@@@ocaml.warning "-40-69"]
