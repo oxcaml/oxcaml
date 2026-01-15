@@ -45,6 +45,8 @@ type expectation =
   ; payload_loc : Location.t (* Location of the whole payload *)
   ; normal      : string_constant (* expectation without -principal *)
   ; principal   : string_constant (* expectation with -principal *)
+  ; print_feedback : bool
+    (* should feedback like `val - : int = 5` be included in the output? *)
   }
 
 (* A list of phrases with the expected toplevel output *)
@@ -60,9 +62,18 @@ type correction =
 
 let match_expect_extension (ext : Parsetree.extension) =
   match ext with
-  | ({Asttypes.txt="expect"|"ocaml.expect"; loc = extid_loc}, payload) ->
+  | ({Asttypes.txt =
+        "expect" | "ocaml.expect" |
+        "expect.ignore_feedback" | "ocaml.expect.ignore_feedback" as txt;
+      loc = extid_loc}, payload) ->
     let invalid_payload () =
       Location.raise_errorf ~loc:extid_loc "invalid [%%%%expect payload]"
+    in
+    let print_feedback =
+      match txt with
+      | "expect" | "ocaml.expect" -> true
+      | "expect.ignore_feedback" | "ocaml.expect.ignore_feedback" -> false
+      | _ -> assert false
     in
     let string_constant (e : Parsetree.expression) =
       match e.pexp_desc with
@@ -87,13 +98,15 @@ let match_expect_extension (ext : Parsetree.extension) =
         ; payload_loc = e.pexp_loc
         ; normal
         ; principal
+        ; print_feedback
         }
       | PStr [] ->
-        let s = { tag = ""; str = "" } in
+        let s = { tag = ""; str = "\n" } in
         { extid_loc
         ; payload_loc  = { extid_loc with loc_start = extid_loc.loc_end }
         ; normal    = s
         ; principal = s
+        ; print_feedback
         }
       | _ -> invalid_payload ()
     in
@@ -162,11 +175,11 @@ let capture_everything buf ppf ~f =
   collect_formatters buf [Format.std_formatter; Format.err_formatter]
                      ~f:(fun () -> Compiler_messages.capture ppf ~f)
 
-let exec_phrase ppf phrase =
+let exec_phrase ppf phrase ~print_feedback =
   Location.reset ();
   if !Clflags.dump_parsetree then Printast. top_phrase ppf phrase;
   if !Clflags.dump_source    then Pprintast.top_phrase ppf phrase;
-  Toploop.execute_phrase true ppf phrase
+  Toploop.execute_phrase print_feedback ppf phrase
 
 let parse_contents ~fname contents =
   let lexbuf = Lexing.from_string contents in
@@ -223,7 +236,7 @@ let eval_expect_file _fname ~file_contents =
   let buf = Buffer.create 1024 in
   let ppf = Format.formatter_of_buffer buf in
   let () = Misc.Style.set_tag_handling ppf in
-  let exec_phrases phrases =
+  let exec_phrases phrases ~print_feedback =
     let phrases =
       match min_line_number phrases with
       | None -> phrases
@@ -236,7 +249,7 @@ let eval_expect_file _fname ~file_contents =
         acc &&
         let snap = Btype.snapshot () in
         try
-          Sys.with_async_exns (fun () -> exec_phrase ppf phrase)
+          Sys.with_async_exns (fun () -> exec_phrase ppf phrase ~print_feedback)
         with exn ->
           let bt = Printexc.get_raw_backtrace () in
           begin try Location.report_exception ppf exn
@@ -261,7 +274,10 @@ let eval_expect_file _fname ~file_contents =
   let corrected_expectations =
     capture_everything buf ppf ~f:(fun () ->
       List.fold_left chunks ~init:[] ~f:(fun acc chunk ->
-        let output = exec_phrases chunk.phrases in
+        let output =
+          exec_phrases chunk.phrases
+            ~print_feedback:chunk.expectation.print_feedback
+        in
         match eval_expectation chunk.expectation ~output with
         | None -> acc
         | Some correction -> correction :: acc)
@@ -271,7 +287,8 @@ let eval_expect_file _fname ~file_contents =
     match trailing_code with
     | None -> ""
     | Some phrases ->
-      capture_everything buf ppf ~f:(fun () -> exec_phrases phrases)
+      capture_everything buf ppf
+        ~f:(fun () -> exec_phrases phrases ~print_feedback:true)
   in
   { corrected_expectations; trailing_output }
 
@@ -280,6 +297,7 @@ let output_slice oc s a b =
 
 let output_corrected oc ~file_contents correction =
   let output_body oc { str; tag } =
+    if not (String.equal str "\n") then
     Printf.fprintf oc "{%s|%s|%s}" tag str tag
   in
   let ofs =

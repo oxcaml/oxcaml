@@ -14,9 +14,7 @@ let foo1 y =
 let () = assert (Int.equal (foo1 0) 55)
 let () = assert (Int.equal (foo1 42) 97)
 
-[%%expect{|
-val foo1 : int -> int = <fun>
-|}]
+[%%expect.ignore_feedback]
 
 (* Test 1.2: basic usage with a nested record returning string *)
 type t_1_2 = { str_1_2 : string ref }
