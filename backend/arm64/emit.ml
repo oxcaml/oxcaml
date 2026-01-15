@@ -56,8 +56,16 @@ module L = Asm_targets.Asm_label
 open! Int_replace_polymorphic_compare
 module H = Dsl_helpers
 
-(* Scratch FP register S7 used for float32 load/store conversions *)
+(* Scratch FP/SIMD register 7 in various widths. - S7: used for float32
+   load/store conversions - D7, V8B_7, B7: used for popcnt emulation when CSSC
+   is unavailable *)
 let reg_s7 = O.reg_op (R.reg_s 7)
+
+let reg_d7 = O.reg_op (R.reg_d 7)
+
+let reg_v8b_7 = O.reg_op (R.reg_v8b 7)
+
+let reg_b7 = O.reg_op (R.reg_b 7)
 
 (* Tradeoff between code size and code speed *)
 
@@ -1753,15 +1761,11 @@ let emit_instr i =
   | Lop (Intop Ipopcnt) ->
     if !Arch.feat_cssc
     then A.ins2 CNT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
-    else
-      let tmp = 7 in
-      let tmp_v8b = O.reg_op (R.reg_v8b tmp) in
-      let tmp_b = O.reg_op (R.reg_b tmp) in
-      let tmp_d = O.reg_op (R.reg_d tmp) in
-      A.ins2 FMOV_gp_to_fp_64 tmp_d (H.reg_x i.arg.(0));
-      A.ins2 CNT_vector tmp_v8b tmp_v8b;
-      A.ins2 ADDV tmp_b tmp_v8b;
-      A.ins2 FMOV_fp_to_gp_64 (H.reg_x i.res.(0)) tmp_d
+    else (
+      A.ins2 FMOV_gp_to_fp_64 reg_d7 (H.reg_x i.arg.(0));
+      A.ins2 CNT_vector reg_v8b_7 reg_v8b_7;
+      A.ins2 ADDV reg_b7 reg_v8b_7;
+      A.ins2 FMOV_fp_to_gp_64 (H.reg_x i.res.(0)) reg_d7)
   | Lop (Intop (Ictz _)) ->
     (* [ctz Rd, Rn] is optionally supported from Armv8.7, but rbit and clz are
        supported in all ARMv8 CPUs. *)
