@@ -112,61 +112,8 @@ module Color = struct
   type t = int
 end
 
-module RegisterStamp = struct
-  type t = int
-
-  type pair = t * t
-
-  let pair (x : t) (y : t) = if x <= y then x, y else y, x
-
-  let fst = fst
-
-  let snd = snd
-
-  (* CR xclerc for xclerc: consider using a bit matrix *)
-
-  module PS = Hashtbl.Make (struct
-    type t = pair
-
-    let equal (left : t) (right : t) : bool =
-      Int.equal (fst left) (fst right) && Int.equal (snd left) (snd right)
-
-    let hash ((x, y) : t) =
-      (* CR xclerc for xclerc: review *)
-      (x lsl 17) lxor y
-  end)
-
-  module PairSet = struct
-    type t = unit PS.t
-
-    let default_size = 256
-
-    let make ~num_registers =
-      let estimated_size = (num_registers * num_registers) asr 5 in
-      PS.create
-        (if estimated_size < default_size then default_size else estimated_size)
-
-    let clear set = PS.clear set
-
-    let mem set (x : pair) = PS.mem set x
-
-    let add set (x : pair) = PS.replace set x ()
-
-    let cardinal set = PS.length set
-
-    let iter set ~f = PS.iter (fun key () -> f key) set
-  end
-end
-
-module Degree = struct
-  type t = int
-
-  let infinite = max_int
-
-  let to_string deg = if deg = max_int then "+inf" else string_of_int deg
-
-  let to_float deg = if deg = max_int then Float.infinity else Float.of_int deg
-end
+module RegisterStamp = Regalloc_interf_graph.RegisterStamp
+module Degree = Regalloc_interf_graph.Degree
 
 let is_move_basic : Cfg.basic -> bool =
  fun desc ->

@@ -44,7 +44,7 @@ type t =
     frozen_moves : InstructionWorkList.t;
     work_list_moves : InstructionWorkList.t;
     active_moves : InstructionWorkList.t;
-    adj_set : RegisterStamp.PairSet.t;
+    graph : Regalloc_interf_graph.t;
     move_list : Instruction.Set.t Reg.Tbl.t;
     stack_slots : Regalloc_stack_slots.t;
     affinity : Regalloc_affinity.t;
@@ -53,24 +53,20 @@ type t =
     reg_work_list : RegWorkList.t Reg.Tbl.t;
     reg_color : int option Reg.Tbl.t;
     reg_alias : Reg.t option Reg.Tbl.t;
-    reg_interf : Reg.t list Reg.Tbl.t;
-    reg_degree : int Reg.Tbl.t;
     instr_work_list : InstrWorkList.t InstructionId.Tbl.t
   }
 
 let[@inline] make ~initial ~stack_slots ~affinity () =
   let num_registers = List.length (Reg.all_relocatable_regs ()) in
+  let graph = Regalloc_interf_graph.make ~num_registers in
   let reg_work_list = Reg.Tbl.create num_registers in
   let reg_color = Reg.Tbl.create num_registers in
   let reg_alias = Reg.Tbl.create num_registers in
-  let reg_interf = Reg.Tbl.create num_registers in
-  let reg_degree = Reg.Tbl.create num_registers in
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace reg_work_list reg RegWorkList.Unknown_list;
       Reg.Tbl.replace reg_color reg None;
       Reg.Tbl.replace reg_alias reg None;
-      Reg.Tbl.replace reg_interf reg [];
-      Reg.Tbl.replace reg_degree reg 0);
+      Regalloc_interf_graph.init_register graph reg);
   List.iter initial ~f:(fun reg ->
       Reg.Tbl.replace reg_work_list reg RegWorkList.Initial);
   Reg.Set.iter
@@ -83,8 +79,8 @@ let[@inline] make ~initial ~stack_slots ~affinity () =
           fatal "precolored register %a is not an hardware register"
             Printreg.reg reg);
       Reg.Tbl.replace reg_alias reg None;
-      Reg.Tbl.replace reg_interf reg [];
-      Reg.Tbl.replace reg_degree reg Degree.infinite)
+      Regalloc_interf_graph.init_register_with_degree graph reg
+        ~degree:Degree.infinite)
     (all_precolored_regs ());
   let original_capacity = num_registers in
   let simplify_work_list = RegWorkListSet.make ~original_capacity in
@@ -100,7 +96,6 @@ let[@inline] make ~initial ~stack_slots ~affinity () =
   let frozen_moves = InstructionWorkList.make ~original_capacity in
   let work_list_moves = InstructionWorkList.make ~original_capacity in
   let active_moves = InstructionWorkList.make ~original_capacity in
-  let adj_set = RegisterStamp.PairSet.make ~num_registers in
   let move_list = Reg.Tbl.create 128 in
   let inst_temporaries = Reg.Set.empty in
   let block_temporaries = Reg.Set.empty in
@@ -119,7 +114,7 @@ let[@inline] make ~initial ~stack_slots ~affinity () =
     frozen_moves;
     work_list_moves;
     active_moves;
-    adj_set;
+    graph;
     move_list;
     stack_slots;
     affinity;
@@ -128,8 +123,6 @@ let[@inline] make ~initial ~stack_slots ~affinity () =
     reg_work_list;
     reg_color;
     reg_alias;
-    reg_interf;
-    reg_degree;
     instr_work_list
   }
 
@@ -144,8 +137,7 @@ let[@inline] add_initial_one state reg =
   Reg.Tbl.replace state.reg_work_list reg RegWorkList.Initial;
   Reg.Tbl.replace state.reg_color reg None;
   Reg.Tbl.replace state.reg_alias reg None;
-  Reg.Tbl.replace state.reg_interf reg [];
-  Reg.Tbl.replace state.reg_degree reg 0;
+  Regalloc_interf_graph.init_register state.graph reg;
   Doubly_linked_list.add_begin state.initial reg
 
 let[@inline] add_initial_list state regs =
@@ -153,16 +145,15 @@ let[@inline] add_initial_list state regs =
       Reg.Tbl.replace state.reg_work_list reg RegWorkList.Initial;
       Reg.Tbl.replace state.reg_color reg None;
       Reg.Tbl.replace state.reg_alias reg None;
-      Reg.Tbl.replace state.reg_interf reg [];
-      Reg.Tbl.replace state.reg_degree reg 0;
+      Regalloc_interf_graph.init_register state.graph reg;
       Doubly_linked_list.add_begin state.initial reg)
 
 let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
+  Regalloc_interf_graph.clear state.graph;
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace state.reg_color reg None;
       Reg.Tbl.replace state.reg_alias reg None;
-      Reg.Tbl.replace state.reg_interf reg [];
-      Reg.Tbl.replace state.reg_degree reg 0);
+      Regalloc_interf_graph.init_register state.graph reg);
   Reg.Set.iter
     (fun reg ->
       assert (
@@ -174,8 +165,9 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
       | Reg _, None -> assert false
       | (Unknown | Stack _), _ -> assert false);
       Reg.Tbl.replace state.reg_alias reg None;
-      Reg.Tbl.replace state.reg_interf reg [];
-      assert (Reg.Tbl.find state.reg_degree reg = Degree.infinite))
+      Regalloc_interf_graph.init_register_with_degree state.graph reg
+        ~degree:Degree.infinite;
+      assert (Regalloc_interf_graph.degree state.graph reg = Degree.infinite))
     (all_precolored_regs ());
   state.initial <- Doubly_linked_list.of_list new_inst_temporaries;
   Doubly_linked_list.add_list state.initial new_block_temporaries;
@@ -195,7 +187,6 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   InstructionWorkList.clear state.frozen_moves;
   InstructionWorkList.clear state.work_list_moves;
   InstructionWorkList.clear state.active_moves;
-  RegisterStamp.PairSet.clear state.adj_set;
   Reg.Tbl.clear state.move_list;
   InstructionId.Tbl.clear state.instr_work_list
 
@@ -212,13 +203,10 @@ let[@inline] color state reg =
 let[@inline] set_color state reg color =
   Reg.Tbl.replace state.reg_color reg color
 
-let[@inline] degree state reg =
-  match Reg.Tbl.find_opt state.reg_degree reg with
-  | None -> fatal "%a is not in the degree map" Printreg.reg reg
-  | Some x -> x
+let[@inline] degree state reg = Regalloc_interf_graph.degree state.graph reg
 
 let[@inline] set_degree state reg degree =
-  Reg.Tbl.replace state.reg_degree reg degree
+  Regalloc_interf_graph.set_degree state.graph reg degree
 
 let[@inline] is_precolored state reg =
   RegWorkList.equal (reg_work_list state reg) RegWorkList.Precolored
@@ -376,60 +364,33 @@ let[@inline] remove_active_moves state (instr : Instruction.t) =
   InstructionWorkList.remove state.active_moves instr
 
 let[@inline] mem_adj_set state reg1 reg2 =
-  RegisterStamp.PairSet.mem state.adj_set
-    (RegisterStamp.pair reg1.Reg.stamp reg2.Reg.stamp)
+  Regalloc_interf_graph.mem_edge state.graph reg1 reg2
 
-let[@inline] adj_list state reg = Reg.Tbl.find state.reg_interf reg
+let[@inline] adj_list state reg = Regalloc_interf_graph.adj_list state.graph reg
 
-let[@inline] add_edge state u v =
-  let is_interesting_reg reg =
-    match reg.Reg.loc with
-    | Reg _ -> true
-    | Unknown -> true
-    | Stack (Local _ | Incoming _ | Outgoing _ | Domainstate _) -> false
-  in
-  let pair = RegisterStamp.pair u.Reg.stamp v.Reg.stamp in
-  if
-    (not (Reg.same u v))
-    && is_interesting_reg u && is_interesting_reg v && same_reg_class u v
-    && not (RegisterStamp.PairSet.mem state.adj_set pair)
-  then (
-    RegisterStamp.PairSet.add state.adj_set pair;
-    let add_adj_list x y =
-      Reg.Tbl.replace state.reg_interf x (y :: Reg.Tbl.find state.reg_interf x)
-    in
-    let incr_degree x =
-      let deg = degree state x in
-      if debug && deg = Degree.infinite
-      then fatal "trying to increment the degree of a precolored node";
-      Reg.Tbl.replace state.reg_degree x (succ deg)
-    in
-    if not (is_precolored state u)
-    then (
-      add_adj_list u v;
-      incr_degree u);
-    if not (is_precolored state v)
-    then (
-      add_adj_list v u;
-      incr_degree v))
+let[@inline] add_edge state u v = Regalloc_interf_graph.add_edge state.graph u v
 
 let[@inline] iter_adjacent state reg ~f =
-  List.iter (adj_list state reg) ~f:(fun reg ->
-      match reg_work_list state reg with
-      | Select_stack | Coalesced -> ()
-      | Unknown_list | Precolored | Initial | Simplify | Freeze | Spill
-      | Spilled | Colored ->
-        f reg)
+  let should_visit r =
+    match reg_work_list state r with
+    | Select_stack | Coalesced -> false
+    | Unknown_list | Precolored | Initial | Simplify | Freeze | Spill | Spilled
+    | Colored ->
+      true
+  in
+  Regalloc_interf_graph.iter_adjacent_if state.graph reg ~should_visit ~f
 
 let[@inline] for_all_adjacent state reg ~f =
-  List.for_all (adj_list state reg) ~f:(fun reg ->
-      match reg_work_list state reg with
-      | Select_stack | Coalesced -> true
-      | Unknown_list | Precolored | Initial | Simplify | Freeze | Spill
-      | Spilled | Colored ->
-        f reg)
+  let should_visit r =
+    match reg_work_list state r with
+    | Select_stack | Coalesced -> false
+    | Unknown_list | Precolored | Initial | Simplify | Freeze | Spill | Spilled
+    | Colored ->
+      true
+  in
+  Regalloc_interf_graph.for_all_adjacent_if state.graph reg ~should_visit ~f
 
-let[@inline] adj_set state = state.adj_set
+let[@inline] adj_set state = Regalloc_interf_graph.adj_set state.graph
 
 let[@inline] is_empty_node_moves state reg =
   match Reg.Tbl.find_opt state.move_list reg with
@@ -480,7 +441,7 @@ let[@inline] decr_degree state reg =
   if d = Degree.infinite
   then ()
   else (
-    Reg.Tbl.replace state.reg_degree reg (pred d);
+    Regalloc_interf_graph.decr_degree state.graph reg;
     if Int.equal d (k reg)
     then (
       enable_moves_one state reg;
@@ -605,7 +566,7 @@ let[@inline] check_set_and_field_consistency_instr state
     set
 
 let[@inline] check_inter_has_no_duplicates state (reg : Reg.t) : unit =
-  let l = Reg.Tbl.find state.reg_interf reg in
+  let l = adj_list state reg in
   let s = Reg.Set.of_list l in
   if List.length l <> Reg.Set.cardinal s
   then fatal "interf list for %a is not a set" Printreg.reg reg
@@ -706,26 +667,27 @@ let[@inline] invariant state =
         if degree = Degree.infinite
         then fatal "invariant: infinite degree for %a" Printreg.reg u
         else
-          let adj_list = Reg.Set.of_list (adj_list state u) in
+          let adj_list_set = Reg.Set.of_list (adj_list state u) in
           let cardinal =
-            Reg.Set.cardinal (Reg.Set.inter adj_list work_lists_or_precolored)
+            Reg.Set.cardinal
+              (Reg.Set.inter adj_list_set work_lists_or_precolored)
           in
           if not (Int.equal degree cardinal)
           then (
-            List.iter (Reg.Tbl.find state.reg_interf u) ~f:(fun r ->
+            List.iter (adj_list state u) ~f:(fun r ->
                 log "%a <- interf[%a]" Printreg.reg r Printreg.reg u);
             Reg.Set.iter
               (fun r -> log "%a <- adj_list[%a]" Printreg.reg r Printreg.reg u)
-              adj_list;
+              adj_list_set;
             Reg.Set.iter
               (fun r ->
                 log "%a <- work_lists_or_precolored[%a]" Printreg.reg r
                   Printreg.reg u)
-              (Reg.Set.inter adj_list work_lists_or_precolored);
+              (Reg.Set.inter adj_list_set work_lists_or_precolored);
             fatal
               "invariant expected degree for %a to be %d but got %d\n\
               \ (#adj_list=%d, #work_lists_or_precolored=%d)"
               Printreg.reg u cardinal degree
-              (Reg.Set.cardinal adj_list)
+              (Reg.Set.cardinal adj_list_set)
               (Reg.Set.cardinal work_lists_or_precolored)))
       work_lists)
