@@ -580,8 +580,6 @@ module type S = sig
         | Comonadic : 'a Comonadic.Axis.t -> 'a t
 
       include Axis with type 'a t := 'a t
-
-      val get : 'a t -> (module Const with type t = 'a)
     end
 
     type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =

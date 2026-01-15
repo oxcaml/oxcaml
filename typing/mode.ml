@@ -3338,19 +3338,6 @@ module Value_with (Areality : Areality) = struct
           (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
           Comonadic.Axis.all
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
-
-    let get (type a) (axis : a t) : (module Const with type t = a) =
-      match axis with
-      | Comonadic Areality -> (module Areality.Const)
-      | Comonadic Forkable -> (module Forkable.Const)
-      | Comonadic Linearity -> (module Linearity.Const)
-      | Comonadic Portability -> (module Portability.Const)
-      | Comonadic Statefulness -> (module Statefulness.Const)
-      | Comonadic Yielding -> (module Yielding.Const)
-      | Monadic Contention -> (module Contention.Const)
-      | Monadic Staticity -> (module Staticity.Const)
-      | Monadic Uniqueness -> (module Uniqueness.Const)
-      | Monadic Visibility -> (module Visibility.Const)
   end
 
   let proj_obj : type a. a Axis.t -> a C.obj = function

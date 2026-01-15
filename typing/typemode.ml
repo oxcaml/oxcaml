@@ -484,8 +484,7 @@ let untransl_mode (modes : Mode.Alloc.Const.Option.t) =
 let untransl_mode_annots annots =
   let untransl_annot =
     Location.map (fun (Atom (ax, mode) : Mode.Alloc.atom) : Parsetree.mode ->
-        let (module Axis) = Mode.Alloc.Axis.get ax in
-        Mode (Format.asprintf "%a" Axis.print mode))
+        Mode (Format.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode))
   in
   List.map untransl_annot annots
 
