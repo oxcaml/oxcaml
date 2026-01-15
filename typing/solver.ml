@@ -562,16 +562,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amodevar mv -> Amodevar (apply_morphvar dst morph hint mv)
     | Amodejoin (a, a_hint, vs) ->
       let hint = Comp_hint.Morph_hint.disallow_right hint in
-      Amodejoin
-        ( C.apply dst morph a,
-          Apply (hint, a_hint),
-          VarMap.map (apply_morphvar dst morph hint) vs )
+      let vs =
+        VarMap.fold
+          (fun _ mv acc ->
+            let mv = apply_morphvar dst morph hint mv in
+            VarMap.add (get_key mv) mv acc)
+          vs VarMap.empty
+      in
+      Amodejoin (C.apply dst morph a, Apply (hint, a_hint), vs)
     | Amodemeet (a, a_hint, vs) ->
       let hint = Comp_hint.Morph_hint.disallow_left hint in
-      Amodemeet
-        ( C.apply dst morph a,
-          Apply (hint, a_hint),
-          VarMap.map (apply_morphvar dst morph hint) vs )
+      let vs =
+        VarMap.fold
+          (fun _ mv acc ->
+            let mv = apply_morphvar dst morph hint mv in
+            VarMap.add (get_key mv) mv acc)
+          vs VarMap.empty
+      in
+      Amodemeet (C.apply dst morph a, Apply (hint, a_hint), vs)
 
   module Unhint = struct
     type ('a, 'd) t =
