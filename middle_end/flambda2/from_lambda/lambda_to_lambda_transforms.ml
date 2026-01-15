@@ -557,13 +557,33 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec128)
          Sixty_four_or_more ~init
   | Punboxedvectorarray Unboxed_vec256 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_vec256" ~length mode loc
-    |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec256)
-         Sixty_four_or_more ~init
+    if Vector_types.wide
+    then
+      makearray_dynamic_singleton_uninitialized "unboxed_vec256" ~length mode
+        loc
+      |> initialize_array env loc ~length
+           (Punboxedvectorarray_set Unboxed_vec256) Sixty_four_or_more ~init
+    else
+      makearray_dynamic_non_scannable_unboxed_product env
+        (Pgcignorableproductarray
+           [ Punboxedvector_ignorable Unboxed_vec128;
+             Punboxedvector_ignorable Unboxed_vec128 ])
+        mode ~length ~init:None loc
   | Punboxedvectorarray Unboxed_vec512 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_vec512" ~length mode loc
-    |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec512)
-         Sixty_four_or_more ~init
+    if Vector_types.wide
+    then
+      makearray_dynamic_singleton_uninitialized "unboxed_vec512" ~length mode
+        loc
+      |> initialize_array env loc ~length
+           (Punboxedvectorarray_set Unboxed_vec512) Sixty_four_or_more ~init
+    else
+      makearray_dynamic_non_scannable_unboxed_product env
+        (Pgcignorableproductarray
+           [ Punboxedvector_ignorable Unboxed_vec128;
+             Punboxedvector_ignorable Unboxed_vec128;
+             Punboxedvector_ignorable Unboxed_vec128;
+             Punboxedvector_ignorable Unboxed_vec128 ])
+        mode ~length ~init:None loc
   | Pgcscannableproductarray _ ->
     let init = must_have_initializer () in
     makearray_dynamic_scannable_unboxed_product env lambda_array_kind mode

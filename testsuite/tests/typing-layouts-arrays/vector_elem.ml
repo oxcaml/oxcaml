@@ -67,3 +67,118 @@ module Int64x2 = struct
     let h = Int64.compare v1h v2h in
     if h = 0 then Int64.compare v1l v2l else h
 end
+
+module Int64x4 = struct
+
+  type t = int64x4
+
+  external box : int64x4# -> int64x4 = "%box_vec256"
+  external unbox : int64x4 -> int64x4# = "%unbox_vec256"
+
+  external interleave_low_64 : int64x2 -> int64x2 -> int64x2 = "caml_vec256_unreachable" "caml_simd_vec128_interleave_low_64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external interleave_high_64 : int64x2 -> int64x2 -> int64x2 = "caml_vec256_unreachable" "caml_simd_vec128_interleave_high_64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external insert_128 :
+    (int[@untagged]) ->
+    (int64x4[@unboxed]) ->
+    (int64x2[@unboxed]) ->
+    (int64x4[@unboxed]) = "caml_vec256_unreachable" "caml_avx_vec256_insert_128"
+    [@@noalloc] [@@builtin]
+
+  external extract_128 :
+    (int[@untagged]) -> (int64x4[@unboxed]) -> (int64x2[@unboxed])
+    = "caml_vec256_unreachable" "caml_avx_vec256_extract_128"
+    [@@noalloc] [@@builtin]
+
+  external low_of : int64 -> int64x2 = "caml_vec256_unreachable" "caml_int64x2_low_of_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external low_to : int64x2 -> int64 = "caml_vec256_unreachable" "caml_int64x2_low_to_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external const1 : int64 -> t = "caml_vec256_unreachable" "caml_int64x4_const1"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external add : t -> t -> t = "caml_vec256_unreachable" "caml_avx2_int64x4_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external sub : t -> t -> t = "caml_vec256_unreachable" "caml_avx2_int64x4_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  let neg x = sub (const1 0L) x
+
+  let high_to x =
+    let x = interleave_high_64 x x in
+    low_to x
+
+  let of_i64s x y z w =
+    let x = low_of x in
+    let y = low_of y in
+    let z = low_of z in
+    let w = low_of w in
+    let xy = interleave_low_64 x y in
+    let zw = interleave_low_64 z w in
+    let i = const1 0L in
+    let i = insert_128 1 i xy in
+    let i = insert_128 0 i zw in
+    i
+
+  let mul x y =
+    let xl = extract_128 0 x in
+    let yl = extract_128 0 y in
+    let xh = extract_128 1 x in
+    let yh = extract_128 1 y in
+    let xll, yll = low_to xl, low_to yl in
+    let xlh, ylh = high_to xl, high_to yl in
+    let xhl, yhl = low_to xh, low_to yh in
+    let xhh, yhh = high_to xh, high_to yh in
+    of_i64s Int64.(mul xhh yhh) Int64.(mul xhl yhl)
+            Int64.(mul xlh ylh) Int64.(mul xll yll)
+
+  let of_int i = of_i64s (Int64.of_int i) (Int64.of_int i)
+                         (Int64.of_int i) (Int64.of_int i)
+  let max_val =
+    match Sys.backend_type with
+    | Bytecode | Other _ -> Obj.magic ()
+    | Native ->
+      of_i64s Int64.max_int Int64.max_int
+              Int64.max_int Int64.max_int
+  let min_val =
+    match Sys.backend_type with
+    | Bytecode | Other _ -> Obj.magic ()
+    | Native ->
+      of_i64s Int64.min_int Int64.min_int
+              Int64.min_int Int64.min_int
+  let rand x =
+    let l, h = extract_128 0 x, extract_128 1 x in
+    let ll, lh = low_to l, high_to l in
+    let hl, hh = low_to h, high_to h in
+    of_i64s (Random.int64 hh) (Random.int64 hl)
+            (Random.int64 lh) (Random.int64 ll)
+
+  let print x =
+    let l, h = extract_128 0 x, extract_128 1 x in
+    let ll, lh = low_to l, high_to l in
+    let hl, hh = low_to h, high_to h in
+    Format.printf "%Ld:%Ld:%Ld:%Ld" hh hl lh ll
+
+  let compare x y =
+    let xl = extract_128 0 x in
+    let yl = extract_128 0 y in
+    let xh = extract_128 1 x in
+    let yh = extract_128 1 y in
+    let xll, yll = low_to xl, low_to yl in
+    let xlh, ylh = high_to xl, high_to yl in
+    let xhl, yhl = low_to xh, low_to yh in
+    let xhh, yhh = high_to xh, high_to yh in
+    let h = Int64.compare xhh yhh in
+    if h <> 0 then h else
+      let h = Int64.compare xhl yhl in
+      if h <> 0 then h else
+        let h = Int64.compare xlh ylh in
+        if h <> 0 then h else
+          Int64.compare xll yll
+end

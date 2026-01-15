@@ -600,31 +600,40 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
           return_transformer = None
         } ]
     | Vec256 ->
-      [ { kind = K.naked_vec256;
-          arg_transformer = None;
-          return_transformer = None
-        } ]
+      if Vector_types.wide
+      then
+        [ { kind = K.naked_vec256;
+            arg_transformer = None;
+            return_transformer = None
+          } ]
+      else
+        let v128 =
+          { kind = K.naked_vec128;
+            arg_transformer = None;
+            return_transformer = None
+          }
+        in
+        [v128; v128]
     | Vec512 ->
-      [ { kind = K.naked_vec512;
-          arg_transformer = None;
-          return_transformer = None
-        } ])
+      if Vector_types.wide
+      then
+        [ { kind = K.naked_vec512;
+            arg_transformer = None;
+            return_transformer = None
+          } ]
+      else
+        let v128 =
+          { kind = K.naked_vec128;
+            arg_transformer = None;
+            return_transformer = None
+          }
+        in
+        [v128; v128; v128; v128])
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
 let unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
   match extern_repr with
-  | Same_as_ocaml_repr (Base Void) -> []
-  | Same_as_ocaml_repr (Base _ as sort) ->
-    let kind =
-      Typeopt.layout_of_non_void_sort sort
-      |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
-           ~machine_width
-      |> K.With_subkind.kind
-    in
-    [{ kind; arg_transformer = None; return_transformer = None }]
-  | Same_as_ocaml_repr (Product sorts) ->
-    List.concat_map unarize_const_sort_for_extern_repr sorts
   | Unboxed_float Boxed_float64 ->
     [ { kind = K.naked_float;
         arg_transformer = Some (P.Unbox_number Naked_float);
@@ -670,20 +679,86 @@ let unarize_extern_repr ~machine_width alloc_mode
         return_transformer = Some (P.Box_number (Naked_vec128, alloc_mode))
       } ]
   | Unboxed_vector Boxed_vec256 ->
-    [ { kind = K.naked_vec256;
-        arg_transformer = Some (P.Unbox_number Naked_vec256);
-        return_transformer = Some (P.Box_number (Naked_vec256, alloc_mode))
-      } ]
+    if Vector_types.wide
+    then
+      [ { kind = K.naked_vec256;
+          arg_transformer = Some (P.Unbox_number Naked_vec256);
+          return_transformer = Some (P.Box_number (Naked_vec256, alloc_mode))
+        } ]
+    else
+      let v128 =
+        { kind = K.naked_vec128;
+          arg_transformer = Some (P.Unbox_number Naked_vec128);
+          return_transformer = Some (P.Box_number (Naked_vec128, alloc_mode))
+        }
+      in
+      [v128; v128]
   | Unboxed_vector Boxed_vec512 ->
-    [ { kind = K.naked_vec512;
-        arg_transformer = Some (P.Unbox_number Naked_vec512);
-        return_transformer = Some (P.Box_number (Naked_vec512, alloc_mode))
-      } ]
+    if Vector_types.wide
+    then
+      [ { kind = K.naked_vec512;
+          arg_transformer = Some (P.Unbox_number Naked_vec512);
+          return_transformer = Some (P.Box_number (Naked_vec512, alloc_mode))
+        } ]
+    else
+      let v128 =
+        { kind = K.naked_vec128;
+          arg_transformer = Some (P.Unbox_number Naked_vec128);
+          return_transformer = Some (P.Box_number (Naked_vec128, alloc_mode))
+        }
+      in
+      [v128; v128; v128; v128]
   | Unboxed_or_untagged_integer Untagged_int ->
     [ { kind = K.naked_immediate;
         arg_transformer = Some P.Untag_immediate;
         return_transformer = Some P.Tag_immediate
       } ]
+  | Same_as_ocaml_repr (Base Void) -> []
+  | Same_as_ocaml_repr (Base Vec128) ->
+    [ { kind = K.naked_vec128;
+        arg_transformer = None;
+        return_transformer = None
+      } ]
+  | Same_as_ocaml_repr (Base Vec256) ->
+    if Vector_types.wide
+    then
+      [ { kind = K.naked_vec256;
+          arg_transformer = None;
+          return_transformer = None
+        } ]
+    else
+      let v128 =
+        { kind = K.naked_vec128;
+          arg_transformer = None;
+          return_transformer = None
+        }
+      in
+      [v128; v128]
+  | Same_as_ocaml_repr (Base Vec512) ->
+    if Vector_types.wide
+    then
+      [ { kind = K.naked_vec512;
+          arg_transformer = None;
+          return_transformer = None
+        } ]
+    else
+      let v128 =
+        { kind = K.naked_vec128;
+          arg_transformer = None;
+          return_transformer = None
+        }
+      in
+      [v128; v128; v128; v128]
+  | Same_as_ocaml_repr (Base _ as sort) ->
+    let kind =
+      Typeopt.layout_of_non_void_sort sort
+      |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
+           ~machine_width
+      |> K.With_subkind.kind
+    in
+    [{ kind; arg_transformer = None; return_transformer = None }]
+  | Same_as_ocaml_repr (Product sorts) ->
+    List.concat_map unarize_const_sort_for_extern_repr sorts
 
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;

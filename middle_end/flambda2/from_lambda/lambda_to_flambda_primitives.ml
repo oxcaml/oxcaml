@@ -159,8 +159,17 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
   | Punboxedoruntaggedintarray Unboxed_int64 -> Array_kind Naked_int64s
   | Punboxedoruntaggedintarray Unboxed_nativeint -> Array_kind Naked_nativeints
   | Punboxedvectorarray Unboxed_vec128 -> Array_kind Naked_vec128s
-  | Punboxedvectorarray Unboxed_vec256 -> Array_kind Naked_vec256s
-  | Punboxedvectorarray Unboxed_vec512 -> Array_kind Naked_vec512s
+  | Punboxedvectorarray Unboxed_vec256 ->
+    if Vector_types.wide
+    then Array_kind Naked_vec256s
+    else Array_kind (Unboxed_product [Naked_vec128s; Naked_vec128s])
+  | Punboxedvectorarray Unboxed_vec512 ->
+    if Vector_types.wide
+    then Array_kind Naked_vec512s
+    else
+      Array_kind
+        (Unboxed_product
+           [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s])
   | Pgcscannableproductarray kinds ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         P.Array_kind.t =
@@ -193,7 +202,13 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
     Array_kind (Unboxed_product (List.map convert_kind kinds))
 
 let convert_array_kind_for_length kind : P.Array_kind_for_length.t =
-  match convert_array_kind kind with
+  match[@warning "-4"] convert_array_kind kind with
+  | Array_kind Naked_vec256s when not Vector_types.wide ->
+    Array_kind (Unboxed_product [Naked_vec128s; Naked_vec128s])
+  | Array_kind Naked_vec512s when not Vector_types.wide ->
+    Array_kind
+      (Unboxed_product
+         [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s])
   | Array_kind array_kind -> Array_kind array_kind
   | Float_array_opt_dynamic -> Float_array_opt_dynamic
 
@@ -262,9 +277,19 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
   | Punboxedvectorarray_ref Unboxed_vec128 ->
     Array_ref_kind (No_float_array_opt Naked_vec128s)
   | Punboxedvectorarray_ref Unboxed_vec256 ->
-    Array_ref_kind (No_float_array_opt Naked_vec256s)
+    if Vector_types.wide
+    then Array_ref_kind (No_float_array_opt Naked_vec256s)
+    else
+      Array_ref_kind
+        (No_float_array_opt (Unboxed_product [Naked_vec128s; Naked_vec128s]))
   | Punboxedvectorarray_ref Unboxed_vec512 ->
-    Array_ref_kind (No_float_array_opt Naked_vec512s)
+    if Vector_types.wide
+    then Array_ref_kind (No_float_array_opt Naked_vec512s)
+    else
+      Array_ref_kind
+        (No_float_array_opt
+           (Unboxed_product
+              [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s]))
   | Pgcscannableproductarray_ref kinds ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
@@ -431,9 +456,19 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
   | Punboxedvectorarray_set Unboxed_vec128 ->
     Array_set_kind (No_float_array_opt Naked_vec128s)
   | Punboxedvectorarray_set Unboxed_vec256 ->
-    Array_set_kind (No_float_array_opt Naked_vec256s)
+    if Vector_types.wide
+    then Array_set_kind (No_float_array_opt Naked_vec256s)
+    else
+      Array_set_kind
+        (No_float_array_opt (Unboxed_product [Naked_vec128s; Naked_vec128s]))
   | Punboxedvectorarray_set Unboxed_vec512 ->
-    Array_set_kind (No_float_array_opt Naked_vec512s)
+    if Vector_types.wide
+    then Array_set_kind (No_float_array_opt Naked_vec512s)
+    else
+      Array_set_kind
+        (No_float_array_opt
+           (Unboxed_product
+              [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s]))
   | Pgcscannableproductarray_set (mode, kinds) ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_set_kind.no_float_array_opt =
@@ -483,8 +518,8 @@ let rec convert_unboxed_product_array_set_kind
   | Naked_int64s -> Naked_int64s
   | Naked_nativeints -> Naked_nativeints
   | Naked_vec128s -> Naked_vec128s
-  | Naked_vec256s -> Naked_vec256s
-  | Naked_vec512s -> Naked_vec512s
+  | Naked_vec256s | Naked_vec512s ->
+    Misc.fatal_error "Arrays of products of wide vectors is not implemented"
   | Unboxed_product kinds ->
     Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds)
 
@@ -569,8 +604,10 @@ let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
   | Punboxedvectorarray Unboxed_vec128 ->
     Duplicate_array_kind (Naked_vec128s { length = None })
   | Punboxedvectorarray Unboxed_vec256 ->
+    (* Don't need to unarize; only determines element size. *)
     Duplicate_array_kind (Naked_vec256s { length = None })
   | Punboxedvectorarray Unboxed_vec512 ->
+    (* Don't need to unarize; only determines element size. *)
     Duplicate_array_kind (Naked_vec512s { length = None })
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     Misc.fatal_error
@@ -928,6 +965,45 @@ let string_like_load ~dbg ~unsafe
     check_access ~dbg ~machine_width ~access_size ~primitive:unsafe_load string
       ~index_kind index
 
+let offset_index ~machine_width ~index_kind ~index ~by =
+  let int =
+    match (index_kind : L.array_index_kind) with
+    | Ptagged_int_index -> I.Tagged_immediate
+    | Punboxed_or_untagged_integer_index width ->
+      standard_int_of_unboxed_integer width
+  in
+  H.Prim
+    (Binary
+       ( Int_arith (int, Add),
+         index,
+         Simple
+           (Simple.const
+              (Reg_width_const.of_int_of_kind machine_width
+                 (K.Standard_int.to_kind int)
+                 by)) ))
+
+let string_like_load_vec ~dbg ~unsafe ~aligned ~size ~machine_width
+    (kind : P.string_like_value) mode ~boxed string ~index_kind index
+    ~current_region =
+  let load ~size ~index =
+    string_like_load ~dbg ~unsafe
+      ~access_size:(vec_accessor_width ~aligned size)
+      ~machine_width kind mode ~boxed string ~index_kind index ~current_region
+  in
+  let offset i = offset_index ~machine_width ~index_kind ~index ~by:i in
+  match size with
+  | L.Boxed_vec256 when not Vector_types.wide ->
+    [ H.maybe_create_unboxed_product
+        [ load ~size:Boxed_vec128 ~index;
+          load ~size:Boxed_vec128 ~index:(offset 16) ] ]
+  | L.Boxed_vec512 when not Vector_types.wide ->
+    [ H.maybe_create_unboxed_product
+        [ load ~size:Boxed_vec128 ~index;
+          load ~size:Boxed_vec128 ~index:(offset 16);
+          load ~size:Boxed_vec128 ~index:(offset 32);
+          load ~size:Boxed_vec128 ~index:(offset 48) ] ]
+  | L.Boxed_vec128 | L.Boxed_vec256 | L.Boxed_vec512 -> [load ~size ~index]
+
 let get_header obj mode ~current_region =
   let wrap hd = box_bint Boxed_nativeint mode hd ~current_region in
   wrap (Unary (Get_header, obj))
@@ -963,6 +1039,28 @@ let bytes_like_set ~dbg ~unsafe
     in
     check_access ~dbg ~machine_width ~access_size ~primitive:unsafe_set bytes
       ~index_kind index
+
+let bytes_like_set_vec ~dbg ~unsafe ~aligned ~size ~machine_width
+    (kind : P.bytes_like_value) ~boxed bytes ~index_kind index new_values =
+  let set ~size ~index ~new_value =
+    bytes_like_set ~dbg ~unsafe
+      ~access_size:(vec_accessor_width ~aligned size)
+      ~machine_width kind ~boxed bytes ~index_kind index new_value
+  in
+  let offset i = offset_index ~machine_width ~index_kind ~index ~by:i in
+  match new_values, size with
+  | [a; b], L.Boxed_vec256 when not Vector_types.wide ->
+    [ set ~size:Boxed_vec128 ~index ~new_value:a;
+      set ~size:Boxed_vec128 ~index:(offset 16) ~new_value:b ]
+  | [a; b; c; d], L.Boxed_vec512 when not Vector_types.wide ->
+    [ set ~size:Boxed_vec128 ~index ~new_value:a;
+      set ~size:Boxed_vec128 ~index:(offset 16) ~new_value:b;
+      set ~size:Boxed_vec128 ~index:(offset 32) ~new_value:c;
+      set ~size:Boxed_vec128 ~index:(offset 48) ~new_value:d ]
+  | [new_value], (L.Boxed_vec128 | L.Boxed_vec256 | L.Boxed_vec512) ->
+    [set ~size ~index ~new_value]
+  | _, (L.Boxed_vec128 | L.Boxed_vec256 | L.Boxed_vec512) ->
+    Misc.fatal_error "Wrong arity for [bytes_like_set_vec]"
 
 (* Array bounds checks *)
 
@@ -1129,6 +1227,26 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed ~current_region
     check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
       ~vec_kind primitive
 
+let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed ~current_region
+    ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index =
+  let load ~vec_kind ~index =
+    array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed ~current_region
+      ~vec_kind array_kind array ~index_kind index
+  in
+  let offset i = offset_index ~machine_width ~index_kind ~index ~by:i in
+  match vec_kind with
+  | Vec256 when not Vector_types.wide ->
+    [ H.maybe_create_unboxed_product
+        [load ~vec_kind:Vec128 ~index; load ~vec_kind:Vec128 ~index:(offset 16)]
+    ]
+  | Vec512 when not Vector_types.wide ->
+    [ H.maybe_create_unboxed_product
+        [ load ~vec_kind:Vec128 ~index;
+          load ~vec_kind:Vec128 ~index:(offset 16);
+          load ~vec_kind:Vec128 ~index:(offset 32);
+          load ~vec_kind:Vec128 ~index:(offset 48) ] ]
+  | Vec128 | Vec256 | Vec512 -> [load ~vec_kind ~index]
+
 let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
     ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index
     new_value =
@@ -1148,6 +1266,27 @@ let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
   else
     check_array_vector_access ~dbg ~machine_width ~array array_kind ~index
       ~vec_kind primitive
+
+let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+    ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index
+    new_values =
+  let set ~vec_kind ~index ~new_value =
+    array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed ~vec_kind array_kind
+      array ~index_kind index new_value
+  in
+  let offset i = offset_index ~machine_width ~index_kind ~index ~by:i in
+  match new_values, vec_kind with
+  | [a; b], Vec256 when not Vector_types.wide ->
+    [ set ~vec_kind:Vec128 ~index ~new_value:a;
+      set ~vec_kind:Vec128 ~index:(offset 16) ~new_value:b ]
+  | [a; b; c; d], Vec512 when not Vector_types.wide ->
+    [ set ~vec_kind:Vec128 ~index ~new_value:a;
+      set ~vec_kind:Vec128 ~index:(offset 16) ~new_value:b;
+      set ~vec_kind:Vec128 ~index:(offset 32) ~new_value:c;
+      set ~vec_kind:Vec128 ~index:(offset 48) ~new_value:d ]
+  | [new_value], (Vec128 | Vec256 | Vec512) -> [set ~vec_kind ~index ~new_value]
+  | _, (Vec128 | Vec256 | Vec512) ->
+    Misc.fatal_error "Wrong arity for [bytes_like_set_vec]"
 
 (* Bigarray accesses *)
 let bigarray_box_or_tag_raw_value_to_read kind alloc_mode =
@@ -2283,6 +2422,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
              ( Float_comp (width, Yielding_int_like_compare_functions ()),
                arg1,
                arg2 )) ])
+  (* CR mslater: box/unbox *)
   | Punbox_vector Boxed_vec128, [[arg]] ->
     [Unary (Unbox_number Naked_vec128, arg)]
   | Punbox_vector Boxed_vec256, [[arg]] ->
@@ -2428,14 +2568,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~boxed (Some mode) bytes ~index_kind index ~current_region ]
   | Pstring_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]]
     ->
-    [ string_like_load ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned:false size)
-        String ~boxed (Some mode) str ~index_kind index ~current_region ]
+    string_like_load_vec ~unsafe ~dbg ~machine_width ~aligned:false ~size String
+      ~boxed (Some mode) str ~index_kind index ~current_region
   | Pbytes_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]]
     ->
-    [ string_like_load ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned:false size)
-        Bytes ~boxed (Some mode) str ~index_kind index ~current_region ]
+    string_like_load_vec ~unsafe ~dbg ~machine_width ~aligned:false ~size Bytes
+      ~boxed (Some mode) str ~index_kind index ~current_region
   | Pbytes_set_16 { unsafe; index_kind }, [[bytes]; [index]; [new_value]] ->
     [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixteen Bytes
         ~boxed:false bytes ~index_kind index new_value ]
@@ -2452,10 +2590,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixty_four Bytes
         ~boxed bytes ~index_kind index new_value ]
   | ( Pbytes_set_vec { size; unsafe; index_kind; boxed },
-      [[bytes]; [index]; [new_value]] ) ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned:false size)
-        Bytes ~boxed bytes ~index_kind index new_value ]
+      [[bytes]; [index]; new_values] ) ->
+    bytes_like_set_vec ~unsafe ~dbg ~machine_width ~aligned:false ~size Bytes
+      ~boxed bytes ~index_kind index new_values
   | Pisint { variant_only }, [[arg]] ->
     [tag_int (Unary (Is_int { variant_only }, arg))]
   | Pisnull, [[arg]] -> [tag_int (Unary (Is_null, arg))]
@@ -2846,10 +2983,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     ]
   | ( Pbigstring_load_vec { size; unsafe; aligned; index_kind; mode; boxed },
       [[big_str]; [index]] ) ->
-    [ string_like_load ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned size)
-        Bigstring (Some mode) ~boxed big_str ~index_kind index ~current_region
-    ]
+    string_like_load_vec ~unsafe ~dbg ~machine_width ~aligned ~size Bigstring
+      (Some mode) ~boxed big_str ~index_kind index ~current_region
   | Pbigstring_set_16 { unsafe; index_kind }, [[bigstring]; [index]; [new_value]]
     ->
     [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixteen Bigstring
@@ -2867,38 +3002,36 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixty_four
         Bigstring ~boxed bigstring ~index_kind index new_value ]
   | ( Pbigstring_set_vec { size; unsafe; aligned; index_kind; boxed },
-      [[bigstring]; [index]; [new_value]] ) ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned size)
-        Bigstring ~boxed bigstring ~index_kind index new_value ]
+      [[bigstring]; [index]; new_values] ) ->
+    bytes_like_set_vec ~unsafe ~dbg ~machine_width ~aligned ~size Bigstring
+      ~boxed bigstring ~index_kind index new_values
   | ( Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
     check_float_array_optimisation_enabled "Pfloat_array_load_vec";
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index ]
+    array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode ~boxed
+      ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index
   | ( Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] )
   | ( Punboxed_float_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index ]
+    array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode ~boxed
+      ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index
   | ( Punboxed_float32_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index
-    ]
+    array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode ~boxed
+      ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index
   | ( Pint_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
     (match machine_width with
     | Sixty_four -> ()
     | Thirty_two | Thirty_two_no_gc_tag_bit ->
       Misc.fatal_error "[Pint_array_load_vec]: immediates must be 64 bits.");
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Immediates array ~index_kind index ]
+    array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode ~boxed
+      ~vec_kind:(vec_kind size) Immediates array ~index_kind index
   | ( Punboxed_int64_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Naked_int64s array ~index_kind index ]
+    array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode ~boxed
+      ~vec_kind:(vec_kind size) Naked_int64s array ~index_kind index
   | ( Punboxed_nativeint_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
     (match machine_width with
@@ -2906,60 +3039,53 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     | Thirty_two | Thirty_two_no_gc_tag_bit ->
       Misc.fatal_error
         "[Punboxed_nativeint_array_load_vec]: nativeint must be 64 bits.");
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Naked_nativeints array ~index_kind
-        index ]
+    array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode ~boxed
+      ~vec_kind:(vec_kind size) Naked_nativeints array ~index_kind index
   | ( Punboxed_int32_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index ]
+    array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode ~boxed
+      ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index
   | ( Pfloat_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
+      [[array]; [index]; new_values] ) ->
     check_float_array_optimisation_enabled "Pfloat_array_set_vec";
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index new_value
-    ]
+    array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+      ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index new_values
   | ( Pfloatarray_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] )
+      [[array]; [index]; new_values] )
   | ( Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index new_value
-    ]
+      [[array]; [index]; new_values] ) ->
+    array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+      ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index new_values
   | ( Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index
-        new_value ]
+      [[array]; [index]; new_values] ) ->
+    array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+      ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index new_values
   | ( Pint_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
+      [[array]; [index]; new_values] ) ->
     (match machine_width with
     | Sixty_four -> ()
     | Thirty_two | Thirty_two_no_gc_tag_bit ->
       Misc.fatal_error "[Pint_array_set_vec]: immediates must be 64 bits.");
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Immediates array ~index_kind index new_value
-    ]
+    array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+      ~vec_kind:(vec_kind size) Immediates array ~index_kind index new_values
   | ( Punboxed_int64_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Naked_int64s array ~index_kind index new_value
-    ]
+      [[array]; [index]; new_values] ) ->
+    array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+      ~vec_kind:(vec_kind size) Naked_int64s array ~index_kind index new_values
   | ( Punboxed_nativeint_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
+      [[array]; [index]; new_values] ) ->
     (match machine_width with
     | Sixty_four -> ()
     | Thirty_two | Thirty_two_no_gc_tag_bit ->
       Misc.fatal_error
         "[Punboxed_nativeint_array_set_vec]: nativeint must be 64 bits.");
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Naked_nativeints array ~index_kind index
-        new_value ]
+    array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+      ~vec_kind:(vec_kind size) Naked_nativeints array ~index_kind index
+      new_values
   | ( Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index new_value
-    ]
+      [[array]; [index]; new_values] ) ->
+    array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+      ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index new_values
   | Pprobe_is_enabled { name; enabled_at_init }, [] ->
     [tag_int (Nullary (Probe_is_enabled { name; enabled_at_init }))]
   | Pobj_dup, [[v]] -> [Unary (Obj_dup, v)]

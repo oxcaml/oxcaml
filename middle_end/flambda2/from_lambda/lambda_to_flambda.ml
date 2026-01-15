@@ -609,37 +609,58 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       in
       cps_non_tail_list acc env ccenv args
         (fun acc env ccenv args _arity ->
+          let single layout =
+            ( env,
+              [ ( id,
+                  Flambda_debug_uid.of_lambda_debug_uid duid,
+                  Flambda_kind.With_subkind
+                  .from_lambda_values_and_unboxed_numbers_only layout
+                    ~machine_width:(Acc.machine_width acc) ) ] )
+          in
+          let product layouts =
+            let arity_component =
+              Flambda_arity.Component_for_creation.Unboxed_product
+                (List.map
+                   (Flambda_arity.Component_for_creation.from_lambda
+                      ~machine_width:(Acc.machine_width acc))
+                   layouts)
+            in
+            let arity = Flambda_arity.create [arity_component] in
+            let fields =
+              Flambda_arity.fresh_idents_unarized ~id arity
+              |> Flambda_debug_uid.add_proj_debugging_uids_to_fields ~duid
+            in
+            let env =
+              Env.register_unboxed_product_with_kinds env ~unboxed_product:id
+                ~before_unarization:arity_component ~fields
+            in
+            env, fields
+          in
           let env, ids_with_kinds =
             match layout with
             | Ptop | Pbottom ->
               Misc.fatal_error "Cannot bind layout [Ptop] or [Pbottom]"
             | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
             | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
-            | Punboxed_vector _ ->
-              ( env,
-                [ ( id,
-                    Flambda_debug_uid.of_lambda_debug_uid duid,
-                    Flambda_kind.With_subkind
-                    .from_lambda_values_and_unboxed_numbers_only layout
-                      ~machine_width:(Acc.machine_width acc) ) ] )
-            | Punboxed_product layouts ->
-              let arity_component =
-                Flambda_arity.Component_for_creation.Unboxed_product
-                  (List.map
-                     (Flambda_arity.Component_for_creation.from_lambda
-                        ~machine_width:(Acc.machine_width acc))
-                     layouts)
-              in
-              let arity = Flambda_arity.create [arity_component] in
-              let fields =
-                Flambda_arity.fresh_idents_unarized ~id arity
-                |> Flambda_debug_uid.add_proj_debugging_uids_to_fields ~duid
-              in
-              let env =
-                Env.register_unboxed_product_with_kinds env ~unboxed_product:id
-                  ~before_unarization:arity_component ~fields
-              in
-              env, fields
+            | Punboxed_vector Unboxed_vec128 ->
+              single layout
+            | Punboxed_vector Unboxed_vec256 ->
+              if Vector_types.wide
+              then single layout
+              else
+                product
+                  [ Punboxed_vector Unboxed_vec128;
+                    Punboxed_vector Unboxed_vec128 ]
+            | Punboxed_vector Unboxed_vec512 ->
+              if Vector_types.wide
+              then single layout
+              else
+                product
+                  [ Punboxed_vector Unboxed_vec128;
+                    Punboxed_vector Unboxed_vec128;
+                    Punboxed_vector Unboxed_vec128;
+                    Punboxed_vector Unboxed_vec128 ]
+            | Punboxed_product layouts -> product layouts
           in
           let body acc ccenv = cps acc env ccenv body k k_exn in
           let current_region = Env.current_region env in
@@ -1431,13 +1452,24 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
       in
       Some (Unboxed_number bn)
     | Pvalue { nullable = Non_nullable; raw_kind = Pboxedvectorval bv } ->
-      let bn : Flambda_kind.Boxable_number.t =
+      let kind : Function_decl.unboxing_kind =
         match bv with
-        | Boxed_vec128 -> Naked_vec128
-        | Boxed_vec256 -> Naked_vec256
-        | Boxed_vec512 -> Naked_vec512
+        | Boxed_vec128 -> Unboxed_number Naked_vec128
+        | Boxed_vec256 ->
+          if String.equal Config.architecture "amd64"
+          then Unboxed_number Naked_vec256
+          else
+            Fields_of_block_with_tag_zero
+              Flambda_kind.With_subkind.[naked_vec128; naked_vec128]
+        | Boxed_vec512 ->
+          if String.equal Config.architecture "amd64"
+          then Unboxed_number Naked_vec512
+          else
+            Fields_of_block_with_tag_zero
+              Flambda_kind.With_subkind.
+                [naked_vec128; naked_vec128; naked_vec128; naked_vec128]
       in
-      Some (Unboxed_number bn)
+      Some kind
     | Pvalue
         { nullable = Non_nullable;
           raw_kind = Pgenval | Pintval | Pvariant _ | Parrayval _
