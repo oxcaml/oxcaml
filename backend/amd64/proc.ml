@@ -70,11 +70,10 @@ let win64 = Arch.win64
        1. C parameter passing;
        2. C return values;
        3. C callee-saved registers.
-     This translates to the set { r10, r11 }.  These registers hence cannot
-     be used for OCaml parameter passing and must also be marked as
-     destroyed across [Ialloc] and [Ipoll] (otherwise a call to
-     caml_call_gc@PLT might clobber these two registers before the assembly
-     stub saves them into the GC regs block).
+     This translates to the set { r10, r11 }. Since these registers may be live
+     across [Ialloc] or [Ipoll], the GC entrypoints used to enter the runtime
+     during these operations do not use standard linker symbols, but are instead
+     fetched from caml_state (in r14).
 *)
 
 let types_are_compatible (left : Reg.t)  (right : Reg.t) =
@@ -463,10 +462,13 @@ let destroyed_at_c_call =
   if win64 then destroyed_at_c_call_win64 else destroyed_at_c_call_unix
 
 let destroyed_at_alloc_or_poll =
-  if X86_proc.use_plt then
-    destroyed_by_plt_stub
+  if Config.runtime5 then
+    [| |]
   else
-    [| r11 |]
+    if X86_proc.use_plt then
+      destroyed_by_plt_stub
+    else
+      [| r11 |]
 
 let destroyed_at_pushtrap =
   [| r11 |]

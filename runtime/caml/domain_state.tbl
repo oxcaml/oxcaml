@@ -202,5 +202,41 @@ DOMAIN_STATE(struct caml_exception_context*, external_raise_async)
 DOMAIN_STATE(struct memprof_domain_s *, memprof)
 DOMAIN_STATE(value *, memprof_young_trigger)
 
+/* Assembly stubs that require all registers to be preserved.  These cannot be
+   called using standard linker symbols, since on at least Linux amd64 these
+   might go through a lazy-binding PLT stub that clobbers some registers.
+
+   These come in up to 4 variants according to the amount of float/SIMD register
+   state that must be preserved, which varies by architecture.
+   On amd64, simd0 = SSE, simd1 = AVX, simd2 = AVX512. */
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_gc)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_gc_simd0)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_gc_simd1)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_gc_simd2)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc1)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc1_simd0)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc1_simd1)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc1_simd2)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc2)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc2_simd0)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc2_simd1)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc2_simd2)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc3)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc3_simd0)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc3_simd1)
+DOMAIN_STATE(caml_gc_entrypoint, caml_alloc3_simd2)
+DOMAIN_STATE(caml_gc_entrypoint, caml_allocN)
+DOMAIN_STATE(caml_gc_entrypoint, caml_allocN_simd0)
+DOMAIN_STATE(caml_gc_entrypoint, caml_allocN_simd1)
+DOMAIN_STATE(caml_gc_entrypoint, caml_allocN_simd2)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_realloc_stack)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_realloc_stack_simd0)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_realloc_stack_simd1)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_realloc_stack_simd2)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_local_realloc)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_local_realloc_simd0)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_local_realloc_simd1)
+DOMAIN_STATE(caml_gc_entrypoint, caml_call_local_realloc_simd2)
+
 DOMAIN_STATE(extra_params_area, extra_params)
 /* This member must occur last, because it is an array, not a scalar */
