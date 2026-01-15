@@ -966,9 +966,8 @@ let prim_has_valid_reprs ~loc prim =
        errors dependent on the [prim_name]. *)
     ()
   | Wrong_repr ->
-    ignore loc
-    (*= raise (Error (loc,
-            Invalid_native_repr_for_primitive (prim.prim_name))) *)
+    raise (Error (loc,
+            Invalid_native_repr_for_primitive (prim.prim_name)))
 
 let prim_can_contain_layout_any prim =
   match prim.prim_name with
