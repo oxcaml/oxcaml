@@ -298,6 +298,9 @@ module History = struct
           position : int;
           arity : int
         }
+    | Recmod_fun_arg
+    | Array_comprehension_element
+    | Array_comprehension_iterator_element
 
   type value_creation_reason =
     | Class_let_binding
@@ -327,19 +330,16 @@ module History = struct
     | Default_type_jkind
     | Existential_type_variable
     | Idx_base
-    | Array_comprehension_element
     | List_comprehension_iterator_element
-    | Array_comprehension_iterator_element
     | Lazy_expression
     | Class_type_argument
     | Class_term_argument
     | Debug_printer_argument
-    | Recmod_fun_arg
+    | Array_type_kind
     | Quotation_result
     | Antiquotation_result
     | Tquote
     | Tsplice
-    | Array_type_kind
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =

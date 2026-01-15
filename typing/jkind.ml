@@ -2145,6 +2145,16 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value_or_null"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Recmod_fun_arg ->
+      fprintf ppf
+        "it's the type of the first argument to a function in a recursive \
+         module"
+    | Array_comprehension_element ->
+      fprintf ppf "it's the element type of array comprehension"
+    | Array_comprehension_iterator_element ->
+      fprintf ppf
+        "it's the element type of an array that is iterated over in a \
+         comprehension"
 
   let format_value_creation_reason ppf ~layout_or_kind :
       History.value_creation_reason -> _ = function
@@ -2188,15 +2198,9 @@ module Format_history = struct
       fprintf ppf
         "it's the base type (the first type parameter) for a@ block index (idx \
          or mut_idx)"
-    | Array_comprehension_element ->
-      fprintf ppf "it's the element type of array comprehension"
     | List_comprehension_iterator_element ->
       fprintf ppf
         "it's the element type of a list that is iterated over in a \
-         comprehension"
-    | Array_comprehension_iterator_element ->
-      fprintf ppf
-        "it's the element type of an array that is iterated over in a \
          comprehension"
     | Lazy_expression -> fprintf ppf "it's the type of a lazy expression"
     | Class_type_argument ->
@@ -2207,10 +2211,6 @@ module Format_history = struct
     | Debug_printer_argument ->
       format_with_notify_js ppf
         "it's the type of an argument to a debugger printer function"
-    | Recmod_fun_arg ->
-      fprintf ppf
-        "it's the type of the first argument to a function in a recursive \
-         module"
     | Quotation_result -> fprintf ppf "it's the result type of a quotation"
     | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
     | Tquote -> fprintf ppf "it's a staged type"
@@ -2940,6 +2940,10 @@ module Debug_printers = struct
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         !printtyp_path parent_path
+    | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
+    | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
+    | Array_comprehension_iterator_element ->
+      fprintf ppf "Array_comprehension_iterator_element"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
     | Class_let_binding -> fprintf ppf "Class_let_binding"
@@ -2966,16 +2970,12 @@ module Debug_printers = struct
     | Default_type_jkind -> fprintf ppf "Default_type_jkind"
     | Existential_type_variable -> fprintf ppf "Existential_type_variable"
     | Idx_base -> fprintf ppf "Idx_base"
-    | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | List_comprehension_iterator_element ->
       fprintf ppf "List_comprehension_iterator_element"
-    | Array_comprehension_iterator_element ->
-      fprintf ppf "Array_comprehension_iterator_element"
     | Lazy_expression -> fprintf ppf "Lazy_expression"
     | Class_type_argument -> fprintf ppf "Class_type_argument"
     | Class_term_argument -> fprintf ppf "Class_term_argument"
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
-    | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Quotation_result -> fprintf ppf "Quotation_result"
     | Antiquotation_result -> fprintf ppf "Antiquotation_result"
     | Tquote -> fprintf ppf "Tquote"

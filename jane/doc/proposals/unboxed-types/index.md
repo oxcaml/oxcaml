@@ -2,6 +2,9 @@
 
 ## Preamble
 
+**This document was primarily written in 2022, and our thinking may have evolved
+in various ways from what is written here.**
+
 This document describes an upcoming feature we (the compilers team) are
 planning. This is all subject to change as we gain experience during
 implementation. The features described here will become available incrementally;
@@ -1044,7 +1047,7 @@ struct t3 {
 };
 ```
 
-Yet this would take 2 words in memory, as `t1` would be padded in order to be
+Yet this would take 12 bytes in memory, as `t1` would be padded in order to be
 32-bit aligned.
 
 ### Further memory-layout concerns
