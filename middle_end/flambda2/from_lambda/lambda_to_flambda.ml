@@ -1456,13 +1456,13 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         match bv with
         | Boxed_vec128 -> Unboxed_number Naked_vec128
         | Boxed_vec256 ->
-          if String.equal Config.architecture "amd64"
+          if Vector_types.wide
           then Unboxed_number Naked_vec256
           else
             Fields_of_block_with_tag_zero
               Flambda_kind.With_subkind.[naked_vec128; naked_vec128]
         | Boxed_vec512 ->
-          if String.equal Config.architecture "amd64"
+          if Vector_types.wide
           then Unboxed_number Naked_vec512
           else
             Fields_of_block_with_tag_zero
