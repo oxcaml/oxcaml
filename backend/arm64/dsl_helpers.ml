@@ -39,6 +39,30 @@ module Smov_element_to_GP = Ast.Smov_element_to_GP
 module L = Asm_targets.Asm_label
 module S = Asm_targets.Asm_symbol
 
+type gp_w = [`Reg of [`GP of [`W]]] Ast.Operand.t
+
+type gp_x = [`Reg of [`GP of [`X]]] Ast.Operand.t
+
+type scalar_s = [`Reg of [`Neon of [`Scalar of [`S]]]] Ast.Operand.t
+
+type scalar_d = [`Reg of [`Neon of [`Scalar of [`D]]]] Ast.Operand.t
+
+type scalar_q = [`Reg of [`Neon of [`Scalar of [`Q]]]] Ast.Operand.t
+
+type v2s = [`Reg of [`Neon of [`Vector of [`V2S] * [`S]]]] Ast.Operand.t
+
+type v4s = [`Reg of [`Neon of [`Vector of [`V4S] * [`S]]]] Ast.Operand.t
+
+type v2d = [`Reg of [`Neon of [`Vector of [`V2D] * [`D]]]] Ast.Operand.t
+
+type v8b = [`Reg of [`Neon of [`Vector of [`V8B] * [`B]]]] Ast.Operand.t
+
+type v16b = [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]] Ast.Operand.t
+
+type v4h = [`Reg of [`Neon of [`Vector of [`V4H] * [`H]]]] Ast.Operand.t
+
+type v8h = [`Reg of [`Neon of [`Vector of [`V8H] * [`H]]]] Ast.Operand.t
+
 (* See [Proc.int_reg_name]. *)
 let[@ocamlformat "disable"] int_reg_name_to_arch_index =
 [| 0; 1; 2; 3; 4; 5; 6; 7;    (* 0 - 7 *)
