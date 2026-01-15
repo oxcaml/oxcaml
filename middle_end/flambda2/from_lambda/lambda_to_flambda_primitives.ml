@@ -483,8 +483,8 @@ let rec convert_unboxed_product_array_set_kind
   | Naked_int64s -> Naked_int64s
   | Naked_nativeints -> Naked_nativeints
   | Naked_vec128s -> Naked_vec128s
-  | Naked_vec256s -> Naked_vec256s
-  | Naked_vec512s -> Naked_vec512s
+  | Naked_vec256s | Naked_vec512s ->
+    Misc.fatal_error "Arrays of products of wide vectors is not implemented"
   | Unboxed_product kinds ->
     Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds)
 
