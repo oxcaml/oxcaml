@@ -360,8 +360,8 @@ and mixed_block_shape
   end
 
 let block_shape ppf shape = match shape with
-  | None | Some [||] -> ()
-  | Some arr when Lambda.is_uniform_block_shape shape ->
+  | Uniform | Maybe_mixed [||] -> ()
+  | Maybe_mixed arr when Lambda.is_uniform_block_shape shape ->
       (* Print uniform shapes as value kinds *)
       let vks = Array.to_list (Array.map (function
         | Lambda.Value vk -> vk
@@ -380,7 +380,7 @@ let block_shape ppf shape = match shape with
             Format.fprintf ppf ")"
         | [] -> ()
       end
-  | Some arr ->
+  | Maybe_mixed arr ->
       (* Mixed shape - use mixed block printer *)
       mixed_block_shape (fun _ _ -> ()) ppf arr
 

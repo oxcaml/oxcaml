@@ -252,10 +252,12 @@ let compute_static_size lam =
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
         (match shape with
-         | None -> Block (Regular_block (List.length args))
-         | Some _ when Lambda.is_uniform_block_shape shape ->
+         | Uniform -> Block (Regular_block (List.length args))
+         | Maybe_mixed arr ->
+           if Lambda.is_uniform_block_shape shape then
              Block (Regular_block (List.length args))
-         | Some arr -> Block (Mixed_record arr))
+           else
+             Block (Mixed_record arr))
     | Pmakelazyblock _ ->
         Block (Regular_block (List.length args))
     | Pmakearray (kind, _, _) ->
@@ -521,7 +523,8 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
-               Lprim (Pmakeblock (0, lifted_block_mut, None, Lambda.alloc_heap),
+               Lprim (Pmakeblock (0, lifted_block_mut, Uniform,
+                                  Lambda.alloc_heap),
                       [Lvar v], no_loc))
   | Lfunction lfun ->
     let free_vars = Lambda.free_variables lfun.body in
@@ -547,7 +550,7 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = new_fun; free_vars_block_size } in
     let block =
-      Lprim (Pmakeblock (0, lifted_block_mut, None, Lambda.alloc_heap),
+      Lprim (Pmakeblock (0, lifted_block_mut, Uniform, Lambda.alloc_heap),
              List.rev block_fields_rev,
              no_loc)
     in

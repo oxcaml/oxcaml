@@ -120,8 +120,8 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
 
 let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   match shape with
-  | None -> List.init num_fields (fun _field -> K.With_subkind.any_value)
-  | Some shape ->
+  | Uniform -> List.init num_fields (fun _field -> K.With_subkind.any_value)
+  | Maybe_mixed shape ->
     let shape_length = Array.length shape in
     if num_fields <> shape_length
     then
@@ -1797,9 +1797,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     else
       (* Mixed block *)
       let shape =
+        match shape with
+        | Uniform ->
+          (* impossible by [L.is_uniform_block_shape] *)
+          assert false
+        | Maybe_mixed shape -> shape
+      in
+      let shape =
         Mixed_block_shape.of_mixed_block_elements
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          (Option.get shape)
+          shape
       in
       let args =
         let new_indexes_to_old_indexes =

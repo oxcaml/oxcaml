@@ -483,7 +483,8 @@ and layout =
   | Psplicevar of Ident.t
 
 and block_shape =
-  unit mixed_block_element array option
+  | Uniform
+  | Maybe_mixed of unit mixed_block_element array
 
 and 'a mixed_block_element =
   | Value of value_kind

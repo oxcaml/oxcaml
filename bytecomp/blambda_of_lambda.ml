@@ -470,7 +470,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim
-                  ( Pmakeblock (0, Immutable, None, Lambda.alloc_heap),
+                  ( Pmakeblock (0, Immutable, Uniform, Lambda.alloc_heap),
                     fields,
                     loc )
             in
@@ -494,16 +494,17 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | _ -> unary (Ccall "caml_obj_dup"))
     | Pmakeblock (tag, _mut, shape, _) -> (
       match shape with
-      | None -> pseudo_event (variadic (Makeblock { tag }))
-      | Some _ when Lambda.is_uniform_block_shape shape ->
-        pseudo_event (variadic (Makeblock { tag }))
-      | Some shape ->
-        (* There is no notion of a mixed block at runtime in bytecode.
-              Further, source-level unboxed types are represented as boxed in
-              bytecode, so no ceremony is needed to box values before inserting
-              them into the (normal, unmixed) block. *)
-        let total_len = Array.length shape in
-        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
+      | Uniform -> pseudo_event (variadic (Makeblock { tag }))
+      | Maybe_mixed arr ->
+        if Lambda.is_uniform_block_shape shape
+        then pseudo_event (variadic (Makeblock { tag }))
+        else
+          (* There is no notion of a mixed block at runtime in bytecode.
+             Further, source-level unboxed types are represented as boxed in
+             bytecode, so no ceremony is needed to box values before inserting
+             them into the (normal, unmixed) block. *)
+          let total_len = Array.length arr in
+          pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal cu -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
