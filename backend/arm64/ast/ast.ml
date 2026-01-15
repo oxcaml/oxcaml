@@ -782,7 +782,10 @@ module Operand = struct
     let print ppf n = Format.fprintf ppf "#%nd" n
 
     let decode_n_immr_imms (bitmask : t) : int * int * int =
-      Logical_immediates.encode_logical_immediate_fields bitmask
+      let { Logical_immediates.n; immr; imms } =
+        Logical_immediates.encode_logical_immediate_fields bitmask
+      in
+      n, immr, imms
   end
 
   module Shift = struct

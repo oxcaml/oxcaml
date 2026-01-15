@@ -112,7 +112,13 @@ let is_logical_immediate x =
 let mask_of_width n =
   if n >= 64 then -1n else Nativeint.(sub (shift_left 1n n) 1n)
 
-let encode_logical_immediate_fields (x : nativeint) : int * int * int =
+type encoded_logical_immediate =
+  { n : int;
+    immr : int;
+    imms : int
+  }
+
+let encode_logical_immediate_fields (x : nativeint) : encoded_logical_immediate =
   if not (is_logical_immediate x)
   then
     Misc.fatal_error
@@ -232,4 +238,4 @@ let encode_logical_immediate_fields (x : nativeint) : int * int * int =
     | size -> Misc.fatal_errorf "invalid element size: %d" size ()
   in
   let imms = size_encoding lor (ones - 1) in
-  n, immr, imms
+  { n; immr; imms }
