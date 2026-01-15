@@ -120,12 +120,12 @@ val v16b_v16b : Linear.instruction -> v16b * v16b
 (** {1 Polymorphic scalar FP register helpers} *)
 
 type scalar_fp_regs_3 = private
-  | S_regs : (scalar_s as 'a) * 'a * 'a -> scalar_fp_regs_3
-  | D_regs : (scalar_d as 'a) * 'a * 'a -> scalar_fp_regs_3
+  | S_regs : (scalar_s as 'op) * 'op * 'op -> scalar_fp_regs_3
+  | D_regs : (scalar_d as 'op) * 'op * 'op -> scalar_fp_regs_3
 
 type scalar_fp_regs_4 = private
-  | S_regs : (scalar_s as 'a) * 'a * 'a * 'a -> scalar_fp_regs_4
-  | D_regs : (scalar_d as 'a) * 'a * 'a * 'a -> scalar_fp_regs_4
+  | S_regs : (scalar_s as 'op) * 'op * 'op * 'op -> scalar_fp_regs_4
+  | D_regs : (scalar_d as 'op) * 'op * 'op * 'op -> scalar_fp_regs_4
 
 val reg_fp_operand_3 : Reg.t -> Reg.t -> Reg.t -> scalar_fp_regs_3
 
