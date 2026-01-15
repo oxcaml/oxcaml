@@ -118,7 +118,8 @@ type encoded_logical_immediate =
     imms : int
   }
 
-let encode_logical_immediate_fields (x : nativeint) : encoded_logical_immediate =
+let encode_logical_immediate_fields (x : nativeint) : encoded_logical_immediate
+    =
   if not (is_logical_immediate x)
   then
     Misc.fatal_error
