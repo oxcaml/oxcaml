@@ -71,17 +71,29 @@ val reg_x : Reg.t -> gp_x
 
 val reg_d : Reg.t -> scalar_d
 
-(** Like [reg_d] but accepts Float, Float32, Vec128 and Valx2 registers. Used
-    for reinterpret casts where we want to treat any of these as D registers. *)
-val reg_d_of_float_reg : Reg.t -> scalar_d
-
 val reg_s : Reg.t -> scalar_s
 
-val reg_q_operand : Reg.t -> scalar_q
+(** Address a Float register as S to access its lower 32 bits. Used for
+    reinterpret casts between Float and Float32. *)
+val reg_s_of_float : Reg.t -> scalar_s
+
+(** Address a Vec128 register as D to access its lower 64 bits. Used for scalar
+    extraction/insertion operations. *)
+val reg_d_of_vec128 : Reg.t -> scalar_d
+
+(** Address a Vec128 register as S to access its lower 32 bits. Used for scalar
+    extraction/insertion operations. *)
+val reg_s_of_vec128 : Reg.t -> scalar_s
+
+val reg_q : Reg.t -> scalar_q
 
 (** {1 Vector register operands} *)
 
 val reg_v2s : Reg.t -> v2s
+
+(** Like [reg_v2s] but expects Float machtype. Used for 64-bit vector operations
+    like Zip1_f32. *)
+val reg_v2s_of_float : Reg.t -> v2s
 
 val reg_v4s : Reg.t -> v4s
 

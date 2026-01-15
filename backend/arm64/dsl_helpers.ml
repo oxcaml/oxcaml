@@ -86,51 +86,56 @@ let reg_index reg =
     reg_name_to_arch_index reg_class name_index
   | { loc = Stack _ | Unknown; _ } -> fatal_error "Dsl_helpers.reg_index"
 
-(* 128-bit vector types require Vec128 or Valx2 *)
-let assert_vec128_or_valx2 ~fname reg =
+(* 128-bit vector types require Vec128 machtype *)
+let assert_vec128 ~fname reg =
   match reg.typ with
-  | Vec128 | Valx2 -> ()
-  | Val | Int | Addr | Float | Float32 | Vec256 | Vec512 ->
-    Misc.fatal_errorf "%s: expected Vec128/Valx2 register, got %a" fname
-      Printreg.reg reg
+  | Vec128 -> ()
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "%s: expected Vec128 register, got %a" fname Printreg.reg
+      reg
 
-(* 64-bit vector types can also use Float registers since they share the same
-   physical register file (D registers = lower 64 bits of V registers) *)
-let assert_float_vec128_or_valx2 ~fname reg =
-  match reg.typ with
-  | Float | Float32 | Vec128 | Valx2 -> ()
-  | Val | Int | Addr | Vec256 | Vec512 ->
-    Misc.fatal_errorf "%s: expected Float/Float32/Vec128/Valx2 register, got %a"
-      fname Printreg.reg reg
-
-(* 64-bit vector register types *)
+(* 64-bit vector register types. These are used for narrowing operations that
+   produce 64-bit results from 128-bit inputs (e.g., XTN, SQXTN) or widening
+   operations that take 64-bit inputs (e.g., SXTL, FCVTL). The registers have
+   Vec128 machtype because they're allocated from the 128-bit register class. *)
 let reg_v2s reg =
-  assert_float_vec128_or_valx2 ~fname:"reg_v2s" reg;
+  assert_vec128 ~fname:"reg_v2s" reg;
   Ast.DSL.reg_v2s (reg_index reg)
 
 let reg_v8b reg =
-  assert_float_vec128_or_valx2 ~fname:"reg_v8b" reg;
+  assert_vec128 ~fname:"reg_v8b" reg;
   Ast.DSL.reg_v8b (reg_index reg)
 
 let reg_v4h reg =
-  assert_float_vec128_or_valx2 ~fname:"reg_v4h" reg;
+  assert_vec128 ~fname:"reg_v4h" reg;
   Ast.DSL.reg_v4h (reg_index reg)
+
+(* 64-bit vector register types for operations where the machtype is Float. Used
+   for 64-bit vector operations like Zip1_f32 where both inputs and output are
+   64-bit vectors represented as Float machtype. *)
+let reg_v2s_of_float reg =
+  let index = reg_index reg in
+  match reg.typ with
+  | Float -> Ast.DSL.reg_v2s index
+  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_v2s_of_float: expected Float register, got %a"
+      Printreg.reg reg
 
 (* 128-bit vector register types *)
 let reg_v4s reg =
-  assert_vec128_or_valx2 ~fname:"reg_v4s" reg;
+  assert_vec128 ~fname:"reg_v4s" reg;
   Ast.DSL.reg_v4s (reg_index reg)
 
 let reg_v2d reg =
-  assert_vec128_or_valx2 ~fname:"reg_v2d" reg;
+  assert_vec128 ~fname:"reg_v2d" reg;
   Ast.DSL.reg_v2d (reg_index reg)
 
 let reg_v16b reg =
-  assert_vec128_or_valx2 ~fname:"reg_v16b" reg;
+  assert_vec128 ~fname:"reg_v16b" reg;
   Ast.DSL.reg_v16b (reg_index reg)
 
 let reg_v8h reg =
-  assert_vec128_or_valx2 ~fname:"reg_v8h" reg;
+  assert_vec128 ~fname:"reg_v8h" reg;
   Ast.DSL.reg_v8h (reg_index reg)
 
 (* Operand tuple helpers for SIMD instructions *)
@@ -249,57 +254,69 @@ let reg_w reg =
 let reg_d reg =
   let index = reg_index reg in
   match reg.typ with
-  | Float | Vec128 | Valx2 ->
-    (* Vec128/Valx2 allowed for scalar extraction from vectors *)
-    Ast.DSL.reg_op (Ast.Reg.reg_d index)
-  | Val | Int | Addr | Float32 | Vec256 | Vec512 ->
-    Misc.fatal_errorf "reg_d: expected Float or Vec128/Valx2 register, got %a"
-      Printreg.reg reg
-
-(* Like [reg_d] but accepts Float, Float32, Vec128 and Valx2 registers. Used for
-   reinterpret casts where we want to treat any of these as D registers. *)
-let reg_d_of_float_reg reg =
-  let index = reg_index reg in
-  match reg.typ with
-  | Float | Float32 | Vec128 | Valx2 -> Ast.DSL.reg_op (Ast.Reg.reg_d index)
-  | Val | Int | Addr | Vec256 | Vec512 ->
-    Misc.fatal_errorf
-      "reg_d_of_float_reg: expected Float, Float32, or Vec128/Valx2 register, \
-       got %a"
-      Printreg.reg reg
+  | Float -> Ast.DSL.reg_op (Ast.Reg.reg_d index)
+  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_d: expected Float register, got %a" Printreg.reg reg
 
 let reg_s reg =
   let index = reg_index reg in
   match reg.typ with
-  | Float32 | Vec128 | Valx2 ->
-    (* Vec128/Valx2 allowed for scalar extraction from vectors *)
-    Ast.DSL.reg_op (Ast.Reg.reg_s index)
-  | Val | Int | Addr | Float | Vec256 | Vec512 ->
-    Misc.fatal_errorf "reg_s: expected Float32 or Vec128/Valx2 register, got %a"
-      Printreg.reg reg
+  | Float32 -> Ast.DSL.reg_op (Ast.Reg.reg_s index)
+  | Val | Int | Addr | Float | Vec128 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_s: expected Float32 register, got %a" Printreg.reg
+      reg
 
-let reg_q_operand reg =
+(* Address a Float register as S to access its lower 32 bits. Used for
+   reinterpret casts between Float and Float32. *)
+let reg_s_of_float reg =
   let index = reg_index reg in
   match reg.typ with
-  | Vec128 | Valx2 -> Ast.DSL.reg_op (Ast.Reg.reg_q index)
-  | Val | Int | Addr | Float | Float32 | Vec256 | Vec512 ->
-    Misc.fatal_errorf "reg_q_operand: expected Vec128/Valx2 register, got %a"
+  | Float -> Ast.DSL.reg_op (Ast.Reg.reg_s index)
+  | Val | Int | Addr | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_s_of_float: expected Float register, got %a"
       Printreg.reg reg
+
+(* Address a Vec128 register as D to access its lower 64 bits. Used for scalar
+   extraction/insertion operations (Scalar_of_v128, V128_of_scalar). *)
+let reg_d_of_vec128 reg =
+  let index = reg_index reg in
+  match reg.typ with
+  | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_d index)
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_d_of_vec128: expected Vec128 register, got %a"
+      Printreg.reg reg
+
+(* Address a Vec128 register as S to access its lower 32 bits. Used for scalar
+   extraction/insertion operations (Scalar_of_v128, V128_of_scalar). *)
+let reg_s_of_vec128 reg =
+  let index = reg_index reg in
+  match reg.typ with
+  | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_s index)
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_s_of_vec128: expected Vec128 register, got %a"
+      Printreg.reg reg
+
+let reg_q reg =
+  let index = reg_index reg in
+  match reg.typ with
+  | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_q index)
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_q: expected Vec128 register, got %a" Printreg.reg reg
 
 let reg_v2d_operand reg =
   let index = reg_index reg in
   match reg.typ with
-  | Vec128 | Valx2 -> Ast.DSL.reg_op (Ast.Reg.reg_v2d index)
-  | Val | Int | Addr | Float | Float32 | Vec256 | Vec512 ->
-    Misc.fatal_errorf "reg_v2d_operand: expected Vec128/Valx2 register, got %a"
+  | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_v2d index)
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_v2d_operand: expected Vec128 register, got %a"
       Printreg.reg reg
 
 let reg_v16b_operand reg =
   let index = reg_index reg in
   match reg.typ with
-  | Vec128 | Valx2 -> Ast.DSL.reg_op (Ast.Reg.reg_v16b index)
-  | Val | Int | Addr | Float | Float32 | Vec256 | Vec512 ->
-    Misc.fatal_errorf "reg_v16b_operand: expected Vec128/Valx2 register, got %a"
+  | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_v16b index)
+  | Val | Int | Addr | Float | Float32 | Valx2 | Vec256 | Vec512 ->
+    Misc.fatal_errorf "reg_v16b_operand: expected Vec128 register, got %a"
       Printreg.reg reg
 
 type scalar_fp_regs_3 =

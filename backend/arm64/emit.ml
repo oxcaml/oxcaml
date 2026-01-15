@@ -330,7 +330,11 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
   | Paddq_s16 -> ins3 ADDP_vector (v8h_v8h_v8h i)
   | Paddq_s8 -> ins3 ADDP_vector (v16b_v16b_v16b i)
   (* Vector zip operations *)
-  | Zip1_f32 -> ins3 ZIP1 (reg_v2s res.(0), reg_v2s arg.(0), reg_v2s arg.(1))
+  | Zip1_f32 ->
+    ins3 ZIP1
+      ( reg_v2s_of_float res.(0),
+        reg_v2s_of_float arg.(0),
+        reg_v2s_of_float arg.(1) )
   | Zip1q_s8 -> ins3 ZIP1 (v16b_v16b_v16b i)
   | Zip1q_s16 -> ins3 ZIP1 (v8h_v8h_v8h i)
   | Zip1q_f32 -> ins3 ZIP1 (v4s_v4s_v4s i)
@@ -1354,7 +1358,7 @@ let emit_load_literal dst lbl =
   | Float -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addr
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
   | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
-  | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) addr
+  | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
   | Vec256 | Vec512 ->
     Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
       Printreg.reg dst
@@ -1374,7 +1378,7 @@ let move_between_distinct_locs (src : Reg.t) (dst : Reg.t) =
   | Float32, Reg _, Float32, Stack _ ->
     A.ins2 STR_simd_and_fp (H.reg_s src) (stack dst)
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
-    A.ins2 STR_simd_and_fp (H.reg_q_operand src) (stack dst)
+    A.ins2 STR_simd_and_fp (H.reg_q src) (stack dst)
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
     A.ins2 STR (H.reg_x src) (stack dst)
   | Float, Stack _, Float, Reg _ ->
@@ -1382,7 +1386,7 @@ let move_between_distinct_locs (src : Reg.t) (dst : Reg.t) =
   | Float32, Stack _, Float32, Reg _ ->
     A.ins2 LDR_simd_and_fp (H.reg_s dst) (stack src)
   | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
-    A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) (stack src)
+    A.ins2 LDR_simd_and_fp (H.reg_q dst) (stack src)
   | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
     A.ins2 LDR (H.reg_x dst) (stack src)
   | _, Stack _, _, Stack _ ->
@@ -1415,19 +1419,22 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   | Float32_of_int32 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst) (H.reg_w src)
   | Int32_of_float32 -> A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s src)
   | Float32_of_float ->
-    (* Reinterpret cast: treat both as d registers for FMOV if distinct. *)
+    (* Reinterpret cast: copy lower 32 bits of Float to Float32 using 32-bit
+       FMOV. We address the Float source as S to get its lower 32 bits. *)
     if distinct
     then (
       assert (Cmm.equal_machtype_component src.typ Float);
       assert (Cmm.equal_machtype_component dst.typ Float32);
-      A.ins2 FMOV_fp (H.reg_d_of_float_reg dst) (H.reg_d_of_float_reg src))
+      A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s_of_float src))
   | Float_of_float32 ->
-    (* Reinterpret cast: treat both as d registers for FMOV if distinct. *)
+    (* Reinterpret cast: copy 32 bits of Float32 to lower 32 bits of Float using
+       32-bit FMOV. We address the Float destination as S; ARM64 zeros the upper
+       32 bits when writing to S. *)
     if distinct
     then (
       assert (Cmm.equal_machtype_component src.typ Float32);
       assert (Cmm.equal_machtype_component dst.typ Float);
-      A.ins2 FMOV_fp (H.reg_d_of_float_reg dst) (H.reg_d_of_float_reg src))
+      A.ins2 FMOV_fp (H.reg_s_of_float dst) (H.reg_s src))
   | V128_of_vec Vec128 ->
     if distinct
     then A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
@@ -1447,28 +1454,33 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   | Float_of_float32 -> A.ins2 FCVT (H.reg_d dst) (H.reg_s src)
   | Float32_of_float -> A.ins2 FCVT (H.reg_s dst) (H.reg_d src)
   | Scalar_of_v128 v -> (
+    (* src is Vec128, dst depends on vector element type *)
     match v with
     | Int8x16 ->
-      (* Note this uses [reg_s] even though the source is wider *)
-      A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s src);
+      A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s_of_vec128 src);
       A.ins_uxtb (H.reg_w dst) (H.reg_w dst)
     | Int16x8 ->
-      A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s src);
+      A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s_of_vec128 src);
       A.ins_uxth (H.reg_w dst) (H.reg_w dst)
-    | Int32x4 -> A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s src)
-    | Int64x2 -> A.ins2 FMOV_fp_to_gp_64 (H.reg_x dst) (H.reg_d src)
+    | Int32x4 -> A.ins2 FMOV_fp_to_gp_32 (H.reg_w dst) (H.reg_s_of_vec128 src)
+    | Int64x2 -> A.ins2 FMOV_fp_to_gp_64 (H.reg_x dst) (H.reg_d_of_vec128 src)
     | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
-    | Float32x4 -> if distinct then A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
-    | Float64x2 -> if distinct then A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d src))
+    | Float32x4 ->
+      if distinct then A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s_of_vec128 src)
+    | Float64x2 ->
+      if distinct then A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d_of_vec128 src))
   | V128_of_scalar v -> (
+    (* dst is Vec128, src depends on vector element type *)
     match v with
-    | Int8x16 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst) (H.reg_w src)
-    | Int16x8 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst) (H.reg_w src)
-    | Int32x4 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s dst) (H.reg_w src)
-    | Int64x2 -> A.ins2 FMOV_gp_to_fp_64 (H.reg_d dst) (H.reg_x src)
+    | Int8x16 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s_of_vec128 dst) (H.reg_w src)
+    | Int16x8 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s_of_vec128 dst) (H.reg_w src)
+    | Int32x4 -> A.ins2 FMOV_gp_to_fp_32 (H.reg_s_of_vec128 dst) (H.reg_w src)
+    | Int64x2 -> A.ins2 FMOV_gp_to_fp_64 (H.reg_d_of_vec128 dst) (H.reg_x src)
     | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
-    | Float32x4 -> if distinct then A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
-    | Float64x2 -> if distinct then A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d src))
+    | Float32x4 ->
+      if distinct then A.ins2 FMOV_fp (H.reg_s_of_vec128 dst) (H.reg_s src)
+    | Float64x2 ->
+      if distinct then A.ins2 FMOV_fp (H.reg_d_of_vec128 dst) (H.reg_d src))
   | V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
 
@@ -1636,7 +1648,7 @@ let emit_instr i =
     | Single { reg = Float32 } ->
       A.ins2 LDR_simd_and_fp (H.reg_s dst) default_addressing
     | Onetwentyeight_aligned ->
-      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) default_addressing
+      A.ins2 LDR_simd_and_fp (H.reg_q dst) default_addressing
     | Onetwentyeight_unaligned ->
       (match addressing_mode with
       | Iindexed n ->
@@ -1651,7 +1663,7 @@ let emit_instr i =
         A.ins4 ADD_immediate reg_x_tmp1 reg_x_tmp1
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none);
-      A.ins2 LDR_simd_and_fp (H.reg_q_operand dst) (H.mem reg_tmp1_base)
+      A.ins2 LDR_simd_and_fp (H.reg_q dst) (H.mem reg_tmp1_base)
     | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
     | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector")
@@ -1686,14 +1698,14 @@ let emit_instr i =
     | Single { reg = Float32 } ->
       A.ins2 STR_simd_and_fp (H.reg_s src) (H.addressing addr base)
     | Onetwentyeight_aligned ->
-      A.ins2 STR_simd_and_fp (H.reg_q_operand src) (H.addressing addr base)
+      A.ins2 STR_simd_and_fp (H.reg_q src) (H.addressing addr base)
     | Onetwentyeight_unaligned -> (
       match addr with
       | Iindexed n ->
         A.ins4 ADD_immediate reg_x_tmp1
           (H.reg_x i.arg.(1))
           (O.imm n) O.optional_none;
-        A.ins2 STR_simd_and_fp (H.reg_q_operand src) (H.mem reg_tmp1_base)
+        A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base)
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
@@ -1702,7 +1714,7 @@ let emit_instr i =
         A.ins4 ADD_immediate reg_x_tmp1 reg_x_tmp1
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none;
-        A.ins2 STR_simd_and_fp (H.reg_q_operand src) (H.mem reg_tmp1_base))
+        A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base))
     | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
     | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector")
