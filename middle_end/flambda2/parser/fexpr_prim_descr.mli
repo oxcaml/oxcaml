@@ -161,8 +161,15 @@ module Describe : sig
   (** Describes repetition of the given construction. *)
   val list : 'p param_cons list -> 'p list param_cons
 
-  (** Custom transformation of parameter value. *)
-  val map : ('b, 'a) map_lens -> 'a param_cons -> 'b param_cons
+  (** Custom transformation of parameter value.
+
+      Labels inverted to be related to the argument. [maps x ~to_ ~from] read
+      "maps [x] to return type" and "maps [x] from return type" *)
+  val maps :
+    to_:(of_fl_env -> 'b -> 'a) ->
+    from:(to_fl_env -> 'a -> 'b) ->
+    'a param_cons ->
+    'b param_cons
 
   (** Simple pattern-matching of parameters. Takes a list of case construction
       (see {!val:case}) and represents the first that matches in appearance

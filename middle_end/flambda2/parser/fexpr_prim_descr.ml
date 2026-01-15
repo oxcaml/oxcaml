@@ -64,6 +64,8 @@ let wrap_loc txt = Fexpr.{ txt; loc = Debuginfo.Scoped_location.Loc_unknown }
 
 let unwrap_loc located = located.Fexpr.txt
 
+(* Parsing fexpr parameters. Low-brow iteration through constructors in
+   declaration order, consuming the param list on match. *)
 let extract_param (env : to_fl_env) (params : param list) (cons : 'p param_cons)
     : 'p * param list =
   let rec pos conv lp params =
@@ -279,15 +281,14 @@ module Describe = struct
         },
         param_cons )
 
-  let map (f : ('b, 'a) map_lens) (pcons : 'a param_cons) : 'b param_cons =
-    Map (pcons, f)
+  let maps ~(to_ : of_fl_env -> 'b -> 'a) ~(from : to_fl_env -> 'a -> 'b)
+      (pcons : 'a param_cons) : 'b param_cons =
+    Map (pcons, { to_fl = from; of_fl = to_ })
 
   let opt_presence (pcons : unit option param_cons) : bool param_cons =
-    map
-      { of_fl = (fun _ b -> if b then Some () else None);
-        to_fl = (fun _ -> Option.is_some)
-      }
-      pcons
+    maps pcons
+      ~to_:(fun _ b -> if b then Some () else None)
+      ~from:(fun _ -> Option.is_some)
 
   let bool_flag f : bool param_cons = opt_presence @@ option @@ flag f
 

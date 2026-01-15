@@ -6,19 +6,11 @@ let todo = L.todo
 (* Common cons *)
 let or_unknown cons =
   L.(
-    map
-      { to_fl =
-          (fun _ o ->
-            match o with
-            | None -> Or_unknown.Unknown
-            | Some v -> Or_unknown.known v);
-        of_fl =
-          (fun _ ouk ->
-            match (ouk : _ Or_unknown.t) with
-            | Unknown -> None
-            | Known v -> Some v)
-      }
-      (option cons))
+    maps (option cons)
+      ~from:(fun _ o ->
+        match o with None -> Or_unknown.Unknown | Some v -> Or_unknown.known v)
+      ~to_:(fun _ ouk ->
+        match (ouk : _ Or_unknown.t) with Unknown -> None | Known v -> Some v))
 
 let target_ocaml_int : Target_ocaml_int.t value_lens =
   { of_fl = (fun _ t -> Target_ocaml_int.to_int t |> string_of_int |> wrap_loc);
@@ -391,26 +383,17 @@ let project_value_slot =
     unary "%project_value_slot"
       ~params:
         (param2
-           (map
-              { to_fl =
-                  (fun env pf ->
-                    Fexpr_to_flambda_commons.fresh_or_existing_function_slot env
-                      pf);
-                of_fl =
-                  (fun env pf ->
-                    Flambda_to_fexpr_commons.Env.translate_function_slot env pf)
-              }
-              (positional string))
-           (map
-              { to_fl =
-                  (fun env vs ->
-                    Fexpr_to_flambda_commons.fresh_or_existing_value_slot env vs
-                      kind);
-                of_fl =
-                  (fun env vs ->
-                    Flambda_to_fexpr_commons.Env.translate_value_slot env vs)
-              }
-              (positional string)))
+           (maps (positional string)
+              ~from:(fun env pf ->
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf)
+              ~to_:(fun env pf ->
+                Flambda_to_fexpr_commons.Env.translate_function_slot env pf))
+           (maps (positional string)
+              ~from:(fun env vs ->
+                Fexpr_to_flambda_commons.fresh_or_existing_value_slot env vs
+                  kind)
+              ~to_:(fun env vs ->
+                Flambda_to_fexpr_commons.Env.translate_value_slot env vs)))
       (fun _ (project_from, value_slot) ->
         Flambda_primitive.Project_value_slot { project_from; value_slot }))
 
@@ -419,26 +402,16 @@ let project_function_slot =
     unary "%project_function_slot"
       ~params:
         (param2
-           (map
-              { to_fl =
-                  (fun env mf ->
-                    Fexpr_to_flambda_commons.fresh_or_existing_function_slot env
-                      mf);
-                of_fl =
-                  (fun env mf ->
-                    Flambda_to_fexpr_commons.Env.translate_function_slot env mf)
-              }
-              (positional string))
-           (map
-              { to_fl =
-                  (fun env mt ->
-                    Fexpr_to_flambda_commons.fresh_or_existing_function_slot env
-                      mt);
-                of_fl =
-                  (fun env mt ->
-                    Flambda_to_fexpr_commons.Env.translate_function_slot env mt)
-              }
-              (positional string)))
+           (maps (positional string)
+              ~from:(fun env mf ->
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf)
+              ~to_:(fun env mf ->
+                Flambda_to_fexpr_commons.Env.translate_function_slot env mf))
+           (maps (positional string)
+              ~from:(fun env mt ->
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt)
+              ~to_:(fun env mt ->
+                Flambda_to_fexpr_commons.Env.translate_function_slot env mt)))
       (fun _ (move_from, move_to) ->
         Flambda_primitive.Project_function_slot { move_from; move_to }))
 
@@ -470,32 +443,30 @@ let array_load =
   L.(
     binary "%array_load"
       ~params:
-        (map
-           { to_fl =
-               (fun _ (k, m) ->
-                 let lk : Flambda_primitive.Array_load_kind.t =
-                   match (k : Flambda_primitive.Array_kind.t) with
-                   | Immediates -> Immediates
-                   | Gc_ignorable_values -> Gc_ignorable_values
-                   | Values -> Values
-                   | Naked_floats -> Naked_floats
-                   | Naked_float32s -> Naked_float32s
-                   | Naked_ints -> Naked_ints
-                   | Naked_int8s -> Naked_int8s
-                   | Naked_int16s -> Naked_int16s
-                   | Naked_int32s -> Naked_int32s
-                   | Naked_int64s -> Naked_int64s
-                   | Naked_nativeints -> Naked_nativeints
-                   | Naked_vec128s -> Naked_vec128s
-                   | Naked_vec256s -> Naked_vec256s
-                   | Naked_vec512s -> Naked_vec512s
-                   | Unboxed_product _ ->
-                     Misc.fatal_error "Unboxed product array ops not supported"
-                 in
-                 k, lk, m);
-             of_fl = (fun _ (k, _, m) -> k, m)
-           }
-           (param2 array_kind mutability))
+        (maps
+           (param2 array_kind mutability)
+           ~from:(fun _ (k, m) ->
+             let lk : Flambda_primitive.Array_load_kind.t =
+               match (k : Flambda_primitive.Array_kind.t) with
+               | Immediates -> Immediates
+               | Gc_ignorable_values -> Gc_ignorable_values
+               | Values -> Values
+               | Naked_floats -> Naked_floats
+               | Naked_float32s -> Naked_float32s
+               | Naked_ints -> Naked_ints
+               | Naked_int8s -> Naked_int8s
+               | Naked_int16s -> Naked_int16s
+               | Naked_int32s -> Naked_int32s
+               | Naked_int64s -> Naked_int64s
+               | Naked_nativeints -> Naked_nativeints
+               | Naked_vec128s -> Naked_vec128s
+               | Naked_vec256s -> Naked_vec256s
+               | Naked_vec512s -> Naked_vec512s
+               | Unboxed_product _ ->
+                 Misc.fatal_error "Unboxed product array ops not supported"
+             in
+             k, lk, m)
+           ~to_:(fun _ (k, _, m) -> k, m))
       (fun _ (k, lk, m) -> Flambda_primitive.Array_load (k, lk, m)))
 
 let phys_eq =
@@ -588,47 +559,44 @@ let array_set =
   L.(
     ternary "%array_set"
       ~params:
-        (map
-           { to_fl =
-               (fun _ (k, ia) ->
-                 let sk : Flambda_primitive.Array_set_kind.t =
-                   match (k : Flambda_primitive.Array_kind.t) with
-                   | Values -> Values ia
-                   | Immediates -> Immediates
-                   | Gc_ignorable_values -> Gc_ignorable_values
-                   | Naked_floats -> Naked_floats
-                   | Naked_float32s -> Naked_float32s
-                   | Naked_ints -> Naked_ints
-                   | Naked_int8s -> Naked_int8s
-                   | Naked_int16s -> Naked_int16s
-                   | Naked_int32s -> Naked_int32s
-                   | Naked_int64s -> Naked_int64s
-                   | Naked_nativeints -> Naked_nativeints
-                   | Naked_vec128s -> Naked_vec128s
-                   | Naked_vec256s -> Naked_vec256s
-                   | Naked_vec512s -> Naked_vec512s
-                   | Unboxed_product _ ->
-                     Misc.fatal_error "Unboxed product array ops not supported"
-                 in
-                 k, sk);
-             of_fl =
-               (fun _ (k, sk) : (Flambda_primitive.Array_kind.t * _) ->
-                 let no_ai =
-                   Flambda_primitive.Init_or_assign.Assignment
-                     Alloc_mode.For_assignments.heap
-                 in
-                 let ai =
-                   match (sk : Flambda_primitive.Array_set_kind.t) with
-                   | Values ai -> ai
-                   | Immediates | Gc_ignorable_values | Naked_floats
-                   | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-                   | Naked_int32s | Naked_int64s | Naked_nativeints
-                   | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
-                     no_ai
-                 in
-                 k, ai)
-           }
-           (param2 array_kind init_or_assign))
+        (maps
+           (param2 array_kind init_or_assign)
+           ~from:(fun _ (k, ia) ->
+             let sk : Flambda_primitive.Array_set_kind.t =
+               match (k : Flambda_primitive.Array_kind.t) with
+               | Values -> Values ia
+               | Immediates -> Immediates
+               | Gc_ignorable_values -> Gc_ignorable_values
+               | Naked_floats -> Naked_floats
+               | Naked_float32s -> Naked_float32s
+               | Naked_ints -> Naked_ints
+               | Naked_int8s -> Naked_int8s
+               | Naked_int16s -> Naked_int16s
+               | Naked_int32s -> Naked_int32s
+               | Naked_int64s -> Naked_int64s
+               | Naked_nativeints -> Naked_nativeints
+               | Naked_vec128s -> Naked_vec128s
+               | Naked_vec256s -> Naked_vec256s
+               | Naked_vec512s -> Naked_vec512s
+               | Unboxed_product _ ->
+                 Misc.fatal_error "Unboxed product array ops not supported"
+             in
+             k, sk)
+           ~to_:(fun _ (k, sk) : (Flambda_primitive.Array_kind.t * _) ->
+             let no_ai =
+               Flambda_primitive.Init_or_assign.Assignment
+                 Alloc_mode.For_assignments.heap
+             in
+             let ai =
+               match (sk : Flambda_primitive.Array_set_kind.t) with
+               | Values ai -> ai
+               | Immediates | Gc_ignorable_values | Naked_floats
+               | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+               | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+               | Naked_vec256s | Naked_vec512s ->
+                 no_ai
+             in
+             k, ai))
       (fun _ (k, sk) -> Flambda_primitive.Array_set (k, sk)))
 
 let bytes_or_bigstring_set =
@@ -726,21 +694,14 @@ module OfFlambda = struct
 
   let binop env (op : Flambda_primitive.binary_primitive) =
     match op with
-    | Block_set { kind; init; field } ->
-      (* let kind = block_access_kind kind in *)
-      (* let init = init_or_assign env init in *)
-      block_set env (kind, init, field)
+    | Block_set { kind; init; field } -> block_set env (kind, init, field)
     | Array_load (ak, width, mut) -> array_load env (ak, width, mut)
     | Phys_equal Eq -> phys_eq env ()
     | Phys_equal Neq -> phys_ne env ()
-    (* | Int_arith (Tagged_immediate, o) -> Infix (Int_arith o) *)
     | Int_arith (i, o) -> int_barith env (i, o)
     | Int_comp (i, c) -> int_comp env (i, c)
-    (* | Int_shift (Tagged_immediate, s) -> Infix (Int_shift s) *)
     | Int_shift (i, s) -> int_shift env (i, s)
-    (* | Float_arith (w, o) -> Infix (Float_arith (w, o)) *)
     | Float_arith (Float64, o) -> float_arith env o
-    (* | Float_comp (w, c) -> Infix (Float_comp (w, c)) *)
     | Float_comp (w, c) -> float_comp env (w, c)
     | String_or_bigstring_load (String, saw) -> string_load env saw
     | String_or_bigstring_load (Bytes, saw) -> bytes_load env saw
