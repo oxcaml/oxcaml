@@ -1,0 +1,20 @@
+All-immutable record
+raw_field 0: 3
+raw_field 1: 5
+raw_field 2: 7
+
+Mixed mutable/immutable record
+raw_field 0 (immut): 21
+raw_field 1 (mut): 41
+raw_field 2 (immut): 61
+after set y: 20
+
+All-mutable record
+initial: p=100 q=200 r=300
+raw: 201 401 601
+after swap: p=300 q=200 r=100
+
+All-float record
+initial: f1=1.5 f2=2.5 f3=3.5
+raw: 4609434218613702656 4612811918334230528 4615063718147915776
+after swap: f1=3.5 f2=2.5 f3=1.5
