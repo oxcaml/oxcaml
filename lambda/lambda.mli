@@ -431,6 +431,7 @@ and array_set_kind =
 and ignorable_product_element_kind =
   | Pint_ignorable
   | Punboxedfloat_ignorable of unboxed_float
+  | Punboxedvector_ignorable of unboxed_vector
   | Punboxedoruntaggedint_ignorable of unboxed_or_untagged_integer
   | Pproduct_ignorable of ignorable_product_element_kind list
   (* Invariant: the product element kind list has length >= 2 *)
