@@ -4950,9 +4950,7 @@ let rec filter_method_row env name priv ty =
   | _ ->
       raise Filter_method_row_failed
 
-let instance_declaration_with_params env params decl =
-  (* Uses [generic_instance_declaration] to guarantee unification
-     succeeds regardless of levels. *)
+let generic_instance_declaration_with_params env params decl =
   let decl = generic_instance_declaration decl in
   List.iter2 (unify_var env) decl.type_params params;
   decl
