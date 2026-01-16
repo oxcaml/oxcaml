@@ -13,7 +13,10 @@ let foo1 y =
 
 let () = assert (Int.equal (foo1 0) 55)
 let () = assert (Int.equal (foo1 42) 97)
-[%%expect.ignore_feedback]
+
+[%%expect{|
+val foo1 : int -> int = <fun>
+|}]
 
 (* Test 1.2: basic usage with a nested record returning string *)
 type t_1_2 = { str_1_2 : string ref }
@@ -246,7 +249,9 @@ let foo4_7 y =
   done;
   10
 ;;
-[%%expect.ignore_feedback]
+[%%expect{|
+val foo4_7 : int -> int = <fun>
+|}]
 
 (* Can't return [x] if it is local *)
 let foo4_8 () =
@@ -290,7 +295,9 @@ let foo5_1 y =  (* Assignment of local allowed in same scope *)
   | (x :: xs) -> 42
 
 let () = assert Int.(equal 42 (foo5_1 42))
-[%%expect.ignore_feedback]
+[%%expect{|
+val foo5_1 : 'a -> int = <fun>
+|}]
 
 let foo5_2 y =  (* Assignment of local works in _local_ for loop body region *)
   let mutable x = [] in
@@ -302,7 +309,9 @@ let foo5_2 y =  (* Assignment of local works in _local_ for loop body region *)
   | (x :: xs) -> 42
 
 let () = assert Int.(equal 42 (foo5_2 42))
-[%%expect.ignore_feedback]
+[%%expect{|
+val foo5_2 : int -> int = <fun>
+|}]
 
 let foo5_3 y = (* Assignment of local works in _local_ while body region *)
   let mutable x = y in
@@ -311,14 +320,19 @@ let foo5_3 y = (* Assignment of local works in _local_ while body region *)
     x <- (local_ (x + !i));
     i := !i + 1;
   done; (x : int)
-[%%expect.ignore_feedback]
+[%%expect{|
+val foo5_3 : int -> int = <fun>
+|}]
 
 let foo5_4 y = (* Assign of local works in _local_ while cond region *)
   let mutable x = y in
   while exclave_ x <- (local_ (x + 1)); x <= 100 do
     x <- x + x
   done; (x : int)
-[%%expect.ignore_feedback]
+
+[%%expect{|
+val foo5_4 : int -> int = <fun>
+|}]
 
 (* Test 6: Regionality *)
 (* 6.1: regional <- regional assignment is allowed *)
@@ -373,17 +387,22 @@ let f_11 () =
   (y, x)
 
 let () = assert (f_11 () = (10,20))
-[%%expect.ignore_feedback]
+[%%expect{|
+val f_11 : unit -> int * int = <fun>
+|}]
 
 (* Test 12: like Test 11, but with a constructor *)
 type t_12 = Foo_12 of int
+[%%expect.ignore_feedback]
 
 let y_12 =
   let mutable x = 42 in
   let y = Foo_12 x in
     x <- 84; y
 ;;
-[%%expect.ignore_feedback]
+[%%expect{|
+val y_12 : t_12 = Foo_12 42
+|}]
 
 (* Test 12.1: Eta-expansion of reordered arguments *)
 let x_12_1 =
