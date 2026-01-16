@@ -654,7 +654,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let shape =
         (Some
             [| Value (Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type);
-              Value { raw_kind = Pintval; nullable = Non_nullable }
+               Value { raw_kind = Pintval; nullable = Non_nullable }
             |])
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in

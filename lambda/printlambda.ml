@@ -360,7 +360,7 @@ and mixed_block_shape
   end
 
 let block_shape ppf shape = match shape with
-  | None | Some [||] -> ()
+  | None -> ()
   | Some arr when Lambda.is_uniform_block_shape shape ->
       (* Print uniform shapes as value kinds *)
       let vks = Array.to_list (Array.map (function
@@ -382,7 +382,7 @@ let block_shape ppf shape = match shape with
       end
   | Some arr ->
       (* Mixed shape - use mixed block printer *)
-      mixed_block_shape (fun _ _ -> ()) ppf arr
+      mixed_block_shape (fun _ () -> ()) ppf arr
 
 let field_read_semantics ppf sem =
   match sem with
