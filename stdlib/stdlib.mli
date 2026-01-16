@@ -32,19 +32,22 @@
 
 (** {1 Exceptions} *)
 
-external raise : ('a : value_or_null). exn -> 'a @ portable unique = "%reraise"
+external raise : ('a : value_or_null)
+  . exn -> 'a @ portable unique @@ stateless = "%reraise"
 (** Raise the given exception value *)
 
-external raise_notrace : ('a : value_or_null). exn -> 'a @ portable unique
-  = "%raise_notrace"
+external raise_notrace : ('a : value_or_null)
+  . exn -> 'a @ portable unique @@ stateless = "%raise_notrace"
 (** A faster version [raise] which does not record the backtrace.
     @since 4.02
 *)
 
-val invalid_arg : ('a : value_or_null) . string -> 'a @ portable unique
+val invalid_arg : ('a : value_or_null)
+  . string -> 'a @ portable unique @@ stateless
 (** Raise exception [Invalid_argument] with the given string. *)
 
-val failwith : ('a : value_or_null) . string -> 'a @ portable unique
+val failwith : ('a : value_or_null)
+  . string -> 'a @ portable unique @@ stateless
 (** Raise exception [Failure] with the given string. *)
 
 exception Exit
@@ -125,7 +128,8 @@ exception Undefined_recursive_module of (string * int * int)
 
 (** {1 Comparisons} *)
 
-external ( = ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%equal"
+external ( = ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%equal"
 (** [e1 = e2] tests for structural equality of [e1] and [e2].
    Mutable structures (e.g. references and arrays) are equal
    if and only if their current contents are structurally equal,
@@ -134,27 +138,32 @@ external ( = ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> 
    Equality between cyclic data structures may not terminate.
    Left-associative operator, see {!Ocaml_operators} for more information. *)
 
-external ( <> ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%notequal"
+external ( <> ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%notequal"
 (** Negation of {!Stdlib.( = )}.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( < ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%lessthan"
+external ( < ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%lessthan"
 (** See {!Stdlib.( >= )}.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( > ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%greaterthan"
+external ( > ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%greaterthan"
 (** See {!Stdlib.( >= )}.
     Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
 
-external ( <= ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%lessequal"
+external ( <= ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%lessequal"
 (** See {!Stdlib.( >= )}.
     Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
 
-external ( >= ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%greaterequal"
+external ( >= ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%greaterequal"
 (** Structural ordering functions. These functions coincide with
    the usual orderings over integers, characters, strings, byte sequences
    and floating-point numbers, and extend them to a
@@ -166,7 +175,8 @@ external ( >= ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) ->
    Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external compare : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> int = "%compare"
+external compare : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> int @@ stateless = "%compare"
 (** [compare x y] returns [0] if [x] is equal to [y],
    a negative integer if [x] is less than [y], and a positive integer
    if [x] is greater than [y].  The ordering implemented by [compare]
@@ -185,17 +195,18 @@ external compare : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -
    required by the {!Set.Make} and {!Map.Make} functors, as well as
    the {!List.sort} and {!Array.sort} functions. *)
 
-val min : ('a : value_or_null) . 'a -> 'a -> 'a
+val min : ('a : value_or_null) . 'a -> 'a -> 'a @@ stateless
 (** Return the smaller of the two arguments.
     The result is unspecified if one of the arguments contains
     the float value [nan]. *)
 
-val max : ('a : value_or_null) . 'a -> 'a -> 'a
+val max : ('a : value_or_null) . 'a -> 'a -> 'a @@ stateless
 (** Return the greater of the two arguments.
     The result is unspecified if one of the arguments contains
     the float value [nan]. *)
 
-external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
+external ( == ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%eq"
 (** [e1 == e2] tests for physical equality of [e1] and [e2].
    On mutable types such as references, arrays, byte sequences, records with
    mutable fields and objects with mutable instance variables,
@@ -207,7 +218,8 @@ external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) ->
    Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
 
-external ( != ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%noteq"
+external ( != ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%noteq"
 (** Negation of {!Stdlib.( == )}.
     Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
@@ -215,17 +227,19 @@ external ( != ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) ->
 
 (** {1 Boolean operations} *)
 
-external not : (bool[@local_opt]) -> bool = "%boolnot"
+external not : (bool[@local_opt]) -> bool @@ stateless = "%boolnot"
 (** The boolean negation. *)
 
-external ( && ) : (bool[@local_opt]) -> (bool[@local_opt]) -> bool = "%sequand"
+external ( && )
+  : (bool[@local_opt]) -> (bool[@local_opt]) -> bool @@ stateless = "%sequand"
 (** The boolean 'and'. Evaluation is sequential, left-to-right:
    in [e1 && e2], [e1] is evaluated first, and if it returns [false],
    [e2] is not evaluated at all.
    Right-associative operator,  see {!Ocaml_operators} for more information.
 *)
 
-external ( || ) : (bool[@local_opt]) -> (bool[@local_opt]) -> bool = "%sequor"
+external ( || )
+  : (bool[@local_opt]) -> (bool[@local_opt]) -> bool @@ stateless = "%sequor"
 (** The boolean 'or'. Evaluation is sequential, left-to-right:
    in [e1 || e2], [e1] is evaluated first, and if it returns [true],
    [e2] is not evaluated at all.
@@ -302,7 +316,7 @@ external __POS_OF__ : ('a : value_or_null) . 'a -> (string * int * int * int) * 
 (** {1 Composition operators} *)
 
 external ( |> ) : ('a : value_or_null) ('b : value_or_null)
-  . 'a -> ('a -> 'b) -> 'b = "%revapply"
+  . 'a -> ('a -> 'b) -> 'b @@ stateless = "%revapply"
 (** Reverse-application operator: [x |> f |> g] is exactly equivalent
  to [g (f (x))].
  Left-associative operator, see {!Ocaml_operators} for more information.
@@ -310,7 +324,7 @@ external ( |> ) : ('a : value_or_null) ('b : value_or_null)
 *)
 
 external ( @@ ) : ('a : value_or_null) ('b : value_or_null)
-  . ('a -> 'b) -> 'a -> 'b = "%apply"
+  . ('a -> 'b) -> 'a -> 'b @@ stateless = "%apply"
 (** Application operator: [g @@ f @@ x] is exactly equivalent to
  [g (f (x))].
  Right-associative operator, see {!Ocaml_operators} for more information.
@@ -323,40 +337,44 @@ external ( @@ ) : ('a : value_or_null) ('b : value_or_null)
     All operations are taken modulo 2{^[Sys.int_size]}.
     They do not fail on overflow. *)
 
-external ( ~- ) : (int[@local_opt]) -> int = "%negint"
+external ( ~- ) : (int[@local_opt]) -> int @@ stateless = "%negint"
 (** Unary negation. You can also write [- e] instead of [~- e].
     Unary operator, see {!Ocaml_operators} for more information.
 *)
 
 
-external ( ~+ ) : (int[@local_opt]) -> int = "%identity"
+external ( ~+ ) : (int[@local_opt]) -> int @@ stateless = "%identity"
 (** Unary addition. You can also write [+ e] instead of [~+ e].
     Unary operator, see {!Ocaml_operators} for more information.
     @since 3.12
 *)
 
-external succ : (int[@local_opt]) -> int = "%succint"
+external succ : (int[@local_opt]) -> int @@ stateless = "%succint"
 (** [succ x] is [x + 1]. *)
 
-external pred : (int[@local_opt]) -> int = "%predint"
+external pred : (int[@local_opt]) -> int @@ stateless = "%predint"
 (** [pred x] is [x - 1]. *)
 
-external ( + ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%addint"
+external ( + )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%addint"
 (** Integer addition.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( - ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%subint"
+external ( - )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%subint"
 (** Integer subtraction.
     Left-associative operator, , see {!Ocaml_operators} for more information.
 *)
 
-external ( * ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%mulint"
+external ( * )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%mulint"
 (** Integer multiplication.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( / ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%divint"
+external ( / )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%divint"
 (** Integer division.
    Integer division rounds the real quotient of its arguments towards zero.
    More precisely, if [x >= 0] and [y > 0], [x / y] is the greatest integer
@@ -367,7 +385,8 @@ external ( / ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%divint"
    @raise Division_by_zero if the second argument is 0.
 *)
 
-external ( mod ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%modint"
+external ( mod )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%modint"
 (** Integer remainder.  If [y] is not zero, the result
    of [x mod y] satisfies the following properties:
    [x = (x / y) * y + x mod y] and
@@ -379,7 +398,7 @@ external ( mod ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%modint"
    @raise Division_by_zero if [y] is zero.
 *)
 
-val abs : int -> int
+val abs : int -> int @@ stateless
 (** [abs x] is the absolute value of [x]. On [min_int] this
    is [min_int] itself and thus remains negative. *)
 
@@ -392,31 +411,36 @@ val min_int : int
 
 (** {2 Bitwise operations} *)
 
-external ( land ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%andint"
+external ( land )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%andint"
 (** Bitwise logical and.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( lor ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%orint"
+external ( lor )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%orint"
 (** Bitwise logical or.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( lxor ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%xorint"
+external ( lxor )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%xorint"
 (** Bitwise logical exclusive or.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-val lnot : int -> int
+val lnot : int -> int @@ stateless
 (** Bitwise logical negation. *)
 
-external ( lsl ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%lslint"
+external ( lsl )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%lslint"
 (** [n lsl m] shifts [n] to the left by [m] bits.
     The result is unspecified if [m < 0] or [m > Sys.int_size].
     Right-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( lsr ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%lsrint"
+external ( lsr )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%lsrint"
 (** [n lsr m] shifts [n] to the right by [m] bits.
     This is a logical shift: zeroes are inserted regardless of
     the sign of [n].
@@ -424,7 +448,8 @@ external ( lsr ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%lsrint"
     Right-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( asr ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%asrint"
+external ( asr )
+  : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless = "%asrint"
 (** [n asr m] shifts [n] to the right by [m] bits.
     This is an arithmetic shift: the sign bit of [n] is replicated.
     The result is unspecified if [m < 0] or [m > Sys.int_size].
@@ -445,103 +470,118 @@ external ( asr ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%asrint"
     ([+.], [-.], [*.], [/.]) with [nan] as an argument return [nan], ...
 *)
 
-external ( ~-. ) : (float[@local_opt]) -> (float[@local_opt]) = "%negfloat"
+external ( ~-. )
+  : (float[@local_opt]) -> (float[@local_opt]) @@ stateless = "%negfloat"
 (** Unary negation. You can also write [-. e] instead of [~-. e].
     Unary operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( ~+. ) : (float[@local_opt]) -> (float[@local_opt]) = "%identity"
+external ( ~+. )
+  : (float[@local_opt]) -> (float[@local_opt]) @@ stateless = "%identity"
 (** Unary addition. You can also write [+. e] instead of [~+. e].
     Unary operator, see {!Ocaml_operators} for more information.
     @since 3.12
 *)
 
-external ( +. ) : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) = "%addfloat"
+external ( +. )
+  : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  @@ stateless = "%addfloat"
 (** Floating-point addition.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( -. ) : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) = "%subfloat"
+external ( -. )
+  : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  @@ stateless = "%subfloat"
 (** Floating-point subtraction.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( *. ) : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) = "%mulfloat"
+external ( *. )
+  : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  @@ stateless = "%mulfloat"
 (** Floating-point multiplication.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( /. ) : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) = "%divfloat"
+external ( /. )
+  : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  @@ stateless = "%divfloat"
 (** Floating-point division.
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( ** ) : float -> float -> float = "caml_power_float" "pow"
-  [@@unboxed] [@@noalloc]
+external ( ** ) : float -> float -> float @@ stateless
+  = "caml_power_float" "pow" [@@unboxed] [@@noalloc]
 (** Exponentiation.
     Right-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external sqrt : float -> float = "caml_sqrt_float" "sqrt"
-  [@@unboxed] [@@noalloc]
+external sqrt : float -> float @@ stateless
+  = "caml_sqrt_float" "sqrt" [@@unboxed] [@@noalloc]
 (** Square root. *)
 
-external exp : float -> float = "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
+external exp : float -> float @@ stateless
+  = "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
 (** Exponential. *)
 
-external log : float -> float = "caml_log_float" "log" [@@unboxed] [@@noalloc]
+external log : float -> float @@ stateless
+  = "caml_log_float" "log" [@@unboxed] [@@noalloc]
 (** Natural logarithm. *)
 
-external log10 : float -> float = "caml_log10_float" "log10"
-  [@@unboxed] [@@noalloc]
+external log10 : float -> float @@ stateless
+  = "caml_log10_float" "log10" [@@unboxed] [@@noalloc]
 (** Base 10 logarithm. *)
 
-external expm1 : float -> float = "caml_expm1_float" "caml_expm1"
-  [@@unboxed] [@@noalloc]
+external expm1 : float -> float @@ stateless
+  = "caml_expm1_float" "caml_expm1" [@@unboxed] [@@noalloc]
 (** [expm1 x] computes [exp x -. 1.0], giving numerically-accurate results
     even if [x] is close to [0.0].
     @since 3.12
 *)
 
-external log1p : float -> float = "caml_log1p_float" "caml_log1p"
-  [@@unboxed] [@@noalloc]
+external log1p : float -> float @@ stateless
+  = "caml_log1p_float" "caml_log1p" [@@unboxed] [@@noalloc]
 (** [log1p x] computes [log(1.0 +. x)] (natural logarithm),
     giving numerically-accurate results even if [x] is close to [0.0].
     @since 3.12
 *)
 
-external cos : float -> float = "caml_cos_float" "cos" [@@unboxed] [@@noalloc]
+external cos : float -> float @@ stateless
+  = "caml_cos_float" "cos" [@@unboxed] [@@noalloc]
 (** Cosine.  Argument is in radians. *)
 
-external sin : float -> float = "caml_sin_float" "sin" [@@unboxed] [@@noalloc]
+external sin : float -> float @@ stateless
+  = "caml_sin_float" "sin" [@@unboxed] [@@noalloc]
 (** Sine.  Argument is in radians. *)
 
-external tan : float -> float = "caml_tan_float" "tan" [@@unboxed] [@@noalloc]
+external tan : float -> float @@ stateless
+  = "caml_tan_float" "tan" [@@unboxed] [@@noalloc]
 (** Tangent.  Argument is in radians. *)
 
-external acos : float -> float = "caml_acos_float" "acos"
-  [@@unboxed] [@@noalloc]
+external acos : float -> float @@ stateless
+  = "caml_acos_float" "acos" [@@unboxed] [@@noalloc]
 (** Arc cosine.  The argument must fall within the range [[-1.0, 1.0]].
     Result is in radians and is between [0.0] and [pi]. *)
 
-external asin : float -> float = "caml_asin_float" "asin"
-  [@@unboxed] [@@noalloc]
+external asin : float -> float @@ stateless
+  = "caml_asin_float" "asin" [@@unboxed] [@@noalloc]
 (** Arc sine.  The argument must fall within the range [[-1.0, 1.0]].
     Result is in radians and is between [-pi/2] and [pi/2]. *)
 
-external atan : float -> float = "caml_atan_float" "atan"
-  [@@unboxed] [@@noalloc]
+external atan : float -> float @@ stateless
+  = "caml_atan_float" "atan" [@@unboxed] [@@noalloc]
 (** Arc tangent.
     Result is in radians and is between [-pi/2] and [pi/2]. *)
 
-external atan2 : float -> float -> float = "caml_atan2_float" "atan2"
-  [@@unboxed] [@@noalloc]
+external atan2 : float -> float -> float @@ stateless
+  = "caml_atan2_float" "atan2" [@@unboxed] [@@noalloc]
 (** [atan2 y x] returns the arc tangent of [y /. x].  The signs of [x]
     and [y] are used to determine the quadrant of the result.
     Result is in radians and is between [-pi] and [pi]. *)
 
-external hypot : float -> float -> float = "caml_hypot_float" "caml_hypot"
-  [@@unboxed] [@@noalloc]
+external hypot : float -> float -> float @@ stateless
+  = "caml_hypot_float" "caml_hypot" [@@unboxed] [@@noalloc]
 (** [hypot x y] returns [sqrt(x *. x + y *. y)], that is, the length
   of the hypotenuse of a right-angled triangle with sides of length
   [x] and [y], or, equivalently, the distance of the point [(x,y)]
@@ -549,20 +589,20 @@ external hypot : float -> float -> float = "caml_hypot_float" "caml_hypot"
   even if the other is [nan].
   @since 4.00  *)
 
-external cosh : float -> float = "caml_cosh_float" "cosh"
-  [@@unboxed] [@@noalloc]
+external cosh : float -> float @@ stateless
+  = "caml_cosh_float" "cosh" [@@unboxed] [@@noalloc]
 (** Hyperbolic cosine.  Argument is in radians. *)
 
-external sinh : float -> float = "caml_sinh_float" "sinh"
-  [@@unboxed] [@@noalloc]
+external sinh : float -> float @@ stateless
+  = "caml_sinh_float" "sinh" [@@unboxed] [@@noalloc]
 (** Hyperbolic sine.  Argument is in radians. *)
 
-external tanh : float -> float = "caml_tanh_float" "tanh"
-  [@@unboxed] [@@noalloc]
+external tanh : float -> float @@ stateless
+  = "caml_tanh_float" "tanh" [@@unboxed] [@@noalloc]
 (** Hyperbolic tangent.  Argument is in radians. *)
 
-external acosh : float -> float = "caml_acosh_float" "caml_acosh"
-  [@@unboxed] [@@noalloc]
+external acosh : float -> float @@ stateless
+  = "caml_acosh_float" "caml_acosh" [@@unboxed] [@@noalloc]
 (** Hyperbolic arc cosine.  The argument must fall within the range
     [[1.0, inf]].
     Result is in radians and is between [0.0] and [inf].
@@ -570,8 +610,8 @@ external acosh : float -> float = "caml_acosh_float" "caml_acosh"
     @since 4.13
 *)
 
-external asinh : float -> float = "caml_asinh_float" "caml_asinh"
-  [@@unboxed] [@@noalloc]
+external asinh : float -> float @@ stateless
+  = "caml_asinh_float" "caml_asinh" [@@unboxed] [@@noalloc]
 (** Hyperbolic arc sine.  The argument and result range over the entire
     real line.
     Result is in radians.
@@ -579,8 +619,8 @@ external asinh : float -> float = "caml_asinh_float" "caml_asinh"
     @since 4.13
 *)
 
-external atanh : float -> float = "caml_atanh_float" "caml_atanh"
-  [@@unboxed] [@@noalloc]
+external atanh : float -> float @@ stateless
+  = "caml_atanh_float" "caml_atanh" [@@unboxed] [@@noalloc]
 (** Hyperbolic arc tangent.  The argument must fall within the range
     [[-1.0, 1.0]].
     Result is in radians and ranges over the entire real line.
@@ -588,38 +628,39 @@ external atanh : float -> float = "caml_atanh_float" "caml_atanh"
     @since 4.13
 *)
 
-external ceil : float -> float = "caml_ceil_float" "ceil"
-  [@@unboxed] [@@noalloc]
+external ceil : float -> float @@ stateless
+  = "caml_ceil_float" "ceil" [@@unboxed] [@@noalloc]
 (** Round above to an integer value.
     [ceil f] returns the least integer value greater than or equal to [f].
     The result is returned as a float. *)
 
-external floor : float -> float = "caml_floor_float" "floor"
-  [@@unboxed] [@@noalloc]
+external floor : float -> float @@ stateless
+  = "caml_floor_float" "floor" [@@unboxed] [@@noalloc]
 (** Round below to an integer value.
     [floor f] returns the greatest integer value less than or
     equal to [f].
     The result is returned as a float. *)
 
-external abs_float : (float[@local_opt]) -> (float[@local_opt]) = "%absfloat"
+external abs_float : (float[@local_opt]) -> (float[@local_opt]) @@ stateless
+  = "%absfloat"
 (** [abs_float f] returns the absolute value of [f]. *)
 
-external copysign : float -> float -> float
-                  = "caml_copysign_float" "caml_copysign"
-                  [@@unboxed] [@@noalloc]
+external copysign : float -> float -> float @@ stateless
+  = "caml_copysign_float" "caml_copysign" [@@unboxed] [@@noalloc]
 (** [copysign x y] returns a float whose absolute value is that of [x]
   and whose sign is that of [y].  If [x] is [nan], returns [nan].
   If [y] is [nan], returns either [x] or [-. x], but it is not
   specified which.
   @since 4.00  *)
 
-external mod_float : float -> float -> float = "caml_fmod_float" "fmod"
-  [@@unboxed] [@@noalloc]
+external mod_float : float -> float -> float @@ stateless
+  = "caml_fmod_float" "fmod" [@@unboxed] [@@noalloc]
 (** [mod_float a b] returns the remainder of [a] with respect to
    [b].  The returned value is [a -. n *. b], where [n]
    is the quotient [a /. b] rounded towards zero to an integer. *)
 
-external frexp : float -> float * int = "caml_frexp_float"
+external frexp : float -> float * int @@ stateless
+  = "caml_frexp_float"
 (** [frexp f] returns the pair of the significant
    and the exponent of [f].  When [f] is zero, the
    significant [x] and the exponent [n] of [f] are equal to
@@ -627,24 +668,27 @@ external frexp : float -> float * int = "caml_frexp_float"
    [f = x *. 2 ** n] and [0.5 <= x < 1.0]. *)
 
 
-external ldexp : (float [@unboxed]) -> (int [@untagged]) -> (float [@unboxed]) =
-  "caml_ldexp_float" "caml_ldexp_float_unboxed" [@@noalloc]
+external ldexp
+  : (float [@unboxed]) -> (int [@untagged]) -> (float [@unboxed]) @@ stateless
+  = "caml_ldexp_float" "caml_ldexp_float_unboxed" [@@noalloc]
 (** [ldexp x n] returns [x *. 2 ** n]. *)
 
-external modf : float -> float * float = "caml_modf_float"
+external modf : float -> float * float @@ stateless = "caml_modf_float"
 (** [modf f] returns the pair of the fractional and integral
    part of [f]. *)
 
-external float : (int[@local_opt]) -> (float[@local_opt]) = "%floatofint"
+external float : (int[@local_opt]) -> (float[@local_opt]) @@ stateless
+  = "%floatofint"
 (** Same as {!Stdlib.float_of_int}. *)
 
-external float_of_int : (int[@local_opt]) -> (float[@local_opt]) = "%floatofint"
+external float_of_int : (int[@local_opt]) -> (float[@local_opt]) @@ stateless
+  = "%floatofint"
 (** Convert an integer to floating-point. *)
 
-external truncate : (float[@local_opt]) -> int = "%intoffloat"
+external truncate : (float[@local_opt]) -> int @@ stateless = "%intoffloat"
 (** Same as {!Stdlib.int_of_float}. *)
 
-external int_of_float : (float[@local_opt]) -> int = "%intoffloat"
+external int_of_float : (float[@local_opt]) -> int @@ stateless = "%intoffloat"
 (** Truncate the given floating-point number to an integer.
    The result is unspecified if the argument is [nan] or falls outside the
    range of representable integers. *)
@@ -685,7 +729,7 @@ type fpclass =
 (** The five classes of floating-point numbers, as determined by
    the {!Stdlib.classify_float} function. *)
 
-external classify_float : (float [@unboxed]) -> fpclass =
+external classify_float : (float [@unboxed]) -> fpclass @@ stateless =
   "caml_classify_float" "caml_classify_float_unboxed" [@@noalloc]
 (** Return the class of the given floating-point number:
    normal, subnormal, zero, infinite, or not a number. *)
@@ -696,7 +740,7 @@ external classify_float : (float [@unboxed]) -> fpclass =
    More string operations are provided in module {!String}.
 *)
 
-val ( ^ ) : string -> string -> string
+val ( ^ ) : string -> string -> string @@ stateless
 (** String concatenation.
     Right-associative operator, see {!Ocaml_operators} for more information.
 
@@ -709,10 +753,10 @@ val ( ^ ) : string -> string -> string
    More character operations are provided in module {!Char}.
 *)
 
-external int_of_char : char -> int = "%identity"
+external int_of_char : char -> int @@ stateless = "%identity"
 (** Return the ASCII code of the argument. *)
 
-val char_of_int : int -> char
+val char_of_int : int -> char @@ stateless
 (** Return the character with the given ASCII code.
    @raise Invalid_argument if the argument is
    outside the range 0--255. *)
@@ -720,7 +764,7 @@ val char_of_int : int -> char
 
 (** {1 Unit operations} *)
 
-external ignore : ('a : value_or_null) . 'a -> unit = "%ignore"
+external ignore : ('a : value_or_null) . 'a -> unit @@ stateless = "%ignore"
 (** Discard the value of its argument and return [()].
    For instance, [ignore(f x)] discards the result of
    the side-effecting function [f].  It is equivalent to
@@ -728,7 +772,8 @@ external ignore : ('a : value_or_null) . 'a -> unit = "%ignore"
    compiler warning; writing [ignore(f x)] instead
    avoids the warning. *)
 
-external ignore_contended : ('a : value_or_null) . 'a @ contended local once -> unit
+external ignore_contended
+  : ('a : value_or_null) . 'a @ contended local once -> unit @@ stateless
   = "%ignore"
 (** Like {!ignore}, but takes a [contended local once] value. This is technically strictly
     stronger than [ignore], but changing [ignore] in place causes backwards compatibility
@@ -816,10 +861,12 @@ external float_of_string : string -> float = "caml_float_of_string"
 
 (** {1 Pair operations} *)
 
-external fst : ('a * 'b[@local_opt]) -> ('a[@local_opt]) = "%field0_immut"
+external fst : ('a * 'b[@local_opt]) -> ('a[@local_opt]) @@ stateless
+  = "%field0_immut"
 (** Return the first component of a pair. *)
 
-external snd : ('a * 'b[@local_opt]) -> ('b[@local_opt]) = "%field1_immut"
+external snd : ('a * 'b[@local_opt]) -> ('b[@local_opt]) @@ stateless
+  = "%field1_immut"
 (** Return the second component of a pair. *)
 
 
@@ -828,7 +875,7 @@ external snd : ('a * 'b[@local_opt]) -> ('b[@local_opt]) = "%field1_immut"
    More list operations are provided in module {!List}.
 *)
 
-val ( @ ) : ('a : value_or_null) . 'a list -> 'a list -> 'a list
+val ( @ ) : ('a : value_or_null) . 'a list -> 'a list -> 'a list @@ stateless
 (** [l0 @ l1] appends [l1] to [l0]. Same function as {!List.append}.
   Right-associative operator, see {!Ocaml_operators} for more information.
   @since 5.1 this function is tail-recursive.
@@ -1230,26 +1277,29 @@ type ('a : value_or_null) ref = { mutable contents : 'a }
 (** The type of references (mutable indirection cells) containing
    a value of type ['a]. *)
 
-external ref : ('a : value_or_null) . 'a -> ('a ref[@local_opt]) = "%makemutable"
+external ref : ('a : value_or_null)
+  . 'a -> ('a ref[@local_opt]) @@ stateless = "%makemutable"
 (** Return a fresh reference containing the given value. *)
 
-external ( ! ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a = "%field0"
+external ( ! ) : ('a : value_or_null)
+  . ('a ref[@local_opt]) -> 'a @@ stateless = "%field0"
 (** [!r] returns the current contents of reference [r].
    Equivalent to [fun r -> r.contents].
    Unary operator, see {!Ocaml_operators} for more information.
 *)
 
-external ( := ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a -> unit = "%setfield0"
+external ( := ) : ('a : value_or_null)
+  . ('a ref[@local_opt]) -> 'a -> unit @@ stateless = "%setfield0"
 (** [r := a] stores the value of [a] in reference [r].
    Equivalent to [fun r v -> r.contents <- v].
    Right-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-external incr : (int ref[@local_opt]) -> unit = "%incr"
+external incr : (int ref[@local_opt]) -> unit @@ stateless = "%incr"
 (** Increment the integer contained in the given reference.
    Equivalent to [fun r -> r := succ !r]. *)
 
-external decr : (int ref[@local_opt]) -> unit = "%decr"
+external decr : (int ref[@local_opt]) -> unit @@ stateless = "%decr"
 (** Decrement the integer contained in the given reference.
    Equivalent to [fun r -> r := pred !r]. *)
 

@@ -30,10 +30,10 @@ let () =
     (Invalid_argument "address was misaligned")
 
 external raise :
-  ('a : value_or_null). exn -> 'a @ portable unique @@ portable
+  ('a : value_or_null). exn -> 'a @ portable unique @@ stateless
   = "%reraise"
 external raise_notrace :
-  ('a : value_or_null). exn -> 'a @ portable unique @@ portable
+  ('a : value_or_null). exn -> 'a @ portable unique @@ stateless
   = "%raise_notrace"
 
 let failwith s = raise(Failure s)
@@ -56,9 +56,9 @@ exception Undefined_recursive_module = Undefined_recursive_module
 (* Composition operators *)
 
 external ( |> ) : ('a : value_or_null) ('b : value_or_null)
-  . 'a -> ('a -> 'b) -> 'b @@ portable = "%revapply"
+  . 'a -> ('a -> 'b) -> 'b @@ stateless = "%revapply"
 external ( @@ ) : ('a : value_or_null) ('b : value_or_null)
-  . ('a -> 'b) -> 'a -> 'b @@ portable = "%apply"
+  . ('a -> 'b) -> 'a -> 'b @@ stateless = "%apply"
 
 (* Debugging *)
 
@@ -75,117 +75,157 @@ external __POS_OF__ : ('a : value_or_null) . 'a -> (string * int * int * int) * 
 
 (* Comparisons *)
 
-external ( = ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%equal"
-external ( <> ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%notequal"
-external ( < ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%lessthan"
-external ( > ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%greaterthan"
-external ( <= ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%lessequal"
-external ( >= ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%greaterequal"
-external compare : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> int @@ portable = "%compare"
+external ( = ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%equal"
+external ( <> ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%notequal"
+external ( < ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%lessthan"
+external ( > ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%greaterthan"
+external ( <= ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%lessequal"
+external ( >= ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%greaterequal"
+external compare : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> int @@ stateless = "%compare"
 
 let min x y = if x <= y then x else y
 let max x y = if x >= y then x else y
 
-external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%eq"
-external ( != ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ portable = "%noteq"
+external ( == ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%eq"
+external ( != ) : ('a : value_or_null)
+  . ('a[@local_opt]) -> ('a[@local_opt]) -> bool @@ stateless = "%noteq"
 
 (* Boolean operations *)
 
-external not : (bool[@local_opt]) -> bool @@ portable = "%boolnot"
-external ( && ) : (bool[@local_opt]) -> (bool[@local_opt]) -> bool @@ portable = "%sequand"
-external ( || ) : (bool[@local_opt]) -> (bool[@local_opt]) -> bool @@ portable = "%sequor"
+external not : (bool[@local_opt]) -> bool @@ stateless = "%boolnot"
+external ( && ) : (bool[@local_opt]) -> (bool[@local_opt]) -> bool @@ stateless
+  = "%sequand"
+external ( || ) : (bool[@local_opt]) -> (bool[@local_opt]) -> bool @@ stateless
+  = "%sequor"
 
 (* Integer operations *)
 
-external ( ~- ) : (int[@local_opt]) -> int @@ portable = "%negint"
-external ( ~+ ) : (int[@local_opt]) -> int @@ portable = "%identity"
-external succ : (int[@local_opt]) -> int @@ portable = "%succint"
-external pred : (int[@local_opt]) -> int @@ portable = "%predint"
-external ( + ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%addint"
-external ( - ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%subint"
-external ( * ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%mulint"
-external ( / ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%divint"
-external ( mod ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%modint"
+external ( ~- ) : (int[@local_opt]) -> int @@ stateless = "%negint"
+external ( ~+ ) : (int[@local_opt]) -> int @@ stateless = "%identity"
+external succ : (int[@local_opt]) -> int @@ stateless = "%succint"
+external pred : (int[@local_opt]) -> int @@ stateless = "%predint"
+external ( + ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%addint"
+external ( - ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%subint"
+external ( * ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%mulint"
+external ( / ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%divint"
+external ( mod ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%modint"
 
 let abs x = if x >= 0 then x else -x
 
-external ( land ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%andint"
-external ( lor ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%orint"
-external ( lxor ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%xorint"
+external ( land ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%andint"
+external ( lor ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%orint"
+external ( lxor ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%xorint"
 
 let lnot x = x lxor (-1)
 
-external ( lsl ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%lslint"
-external ( lsr ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%lsrint"
-external ( asr ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%asrint"
+external ( lsl ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%lslint"
+external ( lsr ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%lsrint"
+external ( asr ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%asrint"
 
 let max_int = (-1) lsr 1
 let min_int = max_int + 1
 
 (* Floating-point operations *)
 
-external ( ~-. ) : (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%negfloat"
-external ( ~+. ) : (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%identity"
-external ( +. ) : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%addfloat"
-external ( -. ) : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%subfloat"
-external ( *. ) : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%mulfloat"
-external ( /. ) : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%divfloat"
-external ( ** ) : float -> float -> float @@ portable = "caml_power_float" "pow"
+external ( ~-. ) : (float[@local_opt]) -> (float[@local_opt]) @@ stateless
+  = "%negfloat"
+external ( ~+. ) : (float[@local_opt]) -> (float[@local_opt]) @@ stateless
+  = "%identity"
+external ( +. )
+  : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  @@ stateless = "%addfloat"
+external ( -. )
+  : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  @@ stateless = "%subfloat"
+external ( *. )
+  : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  @@ stateless = "%mulfloat"
+external ( /. )
+  : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  @@ stateless = "%divfloat"
+external ( ** ) : float -> float -> float @@ stateless
+  = "caml_power_float" "pow" [@@unboxed] [@@noalloc]
+external exp : float -> float @@ stateless
+  = "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
+external expm1 : float -> float @@ stateless = "caml_expm1_float" "caml_expm1"
   [@@unboxed] [@@noalloc]
-external exp : float -> float @@ portable = "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
-external expm1 : float -> float @@ portable = "caml_expm1_float" "caml_expm1"
+external acos : float -> float @@ stateless = "caml_acos_float" "acos"
   [@@unboxed] [@@noalloc]
-external acos : float -> float @@ portable = "caml_acos_float" "acos"
+external asin : float -> float @@ stateless = "caml_asin_float" "asin"
   [@@unboxed] [@@noalloc]
-external asin : float -> float @@ portable = "caml_asin_float" "asin"
+external atan : float -> float @@ stateless = "caml_atan_float" "atan"
   [@@unboxed] [@@noalloc]
-external atan : float -> float @@ portable = "caml_atan_float" "atan"
+external atan2 : float -> float -> float @@ stateless
+  = "caml_atan2_float" "atan2" [@@unboxed] [@@noalloc]
+external hypot : float -> float -> float @@ stateless
+  = "caml_hypot_float" "caml_hypot" [@@unboxed] [@@noalloc]
+external cos : float -> float @@ stateless
+  = "caml_cos_float" "cos" [@@unboxed] [@@noalloc]
+external cosh : float -> float @@ stateless = "caml_cosh_float" "cosh"
   [@@unboxed] [@@noalloc]
-external atan2 : float -> float -> float @@ portable = "caml_atan2_float" "atan2"
+external acosh : float -> float @@ stateless = "caml_acosh_float" "caml_acosh"
   [@@unboxed] [@@noalloc]
-external hypot : float -> float -> float @@ portable
-               = "caml_hypot_float" "caml_hypot" [@@unboxed] [@@noalloc]
-external cos : float -> float @@ portable = "caml_cos_float" "cos" [@@unboxed] [@@noalloc]
-external cosh : float -> float @@ portable = "caml_cosh_float" "cosh"
+external log : float -> float @@ stateless
+  = "caml_log_float" "log" [@@unboxed] [@@noalloc]
+external log10 : float -> float @@ stateless = "caml_log10_float" "log10"
   [@@unboxed] [@@noalloc]
-external acosh : float -> float @@ portable = "caml_acosh_float" "caml_acosh"
+external log1p : float -> float @@ stateless = "caml_log1p_float" "caml_log1p"
   [@@unboxed] [@@noalloc]
-external log : float -> float @@ portable = "caml_log_float" "log" [@@unboxed] [@@noalloc]
-external log10 : float -> float @@ portable = "caml_log10_float" "log10"
+external sin : float -> float @@ stateless
+  = "caml_sin_float" "sin" [@@unboxed] [@@noalloc]
+external sinh : float -> float @@ stateless = "caml_sinh_float" "sinh"
   [@@unboxed] [@@noalloc]
-external log1p : float -> float @@ portable = "caml_log1p_float" "caml_log1p"
+external asinh : float -> float @@ stateless = "caml_asinh_float" "caml_asinh"
   [@@unboxed] [@@noalloc]
-external sin : float -> float @@ portable = "caml_sin_float" "sin" [@@unboxed] [@@noalloc]
-external sinh : float -> float @@ portable = "caml_sinh_float" "sinh"
+external sqrt : float -> float @@ stateless = "caml_sqrt_float" "sqrt"
   [@@unboxed] [@@noalloc]
-external asinh : float -> float @@ portable = "caml_asinh_float" "caml_asinh"
+external tan : float -> float @@ stateless
+  = "caml_tan_float" "tan" [@@unboxed] [@@noalloc]
+external tanh : float -> float @@ stateless = "caml_tanh_float" "tanh"
   [@@unboxed] [@@noalloc]
-external sqrt : float -> float @@ portable = "caml_sqrt_float" "sqrt"
+external atanh : float -> float @@ stateless = "caml_atanh_float" "caml_atanh"
   [@@unboxed] [@@noalloc]
-external tan : float -> float @@ portable = "caml_tan_float" "tan" [@@unboxed] [@@noalloc]
-external tanh : float -> float @@ portable = "caml_tanh_float" "tanh"
+external ceil : float -> float @@ stateless = "caml_ceil_float" "ceil"
   [@@unboxed] [@@noalloc]
-external atanh : float -> float @@ portable = "caml_atanh_float" "caml_atanh"
+external floor : float -> float @@ stateless = "caml_floor_float" "floor"
   [@@unboxed] [@@noalloc]
-external ceil : float -> float @@ portable = "caml_ceil_float" "ceil"
-  [@@unboxed] [@@noalloc]
-external floor : float -> float @@ portable = "caml_floor_float" "floor"
-  [@@unboxed] [@@noalloc]
-external abs_float : (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%absfloat"
-external copysign : float -> float -> float @@ portable
-                  = "caml_copysign_float" "caml_copysign"
-                  [@@unboxed] [@@noalloc]
-external mod_float : float -> float -> float @@ portable = "caml_fmod_float" "fmod"
-  [@@unboxed] [@@noalloc]
-external frexp : float -> float * int @@ portable = "caml_frexp_float"
-external ldexp : (float [@unboxed]) -> (int [@untagged]) -> (float [@unboxed]) @@ portable =
-  "caml_ldexp_float" "caml_ldexp_float_unboxed" [@@noalloc]
-external modf : float -> float * float @@ portable = "caml_modf_float"
-external float : (int[@local_opt]) -> (float[@local_opt]) @@ portable = "%floatofint"
-external float_of_int : (int[@local_opt]) -> (float[@local_opt]) @@ portable = "%floatofint"
-external truncate : (float[@local_opt]) -> int @@ portable = "%intoffloat"
-external int_of_float : (float[@local_opt]) -> int @@ portable = "%intoffloat"
-external float_of_bits : int64 -> float @@ portable
+external abs_float : (float[@local_opt]) -> (float[@local_opt]) @@ stateless
+  = "%absfloat"
+external copysign : float -> float -> float @@ stateless
+  = "caml_copysign_float" "caml_copysign" [@@unboxed] [@@noalloc]
+external mod_float : float -> float -> float @@ stateless
+  = "caml_fmod_float" "fmod" [@@unboxed] [@@noalloc]
+external frexp : float -> float * int @@ stateless = "caml_frexp_float"
+external ldexp
+  : (float [@unboxed]) -> (int [@untagged]) -> (float [@unboxed]) @@ stateless
+  = "caml_ldexp_float" "caml_ldexp_float_unboxed" [@@noalloc]
+external modf : float -> float * float @@ stateless = "caml_modf_float"
+external float
+  : (int[@local_opt]) -> (float[@local_opt]) @@ stateless = "%floatofint"
+external float_of_int
+  : (int[@local_opt]) -> (float[@local_opt]) @@ stateless = "%floatofint"
+external truncate : (float[@local_opt]) -> int @@ stateless = "%intoffloat"
+external int_of_float : (float[@local_opt]) -> int @@ stateless = "%intoffloat"
+external float_of_bits : int64 -> float @@ stateless
   = "caml_int64_float_of_bits" "caml_int64_float_of_bits_unboxed"
   [@@unboxed] [@@noalloc]
 let infinity =
@@ -207,19 +247,20 @@ type fpclass =
   | FP_zero
   | FP_infinite
   | FP_nan
-external classify_float : (float [@unboxed]) -> fpclass @@ portable =
+external classify_float : (float [@unboxed]) -> fpclass @@ stateless =
   "caml_classify_float" "caml_classify_float_unboxed" [@@noalloc]
 
 (* String and byte sequence operations -- more in modules String and Bytes *)
 
-external string_length : string @ local -> int @@ portable = "%string_length"
-external bytes_length : bytes @ local -> int @@ portable = "%bytes_length"
-external bytes_create : int -> bytes @@ portable = "caml_create_bytes"
-external string_blit : string -> int -> bytes -> int -> int -> unit @@ portable
+external string_length : string @ local -> int @@ stateless = "%string_length"
+external bytes_length : bytes @ local -> int @@ stateless = "%bytes_length"
+external bytes_create : int -> bytes @@ stateless = "caml_create_bytes"
+external string_blit : string -> int -> bytes -> int -> int -> unit @@ stateless
                      = "caml_blit_string" [@@noalloc]
-external bytes_blit : bytes -> int -> bytes -> int -> int -> unit @@ portable
+external bytes_blit : bytes -> int -> bytes -> int -> int -> unit @@ stateless
                         = "caml_blit_bytes" [@@noalloc]
-external bytes_unsafe_to_string : bytes -> string @@ portable = "%bytes_to_string"
+external bytes_unsafe_to_string : bytes -> string @@ stateless
+  = "%bytes_to_string"
 
 let ( ^ ) s1 s2 =
   let l1 = string_length s1 and l2 = string_length s2 in
@@ -230,30 +271,36 @@ let ( ^ ) s1 s2 =
 
 (* Character operations -- more in module Char *)
 
-external int_of_char : char -> int @@ portable = "%identity"
-external unsafe_char_of_int : int -> char @@ portable = "%identity"
+external int_of_char : char -> int @@ stateless = "%identity"
+external unsafe_char_of_int : int -> char @@ stateless = "%identity"
 let char_of_int n =
   if n < 0 || n > 255 then invalid_arg "char_of_int" else unsafe_char_of_int n
 
 (* Unit operations *)
 
-external ignore : ('a : value_or_null). 'a -> unit @@ portable = "%ignore"
+external ignore : ('a : value_or_null). 'a -> unit @@ stateless = "%ignore"
 external ignore_contended : ('a : value_or_null).
-  'a @ contended local once -> unit @@ portable = "%ignore"
+  'a @ contended local once -> unit @@ stateless = "%ignore"
 
 (* Pair operations *)
 
-external fst : ('a * 'b[@local_opt]) -> ('a[@local_opt]) @@ portable = "%field0_immut"
-external snd : ('a * 'b[@local_opt]) -> ('b[@local_opt]) @@ portable = "%field1_immut"
+external fst
+  : ('a * 'b[@local_opt]) -> ('a[@local_opt]) @@ stateless = "%field0_immut"
+external snd
+  : ('a * 'b[@local_opt]) -> ('b[@local_opt]) @@ stateless = "%field1_immut"
 
 (* References *)
 
 type ('a : value_or_null) ref = { mutable contents : 'a }
-external ref : ('a : value_or_null) . 'a -> ('a ref[@local_opt]) @@ portable = "%makemutable"
-external ( ! ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a @@ portable = "%field0"
-external ( := ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a -> unit @@ portable = "%setfield0"
-external incr : (int ref[@local_opt]) -> unit @@ portable = "%incr"
-external decr : (int ref[@local_opt]) -> unit @@ portable = "%decr"
+external ref : ('a : value_or_null) . 'a -> ('a ref[@local_opt]) @@ stateless
+  = "%makemutable"
+external ( ! ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a @@ stateless
+  = "%field0"
+external ( := )
+  : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a -> unit @@ stateless
+  = "%setfield0"
+external incr : (int ref[@local_opt]) -> unit @@ stateless = "%incr"
+external decr : (int ref[@local_opt]) -> unit @@ stateless = "%decr"
 
 (* Result type *)
 
@@ -287,7 +334,7 @@ let int_of_string_opt s =
   try Some (int_of_string s)
   with Failure _ -> None
 
-external string_get : string -> int -> char @@ portable = "%string_safe_get"
+external string_get : string -> int -> char @@ stateless = "%string_safe_get"
 
 let valid_float_lexem s =
   let l = string_length s in

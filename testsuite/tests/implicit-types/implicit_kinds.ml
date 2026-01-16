@@ -534,7 +534,7 @@ end
 
 [%%expect{|
 module type S29 =
-  sig module type VeryEvil = sig val x : int -> int @@ portable end end
+  sig module type VeryEvil = sig val x : int -> int @@ stateless end end
 |}]
 
 (* CR implicit-variables: implement in structures. *)
