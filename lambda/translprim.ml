@@ -204,7 +204,7 @@ let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-      Unboxed_vector _) ->
+     Unboxed_vector _ | Unboxed_product _) ->
     Jkind.Sort.Const.Base Value
 
 let to_lambda_prim prim ~poly_sort =
