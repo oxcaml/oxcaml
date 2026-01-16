@@ -234,7 +234,7 @@ let reg_x reg =
   match reg.typ with
   | Val | Int | Addr ->
     if index = 31
-    then Misc.fatal_error "reg_x: register 31 (SP) not valid here"
+    then Misc.fatal_error "reg_x: register SP not valid here"
     else Ast.DSL.reg_op (Ast.Reg.reg_x index)
   | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
     Misc.fatal_errorf "reg_x: expected integer register, got %a" Printreg.reg
@@ -245,7 +245,7 @@ let reg_w reg =
   match reg.typ with
   | Val | Int | Addr ->
     if index = 31
-    then Misc.fatal_error "reg_w: register 31 not valid here"
+    then Misc.fatal_error "reg_w: register SP not valid here"
     else Ast.DSL.reg_op (Ast.Reg.reg_w index)
   | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 ->
     Misc.fatal_errorf "reg_w: expected integer register, got %a" Printreg.reg
