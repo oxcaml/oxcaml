@@ -25,7 +25,13 @@
 *)
 val is_logical_immediate : nativeint -> bool
 
+type encoded_logical_immediate =
+  { n : int;
+    immr : int;
+    imms : int
+  }
+
 (** [encode_logical_immediate_fields x] encodes a logical immediate into (N,
-    immr, imms) fields for ARM64 instructions.
-    @raise Invalid_argument if [x] is not a valid logical immediate. *)
-val encode_logical_immediate_fields : nativeint -> int * int * int
+    immr, imms) fields for ARM64 instructions. Raises a fatal error if [x] is
+    not a valid logical immediate. *)
+val encode_logical_immediate_fields : nativeint -> encoded_logical_immediate

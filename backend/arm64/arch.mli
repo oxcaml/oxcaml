@@ -27,8 +27,8 @@ val command_line_options : (string * Arg.spec * string) list
 (* Addressing modes *)
 
 type addressing_mode =
-  | Iindexed of int                     (* reg + displ *)
-  | Ibased of string * int              (* global var + displ *)
+  | Iindexed of int                          (* reg + displ *)
+  | Ibased of Asm_targets.Asm_symbol.t * int (* symbol + displ *)
 
 (* We do not support the reg + shifted reg addressing mode, because
    what we really need is reg + shifted reg + displ,
@@ -111,8 +111,6 @@ val specific_operation_name : specific_operation -> string
 val print_specific_operation :
   (Format.formatter -> 'a -> unit) -> specific_operation ->
   Format.formatter -> 'a array -> unit
-
-val is_logical_immediate : nativeint -> bool
 
 (* Specific operations that are pure *)
 
