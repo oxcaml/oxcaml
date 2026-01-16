@@ -609,58 +609,37 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       in
       cps_non_tail_list acc env ccenv args
         (fun acc env ccenv args _arity ->
-          let single layout =
-            ( env,
-              [ ( id,
-                  Flambda_debug_uid.of_lambda_debug_uid duid,
-                  Flambda_kind.With_subkind
-                  .from_lambda_values_and_unboxed_numbers_only layout
-                    ~machine_width:(Acc.machine_width acc) ) ] )
-          in
-          let product layouts =
-            let arity_component =
-              Flambda_arity.Component_for_creation.Unboxed_product
-                (List.map
-                   (Flambda_arity.Component_for_creation.from_lambda
-                      ~machine_width:(Acc.machine_width acc))
-                   layouts)
-            in
-            let arity = Flambda_arity.create [arity_component] in
-            let fields =
-              Flambda_arity.fresh_idents_unarized ~id arity
-              |> Flambda_debug_uid.add_proj_debugging_uids_to_fields ~duid
-            in
-            let env =
-              Env.register_unboxed_product_with_kinds env ~unboxed_product:id
-                ~before_unarization:arity_component ~fields
-            in
-            env, fields
-          in
           let env, ids_with_kinds =
             match layout with
             | Ptop | Pbottom ->
               Misc.fatal_error "Cannot bind layout [Ptop] or [Pbottom]"
             | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
             | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
-            | Punboxed_vector Unboxed_vec128 ->
-              single layout
-            | Punboxed_vector Unboxed_vec256 ->
-              if Vector_types.wide
-              then single layout
-              else
-                product
-                  [ Punboxed_vector Unboxed_vec128;
-                    Punboxed_vector Unboxed_vec128 ]
-            | Punboxed_vector Unboxed_vec512 ->
-              if Vector_types.wide
-              then single layout
-              else
-                product
-                  [ Punboxed_vector Unboxed_vec128;
-                    Punboxed_vector Unboxed_vec128;
-                    Punboxed_vector Unboxed_vec128;
-                    Punboxed_vector Unboxed_vec128 ]
-            | Punboxed_product layouts -> product layouts
+            | Punboxed_vector _ ->
+              ( env,
+                [ ( id,
+                    Flambda_debug_uid.of_lambda_debug_uid duid,
+                    Flambda_kind.With_subkind
+                    .from_lambda_values_and_unboxed_numbers_only layout
+                      ~machine_width:(Acc.machine_width acc) ) ] )
+            | Punboxed_product layouts ->
+              let arity_component =
+                Flambda_arity.Component_for_creation.Unboxed_product
+                  (List.map
+                     (Flambda_arity.Component_for_creation.from_lambda
+                        ~machine_width:(Acc.machine_width acc))
+                     layouts)
+              in
+              let arity = Flambda_arity.create [arity_component] in
+              let fields =
+                Flambda_arity.fresh_idents_unarized ~id arity
+                |> Flambda_debug_uid.add_proj_debugging_uids_to_fields ~duid
+              in
+              let env =
+                Env.register_unboxed_product_with_kinds env ~unboxed_product:id
+                  ~before_unarization:arity_component ~fields
+              in
+              env, fields
           in
           let body acc ccenv = cps acc env ccenv body k k_exn in
           let current_region = Env.current_region env in

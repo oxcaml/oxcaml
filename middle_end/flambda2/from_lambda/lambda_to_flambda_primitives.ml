@@ -3059,7 +3059,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | ( Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; new_values] ) ->
     array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-      ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index new_values
+      ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index
+      new_values
   | ( Pint_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; new_values] ) ->
     (match machine_width with

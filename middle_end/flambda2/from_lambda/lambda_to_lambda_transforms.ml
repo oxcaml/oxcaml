@@ -859,6 +859,32 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     let name = Format.sprintf "caml_sys_const_%s" name in
     let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
     Primitive (L.Pccall desc, [L.lambda_unit], loc)
+  | Pccall desc, _ when not (String.equal Config.architecture "amd64") ->
+    let expand ((mode, repr) : _ * L.extern_repr) : _ * L.extern_repr =
+      ( mode,
+        match repr with
+        | Unboxed_vector Boxed_vec256 ->
+          Unboxed_product
+            [Unboxed_vector Boxed_vec128; Unboxed_vector Boxed_vec128]
+        | Unboxed_vector Boxed_vec512 ->
+          Unboxed_product
+            [ Unboxed_vector Boxed_vec128;
+              Unboxed_vector Boxed_vec128;
+              Unboxed_vector Boxed_vec128;
+              Unboxed_vector Boxed_vec128 ]
+        | Same_as_ocaml_repr (Base Vec256) ->
+          Same_as_ocaml_repr (Product [Base Vec128; Base Vec128])
+        | Same_as_ocaml_repr (Base Vec512) ->
+          Same_as_ocaml_repr
+            (Product [Base Vec128; Base Vec128; Base Vec128; Base Vec128])
+        | _ -> repr )
+    in
+    let prim_native_repr_args = List.map expand desc.prim_native_repr_args in
+    let prim_native_repr_res = expand desc.prim_native_repr_res in
+    Primitive
+      ( Pccall { desc with prim_native_repr_args; prim_native_repr_res },
+        args,
+        loc )
   | _, _ -> Primitive (prim, args, loc)
 [@@ocaml.warning "-fragile-match"]
 

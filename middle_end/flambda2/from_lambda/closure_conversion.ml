@@ -684,8 +684,7 @@ let unarize_extern_repr ~machine_width alloc_mode
         arg_transformer = Some P.Untag_immediate;
         return_transformer = Some P.Tag_immediate
       } ]
-  | Unboxed_product _ ->
-    assert false
+  | Unboxed_product _ -> assert false
 
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
