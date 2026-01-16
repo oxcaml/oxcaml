@@ -20,7 +20,7 @@ val foo1 : int -> int = <fun>
 
 (* Test 1.2: basic usage with a nested record returning string *)
 type t_1_2 = { str_1_2 : string ref }
-[%%expect.ignore_feedback]
+[%%expect.ignore_echo]
 let x_1_2 =
   let mutable x = { str_1_2 = ref "Hi" } in
   x <- { str_1_2 = ref "Bye" };
@@ -31,7 +31,7 @@ val x_1_2 : string = "Bye"
 
 (* Test 1.3: returning an immutable record *)
 type t_1_3 = { str_1_3 : string }
-[%%expect.ignore_feedback]
+[%%expect.ignore_echo]
 let x_1_3 =
   let mutable x = { str_1_3 = "Hi" } in
   x <- { str_1_3 = "Bye" };
@@ -42,7 +42,7 @@ val x_1_3 : t_1_3 = {str_1_3 = "Bye"}
 
 (* Test 1.4: returning a mutable nested record *)
 type t_1_4 = { str_1_4 : string ref }
-[%%expect.ignore_feedback]
+[%%expect.ignore_echo]
 let x_1_4 =
   let mutable x = { str_1_4 = ref "Hi" } in
   x <- { str_1_4 = ref "Bye" };
@@ -115,7 +115,7 @@ let [@warning "-26"] m_3_3 =
   let mutable y = 42 in
   (module (struct module F () = struct let x = y end end) : S_3_3)
 
-[%%expect.ignore_feedback{|
+[%%expect.ignore_echo{|
 Line 5, characters 47-48:
 5 |   (module (struct module F () = struct let x = y end end) : S_3_3)
                                                    ^
@@ -393,7 +393,7 @@ val f_11 : unit -> int * int = <fun>
 
 (* Test 12: like Test 11, but with a constructor *)
 type t_12 = Foo_12 of int
-[%%expect.ignore_feedback]
+[%%expect.ignore_echo]
 
 let y_12 =
   let mutable x = 42 in
@@ -459,7 +459,7 @@ val y_13_3 : int ref = {contents = 0}
 |}]
 
 let require_portable (f : (int -> unit) @ portable) = ()
-[%%expect.ignore_feedback]
+[%%expect.ignore_echo]
 
 (* Tests 13.4 to 13.7: Notice the [@ portable] does not prevent future values
    from being non-portable, but the portability of future values of [f] is still

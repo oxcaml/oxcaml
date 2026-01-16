@@ -1,16 +1,16 @@
 (* TEST
    (*
      These are the same test steps as [expect;] (see `ocaml_tests.ml`), but
-     the reference file is changed to `ignore_feedback.reference` so we can
+     the reference file is changed to `ignore_echo.reference` so we can
      test cases where [expect;] changes the input program.
    *)
    setup-simple-build-env;
    run-expect;
-   reference = "${test_source_directory}/ignore_feedback.reference";
+   reference = "${test_source_directory}/ignore_echo.reference";
    check-program-output;
 *)
 
-(* Feedback is printed *)
+(* Echo *)
 type t = A | B of int
 let x = B 5
 [%%expect{|
@@ -18,14 +18,23 @@ type t = A | B of int
 val x : t = B 5
 |}]
 
-(* Feedback is not printed *)
+(* No echo *)
 type t = A | B of int
 let x = B 5
-[%%expect.ignore_feedback]
+[%%expect.ignore_echo]
 
 (* Warnings are not ignored *)
 let x = let x = 5 in 5
-[%%expect.ignore_feedback{|
+[%%expect.ignore_echo{|
+Line 1, characters 12-13:
+1 | let x = let x = 5 in 5
+                ^
+Warning 26 [unused-var]: unused variable x.
+|}]
+
+(* Warnings are added if they are not in the expect output *)
+let x = let x = 5 in 5
+[%%expect.ignore_echo{|
 Line 1, characters 12-13:
 1 | let x = let x = 5 in 5
                 ^

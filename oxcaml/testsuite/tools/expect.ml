@@ -29,10 +29,10 @@
      |}]
    ]}
 
-   By default, REPL feedback like [val - : int = 5] is included in the expect
-   output. To disable this, use [[%%expect.ignore_feedback ..]]
+   By default, REPL echoes like [val - : int = 5] are included in the expect
+   output. To disable this, use [[%%expect.ignore_echo ..]]
    (see examples in testsuite/tests/typing-local/let_mutable.ml).
-   Warnings and errors captured with ignore_feedback.
+   Warnings and errors are still captured with ignore_echo.
 *)
 
 [@@@ocaml.warning "-40-69"]
@@ -50,8 +50,8 @@ type expectation =
   ; payload_loc : Location.t (* Location of the whole payload *)
   ; normal      : string_constant (* expectation without -principal *)
   ; principal   : string_constant (* expectation with -principal *)
-  ; print_feedback : bool
-    (* should feedback like `val - : int = 5` be included in the output? *)
+  ; print_echo  : bool
+    (* should echoes like `val - : int = 5` be included in the output? *)
   }
 
 (* A list of phrases with the expected toplevel output *)
@@ -69,15 +69,15 @@ let match_expect_extension (ext : Parsetree.extension) =
   match ext with
   | ({Asttypes.txt =
         "expect" | "ocaml.expect" |
-        "expect.ignore_feedback" | "ocaml.expect.ignore_feedback" as txt;
+        "expect.ignore_echo" | "ocaml.expect.ignore_echo" as txt;
       loc = extid_loc}, payload) ->
     let invalid_payload () =
       Location.raise_errorf ~loc:extid_loc "invalid [%%%%expect payload]"
     in
-    let print_feedback =
+    let print_echo =
       match txt with
       | "expect" | "ocaml.expect" -> true
-      | "expect.ignore_feedback" | "ocaml.expect.ignore_feedback" -> false
+      | "expect.ignore_echo" | "ocaml.expect.ignore_echo" -> false
       | _ -> assert false
     in
     let string_constant (e : Parsetree.expression) =
@@ -103,7 +103,7 @@ let match_expect_extension (ext : Parsetree.extension) =
         ; payload_loc = e.pexp_loc
         ; normal
         ; principal
-        ; print_feedback
+        ; print_echo
         }
       | PStr [] ->
         let s = { tag = ""; str = "\n" } in
@@ -111,7 +111,7 @@ let match_expect_extension (ext : Parsetree.extension) =
         ; payload_loc  = { extid_loc with loc_start = extid_loc.loc_end }
         ; normal    = s
         ; principal = s
-        ; print_feedback
+        ; print_echo
         }
       | _ -> invalid_payload ()
     in
@@ -180,11 +180,11 @@ let capture_everything buf ppf ~f =
   collect_formatters buf [Format.std_formatter; Format.err_formatter]
                      ~f:(fun () -> Compiler_messages.capture ppf ~f)
 
-let exec_phrase ppf phrase ~print_feedback =
+let exec_phrase ppf phrase ~print_echo =
   Location.reset ();
   if !Clflags.dump_parsetree then Printast. top_phrase ppf phrase;
   if !Clflags.dump_source    then Pprintast.top_phrase ppf phrase;
-  Toploop.execute_phrase print_feedback ppf phrase
+  Toploop.execute_phrase print_echo ppf phrase
 
 let parse_contents ~fname contents =
   let lexbuf = Lexing.from_string contents in
@@ -241,7 +241,7 @@ let eval_expect_file _fname ~file_contents =
   let buf = Buffer.create 1024 in
   let ppf = Format.formatter_of_buffer buf in
   let () = Misc.Style.set_tag_handling ppf in
-  let exec_phrases phrases ~print_feedback =
+  let exec_phrases phrases ~print_echo =
     let phrases =
       match min_line_number phrases with
       | None -> phrases
@@ -254,7 +254,7 @@ let eval_expect_file _fname ~file_contents =
         acc &&
         let snap = Btype.snapshot () in
         try
-          Sys.with_async_exns (fun () -> exec_phrase ppf phrase ~print_feedback)
+          Sys.with_async_exns (fun () -> exec_phrase ppf phrase ~print_echo)
         with exn ->
           let bt = Printexc.get_raw_backtrace () in
           begin try Location.report_exception ppf exn
@@ -280,8 +280,7 @@ let eval_expect_file _fname ~file_contents =
     capture_everything buf ppf ~f:(fun () ->
       List.fold_left chunks ~init:[] ~f:(fun acc chunk ->
         let output =
-          exec_phrases chunk.phrases
-            ~print_feedback:chunk.expectation.print_feedback
+          exec_phrases chunk.phrases ~print_echo:chunk.expectation.print_echo
         in
         match eval_expectation chunk.expectation ~output with
         | None -> acc
@@ -293,7 +292,7 @@ let eval_expect_file _fname ~file_contents =
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> exec_phrases phrases ~print_feedback:true)
+        ~f:(fun () -> exec_phrases phrases ~print_echo:true)
   in
   { corrected_expectations; trailing_output }
 
