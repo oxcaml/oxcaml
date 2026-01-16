@@ -326,9 +326,12 @@ let f' (k : (unit -> (unit -> unit)) @ once ) =
 val f' : (unit -> (unit -> unit)) @ once -> unit = <fun>
 |}]
 
-(* Functors don't have syntactic arity, and for them we must pick one single behavior.
+(* CR modes: Functors don't have yet syntactic arity,
+   and for them we must pick one single behavior.
 
-   We pick the former, more restrictive behavior, for reasons given below. *)
+   We pick the former, more restrictive behavior, for reasons given below.
+
+   Internal ticket 1534. *)
 
 module F (K : (functor () () -> sig end) @ once) = struct
   module (K' @ many) = K ()
@@ -363,12 +366,15 @@ Error: This value is "once" but is expected to be "many".
 (* Functor behavior here is stricter. *)
 
 let () =
+  (* CR modes: this line should raise the error eagerly.
+
+     Internal ticket 6260. *)
   let module (F @ once) () @ many = (functor () -> struct end) in
   let module (M' @ many) = F () in
   ()
 [%%expect{|
-Line 3, characters 27-31:
-3 |   let module (M' @ many) = F () in
+Line 6, characters 27-31:
+6 |   let module (M' @ many) = F () in
                                ^^^^
 Error: This is "once", but expected to be "many".
 |}]
@@ -381,7 +387,10 @@ let f_once (x @ once) () = ()
 val f_once : 'a @ once -> unit -> unit = <fun>
 |}]
 
-(* For functor, the behavior is the same but explicit. *)
+(* CR modes: For functor, the behavior is the same but explicit
+   since currying is not yet implemented.
+
+   Internal ticket 6259. *)
 
 module F (M : S @ once) () = struct end
 [%%expect{|

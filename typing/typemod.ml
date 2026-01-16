@@ -3201,8 +3201,14 @@ and type_application loc strengthen funct_body env smod =
 
 and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     funct_body env (funct, funct_shape) app_view =
-  (* Apply currying constraints if the application is partial
-     and returns a functor, similar to constraints for functions. *)
+  (* CR modes: Apply currying constraints if the application is partial
+     and returns a functor, similar to constraints for functions.
+
+     Since functors don't have syntactic arity, here we guess conservatively
+     and always assume a returned functor is curried. If the body is, e.g.,
+     just some identifier that happens to be a functor, this is unnecessary.
+
+     Internal ticket 1534. *)
   let check_curried_application_complete ~loc ~mty_res ~mode_res ~mode_arg =
     match Mtype.scrape_alias env mty_res with
     | Mty_functor _ ->
