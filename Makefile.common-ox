@@ -110,6 +110,7 @@ compiler: runtime-stdlib
           --only-package=ocaml @install \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
+          oxcaml/testsuite/tools/expectnat.exe \
           oxcaml/testsuite/tools/codegen_main.exe \
           oxcaml/testsuite/tools/asmgen_$(ARCH).o \
           testsuite/lib/lib.cm{,x}a \
@@ -273,6 +274,8 @@ install_for_test: _install
 	cp -a oxcaml/testsuite/tools/* _runtest/testsuite/tools/
 	cp $(main_build)/oxcaml/testsuite/tools/expect.exe _runtest/testsuite/tools/expect
 	chmod 755 _runtest/testsuite/tools/expect
+	cp $(main_build)/oxcaml/testsuite/tools/expectnat.exe _runtest/testsuite/tools/expectnat
+	chmod 755 _runtest/testsuite/tools/expectnat
 	cp $(main_build)/oxcaml/testsuite/tools/codegen_main.exe \
           _runtest/testsuite/tools/codegen
 	chmod 755 _runtest/testsuite/tools/codegen

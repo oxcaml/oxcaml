@@ -15,17 +15,17 @@
 (* See expectcommon.mli for usage *)
 
 module Toplevel = struct
-  let override_sys_argv = Toploop.override_sys_argv
-  let initialize_toplevel_env = Toploop.initialize_toplevel_env
-  let load_file fmt fname = Topeval.load_file false fmt fname
-  let execute_phrase = Toploop.execute_phrase
+  let override_sys_argv = Opttoploop.override_sys_argv
+  let initialize_toplevel_env = Opttoploop.initialize_toplevel_env
+  let load_file = Opttopdirs.load_file
+  let execute_phrase = Opttoploop.execute_phrase
 end
 
 let read_anonymous_arg =
-  Expectcommon.read_anonymous_arg ~object_extensions:[".cmo"; ".cma"]
+  Expectcommon.read_anonymous_arg ~object_extensions:[".cmxs"; ".cmx"; ".cmxa"]
 
-module Options = Main_args.Make_bytetop_options (struct
-  include Main_args.Default.Topmain
+module Options = Oxcaml_args.Make_opttop_options (struct
+  include Oxcaml_args.Default.Opttopmain
   let _stdin () = (* disabled *) ()
   let _args = Arg.read_arg
   let _args0 = Arg.read_arg0
@@ -36,5 +36,7 @@ let () =
   Expectcommon.run
     ~read_anonymous_arg
     ~extra_args:Options.list
-    ~extra_init:(fun () -> ())
+    ~extra_init:(fun () ->
+      Clflags.native_code := true;
+      Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler)
     (module Toplevel)

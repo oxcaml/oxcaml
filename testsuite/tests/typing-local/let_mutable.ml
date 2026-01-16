@@ -1,7 +1,8 @@
 (* TEST
    flags = "-extension let_mutable";
    include stdlib_upstream_compatible;
-   expect; *)
+   expect;
+   expect.opt; *)
 
 (* Test 1.1: basic usage in a for loop *)
 let foo1 y =

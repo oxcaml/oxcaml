@@ -1,26 +1,16 @@
 (* TEST
- reference = "${test_source_directory}/let_mutable.reference";
  include stdlib_upstream_compatible;
  include stdlib_stable;
  flambda2;
  {
    flags = "-extension let_mutable";
-   native;
- }{
-   flags = "-extension let_mutable";
-   bytecode;
+   { expect; expect.opt; }
  }{
    flags = "-extension layouts_alpha -extension let_mutable";
-   native;
- }{
-   flags = "-extension layouts_alpha -extension let_mutable";
-   bytecode;
+   { expect; expect.opt; }
  }{
    flags = "-extension layouts_beta -extension let_mutable";
-   native;
- }{
-   flags = "-extension layouts_beta -extension let_mutable";
-   bytecode;
+   { expect; expect.opt; }
  }*)
 
 open Stdlib_upstream_compatible
@@ -32,9 +22,12 @@ let triangle_f64 n =
     sum <- Float_u.add sum (Float_u.of_int i)
   done;
   sum
+[%%expect.ignore_echo]
 
-let () = Printf.printf "%.2f\n" (triangle_f64 10 |> Float_u.to_float)
-
+let _ = triangle_f64 10 |> Float_u.to_float
+[%%expect{|
+- : float = 55.
+|}]
 
 let triangle_f32 n =
   let mutable sum = #0.0s in
@@ -42,11 +35,12 @@ let triangle_f32 n =
     sum <- Float32_u.add sum (Float32_u.of_int i)
   done;
   sum
+[%%expect.ignore_echo]
 
-let () =
-  Printf.printf "%.2f\n"
-    (triangle_f32 10 |> Float32_u.to_float |> Float_u.to_float)
-
+let _ = triangle_f32 10 |> Float32_u.to_float |> Float_u.to_float
+[%%expect{|
+- : float = 55.
+|}]
 
 let triangle_i64 n =
   let mutable sum = #0L in
@@ -54,9 +48,16 @@ let triangle_i64 n =
     sum <- Int64_u.add sum (Int64_u.of_int i)
   done;
   sum
+[%%expect.ignore_echo]
 
-let () = Printf.printf "%d\n" (triangle_i64 10 |> Int64_u.to_int)
-
+let () = triangle_i64 10 |> Int64_u.to_int
+[%%expect{|
+Line 1, characters 9-42:
+1 | let () = triangle_i64 10 |> Int64_u.to_int
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "int" but an expression was expected of type
+         "unit"
+|}]
 
 let triangle_i32 n =
   let mutable sum = #0l in
@@ -64,8 +65,12 @@ let triangle_i32 n =
     sum <- Int32_u.add sum (Int32_u.of_int i)
   done;
   sum
+[%%expect.ignore_echo]
 
-let () = Printf.printf "%d\n" (triangle_i32 10 |> Int32_u.to_int)
+let _ = triangle_i32 10 |> Int32_u.to_int
+[%%expect{|
+- : int = 55
+|}]
 
 let triangle_i64_i32_f64 n =
   let mutable sum = #(#0L, #(#0l, #0.)) in
@@ -76,9 +81,11 @@ let triangle_i64_i32_f64 n =
                Float_u.add c (Float_u.of_int i)))
   done;
   sum
+[%%expect.ignore_echo]
 
-let () =
+let _ =
   let #(a, #(b, c)) = triangle_i64_i32_f64 10 in
-  Printf.printf "%d %d %.2f\n" (Int64_u.to_int a)
-                               (Int32_u.to_int b)
-                               (Float_u.to_float c)
+  (Int64_u.to_int a, Int32_u.to_int b, Float_u.to_float c)
+[%%expect{|
+- : int * int * float = (55, 55, 55.)
+|}]
