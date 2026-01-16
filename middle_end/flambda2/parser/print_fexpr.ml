@@ -117,8 +117,6 @@ let result_continuation ppf rcont =
   | Return c -> continuation ppf c
   | Never_returns -> Format.fprintf ppf "never"
 
-let exn_continuation ppf c = Format.fprintf ppf "* %a" continuation c
-
 let region ppf (r : region) =
   match r with
   | Named v -> variable ppf v
@@ -263,6 +261,18 @@ let rec simple ppf : simple -> unit = function
 let simple_args ~space ~omit_if_empty ppf = function
   | [] when omit_if_empty -> ()
   | args -> pp_spaced ~space ppf "(@[<hv>%a@])" (pp_comma_list simple) args
+
+let cont_extra_args ppf ea =
+  match ea with
+  | [] -> ()
+  | _ ->
+    Format.fprintf ppf " (%a)"
+      (pp_comma_list (fun ppf (s, k) ->
+           Format.fprintf ppf "%a %a" simple s kind_with_subkind k))
+      ea
+
+let exn_continuation ppf (c, ea) =
+  Format.fprintf ppf "* %a%a" continuation c cont_extra_args ea
 
 let mutability ~space ppf mut =
   let str =

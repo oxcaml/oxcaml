@@ -180,6 +180,8 @@ type simple =
   | Const of const
   | Coerce of simple * coercion
 
+type cont_extra_arg = simple * kind_with_subkind
+
 type alloc_mode_for_allocations =
   | Heap
   | Local of { region : region }
@@ -262,7 +264,7 @@ type loopify_attribute = Loopify_attribute.t =
 type apply =
   { func : simple;
     continuation : result_continuation;
-    exn_continuation : continuation;
+    exn_continuation : continuation * cont_extra_arg list;
     args : simple list;
     call_kind : call_kind;
     alloc_mode : alloc_mode_for_applications;

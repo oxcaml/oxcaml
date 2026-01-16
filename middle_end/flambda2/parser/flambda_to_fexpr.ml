@@ -602,12 +602,13 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let exn_continuation =
     let ec = Apply_expr.exn_continuation app in
-    let c =
-      match Exn_continuation.extra_args ec with
-      | [] -> Exn_continuation.exn_handler ec
-      | _ -> Misc.fatal_error "TODO: extra args for exn continuation"
+    let c = Exn_continuation.exn_handler ec in
+    let ea =
+      List.map
+        (fun (s, k) -> simple env s, kind_with_subkind k)
+        (Exn_continuation.extra_args ec)
     in
-    Env.find_continuation_exn env c
+    Env.find_continuation_exn env c, ea
   in
   let args = List.map (simple env) (Apply_expr.args app) in
   let alloc_mode =

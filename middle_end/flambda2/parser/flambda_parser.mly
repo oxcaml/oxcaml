@@ -213,8 +213,14 @@ module_:
     { { body } }
 ;
 
+exn_extra_arg: s = simple k = kind_with_subkind { s, k }
+
+exn_extra_args:
+  | LPAREN ea = separated_nonempty_list(COMMA, exn_extra_arg) RPAREN
+    { ea }
+
 exn_continuation:
-  | STAR cont = continuation { cont }
+  | STAR cont = continuation ea = loption(exn_extra_args) { cont, ea }
 
 exn_continuation_id:
   | STAR cont = continuation_id { cont }

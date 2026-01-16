@@ -72,7 +72,7 @@ type env =
   { done_continuation : Continuation.t;
     error_continuation : Exn_continuation.t;
     continuations : (Continuation.t * int) CM.t;
-    exn_continuations : Exn_continuation.t CM.t;
+    exn_continuations : Continuation.t CM.t;
     toplevel_region : Variable.t;
     variables : Variable.t VM.t;
     symbols : Symbol.t SM.t;
@@ -121,11 +121,10 @@ let fresh_cont env { Fexpr.txt = name; loc = _ } ~sort ~arity =
 
 let fresh_exn_cont env { Fexpr.txt = name; loc = _ } =
   let c = Continuation.create ~name () in
-  let e = Exn_continuation.create ~exn_handler:c ~extra_args:[] in
-  ( e,
+  ( c,
     { env with
       continuations = CM.add name (c, 1) env.continuations;
-      exn_continuations = CM.add name e env.exn_continuations
+      exn_continuations = CM.add name c env.exn_continuations
     } )
 
 let fresh_var env { Fexpr.txt = name; loc = _ } k =
@@ -233,11 +232,15 @@ let find_result_cont env (c : Fexpr.result_continuation) :
 let find_exn_cont_id env c =
   find_with ~descr:"exn_continuation" ~find:CM.find_opt env.exn_continuations c
 
-let find_exn_cont env (c : Fexpr.continuation) =
+let find_exn_cont env (c : Fexpr.continuation)
+    (extra_args : (Int_ids.Simple.t * Flambda_kind.With_subkind.full_kind) list)
+    =
   match c with
   | Special Done -> Misc.fatal_error "done is not an exception continuation"
   | Special Error -> env.error_continuation
-  | Named cont_id -> find_exn_cont_id env cont_id
+  | Named cont_id ->
+    let c = find_exn_cont_id env cont_id in
+    Exn_continuation.create ~exn_handler:c ~extra_args
 
 let find_var env v =
   find_with ~descr:"variable" ~find:VM.find_opt env.variables v

@@ -315,9 +315,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     in
     let name, body_env =
       if is_exn_handler
-      then
-        let e, env = fresh_exn_cont env name in
-        Exn_continuation.exn_handler e, env
+      then fresh_exn_cont env name
       else fresh_cont env name ~sort ~arity
     in
     let body = expr body_env body in
@@ -579,14 +577,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
               ~arity:(Flambda_arity.cardinal_unarized result_arity)
           in
           let exn_continuation, env = fresh_exn_cont env exn_cont in
-          assert (
-            match Exn_continuation.extra_args exn_continuation with
-            | [] -> true
-            | _ :: _ -> false);
           let body = expr env body in
           let params_and_body =
             Flambda.Function_params_and_body.create ~return_continuation
-              ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
+              ~exn_continuation
               (Bound_parameters.create params)
               ~body ~my_closure ~my_region:(Some my_region)
               ~my_ghost_region:(Some my_ghost_region) ~my_depth
@@ -738,7 +732,13 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
           ~depth
       | None -> Inlining_state.default ~round:0
     in
-    let exn_continuation = find_exn_cont env exn_continuation in
+    let exn_continuation =
+      let c, ea = exn_continuation in
+      let ea =
+        List.map (fun (s, k) -> simple env s, value_kind_with_subkind k) ea
+      in
+      find_exn_cont env c ea
+    in
     let apply =
       Flambda.Apply.create
         ~callee:(Some (simple env func))
