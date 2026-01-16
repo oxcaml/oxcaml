@@ -43,6 +43,9 @@ module Branch_cond = Ast.Branch_cond
 module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 
+(* CR mshinwell: maybe the following two functions should move to a new
+   Cmm.Symbol module, which would include Cmm.symbol as the type "t"? *)
+
 (* Convert Cmm.is_global to Asm_symbol.visibility *)
 let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
   | Cmm.Global -> S.Global
