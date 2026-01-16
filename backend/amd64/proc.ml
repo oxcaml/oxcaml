@@ -652,6 +652,9 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
+  | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
+    assert (stack_ofs >= 0);
+    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
   | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
@@ -675,6 +678,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
       true
     else
       if alloc then true else false
+  | Invalid _ -> more_destruction_points
   | Call {op = Indirect _ | Direct _; _} ->
     true
 
@@ -785,7 +789,7 @@ let expression_supported = function
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
-  | Cexit _ -> true
+  | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
   | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
 

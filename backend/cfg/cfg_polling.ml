@@ -130,7 +130,7 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
   | Switch _ ->
     false
   | Raise _ -> false
-  | Tailcall_self _ | Tailcall_func _ | Return -> true
+  | Tailcall_self _ | Tailcall_func _ | Return | Invalid _ -> true
   | Call_no_return _ | Call _ | Prim _ -> false
 
 let is_safe_block : Cfg.basic_block -> bool =
@@ -226,7 +226,7 @@ module Polls_before_prtc_transfer = struct
       then Ok Might_not_poll
       else Ok Always_polls
     | Return -> Ok Always_polls
-    | Call_no_return _ | Call _ | Prim _ ->
+    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
       if Cfg.can_raise_terminator term.desc
       then Ok (Polls_before_prtc_domain.join dom exn)
       else Ok dom
@@ -426,6 +426,7 @@ let add_calls_terminator :
       } ->
     (External_call, term.dbg) :: points
   | Prim { op = Probe _; label_after = _ } -> points
+  | Invalid _ -> points
 
 let find_poll_alloc_or_calls : Cfg.t -> polling_points =
  fun cfg ->

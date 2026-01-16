@@ -383,6 +383,8 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }; _} ->
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
+  | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
+    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -404,6 +406,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
       true
     else
     if alloc then true else false
+  | Invalid _ -> more_destruction_points
 
 (* Layout of the stack *)
 
@@ -513,7 +516,7 @@ let expression_supported : Cmm.expression -> bool = function
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
-  | Cexit _ -> true
+  | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ | Cconst_vec512 _ -> false
 
 

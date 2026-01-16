@@ -298,7 +298,8 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cifthenelse (_, _, _, _, _, _)
   | Cswitch (_, _, _, _)
   | Ccatch (_, _, _)
-  | Cexit (_, _, _) ->
+  | Cexit (_, _, _)
+  | Cinvalid _ ->
     Use_default
 
 let select_store ~is_assign addr (exp : Cmm.expression) :

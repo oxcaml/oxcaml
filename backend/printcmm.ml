@@ -458,6 +458,8 @@ let rec expr ppf = function
     fprintf ppf "@[<2>(exit%a %a" trap_action_list traps exit_label i;
     List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
     fprintf ppf ")@]"
+  | Cinvalid { message; symbol = sym } ->
+    fprintf ppf "@[<2>(invalid@ %S@ %a)@]" message symbol sym
 
 and sequence ppf = function[@warning "-4"]
   | Csequence (e1, e2) -> fprintf ppf "%a@ %a" sequence e1 sequence e2
