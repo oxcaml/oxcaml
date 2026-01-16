@@ -45,6 +45,7 @@ type token =
   | KWD_PUSH
   | KWD_POP
   | KWD_OF
+  | KWD_NULL
   | KWD_NOTRACE
   | KWD_NOALLOC
   | KWD_NEWER_VERSION_OF

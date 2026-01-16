@@ -73,6 +73,7 @@ let keyword_table =
     "newer_version_of", KWD_NEWER_VERSION_OF;
     "noalloc", KWD_NOALLOC;
     "notrace", KWD_NOTRACE;
+    "null", KWD_NULL;
     "of", KWD_OF;
     "pop", KWD_POP;
     "push", KWD_PUSH;

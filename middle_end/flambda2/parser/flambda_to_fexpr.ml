@@ -47,7 +47,7 @@ let const c : Fexpr.const =
   | Naked_nativeint i -> Naked_nativeint (i |> targetint)
   | Naked_int8 _ | Naked_int16 _ ->
     Misc.fatal_error "small integers not supported in fexpr"
-  | Null -> Misc.fatal_error "null not supported in fexpr"
+  | Null -> Null
 
 let depth_or_infinity (d : int Or_infinity.t) : Fexpr.rec_info =
   match d with Finite d -> Depth d | Infinity -> Infinity

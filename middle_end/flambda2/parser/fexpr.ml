@@ -62,6 +62,7 @@ type const =
   | Naked_vec256 of Vector_types.Vec256.Bit_pattern.bits
   | Naked_vec512 of Vector_types.Vec512.Bit_pattern.bits
   | Naked_nativeint of targetint
+  | Null
 
 type field_of_block =
   | Symbol of symbol

@@ -130,6 +130,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_NEWER_VERSION_OF [@symbol "newer_version_of"]
 %token KWD_NOALLOC [@symbol "noalloc"]
 %token KWD_NOTRACE [@symbol "notrace"]
+%token KWD_NULL [@symbol "null"]
 %token KWD_OF     [@symbol "of"]
 %token KWD_POP    [@symbol "pop"]
 %token KWD_PUSH   [@symbol "push"]
@@ -707,6 +708,7 @@ simple_args:
 const:
   | c = INT { make_const_int c }
   | c = FLOAT { Naked_float c }
+  | KWD_NULL { Null }
 ;
 
 func_name_with_optional_arities:

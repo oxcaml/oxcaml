@@ -251,6 +251,7 @@ let const ppf (c : Fexpr.const) =
     Format.fprintf ppf
       "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
       word1 word2 word3 word4 word5 word6 word7
+  | Null -> Format.fprintf ppf "null"
 
 let rec simple ppf : simple -> unit = function
   | Symbol s -> symbol ppf s

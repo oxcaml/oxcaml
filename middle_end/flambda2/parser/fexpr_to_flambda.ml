@@ -95,6 +95,7 @@ let const (c : Fexpr.const) : Reg_width_const.t =
   | Naked_vec128 bits -> Reg_width_const.naked_vec128 (bits |> vec128)
   | Naked_vec256 bits -> Reg_width_const.naked_vec256 (bits |> vec256)
   | Naked_vec512 bits -> Reg_width_const.naked_vec512 (bits |> vec512)
+  | Null -> Reg_width_const.const_null
 
 let rec rec_info env (ri : Fexpr.rec_info) : Rec_info_expr.t =
   let module US = Rec_info_expr.Unrolling_state in
