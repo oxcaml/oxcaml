@@ -13,16 +13,16 @@ let code loopify(never) size(32) newer_version_of(pr2162_2_first_0)
      | 1 -> k4)
     where k4 =
       let prim = %unbox_num.`float` (y) in
-      let prim_1 = %float_arith.`mul` (prim, 0x1.8p+1) in
+      let prim_1 = %bfloat_arith.`mul` (prim, 0x1.8p+1) in
       let a = %int_barith.`mul` (x, 2) in
       cont k2 (a, prim_1)
     where k3 =
       let prim = %unbox_num.`float` (y) in
-      let prim_1 = %float_arith.`add` (prim, 0x0p+0) in
+      let prim_1 = %bfloat_arith.`add` (prim, 0x0p+0) in
       cont k2 (x, prim_1)
     where k2 (a : imm tagged, unboxed_float : float) =
       let prim = %num_conv.[`tagged_imm`].[`float`] (a) in
-      let prim_1 = %float_arith.`sub` (prim, unboxed_float) in
+      let prim_1 = %bfloat_arith.`sub` (prim, unboxed_float) in
       let Psubfloat = %box_num.`float` (prim_1) in
       cont k (Psubfloat)
 in
@@ -40,16 +40,16 @@ let code loopify(never) size(32) newer_version_of(pr2162_2_1)
      | 1 -> k4)
     where k4 =
       let prim = %unbox_num.`float` (y) in
-      let prim_1 = %float_arith.`mul` (prim, 0x1.8p+1) in
+      let prim_1 = %bfloat_arith.`mul` (prim, 0x1.8p+1) in
       let a = %int_barith.`mul` (x, 2) in
       cont k2 (a, prim_1)
     where k3 =
       let prim = %unbox_num.`float` (y) in
-      let prim_1 = %float_arith.`add` (prim, 0x0p+0) in
+      let prim_1 = %bfloat_arith.`add` (prim, 0x0p+0) in
       cont k2 (x, prim_1)
     where k2 (a : imm tagged, unboxed_float : float) =
       let prim = %num_conv.[`tagged_imm`].[`float`] (a) in
-      let prim_1 = %float_arith.`sub` (prim, unboxed_float) in
+      let prim_1 = %bfloat_arith.`sub` (prim, unboxed_float) in
       let Psubfloat = %box_num.`float` (prim_1) in
       cont k (Psubfloat)
 in
@@ -65,16 +65,16 @@ let code loopify(never) size(32) newer_version_of(pr2162_3_2)
      | 1 -> k4)
     where k4 =
       let prim = %unbox_num.`float` (y) in
-      let prim_1 = %float_arith.`mul` (prim, 0x1.8p+1) in
+      let prim_1 = %bfloat_arith.`mul` (prim, 0x1.8p+1) in
       let Pmulint = %int_barith.`mul` (x, 2) in
       cont k2 (prim_1, Pmulint)
     where k3 =
       let prim = %unbox_num.`float` (y) in
-      let prim_1 = %float_arith.`add` (prim, 0x0p+0) in
+      let prim_1 = %bfloat_arith.`add` (prim, 0x0p+0) in
       cont k2 (prim_1, x)
     where k2 (unboxed_float : float, unboxed_field_0) =
       let prim = %num_conv.[`tagged_imm`].[`float`] (unboxed_field_0) in
-      let prim_1 = %float_arith.`sub` (prim, unboxed_float) in
+      let prim_1 = %bfloat_arith.`sub` (prim, unboxed_float) in
       let Psubfloat = %box_num.`float` (prim_1) in
       cont k (Psubfloat)
 in

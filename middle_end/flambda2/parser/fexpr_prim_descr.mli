@@ -135,7 +135,7 @@ module Describe : sig
       unfortunately. The no match handler can be used to enforce it by matching
       on its argument. *)
   val constructor_flag :
-    ?no_match_handler:('p -> param list) -> (string * 'p) list -> 'p param_cons
+    ?no_match_handler:('p -> unit) -> (string * 'p) list -> 'p param_cons
 
   (** State no parameters are expected. Only useful at toplevel. *)
   val no_param : unit param_cons
@@ -179,7 +179,7 @@ module Describe : sig
       care to order them properly to avoid mismatch, especially with optionnal
       parameters. *)
   val either :
-    ?no_match_handler:('p -> param list) -> 'p case_cons list -> 'p param_cons
+    ?no_match_handler:('p -> unit) -> 'p case_cons list -> 'p param_cons
 
   (** Describes a constructor pattern. Takes the construction we want to match.
       - [~box] allows mapping of the matched value, usually to wrap it in the

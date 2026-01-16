@@ -16,14 +16,14 @@ let code size(51)
     where k4 =
       let prim = %unbox_num.`float` ($camlTests4__float16) in
       let prim_1 = %unbox_num.`float` (y) in
-      let prim_2 = %float_arith.`mul` (prim_1, prim) in
+      let prim_2 = %bfloat_arith.`mul` (prim_1, prim) in
       let b = %box_num.`float` (prim_2) in
       let a = %int_barith.`mul` (x, 2) in
       cont k2 (a, b)
     where k3 =
       let prim = %unbox_num.`float` ($camlTests4__float23) in
       let prim_1 = %unbox_num.`float` (y) in
-      let prim_2 = %float_arith.`add` (prim_1, prim) in
+      let prim_2 = %bfloat_arith.`add` (prim_1, prim) in
       let b = %box_num.`float` (prim_2) in
       cont k2 (x, b)
     where k2 (a : imm tagged, b : float boxed) =
@@ -31,7 +31,7 @@ let code size(51)
       let Pfloatofint = %box_num.`float` (prim) in
       let prim_1 = %unbox_num.`float` (b) in
       let prim_2 = %unbox_num.`float` (Pfloatofint) in
-      let prim_3 = %float_arith.`sub` (prim_2, prim_1) in
+      let prim_3 = %bfloat_arith.`sub` (prim_2, prim_1) in
       let Psubfloat = %box_num.`float` (prim_3) in
       cont k (Psubfloat)
 in
@@ -47,14 +47,14 @@ let code size(51)
     where k4 =
       let prim = %unbox_num.`float` ($camlTests4__float16) in
       let prim_1 = %unbox_num.`float` (y) in
-      let prim_2 = %float_arith.`mul` (prim_1, prim) in
+      let prim_2 = %bfloat_arith.`mul` (prim_1, prim) in
       let b = %box_num.`float` (prim_2) in
       let a = %int_barith.`mul` (x, 2) in
       cont k2 (a, b)
     where k3 =
       let prim = %unbox_num.`float` ($camlTests4__float23) in
       let prim_1 = %unbox_num.`float` (y) in
-      let prim_2 = %float_arith.`add` (prim_1, prim) in
+      let prim_2 = %bfloat_arith.`add` (prim_1, prim) in
       let b = %box_num.`float` (prim_2) in
       cont k2 (x, b)
     where k2 (a : imm tagged, b : float boxed) =
@@ -62,7 +62,7 @@ let code size(51)
       let Pfloatofint = %box_num.`float` (prim) in
       let prim_1 = %unbox_num.`float` (b) in
       let prim_2 = %unbox_num.`float` (Pfloatofint) in
-      let prim_3 = %float_arith.`sub` (prim_2, prim_1) in
+      let prim_3 = %bfloat_arith.`sub` (prim_2, prim_1) in
       let Psubfloat = %box_num.`float` (prim_3) in
       cont k (Psubfloat)
 in
@@ -78,7 +78,7 @@ let code size(67)
     where k4 =
       let prim = %unbox_num.`float` ($camlTests4__float16) in
       let prim_1 = %unbox_num.`float` (y) in
-      let prim_2 = %float_arith.`mul` (prim_1, prim) in
+      let prim_2 = %bfloat_arith.`mul` (prim_1, prim) in
       let Pmulfloat = %box_num.`float` (prim_2) in
       let Pmulint = %int_barith.`mul` (x, 2) in
       let Pmakeblock = %block.[`0`] (Pmulint, Pmulfloat) in
@@ -86,7 +86,7 @@ let code size(67)
     where k3 =
       let prim = %unbox_num.`float` ($camlTests4__float23) in
       let prim_1 = %unbox_num.`float` (y) in
-      let prim_2 = %float_arith.`add` (prim_1, prim) in
+      let prim_2 = %bfloat_arith.`add` (prim_1, prim) in
       let Paddfloat = %box_num.`float` (prim_2) in
       let Pmakeblock = %block.[`0`] (x, Paddfloat) in
       cont k2 (Pmakeblock)
@@ -97,7 +97,7 @@ let code size(67)
       let Pfloatofint = %box_num.`float` (prim) in
       let prim_1 = %unbox_num.`float` (Pfield) in
       let prim_2 = %unbox_num.`float` (Pfloatofint) in
-      let prim_3 = %float_arith.`sub` (prim_2, prim_1) in
+      let prim_3 = %bfloat_arith.`sub` (prim_2, prim_1) in
       let Psubfloat = %box_num.`float` (prim_3) in
       cont k (Psubfloat)
 in

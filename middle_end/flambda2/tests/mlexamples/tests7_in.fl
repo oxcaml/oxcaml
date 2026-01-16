@@ -31,11 +31,11 @@ let code size(31)
   let Pfloatfield_1 = %box_num.`float` (prim_1) in
   let prim_2 = %unbox_num.`float` (Pfloatfield) in
   let prim_3 = %unbox_num.`float` (Pfloatfield_1) in
-  let prim_4 = %float_arith.`mul` (prim_3, prim_2) in
+  let prim_4 = %bfloat_arith.`mul` (prim_3, prim_2) in
   let x = %box_num.`float` (prim_4) in
   let prim_5 = %unbox_num.`float` (y) in
   let prim_6 = %unbox_num.`float` (x) in
-  let prim_7 = %float_arith.`add` (prim_6, prim_5) in
+  let prim_7 = %bfloat_arith.`add` (prim_6, prim_5) in
   let Paddfloat = %box_num.`float` (prim_7) in
   cont k (Paddfloat)
 in

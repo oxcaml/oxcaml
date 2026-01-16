@@ -49,7 +49,7 @@ type _ param_cons =
   | Opt : 'p param_cons -> 'p option param_cons
   | Def : 'p param_cons * 'p * ('p -> 'p -> bool) -> 'p param_cons
   | Lst : 'p param_cons list -> 'p list param_cons
-  | Etr : 'p case_cons list * ('p -> param list) -> 'p param_cons
+  | Etr : 'p case_cons list * ('p -> unit) -> 'p param_cons
   | Map : 'a param_cons * ('b, 'a) map_lens -> 'b param_cons
   | Pa0 : unit param_cons
   | Pa2 : 'a param_cons * 'b param_cons -> ('a * 'b) param_cons
@@ -179,7 +179,9 @@ let rec build_param : type p. of_fl_env -> p -> p param_cons -> param list =
   | Def (pcons, default, eq) ->
     if eq p default then [] else build_param env p pcons
   | Lst pconsl -> List.flatten @@ List.map2 (build_param env) p pconsl
-  | Etr ([], failure) -> failure p
+  | Etr ([], failure) ->
+    failure p;
+    []
   | Etr (Case (conv, param_cons) :: cases, f) -> (
     match conv.of_fl env p with
     | None -> build_param env p (Etr (cases, f))
@@ -261,9 +263,8 @@ module Describe = struct
 
   let list (pconsl : 'p param_cons list) : 'p list param_cons = Lst pconsl
 
-  let either
-      ?(no_match_handler = fun _ -> Misc.fatal_error "Missing parameter case")
-      (cases : 'p case_cons list) : 'p param_cons =
+  let either ?(no_match_handler = fun _ -> ()) (cases : 'p case_cons list) :
+      'p param_cons =
     Etr (cases, no_match_handler)
 
   let case ~(box : _ -> 'c -> 'p) ~(unbox : _ -> 'p -> 'c option)

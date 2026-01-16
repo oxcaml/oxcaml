@@ -33,20 +33,33 @@ let mutability =
     default ~def:Mutability.Immutable
     @@ constructor_flag Mutability.["imm_uniq", Immutable_unique; "mut", Mutable])
 
+let mutability_as_value =
+  { to_fl =
+      (fun _ m : Mutability.t ->
+        match unwrap_loc m with
+        | "immut" -> Immutable
+        | "immut_uniq" -> Immutable_unique
+        | "mut" -> Mutable
+        | _ -> Misc.fatal_error "invalid mutability");
+    of_fl =
+      (fun _ m ->
+        let s =
+          match (m : Mutability.t) with
+          | Immutable -> "immut"
+          | Immutable_unique -> "immut_uniq"
+          | Mutable -> "mut"
+        in
+        wrap_loc s)
+  }
+
 let standard_int =
   L.(
     default ~def:Flambda_kind.Standard_int.Tagged_immediate
     @@ constructor_flag
-         ~no_match_handler:
-           Flambda_kind.Standard_int.(
-             function
-             | (Naked_int8 | Naked_int16) as i ->
-               Misc.fatal_errorf "Unsupported %a" print i
-             | Naked_immediate | Naked_int32 | Naked_int64 | Naked_nativeint
-             | Tagged_immediate ->
-               assert false)
          Flambda_kind.Standard_int.
            [ "imm", Naked_immediate;
+             "int8", Naked_int8;
+             "int16", Naked_int16;
              "int32", Naked_int32;
              "int64", Naked_int64;
              "nativeint", Naked_nativeint ])
@@ -57,6 +70,9 @@ let standard_int_or_float =
       [ "tagged_imm", Tagged_immediate;
         "imm", Naked_immediate;
         "float", Naked_float;
+        "float32", Naked_float32;
+        "int8", Naked_int8;
+        "int16", Naked_int16;
         "int32", Naked_int32;
         "int64", Naked_int64;
         "nativeint", Naked_nativeint ]
@@ -86,19 +102,30 @@ let binary_int_arith_op =
          "xor", Xor ]
         : (string * Flambda_primitive.binary_int_arith_op) list))
 
+let float_bitwidth =
+  L.(
+    default ~def:Flambda_primitive.Float64
+    @@ constructor_flag ["float32", (Float32 : Flambda_primitive.float_bitwidth)])
+
+let unary_float_arith_op =
+  L.constructor_flag Flambda_primitive.["abs", Abs; "neg", Neg]
+
 let binary_float_arith_op =
   L.(
     constructor_flag
       (["add", Add; "sub", Sub; "mul", Mul; "div", Div]
         : (string * Flambda_primitive.binary_float_arith_op) list))
 
+let block_access_field_kind =
+  L.(
+    default ~def:Flambda_primitive.Block_access_field_kind.Any_value
+    @@ constructor_flag
+         ["imm", Flambda_primitive.Block_access_field_kind.Immediate])
+
 let block_access_kind =
   let value =
     L.(
-      param3
-        (default ~def:Flambda_primitive.Block_access_field_kind.Any_value
-        @@ constructor_flag
-             ["imm", Flambda_primitive.Block_access_field_kind.Immediate])
+      param3 block_access_field_kind
         (or_unknown @@ labeled "tag" scannable_tag)
         (or_unknown @@ labeled "size" target_ocaml_int))
   in
@@ -245,6 +272,69 @@ let array_kind_for_length =
             ~unbox:(fun _ -> function
               | Float_array_opt_dynamic -> None | Array_kind k -> Some k) ])
 
+let lazy_tag =
+  L.(
+    default ~def:Lambda.Lazy_tag
+    @@ constructor_flag ["forward", Lambda.Forward_tag])
+
+let duplicate_array_kind =
+  L.(
+    default ~def:Flambda_primitive.Duplicate_array_kind.Values
+    @@ constructor_flag
+         ~no_match_handler:(fun k ->
+           match (k : Flambda_primitive.Duplicate_array_kind.t) with
+           | Values | Immediates -> assert false
+           | Naked_floats _ | Naked_float32s _ | Naked_ints _ | Naked_int8s _
+           | Naked_int16s _ | Naked_int32s _ | Naked_int64s _
+           | Naked_nativeints _ | Naked_vec128s _ | Naked_vec256s _
+           | Naked_vec512s _ ->
+             Misc.fatal_error
+               "fexpr support for duplication of array of unboxed element not \
+                yet implemented")
+         Flambda_primitive.Duplicate_array_kind.["imm", Immediates])
+
+let bigarray_kind =
+  L.(
+    constructor_flag
+      Flambda_primitive.Bigarray_kind.
+        [ "float16", Float16;
+          "float32", Float32;
+          "float32_t", Float32_t;
+          "float64", Float64;
+          "sint8", Sint8;
+          "uint8", Uint8;
+          "sint16", Sint16;
+          "uint16", Uint16;
+          "int32", Int32;
+          "int64", Int64;
+          "int_width_int", Int_width_int;
+          "targetint_width_int", Targetint_width_int;
+          "complex32", Complex32;
+          "complex64", Complex64 ])
+
+let bigarray_layout =
+  L.(
+    default ~def:Flambda_primitive.Bigarray_layout.C
+    @@ constructor_flag ["fortran", Flambda_primitive.Bigarray_layout.Fortran])
+
+let reinterp_64bit_word =
+  L.constructor_flag
+    Flambda_primitive.Reinterpret_64_bit_word.
+      [ "int63_as_int64", Tagged_int63_as_unboxed_int64;
+        "int64_as_int63", Unboxed_int64_as_tagged_int63;
+        "int64_as_float64", Unboxed_int64_as_unboxed_float64;
+        "float64_as_int64", Unboxed_float64_as_unboxed_int64 ]
+
+let int_atomic_op =
+  L.constructor_flag
+    Flambda_primitive.
+      [ "fetch_add", Fetch_add;
+        "add", Add;
+        "sub", Sub;
+        "and", And;
+        "or", Or;
+        "xor", Xor ]
+
 (* Nullaries *)
 let invalid =
   L.(
@@ -295,6 +385,11 @@ let block_load =
       (fun _env (kind, mut, field) ->
         Flambda_primitive.Block_load { kind; mut; field }))
 
+let bigarray_length =
+  L.(
+    unary "%bigarray_lenght" ~params:(positional int) (fun _ dimension ->
+        Flambda_primitive.Bigarray_length { dimension }))
+
 let array_length =
   L.(
     unary "%array_length" ~params:array_kind_for_length (fun _ k ->
@@ -333,10 +428,31 @@ let end_try_ghost_region =
     unary "%end_try_ghost_region" ~params:no_param (fun _ () ->
         Flambda_primitive.End_try_region { ghost = true }))
 
+let duplicate_array =
+  L.(
+    unary "%duplicate_array"
+      ~params:
+        (param3 duplicate_array_kind
+           (positional mutability_as_value)
+           (positional mutability_as_value))
+      (fun _ (kind, source_mutability, destination_mutability) ->
+        Flambda_primitive.Duplicate_array
+          { kind; source_mutability; destination_mutability }))
+
+let int_as_pointer =
+  L.(
+    unary "%int_as_pointer" ~params:alloc_mode_for_allocation (fun _ a ->
+        Flambda_primitive.Int_as_pointer a))
+
 let int_uarith =
   L.(
     unary "%int_uarith" ~params:(param2 standard_int unary_int_arith_op)
       (fun _ (i, o) -> Flambda_primitive.Int_arith (i, o)))
+
+let is_boxed_float =
+  L.(
+    unary "%is_boxed_float" ~params:no_param (fun _ () ->
+        Flambda_primitive.Is_boxed_float))
 
 let is_flat_float_array =
   L.(
@@ -349,7 +465,8 @@ let is_int =
         Flambda_primitive.Is_int { variant_only = true }
         (* CR vlaviron: discuss *)))
 
-let is_null = todo "%is_null"
+let is_null =
+  L.(unary "%is_null" ~params:no_param (fun _ () -> Flambda_primitive.Is_null))
 
 let num_conv =
   L.(
@@ -360,11 +477,25 @@ let num_conv =
            (positional standard_int_or_float))
       (fun _ (src, dst) -> Flambda_primitive.Num_conv { src; dst }))
 
+let make_lazy =
+  L.(
+    unary "%lazy" ~params:lazy_tag (fun _ lt -> Flambda_primitive.Make_lazy lt))
+
 let opaque_identity =
   L.(
     unary "%opaque" ~params:no_param (fun _ () ->
         Flambda_primitive.Opaque_identity
           { middle_end_only = false; kind = Flambda_kind.value }))
+
+let reinterpret_64_bit_word =
+  L.(
+    unary "%reinterpret_64_bit_word" ~params:reinterp_64bit_word (fun _ r ->
+        Flambda_primitive.Reinterpret_64_bit_word r))
+
+let ufloat_arith =
+  L.(
+    unary "%ufloat_arith" ~params:(param2 float_bitwidth unary_float_arith_op)
+      (fun _ (w, o) -> Float_arith (w, o)))
 
 let unbox_num =
   L.(
@@ -431,6 +562,11 @@ let boolean_not =
         Flambda_primitive.Boolean_not))
 
 (* Binaries *)
+let atomic_load_field =
+  L.(
+    binary "%atomic_load_field" ~params:block_access_field_kind (fun _ kind ->
+        Flambda_primitive.Atomic_load_field kind))
+
 let block_set =
   L.(
     binary "%block_set"
@@ -468,6 +604,12 @@ let array_load =
              k, lk, m)
            ~to_:(fun _ (k, _, m) -> k, m))
       (fun _ (k, lk, m) -> Flambda_primitive.Array_load (k, lk, m)))
+
+let bigarray_load =
+  L.(
+    binary "%bigarray_load"
+      ~params:(param3 (positional int) bigarray_kind bigarray_layout)
+      (fun _ (d, k, l) -> Flambda_primitive.Bigarray_load (d, k, l)))
 
 let phys_eq =
   L.(
@@ -530,12 +672,26 @@ let int_shift =
     binary "%int_shift" ~params:(param2 standard_int int_shift_op)
       (fun _ (i, o) -> Flambda_primitive.Int_shift (i, o)))
 
-let float_arith =
+let bfloat_arith =
   L.(
-    binary "%float_arith" ~params:binary_float_arith_op (fun _ op ->
-        Flambda_primitive.Float_arith (Float64, op)))
+    binary "%bfloat_arith" ~params:(param2 float_bitwidth binary_float_arith_op)
+      (fun _ (w, op) -> Flambda_primitive.Float_arith (w, op)))
 
-let float_comp = todo "%float_comp"
+let float_comp =
+  let open L in
+  let open Flambda_primitive in
+  let comp =
+    constructor_flag
+      [ "lt", Yielding_bool (Lt ());
+        "le", Yielding_bool (Le ());
+        "gt", Yielding_bool (Gt ());
+        "ge", Yielding_bool (Ge ());
+        "eq", Yielding_bool Eq;
+        "ne", Yielding_bool Neq;
+        "lt", Yielding_int_like_compare_functions () ]
+  in
+  binary "%float_comp" ~params:(param2 float_bitwidth comp) (fun _ (w, c) ->
+      Flambda_primitive.Float_comp (w, c))
 
 let string_load =
   L.(
@@ -599,6 +755,27 @@ let array_set =
              k, ai))
       (fun _ (k, sk) -> Flambda_primitive.Array_set (k, sk)))
 
+let atomic_exchange_field =
+  L.(
+    ternary "%atomic_exchange_field" ~params:block_access_field_kind (fun _ a ->
+        Flambda_primitive.Atomic_exchange_field a))
+
+let atomic_field_int_arith =
+  L.(
+    ternary "%atomic_field_int_arith" ~params:int_atomic_op (fun _ o ->
+        Flambda_primitive.Atomic_field_int_arith o))
+
+let atomic_set_field =
+  L.(
+    ternary "%atomic_set_field" ~params:block_access_field_kind (fun _ a ->
+        Flambda_primitive.Atomic_set_field a))
+
+let bigarray_set =
+  L.(
+    ternary "%bigarray_set"
+      ~params:(param3 (positional int) bigarray_kind bigarray_layout)
+      (fun _ (d, k, l) -> Flambda_primitive.Bigarray_set (d, k, l)))
+
 let bytes_or_bigstring_set =
   L.(
     ternary "%bytes_or_bigstring_set"
@@ -611,6 +788,10 @@ let bytes_or_bigstring_set =
       (fun _ (blv, saw) -> Flambda_primitive.Bytes_or_bigstring_set (blv, saw)))
 
 (* Quaternaries *)
+let atomic_compare_and_set_field =
+  L.(
+    quaternary "%atomic_compare_and_set_field" ~params:block_access_field_kind
+      (fun _ a -> Flambda_primitive.Atomic_compare_and_set_field a))
 
 (* Variadics *)
 let begin_region =
@@ -645,6 +826,12 @@ let make_block =
         in
         Flambda_primitive.Make_block (kind, m, a)))
 
+let make_array =
+  L.(
+    variadic "%array"
+      ~params:(param3 array_kind mutability alloc_mode_for_allocation)
+      (fun _ (k, m, a) _ -> Flambda_primitive.Make_array (k, m, a)))
+
 module OfFlambda = struct
   let nullop env (op : Flambda_primitive.nullary_primitive) =
     match op with
@@ -660,19 +847,26 @@ module OfFlambda = struct
 
   let unop env (op : Flambda_primitive.unary_primitive) =
     match op with
-    | Block_load { kind; mut; field } -> block_load env (kind, mut, field)
     | Array_length ak -> array_length env ak
+    | Block_load { kind; mut; field } -> block_load env (kind, mut, field)
+    | Bigarray_length { dimension } -> bigarray_length env dimension
     | Box_number (bk, alloc) -> box_num env (bk, alloc)
-    | Tag_immediate -> tag_immediate env ()
-    | Get_tag -> get_tag env ()
+    | Boolean_not -> boolean_not env ()
     | End_region { ghost = false } -> end_region env ()
     | End_try_region { ghost = false } -> end_try_region env ()
     | End_region { ghost = true } -> end_ghost_region env ()
     | End_try_region { ghost = true } -> end_try_ghost_region env ()
+    | Duplicate_array { kind; source_mutability; destination_mutability } ->
+      duplicate_array env (kind, source_mutability, destination_mutability)
+    | Float_arith (w, o) -> ufloat_arith env (w, o)
+    | Get_tag -> get_tag env ()
+    | Is_boxed_float -> is_boxed_float env ()
     | Int_arith (i, o) -> int_uarith env (i, o)
+    | Int_as_pointer a -> int_as_pointer env a
     | Is_flat_float_array -> is_flat_float_array env ()
     | Is_int _ -> is_int env () (* CR vlaviron: discuss *)
     | Is_null -> is_null env ()
+    | Make_lazy lt -> make_lazy env lt
     | Num_conv { src; dst } -> num_conv env (src, dst)
     | Opaque_identity _ -> opaque_identity env ()
     | Unbox_number bk -> unbox_num env bk
@@ -681,12 +875,11 @@ module OfFlambda = struct
       project_value_slot env (project_from, value_slot)
     | Project_function_slot { move_from; move_to } ->
       project_function_slot env (move_from, move_to)
+    | Reinterpret_64_bit_word r -> reinterpret_64_bit_word env r
     | String_length String -> string_length env ()
     | String_length Bytes -> bytes_length env ()
-    | Boolean_not -> boolean_not env ()
-    | Int_as_pointer _ | Duplicate_block _ | Duplicate_array _
-    | Bigarray_length _ | Float_arith _ | Reinterpret_64_bit_word _
-    | Is_boxed_float | Obj_dup | Get_header | Peek _ | Make_lazy _ ->
+    | Tag_immediate -> tag_immediate env ()
+    | Duplicate_block _ | Obj_dup | Get_header | Peek _ ->
       todo
         (Format.asprintf "%a" Flambda_primitive.Without_args.print
            (Flambda_primitive.Without_args.Unary op))
@@ -694,21 +887,22 @@ module OfFlambda = struct
 
   let binop env (op : Flambda_primitive.binary_primitive) =
     match op with
+    | Atomic_load_field ak -> atomic_load_field env ak
     | Block_set { kind; init; field } -> block_set env (kind, init, field)
     | Array_load (ak, width, mut) -> array_load env (ak, width, mut)
+    | Bigarray_load (d, k, l) -> bigarray_load env (d, k, l)
     | Phys_equal Eq -> phys_eq env ()
     | Phys_equal Neq -> phys_ne env ()
     | Int_arith (i, o) -> int_barith env (i, o)
     | Int_comp (i, c) -> int_comp env (i, c)
     | Int_shift (i, s) -> int_shift env (i, s)
-    | Float_arith (Float64, o) -> float_arith env o
+    | Float_arith (w, o) -> bfloat_arith env (w, o)
     | Float_comp (w, c) -> float_comp env (w, c)
     | String_or_bigstring_load (String, saw) -> string_load env saw
     | String_or_bigstring_load (Bytes, saw) -> bytes_load env saw
     | String_or_bigstring_load (Bigstring, saw) -> bigstring_load env saw
     | Bigarray_get_alignment align -> bigarray_get_alignment env align
-    | Float_arith (Float32, _)
-    | Bigarray_load _ | Atomic_load_field _ | Poke _ | Read_offset _ ->
+    | Poke _ | Read_offset _ ->
       Misc.fatal_errorf "TODO: Binary primitive: %a"
         Flambda_primitive.Without_args.print
         (Flambda_primitive.Without_args.Binary op)
@@ -716,9 +910,12 @@ module OfFlambda = struct
   let ternop env (op : Flambda_primitive.ternary_primitive) =
     match op with
     | Array_set (k, sk) -> array_set env (k, sk)
+    | Atomic_exchange_field a -> atomic_exchange_field env a
+    | Atomic_field_int_arith o -> atomic_field_int_arith env o
+    | Atomic_set_field a -> atomic_set_field env a
     | Bytes_or_bigstring_set (blv, saw) -> bytes_or_bigstring_set env (blv, saw)
-    | Bigarray_set _ | Atomic_field_int_arith _ | Atomic_set_field _
-    | Atomic_exchange_field _ | Write_offset _ ->
+    | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
+    | Write_offset _ ->
       todo
         (Format.asprintf "%a" Flambda_primitive.Without_args.print
            (Flambda_primitive.Without_args.Ternary op))
@@ -726,7 +923,8 @@ module OfFlambda = struct
 
   let quaternop env (op : Flambda_primitive.quaternary_primitive) =
     match op with
-    | Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _ ->
+    | Atomic_compare_and_set_field a -> atomic_compare_and_set_field env a
+    | Atomic_compare_exchange_field _ ->
       todo
         (Format.asprintf "%a" Flambda_primitive.Without_args.print
            (Flambda_primitive.Without_args.Quaternary op))
@@ -740,7 +938,9 @@ module OfFlambda = struct
     | Begin_try_region { ghost = true } -> begin_try_ghost_region env ()
     | Make_block (Values (tag, _), mutability, alloc) ->
       make_block env (mutability, tag, alloc)
-    | Make_block ((Naked_floats | Mixed _), _, _) | Make_array _ ->
+    | Make_array (kind, mutability, alloc) ->
+      make_array env (kind, mutability, alloc)
+    | Make_block ((Naked_floats | Mixed (_, _)), _, _) ->
       todo
         (Format.asprintf "%a" Flambda_primitive.Without_args.print
            (Flambda_primitive.Without_args.Variadic op))
