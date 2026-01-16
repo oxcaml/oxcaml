@@ -1410,6 +1410,10 @@ and slam ppf = function
     fprintf ppf "@[<hv 2>{@ %t}@]" print_fields
   | SLfield (container, field) ->
      fprintf ppf "%a.%a" Slambdaident.print container Slambdaident.print field
+  | SLhalves { sval_comptime; sval_runtime } ->
+    fprintf ppf "@[<hv 2>(%a,@ %a)@]" slam sval_comptime slam sval_runtime
+  | SLproj_comptime value -> fprintf ppf "%a.0" slam value
+  | SLproj_runtime value -> fprintf ppf "%a.1" slam value
   | SLfunction func -> fprintf ppf "(fun %a)" slambda_function func
   | SLapply apply -> fprintf ppf "(%a)" slambda_apply apply
   | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
