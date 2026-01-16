@@ -643,22 +643,17 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
     when optimize ->
       let slinit = simplif linit in
       let slbody = simplif lbody in
-      begin
-        match kind_ref with
-        | None ->
-            (* This is a [Pmakeblock] so the fields are all values *)
-            (try
-              mkmutlet Lambda.layout_value_field v duid slinit
-                (eliminate_ref v slbody)
-            with Real_reference ->
-              mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody)
-        | Some [| Lambda.Value field_kind |] ->
-            (try
-              mkmutlet (Pvalue field_kind) v duid slinit
-                (eliminate_ref v slbody)
-            with Real_reference ->
-              mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody)
-        | Some _ ->
+      let try_convert_mutlet layout =
+        try
+          mkmutlet layout v duid slinit (eliminate_ref v slbody)
+        with Real_reference ->
+          mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody
+      in
+      begin match kind_ref with
+        | Default_shape -> try_convert_mutlet Lambda.layout_value_field
+        | Shape [| Lambda.Value field_kind |] ->
+            try_convert_mutlet (Pvalue field_kind)
+        | Shape _ ->
             (* Non-value layout - this plausibly could also be optimised *)
             mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody
       end

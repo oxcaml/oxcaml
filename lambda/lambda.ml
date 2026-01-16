@@ -400,7 +400,8 @@ and layout =
   | Psplicevar of Ident.t
 
 and block_shape =
-  unit mixed_block_element array option
+  | Default_shape
+  | Shape of mixed_block_shape
 
 and 'a mixed_block_element =
   | Value of value_kind
@@ -626,19 +627,24 @@ and equal_constructor_shape x y =
 
 let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   match vks with
-  | None -> None
-  | Some vks -> Some (Array.of_list (List.map (fun vk -> Value vk) vks))
+  | None -> Default_shape
+  | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
 
-let is_uniform_block_shape (shape : block_shape) : bool =
+let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option =
   match shape with
-  | None -> true
-  | Some arr ->
-    Array.for_all
+  | Default_shape -> None
+  | Shape shape ->
+    let is_uniform = Array.for_all
       (function
         | Value _ -> true
         | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
         | _ -> false)
-      arr
+      shape
+    in
+    if is_uniform then None else Some shape
+
+let is_uniform_block_shape (shape : block_shape) : bool =
+  Option.is_none (mixed_block_of_block_shape shape)
 
 let equal_layout x y =
   match x, y with
@@ -1565,7 +1571,7 @@ let transl_prim mod_name name =
       fatal_error ("Primitive " ^ name ^ " not found.")
 
 let block_of_module_representation ~loc = function
-  | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
+  | Module_value_only _ -> Pmakeblock(0, Immutable, Default_shape, alloc_heap)
   | Module_mixed (shape, _) ->
     let rec count_values shape =
       Array.fold_left
@@ -1584,7 +1590,7 @@ let block_of_module_representation ~loc = function
     in
     Typedecl.assert_mixed_product_support loc Module
       ~value_prefix_len:(count_values shape);
-    Pmakeblock(0, Immutable, Some shape, alloc_heap)
+    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 

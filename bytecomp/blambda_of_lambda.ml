@@ -470,7 +470,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim
-                  ( Pmakeblock (0, Immutable, None, Lambda.alloc_heap),
+                  ( Pmakeblock (0, Immutable, Default_shape, Lambda.alloc_heap),
                     fields,
                     loc )
             in
@@ -493,10 +493,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         comp_expr (Lambda.Lprim (Pmakearray (kind, mutability, m), args, loc))
       | _ -> unary (Ccall "caml_obj_dup"))
     | Pmakeblock (tag, _mut, shape, _) -> (
-      match shape with
+      match Lambda.mixed_block_of_block_shape shape with
       | None -> pseudo_event (variadic (Makeblock { tag }))
-      | Some _ when Lambda.is_uniform_block_shape shape ->
-        pseudo_event (variadic (Makeblock { tag }))
       | Some shape ->
         (* There is no notion of a mixed block at runtime in bytecode.
               Further, source-level unboxed types are represented as boxed in

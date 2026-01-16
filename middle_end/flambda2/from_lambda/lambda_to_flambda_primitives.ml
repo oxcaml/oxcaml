@@ -120,8 +120,9 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
 
 let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   match shape with
-  | None -> List.init num_fields (fun _field -> K.With_subkind.any_value)
-  | Some shape ->
+  | Default_shape ->
+    List.init num_fields (fun _field -> K.With_subkind.any_value)
+  | Shape shape ->
     let shape_length = Array.length shape in
     if num_fields <> shape_length
     then
@@ -1783,23 +1784,23 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ ->
+  | Pmakeblock (tag, mutability, shape, mode), _ -> (
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let tag = Tag.Scannable.create_exn tag in
     let mutability = Mutability.from_lambda mutability in
-    if L.is_uniform_block_shape shape
-    then
+    match L.mixed_block_of_block_shape shape with
+    | None ->
       let shape =
         convert_block_shape ~machine_width shape ~num_fields:(List.length args)
       in
       [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
-    else
+    | Some shape ->
       (* Mixed block *)
       let shape =
         Mixed_block_shape.of_mixed_block_elements
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          (Option.get shape)
+          shape
       in
       let args =
         let new_indexes_to_old_indexes =
@@ -1831,7 +1832,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           args
       in
       let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
-      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
+      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
     (* CR mshinwell: this should check the unarized lengths of [layouts] and
