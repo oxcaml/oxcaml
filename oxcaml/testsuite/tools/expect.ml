@@ -302,17 +302,18 @@ let output_slice oc s a b =
 
 let output_corrected oc ~file_contents correction =
   let output_body oc { str; tag } =
-    if not (String.equal str "\n") then
     Printf.fprintf oc "{%s|%s|%s}" tag str tag
   in
   let ofs =
     List.fold_left correction.corrected_expectations ~init:0
       ~f:(fun ofs c ->
         output_slice oc file_contents ofs c.payload_loc.loc_start.pos_cnum;
-        output_body oc c.normal;
         if c.normal.str <> c.principal.str then begin
+          output_body oc c.normal;
           output_string oc ", Principal";
           output_body oc c.principal
+        end else if c.normal.str <> "\n" then begin
+          output_body oc c.normal
         end;
         c.payload_loc.loc_end.pos_cnum)
   in
