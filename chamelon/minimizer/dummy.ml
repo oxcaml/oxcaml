@@ -135,7 +135,7 @@ let dummy1_str_it_desc =
   Tstr_value
     ( Nonrecursive,
       [
-        mk_value_binding
+        mk_value_binding ()
           ~vb_pat:
             (mkpattern_data
                ~pat_desc:
