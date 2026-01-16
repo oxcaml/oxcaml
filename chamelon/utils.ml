@@ -303,3 +303,32 @@ let update_output map = Smap.iter update_single (Smap.map add_def map)
 
 let save_outputs map =
   Smap.iter (fun name str -> update_single (name ^ ".tmp") (add_def str)) map
+
+module E = struct
+  let view e = view_texp e.exp_desc
+  let desc = exp_desc_to_exp
+
+  let app fn args =
+    desc
+      (mkTexp_apply (fn, List.map (fun e -> (Asttypes.Nolabel, mkArg e)) args))
+
+  let ignore e = app Dummy.ignore [ e ]
+  let unit = desc (mkTexp_tuple [])
+
+  let rec list = function
+    | [] -> unit
+    | [ e ] -> e
+    | e :: es -> desc (mkTexp_sequence (e, list es))
+
+  let bind ?(attrs = []) ?id p e =
+    mk_value_binding ?id () ~vb_pat:p ~vb_expr:e ~vb_attributes:attrs
+
+  let let_ value_bindings expr =
+    desc (Texp_let (Nonrecursive, value_bindings, expr))
+
+  let match_ ?id e = function
+    | [] -> list [ ignore e; Dummy.apply_dummy2 ]
+    | cases -> desc (mkTexp_match ?id (e, cases, Partial))
+
+  let try_ e = function [] -> e | cases -> desc (Texp_try (e, cases))
+end

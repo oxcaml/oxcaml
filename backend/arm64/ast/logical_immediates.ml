@@ -32,16 +32,15 @@
  *             1          0          1
  *
  * The accepting states are 2, 3, 5 and 6. *)
-let auto_table =
+let[@ocamlformat "disable"] auto_table =
   [| (* accepting?, next on 0, next on 1 *)
-     (* state 0 *)
-     false, 1, 4;
+     (* state 0 *) false, 1, 4;
      (* state 1 *) false, 1, 2;
-     (* state 2 *) true, 3, 2;
-     (* state 3 *) true, 3, 7;
+     (* state 2 *) true,  3, 2;
+     (* state 3 *) true,  3, 7;
      (* state 4 *) false, 5, 4;
-     (* state 5 *) true, 5, 6;
-     (* state 6 *) true, 7, 6;
+     (* state 5 *) true,  5, 6;
+     (* state 6 *) true,  7, 6;
      (* state 7 *) false, 7, 7 (* error state *)
   |]
 
@@ -90,8 +89,7 @@ let is_logical_immediate x =
   && (not (Nativeint.equal x (-1n)))
   && run_automata (logical_imm_length x) 0 x
 
-(* CR mshinwell: The following will be reviewed separately (PR5201) *)
-
+(* XXX mshinwell: this needs checking carefully *)
 (* Encode a logical immediate into N, immr, imms fields for ARM64 instructions.
    Returns (N, immr, imms) tuple.
 
@@ -114,10 +112,18 @@ let is_logical_immediate x =
 let mask_of_width n =
   if n >= 64 then -1n else Nativeint.(sub (shift_left 1n n) 1n)
 
-let encode_logical_immediate_fields (x : nativeint) : int * int * int =
+type encoded_logical_immediate =
+  { n : int;
+    immr : int;
+    imms : int
+  }
+
+let encode_logical_immediate_fields (x : nativeint) : encoded_logical_immediate
+    =
   if not (is_logical_immediate x)
   then
-    invalid_arg "encode_logical_immediate_fields: not a valid logical immediate";
+    Misc.fatal_error
+      "encode_logical_immediate_fields: not a valid logical immediate";
   let len = logical_imm_length x in
   let mask = mask_of_width len in
   let pattern = Nativeint.(logand x mask) in
@@ -230,7 +236,7 @@ let encode_logical_immediate_fields (x : nativeint) : int * int * int =
     | 8 -> 0b110000
     | 4 -> 0b111000
     | 2 -> 0b111100
-    | _ -> invalid_arg "invalid element size"
+    | size -> Misc.fatal_errorf "invalid element size: %d" size ()
   in
   let imms = size_encoding lor (ones - 1) in
-  n, immr, imms
+  { n; immr; imms }

@@ -556,6 +556,10 @@ and expression =
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
+  | Cinvalid of
+      { message : string;
+        symbol : symbol
+      }
 
 type codegen_option =
   | Reduce_code_size

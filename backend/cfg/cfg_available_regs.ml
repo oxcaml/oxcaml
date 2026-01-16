@@ -389,7 +389,7 @@ module Transfer = struct
         | Never -> assert false
         | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
         | Switch _ | Call _ | Prim _ | Return | Raise _ | Tailcall_func _
-        | Call_no_return _ | Tailcall_self _ ->
+        | Call_no_return _ | Invalid _ | Tailcall_self _ ->
           common ~avail_before ~destroyed_at:Proc.destroyed_at_terminator
             ~is_interesting_constructor:
               Cfg.(
@@ -398,7 +398,7 @@ module Transfer = struct
                 | Call _ | Prim { op = Probe _; label_after = _ } -> true
                 | Always _ | Parity_test _ | Truth_test _ | Float_test _
                 | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-                | Tailcall_func _ | Call_no_return _
+                | Tailcall_func _ | Call_no_return _ | Invalid _
                 | Prim { op = External _; label_after = _ } ->
                   false)
             ~is_end_region:(fun _ -> false)
