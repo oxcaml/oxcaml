@@ -16,5 +16,5 @@ after swap: p=300 q=200 r=100
 
 All-float record
 initial: f1=1.5 f2=2.5 f3=3.5
-raw: 4609434218613702656 4612811918334230528 4615063718147915776
+raw as floats: 1.5 2.5 3.5
 after swap: f1=3.5 f2=2.5 f3=1.5

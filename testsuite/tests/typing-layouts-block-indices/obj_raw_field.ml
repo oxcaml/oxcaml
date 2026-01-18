@@ -64,7 +64,10 @@ let () =
   let raw0 = Obj.raw_field obj 0 in
   let raw1 = Obj.raw_field obj 1 in
   let raw2 = Obj.raw_field obj 2 in
-  Printf.printf "raw: %nd %nd %nd\n" raw0 raw1 raw2;
+  Printf.printf "raw as floats: %g %g %g\n"
+    Int64.(float_of_bits (of_nativeint raw0))
+    Int64.(float_of_bits (of_nativeint raw1))
+    Int64.(float_of_bits (of_nativeint raw2));
   Obj.set_raw_field obj 0 raw2;
   Obj.set_raw_field obj 2 raw0;
   Printf.printf "after swap: f1=%g f2=%g f3=%g\n" r.f1 r.f2 r.f3
