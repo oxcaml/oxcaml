@@ -98,8 +98,8 @@
   (no-infer
    (progn
     (bash "touch .depend") ; hack.
-    (run make "SAK_LINK=cc -o $(1) $(2)" COMPUTE_DEPS=false sak)
-    (run make -sj8 %{targets} COMPUTE_DEPS=false)
+    (run gmake "SAK_LINK=cc -o $(1) $(2)" COMPUTE_DEPS=false sak)
+    (run gmake -sj8 %{targets} COMPUTE_DEPS=false)
     (bash "rm .depend")))))
 
 (install

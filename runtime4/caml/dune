@@ -29,7 +29,7 @@
    ../../Makefile.build_config
    ../../Makefile.config_if_required
   )
-  (action (run make -s -C .. COMPUTE_DEPS=false caml/opnames.h)))
+  (action (run gmake -s -C .. COMPUTE_DEPS=false caml/opnames.h)))
 
 (rule
  (targets version.h)
