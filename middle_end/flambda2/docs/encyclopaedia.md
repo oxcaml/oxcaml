@@ -7,7 +7,7 @@ Note that, while we intentionally try to describe the optimizations performed
 by flambda2 as more-or-less atomic transformations on OCaml source code
 (because we believe that is the form in which they are the most useful to OCaml
 programmers), they in practice happen all at the same time in a lower-level
-intermediate representation. This can sometime (hopefully rarely!) cause
+intermediate representation. This can sometimes (hopefully rarely!) cause
 discrepancies between what would be expected based on this document and what
 actually happens when running the compiler -- if you notice such discrepancies,
 this is still a bug (either of the code or the documentation); please report
