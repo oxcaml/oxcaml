@@ -459,8 +459,10 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
         Format.flush_str_formatter ()
       in
       let rec make_result ({ data; children } : Locate_types.Type_tree.t) :
-          Locate_types_result.(type_ref_payload Tree.t) =
-        let data : Locate_types_result.(type_ref_payload Tree.node_data) =
+          Locate_types_result.type_ref_payload Locate_types_result.Tree.t =
+        let data :
+            Locate_types_result.type_ref_payload
+            Locate_types_result.Tree.node_data =
           match data with
           | Arrow -> Arrow
           | Tuple -> Tuple
