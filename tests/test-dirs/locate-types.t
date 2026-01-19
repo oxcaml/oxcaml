@@ -92,7 +92,18 @@ Tuples
     b (2:5)
     c (3:5)
 
-  $ run "a * b"
+  $ run "x:a * b"
+  Tuple
+    a (1:5)
+    b (2:5)
+
+  $ run "#(a * b * c)"
+  Tuple
+    a (1:5)
+    b (2:5)
+    c (3:5)
+
+  $ run "#(x:a * b)"
   Tuple
     a (1:5)
     b (2:5)
@@ -174,7 +185,7 @@ Compound types
     option
       a (1:5)
 
-  $ run "a -> b -> (a * b)"
+  $ run "a -> b -> #(x:a * b)"
   Arrow
     a (1:5)
     b (2:5)

@@ -464,6 +464,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
           match data with
           | Arrow -> Arrow
           | Tuple -> Tuple
+          | Unboxed_tuple -> Unboxed_tuple
           | Object -> Object
           | Poly_variant -> Poly_variant
           | Type_ref { path; ty } ->

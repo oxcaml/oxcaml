@@ -419,6 +419,7 @@ let json_of_locate_types (resp : Locate_types_result.t) =
       _ = function
     | Arrow -> `List [ `String "Arrow" ]
     | Tuple -> `List [ `String "Tuple" ]
+    | Unboxed_tuple -> `List [ `String "Unboxed_tuple" ]
     | Object -> `List [ `String "Object" ]
     | Poly_variant -> `List [ `String "Poly_variant" ]
     | Type_ref { type_; result } ->

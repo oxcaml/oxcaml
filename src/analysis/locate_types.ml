@@ -17,12 +17,17 @@ let rec create_type_tree ty : Type_tree.t option =
     let children = List.filter_map tys ~f:create_type_tree in
     Some { data = Arrow; children }
   | Ttuple tys ->
-    let children = List.filter_map tys ~f:create_type_tree in
-    Some { data = Tuple; children }
-  | Tconstr (path, arg_tys, abbrev_memo) ->
-    let ty_without_args =
-      Btype.newty2 ~level:Ident.highest_scope (Tconstr (path, [], abbrev_memo))
+    let children =
+      List.filter_map tys ~f:(fun (_, ty) -> create_type_tree ty)
     in
+    Some { data = Tuple; children }
+  | Tunboxed_tuple tys ->
+    let children =
+      List.filter_map tys ~f:(fun (_, ty) -> create_type_tree ty)
+    in
+    Some { data = Unboxed_tuple; children }
+  | Tconstr (path, arg_tys, abbrev_memo) ->
+    let ty_without_args = Btype.newgenty (Tconstr (path, [], abbrev_memo)) in
     let children = List.filter_map arg_tys ~f:create_type_tree in
     Some { data = Type_ref { path; ty = ty_without_args }; children }
   | Tlink ty | Tpoly (ty, _) -> create_type_tree ty
@@ -50,4 +55,12 @@ let rec create_type_tree ty : Type_tree.t option =
           | Rpresent None | Rabsent -> None)
     in
     Some { data = Poly_variant; children }
-  | Tnil | Tvar _ | Tsubst _ | Tunivar _ | Tpackage _ | Tfield _ -> None
+  | Tnil
+  | Tvar _
+  | Tsubst _
+  | Tunivar _
+  | Tpackage _
+  | Tfield _
+  | Tquote _
+  | Tsplice _
+  | Tof_kind _ -> None
