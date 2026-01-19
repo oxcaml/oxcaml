@@ -819,6 +819,28 @@ Error: Opening modules is not supported inside quoted expressions,
 |}]
 ;;
 
+<[ fun (x : < foo: int[@warning "-26"] >) -> x ]>;;
+[%%expect {|
+Line 1, characters 14-38:
+1 | <[ fun (x : < foo: int[@warning "-26"] >) -> x ]>;;
+                  ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Adding attributes on fields in object types
+       is not supported inside quoted expressions,
+       as seen at Line 1, characters 14-38.
+|}]
+;;
+
+<[ fun (x : [ `Foo of int[@warning "-26"] ]) -> x ]>;;
+[%%expect {|
+Line 1, characters 14-41:
+1 | <[ fun (x : [ `Foo of int[@warning "-26"] ]) -> x ]>;;
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Adding attributes on tags in polymorphic variant types
+       is not supported inside quoted expressions,
+       as seen at Line 1, characters 14-41.
+|}]
+;;
+
 <[ fun x -> $ (<[ x ]>) ]>;;
 [%%expect {|
 - : <[$('a) -> $('a)]> expr = <[fun x -> x]>

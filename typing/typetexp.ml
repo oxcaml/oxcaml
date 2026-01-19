@@ -1023,6 +1023,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           Hashtbl.add hfields h (l,f)
       in
       let add_field row_context field =
+        if field.prf_attributes <> [] then
+          Env.check_no_open_quotations
+            field.prf_loc env Variant_tag_with_attribute_qt;
         let rf_loc = field.prf_loc in
         let rf_attributes = field.prf_attributes in
         let rf_desc = match field.prf_desc with
@@ -1381,6 +1384,9 @@ and transl_fields env ~policy ~row_context o fields =
     with Not_found ->
       Hashtbl.add hfields l ty in
   let add_field {pof_desc; pof_loc; pof_attributes;} =
+    if pof_attributes <> [] then
+      Env.check_no_open_quotations
+        pof_loc env Object_field_with_attribute_qt;
     let of_loc = pof_loc in
     let of_attributes = pof_attributes in
     let of_desc = match pof_desc with
