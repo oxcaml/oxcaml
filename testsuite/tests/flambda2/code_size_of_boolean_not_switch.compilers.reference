@@ -7,7 +7,7 @@ let code loopify(never) size(2) newer_version_of(f_0)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let not_scrutinee = %not b in
+  let not_scrutinee = %boolean_not (b) in
   cont k (not_scrutinee)
 in
 let $camlCode_size_of_boolean_not_switch__f_2 = closure f_0_1 @f in

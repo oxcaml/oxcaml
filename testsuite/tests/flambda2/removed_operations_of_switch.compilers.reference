@@ -7,15 +7,15 @@ let code loopify(never) size(27) newer_version_of(f_0)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : [ 0 of val * val ] =
-  (let untagged = %untag_imm b in
+  (let untagged = %untag_imm (b) in
    switch untagged
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let Pmakeblock = %Block 0 (x, y) in
+      let Pmakeblock = %block.[`0`] (x, y) in
       cont k (Pmakeblock)
     where k2 =
-      let Pmakeblock = %Block 0 (y, x) in
+      let Pmakeblock = %block.[`0`] (y, x) in
       cont k (Pmakeblock)
 in
 let $camlRemoved_operations_of_switch__f_2 = closure f_0_1 @f in
