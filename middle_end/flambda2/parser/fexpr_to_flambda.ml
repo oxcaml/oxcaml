@@ -316,7 +316,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     in
     let name, body_env =
       if is_exn_handler
-      then fresh_exn_cont env name
+      then fresh_exn_cont env name ~arity
       else fresh_cont env name ~sort ~arity
     in
     let body = expr body_env body in
@@ -577,7 +577,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
             fresh_cont env ret_cont ~sort:Return
               ~arity:(Flambda_arity.cardinal_unarized result_arity)
           in
-          let exn_continuation, env = fresh_exn_cont env exn_cont in
+          let exn_continuation, env = fresh_exn_cont env exn_cont ~arity:1 in
           let body = expr env body in
           let params_and_body =
             Flambda.Function_params_and_body.create ~return_continuation

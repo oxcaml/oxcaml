@@ -119,11 +119,11 @@ let fresh_cont env { Fexpr.txt = name; loc = _ } ~sort ~arity =
   let c = Continuation.create ~sort ~name () in
   c, { env with continuations = CM.add name (c, arity) env.continuations }
 
-let fresh_exn_cont env { Fexpr.txt = name; loc = _ } =
+let fresh_exn_cont env { Fexpr.txt = name; loc = _ } ~arity =
   let c = Continuation.create ~name () in
   ( c,
     { env with
-      continuations = CM.add name (c, 1) env.continuations;
+      continuations = CM.add name (c, arity) env.continuations;
       exn_continuations = CM.add name c env.exn_continuations
     } )
 
