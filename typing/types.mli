@@ -176,7 +176,8 @@ module Rigid_name : sig
 
   val param : int -> t
 
-  val fresh_unknown : unit -> t
+  val unknown : Shape.Uid.t -> t
+
 end
 
 module Ldd : Ldd_intf.S with module Name = Rigid_name

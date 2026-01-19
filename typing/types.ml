@@ -19,7 +19,7 @@ open Allowance
 open Asttypes
 
 module Rigid_name = struct
-  type unknown_id = int
+  type unknown_id = Shape.Uid.t
 
   type t =
     | Atom of
@@ -40,7 +40,7 @@ module Rigid_name = struct
       | Param x, Param y -> Int.compare x y
       | Atom _, Param _ -> -1
       | Param _, Atom _ -> 1
-      | Unknown x, Unknown y -> Int.compare x y
+      | Unknown x, Unknown y -> Shape.Uid.compare x y
       | Unknown _, _ -> 1
       | _, Unknown _ -> -1
 
@@ -49,18 +49,14 @@ module Rigid_name = struct
       let constr_s = Format.asprintf "%a" Path.print constr in
       Printf.sprintf "%s.%d" constr_s arg_index
     | Param i -> Printf.sprintf "param[%d]" i
-    | Unknown id -> Printf.sprintf "unknown[%d]" id
+    | Unknown id ->
+      Format.asprintf "unknown[%a]" Shape.Uid.print id
 
   let atomic constr arg_index = Atom { constr; arg_index }
 
   let param i = Param i
 
-  let fresh_unknown =
-    let next = ref 0 in
-    fun () ->
-      let id = !next in
-      incr next;
-      Unknown id
+  let unknown uid = Unknown uid
 end
 
 module Ldd = struct

@@ -32,6 +32,14 @@ let reset_constructor_ikind_on_substitution = false
 
 module Ldd = Types.Ldd
 
+let fresh_unknown_uid () : Types.Uid.t =
+  let current_unit =
+    match Compilation_unit.get_current () with
+    | None -> None
+    | Some cu -> Some (Unit_info.make_dummy ~input_name:"<ikind>" cu)
+  in
+  Types.Uid.mk ~current_unit
+
 (** A kind solver specialized to [Types.Ldd] and [Types.type_expr].
 
       The solver computes LDD polynomials of the form
@@ -363,7 +371,9 @@ module Solver = struct
             (* CR ikinds: open rows get conservative non-float value (boxed)
                intersected with an unknown rigid so the solver treats it as an
                unknown element. This can be improved. Internal ticket 6205. *)
-            let unknown = rigid_name ctx (Ldd.Name.fresh_unknown ()) in
+            let unknown =
+              rigid_name ctx (Ldd.Name.unknown (fresh_unknown_uid ()))
+            in
             Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
         else
           (* All-constant (immediate) polymorphic variant. *)
@@ -433,7 +443,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
        treat those as abstract unknowns. *)
     (* Fallback for unknown constructors: treat them as abstract,
        non-recursive values. *)
-    let unknown = Ldd.Name.fresh_unknown () in
+    let unknown = Ldd.Name.unknown (fresh_unknown_uid ()) in
     let kind : Solver.ckind = fun _ctx -> Ldd.node_of_var (Ldd.rigid unknown) in
     Solver.Ty { args = []; kind; abstract = true }
   | Some type_decl ->
