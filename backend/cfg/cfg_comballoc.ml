@@ -109,14 +109,14 @@ let find_compatible_allocations :
   loop [] cell ~curr_mode ~curr_size
 
 (** [combine ~max_instr_id cell] combines allocations, starting from [cell] and
-   using [max_instr_id] as the counter to get new instruction identifiers.
+    using [max_instr_id] as the counter to get new instruction identifiers.
 
-   The allocation are combined by repeatedly:
+    The allocation are combined by repeatedly:
 
-   - 1. looking for a "first" allocation;
-   - 2. looking for all subsequent allocations compatible with the "first" one;
-   - 3. continuing the process at step 1. from the instruction after the last
-        one seen at step 2.
+    - 1. looking for a "first" allocation;
+    - 2. looking for all subsequent allocations compatible with the "first" one;
+    - 3. continuing the process at step 1. from the instruction after the last
+      one seen at step 2.
 
     When steps 1 and 2 are both successful, allocations are effectively
     combined. This means that:

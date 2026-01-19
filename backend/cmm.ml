@@ -66,13 +66,12 @@ let typ_int128 = [| Int; Int |]
       Int
     v}
 
-  In particular, [Addr] must be above [Val], to ensure that if there is
-  a join point between a code path yielding [Addr] and one yielding [Val]
-  then the result is treated as a derived pointer into the heap (i.e. [Addr]).
-  (Such a result may not be live across any call site or a fatal compiler
-  error will result.)
-  The order is used only in selection, Valx2 is generated after selection.
-*)
+    In particular, [Addr] must be above [Val], to ensure that if there is a join
+    point between a code path yielding [Addr] and one yielding [Val] then the
+    result is treated as a derived pointer into the heap (i.e. [Addr]). (Such a
+    result may not be live across any call site or a fatal compiler error will
+    result.) The order is used only in selection, Valx2 is generated after
+    selection. *)
 
 let lub_component comp1 comp2 =
   match comp1, comp2 with
@@ -574,6 +573,10 @@ and expression =
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
+  | Cinvalid of
+      { message : string;
+        symbol : symbol
+      }
 
 type codegen_option =
   | Reduce_code_size
@@ -659,7 +662,7 @@ let iter_shallow_tail f = function
     List.iter (fun { body = h; _ } -> f h) handlers;
     f body;
     true
-  | Cexit _ | Cop (Craise _, _, _) -> true
+  | Cexit _ | Cop (Craise _, _, _) | Cinvalid _ -> true
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _
@@ -692,7 +695,7 @@ let map_shallow_tail f = function
       { label; params; body = f handler; dbg; is_cold }
     in
     Ccatch (flag, List.map map_h handlers, f body)
-  | (Cexit _ | Cop (Craise _, _, _)) as cmm -> cmm
+  | (Cexit _ | Cop (Craise _, _, _) | Cinvalid _) as cmm -> cmm
   | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
     | Cvar _ | Ctuple _
@@ -719,7 +722,7 @@ let map_tail f =
       | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
       | Cvar _ | Ctuple _ | Cop _ ) as c ->
       f c
-    | ( Cexit _
+    | ( Cexit _ | Cinvalid _
       | Clet (_, _, _)
       | Cphantom_let (_, _, _)
       | Csequence (_, _)
@@ -752,7 +755,7 @@ let iter_shallow f = function
   | Cexit (_n, el, _traps) -> List.iter f el
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ ->
+  | Cvar _ | Cinvalid _ ->
     ()
 
 let map_shallow f = function
@@ -773,7 +776,7 @@ let map_shallow f = function
   | Cexit (n, el, traps) -> Cexit (n, List.map f el, traps)
   | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-    | Cvar _ ) as c ->
+    | Cvar _ | Cinvalid _ ) as c ->
     c
 
 let rank_machtype_component : machtype_component -> int = function
@@ -1054,3 +1057,9 @@ let is_addr (m : machtype_component) =
 
 let is_exn_handler (flag : ccatch_flag) =
   match flag with Exn_handler -> true | Normal | Recursive -> false
+
+let equal_exit_label (lbl1 : exit_label) (lbl2 : exit_label) =
+  match lbl1, lbl2 with
+  | Return_lbl, Return_lbl -> true
+  | Lbl lbl1, Lbl lbl2 -> Static_label.equal lbl1 lbl2
+  | Return_lbl, Lbl _ | Lbl _, Return_lbl -> false

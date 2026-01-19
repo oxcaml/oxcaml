@@ -13,8 +13,8 @@ val get_cells :
   int ->
   Cfg.basic Cfg.instruction DLL.cell list
 
-(** The following functions check for overflow and ranges of immediates w.r.t. the
-    operation and optionally rewrite the operation.  *)
+(** The following functions check for overflow and ranges of immediates w.r.t.
+    the operation and optionally rewrite the operation. *)
 val add_immediates :
   Operation.integer_operation ->
   int ->

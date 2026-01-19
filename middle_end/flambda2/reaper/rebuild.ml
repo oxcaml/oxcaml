@@ -277,17 +277,17 @@ let bound_vars_will_have_their_representation_changed env bvs =
 let function_params_and_body_free_names fpb =
   Function_params_and_body.pattern_match fpb
     ~f:(fun
-         ~return_continuation
-         ~exn_continuation
-         params
-         ~body:_
-         ~my_closure
-         ~is_my_closure_used:_
-         ~my_region
-         ~my_ghost_region
-         ~my_depth
-         ~free_names_of_body
-       ->
+        ~return_continuation
+        ~exn_continuation
+        params
+        ~body:_
+        ~my_closure
+        ~is_my_closure_used:_
+        ~my_region
+        ~my_ghost_region
+        ~my_depth
+        ~free_names_of_body
+      ->
       let f =
         match free_names_of_body with Unknown -> assert false | Known f -> f
       in
@@ -325,9 +325,10 @@ let name_poison env name =
 let rewrite_simple (env : env) simple =
   Simple.pattern_match simple
     ~name:(fun name ~coercion:_ ->
-      if not
-           (Option.is_none
-              (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
+      if
+        not
+          (Option.is_none
+             (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
       then simple (* XXX Misc.fatal_errorf "UNBOXED?? %a@." Name.print name; *)
       else if is_name_used env name
       then simple
@@ -670,13 +671,14 @@ let rebuild_named_default_case env (named : Named.t) =
 let rewrite_apply_cont_expr env ac =
   let cont = Apply_cont_expr.continuation ac in
   let args = Apply_cont_expr.args ac in
-  if List.exists
-       (fun arg ->
-         Simple.pattern_match arg
-           ~name:(fun name ~coercion:_ ->
-             not (DS.has_source env.uses (Code_id_or_name.name name)))
-           ~const:(fun _ -> false))
-       args
+  if
+    List.exists
+      (fun arg ->
+        Simple.pattern_match arg
+          ~name:(fun name ~coercion:_ ->
+            not (DS.has_source env.uses (Code_id_or_name.name name)))
+          ~const:(fun _ -> false))
+      args
   then None
   else
     let args =
@@ -753,16 +755,17 @@ let make_apply_wrapper env
     match rev_args_or_invalid with
     | Ok (_, rev_args) ->
       let args = List.rev rev_args in
-      if List.compare_lengths args return_parameters = 0
-         && List.for_all2
-              (fun arg param ->
-                Simple.pattern_match'
-                  ~const:(fun _ -> false)
-                  ~symbol:(fun _ ~coercion:_ -> false)
-                  ~var:(fun v ~coercion:_ ->
-                    Variable.equal v (Bound_parameter.var param))
-                  arg)
-              args return_parameters
+      if
+        List.compare_lengths args return_parameters = 0
+        && List.for_all2
+             (fun arg param ->
+               Simple.pattern_match'
+                 ~const:(fun _ -> false)
+                 ~symbol:(fun _ ~coercion:_ -> false)
+                 ~var:(fun v ~coercion:_ ->
+                   Variable.equal v (Bound_parameter.var param))
+                 arg)
+             args return_parameters
       then
         (* If the decisions are equal, we are making the same transformation to
            the arguments passed to the return continuation in the callee as to
@@ -861,21 +864,27 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
     Call_kind.method_call kind ~obj:(rewrite_simple obj) alloc_mode
   | C_call _ as ck -> ck
   | Effect (Perform { eff }) ->
-    Call_kind.effect (Call_kind.Effect.perform ~eff:(rewrite_simple eff))
+    Call_kind.effect_ (Call_kind.Effect.perform ~eff:(rewrite_simple eff))
   | Effect (Reperform { eff; cont; last_fiber }) ->
-    Call_kind.effect
+    Call_kind.effect_
       (Call_kind.Effect.reperform ~eff:(rewrite_simple eff)
          ~cont:(rewrite_simple cont)
          ~last_fiber:(rewrite_simple last_fiber))
-  | Effect (Run_stack { stack; f; arg }) ->
-    Call_kind.effect
-      (Call_kind.Effect.run_stack ~stack:(rewrite_simple stack)
+  | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.with_stack ~valuec:(rewrite_simple valuec)
+         ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
          ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
-  | Effect (Resume { stack; f; arg; last_fiber }) ->
-    Call_kind.effect
-      (Call_kind.Effect.resume ~stack:(rewrite_simple stack)
-         ~f:(rewrite_simple f) ~arg:(rewrite_simple arg)
-         ~last_fiber:(rewrite_simple last_fiber))
+  | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.with_stack_bind ~valuec:(rewrite_simple valuec)
+         ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
+         ~dyn:(rewrite_simple dyn) ~bind:(rewrite_simple bind)
+         ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
+  | Effect (Resume { cont; f; arg }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.resume ~cont:(rewrite_simple cont) ~f:(rewrite_simple f)
+         ~arg:(rewrite_simple arg))
 
 let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in
@@ -919,9 +928,10 @@ let decide_whether_apply_needs_calling_convention_change env apply =
           match env.should_preserve_direct_calls with
           | Yes -> call_kind
           | No ->
-            if not
-                 (Compilation_unit.is_current
-                    (Code_id.get_compilation_unit code_id))
+            if
+              not
+                (Compilation_unit.is_current
+                   (Code_id.get_compilation_unit code_id))
             then call_kind
             else
               Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
@@ -1579,12 +1589,13 @@ let rec default_defining_expr_for_rebuilding_let env res
               Some (p, Rev_expr.Deleted_code))
           | Block_like sym -> if is_symbol_used env sym then Some arg else None
           | Set_of_closures m ->
-            if Function_slot.Lmap.exists
-                 (fun _ sym ->
-                   Option.is_some
-                     (DS.get_changed_representation env.uses
-                        (Code_id_or_name.symbol sym)))
-                 m
+            if
+              Function_slot.Lmap.exists
+                (fun _ sym ->
+                  Option.is_some
+                    (DS.get_changed_representation env.uses
+                       (Code_id_or_name.symbol sym)))
+                m
             then
               let m =
                 Function_slot.Lmap.of_list
@@ -1606,9 +1617,8 @@ let rec default_defining_expr_for_rebuilding_let env res
                      (Function_slot.Lmap.bindings m))
               in
               Some (Bound_static.Pattern.set_of_closures m, e)
-            else if Function_slot.Lmap.exists
-                      (fun _ sym -> is_symbol_used env sym)
-                      m
+            else if
+              Function_slot.Lmap.exists (fun _ sym -> is_symbol_used env sym) m
             then Some arg
             else None)
         (List.combine (Bound_static.to_list bound_static) group)
@@ -1657,9 +1667,10 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
   let bound_pattern, new_defining_expr, res =
     default_defining_expr_for_rebuilding_let env res bound_pattern defining_expr
   in
-  if Bound_pattern.fold_all_bound_vars bound_pattern
-       ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
-       ~init:false
+  if
+    Bound_pattern.fold_all_bound_vars bound_pattern
+      ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
+      ~init:false
   then
     ( RE.from_expr
         ~expr:
@@ -1876,8 +1887,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         DS.cannot_change_calling_convention env.uses code_id
       in
       ( (if cannot_change_calling_convention
-        then Not_changing_calling_convention
-        else Changing_calling_convention code_id),
+         then Not_changing_calling_convention
+         else Changing_calling_convention code_id),
         code_dep.params,
         code_dep.return )
   in
@@ -1907,42 +1918,44 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     match Code_metadata.result_types code_metadata with
     | Unknown | Bottom -> code_metadata
     | Ok result_types ->
-      let old_typing_env =
-        match env.old_typing_env with
-        | None -> Misc.fatal_errorf "Result types without typing env"
-        | Some old_typing_env -> old_typing_env
-      in
       let result_types =
-        if Sys.getenv_opt "FORGETALL" <> None && true
-        then Or_unknown_or_bottom.Unknown
-        else
-          let params_vars_and_keep, results_vars_and_keep =
-            match updating_calling_convention with
-            | Not_changing_calling_convention ->
-              ( List.map (fun p -> p, DS.Keep) params_vars,
-                List.map (fun p -> p, DS.Keep) results_vars )
-            | Changing_calling_convention code_id ->
-              let return_decisions =
-                Code_id.Map.find code_id env.function_return_decision
-              in
-              let params_decision =
-                Code_id.Map.find code_id env.function_params_to_keep
-              in
-              ( List.map2
-                  (fun p -> function
-                    | Keep _ | Unbox _ -> p, DS.Keep
-                    | Delete -> p, DS.Delete)
-                  params_vars params_decision,
-                List.map2
-                  (fun p -> function
-                    | Keep _ | Unbox _ -> p, DS.Keep
-                    | Delete -> p, DS.Delete)
-                  results_vars return_decisions )
-          in
-          Or_unknown_or_bottom.Ok
-            (Dep_solver.rewrite_result_types env.uses ~old_typing_env
-               ~my_closure ~params:params_vars_and_keep
-               ~results:results_vars_and_keep result_types)
+        match env.old_typing_env with
+        | None ->
+          (* This can happen if the result continuation of the compilation unit
+             is never used. If this happens, this compilation unit either always
+             raises an exception or diverges. In any case, it will not be
+             possible to use this compilation unit in another compilation unit,
+             so keeping the result types is useless. *)
+          Or_unknown_or_bottom.Unknown
+        | Some old_typing_env ->
+          if Sys.getenv_opt "FORGETALL" <> None && true
+          then Or_unknown_or_bottom.Unknown
+          else
+            let params_vars_and_keep, results_vars_and_keep =
+              match updating_calling_convention with
+              | Not_changing_calling_convention ->
+                ( List.map (fun p -> p, DS.Keep) params_vars,
+                  List.map (fun p -> p, DS.Keep) results_vars )
+              | Changing_calling_convention code_id ->
+                let return_decisions =
+                  Code_id.Map.find code_id env.function_return_decision
+                in
+                let params_decision =
+                  Code_id.Map.find code_id env.function_params_to_keep
+                in
+                ( List.map2
+                    (fun p -> function
+                      | Keep _ | Unbox _ -> p, DS.Keep | Delete -> p, DS.Delete)
+                    params_vars params_decision,
+                  List.map2
+                    (fun p -> function
+                      | Keep _ | Unbox _ -> p, DS.Keep | Delete -> p, DS.Delete)
+                    results_vars return_decisions )
+            in
+            Or_unknown_or_bottom.Ok
+              (Dep_solver.rewrite_result_types env.uses ~old_typing_env
+                 ~my_closure ~params:params_vars_and_keep
+                 ~results:results_vars_and_keep result_types)
       in
       Code_metadata.with_result_types result_types code_metadata
   in
@@ -2054,8 +2067,9 @@ and rebuild_static_const_or_code env res
     ->
     let is_my_closure_used = is_var_used env params_and_body.my_closure in
     let code_metadata =
-      if Bool.equal is_my_closure_used
-           (Code_metadata.is_my_closure_used code_metadata)
+      if
+        Bool.equal is_my_closure_used
+          (Code_metadata.is_my_closure_used code_metadata)
       then code_metadata
       else (
         assert (not is_my_closure_used);
@@ -2127,20 +2141,21 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       DS.cannot_change_calling_convention solved_dep code_id
     in
     if cannot_change_calling_convention
-    then (fun var kind ->
-      assert (
-        Option.is_none
-          (DS.get_unboxed_fields solved_dep (Code_id_or_name.var var)));
-      Keep (var, kind))
+    then (
+      fun var kind ->
+        assert (
+          Option.is_none
+            (DS.get_unboxed_fields solved_dep (Code_id_or_name.var var)));
+        Keep (var, kind))
     else
       fun param kind ->
-      match DS.get_unboxed_fields solved_dep (Code_id_or_name.var param) with
-      | None ->
-        let is_var_used =
-          raw_is_var_used solved_dep param (K.With_subkind.kind kind)
-        in
-        if is_var_used then Keep (param, kind) else Delete
-      | Some fields -> Unbox fields
+        match DS.get_unboxed_fields solved_dep (Code_id_or_name.var param) with
+        | None ->
+          let is_var_used =
+            raw_is_var_used solved_dep param (K.With_subkind.kind kind)
+          in
+          if is_var_used then Keep (param, kind) else Delete
+        | Some fields -> Unbox fields
   in
   let function_params_to_keep =
     Code_id.Map.mapi
@@ -2195,15 +2210,16 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     in
     match DS.get_unboxed_fields solved_dep (Code_id_or_name.var param) with
     | None ->
-      if keep_all_parameters
-         ||
-         let is_var_used =
-           raw_is_var_used solved_dep param (K.With_subkind.kind kind)
-         in
-         is_var_used
-         ||
-         let info = Continuation.Map.find cont continuation_info in
-         info.is_exn_handler && Variable.equal param (List.hd info.params)
+      if
+        keep_all_parameters
+        ||
+        let is_var_used =
+          raw_is_var_used solved_dep param (K.With_subkind.kind kind)
+        in
+        is_var_used
+        ||
+        let info = Continuation.Map.find cont continuation_info in
+        info.is_exn_handler && Variable.equal param (List.hd info.params)
       then
         Keep
           (param, DS.rewrite_kind_with_subkind solved_dep (Name.var param) kind)

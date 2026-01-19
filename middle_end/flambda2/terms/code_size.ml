@@ -243,12 +243,12 @@ let divmod_bi_check ~machine_width else_branch_size
     (bi : Flambda_kind.Standard_int.t) =
   (* CR gbury: we should allow check Arch.division_crashed_on_overflow, but
      that's likely a dependency we want to avoid ? *)
-  if Target_system.Machine_width.is_32_bit machine_width
-     ||
-     match bi with
-     | Naked_int8 | Naked_int16 | Naked_int32 -> false
-     | Naked_int64 | Naked_nativeint | Naked_immediate | Tagged_immediate ->
-       true
+  if
+    Target_system.Machine_width.is_32_bit machine_width
+    ||
+    match bi with
+    | Naked_int8 | Naked_int16 | Naked_int32 -> false
+    | Naked_int64 | Naked_nativeint | Naked_immediate | Tagged_immediate -> true
   then 2 + else_branch_size
   else 0
 

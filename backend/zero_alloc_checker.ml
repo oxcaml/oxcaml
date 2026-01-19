@@ -266,7 +266,7 @@ end
 module V : sig
   type t
 
-  (** order of the abstract domain  *)
+  (** order of the abstract domain *)
   val lessequal : t -> t -> bool
 
   val join : t -> t -> t
@@ -297,8 +297,9 @@ module V : sig
 
   val top : Witnesses.t -> t
 
-  (** [compare] is structural on terms (for the use of [V.t] as a key in sets and maps),
-      whereas [lessequal] is the order of the abstract domain (for fixed point checks). *)
+  (** [compare] is structural on terms (for the use of [V.t] as a key in sets
+      and maps), whereas [lessequal] is the order of the abstract domain (for
+      fixed point checks). *)
   val compare : t -> t -> int
 
   val match_with :
@@ -400,9 +401,8 @@ end = struct
         ~cardinal:Var.Map.cardinal
   end
 
-  (** Normal form of Transform.
-      [Transform] represents an abstract transformer of a primitive
-      such as a function call. *)
+  (** Normal form of Transform. [Transform] represents an abstract transformer
+      of a primitive such as a function call. *)
   module Transform : sig
     type t
 
@@ -433,7 +433,7 @@ end = struct
     (** [same_vars] compares variables ignoring witnesses *)
     val same_vars : t -> t -> bool
 
-    (** does not change the number of variables, only their witnesses.  *)
+    (** does not change the number of variables, only their witnesses. *)
     val cutoff_witnesses : t -> n:int -> t
   end = struct
     type t =
@@ -632,7 +632,7 @@ end = struct
      in the Join module, and perhaps lead to a type like { args : Args.t; rest :
      'a; } that could then be used in other modules such as Transform. *)
 
-  (** helper for Join  *)
+  (** helper for Join *)
   module Args : sig
     type t
 
@@ -649,12 +649,12 @@ end = struct
     (** [transform t tr] replace each element x of [t] with "transform x tr" *)
     val transform : t -> Transform.t -> t
 
-    (** [transform_var t var w]
-        replace each element x of [t] with "transfrom x var". *)
+    (** [transform_var t var w] replace each element x of [t] with "transfrom x
+        var". *)
     val transform_var : t -> Var.t -> Witnesses.t -> t
 
-    (** [transform_top t w] replace each element x of [t] with
-        "transform t (Top w)" *)
+    (** [transform_top t w] replace each element x of [t] with "transform t (Top
+        w)" *)
     val transform_top : t -> Witnesses.t -> t
 
     val transform_join : t -> t -> t
@@ -1333,11 +1333,12 @@ end = struct
             ~init vars
       | Join j ->
         let vars, trs = Join.get j in
-        if (not (contains_any env vars))
-           && not
-                (Transforms.exists
-                   (fun tr -> contains_any env (Transform.get_vars tr))
-                   trs)
+        if
+          (not (contains_any env vars))
+          && not
+               (Transforms.exists
+                  (fun tr -> contains_any env (Transform.get_vars tr))
+                  trs)
         then t
         else
           let init =
@@ -1406,10 +1407,10 @@ end = struct
       div = V.apply t.div ~env
     }
 
-  let transform effect v =
-    { nor = V.transform effect v.nor;
-      exn = V.transform effect v.exn;
-      div = V.transform effect v.div
+  let transform effect_ v =
+    { nor = V.transform effect_ v.nor;
+      exn = V.transform effect_ v.exn;
+      div = V.transform effect_ v.div
     }
 
   let replace_witnesses w t =
@@ -1431,7 +1432,7 @@ end = struct
     }
 end
 
-(**  Representation of user-provided annotations as abstract values *)
+(** Representation of user-provided annotations as abstract values *)
 module Annotation : sig
   type t
 
@@ -1445,8 +1446,9 @@ module Annotation : sig
 
   val expected_value : t -> Value.t
 
-  (** [valid t value] returns true if and only if the [value] satisfies the annotation,
-      i.e., [value] is less or equal to [expected_value a] when ignoring witnesses. *)
+  (** [valid t value] returns true if and only if the [value] satisfies the
+      annotation, i.e., [value] is less or equal to [expected_value a] when
+      ignoring witnesses. *)
 
   val valid : t -> Value.t -> bool
 
@@ -1681,9 +1683,9 @@ end = struct
       let scoped_name =
         t.fun_dbg |> Debuginfo.get_dbg |> Debuginfo.Dbg.to_list
         |> List.map (fun dbg ->
-               Debuginfo.(
-                 Scoped_location.string_of_scopes ~include_zero_alloc:false
-                   dbg.dinfo_scopes))
+            Debuginfo.(
+              Scoped_location.string_of_scopes ~include_zero_alloc:false
+                dbg.dinfo_scopes))
         |> String.concat ","
       in
       Format.fprintf ppf
@@ -1793,7 +1795,8 @@ end = struct
                0\" flags.\n\
                The \"-zero-alloc-checker-join 0\" flag may substantially \
                increase compilation time.\n\
-               (widening applied in function %s%s)" t.fun_name component_msg,
+               (widening applied in function %s%s)"
+              t.fun_name component_msg,
             [] )
         | Indirect_call _ | Indirect_tailcall _ | Direct_call _
         | Direct_tailcall _ | Extcall _ ->
@@ -1875,8 +1878,8 @@ module Func_info : sig
       dbg : Debuginfo.t;  (** debug info associated with the function *)
       mutable value : Value.t;  (** the result of the check *)
       annotation : Annotation.t option
-          (** [value] must be lessequal than the expected value
-          if there is user-defined annotation on this function. *)
+          (** [value] must be lessequal than the expected value if there is
+              user-defined annotation on this function. *)
     }
 
   val create : string -> Value.t -> Debuginfo.t -> Annotation.t option -> t
@@ -1890,8 +1893,8 @@ end = struct
       dbg : Debuginfo.t;  (** debug info associated with the function *)
       mutable value : Value.t;  (** the result of the check *)
       annotation : Annotation.t option
-          (** [value] must be lessequal than the expected value
-          if there is user-defined annotation on this function. *)
+          (** [value] must be lessequal than the expected value if there is
+              user-defined annotation on this function. *)
     }
 
   let create name value dbg annotation = { name; dbg; value; annotation }
@@ -1905,8 +1908,8 @@ end
 (* CR-someday gyorsh: We may also want annotations on call sites, not only on
    functions. *)
 
-(** Information about functions that we have seen so far in the current compilation
-      unit. *)
+(** Information about functions that we have seen so far in the current
+    compilation unit. *)
 module Unit_info : sig
   (** mutable state *)
   type t
@@ -1919,8 +1922,8 @@ module Unit_info : sig
 
   val find_exn : t -> string -> Func_info.t
 
-  (** [recod t name v dbg a] name must be in the current compilation unit,
-      and not previously recorded.  *)
+  (** [recod t name v dbg a] name must be in the current compilation unit, and
+      not previously recorded. *)
   val record :
     t -> string -> Value.t -> Debuginfo.t -> Annotation.t option -> unit
 
@@ -1965,18 +1968,19 @@ module Unresolved_dependencies : sig
 
   val get_callers : callee:string -> t -> String.Set.t
 
-  (** removes all association of the [callee] with its direct callers. [callee] must exist
-      and must not be associated with any callees of its own in [t]. *)
+  (** removes all association of the [callee] with its direct callers. [callee]
+      must exist and must not be associated with any callees of its own in [t].
+  *)
   val remove : callee:string -> t -> unit
 
   (** adds a new caller. *)
   val add : t -> caller:string -> callees:String.Set.t -> unit
 
-  (** Ensure [caller] exists and is already associated with [callees], and remove
-      association of [caller] with any other callees.  *)
+  (** Ensure [caller] exists and is already associated with [callees], and
+      remove association of [caller] with any other callees. *)
   val update : t -> caller:string -> callees:String.Set.t -> unit
 end = struct
-  (** reverse dependencies: map from an unresolved callee to all its callers  *)
+  (** reverse dependencies: map from an unresolved callee to all its callers *)
   type t = String.Set.t String.Tbl.t
 
   let create () = String.Tbl.create 2
@@ -2036,13 +2040,14 @@ end = struct
 end
 
 module Compilenv_utils : sig
-  (** [get_value_opt f] returns the value recorded for function [f] in [Compilenv],
-      either because the check passed or because of user-defined "assume" annotation.
-      If [f] was compiled with checks disabled, returns None.
-  *)
+  (** [get_value_opt f] returns the value recorded for function [f] in
+      [Compilenv], either because the check passed or because of user-defined
+      "assume" annotation. If [f] was compiled with checks disabled, returns
+      None. *)
   val get_value_opt : string -> Value.t option
 
-  (** [set_value f v] records the value of the function named [f] in [Compilenv]. *)
+  (** [set_value f v] records the value of the function named [f] in
+      [Compilenv]. *)
   val set_value : string -> Value.t -> unit
 end = struct
   (* Compact the mapping from function name to Value.t to reduce size of
@@ -2091,10 +2096,9 @@ end = struct
     decode (Zero_alloc_info.get_value info s)
 end
 
-(** The analysis involved some fixed point computations.
-    Termination: [Value.t] is a finite height domain and
-    [transfer] is a monotone function w.r.t. [Value.lessequal] order.
-*)
+(** The analysis involved some fixed point computations. Termination: [Value.t]
+    is a finite height domain and [transfer] is a monotone function w.r.t.
+    [Value.lessequal] order. *)
 module Analysis : sig
   (** Check one function. *)
   val cfg :
@@ -2105,8 +2109,9 @@ module Analysis : sig
     Format.formatter ->
     unit
 
-  (** Resolve all function summaries, check them against user-provided assertions,
-      and record the summaries in Compilenv to be saved in .cmx files *)
+  (** Resolve all function summaries, check them against user-provided
+      assertions, and record the summaries in Compilenv to be saved in .cmx
+      files *)
   val record_unit :
     Unit_info.t -> Unresolved_dependencies.t -> Format.formatter -> unit
 end = struct
@@ -2115,7 +2120,7 @@ end = struct
     { ppf : Format.formatter;
       current_fun_name : string;
       future_funcnames : String.Set.t;
-      unit_info : Unit_info.t;  (** must be the current compilation unit.  *)
+      unit_info : Unit_info.t;  (** must be the current compilation unit. *)
       keep_witnesses : bool
     }
 
@@ -2174,9 +2179,10 @@ end = struct
       | Some a ->
         Builtin_attributes.mark_zero_alloc_attribute_checked analysis_name
           (Annotation.get_loc a);
-        if (not (Annotation.is_assume a))
-           && enabled ()
-           && not (Annotation.valid a func_info.value)
+        if
+          (not (Annotation.is_assume a))
+          && enabled ()
+          && not (Annotation.valid a func_info.value)
         then
           (* CR-soon gyorsh: keeping track of all the witnesses until the end of
              the compilation unit will be expensive. For functions that do not
@@ -2273,42 +2279,42 @@ end = struct
         then resolved callee_info.value
         else unresolved "defined earlier with unresolved dependencies"
 
-  let transform_return ~(effect : V.t) dst =
+  let transform_return ~(effect_ : V.t) dst =
     (* Instead of calling [Value.transform] directly, first check for trivial
        cases to avoid reallocating [dst]. *)
-    V.match_with effect ~bot:Value.bot ~safe:dst
-      ~top:(fun _ -> Value.transform effect dst)
-      ~unresolved:(fun () -> Value.transform effect dst)
+    V.match_with effect_ ~bot:Value.bot ~safe:dst
+      ~top:(fun _ -> Value.transform effect_ dst)
+      ~unresolved:(fun () -> Value.transform effect_ dst)
 
-  let transform_diverge ~(effect : V.t) (dst : Value.t) =
-    let div = V.join effect dst.div in
+  let transform_diverge ~(effect_ : V.t) (dst : Value.t) =
+    let div = V.join effect_ dst.div in
     { dst with div }
 
-  let transform t ~next ~exn ~(effect : Value.t) desc dbg =
-    report t effect ~msg:"transform effect" ~desc dbg;
-    let next = transform_return ~effect:effect.nor next in
-    let exn = transform_return ~effect:effect.exn exn in
+  let transform t ~next ~exn ~(effect_ : Value.t) desc dbg =
+    report t effect_ ~msg:"transform effect" ~desc dbg;
+    let next = transform_return ~effect_:effect_.nor next in
+    let exn = transform_return ~effect_:effect_.exn exn in
     report t next ~msg:"transform new next" ~desc dbg;
     report t exn ~msg:"transform new exn" ~desc dbg;
     let r = Value.join next exn in
     report t r ~msg:"transform join" ~desc dbg;
-    let r = transform_diverge ~effect:effect.div r in
+    let r = transform_diverge ~effect_:effect_.div r in
     report t r ~msg:"transform result" ~desc dbg;
     r
 
   let transform_top t ~next ~exn w desc dbg =
-    let effect =
+    let effect_ =
       match Metadata.assume_value dbg ~can_raise:true w with
       | Some v -> v
       | None -> Value.top w
     in
-    transform t ~next ~exn ~effect desc dbg
+    transform t ~next ~exn ~effect_ desc dbg
 
   let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg =
     report t next ~msg:"transform_call next" ~desc dbg;
     report t exn ~msg:"transform_call exn" ~desc dbg;
     let v = find_callee t callee ~desc dbg k in
-    let effect =
+    let effect_ =
       let w = create_witnesses t k dbg in
       match Metadata.assume_value dbg ~can_raise:true w with
       | Some v' ->
@@ -2316,14 +2322,14 @@ end = struct
         if Value.is_resolved v then Value.meet v v' else v'
       | None -> v
     in
-    transform t ~next ~exn ~effect desc dbg
+    transform t ~next ~exn ~effect_ desc dbg
 
   (** Summary of target specific operations. *)
   let transform_specific t s ~next ~exn dbg =
     let desc = "Arch.specific_operation" in
     report t next ~msg:"transform_specific next" ~desc dbg;
     report t exn ~msg:"transform_specific exn" ~desc dbg;
-    let effect =
+    let effect_ =
       let w = create_witnesses t (Arch_specific s) dbg in
       match Metadata.assume_value dbg ~can_raise:false w with
       | Some v -> v
@@ -2336,7 +2342,7 @@ end = struct
         let div = V.bot in
         { Value.nor; exn; div }
     in
-    transform t ~next ~exn ~effect desc dbg
+    transform t ~next ~exn ~effect_ desc dbg
 
   module Env : sig
     type t
@@ -2356,7 +2362,7 @@ end = struct
     val print : msg:string -> Format.formatter -> t -> unit
 
     (** initialize [env] with Bot for all functions on normal and exceptional
-       return, and Safe for diverge component conservatively. *)
+        return, and Safe for diverge component conservatively. *)
     val init_val : Value.t
   end = struct
     type data =
@@ -2469,10 +2475,11 @@ end = struct
      unresolved callees of [func_info]. *)
   let fixpoint_self_rec (func_info : Func_info.t) ppf =
     let unresolved_callees = Value.get_unresolved_names func_info.value in
-    if String.Set.is_empty unresolved_callees
-       || not
-            (String.Set.equal unresolved_callees
-               (String.Set.singleton func_info.name))
+    if
+      String.Set.is_empty unresolved_callees
+      || not
+           (String.Set.equal unresolved_callees
+              (String.Set.singleton func_info.name))
     then unresolved_callees
     else
       let init_env = Env.singleton func_info Env.init_val in
@@ -2484,8 +2491,9 @@ end = struct
      not resolve mutually recursive loops. *)
   let rec propagate ~callee unit_info unresolved_deps ppf =
     let callee_info = Unit_info.find_exn unit_info callee in
-    if Value.is_resolved callee_info.value
-       && Unresolved_dependencies.contains ~callee unresolved_deps
+    if
+      Value.is_resolved callee_info.value
+      && Unresolved_dependencies.contains ~callee unresolved_deps
     then (
       let callers =
         Unresolved_dependencies.get_callers ~callee unresolved_deps
@@ -2580,23 +2588,23 @@ end = struct
       let transform_call_indirect t ~next ~exn callees wkind ~desc dbg =
         report t next ~msg:"transform_call_indirect next" ~desc dbg;
         report t exn ~msg:"transform_call_indirect exn" ~desc dbg;
-        let effect =
+        let effect_ =
           List.fold_left
             (fun all_effects { Cmm.sym_name = callee; _ } ->
               let k = wkind callee in
               let v = find_callee t callee ~desc dbg k in
               let w = create_witnesses t k dbg in
-              let effect =
+              let effect_ =
                 match Metadata.assume_value dbg ~can_raise:true w with
                 | Some v' ->
                   assert (Value.is_resolved v');
                   if Value.is_resolved v then Value.meet v v' else v'
                 | None -> v
               in
-              Value.join effect all_effects)
+              Value.join effect_ all_effects)
             Value.bot callees
         in
-        transform t ~next ~exn ~effect desc dbg
+        transform t ~next ~exn ~effect_ desc dbg
 
       let transform_tailcall_imm t func dbg =
         (* Sound to ignore [next] and [exn] because the call never returns. *)
@@ -2640,12 +2648,12 @@ end = struct
         | Alloc { mode = Local; _ } -> next
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
-          let effect =
+          let effect_ =
             match Metadata.assume_value dbg ~can_raise:false w with
-            | Some effect -> effect
+            | Some effect_ -> effect_
             | None -> Value.{ nor = V.top w; exn = V.bot; div = V.bot }
           in
-          transform t ~effect ~next ~exn:Value.bot "heap allocation" dbg
+          transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
         | Dls_get | Tls_get -> next
 
@@ -2729,6 +2737,7 @@ end = struct
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
+        | Invalid _ -> next
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
         Ok (terminator next ~exn i t)
@@ -2774,7 +2783,7 @@ let unit_info = Unit_info.create ()
 
 let unresolved_deps = Unresolved_dependencies.create ()
 
-let update_caml_flambda_invalid_cfg cfg_with_layout =
+let drop_invalid_successors cfg_with_layout =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (* This condition matches the one in [Selectgen] to avoid copying [fd]
      unnecessarily. *)
@@ -2788,28 +2797,25 @@ let update_caml_flambda_invalid_cfg cfg_with_layout =
     let modified = ref false in
     Cfg.iter_blocks cfg ~f:(fun label block ->
         match block.terminator.desc with
-        | Prim { op = External ({ func_symbol; _ } as ext); label_after = _ } ->
-          if String.equal func_symbol Cmm.caml_flambda2_invalid
-          then (
-            let successors =
-              Cfg.successor_labels ~normal:true ~exn:true block
-            in
-            block.terminator
-              <- { block.terminator with desc = Call_no_return ext };
-            block.exn <- None;
-            block.can_raise <- false;
-            (* update predecessors for successors of [block]. *)
-            Label.Set.iter
-              (fun successor_label ->
-                let successor_block = Cfg.get_block_exn cfg successor_label in
-                successor_block.predecessors
-                  <- Label.Set.remove label successor_block.predecessors)
-              successors;
-            modified := true)
-        | Prim { op = Probe _; _ }
-        | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-        | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-        | Tailcall_func _ | Call_no_return _ | Call _ ->
+        | Invalid ({ label_after = Some _; _ } as r) ->
+          let successors = Cfg.successor_labels ~normal:true ~exn:true block in
+          block.terminator
+            <- { block.terminator with
+                 desc = Invalid { r with label_after = None }
+               };
+          block.exn <- None;
+          block.can_raise <- false;
+          Label.Set.iter
+            (fun successor_label ->
+              let successor_block = Cfg.get_block_exn cfg successor_label in
+              successor_block.predecessors
+                <- Label.Set.remove label successor_block.predecessors)
+            successors;
+          modified := true
+        | Invalid { label_after = None; _ }
+        | Prim _ | Never | Always _ | Parity_test _ | Truth_test _
+        | Float_test _ | Int_test _ | Switch _ | Return | Raise _
+        | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _ ->
           ());
     if not !modified
     then cfg_with_layout
@@ -2819,7 +2825,7 @@ let update_caml_flambda_invalid_cfg cfg_with_layout =
 let cfg ppf_dump ~future_funcnames cl =
   let cfg = Cfg_with_layout.cfg cl in
   Analysis.cfg cfg ~future_funcnames unit_info unresolved_deps ppf_dump;
-  update_caml_flambda_invalid_cfg cl
+  drop_invalid_successors cl
 
 let reset_unit_info () =
   Unit_info.reset unit_info;

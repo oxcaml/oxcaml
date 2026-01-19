@@ -132,7 +132,7 @@ module Make (Op : Operation) : S with type op = Op.t = struct
     { num_next = 0; num_eqs = Equations.empty; num_reg = Reg.Map.empty }
 
   (** Generate a fresh value number [v] and associate it to register [r].
-  Returns a pair [(n',v)] with the updated value numbering [n']. *)
+      Returns a pair [(n',v)] with the updated value numbering [n']. *)
 
   let fresh_valnum_reg n r =
     let v = n.num_next in
@@ -158,11 +158,10 @@ module Make (Op : Operation) : S with type op = Op.t = struct
 
   let fresh_valnum_regs n rs = array_fold_transf fresh_valnum_reg n rs
 
-  (** [valnum_reg n r] returns the value number for the contents of
-  register [r].  If none exists, a fresh value number is returned
-  and associated with register [r].  The possibly updated numbering
-  is also returned.  [valnum_regs] is similar, but for an array of
-  registers. *)
+  (** [valnum_reg n r] returns the value number for the contents of register
+      [r]. If none exists, a fresh value number is returned and associated with
+      register [r]. The possibly updated numbering is also returned.
+      [valnum_regs] is similar, but for an array of registers. *)
 
   let valnum_reg n r =
     try n, Reg.Map.find r n.num_reg with Not_found -> fresh_valnum_reg n r
@@ -451,7 +450,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Switch _ ->
       set_unknown_regs numbering (Proc.destroyed_at_terminator terminator.desc)
     | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-    | Call _ | Prim _ ->
+    | Call _ | Prim _ | Invalid _ ->
       (* For function calls and probes, we should at least forget: - equations
          involving memory loads, since the callee can perform arbitrary memory
          stores; - equations involving arithmetic operations that can produce
@@ -525,8 +524,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
    fun cfg_with_layout ->
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     (if not (List.mem ~set:cfg.fun_codegen_options Cfg.No_CSE)
-    then
-      let state = State.make cfg.next_instruction_id in
-      cse_blocks state cfg);
+     then
+       let state = State.make cfg.next_instruction_id in
+       cse_blocks state cfg);
     cfg_with_layout
 end

@@ -1,5 +1,5 @@
-(** Function summaries computed by zero_alloc analysis
-    and encoded as integers for storing in .cmx files. *)
+(** Function summaries computed by zero_alloc analysis and encoded as integers
+    for storing in .cmx files. *)
 
 [@@@ocaml.warning "+a-40-41-42"]
 
@@ -14,8 +14,8 @@ val reset : t -> unit
 (** [merge_checks t ~into] modifies [into] by adding information from [t]. *)
 val merge : t -> into:t -> unit
 
-(** [get_value t fun_name] returns None if [fun_name] is not associated
-    with any value. *)
+(** [get_value t fun_name] returns None if [fun_name] is not associated with any
+    value. *)
 val get_value : t -> string -> value option
 
 val set_value : t -> string -> value -> unit

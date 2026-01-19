@@ -536,8 +536,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   then
     Misc.fatal_errorf
       "Unbound free_vars in function body when translating to cmm: %a@\n\
-       function body: %a" Backend_var.Set.print fun_free_vars
-      Printcmm.expression fun_body;
+       function body: %a"
+      Backend_var.Set.print fun_free_vars Printcmm.expression fun_body;
   let fun_body =
     if !Clflags.afl_instrument
     then Afl_instrument.instrument_function fun_body fun_dbg
@@ -577,17 +577,17 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~(translate_expr : translate_expr) =
   Function_params_and_body.pattern_match p
     ~f:(fun
-         ~return_continuation
-         ~exn_continuation
-         params
-         ~body
-         ~my_closure
-         ~is_my_closure_used
-         ~my_region
-         ~my_ghost_region
-         ~my_depth:_
-         ~free_names_of_body:_
-       ->
+        ~return_continuation
+        ~exn_continuation
+        params
+        ~body
+        ~my_closure
+        ~is_my_closure_used
+        ~my_region
+        ~my_ghost_region
+        ~my_depth:_
+        ~free_names_of_body:_
+      ->
       try
         params_and_body0 env res code_id ~result_arity ~fun_dbg
           ~zero_alloc_attribute ~return_continuation ~exn_continuation params
@@ -618,8 +618,8 @@ let debuginfo_for_set_of_closures env set =
     Set_of_closures.function_decls set
     |> Function_declarations.funs |> Function_slot.Map.data
     |> List.map
-         (fun (code_id : Function_declarations.code_id_in_function_declaration)
-         ->
+         (fun
+           (code_id : Function_declarations.code_id_in_function_declaration) ->
            match code_id with
            | Deleted { dbg; _ } -> dbg
            | Code_id { code_id; only_full_applications = _ } ->

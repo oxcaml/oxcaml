@@ -696,3 +696,85 @@ type 'a t1 constraint 'a = [< `A ]
 type 'a t2 = 'a t1 constraint 'a = [< `A ]
 type 'a t3 = T : 'b t2 -> ([< `A ] as 'b) t3
 |}]
+
+(*********************************************************)
+
+type zero = Zero
+type 'a succ = Succ
+type _ t : immutable_data =
+  | Zero : zero t
+  | Succ : 'a t -> 'a succ t
+(* CR: This should be accepted. Internal ticket 6194. *)
+[%%expect {|
+type zero = Zero
+type 'a succ = Succ
+Lines 3-5, characters 0-28:
+3 | type _ t : immutable_data =
+4 |   | Zero : zero t
+5 |   | Succ : 'a t -> 'a succ t
+Error: The kind of type "t" is immutable_data with (type : value) t
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
+
+type zero = private Zero
+type 'a succ = private Succ
+type _ t : immutable_data =
+  | Zero : zero t
+  | Succ : 'a t -> 'a succ t
+(* CR: This should be accepted. Internal ticket 6194. *)
+[%%expect {|
+type zero = private Zero
+type 'a succ = private Succ
+Lines 3-5, characters 0-28:
+3 | type _ t : immutable_data =
+4 |   | Zero : zero t
+5 |   | Succ : 'a t -> 'a succ t
+Error: The kind of type "t" is immutable_data with (type : value) t
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
+
+type zero
+type !'a succ
+type _ t : immutable_data =
+  | Zero : zero t
+  | Succ : 'a t -> 'a succ t
+(* CR: This should be accepted. Internal ticket 6194. *)
+[%%expect {|
+type zero
+type !'a succ
+Lines 3-5, characters 0-28:
+3 | type _ t : immutable_data =
+4 |   | Zero : zero t
+5 |   | Succ : 'a t -> 'a succ t
+Error: The kind of type "t" is immutable_data with (type : value) t
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
+
+type _ t : value mod portable =
+  | Zero : [ `zero ] t
+  | Succ : 'a t -> [ `succ of 'a ] t
+(* CR: This should be accepted. Internal ticket 6194. *)
+[%%expect {|
+Lines 1-3, characters 0-36:
+1 | type _ t : value mod portable =
+2 |   | Zero : [ `zero ] t
+3 |   | Succ : 'a t -> [ `succ of 'a ] t
+Error: The kind of type "t" is immutable_data with (type : value) t/2
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]

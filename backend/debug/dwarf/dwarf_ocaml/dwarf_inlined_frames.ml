@@ -165,8 +165,8 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
       (abstract_instance @ range_list_attributes
       @ [DAH.create_call_file (Dwarf_state.get_file_num state block.dinfo_file)]
       @ (if block.dinfo_line >= 0
-        then [DAH.create_call_line block.dinfo_line]
-        else [])
+         then [DAH.create_call_line block.dinfo_line]
+         else [])
       @
       if block.dinfo_char_start >= 0
       then [DAH.create_call_column block.dinfo_char_start]
@@ -289,7 +289,8 @@ let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~function_proto_die =
   let all_blocks = IF.all_indexes inlined_frame_ranges in
   let scope_proto_dies, _all_summaries =
     IF.Inlined_frames.Index.Set.fold
-      (fun (block_with_parents : Debuginfo.t) (scope_proto_dies, all_summaries) ->
+      (fun (block_with_parents : Debuginfo.t) (scope_proto_dies, all_summaries)
+         ->
         DS.Debug.log "--------------------------------------------------\n";
         DS.Debug.log "START: %a\n%!" Debuginfo.print_compact_extended
           block_with_parents;

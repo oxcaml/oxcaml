@@ -152,8 +152,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
       Misc.fatal_errorf "invalid argument index (%d) for instruction %a" arg_idx
         InstructionId.format term.id
   in
-  let[@inline] apply_constructor :
-      type a b.
+  let[@inline] apply_constructor : type a b.
       known_value option ->
       extract:(known_value -> a option) ->
       f:(a -> b option) ->
@@ -162,8 +161,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     let res = Option.map f (Option.bind value extract) in
     Option.join res
   in
-  let[@inline] apply_constructors :
-      type a b.
+  let[@inline] apply_constructors : type a b.
       known_value option ->
       known_value option ->
       extract:(known_value -> a option) ->
@@ -218,8 +216,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
         in
         if result < 0 then Some lt else if result > 0 then Some gt else Some eq)
   | Float_test { width; lt : Label.t; eq : Label.t; gt : Label.t; uo } -> (
-    let apply_float_constructors :
-        type a.
+    let apply_float_constructors : type a.
         known_value option ->
         known_value option ->
         extract:(known_value -> a option) ->
@@ -263,13 +260,14 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
         else None)
   | Never -> assert false
   | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ ->
+  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     None
 
 let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool)
     ~(allowed_to_be_irreducible : bool) : bool =
-  if !Oxcaml_flags.cfg_value_propagation
-     && is_after_regalloc && allowed_to_be_irreducible
+  if
+    !Oxcaml_flags.cfg_value_propagation
+    && is_after_regalloc && allowed_to_be_irreducible
   then (
     let known_values = collect_known_values block.body in
     match evaluate_terminator known_values block.terminator with
@@ -310,8 +308,9 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
            are jumping "inside" the loop directly, which in turn means the loop
            is no longer natural. This is acceptable if we are past the last use
            of the loop information. *)
-        if !Oxcaml_flags.cfg_value_propagation
-           && is_after_regalloc && cfg.allowed_to_be_irreducible
+        if
+          !Oxcaml_flags.cfg_value_propagation
+          && is_after_regalloc && cfg.allowed_to_be_irreducible
         then
           let known_values = collect_known_values block.body in
           evaluate_terminator known_values successor_block.terminator
@@ -322,8 +321,9 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
         block.terminator <- { block.terminator with desc = Always succ };
         true
       | None -> (
-        if Label.equal block.start cfg.entry_label
-           || not cfg.allowed_to_be_irreducible
+        if
+          Label.equal block.start cfg.entry_label
+          || not cfg.allowed_to_be_irreducible
         then false
         else
           (* If we jump to a block that is empty, we can copy the terminator
@@ -343,7 +343,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
                  };
             true
           | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
-          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
             false)
     else false
   | Never ->
@@ -370,7 +370,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       simplify_switch block labels;
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ ->
+  | Call _ | Prim _ | Invalid _ ->
     false
 
 let run cfg =

@@ -179,14 +179,12 @@ let tuple_impl impls =
 
 let tuple (ts : ('a, 'reprs, 'r) Tuple.Of2(T).t) :
     (('a, 'r) Tuple.t, ('reprs, 'r) Tuple.t) t =
-  let rec impls :
-      type a reprs r.
+  let rec impls : type a reprs r.
       (a, reprs, r) Tuple.Of2(T).t -> (reprs, r) Tuple.Of(Impl).t = function
     | [] -> []
     | { impl; _ } :: ts -> impl :: impls ts
   in
-  let rec get_values :
-      type a reprs r.
+  let rec get_values : type a reprs r.
       (a, reprs, r) Tuple.Of2(T).t -> (reprs, r) Tuple.t -> (a, r) Tuple.t =
    fun ts reprs ->
     match ts, reprs with

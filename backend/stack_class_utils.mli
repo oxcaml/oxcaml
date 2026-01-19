@@ -2,9 +2,10 @@
 
 (** Definition of stack classes for a given backend.
 
-    The number of stack slot classes may differ from the number of register classes.
-    On x86, we use the same register class for floating point and SIMD vector registers,
-    but they take up different amounts of space on the stack. *)
+    The number of stack slot classes may differ from the number of register
+    classes. On x86, we use the same register class for floating point and SIMD
+    vector registers, but they take up different amounts of space on the stack.
+*)
 module type T = sig
   (** The "enum" representing the different classes. *)
   type t
@@ -28,8 +29,8 @@ module type T = sig
   val of_machtype : Cmm.machtype_component -> t
 end
 
-(** Definition of tables with stack classes as keys. All stack classes
-    are always bound. *)
+(** Definition of tables with stack classes as keys. All stack classes are
+    always bound. *)
 module type Tbl = sig
   type stack_class
 
@@ -38,8 +39,8 @@ module type Tbl = sig
   (** Creates a table with all stack classes set to the passed value. *)
   val make : 'a -> 'a t
 
-  (** Creates a table by calling [f] on each and every stack class to
-      get the initial value for that class. *)
+  (** Creates a table by calling [f] on each and every stack class to get the
+      initial value for that class. *)
   val init : f:(stack_class -> 'a) -> 'a t
 
   val copy : 'a t -> 'a t

@@ -571,6 +571,7 @@
   cmm
   cmmgen_state
   CSE
+  dsl_helpers
   emit
   emitaux
   fdo_info
@@ -590,7 +591,6 @@
   probe_emission
   simd
   simd_selection
-  simd_proc
   amd64_simd_defs
   amd64_simd_instrs
   stack_check
@@ -793,8 +793,8 @@
   (backend bisect_ppx))
  ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
  ; to be built against the system compiler, which won't work.
- (ocamlc_flags unix.cma)
- (ocamlopt_flags unix.cmxa)
+ (ocamlc_flags (:standard -I +unix unix.cma))
+ (ocamlopt_flags (:standard -I +unix unix.cmxa))
  (libraries
   flambda2
   flambda2_ui

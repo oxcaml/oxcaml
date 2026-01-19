@@ -1029,7 +1029,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
              modifs
              (Lvar cpy))
   | Texp_letmodule(None, loc, Mp_present, modl, body) ->
-      let lam = !transl_module ~scopes Tcoerce_none None modl in
+      let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
+      let lam = !transl_module ~scopes:mod_scopes Tcoerce_none None modl in
       Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
                 transl_exp ~scopes sort body)
   | Texp_letmodule(Some id, _loc, Mp_present, modl, body) ->
@@ -1329,7 +1330,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_quotation exp ->
-      Translquote.transl_quote (transl_exp ~scopes sort) exp e.exp_loc
+      Translquote.transl_quote
+        ~scopes ~loc:e.exp_loc ~transl:(transl_exp ~scopes sort) exp
   (* TODO: update scopes *)
   | Texp_antiquotation exp ->
       fatal_errorf
@@ -1906,7 +1908,7 @@ and transl_function ~in_new_scope ~scopes e params body
   let scopes =
     if in_new_scope then
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
-    else enter_anonymous_function ~scopes ~assume_zero_alloc
+    else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
   in
   let sreturn_mode = transl_alloc_mode_l sreturn_mode in
   let { params; body; return_sort; return_mode; region } =

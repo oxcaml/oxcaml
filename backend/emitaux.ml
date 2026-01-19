@@ -55,8 +55,9 @@ let get_flags debuginfo =
   match debuginfo with
   | Dbg_other d | Dbg_raise d -> if is_none_dbg d then 0 else 1
   | Dbg_alloc dbgs ->
-    if !Clflags.debug
-       && List.exists (fun d -> not (is_none_dbg d.Cmm.alloc_dbg)) dbgs
+    if
+      !Clflags.debug
+      && List.exists (fun d -> not (is_none_dbg d.Cmm.alloc_dbg)) dbgs
     then 3
     else 2
 
@@ -443,8 +444,8 @@ module Dwarf_helpers = struct
         Symbol.for_current_unit () |> Symbol.linkage_name
         |> Linkage_name.to_string |> Ident.create_persistent
       in
-      let code_begin = Asm_targets.Asm_symbol.create code_begin in
-      let code_end = Asm_targets.Asm_symbol.create code_end in
+      let code_begin = Asm_targets.Asm_symbol.create_global code_begin in
+      let code_end = Asm_targets.Asm_symbol.create_global code_end in
       dwarf
         := Some
              (Dwarf.create ~sourcefile ~unit_name ~asm_directives

@@ -109,9 +109,10 @@ let check_tailrec_position t =
       let successors =
         Cfg.successor_labels ~normal:true ~exn:false entry_block
       in
-      if not
-           (Label.Set.cardinal successors = 1
-           && Label.equal tailrec_label (Label.Set.min_elt successors))
+      if
+        not
+          (Label.Set.cardinal successors = 1
+          && Label.equal tailrec_label (Label.Set.min_elt successors))
       then
         report t
           "Expected tailrec block %a to be the entry block or the only \
@@ -132,7 +133,7 @@ let check_tailrec t _label block =
           Label.print l Label.print destination)
   | Call _ | Prim _ | Tailcall_func _ | Never | Always _ | Parity_test _
   | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-  | Call_no_return _ ->
+  | Call_no_return _ | Invalid _ ->
     ()
 
 let check_can_raise t label (block : Cfg.basic_block) =
@@ -159,25 +160,27 @@ let check_stack_offset t label (block : Cfg.basic_block) =
      are freed up to the top of trap stack, and the number of freed slots may be
      different for different predecessors of a given trap handler block. *)
   (if not block.is_trap_handler
-  then
-    let stack_offset = block.stack_offset in
-    List.iter
-      (fun predecessor ->
-        let pred_block = Cfg.get_block_exn t.cfg predecessor in
-        let pred_terminator_stack_offset = pred_block.terminator.stack_offset in
-        if not (Int.equal stack_offset pred_terminator_stack_offset)
-        then
-          report t
-            "Wrong stack offset: block %s in predecessors of block %s, stack \
-             offset of the terminator of %s is %d, stack offset of block %s is \
-             %d, expected stack offset of terminator is %d \
-             (block.is_trap_handler=%b).\n"
-            (Label.to_string predecessor)
-            (Label.to_string label)
-            (Label.to_string predecessor)
-            pred_terminator_stack_offset (Label.to_string label)
-            block.stack_offset stack_offset block.is_trap_handler)
-      (Cfg.predecessor_labels block));
+   then
+     let stack_offset = block.stack_offset in
+     List.iter
+       (fun predecessor ->
+         let pred_block = Cfg.get_block_exn t.cfg predecessor in
+         let pred_terminator_stack_offset =
+           pred_block.terminator.stack_offset
+         in
+         if not (Int.equal stack_offset pred_terminator_stack_offset)
+         then
+           report t
+             "Wrong stack offset: block %s in predecessors of block %s, stack \
+              offset of the terminator of %s is %d, stack offset of block %s \
+              is %d, expected stack offset of terminator is %d \
+              (block.is_trap_handler=%b).\n"
+             (Label.to_string predecessor)
+             (Label.to_string label)
+             (Label.to_string predecessor)
+             pred_terminator_stack_offset (Label.to_string label)
+             block.stack_offset stack_offset block.is_trap_handler)
+       (Cfg.predecessor_labels block));
   let terminator_stack_offset = block.terminator.stack_offset in
   Label.Set.iter
     (fun successor ->
@@ -273,8 +276,9 @@ let check_block t label (block : Cfg.basic_block) =
   Label.Set.iter
     (fun successor ->
       let succ_block = Cfg.get_block_exn t.cfg successor in
-      if not
-           (List.exists (Label.equal label) (Cfg.predecessor_labels succ_block))
+      if
+        not
+          (List.exists (Label.equal label) (Cfg.predecessor_labels succ_block))
       then
         report t "%s in successors(%s) but %s is not in predecessors(%s)"
           (Label.to_string successor)

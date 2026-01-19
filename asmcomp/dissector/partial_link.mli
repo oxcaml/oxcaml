@@ -47,12 +47,14 @@ exception Error of error
 (** Pretty-print a partial linking error. *)
 val report_error : Format.formatter -> error -> unit
 
-(** [link_partitions ~temp_dir partitions] partially links each partition into
-    a single relocatable object file.
+(** [link_partitions ~temp_dir partitions] partially links each partition into a
+    single relocatable object file.
 
     For each partition, creates a response file listing the input files, then
     invokes the linker with:
+    {v
       ld --whole-archive @<response_file> --relocatable -o <output.o>
+    v}
 
     Returns the list of linked partitions with paths to the output .o files.
 

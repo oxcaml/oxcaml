@@ -24,6 +24,8 @@ module String = Misc.Stdlib.String
 
 module D = Asm_targets.Asm_directives.Directive
 module C = D.Constant
+module Asm_label = Asm_targets.Asm_label
+module Asm_symbol = Asm_targets.Asm_symbol
 
 
 type section = {
@@ -200,7 +202,9 @@ let eval_const b current_pos cst =
     | C.Signed_int n -> Rint n
     | C.Unsigned_int n -> Rint (Numbers.Uint64.to_int64 n)
     | C.This -> Rabs ("", 0L)
-    | C.Named_thing lbl -> Rabs (lbl, 0L)
+    | C.Label lbl -> Rabs (Asm_label.encode lbl, 0L)
+    | C.Symbol sym -> Rabs (Asm_symbol.encode sym, 0L)
+    | C.Variable name -> Rabs (name, 0L)
     | C.Sub (c1, c2) -> (
         let c1 = eval c1 and c2 = eval c2 in
         match (c1, c2) with
@@ -1395,8 +1399,8 @@ let assemble_instr b loc = function
 
 
 let[@warning "+4"] constant b cst
-      (width: D.Constant_with_width.width_in_bytes) =
-  let open D.Constant_with_width in
+      (width : D.Constant_with_width.Width_in_bytes.t) =
+  let open D.Constant_with_width.Width_in_bytes in
   match cst, width with
   | C.Signed_int n, Eight -> buf_int8L b n
   | C.Signed_int n, Sixteen -> buf_int16L b n
@@ -1406,16 +1410,20 @@ let[@warning "+4"] constant b cst
   | C.Unsigned_int n, Sixteen -> buf_int16L b (Numbers.Uint64.to_int64 n)
   | C.Unsigned_int n, Thirty_two -> buf_int32L b (Numbers.Uint64.to_int64 n)
   | C.Unsigned_int n, Sixty_four -> buf_int64L b (Numbers.Uint64.to_int64 n)
-  | (C.This | C.Named_thing _ | C.Add _ | C.Sub _), Eight ->
+  | ( (C.This | C.Label _ | C.Symbol _ | C.Variable _ | C.Add _ | C.Sub _),
+      Eight ) ->
     record_local_reloc b (RelocConstant (cst, B8));
     buf_int8L b 0L
-  | (C.This | C.Named_thing _ | C.Add _ | C.Sub _), Sixteen ->
+  | ( (C.This | C.Label _ | C.Symbol _ | C.Variable _ | C.Add _ | C.Sub _),
+      Sixteen ) ->
     record_local_reloc b (RelocConstant (cst, B16));
     buf_int16L b 0L
-  | (C.This | C.Named_thing _ | C.Add _ | C.Sub _), Thirty_two ->
+  | ( (C.This | C.Label _ | C.Symbol _ | C.Variable _ | C.Add _ | C.Sub _),
+      Thirty_two ) ->
     record_local_reloc b (RelocConstant (cst, B32));
     buf_int32L b 0L
-  | (C.This | C.Named_thing _ | C.Add _ | C.Sub _), Sixty_four ->
+  | ( (C.This | C.Label _ | C.Symbol _ | C.Variable _ | C.Add _ | C.Sub _),
+      Sixty_four ) ->
     record_local_reloc b (RelocConstant (cst, B64));
     buf_int64L b 0L
 
@@ -1426,14 +1434,20 @@ let assemble_line b loc ins =
         assemble_instr b loc instr;
         incr loc
     | Directive (D.Comment _ )-> ()
-    | Directive (D.Global sym) -> (get_symbol b sym).sy_binding <- Sy_global
-    | Directive (D.Weak sym) -> (get_symbol b sym).sy_binding <- Sy_weak
-    | Directive (D.Protected sym) -> (get_symbol b sym).sy_protected <- true
+    | Directive (D.Global sym) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_binding <- Sy_global
+    | Directive (D.Weak sym) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_binding <- Sy_weak
+    | Directive (D.Protected sym) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_protected <- true
     | Directive (D.Const {constant = c; comment = _ }) ->
       constant b
               (D.Constant_with_width.constant c)
               (D.Constant_with_width.width_in_bytes c)
-    | Directive (D.New_label (s, _)) -> declare_label b s
+    | Directive (D.New_label (D.Label lbl, _)) ->
+      declare_label b (Asm_label.encode lbl)
+    | Directive (D.New_label (D.Symbol sym, _)) ->
+      declare_label b (Asm_symbol.encode sym)
     | Directive (D.Bytes { str; comment = _ }) -> Buffer.add_string b.buf str
     | Directive (D.External _) -> ()
     | Directive (D.Direct_assignment _) -> assert false
@@ -1450,10 +1464,15 @@ let assemble_line b loc ins =
     | Directive (D.Loc _) -> ()
     | Directive (D.Private_extern _) -> assert false
     | Directive (D.Indirect_symbol _) -> assert false
-    | Directive (D.Type (lbl, kind)) -> (get_symbol b lbl).sy_type <- Some kind
-    | Directive (D.Size (lbl, cst)) -> (
+    | Directive (D.Type (D.Label lbl, kind)) ->
+      (get_symbol b (Asm_label.encode lbl)).sy_type <- Some kind
+    | Directive (D.Type (D.Symbol sym, kind)) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_type <- Some kind
+    | Directive (D.Size (sym, cst)) -> (
         match eval_const b (Buffer.length b.buf) cst with
-        | Rint n -> (get_symbol b lbl).sy_size <- Some (Int64.to_int n)
+        | Rint n ->
+            (get_symbol b (Asm_symbol.encode sym)).sy_size
+              <- Some (Int64.to_int n)
         | _ -> assert false)
     | Directive (D.Align { fill_x86_bin_emitter=data; bytes = n}) -> (
         (* TODO: Buffer.length = 0 => set section align *)
@@ -1492,15 +1511,21 @@ let assemble_line b loc ins =
           buf_int8 b 0
         done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
-    | Directive (D.Reloc { name = D.R_X86_64_PLT32;
-              expr = C.Sub (C.Named_thing wrap_label, C.Signed_int 4L);
-              offset = C.Sub (C.This, C.Signed_int 4L);
-            })  when String.Tbl.mem local_labels wrap_label ->
-      record_local_reloc b ~offset:(-4) (RelocCall wrap_label)
+    | Directive
+        (D.Reloc
+          { name = D.R_X86_64_PLT32;
+            target_symbol;
+            addend = 4L;
+            offset = C.Sub (C.This, C.Signed_int 4L)
+          })
+      when String.Tbl.mem local_labels (Asm_symbol.encode target_symbol) ->
+      let sym = Asm_symbol.encode target_symbol in
+      record_local_reloc b ~offset:(-4) (RelocCall sym)
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->
-      X86_gas.generate_asm Out_channel.stderr [ins];
+      let dll = Oxcaml_utils.Doubly_linked_list.make_single ins in
+      X86_gas.generate_asm Out_channel.stderr dll;
       Misc.fatal_errorf "x86_binary_emitter: unsupported instruction"
   with e ->
     Printf.eprintf "Exception %s:\n%!" (Printexc.to_string e);
@@ -1521,8 +1546,10 @@ let assemble_section arch section =
 
   let icount = ref 0 in
   ArrayLabels.iter section.sec_instrs ~f:(function
-    | Directive (D.New_label (lbl, _)) ->
-        String.Tbl.add local_labels lbl !icount
+    | Directive (D.New_label (D.Label lbl, _)) ->
+        String.Tbl.add local_labels (Asm_label.encode lbl) !icount
+    | Directive (D.New_label (D.Symbol sym, _)) ->
+        String.Tbl.add local_labels (Asm_symbol.encode sym) !icount
     | Ins _ -> incr icount
     | _ -> ());
 

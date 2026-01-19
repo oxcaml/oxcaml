@@ -95,6 +95,6 @@ module Relocation : sig
   val addend : t -> int64
 end
 
-(** [relocations t] returns the list of R_X86_64_64 relocations needed to
-    fill the IGOT entries with the addresses of the original symbols. *)
+(** [relocations t] returns the list of R_X86_64_64 relocations needed to fill
+    the IGOT entries with the addresses of the original symbols. *)
 val relocations : t -> Relocation.t list

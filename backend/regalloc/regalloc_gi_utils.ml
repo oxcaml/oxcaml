@@ -256,8 +256,9 @@ module Interval = struct
 
   let overlap : t -> t -> bool =
    fun left right ->
-    if is_before_or_alone left.end_ right.begin_
-       || is_before_or_alone right.end_ left.begin_
+    if
+      is_before_or_alone left.end_ right.begin_
+      || is_before_or_alone right.end_ left.begin_
     then false
     else Range.overlap left.ranges right.ranges
 
@@ -304,8 +305,7 @@ let build_intervals : Cfg_with_infos.t -> Interval.t Reg.Tbl.t =
         add_range reg curr;
         Reg.Tbl.replace current_ranges reg { Range.begin_; end_ })
   in
-  let update_instr :
-      type a.
+  let update_instr : type a.
       int ->
       a Cfg.instruction ->
       trap_handler:bool ->
@@ -358,8 +358,9 @@ module Hardware_register = struct
     }
 
   let make_location ~reg_class ~reg_index_in_class =
-    if reg_index_in_class < 0
-       || reg_index_in_class >= Reg_class.num_available_registers reg_class
+    if
+      reg_index_in_class < 0
+      || reg_index_in_class >= Reg_class.num_available_registers reg_class
     then
       fatal "invalid register index: %d (class=%a)" reg_index_in_class
         Reg_class.print reg_class;
@@ -452,8 +453,7 @@ module Hardware_registers = struct
     let reg_class = Reg_class.of_machtype of_reg.typ in
     Array.find_opt (Reg_class.Tbl.find t reg_class) ~f
 
-  let fold_class :
-      type a.
+  let fold_class : type a.
       t -> of_reg:Reg.t -> f:(a -> Hardware_register.t -> a) -> init:a -> a =
    fun t ~of_reg ~f ~init ->
     let reg_class = Reg_class.of_machtype of_reg.typ in
@@ -484,11 +484,8 @@ module Hardware_registers = struct
     Interval.overlap interval hardware_reg.interval
     || exists_assigned hardware_reg.assigned
          ~f:(fun
-              { Hardware_register.pseudo_reg = _;
-                interval = itv;
-                evictable = _
-              }
-            -> Interval.overlap itv interval)
+             { Hardware_register.pseudo_reg = _; interval = itv; evictable = _ }
+           -> Interval.overlap itv interval)
 
   let find_using_affinities (t : t) (affinities : Regalloc_affinity.t)
       (reg : Reg.t) (interval : Interval.t) : Hardware_register.t option =
@@ -563,9 +560,9 @@ module Hardware_registers = struct
             let (cost, evictable) : int * bool =
               List.fold_left overlaping ~init:(0, true)
                 ~f:(fun
-                     (acc_cost, acc_evictable)
-                     { Hardware_register.pseudo_reg; interval = _; evictable }
-                   ->
+                    (acc_cost, acc_evictable)
+                    { Hardware_register.pseudo_reg; interval = _; evictable }
+                  ->
                   ( acc_cost + actual_cost costs pseudo_reg,
                     acc_evictable && evictable ))
             in

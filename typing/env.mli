@@ -126,6 +126,9 @@ val find_modtype_expansion_lazy: Path.t -> t -> Subst.Lazy.module_type
 val find_hash_type: Path.t -> t -> type_declaration
 (* Find the "#t" type given the path for "t" *)
 
+val find_implicit_jkind: string -> t -> jkind_lr option
+(* Find the implicit jkind for a type variable name. *)
+
 val find_value_address: Path.t -> t -> address
 val find_module_address: Path.t -> t -> address
 val find_class_address: Path.t -> t -> address
@@ -219,6 +222,10 @@ type no_open_quotations_context =
   | Sig_qt
   | Open_qt
 
+type none_in_quotations_context =
+  | Constructor
+  | Label
+
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
   | Unbound_type of Longident.t
@@ -253,7 +260,8 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
-  | No_constructor_in_stage of Longident.t * Location.t * int
+  | Unbound_in_stage of
+      none_in_quotations_context * Longident.t * Location.t * stage * stage
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -424,6 +432,8 @@ val add_modtype_lazy: update_summary:bool ->
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
 val add_local_constraint: Path.t -> type_declaration -> t -> t
+val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
+val clear_implicit_jkinds : t -> t
 
 (* Insertion of persistent signatures *)
 
@@ -620,6 +630,11 @@ val env_of_only_summary : (summary -> Subst.t -> t) -> t -> t
 type error =
   | Missing_module of Location.t * Path.t * Path.t
   | Illegal_value_name of Location.t * string
+  | Implicit_jkind_already_defined of {
+      loc : Location.t;
+      name : string;
+      defined_at : Location.t;
+    }
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
   | Toplevel_splice of Location.t

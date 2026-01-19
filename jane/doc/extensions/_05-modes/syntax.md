@@ -85,10 +85,10 @@ ty @ modes` is allowed.
 
 ```ocaml
 let foo ?(x : int @ modes = default) = ..
-let foo ?x:((a, b) : int @ modes = default)
+let foo ?x:((a, b) : int * int @ modes = default)
 let foo ~(x : int @ modes) = ..
-let foo ~x:((a, b) : int @ modes) = ..
-let foo ((a, b) : int @ modes) = ..
+let foo ~x:((a, b) : int * int @ modes) = ..
+let foo ((a, b) : int * int @ modes) = ..
 ```
 
 Patterns that are not directly function parameters can’t have modes. For
@@ -111,7 +111,7 @@ mode constraint `pat @ modes` and type-and-mode constraint `pat : ty @ modes` wi
 allowed.
 ```ocaml
   let a : int @ modes = 42 in
-  let (a, b) : int @ once portable = 42 in
+  let (a, b) : int * int @ once portable = (42, 42) in
 ```
 
 ## Functions and their body

@@ -349,9 +349,10 @@ module Mod_bounds = struct
       if b then Axis_set.add axis_set ax else axis_set
     in
     let[@inline] add_crossing_if ax axis_set =
-      if Crossing.Per_axis.(
-           (le [@inlined hint]) ax ((max [@inlined hint]) ax)
-             ((Crossing.proj [@inlined hint]) ax (crossing t)))
+      if
+        Crossing.Per_axis.(
+          (le [@inlined hint]) ax ((max [@inlined hint]) ax)
+            ((Crossing.proj [@inlined hint]) ax (crossing t)))
       then Axis_set.add axis_set (Modal ax)
       else axis_set
     in
@@ -552,8 +553,7 @@ module Layout_and_axes = struct
      of this function for these axes is undefined; do *not* look at the results for these
      axes.
   *)
-  let normalize :
-      type layout l r1 r2.
+  let normalize : type layout l r1 r2.
       context:_ ->
       mode:r2 normalize_mode ->
       skip_axes:_ ->
@@ -657,7 +657,9 @@ module Layout_and_axes = struct
              substitution may have enabled us to now terminate significantly
              faster.) In practice, this doesn't seem to make us reject any
              programs we care about. *)
-          match previously_ran_out_of_fuel with false -> 10 | true -> 1
+          match previously_ran_out_of_fuel with
+          | false -> 10
+          | true -> 1
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
@@ -777,10 +779,10 @@ module Layout_and_axes = struct
                                    we have now seen the types under all of these
                                    axes. *)
                                 (if args_equal
-                                then
-                                  Axis_set.union relevant_axes
-                                    relevant_axes_when_seen
-                                else relevant_axes)
+                                 then
+                                   Axis_set.union relevant_axes
+                                     relevant_axes_when_seen
+                                 else relevant_axes)
                             }
                             seen_constrs
                       };
@@ -1066,8 +1068,7 @@ module Const = struct
         [value mod global many unique portable uncontended external_ non_null]
         could be written in terms of [value] (as it appears above), or in terms
         of [immediate] (which would just be [immediate]). Since the latter
-        requires less modes to be printed, it is chosen.
-    *)
+        requires less modes to be printed, it is chosen. *)
     val convert : expanded:bool -> 'd t -> Outcometree.out_jkind_const
   end = struct
     type printable_jkind =
@@ -1078,8 +1079,9 @@ module Const = struct
       }
 
     (** [diff base actual] returns the axes on which [actual] is strictly
-     stronger than [base], represented as a mod-bounds where unchanged axes
-     are set to [max]. Returns [None] if [actual] isn't stronger than [base]. *)
+        stronger than [base], represented as a mod-bounds where unchanged axes
+        are set to [max]. Returns [None] if [actual] isn't stronger than [base].
+    *)
     let diff base actual =
       match Mod_bounds.less_or_equal actual base with
       | Not_le _ -> None
@@ -1102,23 +1104,26 @@ module Const = struct
             Crossing.max Value.Axis.all
         in
         let externality =
-          if Externality.equal
-               (Mod_bounds.externality base)
-               (Mod_bounds.externality actual)
+          if
+            Externality.equal
+              (Mod_bounds.externality base)
+              (Mod_bounds.externality actual)
           then Externality.max
           else Mod_bounds.externality actual
         in
         let nullability =
-          if Nullability.equal
-               (Mod_bounds.nullability base)
-               (Mod_bounds.nullability actual)
+          if
+            Nullability.equal
+              (Mod_bounds.nullability base)
+              (Mod_bounds.nullability actual)
           then Nullability.max
           else Mod_bounds.nullability actual
         in
         let separability =
-          if Separability.equal
-               (Mod_bounds.separability base)
-               (Mod_bounds.separability actual)
+          if
+            Separability.equal
+              (Mod_bounds.separability base)
+              (Mod_bounds.separability actual)
           then Separability.max
           else Mod_bounds.separability actual
         in
@@ -1191,7 +1196,8 @@ module Const = struct
         Some { base = base.name; modal_bounds; printable_with_bounds }
       | false, _ | _, None -> None
 
-    (** Select the out_jkind_const with the least number of modal bounds to print *)
+    (** Select the out_jkind_const with the least number of modal bounds to
+        print *)
     let rec select_simplest = function
       | a :: b :: tl ->
         let simpler =
@@ -1300,37 +1306,36 @@ module Const = struct
       with_bounds
     }
 
-  let rec of_user_written_annotation_unchecked_level :
-      type l r.
+  let rec of_user_written_annotation_unchecked_level : type l r.
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
     | Pjk_abbreviation name ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       (match name with
-      | "any" -> Builtin.any.jkind
-      | "value_or_null" -> Builtin.value_or_null.jkind
-      | "value" -> Builtin.value.jkind
-      | "void" -> Builtin.void.jkind
-      | "immediate64" -> Builtin.immediate64.jkind
-      | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
-      | "immediate" -> Builtin.immediate.jkind
-      | "immediate_or_null" -> Builtin.immediate_or_null.jkind
-      | "float64" -> Builtin.float64.jkind
-      | "float32" -> Builtin.float32.jkind
-      | "word" -> Builtin.word.jkind
-      | "untagged_immediate" -> Builtin.untagged_immediate.jkind
-      | "bits8" -> Builtin.bits8.jkind
-      | "bits16" -> Builtin.bits16.jkind
-      | "bits32" -> Builtin.bits32.jkind
-      | "bits64" -> Builtin.bits64.jkind
-      | "vec128" -> Builtin.vec128.jkind
-      | "vec256" -> Builtin.vec256.jkind
-      | "vec512" -> Builtin.vec512.jkind
-      | "immutable_data" -> Builtin.immutable_data.jkind
-      | "sync_data" -> Builtin.sync_data.jkind
-      | "mutable_data" -> Builtin.mutable_data.jkind
-      | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
+        | "any" -> Builtin.any.jkind
+        | "value_or_null" -> Builtin.value_or_null.jkind
+        | "value" -> Builtin.value.jkind
+        | "void" -> Builtin.void.jkind
+        | "immediate64" -> Builtin.immediate64.jkind
+        | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
+        | "immediate" -> Builtin.immediate.jkind
+        | "immediate_or_null" -> Builtin.immediate_or_null.jkind
+        | "float64" -> Builtin.float64.jkind
+        | "float32" -> Builtin.float32.jkind
+        | "word" -> Builtin.word.jkind
+        | "untagged_immediate" -> Builtin.untagged_immediate.jkind
+        | "bits8" -> Builtin.bits8.jkind
+        | "bits16" -> Builtin.bits16.jkind
+        | "bits32" -> Builtin.bits32.jkind
+        | "bits64" -> Builtin.bits64.jkind
+        | "vec128" -> Builtin.vec128.jkind
+        | "vec256" -> Builtin.vec256.jkind
+        | "vec512" -> Builtin.vec512.jkind
+        | "immutable_data" -> Builtin.immutable_data.jkind
+        | "sync_data" -> Builtin.sync_data.jkind
+        | "mutable_data" -> Builtin.mutable_data.jkind
+        | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
       |> allow_left |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
@@ -1551,7 +1556,7 @@ let of_type_decl ~context ~transl_type (decl : Parsetree.type_declaration) =
   let jkind_of_attribute =
     Builtin_attributes.jkind decl.ptype_attributes
     |> Option.map (fun attr ->
-           (of_attribute ~context attr |> disallow_right, None), attr)
+        (of_attribute ~context attr |> disallow_right, None), attr)
   in
   match jkind_of_annotation, jkind_of_attribute with
   | None, None -> None
@@ -2049,8 +2054,8 @@ module Format_history = struct
     | Wildcard -> fprintf ppf "it's a _ in the type"
     | Unification_var -> fprintf ppf "it's a fresh unification variable"
 
-  let rec format_annotation_context :
-      type l r. _ -> (l * r) History.annotation_context -> unit =
+  let rec format_annotation_context : type l r.
+      _ -> (l * r) History.annotation_context -> unit =
    fun ppf -> function
     | Type_declaration p ->
       fprintf ppf "the declaration of the type %a" !printtyp_path p
@@ -2066,6 +2071,8 @@ module Format_history = struct
     | Existential_unpack name -> fprintf ppf "the existential variable %s" name
     | Univar name -> fprintf ppf "the universal variable %s" name
     | Type_variable name -> fprintf ppf "the type variable %s" name
+    | Implicit_jkind name ->
+      fprintf ppf "the implicit kind of type variables named %s" name
     | Type_wildcard loc ->
       fprintf ppf "the wildcard _ at %a" Location.print_loc_in_lowercase loc
     | Type_of_kind loc ->
@@ -2138,6 +2145,16 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value_or_null"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Recmod_fun_arg ->
+      fprintf ppf
+        "it's the type of the first argument to a function in a recursive \
+         module"
+    | Array_comprehension_element ->
+      fprintf ppf "it's the element type of array comprehension"
+    | Array_comprehension_iterator_element ->
+      fprintf ppf
+        "it's the element type of an array that is iterated over in a \
+         comprehension"
 
   let format_value_creation_reason ppf ~layout_or_kind :
       History.value_creation_reason -> _ = function
@@ -2181,15 +2198,9 @@ module Format_history = struct
       fprintf ppf
         "it's the base type (the first type parameter) for a@ block index (idx \
          or mut_idx)"
-    | Array_comprehension_element ->
-      fprintf ppf "it's the element type of array comprehension"
     | List_comprehension_iterator_element ->
       fprintf ppf
         "it's the element type of a list that is iterated over in a \
-         comprehension"
-    | Array_comprehension_iterator_element ->
-      fprintf ppf
-        "it's the element type of an array that is iterated over in a \
          comprehension"
     | Lazy_expression -> fprintf ppf "it's the type of a lazy expression"
     | Class_type_argument ->
@@ -2200,10 +2211,6 @@ module Format_history = struct
     | Debug_printer_argument ->
       format_with_notify_js ppf
         "it's the type of an argument to a debugger printer function"
-    | Recmod_fun_arg ->
-      fprintf ppf
-        "it's the type of the first argument to a function in a recursive \
-         module"
     | Quotation_result -> fprintf ppf "it's the result type of a quotation"
     | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
     | Tquote -> fprintf ppf "it's a staged type"
@@ -2211,7 +2218,8 @@ module Format_history = struct
     | Unknown s ->
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
-         compilers team with this message: %s)@]" s
+         compilers team with this message: %s)@]"
+        s
     | Array_type_kind ->
       fprintf ppf
         "it's the element type for an array operation with an opaque@ array \
@@ -2395,39 +2403,37 @@ module Violation = struct
         fprintf ppf "@\n@\nThe first mode-crosses less than the second along:";
         Axis_set.to_list disagreeing_axes
         |> List.iter (fun (Pack axis : Axis.packed) ->
-               let pp_bound ppf jkind =
-                 let mod_bound = Mod_bounds.get ~axis jkind.mod_bounds in
-                 let with_bounds =
-                   match Per_axis.(le axis (max axis) mod_bound) with
-                   | true ->
-                     (* If the mod_bound is max, then no with-bounds are
+            let pp_bound ppf jkind =
+              let mod_bound = Mod_bounds.get ~axis jkind.mod_bounds in
+              let with_bounds =
+                match Per_axis.(le axis (max axis) mod_bound) with
+                | true ->
+                  (* If the mod_bound is max, then no with-bounds are
                         relevant *)
-                     []
-                   | false ->
-                     With_bounds.to_list jkind.with_bounds
-                     |> List.filter_map
-                          (fun
-                            (ty, ({ relevant_axes } : With_bounds_type_info.t))
-                          ->
-                            match Axis_set.mem relevant_axes axis with
-                            | true -> Some (!outcometrees_of_types [ty])
-                            | false -> None)
-                     |> List.flatten
-                 in
-                 let ojkind =
-                   List.fold_left
-                     (fun acc with_bound ->
-                       Outcometree.Ojkind_const_with (acc, with_bound, []))
-                     (Outcometree.Ojkind_const_mod
-                        ( None,
-                          [Format.asprintf "%a" (Per_axis.print axis) mod_bound]
-                        ))
-                     with_bounds
-                 in
-                 !Oprint.out_jkind_const ppf ojkind
-               in
-               fprintf ppf "@;  @[<hov 2>%s:@ %a ≰@ %a@]" (Axis.name axis)
-                 pp_bound sub.jkind pp_bound super.jkind))
+                  []
+                | false ->
+                  With_bounds.to_list jkind.with_bounds
+                  |> List.filter_map
+                       (fun
+                         (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
+                         match Axis_set.mem relevant_axes axis with
+                         | true -> Some (!outcometrees_of_types [ty])
+                         | false -> None)
+                  |> List.flatten
+              in
+              let ojkind =
+                List.fold_left
+                  (fun acc with_bound ->
+                    Outcometree.Ojkind_const_with (acc, with_bound, []))
+                  (Outcometree.Ojkind_const_mod
+                     ( None,
+                       [Format.asprintf "%a" (Per_axis.print axis) mod_bound] ))
+                  with_bounds
+              in
+              !Oprint.out_jkind_const ppf ojkind
+            in
+            fprintf ppf "@;  @[<hov 2>%s:@ %a ≰@ %a@]" (Axis.name axis) pp_bound
+              sub.jkind pp_bound super.jkind))
     | No_intersection _ -> ()
 
   let report_fuel ppf violation =
@@ -2435,7 +2441,8 @@ module Violation = struct
       fprintf ppf
         "@;\
          @[Note: I gave up trying to find the simplest kind for the %s,@,\
-         as it is very large or deeply recursive.@]" which
+         as it is very large or deeply recursive.@]"
+        which
     in
     let first_ran_out, second_ran_out =
       match violation with
@@ -2703,18 +2710,18 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
   let require_le sub_result =
     Sub_result.require_le sub_result
     |> Result.map_error (fun reasons ->
-           (* When we report an error, we want to show the best-normalized
+        (* When we report an error, we want to show the best-normalized
               version of sub, but the original super. When this check fails, it
               is usually the case that the super was written by the user and the
               sub was inferred. Thus, we should display the user-written jkind,
               but simplify the inferred one, since the inferred one is probably
               overly complex. *)
-           (* CR layouts v2.8: It would be useful report to the user why this
+        (* CR layouts v2.8: It would be useful report to the user why this
               violation occurred, specifically which axes the violation is
               along. Internal ticket 5100. *)
-           let best_sub = normalize ~mode:Require_best ~context sub in
-           Violation.of_ ~context
-             (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
+        let best_sub = normalize ~mode:Require_best ~context sub in
+        Violation.of_ ~context
+          (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
   in
   let* () =
     (* Validate layouts *)
@@ -2873,8 +2880,8 @@ module Debug_printers = struct
     | Wildcard -> fprintf ppf "Wildcard"
     | Unification_var -> fprintf ppf "Unification_var"
 
-  let rec annotation_context :
-      type l r. _ -> (l * r) History.annotation_context -> unit =
+  let rec annotation_context : type l r.
+      _ -> (l * r) History.annotation_context -> unit =
    fun ppf -> function
     | Type_declaration p -> fprintf ppf "Type_declaration %a" Path.print p
     | Type_parameter (p, var) ->
@@ -2887,6 +2894,7 @@ module Debug_printers = struct
     | Existential_unpack name -> fprintf ppf "Existential_unpack %s" name
     | Univar name -> fprintf ppf "Univar %S" name
     | Type_variable name -> fprintf ppf "Type_variable %S" name
+    | Implicit_jkind name -> fprintf ppf "Implicit_jkind %S" name
     | Type_wildcard loc ->
       fprintf ppf "Type_wildcard (%a)" Location.print_loc loc
     | Type_of_kind loc -> fprintf ppf "Type_of_kind (%a)" Location.print_loc loc
@@ -2932,6 +2940,10 @@ module Debug_printers = struct
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         !printtyp_path parent_path
+    | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
+    | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
+    | Array_comprehension_iterator_element ->
+      fprintf ppf "Array_comprehension_iterator_element"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
     | Class_let_binding -> fprintf ppf "Class_let_binding"
@@ -2958,16 +2970,12 @@ module Debug_printers = struct
     | Default_type_jkind -> fprintf ppf "Default_type_jkind"
     | Existential_type_variable -> fprintf ppf "Existential_type_variable"
     | Idx_base -> fprintf ppf "Idx_base"
-    | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | List_comprehension_iterator_element ->
       fprintf ppf "List_comprehension_iterator_element"
-    | Array_comprehension_iterator_element ->
-      fprintf ppf "Array_comprehension_iterator_element"
     | Lazy_expression -> fprintf ppf "Lazy_expression"
     | Class_type_argument -> fprintf ppf "Class_type_argument"
     | Class_term_argument -> fprintf ppf "Class_term_argument"
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
-    | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Quotation_result -> fprintf ppf "Quotation_result"
     | Antiquotation_result -> fprintf ppf "Antiquotation_result"
     | Tquote -> fprintf ppf "Tquote"
@@ -3054,7 +3062,8 @@ module Debug_printers = struct
        ; history = %a@,\
        ; ran_out_of_fuel_during_normalize = %a@,\
        ; quality = %s@,\
-      \ }@]" Jkind_desc.Debug_printers.t jkind
+      \ }@]"
+      Jkind_desc.Debug_printers.t jkind
       (pp_print_option Pprintast.jkind_annotation)
       a history h pp_print_bool roofdn
       (match q with Best -> "Best" | Not_best -> "Not_best")
@@ -3075,7 +3084,8 @@ let report_error ~loc : Error.t -> _ = function
       (* CR layouts v2.9: use the context to produce a better error message.
          When RAE tried this, some types got printed like [t/2], but the
          [/2] shouldn't be there. Investigate and fix. *)
-      "@[<v>Unknown layout %a@]" Pprintast.jkind_annotation jkind
+      "@[<v>Unknown layout %a@]"
+      Pprintast.jkind_annotation jkind
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\

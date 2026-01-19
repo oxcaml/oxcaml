@@ -66,7 +66,7 @@ let run_parser ~start_symbol ~start_pos (lb : Lexing.lexbuf) =
       supplier start
   with Lex.Error (error, loc) ->
     Error (Lexing_error (error, make_loc ~relative_to:start_pos loc))
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]
 
 let run_parser_on_file ~start_symbol filename =
   let ic = open_in filename in
@@ -152,10 +152,10 @@ let make_compilation_unit ~extension ~filename ?(tag = "") () =
 let parse filename =
   parse_fexpr filename
   |> Result.map (fun fexpr ->
-         let comp_unit = make_compilation_unit ~extension:".fl" ~filename () in
-         let unit_info = Unit_info.make_dummy ~input_name:filename comp_unit in
-         let old_unit_info = Env.get_unit_name () in
-         Env.set_unit_name (Some unit_info);
-         let flambda = Fexpr_to_flambda.conv comp_unit fexpr in
-         Env.set_unit_name old_unit_info;
-         flambda)
+      let comp_unit = make_compilation_unit ~extension:".fl" ~filename () in
+      let unit_info = Unit_info.make_dummy ~input_name:filename comp_unit in
+      let old_unit_info = Env.get_unit_name () in
+      Env.set_unit_name (Some unit_info);
+      let flambda = Fexpr_to_flambda.conv comp_unit fexpr in
+      Env.set_unit_name old_unit_info;
+      flambda)

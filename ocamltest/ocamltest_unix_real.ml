@@ -26,5 +26,16 @@ let wrap f x =
     in
       raise (Sys_error msg)
 
-let symlink ?to_dir source = wrap (Unix.symlink ?to_dir source)
-let chmod file = wrap (Unix.chmod file)
+(* These must be eta-expanded otherwise we get the following error when using
+   OxCaml's stdlib:
+
+   Error: This value is local
+       but is expected to be local to the parent region or global
+       because it is an argument in a tail call.
+   Hint: This is a partial application
+         Adding 1 more argument will make the value non-local
+ *)
+let symlink ?to_dir source =
+  wrap (fun dest -> Unix.symlink ?to_dir source dest)
+let chmod file =
+  wrap (fun perms -> Unix.chmod file perms)

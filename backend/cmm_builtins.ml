@@ -54,8 +54,9 @@ let if_operation_supported op ~f =
   match Proc.operation_supported op with true -> Some (f ()) | false -> None
 
 let if_operation_supported_bi bi op ~f =
-  if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int64
-     && size_int = 4
+  if
+    Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int64
+    && size_int = 4
   then None
   else if_operation_supported op ~f
 
@@ -90,7 +91,8 @@ let shift32 make_op arg count dbg =
     | Cifthenelse (_, _, _, _, _, _)
     | Cswitch (_, _, _, _)
     | Ccatch (_, _, _)
-    | Cexit (_, _, _) ->
+    | Cexit (_, _, _)
+    | Cinvalid _ ->
       Cop (Cand, [count; Cconst_int (mask, dbg)], dbg)
   in
   Some (make_op arg count dbg)
@@ -107,15 +109,17 @@ let clz ~arg_is_non_zero bi arg dbg =
   let op = Cclz { arg_is_non_zero } in
   if_operation_supported_bi bi op ~f:(fun () ->
       let res = Cop (op, [make_unsigned_int bi arg dbg], dbg) in
-      if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
-         && size_int = 8
+      if
+        Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
+        && size_int = 8
       then Cop (Caddi, [res; Cconst_int (-32, dbg)], dbg)
       else res)
 
 let ctz ~arg_is_non_zero bi arg dbg =
   let arg = make_unsigned_int bi arg dbg in
-  if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
-     && size_int = 8
+  if
+    Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
+    && size_int = 8
   then
     (* regardless of the value of the argument [arg_is_non_zero], always set the
        corresponding field to [true], because we make it non-zero below by
@@ -827,15 +831,15 @@ let transl_vec_builtin name args dbg _typ_res =
   | _ -> None
 
 (** [transl_builtin prim args dbg] returns None if the built-in [prim] is not
-  supported, otherwise it constructs and returns the corresponding Cmm
-  expression.
+    supported, otherwise it constructs and returns the corresponding Cmm
+    expression.
 
-  The names of builtins below correspond to the native code names associated
-  with "external" declarations in the stand-alone library [ocaml_intrinsics].
+    The names of builtins below correspond to the native code names associated
+    with "external" declarations in the stand-alone library [ocaml_intrinsics].
 
-  For situations such as where the Cmm code below returns e.g. an untagged
-  integer, we exploit the generic mechanism on "external" to deal with the
-  tagging before the result is returned to the user. *)
+    For situations such as where the Cmm code below returns e.g. an untagged
+    integer, we exploit the generic mechanism on "external" to deal with the
+    tagging before the result is returned to the user. *)
 let transl_builtin name args dbg typ_res =
   match name with
   | "caml_int128_add" ->
@@ -984,7 +988,8 @@ let transl_builtin name args dbg typ_res =
         | Cifthenelse (_, _, _, _, _, _)
         | Cswitch (_, _, _, _)
         | Ccatch (_, _, _)
-        | Cexit (_, _, _) ->
+        | Cexit (_, _, _)
+        | Cinvalid _ ->
           Cop (op, [cond; ifso; ifnot], dbg))
   | "caml_int32_shift_left_by_int32_unboxed" ->
     let arg, count = two_args name args in

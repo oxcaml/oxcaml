@@ -313,7 +313,7 @@ let init_shape id modl =
             Tarrow(_,ty_arg,_,_) -> begin
               (* CR layouts: We should allow any representable layout here. It
                  will require reworking [camlinternalMod.init_mod]. *)
-              let jkind = Jkind.Builtin.value ~why:Recmod_fun_arg in
+              let jkind = Jkind.Builtin.value_or_null ~why:Recmod_fun_arg in
               let ty_arg = Ctype.correct_levels ty_arg in
               match Ctype.check_type_jkind env ty_arg jkind with
               | Ok _ -> const_int 0 (* camlinternalMod.Function *)
@@ -540,10 +540,10 @@ let merge_functors ~scopes mexp coercion root_path =
       let path, param =
         match param with
         | Unit -> None, Ident.create_local "*"
-        | Named (None, _, _) ->
+        | Named (None, _, _, _) ->
           let id = Ident.create_local "_" in
           functor_path path id, id
-        | Named (Some id, _, _) -> functor_path path id, id
+        | Named (Some id, _, _, _) -> functor_path path id, id
       in
       let inline_attribute =
         merge_inline_attributes inline_attribute inline_attribute' loc

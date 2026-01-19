@@ -31,8 +31,8 @@
 
     A partition groups object files together for partial linking. The first
     partition (Main) contains code that must be addressable within the small
-    code model's 2GB limit. Additional partitions (Large_code) are placed
-    at higher addresses and use an intermediate GOT/PLT to bridge calls. *)
+    code model's 2GB limit. Additional partitions (Large_code) are placed at
+    higher addresses and use an intermediate GOT/PLT to bridge calls. *)
 
 (** The kind of partition, determining how sections are named and placed. *)
 type kind =
@@ -41,8 +41,8 @@ type kind =
           etc.) and are placed by default linker rules at low addresses. *)
   | Large_code of int
       (** A large code partition with the given index (1, 2, ...). Sections are
-          renamed with a prefix (e.g., .caml.p1.text) and placed after .bss
-          by the linker script. *)
+          renamed with a prefix (e.g., .caml.p1.text) and placed after .bss by
+          the linker script. *)
 
 (** Returns the symbol prefix for IGOT/IPLT symbols in this partition. *)
 val symbol_prefix : kind -> string

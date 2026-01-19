@@ -364,7 +364,9 @@ let (foo @ stateless) f =
 Line 3, characters 24-25:
 3 |     | ImmutableRef r -> r.contents <- 1
                             ^
-Error: This value is "immutable" but is expected to be "read_write"
+Error: This value is "immutable"
+       because it is contained (via constructor "ImmutableRef") (with some modality) in the value at Line 3, characters 6-20.
+       However, the highlighted expression is expected to be "read_write"
        because its mutable field "contents" is being written.
 |}]
 
@@ -454,4 +456,51 @@ let _ = bar foo
 
 [%%expect{|
 - : string = "foo"
+|}]
+
+(* Regression test for internal ticket 6242. *)
+
+exception R of int ref
+
+let r = ref 42
+
+module M : sig @@ portable
+  val wrap : unit -> exn
+  val unwrap : exn -> int ref
+end = struct
+  let wrap () = R r
+  let unwrap = function
+    | R r -> r
+    | _ -> assert false
+end
+
+[%%expect{|
+exception R of int ref
+val r : int ref = {contents = 42}
+Lines 8-13, characters 6-3:
+ 8 | ......struct
+ 9 |   let wrap () = R r
+10 |   let unwrap = function
+11 |     | R r -> r
+12 |     | _ -> assert false
+13 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val wrap : unit -> exn
+           val unwrap : exn -> int ref @ contended @@ portable
+         end @ nonportable
+       is not included in
+         sig
+           val wrap : unit -> exn @@ portable
+           val unwrap : exn -> int ref @@ portable
+         end @ nonportable
+       Values do not match:
+         val wrap : unit -> exn (* in a structure at nonportable *)
+       is not included in
+         val wrap : unit -> exn @@ portable (* in a structure at nonportable *)
+       The left-hand side is "nonportable"
+       because it contains a usage (of the constructor "R" at Line 9, characters 16-17)
+       which is expected to be "uncontended".
+       However, the right-hand side is "portable".
 |}]

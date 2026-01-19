@@ -175,8 +175,8 @@ module For_testing : sig
 end
 
 module For_printing : sig
-  (** The result of [create] will not be aded to the internal lists of registers,
-      and therefore should not be kept around after printing. *)
+  (** The result of [create] will not be aded to the internal lists of
+      registers, and therefore should not be kept around after printing. *)
   val create :
     name:Name.t ->
     typ:Cmm.machtype_component ->

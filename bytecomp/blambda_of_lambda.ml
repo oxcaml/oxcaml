@@ -423,8 +423,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | _ :: _ ->
             (* for the floatarray hack *)
             Prim (Ccall "caml_make_array", [block])))
-    | Presume -> context_switch Resume ~arity:4
-    | Prunstack -> context_switch Runstack ~arity:3
+    | Presume -> context_switch Resume ~arity:3
+    | Pwith_stack -> context_switch With_stack ~arity:5
+    | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
       (* Use a dummy initializer to implement the "uninitialized" primitive *)
@@ -868,8 +869,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
       | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2))
 
-and comp_binary_scalar_intrinsic :
-    type a. a Scalar.Operation.Binary.t -> blambda -> blambda -> blambda =
+and comp_binary_scalar_intrinsic : type a.
+    a Scalar.Operation.Binary.t -> blambda -> blambda -> blambda =
  fun op x y ->
   let prim prim = Prim (prim, [x; y]) in
   let ccall fmt = kccallf prim fmt in
@@ -880,15 +881,15 @@ and comp_binary_scalar_intrinsic :
       match op with
       | Add ->
         (match y with
-        | Const (Const_base (Const_int y)) when is_immed y ->
-          Prim (Offsetint y, [x])
-        | _ -> prim Addint)
+          | Const (Const_base (Const_int y)) when is_immed y ->
+            Prim (Offsetint y, [x])
+          | _ -> prim Addint)
         |> sign_extend taggable
       | Sub ->
         (match y with
-        | Const (Const_base (Const_int y)) when is_immed (-y) ->
-          Prim (Offsetint (-y), [x])
-        | _ -> prim Subint)
+          | Const (Const_base (Const_int y)) when is_immed (-y) ->
+            Prim (Offsetint (-y), [x])
+          | _ -> prim Subint)
         |> sign_extend taggable
       | Mul -> prim Mulint |> sign_extend taggable
       | Div (Safe | Unsafe) -> prim Divint |> sign_extend taggable

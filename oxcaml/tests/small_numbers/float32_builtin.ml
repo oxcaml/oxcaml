@@ -23,7 +23,7 @@ module Poly = struct
   external compare : 'a -> 'a -> int = "%compare"
 
   external seeded_hash_param : int -> int -> int -> 'a -> int = "caml_hash_exn"
-    [@@noalloc]
+  [@@noalloc]
 
   external to_bytes : 'a -> extern_flags list -> bytes
     = "caml_output_value_to_bytes"
@@ -65,41 +65,41 @@ module CFloat32 = struct
 
   external bits_to_int : (t[@unboxed]) -> (int32[@unboxed])
     = "float32_bits_to_int_boxed" "float32_bits_to_int"
-    [@@noalloc]
+  [@@noalloc]
 
   external zero : unit -> (t[@unboxed]) = "float32_zero_boxed" "float32_zero"
-    [@@noalloc]
+  [@@noalloc]
 
   external neg_zero : unit -> (t[@unboxed])
     = "float32_neg_zero_boxed" "float32_neg_zero"
-    [@@noalloc]
+  [@@noalloc]
 
   external one : unit -> (t[@unboxed]) = "float32_one_boxed" "float32_one"
-    [@@noalloc]
+  [@@noalloc]
 
   external neg_one : unit -> (t[@unboxed])
     = "float32_neg_one_boxed" "float32_neg_one"
-    [@@noalloc]
+  [@@noalloc]
 
   external nan : unit -> (t[@unboxed]) = "float32_nan_boxed" "float32_nan"
-    [@@noalloc]
+  [@@noalloc]
 
   external nan2 : unit -> (t[@unboxed]) = "float32_nan2_boxed" "float32_nan2"
-    [@@noalloc]
+  [@@noalloc]
 
   external neg_infinity : unit -> (t[@unboxed])
     = "float32_neg_infinity_boxed" "float32_neg_infinity"
-    [@@noalloc]
+  [@@noalloc]
 
   external infinity : unit -> (t[@unboxed])
     = "float32_infinity_boxed" "float32_infinity"
-    [@@noalloc]
+  [@@noalloc]
 
   external maxv : unit -> (t[@unboxed]) = "float32_maxv_boxed" "float32_maxv"
-    [@@noalloc]
+  [@@noalloc]
 
   external minv : unit -> (t[@unboxed]) = "float32_minv_boxed" "float32_minv"
-    [@@noalloc]
+  [@@noalloc]
 
   let zero = zero ()
 
@@ -123,79 +123,79 @@ module CFloat32 = struct
 
   external eq : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_eq_boxed" "float32_eq"
-    [@@noalloc]
+  [@@noalloc]
 
   external neq : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_ne_boxed" "float32_ne"
-    [@@noalloc]
+  [@@noalloc]
 
   external lt : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_lt_boxed" "float32_lt"
-    [@@noalloc]
+  [@@noalloc]
 
   external le : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_le_boxed" "float32_le"
-    [@@noalloc]
+  [@@noalloc]
 
   external gt : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_gt_boxed" "float32_gt"
-    [@@noalloc]
+  [@@noalloc]
 
   external ge : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_ge_boxed" "float32_ge"
-    [@@noalloc]
+  [@@noalloc]
 
   external nlt : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_nlt_boxed" "float32_nlt"
-    [@@noalloc]
+  [@@noalloc]
 
   external nle : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_nle_boxed" "float32_nle"
-    [@@noalloc]
+  [@@noalloc]
 
   external ngt : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_ngt_boxed" "float32_ngt"
-    [@@noalloc]
+  [@@noalloc]
 
   external nge : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_nge_boxed" "float32_nge"
-    [@@noalloc]
+  [@@noalloc]
 
   external ord : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_ord_boxed" "float32_ord"
-    [@@noalloc]
+  [@@noalloc]
 
   external uord : (t[@unboxed]) -> (t[@unboxed]) -> bool
     = "float32_uord_boxed" "float32_uord"
-    [@@noalloc]
+  [@@noalloc]
 
   external add : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_add_boxed" "float32_add"
-    [@@noalloc]
+  [@@noalloc]
 
   external sub : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_sub_boxed" "float32_sub"
-    [@@noalloc]
+  [@@noalloc]
 
   external mul : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_mul_boxed" "float32_mul"
-    [@@noalloc]
+  [@@noalloc]
 
   external div : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_div_boxed" "float32_div"
-    [@@noalloc]
+  [@@noalloc]
 
   external abs : (t[@unboxed]) -> (t[@unboxed])
     = "float32_abs_boxed" "float32_abs"
-    [@@noalloc]
+  [@@noalloc]
 
   external neg : (t[@unboxed]) -> (t[@unboxed])
     = "float32_neg_boxed" "float32_neg"
-    [@@noalloc]
+  [@@noalloc]
 
   external is_nan : (t[@unboxed]) -> bool
     = "float32_is_nan_boxed" "float32_is_nan"
-    [@@noalloc]
+  [@@noalloc]
 
   let check_float32s f =
     Random.set_state (Random.State.make [| 1234567890 |]);

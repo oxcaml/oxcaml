@@ -5,8 +5,7 @@ open! Int_replace_polymorphic_compare
 
 let debug = false
 
-let may_use_stack_operand_for_second_argument :
-    type a.
+let may_use_stack_operand_for_second_argument : type a.
     num_args:int ->
     res_is_fst:bool ->
     spilled_map ->
@@ -22,8 +21,7 @@ let may_use_stack_operand_for_second_argument :
   | true -> use_stack_operand map instr.arg 1);
   May_still_have_spilled_registers
 
-let may_use_stack_operand_for_only_argument :
-    type a.
+let may_use_stack_operand_for_only_argument : type a.
     has_result:bool ->
     spilled_map ->
     a Cfg.instruction ->
@@ -38,8 +36,8 @@ let may_use_stack_operand_for_only_argument :
   then May_still_have_spilled_registers
   else All_spilled_registers_rewritten
 
-let may_use_stack_operand_for_only_result :
-    type a. spilled_map -> a Cfg.instruction -> stack_operands_rewrite =
+let may_use_stack_operand_for_only_result : type a.
+    spilled_map -> a Cfg.instruction -> stack_operands_rewrite =
  fun map instr ->
   if debug then check_lengths instr ~of_arg:0 ~of_res:1;
   match is_spilled map instr.res.(0) with
@@ -48,8 +46,7 @@ let may_use_stack_operand_for_only_result :
     use_stack_operand map instr.res 0;
     All_spilled_registers_rewritten
 
-let may_use_stack_operand_for_result :
-    type a.
+let may_use_stack_operand_for_result : type a.
     num_args:int -> spilled_map -> a Cfg.instruction -> stack_operands_rewrite =
  fun ~num_args map instr ->
   if debug then check_lengths instr ~of_arg:num_args ~of_res:1;
@@ -68,17 +65,16 @@ type result =
 let is_stack_operand : Reg.t -> bool =
  fun reg -> match reg.loc with Stack _ -> true | Unknown | Reg _ -> false
 
-let binary_operation :
-    type a. spilled_map -> a Cfg.instruction -> result -> stack_operands_rewrite
-    =
+let binary_operation : type a.
+    spilled_map -> a Cfg.instruction -> result -> stack_operands_rewrite =
  fun map instr result ->
   (if debug
-  then
-    match result with
-    | Result_can_be_on_stack ->
-      check_lengths instr ~of_arg:2 ~of_res:1;
-      check_same "res(0)" instr.res.(0) "arg(0)" instr.arg.(0)
-    | Result_cannot_be_on_stack -> check_lengths instr ~of_arg:2 ~of_res:1);
+   then
+     match result with
+     | Result_can_be_on_stack ->
+       check_lengths instr ~of_arg:2 ~of_res:1;
+       check_same "res(0)" instr.res.(0) "arg(0)" instr.arg.(0)
+     | Result_cannot_be_on_stack -> check_lengths instr ~of_arg:2 ~of_res:1);
   let already_has_memory_operand =
     is_stack_operand instr.arg.(0)
     || is_stack_operand instr.arg.(1)
@@ -129,8 +125,8 @@ let binary_operation :
           use_stack_operand map instr.arg 0;
           May_still_have_spilled_registers)
 
-let unary_operation_argument_or_result_on_stack :
-    type a. spilled_map -> a Cfg.instruction -> stack_operands_rewrite =
+let unary_operation_argument_or_result_on_stack : type a.
+    spilled_map -> a Cfg.instruction -> stack_operands_rewrite =
  fun map instr ->
   if debug then check_lengths instr ~of_arg:1 ~of_res:1;
   if is_stack_operand instr.arg.(0) || is_stack_operand instr.res.(0)
@@ -207,8 +203,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     May_still_have_spilled_registers
   | Op
       (Reinterpret_cast
-        ( Float_of_float32 | Float32_of_float | V128_of_vec _ | V256_of_vec _
-        | V512_of_vec _ ))
+         ( Float_of_float32 | Float32_of_float | V128_of_vec _ | V256_of_vec _
+         | V512_of_vec _ ))
   | Op (Static_cast (V128_of_scalar Float64x2 | Scalar_of_v128 Float64x2))
   | Op (Static_cast (V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4))
   | Op (Static_cast (V256_of_scalar Float64x4 | Scalar_of_v256 Float64x4))
@@ -234,17 +230,18 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     may_use_stack_operand_for_result map instr ~num_args:1
   | Op
       (Static_cast
-        ( Float_of_int (Float32 | Float64)
-        | Int_of_float (Float32 | Float64)
-        | Float_of_float32 | Float32_of_float )) ->
+         ( Float_of_int (Float32 | Float64)
+         | Int_of_float (Float32 | Float64)
+         | Float_of_float32 | Float32_of_float )) ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
   | Op (Const_symbol _) ->
     if !Clflags.pic_code || !Clflags.dlcode || Arch.win64
     then May_still_have_spilled_registers
     else may_use_stack_operand_for_only_result map instr
   | Op (Const_int n) ->
-    if Nativeint.compare n 0x7FFFFFFFn <= 0
-       && Nativeint.compare n (-0x80000000n) >= 0
+    if
+      Nativeint.compare n 0x7FFFFFFFn <= 0
+      && Nativeint.compare n (-0x80000000n) >= 0
     then may_use_stack_operand_for_only_result map instr
     else May_still_have_spilled_registers
   | Op (Intop (Iadd | Isub | Iand | Ior | Ixor)) ->
@@ -278,11 +275,11 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Reinterpret_cast (Int_of_value | Value_of_int))
   | Op
       (Specific
-        ( Isextend32 | Izextend32 | Ilea _
-        | Istore_int (_, _, _)
-        | Ioffset_loc (_, _)
-        | Ifloatarithmem (_, _, _)
-        | Icldemote _ | Iprefetch _ | Ibswap _ ))
+         ( Isextend32 | Izextend32 | Ilea _
+         | Istore_int (_, _, _)
+         | Ioffset_loc (_, _)
+         | Ifloatarithmem (_, _, _)
+         | Icldemote _ | Iprefetch _ | Ibswap _ ))
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue ->
     (* no rewrite *)
     May_still_have_spilled_registers
@@ -308,7 +305,7 @@ let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
        the operands). *)
     May_still_have_spilled_registers
   | Always _ | Return | Raise _ | Switch _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _
+  | Call_no_return _ | Invalid _
   | Prim { op = External _; _ }
   | Call { op = Indirect _ | Direct _; _ } ->
     (* no rewrite *)

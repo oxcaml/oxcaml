@@ -26,9 +26,10 @@ let get_module_info comp_unit =
     Misc.fatal_error
       "get_global_info is not for use with predefined exception compilation \
        units";
-  if Compilation_unit.Name.equal cmx_name
-       (Flambda2_identifiers.Symbol.external_symbols_compilation_unit ()
-       |> Compilation_unit.name)
+  if
+    Compilation_unit.Name.equal cmx_name
+      (Flambda2_identifiers.Symbol.external_symbols_compilation_unit ()
+      |> Compilation_unit.name)
   then None
   else Compilenv.get_unit_export_info comp_unit
 
@@ -161,8 +162,9 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
      to be computed differently according to the array kind, in the case where
      the width of a float is not equal to the machine word width (at present,
      this happens only on 32-bit targets). *)
-  if Cmm_helpers.wordsize_shift <> Cmm_helpers.numfloat_shift
-     && Flambda_features.flat_float_array ()
+  if
+    Cmm_helpers.wordsize_shift <> Cmm_helpers.numfloat_shift
+    && Flambda_features.flat_float_array ()
   then
     Misc.fatal_error
       "Cannot compile on targets where floats are not word-width when the \
@@ -184,12 +186,12 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     match mode, close_program_metadata with
     | Classic, Classic (code, reachable_names, cmx, offsets) ->
       (if Flambda_features.inlining_report ()
-      then
-        let output_prefix = prefixname ^ ".cps_conv" in
-        let inlining_tree =
-          Inlining_report.output_then_forget_decisions ~output_prefix
-        in
-        Compiler_hooks.execute Inlining_tree inlining_tree);
+       then
+         let output_prefix = prefixname ^ ".cps_conv" in
+         let inlining_tree =
+           Inlining_report.output_then_forget_decisions ~output_prefix
+         in
+         Compiler_hooks.execute Inlining_tree inlining_tree);
       raw_flambda, offsets, reachable_names, cmx, code
     | Normal, Normal ->
       let round = 0 in
@@ -204,12 +206,12 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
               raw_flambda)
       in
       (if Flambda_features.inlining_report ()
-      then
-        let output_prefix = Printf.sprintf "%s.%d" prefixname round in
-        let inlining_tree =
-          Inlining_report.output_then_forget_decisions ~output_prefix
-        in
-        Compiler_hooks.execute Inlining_tree inlining_tree);
+       then
+         let output_prefix = Printf.sprintf "%s.%d" prefixname round in
+         let inlining_tree =
+           Inlining_report.output_then_forget_decisions ~output_prefix
+         in
+         Compiler_hooks.execute Inlining_tree inlining_tree);
       Compiler_hooks.execute Flambda2 flambda;
       let last_pass_name = "simplify" in
       print_flambda last_pass_name

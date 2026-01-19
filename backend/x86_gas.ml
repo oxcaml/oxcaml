@@ -19,6 +19,7 @@ open! Int_replace_polymorphic_compare
 open X86_ast
 open X86_proc
 open Amd64_simd_instrs
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 let bprintf = Printf.bprintf
 
@@ -223,10 +224,8 @@ let generate_asm oc lines =
   let b = Buffer.create 10000 in
   output_string oc "\t.file \"\"\n";
   (* PR#7037 *)
-  List.iter
-    (fun i ->
+  DLL.iter lines ~f:(fun i ->
       Buffer.clear b;
       print_line b i;
       Buffer.add_char b '\n';
       Buffer.output_buffer oc b)
-    lines

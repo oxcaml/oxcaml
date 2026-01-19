@@ -77,7 +77,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
       | Cdls_get | Ctls_get ->
         List.for_all is_simple_expr args)
-    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ -> false
+    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> false
 
   and is_simple_expr expr =
     match Target.is_simple_expr expr with
@@ -134,7 +134,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
-    | Cswitch _ | Ccatch _ | Cexit _ -> EC.arbitrary
+    | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> EC.arbitrary
 
   and effects_of (expr : Cmm.expression) =
     match Target.effects_of expr with
@@ -185,12 +185,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let provenance = VP.provenance v in
     (if Option.is_some provenance
-    then
-      let naming_op =
-        SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
-          ~provenance ~regs:r1
-      in
-      SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
+     then
+       let naming_op =
+         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
+           ~provenance ~regs:r1
+       in
+       SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
     env
 
   (* Add an Iop opcode. Can be augmented by the processor description to insert
@@ -504,7 +504,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let module EC = SU.Effect_and_coeffect in
     let may_defer_evaluation =
       let ec = effects_of exp in
-      match EC.effect ec with
+      match EC.effect_ ec with
       | Arbitrary | Raise ->
         (* Preserve the ordering of effectful expressions by evaluating them
            early (in the correct order) and assigning their results to
@@ -526,13 +526,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              every [exp'] (for [exp'] as in the comment above) has no effects
              "worse" (in the sense of the ordering in [t]) than raising an
              exception. *)
-          match EC.effect effects_after with
+          match EC.effect_ effects_after with
           | None | Raise -> true
           | Arbitrary -> false)
         | Arbitrary -> (
           (* Arbitrary expressions may only be deferred if evaluation of every
              [exp'] (for [exp'] as in the comment above) has no effects. *)
-          match EC.effect effects_after with
+          match EC.effect_ effects_after with
           | None -> true
           | Arbitrary | Raise -> false))
     in
@@ -804,6 +804,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccatch (rec_flag, handlers, body) ->
       emit_expr_catch env sub_cfg bound_name rec_flag handlers body
     | Cexit (lbl, args, traps) -> emit_expr_exit env sub_cfg lbl args traps
+    | Cinvalid { message; symbol } -> emit_invalid env sub_cfg message symbol
 
   (* Emit an expression in tail position of a function. *)
   and emit_tail env sub_cfg (exp : Cmm.expression) =
@@ -827,10 +828,46 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccatch (_, [], e1) -> emit_tail env sub_cfg e1
     | Ccatch (rec_flag, handlers, e1) ->
       emit_tail_catch env sub_cfg rec_flag handlers e1
+    | Cinvalid { message; symbol } ->
+      let ok = emit_invalid env sub_cfg message symbol in
+      insert_return env sub_cfg ok (SU.pop_all_traps env)
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
+
+  and emit_invalid env sub_cfg message symbol =
+    let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
+    let* loc_arg, stack_ofs, stack_align =
+      (* Set up the argument for the call to caml_flambda2_invalid *)
+      emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
+    in
+    if !SU.current_function_is_check_enabled
+    then (
+      (* For zero alloc checking we need to treat [Invalid] as returning. *)
+      let label = Cmm.new_label () in
+      let label_after = Some label in
+      let ty = Cmm.typ_int in
+      let rd = Reg.createv ty in
+      let term = Cfg.Invalid { message; stack_ofs; stack_align; label_after } in
+      let loc_res =
+        SU.insert_op_debug' env sub_cfg term Debuginfo.none loc_arg
+          (Proc.loc_external_results (Reg.typv rd))
+      in
+      Sub_cfg.add_never_block sub_cfg ~label;
+      SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+      SU.set_traps_for_raise env;
+      Ok rd)
+    else
+      (* When not zero alloc checking we treat [Invalid] as non-returning. *)
+      let term =
+        Cfg.Invalid { message; stack_ofs; stack_align; label_after = None }
+      in
+      let (_ : Reg.t array) =
+        SU.insert_op_debug' env sub_cfg term Debuginfo.none loc_arg [||]
+      in
+      SU.set_traps_for_raise env;
+      Never_returns
 
   and emit_expr_raise (env : SU.environment) sub_cfg k
       (args : Cmm.expression list) dbg : _ Or_never_returns.t =
@@ -935,35 +972,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.set_traps_for_raise env;
         Sub_cfg.add_never_block sub_cfg ~label:label_after;
         Ok rd
-      | Terminator (Call_no_return ({ func_symbol; ty_args; _ } as r)) ->
+      | Terminator (Call_no_return ({ ty_args; _ } as r)) ->
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
-        let keep_for_checking =
-          !SU.current_function_is_check_enabled
-          && String.equal func_symbol Cmm.caml_flambda2_invalid
-        in
-        let returns, ty =
-          if keep_for_checking then true, Cmm.typ_int else false, ty
-        in
         let rd = Reg.createv ty in
-        let label = Cmm.new_label () in
         let r = { r with stack_ofs; stack_align } in
-        let term : Cfg.terminator =
-          if keep_for_checking
-          then Prim { op = External r; label_after = label }
-          else Call_no_return r
-        in
+        let term : Cfg.terminator = Call_no_return r in
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg term dbg loc_arg
             (Proc.loc_external_results (Reg.typv rd))
         in
         SU.set_traps_for_raise env;
-        if returns
-        then (
-          Sub_cfg.add_never_block sub_cfg ~label;
-          Ok rd)
-        else Never_returns
+        Never_returns
       | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
         let rd = Reg.createv Cmm.typ_val in
         let bytes = SU.size_expr env (Ctuple new_args) in
@@ -1261,8 +1282,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
         let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
-        if String.equal func.sym_name !SU.current_function_name
-           && SU.trap_stack_is_empty env
+        if
+          String.equal func.sym_name !SU.current_function_name
+          && SU.trap_stack_is_empty env
         then (
           let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
           let loc_arg' =

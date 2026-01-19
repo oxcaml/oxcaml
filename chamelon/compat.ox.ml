@@ -426,14 +426,19 @@ let mk_constructor_description cstr_name =
     cstr_constant = true;
   }
 
-let mk_value_binding ~vb_pat ~vb_expr ~vb_attributes =
+type value_binding_identifier = Jkind.Sort.t
+
+let value_binding_identifier_from_texp_match_identifier jkind = jkind
+
+let mk_value_binding ?(id = Jkind.Sort.value) ~vb_pat ~vb_expr ~vb_attributes ()
+    =
   {
     vb_pat;
     vb_expr;
     vb_attributes;
     vb_rec_kind = Dynamic;
     vb_loc = Location.none;
-    vb_sort = Jkind.Sort.value;
+    vb_sort = id;
   }
 
 let mk_value_description ~val_type ~val_kind ~val_attributes =
@@ -441,7 +446,7 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
     val_type;
     val_kind;
     val_loc = Location.none;
-    val_modalities = Mode.Modality.id;
+    val_modalities = Mode.Modality.(Const.id |> of_const);
     val_attributes;
     val_uid = Uid.internal_not_actually_unique;
     val_zero_alloc = Zero_alloc.default;

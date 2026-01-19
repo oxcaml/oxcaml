@@ -80,8 +80,8 @@ let list t ~length : _ list t =
   then failwith (Format.sprintf "list: length must be non-negative: %d" length)
   else
     fun r ->
-    let rec loop n acc = if n = 0 then acc else loop (n - 1) (t r :: acc) in
-    loop length []
+      let rec loop n acc = if n = 0 then acc else loop (n - 1) (t r :: acc) in
+      loop length []
 
 let fn ?(hash_arg = Hashtbl.hash) t_ret r =
   let base = Splittable_random.split r in

@@ -80,17 +80,18 @@ let loopify_decision_for_call dacc apply =
       match Apply.callee apply with
       | None -> Loopify_state.do_not_loopify
       | Some callee ->
-        if Simple.equal (canon (Simple.var my_closure)) (canon callee)
-           && (match Apply.continuation apply with
-              | Never_returns ->
-                (* If we never return, then this call is a tail-call *)
-                true
-              | Return apply_return_continuation ->
-                Continuation.equal apply_return_continuation return_continuation)
-           && Exn_continuation.equal
-                (Apply.exn_continuation apply)
-                (Exn_continuation.create ~exn_handler:exn_continuation
-                   ~extra_args:[])
+        if
+          Simple.equal (canon (Simple.var my_closure)) (canon callee)
+          && (match Apply.continuation apply with
+            | Never_returns ->
+              (* If we never return, then this call is a tail-call *)
+              true
+            | Return apply_return_continuation ->
+              Continuation.equal apply_return_continuation return_continuation)
+          && Exn_continuation.equal
+               (Apply.exn_continuation apply)
+               (Exn_continuation.create ~exn_handler:exn_continuation
+                  ~extra_args:[])
         then DE.loopify_state denv
         else Loopify_state.do_not_loopify)
 
@@ -233,8 +234,9 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
         Simplify_rec_info_expr.known_remaining_unrolling_depth dacc
           (Call_site_inlining_decision.get_rec_info dacc ~function_type)
       in
-      if Are_rebuilding_terms.do_rebuild_terms
-           (DE.are_rebuilding_terms (DA.denv dacc))
+      if
+        Are_rebuilding_terms.do_rebuild_terms
+          (DE.are_rebuilding_terms (DA.denv dacc))
       then
         Inlining_report.record_decision_at_call_site_for_known_function
           ~pass:Inlining_report.Pass.Before_simplify ~unrolling_depth
@@ -287,16 +289,18 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
         | Return apply_return_continuation, Ok result_types ->
           Result_types.pattern_match result_types
             ~f:(fun ~params ~results env_extension ->
-              if Flambda_arity.cardinal_unarized params_arity
-                 <> Bound_parameters.cardinal params
+              if
+                Flambda_arity.cardinal_unarized params_arity
+                <> Bound_parameters.cardinal params
               then
                 Misc.fatal_errorf
                   "Params arity %a does not match up with params in the result \
                    types structure:@ %a@ for application:@ %a"
                   Flambda_arity.print params_arity Result_types.print
                   result_types Apply.print apply;
-              if Flambda_arity.cardinal_unarized result_arity
-                 <> Bound_parameters.cardinal results
+              if
+                Flambda_arity.cardinal_unarized result_arity
+                <> Bound_parameters.cardinal results
               then
                 Misc.fatal_errorf
                   "Result arity %a does not match up with the result types \
@@ -908,19 +912,20 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       let result_arity_of_application = Apply.return_arity apply in
       if provided_num_args = num_params
       then
-        if (* This check can only be performed for exact applications:
+        if
+          (* This check can only be performed for exact applications:
 
-              - In the partial application case, the type checker should have
-              specified kind Value as the return kind of the application
-              (propagated through Lambda to this point), and it would be wrong
-              to compare against the return arity of the fully-applied function.
+             - In the partial application case, the type checker should have
+             specified kind Value as the return kind of the application
+             (propagated through Lambda to this point), and it would be wrong to
+             compare against the return arity of the fully-applied function.
 
-              - In the overapplication case, the correct return arity is only
-              present on the application expression, so all we can do is check
-              that the function being overapplied returns kind Value. *)
-           not
-             (Flambda_arity.equal_ignoring_subkinds result_arity
-                result_arity_of_application)
+             - In the overapplication case, the correct return arity is only
+             present on the application expression, so all we can do is check
+             that the function being overapplied returns kind Value. *)
+          not
+            (Flambda_arity.equal_ignoring_subkinds result_arity
+               result_arity_of_application)
         then
           if Flambda_features.kind_checks ()
           then
@@ -939,8 +944,9 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       else if provided_num_args > num_params
       then (
         (* See comment above. *)
-        if Flambda_features.kind_checks ()
-           && not (Flambda_arity.is_one_param_of_kind_value result_arity)
+        if
+          Flambda_features.kind_checks ()
+          && not (Flambda_arity.is_one_param_of_kind_value result_arity)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for overapplied OCaml function:@ \
@@ -952,10 +958,11 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       else if provided_num_args > 0 && provided_num_args < num_params
       then (
         (* See comment above. *)
-        if Flambda_features.kind_checks ()
-           && not
-                (Flambda_arity.is_one_param_of_kind_value
-                   result_arity_of_application)
+        if
+          Flambda_features.kind_checks ()
+          && not
+               (Flambda_arity.is_one_param_of_kind_value
+                  result_arity_of_application)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for partially-applied OCaml \
@@ -1351,15 +1358,20 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
     | Reperform { eff; cont; last_fiber } ->
       E.reperform ~eff:(simplify_simple eff) ~cont:(simplify_simple cont)
         ~last_fiber:(simplify_simple last_fiber)
-    | Run_stack { stack; f; arg } ->
-      E.run_stack ~stack:(simplify_simple stack) ~f:(simplify_simple f)
+    | With_stack { valuec; exnc; effc; f; arg } ->
+      E.with_stack ~valuec:(simplify_simple valuec) ~exnc:(simplify_simple exnc)
+        ~effc:(simplify_simple effc) ~f:(simplify_simple f)
         ~arg:(simplify_simple arg)
-    | Resume { stack; f; arg; last_fiber } ->
-      E.resume ~stack:(simplify_simple stack) ~f:(simplify_simple f)
+    | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+      E.with_stack_bind ~valuec:(simplify_simple valuec)
+        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
+        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
+    | Resume { cont; f; arg } ->
+      E.resume ~cont:(simplify_simple cont) ~f:(simplify_simple f)
         ~arg:(simplify_simple arg)
-        ~last_fiber:(simplify_simple last_fiber)
   in
-  let apply = Apply.with_call_kind apply (Call_kind.effect op) in
+  let apply = Apply.with_call_kind apply (Call_kind.effect_ op) in
   let dacc, use_id =
     match Apply.continuation apply with
     | Never_returns -> dacc, None

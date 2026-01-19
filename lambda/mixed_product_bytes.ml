@@ -97,10 +97,10 @@ module Wrt_path = struct
           ( i + 1,
             add totals
               (if i = pos
-              then count_wrt_path el path
-              else if i < pos
-              then { zero with left = count el }
-              else { zero with right = count el }) ))
+               then count_wrt_path el path
+               else if i < pos
+               then { zero with left = count el }
+               else { zero with right = count el }) ))
         (0, zero) shape
     in
     totals
@@ -139,8 +139,9 @@ module Wrt_path = struct
       let deepened_gap_upper_bound =
         Byte_count.(add (add gap_bytes here.value) here.flat)
       in
-      if Byte_count.on_64_bit_arch deepened_gap_upper_bound
-         >= lowest_invalid_gap_on_64_bit_arch
+      if
+        Byte_count.on_64_bit_arch deepened_gap_upper_bound
+        >= lowest_invalid_gap_on_64_bit_arch
       then None
       else Some { offset_bytes; gap_bytes }
     else Some { offset_bytes; gap_bytes = Byte_count.zero }

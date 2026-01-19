@@ -884,6 +884,15 @@ let set_printing_env env =
     printing_cont := [cont];
   end
 
+(* CR-soon zqian: Currently we immediately backtrack each mutation, which might
+cause incoherent types/modes in a single printing. Instead, we should move
+backtrack logic into [wrap_printing_env], which is called for each "printing
+request". Unfortunately, that seems to interfere with type naming context. The
+later is cleaned up in Ocaml 5.3, so we should retry once we merge 5.3. *)
+let wrap_mutation f =
+  let snap = Btype.snapshot () in
+  try_finally f ~always:(fun () -> Btype.backtrack snap)
+
 let wrap_printing_env env f =
   set_printing_env env; reset_naming_context ();
   try_finally f ~always:(fun () -> set_printing_env Env.empty)
@@ -1751,12 +1760,7 @@ and tree_of_typfields mode rest = function
 
 let tree_of_typexp mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  (* CR zqian: the backtracking should happen at a higher-level than this. In
-  particular, it should happen only once per user printing command. *)
-  let snap = Btype.snapshot () in
-  let r = tree_of_typexp mode Alloc.Const.legacy ty in
-  Btype.backtrack snap;
-  r
+  wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty)
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
@@ -2267,7 +2271,7 @@ let tree_of_value_description id decl =
   let ty = tree_of_type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
-  let snap = Btype.snapshot () in
+  wrap_mutation (fun () ->
   let moda =
     Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha decl.val_modalities
   in
@@ -2319,9 +2323,7 @@ let tree_of_value_description id decl =
     | Val_prim p -> Primitive.print p vd
     | _ -> vd
   in
-  let r = Osig_value vd in
-  Btype.backtrack snap;
-  r
+  Osig_value vd)
 
 let value_description id ppf decl =
   !Oprint.out_sig_item ppf (tree_of_value_description id decl)
@@ -2647,12 +2649,14 @@ let rec tree_of_modtype ?abbrev = function
       Omty_ident (tree_of_path (Some Module_type) p)
   | Mty_signature sg ->
       Omty_signature (tree_of_signature ?abbrev sg)
-  | Mty_functor(param, ty_res) ->
+  | Mty_functor(param, ty_res, m_res) ->
+      wrap_mutation (fun () ->
       let param, env =
         tree_of_functor_parameter ?abbrev param
       in
       let res = wrap_env env (tree_of_modtype ?abbrev) ty_res in
-      Omty_functor (param, res)
+      let mres = m_res |> Mode.Alloc.zap_to_legacy |> tree_of_modes in
+      Omty_functor (param, res, mres))
   | Mty_alias p ->
       Omty_alias (tree_of_path (Some Module) p)
   | Mty_strengthen _ as mty ->
@@ -2670,7 +2674,7 @@ let rec tree_of_modtype ?abbrev = function
 and tree_of_functor_parameter ?abbrev = function
   | Unit ->
       None, fun k -> k
-  | Named (param, ty_arg) ->
+  | Named (param, ty_arg, m_arg) ->
       let name, env =
         match param with
         | None -> None, fun env -> env
@@ -2678,7 +2682,8 @@ and tree_of_functor_parameter ?abbrev = function
             Some (Ident.name id),
             fun k -> Env.add_module ~arg:true id Mp_present ty_arg k
       in
-      Some (name, tree_of_modtype ?abbrev ty_arg), env
+      let marg = m_arg |> Mode.Alloc.zap_to_legacy |> tree_of_modes in
+      Some (name, tree_of_modtype ?abbrev ty_arg, marg), env
 
 and tree_of_signature ?abbrev = function
   | [] -> []
@@ -2771,16 +2776,17 @@ and tree_of_modtype_declaration ?abbrev id decl =
   in
   Osig_modtype (Ident.name id, mty)
 
-and tree_of_module ?abbrev id md rs =
-  let snap = Btype.snapshot () in
-  let moda = Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities in
-  let r =
+and tree_of_module ?abbrev id md rs = wrap_mutation (fun () ->
+  let moda =
+    if Mode.Modality.is_undefined md.md_modalities then
+      Mode.Modality.Const.id
+    else
+      Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities
+  in
     Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
     tree_of_modalities Immutable moda,
     tree_of_rec rs)
-  in
-  Btype.backtrack snap;
-  r
+  )
 
 let rec functor_parameters ~sep custom_printer = function
   | [] -> ignore

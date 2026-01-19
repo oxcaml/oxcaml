@@ -277,19 +277,22 @@ let decide_param_usage_non_recursive ~free_names ~required_names
     Misc.fatal_errorf
       "The data_flow analysis marked the param %a@ as not required, but the \
        free_names indicate it is actually used:@ \n\
-       free_names = %a" BP.print param NO.print free_names;
+       free_names = %a"
+      BP.print param NO.print free_names;
   if is_used && Variable.Set.mem param_var removed_aliased
   then
     Misc.fatal_errorf
       "The alias analysis marked the param %a@ as removed, but the free_names \
        indicate it is actually used:@ \n\
-       free_names = %a" BP.print param NO.print free_names;
+       free_names = %a"
+      BP.print param NO.print free_names;
   if is_used then Used else Unused
 
 let decide_param_usage_recursive ~required_names ~invariant_set ~removed_aliased
     param : Apply_cont_rewrite.used =
-  if Name.Set.mem (BP.name param) required_names
-     && not (Variable.Set.mem (BP.var param) removed_aliased)
+  if
+    Name.Set.mem (BP.name param) required_names
+    && not (Variable.Set.mem (BP.var param) removed_aliased)
   then
     if Bound_parameter.Set.mem param invariant_set
     then Used_as_invariant
@@ -457,9 +460,9 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           let remove_let_cont_leaving_handler =
             match RE.to_apply_cont body with
             | Some apply_cont -> (
-              if not
-                   (Continuation.equal cont
-                      (Apply_cont.continuation apply_cont))
+              if
+                not
+                  (Continuation.equal cont (Apply_cont.continuation apply_cont))
               then false
               else
                 match Apply_cont.args apply_cont with
@@ -708,12 +711,13 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
       (* TODO move to its own function *)
       let uenv =
         (* CR : factor this out in a separate function ? *)
-        if (* We must make the final decision now as to whether to inline this
-              continuation or not; we can't wait until
-              [Simplify_apply_cont.rebuild_apply_cont] because we need to decide
-              sooner than that whether to keep the [Let_cont] (in order to keep
-              free name sets correct). *)
-           is_single_inlinable_use
+        if
+          (* We must make the final decision now as to whether to inline this
+             continuation or not; we can't wait until
+             [Simplify_apply_cont.rebuild_apply_cont] because we need to decide
+             sooner than that whether to keep the [Let_cont] (in order to keep
+             free name sets correct). *)
+          is_single_inlinable_use
         then (
           (* Note that [Continuation_uses] won't set [is_single_inlinable_use]
              if [cont] is an exception handler. *)
@@ -739,8 +743,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
                   let args = Apply_cont.args apply_cont in
                   Shortcut_to (Apply_cont.continuation apply_cont, args))
               | None ->
-                if RE.can_be_removed_as_invalid handler
-                     (UA.are_rebuilding_terms uacc)
+                if
+                  RE.can_be_removed_as_invalid handler
+                    (UA.are_rebuilding_terms uacc)
                 then Invalid
                 else Unknown
           in
@@ -869,9 +874,10 @@ let rec rebuild_continuation_handlers_loop ~rebuild_body
               match invariant_params with
               | None -> Some cont_invariant_params
               | Some invariant_params ->
-                if not
-                     (Bound_parameters.equal invariant_params
-                        cont_invariant_params)
+                if
+                  not
+                    (Bound_parameters.equal invariant_params
+                       cont_invariant_params)
                 then
                   Misc.fatal_errorf
                     "Inconsistent invariant params: invariant_params=%a@ \
@@ -1539,7 +1545,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
   match data.handlers with
   | Non_recursive
       ({ cont; params; lifted_params; handler; is_exn_handler; is_cold } as
-      original) -> (
+       original) -> (
     match
       Continuation_uses_env.get_continuation_uses body_continuation_uses_env
         cont

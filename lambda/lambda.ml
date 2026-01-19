@@ -177,7 +177,8 @@ type primitive =
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
-  | Prunstack
+  | Pwith_stack
+  | Pwith_stack_bind
   | Pperform
   | Presume
   | Preperform
@@ -1702,7 +1703,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                to be [max] for conservative soundness. [new_env] is only used
                for printing in debugger. *)
             let vd = Env.find_value (Path.Pident id) old_env in
-            let vd = {vd with val_modalities = Mode.Modality.id} in
+            let vd = {vd with val_modalities = Mode.Modality.undefined} in
             let mode = Mode.Value.max |> Mode.Value.disallow_right in
             (vd, mode)
           in
@@ -2110,7 +2111,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Punbox_vector _ -> None
   | Pbox_vector (_, m) -> Some m
   | Punbox_unit -> None
-  | Prunstack | Presume | Pperform | Preperform
+  | Pwith_stack | Pwith_stack_bind | Presume | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
@@ -2285,7 +2286,8 @@ let primitive_can_raise prim =
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
-  | Prunstack | Pperform | Presume | Preperform -> true (* XXX! *)
+  | Pwith_stack | Pwith_stack_bind | Pperform | Presume
+  | Preperform -> true (* XXX! *)
   | Pdls_get | Ptls_get | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
@@ -2659,7 +2661,8 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | (Parray_to_iarray | Parray_of_iarray) -> layout_any_value
   | Pget_header _ -> layout_boxed_int Boxed_nativeint
-  | Prunstack | Presume | Pperform | Preperform -> layout_any_value
+  | Pwith_stack | Pwith_stack_bind | Presume | Pperform | Preperform ->
+    layout_any_value
   | Patomic_load_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null
   | Patomic_load_field { immediate_or_pointer = Pointer } ->

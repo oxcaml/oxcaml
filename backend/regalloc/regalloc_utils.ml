@@ -23,12 +23,12 @@ let find_param_value param_name =
   let all_params = !function_specific_params @ !Oxcaml_flags.regalloc_params in
   all_params
   |> List.find_map ~f:(fun param ->
-         match String.split_on_char ':' param with
-         | [] -> None
-         | name :: rest ->
-           if String.equal name param_name
-           then Some (String.concat ":" rest)
-           else None)
+      match String.split_on_char ':' param with
+      | [] -> None
+      | name :: rest ->
+        if String.equal name param_name
+        then Some (String.concat ":" rest)
+        else None)
 
 let bool_of_param ?guard ?(default = false) param_name =
   lazy
@@ -46,12 +46,12 @@ let bool_of_param ?guard ?(default = false) param_name =
            param_name value
      in
      (if res
-     then
-       match guard with
-       | None -> ()
-       | Some (guard_value, guard_name) ->
-         if not guard_value
-         then fatal "%s is set but %s is not" param_name guard_name);
+      then
+        match guard with
+        | None -> ()
+        | Some (guard_value, guard_name) ->
+          if not guard_value
+          then fatal "%s is set but %s is not" param_name guard_name);
      res)
 
 let debug = false
@@ -96,10 +96,11 @@ let make_log_function : label:string -> log_function =
     if enabled
     then
       fun ?no_eol fmt ->
-      Format.eprintf
-        ("[%s] %s" ^^ fmt ^^ match no_eol with None -> "\n%!" | Some () -> "")
-        label
-        (make_indent !indent_level)
+        Format.eprintf
+          ("[%s] %s" ^^ fmt
+          ^^ match no_eol with None -> "\n%!" | Some () -> "")
+          label
+          (make_indent !indent_level)
     else fun ?no_eol:_ fmt -> Format.(ifprintf err_formatter) fmt
   in
   { indent; dedent; reset_indentation; log; enabled }
@@ -280,7 +281,7 @@ module Insert_skipping_name_for_debugger = struct
     | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
     | Stack_check _ | Op _ ->
       false
-    [@@ocaml.warning "-4"]
+  [@@ocaml.warning "-4"]
 
   (* Find the insertion point after skipping [Name_for_debugger] instructions
      that name [reg]. *)
@@ -440,7 +441,7 @@ module SpillCosts = struct
         | Prim { op = External _; _ }
         | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
         | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-        | Tailcall_func _ | Call_no_return _ | Call _ ->
+        | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ ->
           update_instr cost block.terminator);
     costs
 end
@@ -452,8 +453,8 @@ let check_length str arr expected =
     fatal "the length of %s was expected to be %d but is actually %d" str
       expected actual
 
-let check_lengths :
-    type a. of_arg:int -> of_res:int -> a Cfg.instruction -> unit =
+let check_lengths : type a.
+    of_arg:int -> of_res:int -> a Cfg.instruction -> unit =
  fun ~of_arg ~of_res instr ->
   check_length "arg" instr.arg of_arg;
   check_length "res" instr.res of_res
@@ -492,8 +493,8 @@ let may_use_stack_operands_array : spilled_map -> Reg.t array -> unit =
   Array.iteri regs ~f:(fun i reg ->
       if is_spilled map reg then use_stack_operand map regs i)
 
-let may_use_stack_operands_everywhere :
-    type a. spilled_map -> a Cfg.instruction -> stack_operands_rewrite =
+let may_use_stack_operands_everywhere : type a.
+    spilled_map -> a Cfg.instruction -> stack_operands_rewrite =
  fun map instr ->
   may_use_stack_operands_array map instr.arg;
   may_use_stack_operands_array map instr.res;

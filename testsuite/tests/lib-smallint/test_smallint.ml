@@ -3,8 +3,8 @@ module Int = Stdlib_stable.Int
 module type Smallint = sig
   (** Signed [n]-bit tagged integer values.
 
-    These integers are [n] bits wide and use two's complement representation.
-    All operations are taken modulo [2^n]. They do not fail on overflow. *)
+      These integers are [n] bits wide and use two's complement representation.
+      All operations are taken modulo [2^n]. They do not fail on overflow. *)
 
   (** {1:ints n-bit Integers} *)
 
@@ -28,21 +28,22 @@ module type Smallint = sig
 
   val mul : t -> t -> t
 
-  (** Integer division. This division rounds the real quotient of
-      its arguments towards zero, as specified for {!Stdlib.(/)}.
+  (** Integer division. This division rounds the real quotient of its arguments
+      towards zero, as specified for {!Stdlib.(/)}.
       @raise Division_by_zero if the second argument is zero. *)
   val div : t -> t -> t
 
-  (** Same as {!div}, except that arguments and result are interpreted as {e
-      unsigned} integers. *)
+  (** Same as {!div}, except that arguments and result are interpreted as
+      {e unsigned} integers. *)
   val unsigned_div : t -> t -> t
 
-  (** Integer remainder. If [y] is not zero, [rem x y = sub x (mul (div x y)
-      y)]. If [y] is zero, [rem x y] raises [Division_by_zero]. *)
+  (** Integer remainder. If [y] is not zero,
+      [rem x y = sub x (mul (div x y) y)]. If [y] is zero, [rem x y] raises
+      [Division_by_zero]. *)
   val rem : t -> t -> t
 
-  (** Same as {!rem}, except that arguments and result are interpreted as {e
-      unsigned} integers. *)
+  (** Same as {!rem}, except that arguments and result are interpreted as
+      {e unsigned} integers. *)
   val unsigned_rem : t -> t -> t
 
   (** [succ x] is [add x 1]. *)
@@ -56,12 +57,10 @@ module type Smallint = sig
       argument is {!min_int}. *)
   val abs : t -> t
 
-  (** [max_int] is the greatest representable integer,
-      [2{^[size - 1]} - 1]. *)
+  (** [max_int] is the greatest representable integer, [2{^[size - 1]} - 1]. *)
   val max_int : t
 
-  (** [min_int] is the smallest representable integer,
-      [-2{^[size - 1]}]. *)
+  (** [min_int] is the smallest representable integer, [-2{^[size - 1]}]. *)
   val min_int : t
 
   (** Bitwise logical and. *)
@@ -76,20 +75,18 @@ module type Smallint = sig
   (** Bitwise logical negation. *)
   val lognot : t -> t
 
-  (** [shift_left x n] shifts [x] to the left by [n] bits. The result
-      is unspecified if [n < 0] or [n >= ]{!size}. *)
+  (** [shift_left x n] shifts [x] to the left by [n] bits. The result is
+      unspecified if [n < 0] or [n >= ]{!size}. *)
   val shift_left : t -> int -> t
 
   (** [shift_right x n] shifts [x] to the right by [n] bits. This is an
-      arithmetic shift: the sign bit of [x] is replicated and inserted
-      in the vacated bits. The result is unspecified if [n < 0] or
-      [n >=]{!size}. *)
+      arithmetic shift: the sign bit of [x] is replicated and inserted in the
+      vacated bits. The result is unspecified if [n < 0] or [n >=]{!size}. *)
   val shift_right : t -> int -> t
 
-  (** [shift_right x n] shifts [x] to the right by [n] bits. This is a
-      logical shift: zeroes are inserted in the vacated bits regardless
-      of the sign of [x]. The result is unspecified if [n < 0] or
-      [n >=]{!size}. *)
+  (** [shift_right x n] shifts [x] to the right by [n] bits. This is a logical
+      shift: zeroes are inserted in the vacated bits regardless of the sign of
+      [x]. The result is unspecified if [n < 0] or [n >=]{!size}. *)
   val shift_right_logical : t -> int -> t
 
   (** {1:preds Predicates and comparisons} *)
@@ -100,7 +97,8 @@ module type Smallint = sig
   (** [compare x y] is {!Stdlib.compare}[ x y] but more efficient. *)
   val compare : t -> t -> int
 
-  (** Same as {!compare}, except that arguments are interpreted as {e unsigned} integers. *)
+  (** Same as {!compare}, except that arguments are interpreted as {e unsigned}
+      integers. *)
   val unsigned_compare : t -> t -> int
 
   (** Return the lesser of the two arguments. *)
@@ -111,42 +109,41 @@ module type Smallint = sig
 
   (** {1:convert Converting} *)
 
-  (** [to_int x] is [x] as an {!int}. If [size > Sys.int_size], the topmost
-      bits will be lost in the conversion *)
+  (** [to_int x] is [x] as an {!int}. If [size > Sys.int_size], the topmost bits
+      will be lost in the conversion *)
   val to_int : t -> int
 
   (** [of_int x] truncates the representation of [x] to fit in {!t}. *)
   val of_int : int -> t
 
-  (** Same as {!to_int}, but interprets the argument as an {e unsigned} integer. *)
+  (** Same as {!to_int}, but interprets the argument as an {e unsigned} integer.
+  *)
   val unsigned_to_int : t -> int
 
   (** [to_float x] is [x] as a floating point number. *)
   val to_float : t -> float
 
-  (** [of_float x] truncates [x] to an integer. The result is
-      unspecified if the argument is [nan] or falls outside the range of
-      representable integers. *)
+  (** [of_float x] truncates [x] to an integer. The result is unspecified if the
+      argument is [nan] or falls outside the range of representable integers. *)
   val of_float : float -> t
 
   (** [to_string x] is the written representation of [x] in decimal. *)
   val to_string : t -> string
 
-  (** Convert the given string to a {!size}-bit integer.
-      The string is read in decimal (by default, or if the string
-      begins with [0u]) or in hexadecimal, octal or binary if the
-      string begins with [0x], [0o] or [0b] respectively.
+  (** Convert the given string to a {!size}-bit integer. The string is read in
+      decimal (by default, or if the string begins with [0u]) or in hexadecimal,
+      octal or binary if the string begins with [0x], [0o] or [0b] respectively.
 
       The [0u] prefix reads the input as an unsigned integer in the range
-      [[0, 2*max_int+1]].  If the input exceeds {!max_int}
-      it is converted to the signed integer
-      [min_int + input - max_int - 1].
+      [[0, 2*max_int+1]]. If the input exceeds {!max_int} it is converted to the
+      signed integer [min_int + input - max_int - 1].
 
-      The [_] (underscore) character can appear anywhere in the string
-      and is ignored.
-      @raise Failure if the given string is not
-      a valid representation of an integer, or if the integer represented
-      exceeds the range of integers representable in type [t]. *)
+      The [_] (underscore) character can appear anywhere in the string and is
+      ignored.
+      @raise Failure
+        if the given string is not a valid representation of an integer, or if
+        the integer represented exceeds the range of integers representable in
+        type [t]. *)
   val of_string : string -> t
 
   (** A seeded hash function for ints, with the same output value as
@@ -166,7 +163,8 @@ let phys_same x y = Obj.repr x == Obj.repr y
 
 let special_floats = Float.[infinity; nan; neg_infinity; epsilon; -0.; 0.]
 
-(** generates a random float that rounds toward zero to the same integer value *)
+(** generates a random float that rounds toward zero to the same integer value
+*)
 let nudge rng f =
   let f_pos = Float.abs f in
   if not (Float.is_finite f)
@@ -218,11 +216,11 @@ let test_strings ~int_size ~f =
   List.iter f
     (arbitrary_wonky_format_that_still_parses
     :: ListLabels.concat_map (test_cases ~int_size) ~f:(fun x ->
-           [Printf.sprintf "%#d" x; Printf.sprintf "%d" x]
-           @ (if x >= 0 then [Printf.sprintf "+%d" x] else [])
-           @ prefix_formats x ~prefix:""
-           @ prefix_formats x ~prefix:"+"
-           @ prefix_formats x ~prefix:"-"))
+        [Printf.sprintf "%#d" x; Printf.sprintf "%d" x]
+        @ (if x >= 0 then [Printf.sprintf "+%d" x] else [])
+        @ prefix_formats x ~prefix:""
+        @ prefix_formats x ~prefix:"+"
+        @ prefix_formats x ~prefix:"-"))
 
 let run (module Smallint : Smallint) ~min_int ~max_int =
   let int_size = Smallint.size in

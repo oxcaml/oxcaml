@@ -19,13 +19,13 @@
 module Function_call : sig
   type t = private
     | Direct of Code_id.t
-        (** The [code_id] uniquely determines the function symbol that
-            must be called. *)
+        (** The [code_id] uniquely determines the function symbol that must be
+            called. *)
     | Indirect_unknown_arity
     | Indirect_known_arity of Code_id.Set.t Or_unknown.t
-        (** If a [Code_id.Set.t] is provided, only the provided functions
-             (or a simplified version thereof) can be called, but we don't
-             statically know which. *)
+        (** If a [Code_id.Set.t] is provided, only the provided functions (or a
+            simplified version thereof) can be called, but we don't statically
+            know which. *)
 end
 
 module Method_kind : sig
@@ -42,9 +42,9 @@ end
 (* CR mshinwell: consider refactoring [Call_kind] so that there wouldn't be a
    separate callee field for cases like this. *)
 
-(** Algebraic effect operations.  The corresponding [Apply_expr] will have the
-    callee set to [None] and an empty argument list for these.  This is done
-    to ensure there is no confusion between the different [Simple]s. *)
+(** Algebraic effect operations. The corresponding [Apply_expr] will have the
+    callee set to [None] and an empty argument list for these. This is done to
+    ensure there is no confusion between the different [Simple]s. *)
 module Effect : sig
   type t = private
     | Perform of { eff : Simple.t }
@@ -53,16 +53,26 @@ module Effect : sig
           cont : Simple.t;
           last_fiber : Simple.t
         }
-    | Run_stack of
-        { stack : Simple.t;
+    | With_stack of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          f : Simple.t;
+          arg : Simple.t
+        }
+    | With_stack_bind of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          dyn : Simple.t;
+          bind : Simple.t;
           f : Simple.t;
           arg : Simple.t
         }
     | Resume of
-        { stack : Simple.t;
+        { cont : Simple.t;
           f : Simple.t;
-          arg : Simple.t;
-          last_fiber : Simple.t
+          arg : Simple.t
         }
 
   include Contains_names.S with type t := t
@@ -71,10 +81,25 @@ module Effect : sig
 
   val reperform : eff:Simple.t -> cont:Simple.t -> last_fiber:Simple.t -> t
 
-  val run_stack : stack:Simple.t -> f:Simple.t -> arg:Simple.t -> t
+  val with_stack :
+    valuec:Simple.t ->
+    exnc:Simple.t ->
+    effc:Simple.t ->
+    f:Simple.t ->
+    arg:Simple.t ->
+    t
 
-  val resume :
-    stack:Simple.t -> f:Simple.t -> arg:Simple.t -> last_fiber:Simple.t -> t
+  val with_stack_bind :
+    valuec:Simple.t ->
+    exnc:Simple.t ->
+    effc:Simple.t ->
+    dyn:Simple.t ->
+    bind:Simple.t ->
+    f:Simple.t ->
+    arg:Simple.t ->
+    t
+
+  val resume : cont:Simple.t -> f:Simple.t -> arg:Simple.t -> t
 end
 
 (* The allocation mode corresponds to the type of the function that is called:
@@ -128,4 +153,4 @@ val c_call :
   Alloc_mode.For_applications.t ->
   t
 
-val effect : Effect.t -> t
+val effect_ : Effect.t -> t

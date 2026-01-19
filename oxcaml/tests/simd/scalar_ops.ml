@@ -4,15 +4,15 @@
 
 external int64x2_of_int64s : int64 -> int64 -> int64x2
   = "caml_vec128_unreachable" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x2_low_int64 : int64x2 -> int64
   = "caml_vec128_unreachable" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x2_high_int64 : int64x2 -> int64
   = "caml_vec128_unreachable" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 let eq lv hv l h =
   if l <> lv then Printf.printf "%016Lx <> %016Lx\n" lv l;
@@ -42,23 +42,23 @@ let eqf32 x y =
 module Int = struct
   external count_leading_zeros : int -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int_clz_tagged_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external count_leading_zeros2 : int -> int
     = "caml_vec128_unreachable" "caml_int_clz_untagged_to_untagged"
-    [@@untagged] [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@untagged] [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external count_set_bits : int -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int_popcnt_tagged_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external count_set_bits2 : int -> int
     = "caml_vec128_unreachable" "caml_int_popcnt_untagged_to_untagged"
-    [@@untagged] [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@untagged] [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external count_trailing_zeros : int -> int
     = "caml_vec128_unreachable" "caml_int_ctz_untagged_to_untagged"
-    [@@untagged] [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@untagged] [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   let check f g =
     let open Int in
@@ -97,28 +97,28 @@ end
 module Int64 = struct
   external count_leading_zeros : (int64[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int64_clz_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external count_leading_zeros_nonzero_arg :
     (int64[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int64_clz_nonzero_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external count_trailing_zeros : (int64[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int64_ctz_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  (** Same as [count_trailing_zeros] except if the argument is zero,
-      then the result is undefined. Emits more efficient code. *)
+  (** Same as [count_trailing_zeros] except if the argument is zero, then the
+      result is undefined. Emits more efficient code. *)
   external count_trailing_zeros_nonzero_arg :
     (int64[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int64_ctz_nonzero_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   (** [count_set_bits n] returns the number of bits that are 1 in [n]. *)
   external count_set_bits : (int64[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int64_popcnt_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   let check' ~eq ?nonzero f g =
     let nz = Option.value ~default:false nonzero in
@@ -167,28 +167,28 @@ end
 module Int32 = struct
   external count_leading_zeros : (int32[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int32_clz_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external count_leading_zeros_nonzero_arg :
     (int32[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int32_clz_nonzero_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external count_trailing_zeros : (int32[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int32_ctz_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  (** Same as [count_trailing_zeros] except if the argument is zero,
-      then the result is undefined. Emits more efficient code. *)
+  (** Same as [count_trailing_zeros] except if the argument is zero, then the
+      result is undefined. Emits more efficient code. *)
   external count_trailing_zeros_nonzero_arg :
     (int32[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int32_ctz_nonzero_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   (** [count_set_bits n] returns the number of bits that are 1 in [n]. *)
   external count_set_bits : (int32[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int32_popcnt_unboxed_to_untagged"
-    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   let check ?nonzero f g =
     let nz = Option.value ~default:false nonzero in
@@ -235,71 +235,71 @@ end
 module Float = struct
   external to_int64 : float -> int64
     = "caml_int64_of_float" "caml_int64_of_float_unboxed"
-    [@@unboxed] [@@noalloc] [@@builtin]
+  [@@unboxed] [@@noalloc] [@@builtin]
 
   external of_int64 : int64 -> float
     = "caml_int64_to_float" "caml_int64_to_float_unboxed"
-    [@@unboxed] [@@noalloc] [@@builtin]
+  [@@unboxed] [@@noalloc] [@@builtin]
 
   external max_f64 : float -> float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_max"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external max_f32 : float32 -> float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_max"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external min_f64 : float -> float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_min"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external min_f32 : float32 -> float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_min"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external iround_f64 : float -> int64
     = "caml_vec128_unreachable" "caml_simd_cast_float64_int64"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external iround_f32 : float32 -> int64
     = "caml_vec128_unreachable" "caml_simd_cast_float32_int64"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_current_f64 : float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_round_current"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_neg_inf_f64 : float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_round_neg_inf"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_pos_inf_f64 : float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_round_pos_inf"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_towards_zero_f64 : float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_round_towards_zero"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_current_f32 : float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_round_current"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_neg_inf_f32 : float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_round_neg_inf"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_pos_inf_f32 : float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_round_pos_inf"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_towards_zero_f32 : float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_round_towards_zero"
-    [@@noalloc] [@@builtin] [@@unboxed]
+  [@@noalloc] [@@builtin] [@@unboxed]
 
   external float32_of_bits : int32 -> float32
     = "caml_float32_of_bits_bytecode" "caml_float32_of_bits"
-    [@@unboxed] [@@noalloc]
+  [@@unboxed] [@@noalloc]
 
   let f32_nan = float32_of_bits 0x7fc00001l
 

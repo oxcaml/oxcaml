@@ -992,13 +992,15 @@ let multiple_word_array_access_validity_condition array ~machine_width
     Misc.fatal_errorf
       "Invalid num_consecutive_elements_being_accessed value: %d"
       num_consecutive_elements_being_accessed
-  else if width_in_scalars_per_access > 1
-          && num_consecutive_elements_being_accessed > 1
+  else if
+    width_in_scalars_per_access > 1
+    && num_consecutive_elements_being_accessed > 1
   then
     Misc.fatal_error
       "Unboxed product arrays cannot involve vector accesses at present"
-  else if width_in_scalars_per_access = 1
-          && num_consecutive_elements_being_accessed = 1
+  else if
+    width_in_scalars_per_access = 1
+    && num_consecutive_elements_being_accessed = 1
   then
     (* Ensure good code generation in the common case. *)
     check_bound ~index_kind ~bound_kind:Tagged_immediate ~index
@@ -1809,7 +1811,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let projected_args =
       List.hd orig_args |> Array.of_list
       |> (fun a ->
-           Array.sub a num_fields_prior_to_projected_fields num_projected_fields)
+      Array.sub a num_fields_prior_to_projected_fields num_projected_fields)
       |> Array.to_list
     in
     List.map (fun arg : H.expr_primitive -> Simple arg) projected_args
@@ -3178,8 +3180,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Pignore | Psequand | Psequor | Pbytes_of_string | Pbytes_to_string
-      | Parray_of_iarray | Parray_to_iarray | Prunstack | Pperform | Presume
-      | Preperform ),
+      | Parray_of_iarray | Parray_to_iarray | Pwith_stack | Pwith_stack_bind
+      | Pperform | Presume | Preperform ),
       _ ) ->
     Misc.fatal_errorf
       "[%a] should have been removed by [Lambda_to_flambda.transform_primitive]"

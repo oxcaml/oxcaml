@@ -146,9 +146,15 @@ let fmt_index_kind f = function
   | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
   | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 
+let fmt_label_ambiguity f = function
+  | Ambiguous { path; arity } ->
+    fprintf f "Ambiguous %a %d" fmt_path path arity
+  | Unambiguous ->
+    fprintf f "Unambiguous"
+
 let fmt_type_inspection f = function
-  | Label_disambiguation ->
-    fprintf f "Label_disambiguation"
+  | Label_disambiguation amb ->
+    fprintf f "Label_disambiguation %a" fmt_label_ambiguity amb
   | Polymorphic_parameter ->
     fprintf f "Polymorphic_parameter"
 
@@ -445,8 +451,8 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
      attributes i ppf attrs;
   | Tpat_inspected_type ti ->
      line i ppf "Tpat_inspected_type\n";
-      attributes i ppf attrs;
-      line (i+1) ppf "%a\n" fmt_type_inspection ti;
+     attributes i ppf attrs;
+     line (i+1) ppf "%a\n" fmt_type_inspection ti;
 
 and function_body i ppf (body : function_body) =
   match[@warning "+9"] body with
@@ -1001,13 +1007,16 @@ and module_type i ppf x =
   | Tmty_signature (s) ->
       line i ppf "Tmty_signature\n";
       signature i ppf s;
-  | Tmty_functor (Unit, mt2) ->
+  | Tmty_functor (Unit, mt2, mm2) ->
       line i ppf "Tmty_functor ()\n";
       module_type i ppf mt2;
-  | Tmty_functor (Named (s, _, mt1), mt2) ->
+      alloc_const_option_mode i ppf mm2
+  | Tmty_functor (Named (s, _, mt1, mm1), mt2, mm2) ->
       line i ppf "Tmty_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt1;
+      alloc_const_option_mode i ppf mm1;
       module_type i ppf mt2;
+      alloc_const_option_mode i ppf mm2
   | Tmty_with (mt, l) ->
       line i ppf "Tmty_with\n";
       module_type i ppf mt;
@@ -1121,9 +1130,10 @@ and module_expr i ppf x =
   | Tmod_functor (Unit, me) ->
       line i ppf "Tmod_functor ()\n";
       module_expr i ppf me;
-  | Tmod_functor (Named (s, _, mt), me) ->
+  | Tmod_functor (Named (s, _, mt, mm), me) ->
       line i ppf "Tmod_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt;
+      alloc_const_option_mode i ppf mm;
       module_expr i ppf me;
   | Tmod_apply (me1, me2, _) ->
       line i ppf "Tmod_apply\n";

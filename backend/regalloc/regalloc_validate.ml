@@ -301,10 +301,10 @@ module Description : sig
       Reload. The unique IDs of instructions are sufficient to determine this,
       and the description does not need to record the block an instruction
       belongs to. It is possible to reconstruct some information about the CFG
-      structure from the description.
-      For example, successors of a block can be reconstructed from the labels
-      that appear in terminator's [desc]. It also checks that all [fun_args]
-      were preassigned before allocation and that they haven't changed after. *)
+      structure from the description. For example, successors of a block can be
+      reconstructed from the labels that appear in terminator's [desc]. It also
+      checks that all [fun_args] were preassigned before allocation and that
+      they haven't changed after. *)
   type t
 
   (** Will return [Some _] for the instructions that existed in the CFG before
@@ -406,15 +406,15 @@ end = struct
     let reg_fun_args =
       (Cfg_with_layout.cfg cfg).fun_args
       |> Array.map (fun reg ->
-             let reg = Register.create reg in
-             (* Assert that [fun_args] are preassigned. *)
-             (match reg.reg_id with
-             | Preassigned _ -> ()
-             | Named _ ->
-               Regalloc_utils.fatal
-                 "Register in function arguments that isn't preassigned: %a"
-                 Register.print reg);
-             reg)
+          let reg = Register.create reg in
+          (* Assert that [fun_args] are preassigned. *)
+          (match reg.reg_id with
+          | Preassigned _ -> ()
+          | Named _ ->
+            Regalloc_utils.fatal
+              "Register in function arguments that isn't preassigned: %a"
+              Register.print reg);
+          reg)
     in
     let t =
       { instructions = Hashtbl.create basic_count;
@@ -599,6 +599,14 @@ end = struct
         Prim { op = prim2; label_after = l2 } )
     (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
       when Stdlib.compare prim1 prim2 = 0 ->
+      compare_label l1 l2
+    | ( Invalid { message = m1; label_after = None; _ },
+        Invalid { message = m2; label_after = None; _ } )
+      when String.compare m1 m2 = 0 ->
+      ()
+    | ( Invalid { message = m1; label_after = Some l1; _ },
+        Invalid { message = m2; label_after = Some l2; _ } )
+      when String.compare m1 m2 = 0 ->
       compare_label l1 l2
     | _ ->
       Regalloc_utils.fatal
@@ -892,8 +900,8 @@ end = struct
            Existing equation has to agree on 0 or 2 sides (cannot be exactly \
            1) with the removed equation.\n\
            Existing equation %a.\n\
-           Removed equation: %a." Equation.print (eq_reg, eq_loc) Equation.print
-          (reg, loc);
+           Removed equation: %a."
+          Equation.print (eq_reg, eq_loc) Equation.print (reg, loc);
         let message = Format.flush_str_formatter () in
         raise (Verification_failed message))
     in
@@ -1102,7 +1110,8 @@ module Transfer (Desc_val : Description_value) :
     Equation_set.rename_reg ~arg:reg_instr.arg.(0) ~res:reg_instr.res.(0)
       equations
 
-  (** For equations coming from exceptional path remove the expected equations. *)
+  (** For equations coming from exceptional path remove the expected equations.
+  *)
   let remove_exn_bucket equations =
     let phys_reg = Proc.loc_exn_bucket in
     let reg = Register.create phys_reg in
@@ -1113,7 +1122,7 @@ module Transfer (Desc_val : Description_value) :
     in
     Equation_set.remove_result equations ~reg_res:[| reg |] ~loc_res:[| loc |]
     |> Result.map_error (fun message ->
-           Printf.sprintf "While removing exn bucket: %s" message)
+        Printf.sprintf "While removing exn bucket: %s" message)
 
   (** This corresponds to case (7) in Fig. 1 of the paper [1] generalized for
       all other cases not handled by [rename_location] or [rename_register]. We
@@ -1134,49 +1143,46 @@ module Transfer (Desc_val : Description_value) :
     let exn =
       exn
       |> Option.map (fun exn ->
-             (* Handle the exceptional path specific conversions here because in
-                [exception_] we don't have enough information in order to give a
-                meaningful error message. *)
-             exn
-             (* Remove the equality for [exn_bucket] if it exists. *)
-             |> remove_exn_bucket
-             |> wrap_error
-             |> bind (fun equations ->
-                    (* Verify the destroyed registers for exceptional path
-                       only. *)
-                    equations
-                    |> Equation_set.verify_destroyed_locations
-                         ~destroyed:
-                           (Location.of_regs_exn Proc.destroyed_at_raise)
-                    |> Result.map_error (fun message ->
-                           Printf.sprintf
-                             "While verifying locations destroyed at raise: %s"
-                             message)
-                    |> wrap_error))
+          (* Handle the exceptional path specific conversions here because in
+             [exception_] we don't have enough information in order to give a
+             meaningful error message. *)
+          exn
+          (* Remove the equality for [exn_bucket] if it exists. *)
+          |> remove_exn_bucket
+          |> wrap_error
+          |> bind (fun equations ->
+              (* Verify the destroyed registers for exceptional path only. *)
+              equations
+              |> Equation_set.verify_destroyed_locations
+                   ~destroyed:(Location.of_regs_exn Proc.destroyed_at_raise)
+              |> Result.map_error (fun message ->
+                  Printf.sprintf
+                    "While verifying locations destroyed at raise: %s" message)
+              |> wrap_error))
       (* If instruction can't raise [Option.is_none exn] then use empty set of
          equations as that's the same as skipping the step. *)
       |> Option.value ~default:(Ok Domain.bot)
     in
     equations
-    |> (* First remove the result equations. *)
+    |>
+    (* First remove the result equations. *)
     Equation_set.remove_result ~reg_res:reg_instr.Instruction.res
       ~loc_res:(Location.of_regs_exn loc_instr.res)
     |> wrap_error
     |> bind (fun equations ->
-           (* Join the exceptional path equations. *)
-           exn
-           |> Result.map (fun exn_equations ->
-                  Equation_set.union equations exn_equations))
+        (* Join the exceptional path equations. *)
+        exn
+        |> Result.map (fun exn_equations ->
+            Equation_set.union equations exn_equations))
     |> bind (fun equations ->
-           (* Verify the destroyed registers (including the exceptional
-              path). *)
-           Equation_set.verify_destroyed_locations ~destroyed equations
-           |> wrap_error)
+        (* Verify the destroyed registers (including the exceptional path). *)
+        Equation_set.verify_destroyed_locations ~destroyed equations
+        |> wrap_error)
     |> Result.map (fun equations ->
-           (* Add all eqations for the arguments. *)
-           Equation_set.add_argument ~reg_arg:reg_instr.Instruction.arg
-             ~loc_arg:(Location.of_regs_exn loc_instr.arg)
-             equations)
+        (* Add all eqations for the arguments. *)
+        Equation_set.add_argument ~reg_arg:reg_instr.Instruction.arg
+          ~loc_arg:(Location.of_regs_exn loc_instr.arg)
+          equations)
 
   let basic t instr () : (domain, error) result =
     match Description.find_basic description instr with
@@ -1368,23 +1374,22 @@ let verify_entrypoint (equations : Equation_set.t) (desc : Description.t)
   Equation_set.remove_result ~reg_res:reg_fun_args ~loc_res:loc_fun_args
     equations
   |> bind (fun equations ->
-         (* This check is stronger than the one in the paper [1]. That because C
-            allows to start with uninitialized variables as it's explained in
-            chapter 3.2 and of section "Dataflow Analysis and Its Uses". Such a
-            thing is not allowed in OCaml. Therefore after removing all
-            equations for arguments the should be no additional equations
-            left. *)
-         if Equation_set.is_empty equations
-         then Ok cfg
-         else (
-           Format.fprintf Format.str_formatter
-             "Some equations still present at entrypoint after removing \
-              parameter equations: [%a]"
-             Equation_set.print equations;
-           let message = Format.flush_str_formatter () in
-           Error message))
+      (* This check is stronger than the one in the paper [1]. That because C
+         allows to start with uninitialized variables as it's explained in
+         chapter 3.2 and of section "Dataflow Analysis and Its Uses". Such a
+         thing is not allowed in OCaml. Therefore after removing all equations
+         for arguments the should be no additional equations left. *)
+      if Equation_set.is_empty equations
+      then Ok cfg
+      else (
+        Format.fprintf Format.str_formatter
+          "Some equations still present at entrypoint after removing parameter \
+           equations: [%a]"
+          Equation_set.print equations;
+        let message = Format.flush_str_formatter () in
+        Error message))
   |> Result.map_error (fun message : Error.At_entrypoint.t ->
-         { message; equations; reg_fun_args; loc_fun_args })
+      { message; equations; reg_fun_args; loc_fun_args })
 
 let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
     (Cfg_with_layout.t, Error.t) Result.t =
@@ -1434,7 +1439,7 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
     in
     verify_entrypoint entrypoint_equations desc cfg
     |> Result.map_error (fun (error : Error.At_entrypoint.t) : Error.t ->
-           { source = At_entrypoint error; res_instr; res_block; desc; cfg })
+        { source = At_entrypoint error; res_instr; res_block; desc; cfg })
   | Error error ->
     Error { source = At_instruction error; res_instr; res_block; desc; cfg }
 

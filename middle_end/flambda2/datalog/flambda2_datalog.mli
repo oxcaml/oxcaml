@@ -38,8 +38,7 @@ module Datalog : sig
         ['k].
 
         The ['t] and ['v] parameters are only relevant when applied to a column
-        that is part of a schema.
-    *)
+        that is part of a schema. *)
     type ('t, 'k, 'v) id
 
     type (_, _, _) hlist =
@@ -88,33 +87,32 @@ module Datalog : sig
   type ('t, 'k) relation = ('t, 'k, unit) table
 
   (** [create_relation ~name schema] creates a new relation with name [name] and
-        schema [schema].
+      schema [schema].
 
-        The schema is given as a heterogenous list of column types, and the relation
-        is represented in memory as a series of nested maps following this list. If
-        the schema [ty1; ty2; ty3] is provided, the relation will be represented as
-        a map from [ty1] whose values are maps from [ty2] to [ty2]. The order of
-        arguments provided to a relation thus have profound implication for the
-        performance of iterations on the relation, and needs to be chosen carefully.
+      The schema is given as a heterogenous list of column types, and the
+      relation is represented in memory as a series of nested maps following
+      this list. If the schema [ty1; ty2; ty3] is provided, the relation will be
+      represented as a map from [ty1] whose values are maps from [ty2] to [ty2].
+      The order of arguments provided to a relation thus have profound
+      implication for the performance of iterations on the relation, and needs
+      to be chosen carefully.
 
-        See documentation of [create_table] for the [provenance] argument.
+      See documentation of [create_table] for the [provenance] argument.
 
-        @raise Misc.Fatal_error if [schema] is empty.
+      @raise Misc.Fatal_error if [schema] is empty.
 
-        {b Example}
+      {b Example}
 
-        The following code defines a binary edge relationship between nodes,
-        represented as a map from a node to its successors, and an unary predicate
-        to distinguish some sort of {e marked} nodes.
+      The following code defines a binary edge relationship between nodes,
+      represented as a map from a node to its successors, and an unary predicate
+      to distinguish some sort of {e marked} nodes.
 
-        {[
-        let marked_pred : node rel1 =
-          create_relation ~name:"marked" [node]
+      {[
+        let marked_pred : node rel1 = create_relation ~name:"marked" [node]
 
         let edge_rel : (node, node) rel2 =
           create_relation ~name:"edge" [node; node]
-        ]}
-          *)
+      ]} *)
   val create_relation :
     ?provenance:bool ->
     name:string ->
@@ -163,10 +161,10 @@ module Datalog : sig
       {b Example}
 
       {[
-      let marked = atom marked_pred
-      let edge = atom edge_rel
-      ]}
-  *)
+        let marked = atom marked_pred
+
+        let edge = atom edge_rel
+      ]} *)
   val atom : ('t, 'k) relation -> 'k Term.hlist -> [> `Atom of atom]
 
   val not : [< `Atom of atom] -> [> `Not_atom of atom]
@@ -195,22 +193,25 @@ module Datalog : sig
       marked node [n1].
 
       {[
-      let n1 = Node.make ()
-      let n2 = Node.make ()
-      let n3 = Node.make ()
-      let n4 = Node.make ()
-      let n5 = Node.make ()
+        let n1 = Node.make ()
 
-      let db =
-        add_fact marked_pred [n1]
-        @@ add_fact edge_rel [n1; n2]
-        @@ add_fact edge_rel [n3; n2]
-        @@ add_fact edge_rel [n2; n5]
-        @@ add_fact edge_rel [n5; n4]
-        @@ add_fact edge_rel [n4; n2]
-        @@ empty
-      ]}
-  *)
+        let n2 = Node.make ()
+
+        let n3 = Node.make ()
+
+        let n4 = Node.make ()
+
+        let n5 = Node.make ()
+
+        let db =
+          add_fact marked_pred [n1]
+          @@ add_fact edge_rel [n1; n2]
+          @@ add_fact edge_rel [n3; n2]
+          @@ add_fact edge_rel [n2; n5]
+          @@ add_fact edge_rel [n5; n4]
+          @@ add_fact edge_rel [n4; n2]
+          @@ empty
+      ]} *)
   val add_fact : ('t, 'k) relation -> 'k Constant.hlist -> database -> database
 
   module String : sig
@@ -218,8 +219,7 @@ module Datalog : sig
 
         The type ['a String.hlist] is equivalent to the type [string list], but
         with extra type information, which we leverage to provide the [program]
-        API.
-    *)
+        API. *)
 
     type _ hlist =
       | [] : nil hlist
@@ -230,10 +230,10 @@ module Datalog : sig
     (** A cursor represents a query on the database. Cursors provide [iter] and
         [fold] functions to iterate over the matching facts.
 
-        {b Warning}: Cursors are {b mutable} data structures that are temporarily
-        bound to a database and modified internally by iteration functions such as
-        [iter] or [fold]. Reusing a cursor while it is being iterated over is
-        unspecified behavior.
+        {b Warning}: Cursors are {b mutable} data structures that are
+        temporarily bound to a database and modified internally by iteration
+        functions such as [iter] or [fold]. Reusing a cursor while it is being
+        iterated over is unspecified behavior.
 
         {b Binding order}
 
@@ -242,37 +242,36 @@ module Datalog : sig
         parameterized queries, the parameters appear before the variables in the
         binding order.
 
-        This order corresponds to the nesting order of the loop nest that will be
-        used to evaluate the query, so it can have dramatic performance impact and
-        need to be chosen carefully.
+        This order corresponds to the nesting order of the loop nest that will
+        be used to evaluate the query, so it can have dramatic performance
+        impact and need to be chosen carefully.
 
         In order for the engine to be able to evaluate the query, variables must
         appear in the same order in at least one of the atoms constituting the
-        query; for instance, it is not possible to iterate over
-        [[edge [x; y]]] in the [[y; x]] binding order: we are requesting that [y]
-        be bound before [x], but in order to find the set of possible values for
-        [y] from [edge] we need to first know the possible values for [x]. These
-        cases will raise an error.
+        query; for instance, it is not possible to iterate over [[edge [x; y]]]
+        in the [[y; x]] binding order: we are requesting that [y] be bound
+        before [x], but in order to find the set of possible values for [y] from
+        [edge] we need to first know the possible values for [x]. These cases
+        will raise an error.
 
         It is, however, possible to iterate on the query
-        [[edge [x; y]; edge [y; x]]] using the [[y; x]] binding order: we
-        can use the [edge [y; x]] instance to bind the variables for [y] and [x]
-        in this order, then check if [(x, y)] is in the [edge] relation for
-        each [(y, x)] pair that we find. In this case, the occurrences of [y] and
-        [x] in [edge [y; x]] are said to be {b binding}, while their occurrences
-        in [edge [x; y]] are {b non-binding}.
+        [[edge [x; y]; edge [y; x]]] using the [[y; x]] binding order: we can
+        use the [edge [y; x]] instance to bind the variables for [y] and [x] in
+        this order, then check if [(x, y)] is in the [edge] relation for each
+        [(y, x)] pair that we find. In this case, the occurrences of [y] and [x]
+        in [edge [y; x]] are said to be {b binding}, while their occurrences in
+        [edge [x; y]] are {b non-binding}.
 
         More precisely, an occurrence of a variable [x] in a positive atom is
-        binding if all the previous arguments of the atom appear before [x] in the
-        binding order; all other occurrences are non-binding. In order to
-        evaluate a query, we require that all variables have at least one binding
-        occurrence in the query.
+        binding if all the previous arguments of the atom appear before [x] in
+        the binding order; all other occurrences are non-binding. In order to
+        evaluate a query, we require that all variables have at least one
+        binding occurrence in the query.
 
-        Occurrences from negated atoms (from [not]) are never binding.
-      *)
+        Occurrences from negated atoms (from [not]) are never binding. *)
 
     (** Parameterized cursors take an additional argument of type
-            ['p Constant.hlist] that is provided when evaluating the cursor. *)
+        ['p Constant.hlist] that is provided when evaluating the cursor. *)
     type ('p, 'v) with_parameters
 
     (** Cursors yielding values of type ['v Constant.hlist]. *)
@@ -289,8 +288,9 @@ module Datalog : sig
 
         {b Note}: If you need to perform queries that depend on the value of a
         variable outside the database, consider using parameterized cursors (see
-        {!Cursor.create_with_parameters}). Reusing a parameterized cursor is more
-        efficient than creating new cursors for each value of the parameters.
+        {!Cursor.create_with_parameters}). Reusing a parameterized cursor is
+        more efficient than creating new cursors for each value of the
+        parameters.
 
         {b Example}
 
@@ -299,13 +299,11 @@ module Datalog : sig
         ([edge_cursor]), respectively.
 
         {[
-        let marked_cursor =
-          Cursor.create ["X"] (fun [x] -> [marked [x]])
+          let marked_cursor = Cursor.create ["X"] (fun [x] -> [marked [x]])
 
-        let edge_cursor =
-          Cursor.create ["src"; "dst"] (fun [src; dst] -> [edge [src; dst]])
-        ]}
-    *)
+          let edge_cursor =
+            Cursor.create ["src"; "dst"] (fun [src; dst] -> [edge [src; dst]])
+        ]} *)
     val create : 'v String.hlist -> ('v Term.hlist -> hypothesis list) -> 'v t
 
     (** Create a parameterized cursor.
@@ -320,28 +318,27 @@ module Datalog : sig
         provided when evaluating the query.
 
         Notice that in the [successor_cursor], the parameters appears {e before}
-        the variable in the [edge] relation, while in the [predecessor_cursor], it
-        appears {e after} the variable.
+        the variable in the [edge] relation, while in the [predecessor_cursor],
+        it appears {e after} the variable.
 
         This means that the [successor_cursor] can be iterated efficiently,
         because it follows the structure of the relation: internally, the [edge]
         relation is represented as a map from nodes to their successors, and so
         evaluating the [successor_cursor] will result in a simple map lookup.
 
-        On the other hand, evaluating [predecessor_cursor] requires iterating over
-        all the (non-terminal) nodes to check whether it contains [p] in its
-        successor map.
+        On the other hand, evaluating [predecessor_cursor] requires iterating
+        over all the (non-terminal) nodes to check whether it contains [p] in
+        its successor map.
 
         {[
-        let successor_cursor =
-          Cursor.create_with_parameters ~parameters:["P"] ["X"] (fun [p] [x] ->
-              [edge [p; x]])
+          let successor_cursor =
+            Cursor.create_with_parameters ~parameters:["P"] ["X"]
+              (fun [p] [x] -> [edge [p; x]])
 
-        let predecessor_cursor =
-          Cursor.create_with_parameters ~parameters:["P"] ["X"] (fun [p] [x] ->
-              [edge [x; p]])
-        ]}
-    *)
+          let predecessor_cursor =
+            Cursor.create_with_parameters ~parameters:["P"] ["X"]
+              (fun [p] [x] -> [edge [x; p]])
+        ]} *)
     val create_with_parameters :
       parameters:'p String.hlist ->
       'v String.hlist ->
@@ -355,15 +352,14 @@ module Datalog : sig
 
         {b Example}
 
-        The following code computes the list of reversed edges (edges from target
-        to source).
+        The following code computes the list of reversed edges (edges from
+        target to source).
 
         {[
-        let reverse_edges =
-          Cursor.fold edge_cursor db ~init:[] ~f:(fun [src; dst] acc ->
-              (dst, src) :: acc)
-        ]}
-    *)
+          let reverse_edges =
+            Cursor.fold edge_cursor db ~init:[] ~f:(fun [src; dst] acc ->
+                (dst, src) :: acc)
+        ]} *)
     val fold :
       'v t -> database -> init:'a -> f:('v Constant.hlist -> 'a -> 'a) -> 'a
 
@@ -377,18 +373,17 @@ module Datalog : sig
         The following code prints all the marked nodes.
 
         {[
-        let () =
-          Format.eprintf "@[<v 2>Marked nodes:@ ";
-          Cursor.iter marked_cursor db ~f:(fun [n] ->
-              Format.eprintf "- %a@ " Node.print n);
-          Format.eprintf "@]@."
-        ]}
-    *)
+          let () =
+            Format.eprintf "@[<v 2>Marked nodes:@ ";
+            Cursor.iter marked_cursor db ~f:(fun [n] ->
+                Format.eprintf "- %a@ " Node.print n);
+            Format.eprintf "@]@."
+        ]} *)
     val iter : 'v t -> database -> f:('v Constant.hlist -> unit) -> unit
 
-    (** [fold_with_parameters cursor params db ~init ~f] accumulates the function
-        [f] over all the variable bindings that match the query in [db]. The
-        values of the parameters are taken from the [params] list.
+    (** [fold_with_parameters cursor params db ~init ~f] accumulates the
+        function [f] over all the variable bindings that match the query in
+        [db]. The values of the parameters are taken from the [params] list.
 
         {b Warning}: [cursor] must not be used from inside [f].
 
@@ -397,11 +392,10 @@ module Datalog : sig
         The following code accumulates the successors of node [n2] in a list.
 
         {[
-        let successors =
-          Cursor.fold_with_parameters successor_cursor [n2] db ~init:[]
-            ~f:(fun [n] acc -> n :: acc)
-        ]}
-    *)
+          let successors =
+            Cursor.fold_with_parameters successor_cursor [n2] db ~init:[]
+              ~f:(fun [n] acc -> n :: acc)
+        ]} *)
     val fold_with_parameters :
       ('p, 'v) with_parameters ->
       'p Constant.hlist ->
@@ -410,9 +404,9 @@ module Datalog : sig
       f:('v Constant.hlist -> 'a -> 'a) ->
       'a
 
-    (** [iter_with_parameters cursor params db ~f] applies [f] to all the variable
-        bindings that match the query in [db], where the parameter values are
-        taken from [params].
+    (** [iter_with_parameters cursor params db ~f] applies [f] to all the
+        variable bindings that match the query in [db], where the parameter
+        values are taken from [params].
 
         {b Warning}: [cursor] must not be used from inside [f].
 
@@ -421,13 +415,12 @@ module Datalog : sig
         The following code prints the predecessors of node [n2].
 
         {[
-        let () =
-          Format.eprintf "@[<v 2>Predecessors of %a:@ " Node.print n2;
-          Cursor.iter_with_parameters predecessor_cursor [n2] db ~f:(fun [n] ->
-              Format.eprintf "- %a@ " Node.print n);
-          Format.eprintf "@]@."
-        ]}
-    *)
+          let () =
+            Format.eprintf "@[<v 2>Predecessors of %a:@ " Node.print n2;
+            Cursor.iter_with_parameters predecessor_cursor [n2] db
+              ~f:(fun [n] -> Format.eprintf "- %a@ " Node.print n);
+            Format.eprintf "@]@."
+        ]} *)
     val iter_with_parameters :
       ('p, 'v) with_parameters ->
       'p Constant.hlist ->
@@ -439,32 +432,30 @@ module Datalog : sig
   (** The type of compiled rules.
 
       Rule specifications must be compiled to low-level rules using
-      {!compile_rule} before being applied to a database using {!Schedule.rules}.
+      {!compile_rule} before being applied to a database using
+      {!Schedule.rules}.
 
       {b Note}: Although compiled rules are mutable data structures, this
       mutability is only exploited while the compiled rule is executing (e.g.
-      during {!Schedule.run}). It is thus safe to reuse a [rule] across
-      multiple schedules or within the same schedule.
-  *)
+      during {!Schedule.run}). It is thus safe to reuse a [rule] across multiple
+      schedules or within the same schedule. *)
   type rule
 
   module Schedule : sig
     type t
 
     (** [saturate rules] is a schedule that repeatedly applies the rules in
-          [rules] until reaching a fixpoint.
+        [rules] until reaching a fixpoint.
 
-          {b Note}: [saturate rules] is equivalent to [fixpoint (rules rules)], but
-          is (slightly) more efficient. It is not necessary to wrap a [saturate]
-          schedule in a [fixpoint].
-      *)
+        {b Note}: [saturate rules] is equivalent to [fixpoint (rules rules)],
+        but is (slightly) more efficient. It is not necessary to wrap a
+        [saturate] schedule in a [fixpoint]. *)
     val saturate : rule list -> t
 
     (** [fixpoint schedules] repeatedly runs the schedules in [schedules] until
-          reaching a fixpoint.
+        reaching a fixpoint.
 
-          Facts added by previous schedules in the list are visible.
-      *)
+        Facts added by previous schedules in the list are visible. *)
     val fixpoint : t list -> t
 
     type stats
@@ -475,9 +466,8 @@ module Datalog : sig
 
     (** [run schedule db] runs the schedule [schedule] on the database [db].
 
-          It returns a new database that contains all the facts in [db], plus all
-          the facts that were inferred by [schedule].
-      *)
+        It returns a new database that contains all the facts in [db], plus all
+        the facts that were inferred by [schedule]. *)
     val run : ?stats:stats -> t -> database -> database
   end
 
@@ -485,12 +475,11 @@ module Datalog : sig
 
   val print_bindings : Format.formatter -> bindings -> unit
 
-  (** The type [('p, 'v) program] is the type of programs returning values
-      of type ['v] with parameters ['p].
+  (** The type [('p, 'v) program] is the type of programs returning values of
+      type ['v] with parameters ['p].
 
       The output of programs is either queries or rules; the use of a shared
-      types allows writing combinators that work in both cases.
-    *)
+      types allows writing combinators that work in both cases. *)
   type ('p, 'a) program
 
   (** Compile a program and returns the resulting value.
@@ -500,8 +489,7 @@ module Datalog : sig
       free variables, use [compile [] (fun [] -> program)].
 
       Repeated compilation of a program building mutable values (such as
-      cursors) create new values each time they are compiled.
-    *)
+      cursors) create new values each time they are compiled. *)
   val compile : 'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> 'a
 
   val compile_with_parameters :
@@ -513,8 +501,7 @@ module Datalog : sig
   (** [foreach vars prog] binds the variables [vars] in [prog].
 
       The order variables are provided in [vars] is the iteration order during
-      evaluation.
-    *)
+      evaluation. *)
   val foreach :
     'a String.hlist -> ('a Term.hlist -> ('p, 'b) program) -> ('p, 'b) program
 

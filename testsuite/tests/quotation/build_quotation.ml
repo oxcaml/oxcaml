@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension runtime_metaprogramming";
+ flags = "-extension runtime_metaprogramming -extension comprehensions";
  expect;
 *)
 
@@ -538,7 +538,12 @@ type rcd = { x : int; y : string; }
 
 <[ {x = 42; y = "foo"} ]>;;
 [%%expect {|
-- : <[rcd]> expr = <[{ x = 42; y = "foo"; }]>
+Line 1, characters 4-5:
+1 | <[ {x = 42; y = "foo"} ]>;;
+        ^
+Error: Label "x" used at Line 1, characters 4-5 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 type rcd_u = #{xu: int; yu: string};;
@@ -548,17 +553,34 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
 [%%expect {|
-- : <[unit -> rcd_u]> expr = <[fun () -> { xu = 42; yu = "foo"; }]>
+Line 1, characters 15-17:
+1 | <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
+                   ^^
+Error: Label "xu" used at Line 1, characters 15-17
+       cannot be used in this context;
+       "xu" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "xu" is defined outside any quotations.
 |}];;
 
 <[ fun r -> r.x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun r -> r.x]>
+Line 1, characters 14-15:
+1 | <[ fun r -> r.x ]>;;
+                  ^
+Error: Label "x" used at Line 1, characters 14-15
+       cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ fun {x; y} -> x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun {x=x; y=y; } -> x]>
+Line 1, characters 8-9:
+1 | <[ fun {x; y} -> x ]>;;
+            ^
+Error: Label "x" used at Line 1, characters 8-9 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;
@@ -674,6 +696,12 @@ end;;
 module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
+<[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> int -> unit]> expr =
+<[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
+|}];;
+
 <[ fun (module _ : S) x -> 42 ]>;;
 [%%expect {|
 Line 1, characters 19-20:
@@ -719,6 +747,44 @@ let x = <[ 123 ]> in <[ $x ]>;;
 - : <[int]> expr = <[123]>
 |}];;
 
+let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 for b = a to 10 ]]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 and b = 1 to 10 ]]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
+[%%expect {|
+- : <[int list]> expr =
+<[[ a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 ]]>
+|}];;
+
+let _ = <[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
+[%%expect {|
+- : <[int array]> expr =
+<[[| a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 |]]>
+|}];;
+
+let _ = <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
+[%%expect {|
+- : <[string array]> expr = <[[| a ^ "!" for a in [|"foo"; "bar"|] |]]>
+|}];;
+
+let _ = <[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
+[%%expect {|
+- : <[string iarray]> expr = <[[: a ^ "!" for a in [|"foo"; "bar"|] :]]>
+|}];;
+
+let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
+[%%expect {|
+- : <[string list]> expr =
+<[[ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ]]>
+|}];;
+
 <[ let o = object method f = 1 end in o#f ]>;;
 [%%expect {|
 Line 1, characters 11-34:
@@ -737,6 +803,21 @@ Line 1, characters 3-23:
 Error: Opening modules is not supported inside quoted expressions,
        as seen at Line 1, characters 3-23.
 |}];;
+
+module M = struct
+  let foo = 42
+end;;
+
+<[ let open M in M.foo ]>;;
+[%%expect {|
+module M : sig val foo : int end
+Line 5, characters 3-22:
+5 | <[ let open M in M.foo ]>;;
+       ^^^^^^^^^^^^^^^^^^^
+Error: Opening modules is not supported inside quoted expressions,
+       as seen at Line 5, characters 3-22.
+|}]
+;;
 
 <[ fun x -> $ (<[ x ]>) ]>;;
 [%%expect {|

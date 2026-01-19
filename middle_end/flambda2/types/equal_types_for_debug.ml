@@ -247,12 +247,12 @@ let equal_head_of_kind_value_non_null ~equal_type env
           add_env_extension_strict env when_block1 when_block2 )
     in
     (match envs_immediate with
-    | Bottom, Bottom -> true
-    | Bottom, Ok _ | Ok _, Bottom -> false
-    | Ok left_env, Ok right_env ->
-      Or_unknown.equal
-        (equal_type (extension_env env left_env right_env))
-        t1.immediates t2.immediates)
+      | Bottom, Bottom -> true
+      | Bottom, Ok _ | Ok _, Bottom -> false
+      | Ok left_env, Ok right_env ->
+        Or_unknown.equal
+          (equal_type (extension_env env left_env right_env))
+          t1.immediates t2.immediates)
     &&
     match envs_block with
     | Bottom, Bottom -> true

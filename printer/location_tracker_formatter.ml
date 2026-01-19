@@ -91,7 +91,8 @@ module Tracking_formatter = struct
 
   let track_output_position_of_formatter t =
     let ppf = t.ppf in
-    let { Format.out_string; out_flush; out_newline; out_spaces; out_indent } =
+    let { Format.out_string; out_flush; out_newline; out_spaces; out_indent
+        ; out_width } =
       Format.pp_get_formatter_out_functions ppf ()
     in
     let track_newline () =
@@ -117,6 +118,7 @@ module Tracking_formatter = struct
     in
     let out_functions : Format.formatter_out_functions =
       { out_string
+      ; out_width
       ; out_flush
       ; (* The default [out_newline] calls [out_string] with a newline
            character, so we don't need to override [out_newline]. A similar
