@@ -67,7 +67,7 @@ let unwrap_loc located = located.Fexpr.txt
 (* Parsing fexpr parameters. Low-brow iteration through constructors in
    declaration order, consuming the param list on match. *)
 let extract_param (env : to_fl_env) (params : param list) (cons : 'p param_cons)
-    : 'p * param list =
+    : 'p option * param list =
   let rec pos conv lp params =
     match params with
     | [] -> None, lp
@@ -164,9 +164,7 @@ let extract_param (env : to_fl_env) (params : param list) (cons : 'p param_cons)
     | Pa2 (pc1, pc2) -> param2 pc1 pc2
     | Pa3 (pc1, pc2, pc3) -> param3 pc1 pc2 pc3
   in
-  match aux cons params with
-  | None, _ -> Misc.fatal_error "Missing parameter"
-  | Some p, params -> p, params
+  aux cons params
 
 let rec build_param : type p. of_fl_env -> p -> p param_cons -> param list =
  fun env p cons ->
@@ -195,16 +193,20 @@ let rec build_param : type p. of_fl_env -> p -> p param_cons -> param list =
     let p1, p2, p3 = p in
     build_param env p1 pc1 @ build_param env p2 pc2 @ build_param env p3 pc3
 
-let lens_of_cons (cons : 'p param_cons) : 'p params_lens =
+let lens_of_cons id (cons : 'p param_cons) : 'p params_lens =
   { of_fl = (fun env p -> build_param env p cons);
     to_fl =
       (fun env params ->
         let ps, rem = extract_param env params cons in
-        match rem with
-        | [] -> ps
-        | _ ->
-          Format.eprintf "Unexpected parameter %a\n" Print_fexpr.prim_params rem;
-          ps)
+        match ps with
+        | None -> Misc.fatal_errorf "Missing parameter for %s" id
+        | Some ps -> (
+          match rem with
+          | [] -> ps
+          | _ ->
+            Format.eprintf "Unexpected parameter %a\n" Print_fexpr.prim_params
+              rem;
+            ps))
   }
 
 let prim_table = Hashtbl.create 32
@@ -311,23 +313,23 @@ module Describe = struct
 
   let nullary : type p. string -> params:p param_cons -> p cons0 -> p conv =
    fun id ~params cons ->
-    let params = lens_of_cons params in
+    let params = lens_of_cons id params in
     let of_fl env p =
       let params = params.of_fl env p in
       { prim = id; params }
     in
     let to_fl env t args =
       match args with
-      | [] -> Misc.fatal_errorf "Primitive %s takes no arguments" id
-      | _ ->
+      | [] ->
         let params = params.to_fl env t.params in
         Flambda_primitive.Nullary (cons env params)
+      | _ -> Misc.fatal_errorf "Primitive %s takes no arguments" id
     in
     register_lens id { of_fl; to_fl }
 
   let unary : type p. string -> params:p param_cons -> p cons1 -> p conv =
    fun id ~params cons ->
-    let params = lens_of_cons params in
+    let params = lens_of_cons id params in
     let of_fl env p =
       let params = params.of_fl env p in
       { prim = id; params }
@@ -343,7 +345,7 @@ module Describe = struct
 
   let binary : type p. string -> params:p param_cons -> p cons2 -> p conv =
    fun id ~params cons ->
-    let params = lens_of_cons params in
+    let params = lens_of_cons id params in
     let of_fl env p =
       let params = params.of_fl env p in
       { prim = id; params }
@@ -359,7 +361,7 @@ module Describe = struct
 
   let ternary : type p. string -> params:p param_cons -> p cons3 -> p conv =
    fun id ~params cons ->
-    let params = lens_of_cons params in
+    let params = lens_of_cons id params in
     let of_fl env p =
       let params = params.of_fl env p in
       { prim = id; params }
@@ -375,7 +377,7 @@ module Describe = struct
 
   let quaternary : type p. string -> params:p param_cons -> p cons4 -> p conv =
    fun id ~params cons ->
-    let params = lens_of_cons params in
+    let params = lens_of_cons id params in
     let of_fl env p =
       let params = params.of_fl env p in
       { prim = id; params }
@@ -391,7 +393,7 @@ module Describe = struct
 
   let variadic : type p. string -> params:p param_cons -> p consN -> p conv =
    fun id ~params cons ->
-    let params = lens_of_cons params in
+    let params = lens_of_cons id params in
     let of_fl env p =
       let params = params.of_fl env p in
       { prim = id; params }

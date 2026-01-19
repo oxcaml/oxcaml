@@ -655,13 +655,19 @@ let int_comp =
           ~box:(fun _ (s, ()) -> Yielding_bool (Ge s))
           ~unbox:(fun _ -> function
             | Yielding_bool (Ge s) -> Some (s, ()) | _ -> None);
-        id_case
-          (constructor_flag ["eq", Yielding_bool Eq; "ne", Yielding_bool Neq]);
         case
           (param2 sign (flag "qmark"))
           ~box:(fun _ (s, ()) -> Yielding_int_like_compare_functions s)
           ~unbox:(fun _ -> function
-            | Yielding_int_like_compare_functions s -> Some (s, ()) | _ -> None)
+            | Yielding_int_like_compare_functions s -> Some (s, ()) | _ -> None);
+        case (flag "eq")
+          ~box:(fun _ () -> Yielding_bool Eq)
+          ~unbox:(fun _ -> function Yielding_bool Eq -> Some () | _ -> None);
+        case (flag "ne")
+          ~box:(fun _ () -> Yielding_bool Neq)
+          ~unbox:(fun _ -> function Yielding_bool Neq -> Some () | _ -> None)
+        (* id_case *)
+        (*   (constructor_flag ["eq", Yielding_bool Eq; "ne", Yielding_bool Neq]); *)
       ]
   in
   binary "%int_comp" ~params:(param2 standard_int comp) (fun _ (i, c) ->
