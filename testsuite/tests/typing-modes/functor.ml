@@ -182,8 +182,8 @@ Error: Modules do not match: sig val f : unit -> unit end @ nonportable
      is not included in
        val f : unit -> unit (* in a structure at portable *)
      The left-hand side is "nonportable"
-     because it contains a usage (of the value "r" at Line 2, characters 40-41)
-     which is expected to be "uncontended".
+       because it contains a usage (of the value "r" at Line 2, characters 40-41)
+       which is expected to be "uncontended".
      However, the right-hand side is "portable".
 |}]
 
@@ -279,8 +279,8 @@ Error: Signature mismatch in included functor's parameter:
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The left-hand side is "nonportable"
-       because it contains a usage (of the value "r" at Line 2, characters 40-41)
-       which is expected to be "uncontended".
+         because it contains a usage (of the value "r" at Line 2, characters 40-41)
+         which is expected to be "uncontended".
        However, the right-hand side is "portable".
 |}]
 

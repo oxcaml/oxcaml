@@ -157,7 +157,7 @@ Line 4, characters 12-13:
 4 |     unique_ k
                 ^
 Error: This value is "aliased"
-       because it is used in a loop (at Lines 3-5, characters 2-6).
+         because it is used in a loop (at Lines 3-5, characters 2-6).
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -173,7 +173,7 @@ Line 5, characters 14-15:
 5 |     let _ = g a in ()
                   ^
 Error: This value is "aliased"
-       because it is used in a loop (at Lines 4-6, characters 2-6).
+         because it is used in a loop (at Lines 4-6, characters 2-6).
        However, the highlighted expression is expected to be "unique".
 |}]
 

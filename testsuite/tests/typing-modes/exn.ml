@@ -69,9 +69,10 @@ let (foo @ portable) (g @ nonportable) =
 Line 2, characters 23-24:
 2 |     raise (Nonportable g)
                            ^
-Error: This value is "nonportable" but is expected to be "portable"
-       because it is contained (via constructor "Nonportable") in the value at Line 2, characters 10-25
-       which is expected to be "portable".
+Error: This value is "nonportable"
+       but is expected to be "portable"
+         because it is contained (via constructor "Nonportable") in the value at Line 2, characters 10-25
+         which is expected to be "portable".
 |}]
 
 let (foo @ portable) () =
@@ -186,8 +187,8 @@ Line 3, characters 21-22:
 3 |     | Contended r -> r := 4
                          ^
 Error: This value is "contended"
-       because it is used inside the function at Lines 1-4, characters 21-13
-       which is expected to be "portable".
+         because it is used inside the function at Lines 1-4, characters 21-13
+         which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
@@ -210,8 +211,8 @@ Line 2, characters 11-20:
 2 |     raise (Contended (ref 42))
                ^^^^^^^^^
 Error: This value is "contended"
-       because it is used inside the function at Lines 1-2, characters 21-30
-       which is expected to be "portable".
+         because it is used inside the function at Lines 1-2, characters 21-30
+         which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
   Hint: All arguments of the constructor "Contended"
   must cross this axis to use it in this position.
@@ -299,12 +300,12 @@ Line 3, characters 34-35:
 3 |     raise (StatefulFun (fun () -> x.contents <- 1))
                                       ^
 Error: This value is "immutable"
-       because it is used inside the function at Line 3, characters 23-50
-       which is expected to be "stateless"
-       because it is contained (via constructor "StatefulFun") in the value at Line 3, characters 10-51
-       which is expected to be "stateless".
+         because it is used inside the function at Line 3, characters 23-50
+         which is expected to be "stateless"
+         because it is contained (via constructor "StatefulFun") in the value at Line 3, characters 10-51
+         which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write"
-       because its mutable field "contents" is being written.
+         because its mutable field "contents" is being written.
 |}]
 
 let (foo @ stateless) () =
@@ -316,12 +317,12 @@ Line 4, characters 23-24:
 4 |     raise (StatefulFun g)
                            ^
 Error: This value is "stateful"
-       because it contains a usage (of the value "x" at Line 3, characters 15-16)
-       which is expected to be "read_write"
-       because its mutable field "contents" is being written.
+         because it contains a usage (of the value "x" at Line 3, characters 15-16)
+         which is expected to be "read_write"
+         because its mutable field "contents" is being written.
        However, the highlighted expression is expected to be "stateless"
-       because it is contained (via constructor "StatefulFun") in the value at Line 4, characters 10-25
-       which is expected to be "stateless".
+         because it is contained (via constructor "StatefulFun") in the value at Line 4, characters 10-25
+         which is expected to be "stateless".
 |}]
 
 (* visibility axis *)
@@ -350,10 +351,10 @@ Line 3, characters 24-25:
 3 |     | ReadWriteRef r -> r.contents <- 1
                             ^
 Error: This value is "immutable"
-       because it is used inside the function at Lines 1-4, characters 22-13
-       which is expected to be "stateless".
+         because it is used inside the function at Lines 1-4, characters 22-13
+         which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write"
-       because its mutable field "contents" is being written.
+         because its mutable field "contents" is being written.
 |}]
 
 let (foo @ stateless) f =
@@ -365,9 +366,9 @@ Line 3, characters 24-25:
 3 |     | ImmutableRef r -> r.contents <- 1
                             ^
 Error: This value is "immutable"
-       because it is contained (via constructor "ImmutableRef") (with some modality) in the value at Line 3, characters 6-20.
+         because it is contained (via constructor "ImmutableRef") (with some modality) in the value at Line 3, characters 6-20.
        However, the highlighted expression is expected to be "read_write"
-       because its mutable field "contents" is being written.
+         because its mutable field "contents" is being written.
 |}]
 
 let (foo @ stateless) () =
@@ -377,8 +378,8 @@ Line 2, characters 11-23:
 2 |     raise (ReadWriteRef {contents = 0})
                ^^^^^^^^^^^^
 Error: This value is "immutable"
-       because it is used inside the function at Lines 1-2, characters 22-39
-       which is expected to be "stateless".
+         because it is used inside the function at Lines 1-2, characters 22-39
+         which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write".
   Hint: All arguments of the constructor "ReadWriteRef"
   must cross this axis to use it in this position.
@@ -501,7 +502,7 @@ Error: Signature mismatch:
        is not included in
          val wrap : unit -> exn @@ portable (* in a structure at nonportable *)
        The left-hand side is "nonportable"
-       because it contains a usage (of the constructor "R" at Line 9, characters 16-17)
-       which is expected to be "uncontended".
+         because it contains a usage (of the constructor "R" at Line 9, characters 16-17)
+         which is expected to be "uncontended".
        However, the right-hand side is "portable".
 |}]

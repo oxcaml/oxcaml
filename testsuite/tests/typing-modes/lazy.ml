@@ -15,8 +15,9 @@ let foo () =
 Line 2, characters 37-38:
 2 |     lazy (let x @ local = "hello" in x)
                                          ^
-Error: This value is "local" but is expected to be "global"
-       because it is a lazy expression and thus needs to be allocated on the heap.
+Error: This value is "local"
+       but is expected to be "global"
+         because it is a lazy expression and thus needs to be allocated on the heap.
 |}]
 
 let foo (local_ x) =
@@ -117,8 +118,9 @@ let foo (x @ contended) =
 Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
-Error: This value is "contended" but is expected to be "uncontended"
-       because it is a lazy value being forced.
+Error: This value is "contended"
+       but is expected to be "uncontended"
+         because it is a lazy value being forced.
 |}]
 
 (* stdlib's [Lazy.force] is a special case of lazy pattern *)

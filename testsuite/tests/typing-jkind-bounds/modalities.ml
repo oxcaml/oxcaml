@@ -38,7 +38,7 @@ Line 1, characters 54-65:
 1 | let foo (t : int ref t @ contended) = use_uncontended t.contended
                                                           ^^^^^^^^^^^
 Error: This value is "contended"
-       because it is the field "contended" (with some modality) of the record at Line 1, characters 54-55.
+         because it is the field "contended" (with some modality) of the record at Line 1, characters 54-55.
        However, the highlighted expression is expected to be "uncontended".
 |}]
 

@@ -174,7 +174,7 @@ Line 3, characters 21-24:
 3 |     Unique_array.set arr i 0
                          ^^^
 Error: This value is "aliased"
-       because it is used in a loop (at Lines 2-4, characters 2-6).
+         because it is used in a loop (at Lines 2-4, characters 2-6).
        However, the highlighted expression is expected to be "unique".
 |}]
 

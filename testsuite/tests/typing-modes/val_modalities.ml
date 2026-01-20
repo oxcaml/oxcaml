@@ -167,8 +167,8 @@ Error: Signature mismatch:
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
        The left-hand side is "stateful"
-       because it contains a usage (of the value "y" at Line 11, characters 29-30)
-       which is expected to be "read_write".
+         because it contains a usage (of the value "y" at Line 11, characters 29-30)
+         which is expected to be "read_write".
        However, the right-hand side is "stateless".
 |}, Principal{|
 Lines 8-12, characters 33-5:
@@ -191,8 +191,8 @@ Error: Signature mismatch:
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
        The left-hand side is "stateful"
-       because it contains a usage (of the value "y" at Line 11, characters 29-30)
-       which is expected to be "read_write".
+         because it contains a usage (of the value "y" at Line 11, characters 29-30)
+         which is expected to be "read_write".
        However, the right-hand side is "stateless".
 |}]
 
@@ -448,8 +448,8 @@ Line 7, characters 20-23:
 7 |     uncontended_use M.r
                         ^^^
 Error: This value is "contended"
-       because it is used inside the function at Lines 5-7, characters 23-23
-       which is expected to be "portable".
+         because it is used inside the function at Lines 5-7, characters 23-23
+         which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
