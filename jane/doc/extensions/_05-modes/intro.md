@@ -87,7 +87,7 @@ function's body is a region, as are loop bodies.
 The type checker does not allow values that are *local* to escape their scope
 (for example, by being returned from a function or stored in a global
 ref). Values that are *global* may freely escape their scope. The compiler may
-stack allocate values that are local (but is not required to do so).
+stack allocate values that are local (but does not guarantee to do so).
 
 There is a caveat to the scoping restriction: for some types such as `int`, the
 type system does allow *local* values to escape (i.e., they may be used as
