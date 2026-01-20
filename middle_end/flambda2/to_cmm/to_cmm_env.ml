@@ -396,10 +396,6 @@ let gen_variable ~debug_uid var =
            ~location:Debuginfo.none ~original_ident:v ~debug_uid)
   in
   let res = Backend_var.With_provenance.create ?provenance v in
-  if Flambda_features.debug_flambda2 ()
-  then
-    Format.eprintf "** VAR: %a <-> %a@." Variable.print var
-      Backend_var.With_provenance.print res;
   res
 
 let add_bound_param env v v' =
@@ -862,22 +858,13 @@ let bind_phantom_variable env res var defining_expr =
 
 let wrap_phantom ~phantomize cmm_var cmm_expr free_vars =
   if not phantomize
-  then (
-    if Flambda_features.debug_flambda2 ()
-    then
-      Format.eprintf "no phantomization for %a@."
-        Backend_var.With_provenance.print cmm_var;
-    cmm_expr, free_vars)
-  else (
-    if Flambda_features.debug_flambda2 ()
-    then
-      Format.eprintf "adding phantom for %a:@\n  %a@."
-        Backend_var.With_provenance.print cmm_var Printcmm.expression cmm_expr;
+  then cmm_expr, free_vars
+  else
     let free_vars =
       FV.add ~mode:Phantom (Backend_var.With_provenance.var cmm_var) free_vars
     in
     let cmm_expr = Cmm.Cname_for_debugger (cmm_var, cmm_expr) in
-    cmm_expr, free_vars)
+    cmm_expr, free_vars
 
 let will_inline_simple env res
     { effs;
@@ -1158,12 +1145,7 @@ let flush_phantom_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
   | None ->
     if phantomize && FV.mem ~mode:Phantom v acc_free_vars
     then gen_phantom_let None acc_free_vars
-    else (
-      if Flambda_features.debug_flambda2 ()
-      then
-        Format.eprintf "dropping phantom let(%b): %a@." phantomize
-          Backend_var.With_provenance.print cmm_var;
-      acc, acc_free_vars, symbol_inits)
+    else acc, acc_free_vars, symbol_inits
   | Some (cmm_expr, expr_free_vars) ->
     let free_vars = FV.union acc_free_vars expr_free_vars in
     gen_phantom_let cmm_expr free_vars
