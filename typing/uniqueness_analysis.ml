@@ -1622,8 +1622,8 @@ end = struct
   let variant_field s t = child (Projection.Variant_field s) t
 
   let array_index mut i t =
-    let modality, _modality_annot =
-      Typemode.transl_modalities ~maturity:Stable mut []
+    let modality =
+      (Typemode.transl_modalities ~maturity:Stable mut []).moda_modalities
     in
     modal_child modality (Projection.Array_index i) t
 

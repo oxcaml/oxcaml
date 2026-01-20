@@ -211,8 +211,7 @@ let label_decl sub x =
 let field_decl sub x =
   let ca_type = sub.typ sub x.ca_type in
   let ca_loc = sub.location sub x.ca_loc in
-  { ca_type; ca_loc; ca_modalities = x.ca_modalities;
-    ca_modalities_annot = x.ca_modalities_annot }
+  { ca_type; ca_loc; ca_modalities = x.ca_modalities }
 
 let constructor_args sub = function
   | Cstr_tuple l -> Cstr_tuple (List.map (field_decl sub) l)
@@ -356,7 +355,6 @@ let function_param sub
       fp_newtypes;
       fp_sort;
       fp_mode;
-      fp_modes_annot;
       fp_loc;
     }
   =
@@ -384,7 +382,6 @@ let function_param sub
     fp_newtypes;
     fp_sort;
     fp_mode;
-    fp_modes_annot;
     fp_loc;
   }
 
@@ -493,12 +490,12 @@ let expr sub x =
         Texp_let (rec_flag, list, sub.expr sub exp)
     | Texp_letmutable (vb, exp) ->
         Texp_letmutable (sub.value_binding sub vb, sub.expr sub exp)
-    | Texp_function { params; body; alloc_mode; ret_mode; ret_modes_annot;
-                      ret_sort; zero_alloc } ->
+    | Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
+                      zero_alloc } ->
         let params = List.map (function_param sub) params in
         let body = function_body sub body in
-        Texp_function { params; body; alloc_mode; ret_mode; ret_modes_annot;
-                        ret_sort; zero_alloc }
+        Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
+                        zero_alloc }
     | Texp_apply (exp, list, pos, am, za) ->
         Texp_apply (
           sub.expr sub exp,
@@ -734,8 +731,8 @@ let signature_item sub x =
         Tsig_modtype (sub.module_type_declaration sub x)
     | Tsig_modtypesubst x ->
         Tsig_modtypesubst (sub.module_type_declaration sub x)
-    | Tsig_include (incl, moda, annot) ->
-        Tsig_include (sig_include_infos sub incl, moda, annot)
+    | Tsig_include (incl, moda) ->
+        Tsig_include (sig_include_infos sub incl, moda)
     | Tsig_class list ->
         Tsig_class (List.map (sub.class_description sub) list)
     | Tsig_class_type list ->
@@ -1071,8 +1068,7 @@ let value_binding sub x =
   let vb_expr = sub.expr sub x.vb_expr in
   let vb_attributes = sub.attributes sub x.vb_attributes in
   let vb_rec_kind = x.vb_rec_kind in
-  {vb_loc; vb_pat; vb_expr; vb_attributes; vb_sort = x.vb_sort; vb_rec_kind;
-   vb_modes_annot = x.vb_modes_annot}
+  {vb_loc; vb_pat; vb_expr; vb_attributes; vb_sort = x.vb_sort; vb_rec_kind}
 
 let env _sub x = x
 

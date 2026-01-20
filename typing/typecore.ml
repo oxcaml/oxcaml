@@ -1081,8 +1081,7 @@ let mode_annots_from_pat pat =
     | Ppat_constraint (_, _, modes) -> modes
     | _ -> []
   in
-  let mode_opt, modes_annot = Typemode.transl_mode_annots modes in
-  mode_opt, modes_annot
+  Typemode.transl_mode_annots modes
 
 let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
   let error axis =
@@ -2862,8 +2861,8 @@ and type_pat_aux
     let ty_elt, arg_sort =
       solve_Ppat_array ~refine:false loc penv mutability expected_ty
     in
-    let modalities, _modalities_annot =
-      Typemode.transl_modalities ~maturity:Stable mutability []
+    let modalities =
+      (Typemode.transl_modalities ~maturity:Stable mutability []).moda_modalities
     in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
       alloc_mode.mode;
@@ -3393,7 +3392,12 @@ and type_pat_aux
       (* Pretend separate = true *)
       begin match sty with
       | Some sty ->
-        let type_modes, type_modes_annot = Typemode.transl_alloc_mode ms in
+        let type_modes_annot = Typemode.transl_mode_annots ms in
+        let type_modes =
+          Mode.Alloc.Const.Option.value
+            type_modes_annot.mode_modes
+            ~default:Mode.Alloc.Const.legacy
+        in
         let cty, ty, expected_ty' =
           solve_Ppat_constraint tps loc !!penv type_modes sty expected_ty
         in
@@ -4704,14 +4708,12 @@ let maybe_expansive e = not (is_nonexpansive e)
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
-    (fun {vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc;
-          vb_modes_annot} ->
+    (fun {vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc} ->
        match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
        | None ->
          raise(Error(vb_expr.exp_loc, env, Illegal_letrec_expr))
        | Some vb_rec_kind ->
-         { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc;
-           vb_modes_annot})
+         { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
     valbinds
 
 let check_recursive_class_bindings env ids exprs =
@@ -4753,7 +4755,7 @@ let rec approx_type env sty =
       (* CR layouts v5: value requirement here to be relaxed *)
       if is_optional p then newvar Predef.option_argument_jkind
       else begin
-        let arg_mode, _ = Typemode.transl_alloc_mode arg_mode in
+        let arg_mode = (Typemode.transl_alloc_mode arg_mode).mode_modes in
         let arg_ty =
           (* Polymorphic types will only unify with types that match all of their
            polymorphic parts, so we need to fully translate the type here
@@ -4766,7 +4768,7 @@ let rec approx_type env sty =
         newty (Tarrow ((p,marg,mret), arg_ty.ctyp_type, ret, commu_ok))
       end
   | Ptyp_arrow (p, arg_sty, sty, arg_mode, _) ->
-      let arg_mode, _arg_mode_annot = Typemode.transl_alloc_mode arg_mode in
+      let arg_mode = (Typemode.transl_alloc_mode arg_mode).mode_modes in
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         if is_optional p
@@ -4795,7 +4797,9 @@ let type_pattern_approx env spat ty_expected =
       let inferred_ty =
         match sty with
         | {ptyp_desc=Ptyp_poly _} ->
-          let arg_type_mode, _ = Typemode.transl_alloc_mode arg_type_mode in
+          let arg_type_mode =
+            (Typemode.transl_alloc_mode arg_type_mode).mode_modes
+          in
           let inferred_ty =
             Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false
               arg_type_mode sty
@@ -4836,7 +4840,7 @@ let type_approx_fun_one_param
     match spato with
     | None -> None, false
     | Some spat ->
-        let mode_annots, _mode_annot = mode_annots_from_pat spat in
+        let mode_annots = (mode_annots_from_pat spat).mode_modes in
         let has_poly = has_poly_constraint spat in
         if has_poly && is_optional label then
           raise(Error(spat.ppat_loc, env, Optional_poly_param));
@@ -6914,21 +6918,27 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_constraint (sarg, None, modes) ->
-      let modes, modes_annot = Typemode.transl_mode_annots modes in
-      let expected_mode = type_expect_mode ~loc ~env ~modes expected_mode in
+      let modes = Typemode.transl_mode_annots modes in
+      let expected_mode =
+        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+      in
       let exp = type_expect env expected_mode sarg (mk_expected ty_expected ?explanation) in
       { exp with exp_loc = loc
-      ; exp_extra = (Texp_mode (modes, modes_annot), loc, []) :: exp.exp_extra
+      ; exp_extra = (Texp_mode modes, loc, []) :: exp.exp_extra
       }
   | Pexp_constraint (sarg, Some sty, modes) ->
-      let modes, modes_annot = Typemode.transl_mode_annots modes in
+      let modes = Typemode.transl_mode_annots modes in
       let (ty, extra_cty) =
         let alloc_mode =
-          Mode.Alloc.Const.Option.value modes ~default:Mode.Alloc.Const.legacy
+          Mode.Alloc.Const.Option.value
+            modes.mode_modes
+            ~default:Mode.Alloc.Const.legacy
         in
         type_constraint env sty alloc_mode
       in
-      let expected_mode = type_expect_mode ~loc ~env ~modes expected_mode in
+      let expected_mode =
+        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+      in
       let ty' = instance ty in
       let error_message_attr_opt =
         Builtin_attributes.error_message_attr sexp.pexp_attributes in
@@ -6942,7 +6952,7 @@ and type_expect_
         exp_attributes = arg.exp_attributes;
         exp_env = env;
         exp_extra =
-          (Texp_mode (modes, modes_annot), loc, []) ::
+          (Texp_mode modes, loc, []) ::
           (Texp_constraint extra_cty,
            loc,
            sexp.pexp_attributes) :: arg.exp_extra;
@@ -8131,7 +8141,7 @@ and type_function
       let typed_arg_label, pat =
         Typetexp.transl_label_from_pat arg_label pat
       in
-      let mode_annots, arg_modes_annot = mode_annots_from_pat pat in
+      let mode_annots = (mode_annots_from_pat pat).mode_modes in
       let has_poly = has_poly_constraint pat in
       if has_poly && is_optional_parsetree arg_label then
         raise(Error(pat.ppat_loc, env, Optional_poly_param));
@@ -8161,10 +8171,9 @@ and type_function
              before [split_function_ty] which enters new region. *)
           (* CR lstevenson: We redundantly transl the mode annotations a second
              time in the recursive call to type_function later on. *)
-          let annots, _ =
-            Typemode.transl_mode_annots body_constraint.ret_mode_annotations
-          in
-          annots
+          (Typemode.transl_mode_annots body_constraint.ret_mode_annotations)
+            .mode_modes
+
         | _ :: _ -> Alloc.Const.Option.none
       in
       let env,
@@ -8333,7 +8342,6 @@ and type_function
               fp_newtypes = newtypes;
               fp_sort = arg_sort;
               fp_mode = Alloc.disallow_right arg_mode;
-              fp_modes_annot = arg_modes_annot;
               fp_curry = curry;
               fp_loc = pparam_loc;
             };
@@ -8353,21 +8361,21 @@ and type_function
       let { ret_type_constraint; mode_annotations; ret_mode_annotations } =
         body_constraint
       in
-      let mode, modes_annot = Typemode.transl_mode_annots mode_annotations in
-      let ret_mode, ret_modes_annot =
+      let mode = Typemode.transl_mode_annots mode_annotations in
+      let ret_mode =
         Typemode.transl_mode_annots ret_mode_annotations
       in
-      let type_mode, type_modes_annot =
+      let type_mode =
         match ret_mode_annotations with
         | _ :: _ ->
             (* if return mode annotation is present, we use that to interpret the return
                type annotation (currying mode behavior) *)
-            ret_mode, ret_modes_annot
+            ret_mode
         | [] ->
             (* otherwise, we do not constrain the body mode, and we use the mode of the whole
             function to interpret the return type *)
             (* CR zqian: We should infer from [mode], instead of using directly. *)
-            mode, modes_annot
+            mode
       in
       match body with
       | Pfunction_body body ->
@@ -8378,13 +8386,13 @@ and type_function
             let body_loc = body.pexp_loc in
             let body, exp_type, exp_extra =
               type_constraint_expect (expression_constraint body)
-                env expected_mode body_loc ~loc_arg:body_loc type_mode constraint_ ty_expected
+                env expected_mode body_loc ~loc_arg:body_loc type_mode.mode_modes constraint_ ty_expected
             in
             let texp_mode =
-              match type_modes_annot with
+              match type_mode.mode_desc with
               | [] -> []
               | _ :: _ ->
-                [ (Texp_mode (type_mode, type_modes_annot), body_loc, []) ]
+                [ (Texp_mode type_mode, body_loc, []) ]
             in
             { body with
                 exp_extra =
@@ -8432,13 +8440,13 @@ and type_function
               in
               let (body, fun_alloc_mode, ret_info), exp_type, exp_extra =
                 type_constraint_expect function_cases_constraint_arg
-                  env expected_mode loc type_mode constraint_ ty_expected ~loc_arg:loc
+                  env expected_mode loc type_mode.mode_modes constraint_ ty_expected ~loc_arg:loc
               in
               let exp_extra =
-                match type_modes_annot with
+                match type_mode.mode_desc with
                 | [] -> [ exp_extra ]
                 | _ :: _ ->
-                  [ Texp_mode (type_mode, type_modes_annot) ; exp_extra ]
+                  [ Texp_mode type_mode ; exp_extra ]
               in
               (body, exp_type, fun_alloc_mode, ret_info), exp_extra
           in
@@ -9036,7 +9044,6 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                     fc_arg_sort = arg_sort;
                   };
               ret_mode = Alloc.disallow_right mret;
-              ret_modes_annot = [];
               ret_sort;
               alloc_mode;
               zero_alloc = Zero_alloc.default
@@ -9064,7 +9071,6 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                          [{vb_pat=let_pat; vb_expr=texp; vb_sort=let_pat_sort;
                            vb_attributes=[]; vb_loc=Location.none;
                            vb_rec_kind = Dynamic;
-                           vb_modes_annot = [];
                           }],
                          func let_var) }
       end
@@ -10252,7 +10258,6 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
          vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
-         vb_modes_annot=[];
         })
       l spat_sexp_list
   in
@@ -10494,8 +10499,8 @@ and type_generic_array
     if Types.is_mutable mutability then Predef.type_array
     else Predef.type_iarray
   in
-  let modalities, _ =
-    Typemode.transl_modalities ~maturity:Stable mutability []
+  let modalities =
+    (Typemode.transl_modalities ~maturity:Stable mutability []).moda_modalities
   in
   let is_contained_by : Mode.Hint.is_contained_by =
     {containing = Array Modality; container = loc}
@@ -10652,7 +10657,6 @@ and type_n_ary_function
           Texp_function
             { params; body; ret_sort;
               alloc_mode; ret_mode;
-              ret_modes_annot = [];
               zero_alloc
             };
         exp_loc = loc;

@@ -77,7 +77,6 @@ let mkTexp_construct ?id:(mode = Some dummy_alloc_mode) (name, desc, args) =
 type texp_function_param_identifier = {
   param_sort : Jkind.Sort.t;
   param_mode : Alloc.l;
-  param_modes_annot : modes_annot;
   param_curry : function_curry;
   param_newtypes :
     (Ident.t * string Location.loc * Parsetree.jkind_annotation option * Uid.t)
@@ -120,7 +119,6 @@ type texp_function_identifier = {
   alloc_mode : alloc_mode;
   ret_sort : Jkind.sort;
   ret_mode : Alloc.l;
-  ret_modes_annot : modes_annot;
   zero_alloc : Zero_alloc.t;
 }
 
@@ -138,7 +136,6 @@ let texp_function_param_identifier_defaults =
   {
     param_sort = Jkind.Sort.value;
     param_mode = Alloc.disallow_right Alloc.legacy;
-    param_modes_annot = [];
     param_curry = More_args { partial_mode = Alloc.disallow_right Alloc.legacy };
     param_newtypes = [];
   }
@@ -148,7 +145,6 @@ let texp_function_defaults =
     alloc_mode = dummy_alloc_mode;
     ret_sort = Jkind.Sort.value;
     ret_mode = Alloc.disallow_right Alloc.legacy;
-    ret_modes_annot = [];
     zero_alloc = Zero_alloc.default;
   }
 
@@ -179,7 +175,6 @@ let mkTexp_function ?(id = texp_function_defaults)
               fp_partial = partial;
               fp_sort = id.param_sort;
               fp_mode = id.param_mode;
-              fp_modes_annot = id.param_modes_annot;
               fp_curry = id.param_curry;
               fp_newtypes = id.param_newtypes;
               fp_loc = Location.none;
@@ -207,7 +202,6 @@ let mkTexp_function ?(id = texp_function_defaults)
       alloc_mode = id.alloc_mode;
       ret_sort = id.ret_sort;
       ret_mode = id.ret_mode;
-      ret_modes_annot = id.ret_modes_annot;
       zero_alloc = id.zero_alloc;
     }
 
@@ -267,7 +261,6 @@ let view_texp (e : expression_desc) =
         alloc_mode;
         ret_sort;
         ret_mode;
-        ret_modes_annot;
         zero_alloc;
       } ->
       let params =
@@ -289,7 +282,6 @@ let view_texp (e : expression_desc) =
                 {
                   param_sort = param.fp_sort;
                   param_mode = param.fp_mode;
-                  param_modes_annot = param.fp_modes_annot;
                   param_curry = param.fp_curry;
                   param_newtypes = param.fp_newtypes;
                 };
@@ -318,7 +310,7 @@ let view_texp (e : expression_desc) =
       in
       Texp_function
         ( { params; body },
-          { alloc_mode; ret_sort; ret_mode; ret_modes_annot; zero_alloc } )
+          { alloc_mode; ret_sort; ret_mode; zero_alloc } )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
   | _ -> O e
@@ -450,7 +442,6 @@ let mk_value_binding ~vb_pat ~vb_expr ~vb_attributes =
     vb_rec_kind = Dynamic;
     vb_loc = Location.none;
     vb_sort = Jkind.Sort.value;
-    vb_modes_annot = [];
   }
 
 let mk_value_description ~val_type ~val_kind ~val_attributes =

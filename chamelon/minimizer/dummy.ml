@@ -66,9 +66,11 @@ let unit_typ =
     ctyp_attributes = [];
   }
 
+let default_mode = Typemode.transl_alloc_mode []
+
 let a_to_unit =
   {
-    ctyp_desc = Ttyp_arrow (Nolabel, a_typ, [], unit_typ, []);
+    ctyp_desc = Ttyp_arrow (Nolabel, a_typ, default_mode, unit_typ, default_mode);
     ctyp_type =
       newty2 ~level:0
         (mkTarrow (Nolabel, a_typ.ctyp_type, unit_typ.ctyp_type, commu_ok));
@@ -79,7 +81,7 @@ let a_to_unit =
 
 let unit_to_a =
   {
-    ctyp_desc = Ttyp_arrow (Nolabel, unit_typ, [], a_typ, []);
+    ctyp_desc = Ttyp_arrow (Nolabel, unit_typ, default_mode, a_typ, default_mode);
     ctyp_type =
       newty2 ~level:0
         (mkTarrow (Nolabel, unit_typ.ctyp_type, a_typ.ctyp_type, commu_ok));
@@ -203,7 +205,7 @@ let dummy2_vd =
     val_desc = unit_to_a;
     val_prim = [ "%opaque" ];
     val_val = dummy_value_description;
-    val_modalities_annot = [];
+    val_modal_info = Valmi_str_primitive (Typemode.transl_mode_annots []);
     val_loc = Location.none;
     val_attributes = [];
   }
@@ -244,7 +246,7 @@ let ignore_vd =
     val_desc = a_to_unit;
     val_prim = [ "%ignore" ];
     val_val = dummy_value_description;
-    val_modalities_annot = [];
+    val_modal_info = Valmi_str_primitive (Typemode.transl_mode_annots []);
     val_loc = Location.none;
     val_attributes = [];
   }

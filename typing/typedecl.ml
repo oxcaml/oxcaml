@@ -503,7 +503,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
               }
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
-         let modalities, modalities_annot =
+         let modalities =
           Typemode.transl_modalities ~maturity:Stable mut modalities
          in
          let arg = Ast_helper.Typ.force_poly arg in
@@ -513,7 +513,6 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           ld_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
           ld_mutable = mut;
           ld_modalities = modalities;
-          ld_modalities_annot = modalities_annot;
           ld_type = cty; ld_loc = loc; ld_attributes = attrs}
       )
   in
@@ -527,7 +526,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
            env ld.ld_loc kloc ty;
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
-          ld_modalities = ld.ld_modalities;
+          ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = Jkind.Sort.Const.void;
             (* Updated by [update_label_sorts] *)
           ld_type = ty;
@@ -545,18 +544,17 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
       transl_simple_type ~new_var_jkind env ?univars ~closed
         Mode.Alloc.Const.legacy arg.pca_type
     in
-    let gf, gf_annot =
+    let gf =
       Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
     in
-    {ca_modalities = gf; ca_modalities_annot = gf_annot; ca_type = cty;
-     ca_loc = arg.pca_loc}
+    {ca_modalities = gf; ca_type = cty; ca_loc = arg.pca_loc}
   in
   let tyl_gfl = List.map mk cal in
   let tyl_gfl' = List.mapi (fun idx (ca : Typedtree.constructor_argument) ->
     check_representable ~why:(Constructor_declaration idx)
       env loc kloc ca.ca_type.ctyp_type;
     {
-      Types.ca_modalities = ca.ca_modalities;
+      Types.ca_modalities = ca.ca_modalities.moda_modalities;
       ca_loc = ca.ca_loc;
       ca_type = ca.ca_type.ctyp_type;
       ca_sort = Jkind.Sort.Const.void;
@@ -3867,31 +3865,28 @@ type transl_value_decl_modal =
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
-  let mode, val_modalities, val_modalities_annot =
+  let mode, val_modalities, val_modal_info =
     match modal with
     | Str_primitive ->
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
-        let mode, modes_annot = Typemode.transl_mode_annots modes in
+        let modes = Typemode.transl_mode_annots modes in
         let mode =
-          mode
+          modes.mode_modes
           |> Mode.Alloc.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
-        let modalities_annot =
-          List.map Typemode.mode_annot_to_modality_annot modes_annot
-        in
-        mode, Mode.Modality.undefined, modalities_annot
+        mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
-        let modalities, modalities_annot =
+        let raw_modalities =
           match valdecl.pval_modalities with
-          | [] -> sig_modalities, []
+          | [] -> { moda_modalities = sig_modalities; moda_desc = [] }
           | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
         in
-        let modalities = Mode.Modality.of_const modalities in
-        md_mode, modalities, modalities_annot
+        let modalities = Mode.Modality.of_const raw_modalities.moda_modalities in
+        md_mode, modalities, Valmi_sig_value raw_modalities
   in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
@@ -4007,7 +4002,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
      val_id = id;
      val_name = valdecl.pval_name;
      val_desc = cty; val_val = v;
-     val_modalities_annot;
+     val_modal_info;
      val_prim = valdecl.pval_prim;
      val_loc = valdecl.pval_loc;
      val_attributes = valdecl.pval_attributes;

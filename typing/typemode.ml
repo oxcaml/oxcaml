@@ -3,13 +3,15 @@ open Mode
 open Jkind_axis
 module Jkind = Btype.Jkind0
 
-type mode_annot = Mode.Alloc.atom Location.loc
+type 'a modes =
+  { mode_modes : 'a;
+    mode_desc : Mode.Alloc.atom Location.loc list
+  }
 
-type modes_annot = mode_annot list
-
-type modality_annot = Mode.Modality.atom Location.loc
-
-type modalities_annot = modality_annot list
+type modalities =
+  { moda_modalities : Mode.Modality.Const.t;
+    moda_desc : Mode.Modality.atom Location.loc list
+  }
 
 type 'ax annot_type =
   | Modifier : 'a Axis.t annot_type
@@ -415,7 +417,7 @@ let transl_mode_annots annots =
   let modes =
     List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
   in
-  modes, annots
+  { mode_modes = modes; mode_desc = annots }
 
 let untransl_mode (modes : Mode.Alloc.Const.Option.t) =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
@@ -696,7 +698,7 @@ let transl_modalities ~maturity mut annots =
       mut_modalities modalities
   in
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
-  modalities, annots
+  { moda_modalities = modalities; moda_desc = annots }
 
 let let_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:true
@@ -714,9 +716,11 @@ let untransl_modalities mut t =
 let untransl_modalities_annot t = List.map untransl_modality_annot t
 
 let transl_alloc_mode annots =
-  let opt_modes, annots = transl_mode_annots annots in
+  let { mode_modes = opt_modes; mode_desc = annots } =
+    transl_mode_annots annots
+  in
   let modes = Alloc.Const.Option.value opt_modes ~default:Alloc.Const.legacy in
-  modes, annots
+  { mode_modes = modes; mode_desc = annots }
 
 (* Error reporting *)
 

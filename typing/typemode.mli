@@ -1,25 +1,26 @@
 module Jkind = Btype.Jkind0
 
-type mode_annot = Mode.Alloc.atom Location.loc
+type 'a modes =
+  { mode_modes : 'a;
+    mode_desc : Mode.Alloc.atom Location.loc list
+  }
 
-type modes_annot = mode_annot list
-
-type modality_annot = Mode.Modality.atom Location.loc
-
-type modalities_annot = modality_annot list
+type modalities =
+  { moda_modalities : Mode.Modality.Const.t;
+    moda_desc : Mode.Modality.atom Location.loc list
+  }
 
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified
 *)
-val transl_mode_annots :
-  Parsetree.modes -> Mode.Alloc.Const.Option.t * modes_annot
+val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t modes
 
 val untransl_mode : Mode.Alloc.Const.Option.t -> Parsetree.modes
 
-val untransl_mode_annots : modes_annot -> Parsetree.modes
+val untransl_mode_annots : Mode.Alloc.atom Location.loc list -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t * modes_annot
+val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t modes
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
@@ -29,7 +30,7 @@ val transl_modalities :
   maturity:Language_extension.maturity ->
   Types.mutability ->
   Parsetree.modalities ->
-  Mode.Modality.Const.t * modalities_annot
+  modalities
 
 val let_mutable_modalities : Mode.Modality.Const.t
 
@@ -38,7 +39,8 @@ val atomic_mutable_modalities : Mode.Modality.Const.t
 
 val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
 
-val untransl_modality_annot : modality_annot -> Parsetree.modality Location.loc
+val untransl_modality_annot :
+  Mode.Modality.atom Location.loc -> Parsetree.modality Location.loc
 
 (** Un-interpret modalities back to parsetree. Takes the mutability and
     attributes on the field and remove mutable-implied modalities accordingly.
@@ -46,7 +48,8 @@ val untransl_modality_annot : modality_annot -> Parsetree.modality Location.loc
 val untransl_modalities :
   Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
 
-val untransl_modalities_annot : modalities_annot -> Parsetree.modalities
+val untransl_modalities_annot :
+  Mode.Modality.atom Location.loc list -> Parsetree.modalities
 
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t
@@ -54,5 +57,3 @@ val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t
 val untransl_mod_bounds : Jkind.Mod_bounds.t -> Parsetree.modes
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
-
-val mode_annot_to_modality_annot : mode_annot -> modality_annot

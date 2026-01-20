@@ -42,10 +42,15 @@ type constant =
 
 module Uid = Shape.Uid
 
-type mode_annot = Typemode.mode_annot
-type modes_annot = Typemode.modes_annot
-type modality_annot = Typemode.modality_annot
-type modalities_annot = Typemode.modalities_annot
+type 'a modes = 'a Typemode.modes =
+  { mode_modes : 'a;
+    mode_desc : Mode.Alloc.atom Location.loc list
+  }
+
+type modalities = Typemode.modalities =
+  { moda_modalities : Mode.Modality.Const.t;
+    moda_desc : Mode.Modality.atom Location.loc list
+  }
 
 (* Value expressions for the core language *)
 
@@ -155,7 +160,7 @@ and 'a pattern_data =
    }
 
 and pat_extra =
-  | Tpat_constraint of core_type * modes_annot
+  | Tpat_constraint of core_type * Mode.Alloc.Const.Option.t modes
   | Tpat_type of Path.t * Longident.t loc
   | Tpat_open of Path.t * Longident.t loc * Env.t
   | Tpat_unpack
@@ -221,7 +226,7 @@ and exp_extra =
   | Texp_newtype of Ident.t * string loc *
                     Parsetree.jkind_annotation option * Uid.t
   | Texp_stack
-  | Texp_mode of Mode.Alloc.Const.Option.t * modes_annot
+  | Texp_mode of Mode.Alloc.Const.Option.t modes
   | Texp_inspected_type of [ `exp ] type_inspection
 
 and arg_label = Types.arg_label =
@@ -240,7 +245,6 @@ and expression_desc =
       { params : function_param list;
         body : function_body;
         ret_mode : Mode.Alloc.l;
-        ret_modes_annot : modes_annot;
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
         zero_alloc : Zero_alloc.t;
@@ -410,7 +414,6 @@ and function_param =
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
     fp_mode: Mode.Alloc.l;
-    fp_modes_annot: modes_annot;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -545,11 +548,12 @@ and module_expr =
 
 and module_type_constraint =
   Tmodtype_implicit
-| Tmodtype_explicit of module_type * modes_annot
+| Tmodtype_explicit of module_type * Mode.Alloc.Const.Option.t modes
 
 and functor_parameter =
   | Unit
-  | Named of Ident.t option * string option loc * module_type * modes_annot
+  | Named of Ident.t option * string option loc * module_type *
+             Mode.Alloc.Const.t modes
 
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
@@ -606,7 +610,6 @@ and value_binding =
     vb_expr: expression;
     vb_rec_kind: Value_rec_types.recursive_binding_kind;
     vb_sort: Jkind.sort;
-    vb_modes_annot: modes_annot;
     vb_attributes: attributes;
     vb_loc: Location.t;
   }
@@ -634,7 +637,7 @@ and module_type =
 and module_type_desc =
     Tmty_ident of Path.t * Longident.t loc
   | Tmty_signature of signature
-  | Tmty_functor of functor_parameter * module_type * modes_annot
+  | Tmty_functor of functor_parameter * module_type * Mode.Alloc.Const.t modes
   | Tmty_with of module_type * (Path.t * Longident.t loc * with_constraint) list
   | Tmty_typeof of module_expr
   | Tmty_alias of Path.t * Longident.t loc
@@ -653,8 +656,7 @@ and primitive_coercion =
 
 and signature = {
   sig_items : signature_item list;
-  sig_modalities : Mode.Modality.Const.t;
-  sig_modalities_annot : modalities_annot;
+  sig_modalities : modalities;
   sig_type : Types.signature;
   sig_final_env : Env.t;
   sig_sloc : Location.t;
@@ -677,8 +679,7 @@ and signature_item_desc =
   | Tsig_modtype of module_type_declaration
   | Tsig_modtypesubst of module_type_declaration
   | Tsig_open of open_description
-  | Tsig_include of include_description * Mode.Modality.Const.t *
-                    modalities_annot
+  | Tsig_include of include_description * modalities
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
@@ -690,8 +691,7 @@ and module_declaration =
      md_uid: Uid.t;
      md_presence: module_presence;
      md_type: module_type;
-     md_modalities: Mode.Modality.t;
-     md_modalities_annot: modalities_annot;
+     md_modalities: modalities;
      md_attributes: attribute list;
      md_loc: Location.t;
     }
@@ -777,7 +777,8 @@ and core_type =
 
 and core_type_desc =
   | Ttyp_var of string option * Parsetree.jkind_annotation option
-  | Ttyp_arrow of arg_label * core_type * modes_annot * core_type * modes_annot
+  | Ttyp_arrow of arg_label * core_type * Mode.Alloc.Const.t modes *
+                  core_type * Mode.Alloc.Const.t modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list
@@ -821,12 +822,16 @@ and object_field_desc =
   | OTtag of string loc * core_type
   | OTinherit of core_type
 
+and value_description_modal_info =
+  | Valmi_sig_value of modalities
+  | Valmi_str_primitive of Mode.Alloc.Const.Option.t modes
+
 and value_description =
   { val_id: Ident.t;
     val_name: string loc;
     val_desc: core_type;
     val_val: Types.value_description;
-    val_modalities_annot: modalities_annot;
+    val_modal_info: value_description_modal_info;
     val_prim: string list;
     val_loc: Location.t;
     val_attributes: attribute list;
@@ -859,8 +864,7 @@ and label_declaration =
      ld_name: string loc;
      ld_uid: Uid.t;
      ld_mutable: mutability;
-     ld_modalities: Modality.Const.t;
-     ld_modalities_annot: modalities_annot;
+     ld_modalities: modalities;
      ld_type: core_type;
      ld_loc: Location.t;
      ld_attributes: attribute list;
@@ -880,8 +884,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Modality.Const.t;
-    ca_modalities_annot: modalities_annot;
+    ca_modalities: modalities;
     ca_type: core_type;
     ca_loc: Location.t;
   }
