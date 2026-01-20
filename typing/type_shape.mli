@@ -102,21 +102,6 @@ type shape_with_layout = private
     type_layout : Layout.t;
     type_name : string
   }
-(* CR sspies: We need to revisit the treatment of layouts for type shapes.
-   Currently, as the declaration above indicates, we use the layout from the
-   binder of the variable and propagate it through. Once type shapes are merged
-   into shapes, we should compute layouts on-demand from shapes directly. The
-   reason is that, in the future, the layouts stored in the constructors of type
-   declarations will become unreliable as a source of information. Instead, the
-   strategy for layouts should be the following:
-
-    1. For the closed types that we obtain at binders, compute the shape. In
-       this step, type declarations with arguments should become lambdas, and
-       type application should become application.
-    2. When emitting the DWARF information, reduce the shape to resolve all
-       abstraction/application pairs. Then emit the DWARF information by
-       recursion on the resulting shape.
-*)
 
 val all_type_decls : Shape.t Uid.Tbl.t
 
@@ -128,16 +113,6 @@ val add_to_type_decls :
 
 val add_to_type_shapes :
   Uid.t -> Types.type_expr -> Layout.t -> name:string -> path_lookup -> unit
-
-(* CR sspies: [estimate_layout_from_shape] below is only an approximation. It
-   does, for example, not deal with type application and, as a result, can find
-   type variables that would have been substituted. This layout computation
-   needs to be revisited once type shapes have been integrated into shapes.
-
-   If the function returns [Some], the layout is precise (regardless of the
-   issues mentioned above). It returns [None] whenever estimation failed.
-*)
-val estimate_layout_from_type_shape : Shape.t -> Layout.t option
 
 val print_table_all_type_decls : Format.formatter -> unit
 
