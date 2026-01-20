@@ -297,7 +297,6 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
-  | Borrow_out_of_context
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -387,16 +386,10 @@ let mk_expected ?explanation ty = { ty; explanation; }
 let case lhs rhs =
   {c_lhs = lhs; c_guard = None; c_rhs = rhs}
 
-let mark_borrow e =
+let is_borrow e =
   match e.pexp_desc with
-  | Pexp_borrow (body, marked) ->
-      if marked then
-        Misc.fatal_errorf "borrow already marked at %a"
-          Location.print_loc e.pexp_loc
-      else
-        true,
-        {e with pexp_desc = Pexp_borrow (body, true)}
-  | _ -> false, e
+  | Pexp_borrow _ -> true
+  | _ -> false
 
 type position_in_function = FTail | FNontail
 
@@ -6241,8 +6234,8 @@ and type_expect_
       let is_bor, spat_sexp_list =
         List.fold_left_map
           (fun acc pvb ->
-            let is_bor, pvb_expr = mark_borrow pvb.pvb_expr in
-            acc || is_bor, {pvb with pvb_expr})
+            let is_bor = is_borrow pvb.pvb_expr in
+            acc || is_bor, pvb)
           false spat_sexp_list
       in
       let env, expected_mode, exp_extra =
@@ -6372,9 +6365,7 @@ and type_expect_
             exp_attributes = sexp.pexp_attributes;
           }
       end
-  | Pexp_borrow (body, mark) ->
-    if not mark then
-      raise (Error(loc, env, Borrow_out_of_context));
+  | Pexp_borrow body ->
     let mode =
       { Mode.Value.Const.min with
         areality = Local;
@@ -6396,7 +6387,7 @@ and type_expect_
       let is_bor, sargs =
         List.fold_left_map
           (fun acc (label, sarg) ->
-            let is_bor, sarg = mark_borrow sarg in
+            let is_bor = is_borrow sarg in
             acc || is_bor, (label, sarg))
           false sargs
       in
@@ -6513,7 +6504,7 @@ and type_expect_
       check_tail_call_local_returning loc env ap_mode pm;
       exp
   | Pexp_match(sarg, caselist) ->
-      let is_bor, sarg = mark_borrow sarg in
+      let is_bor = is_borrow sarg in
       let env, expected_mode, exp_extra =
         enter_region_if is_bor ~region:(loc, Borrow) env expected_mode
       in
@@ -12291,9 +12282,6 @@ let report_error ~loc env =
         "The eval extension takes a single type as its argument, for \
          example %a."
         Style.inline_code "[%eval: int]"
-  | Borrow_out_of_context ->
-      Location.errorf ~loc
-        "@[Cannot borrow here because there is no borrowing context.@]"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env

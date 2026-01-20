@@ -43,7 +43,9 @@ let x = borrow_ "hello"
 Line 1, characters 8-23:
 1 | let x = borrow_ "hello"
             ^^^^^^^^^^^^^^^
-Error: Cannot borrow here because there is no borrowing context.
+Error: This value is "local"
+       because it is borrowed.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* CR-someday zqian: support non-shallow borrowing *)
@@ -52,10 +54,17 @@ let foo () =
   let y0, y1 = borrow_ y, borrow_ y in
   ()
 [%%expect{|
-Line 3, characters 15-24:
+Line 3, characters 6-8:
 3 |   let y0, y1 = borrow_ y, borrow_ y in
-                   ^^^^^^^^^
-Error: Cannot borrow here because there is no borrowing context.
+          ^^
+Warning 26 [unused-var]: unused variable y0.
+
+Line 3, characters 10-12:
+3 |   let y0, y1 = borrow_ y, borrow_ y in
+              ^^
+Warning 26 [unused-var]: unused variable y1.
+
+val foo : unit -> unit = <fun>
 |}]
 
 (* borrowed values are aliased and cannot be used as unique *)

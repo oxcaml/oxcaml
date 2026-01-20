@@ -330,7 +330,7 @@ let rec add_expr bv exp =
   | Pexp_hole -> ()
   | Pexp_unreachable -> ()
   | Pexp_comprehension x -> add_comprehension_expr bv x
-  | Pexp_borrow (e, _) -> add_expr bv e
+  | Pexp_borrow e -> add_expr bv e
 
 and add_comprehension_expr bv = function
   | Pcomp_list_comprehension comp -> add_comprehension bv comp

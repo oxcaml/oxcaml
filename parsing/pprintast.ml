@@ -1137,7 +1137,7 @@ and expression ctxt f x =
     | Pexp_splice e ->
         pp f "@[$%a@]" (simple_expr ctxt) e
     | Pexp_hole -> pp f "_"
-    | Pexp_borrow (e, _) ->
+    | Pexp_borrow e ->
         pp f "@[<hov2>borrow_@ %a@]" (expression2 reset_ctxt)  e
     | _ -> expression1 ctxt f x
 

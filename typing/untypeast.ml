@@ -433,7 +433,7 @@ let exp_extra sub (extra, loc, attrs) sexp =
         (* Type inspections are unnecessary in a Parsetree,
            as type inference reproduces them *)
         sexp.pexp_desc
-    | Texp_borrowed -> Pexp_borrow (sexp, false)
+    | Texp_borrowed -> Pexp_borrow sexp
     | Texp_ghost_region ->sexp.pexp_desc
   in
   Exp.mk ~loc ~attrs desc
