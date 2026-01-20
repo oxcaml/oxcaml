@@ -2241,6 +2241,7 @@ module Format_history = struct
     | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
     | Tquote -> fprintf ppf "it's a staged type"
     | Tsplice -> fprintf ppf "it's a splice of a staged type"
+    | Teval -> fprintf ppf "it's the result of evaluating a staged program"
     | Unknown s ->
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
@@ -3006,6 +3007,7 @@ module Debug_printers = struct
     | Antiquotation_result -> fprintf ppf "Antiquotation_result"
     | Tquote -> fprintf ppf "Tquote"
     | Tsplice -> fprintf ppf "Tsplice"
+    | Teval -> fprintf ppf "Teval"
     | Unknown s -> fprintf ppf "Unknown %s" s
     | Array_type_kind -> fprintf ppf "Array_type_kind"
 
