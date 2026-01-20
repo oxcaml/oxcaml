@@ -331,8 +331,8 @@ Caml_inline void prefetch_block(value v)
      somewhere between 1/8-1/2 of a prefetch operation (in expectation,
      depending on alignment, word size, and cache line size), which is
      cheap enough to make this worthwhile. */
-  caml_prefetch((const void *)Hp_val(v));
-  caml_prefetch((const void *)&Field(v, 3));
+  caml_prefetchw((const void *)Hp_val(v));
+  caml_prefetchw((const void *)&Field(v, 3));
 }
 
 static void ephe_next_cycle (void)
@@ -1278,7 +1278,7 @@ again:
       /* Didn't finish scanning this object, either because budget <= 0,
          or the prefetch buffer filled up. Leave the rest on the stack. */
       mark_stack_push_range(stk, me.start, me.end);
-      caml_prefetch((void*)(me.start + 1));
+      caml_prefetchw((void*)(me.start + 1));
 
       if (pb_size(&pb) > PREFETCH_BUFFER_MIN) {
         /* We may have just discovered more work when we were about to run out.

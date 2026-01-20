@@ -18,7 +18,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
-#include <assert.h>
 
 #include "caml/config.h"
 #include "caml/custom.h"
@@ -228,13 +227,12 @@ Caml_inline header_t get_header_val(value v) {
 
 /* Allocate a block to copy `v` into, and attempt to write the
  * forwarding pointer into field 0 of `v`. If we lose the race against
- * some other domain to do that, update our newly-allocated block to
- * No_scan_tag and return 0. If we win, return our newly-allocated
- * block. Win or lose, update `*p` with the new block plus
- * `infix_offset` (which is in bytes).
+ * some other domain to do that, return 0. If we win, return our
+ * newly-allocated block. Win or lose, update `*p` with the promoted
+ * block plus `infix_offset` (which is in bytes).
  *
  * `hd` is the header of `v`.
-
+ *
  * `prefix` is the size in words of any unscannable prefix of `v`. If
  * `v` includes any infix tags, they must be within this prefix.
  *
@@ -242,12 +240,15 @@ Caml_inline header_t get_header_val(value v) {
  * of handy values and accumulators during a single minor GC.
 */
 
-Caml_inline value try_forward(value v, volatile value *p, header_t hd,
+Caml_inline value try_promote(value v, volatile value *p, header_t hd,
                               mlsize_t infix_offset, mlsize_t prefix,
                               struct oldify_state *st)
 {
   caml_domain_state *domain = st->domain;
   void *mem = NULL;
+
+  CAMLassert(!Is_update_in_progress(hd)); /* hd was obtained by get_header_val */
+  CAMLassert(!Is_promoted_hd(hd)); /* Promoted blocks already filtered out */
 
   /* manual inline of parts of caml_shared_try_alloc */
   mlsize_t wosize = Wosize_hd(hd);
@@ -258,7 +259,7 @@ Caml_inline value try_forward(value v, volatile value *p, header_t hd,
       CAML_EV_ALLOC(wosize);
       ++ st->pool_live_blocks;
       st->pool_live_words += whsize;
-      st->pool_frag_words += wsize_sizeclass[sizeclass_wsize[whsize]] - whsize;
+      st->pool_frag_words += wfrag_whsize[whsize];
       Hd_hp((value *)mem) = Hd_with_color(hd, st->status);
     }
   }
@@ -299,13 +300,12 @@ Caml_inline value try_forward(value v, volatile value *p, header_t hd,
          and use the one from the other domain. */
       (void)spin_on_header(v);
 
-      *Hp_val(result) = Make_header(wosize, No_scan_tag, st->status);
+      *Hp_val(result) = Make_header(wosize, Abstract_tag, st->status);
 #ifdef DEBUG
       for (mlsize_t i = 0; i < wosize ; i++) {
-        Field(result, i) = Val_long(1);
+        Field(result, i) = Debug_free_unused;
       }
 #endif
-      result = Field(v, 0);
       *p = Field(v, 0) + infix_offset;
       return (value)0;
     }
@@ -352,7 +352,7 @@ tail_call:
   } while (tag == Infix_tag);
 
   mlsize_t sz = Wosize_hd (hd);
-  value field0 = Field(v, 0); /* will be overwritten by try_forward */
+  value field0 = Field(v, 0); /* will be overwritten by try_promote */
   if (tag == Forward_tag) {
     CAMLassert (infix_offset == 0);
     CAMLassert (sz == 1);
@@ -365,7 +365,7 @@ tail_call:
     if (ft == Forward_tag || ft == Lazy_tag ||
         ft == Forcing_tag || ft == Double_tag) {
       /* Do not short-circuit the pointer.  Copy as a normal block. */
-      value result = try_forward(v, p, hd, infix_offset, 0, st);
+      value result = try_promote(v, p, hd, infix_offset, 0, st);
       if (result) {
         p = Op_val (result);
         v = f;
@@ -378,7 +378,7 @@ tail_call:
   } else {
     mlsize_t unscannable_prefix =
       (tag == Closure_tag) ? Start_env_closinfo(Closinfo_val(v)) : 0;
-    value result = try_forward(v, p, hd, infix_offset, unscannable_prefix, st);
+    value result = try_promote(v, p, hd, infix_offset, unscannable_prefix, st);
 
     if (result) {
       if (tag == Cont_tag) {
@@ -392,11 +392,12 @@ tail_call:
         }
       } else if (!Scannable_tag(tag)) {
         CAMLassert (infix_offset == 0);
+        CAMLassert (unscannable_prefix == 0); /* not Closure_tag */
         Field(result, 0) = field0;
         for (mlsize_t i = 1; i < sz; i++) {
           Field(result, i) = Field(v, i);
         }
-      } else { /* Scannable and not Cont_tag or Forward_tag */
+      } else { /* Scannable, and neither Cont_tag nor Forward_tag */
         CAMLassert(tag < Infix_tag);
         /* Copy the non-scannable suffix of fields.
            There is some trickiness around the 0th field, which
@@ -448,12 +449,12 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
     redo = false;
     while (st->todo_list != 0) {
       value v = st->todo_list;                        /* Get the head. */
-      CAMLassert (Is_promoted_hd(get_header_val(v))); /* It must be forwarded. */
+      CAMLassert (Is_promoted_hd(get_header_val(v))); /* It must be promoted. */
       value new_v = Field(v, 0);                      /* Follow forward pointer. */
       value next = Field (new_v, 1);
       st->todo_list = next;
-      /* TODO: Prefetch further in advance */
-      caml_prefetch((void*)next);
+      /* TODO: Measure whether this prefetch helps or hurts */
+      caml_prefetchw((void*)next);
 
       mlsize_t scannable_wosize = Scannable_wosize_val(new_v);
 

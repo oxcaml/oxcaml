@@ -18,7 +18,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include "caml/addrmap.h"
 #include "caml/custom.h"
 #include "caml/runtime_events.h"
@@ -57,11 +56,11 @@ typedef struct pool {
   uintnat chunk_size;
 } pool;
 static_assert(sizeof(pool) == Bsize_wsize(POOL_HEADER_WSIZE), "");
-#define POOL_SLAB_WOFFSET(sz) (POOL_HEADER_WSIZE + wastage_sizeclass[sz])
+#define POOL_SLAB_WOFFSET(sz) (POOL_HEADER_WSIZE + padding_sizeclass[sz])
 #define POOL_FIRST_BLOCK(p, sz) ((header_t*)(p) + POOL_SLAB_WOFFSET(sz))
 #define POOL_END(p) ((header_t*)(p) + POOL_WSIZE)
 #define POOL_BLOCKS(sz) ((POOL_WSIZE - POOL_HEADER_WSIZE) / \
-                         wsize_sizeclass[sz])
+                         whsize_sizeclass[sz])
 
 typedef struct large_alloc {
   caml_domain_state* owner;
@@ -337,7 +336,7 @@ static void calc_pool_stats(pool* a, sizeclass_t sz, struct heap_stats* s)
 {
   header_t* p = POOL_FIRST_BLOCK(a, sz);
   header_t* end = POOL_END(a);
-  mlsize_t wh = wsize_sizeclass[sz];
+  mlsize_t wh = whsize_sizeclass[sz];
   s->pool_frag_words += POOL_SLAB_WOFFSET(sz);
 
   while (p + wh <= end) {
@@ -359,7 +358,7 @@ Caml_inline void pool_initialize(pool* r,
                                  sizeclass_t sz,
                                  caml_domain_state* owner)
 {
-  mlsize_t wh = wsize_sizeclass[sz];
+  mlsize_t wh = whsize_sizeclass[sz];
   header_t* p = POOL_FIRST_BLOCK(r, sz);
   header_t* end = POOL_END(r);
 
@@ -513,7 +512,7 @@ static void avail_pool_full(struct caml_heap_state* local,
 
   local->avail_pools[sz] = p->next;
   if (p->next) {
-    caml_prefetch(p->next->next_obj);
+    caml_prefetchw(p->next->next_obj);
     local->free.lists[sz] = &p->next->next_obj;
   } else {
     local->free.lists[sz] = NULL;
@@ -578,14 +577,14 @@ value* caml_shared_try_alloc(struct caml_heap_state* local, mlsize_t wosize,
   CAML_EV_ALLOC(wosize);
 
   if (whsize <= SIZECLASS_MAX) {
-    sizeclass_t sz = sizeclass_wsize[whsize];
-    CAMLassert(wsize_sizeclass[sz] >= whsize);
+    sizeclass_t sz = sizeclass_whsize[whsize];
+    CAMLassert(whsize_sizeclass[sz] >= whsize);
     p = pool_allocate(local, sz);
     if (!p) return 0;
     struct heap_stats* s = &local->stats;
     s->pool_live_blocks++;
     s->pool_live_words += whsize;
-    s->pool_frag_words += wsize_sizeclass[sz] - whsize;
+    s->pool_frag_words += wfrag_whsize[whsize];
   } else {
     p = large_allocate(local, Bsize_wsize(whsize));
     if (!p) return 0;
@@ -656,7 +655,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
   {
     header_t* p = POOL_FIRST_BLOCK(a, sz);
     header_t* end = POOL_END(a);
-    mlsize_t wh = wsize_sizeclass[sz];
+    mlsize_t wh = whsize_sizeclass[sz];
     int all_used = 1;
     CAMLassert(a->owner == local->owner);
 
@@ -787,7 +786,7 @@ uintnat caml_heap_blocks(struct caml_heap_state* local) {
 }
 
 void caml_redarken_pool(struct pool* r, scanning_action f, void* fdata) {
-  mlsize_t wh = wsize_sizeclass[r->sz];
+  mlsize_t wh = whsize_sizeclass[r->sz];
   header_t* p = POOL_FIRST_BLOCK(r, r->sz);
   header_t* end = POOL_END(r);
 
@@ -1004,11 +1003,11 @@ static void compact_debug_check_pools(pool* p, bool full)
     while (block < end) {
       CAMLassert (*block || !full);
       if (*block) {
-        sizeclass_t sz = sizeclass_wsize[Whsize_hd(*block)];
+        sizeclass_t sz = sizeclass_whsize[Whsize_hd(*block)];
         CAMLassert(sz == p->sz);
       }
 
-      block += wsize_sizeclass[p->sz];
+      block += whsize_sizeclass[p->sz];
     }
 
     p = p->next;
@@ -1169,7 +1168,7 @@ static void compact_update_pools(pool *cur_pool)
   while (cur_pool) {
     header_t* p = POOL_FIRST_BLOCK(cur_pool, cur_pool->sz);
     header_t* end = POOL_END(cur_pool);
-    mlsize_t wh = wsize_sizeclass[cur_pool->sz];
+    mlsize_t wh = whsize_sizeclass[cur_pool->sz];
 
     while (p + wh <= end) {
       if (*p &&
@@ -1354,7 +1353,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
     while (cur_pool) {
       header_t* p = POOL_FIRST_BLOCK(cur_pool, sz_class);
       header_t* end = POOL_END(cur_pool);
-      mlsize_t wh = wsize_sizeclass[sz_class];
+      mlsize_t wh = whsize_sizeclass[sz_class];
 
       pool_stats[k].free_blocks = 0;
       pool_stats[k].live_blocks = 0;
@@ -1430,7 +1429,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
     while (cur_pool) {
       header_t* p = POOL_FIRST_BLOCK(cur_pool, sz_class);
       header_t* end = POOL_END(cur_pool);
-      mlsize_t wh = wsize_sizeclass[sz_class];
+      mlsize_t wh = whsize_sizeclass[sz_class];
 
       while (p + wh <= end) {
         header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
@@ -1615,7 +1614,7 @@ int compact_compare_pools(const void* v1, const void* v2) {
 void compact_phase_one_mark(struct caml_heap_state* heap)
 {
   for (sizeclass_t sz_class = 1; sz_class < NUM_SIZECLASSES; sz_class++) {
-    mlsize_t wh = wsize_sizeclass[sz_class];
+    mlsize_t wh = whsize_sizeclass[sz_class];
     uintnat avail_pools =
       compact_count_pools(heap->unswept_avail_pools[sz_class]);
     uintnat full_pools =
@@ -2020,7 +2019,7 @@ void compact_run_phase(struct caml_heap_state* heap,
     while (evac_pool) {
       header_t* p = POOL_FIRST_BLOCK(evac_pool, sz_class);
       header_t* end = POOL_END(evac_pool);
-      mlsize_t wh = wsize_sizeclass[sz_class];
+      mlsize_t wh = whsize_sizeclass[sz_class];
 
       while (p + wh <= end) {
         header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
@@ -2287,7 +2286,7 @@ static void verify_pool(pool* a, sizeclass_t sz, struct mem_stats* s) {
   {
     header_t* p = POOL_FIRST_BLOCK(a, sz);
     header_t* end = POOL_END(a);
-    mlsize_t wh = wsize_sizeclass[sz];
+    mlsize_t wh = whsize_sizeclass[sz];
     s->overhead += POOL_SLAB_WOFFSET(sz);
 
     while (p + wh <= end) {

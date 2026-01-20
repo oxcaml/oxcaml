@@ -24,7 +24,6 @@
 #include "misc.h"
 #include "gc_stats.h"
 #include "major_gc.h"
-#include <assert.h>
 #include "sizeclasses.h"
 
 CAMLextern atomic_uintnat caml_compactions_count;
@@ -119,7 +118,9 @@ typedef struct shared_heap_fast_data_s *shared_heap_fast_data_p;
 shared_heap_fast_data_p caml_shared_fast_data(struct caml_heap_state *);
 
 /* Call back into the shared-heap code from the inline fast allocation
- * code (below), when the "fast allocation data" is somehow exhausted. */
+ * code (below), when the "fast allocation data" is somehow
+ * exhausted. Restores invariant.
+ */
 
 void caml_shared_fast_data_refill(struct caml_heap_state *,
                                   sizeclass_t);
@@ -129,20 +130,34 @@ void caml_shared_fast_data_refill(struct caml_heap_state *,
  * the contents of this data structure. */
 struct shared_heap_fast_data_s {
   value **lists[NUM_SIZECLASSES];
+  /* Invariant: `(lists[sz] == NULL || *lists[sz] != NULL)`, that is,
+   *  we don't point to any empty free lists. */
 };
+
+/* Allocates a block of at least `whsize` words, using `fast_data`,
+ * for `domain`, returning a pointer to the header word. Requires
+ * `whsize <= SIZECLASS_MAX`. If we can't do a fast allocation, return
+ * NULL (meaning "use caml_shared_try_alloc instead"). Does not
+ * accumulate shared-heap stats, so the caller should accumulate those
+ * and later call `caml_shared_add_pool_stats`.
+ */
 
 Caml_inline void *caml_shared_fast_alloc (mlsize_t whsize,
                                           shared_heap_fast_data_p fast_data,
                                           caml_domain_state *domain)
 {
-  sizeclass_t sz = sizeclass_wsize[whsize];
+  CAMLassert(whsize <= SIZECLASS_MAX);
+
+  sizeclass_t sz = sizeclass_whsize[whsize];
   value **free_p = fast_data->lists[sz];
   if (!free_p) {
     return NULL;
   }
   value *block = *free_p;
+  CAMLassert(block != NULL);
   value *next = (value*)(block[1]);
-  caml_prefetch(next);
+  caml_prefetchw(next);
+  caml_prefetchw(next+3); /* will coalesce, or prefetch the next cache line */
   *free_p = next;
   if (!next) caml_shared_fast_data_refill(domain->shared_heap, sz);
   return (void*)block;
