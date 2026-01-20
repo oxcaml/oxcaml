@@ -676,9 +676,10 @@ let test2 (x @ once) : (unit -> unit) @ many =
 Line 2, characters 21-22:
 2 |   fun () -> let _x = x in ()
                          ^
-Error: The value "x" is "once" but is expected to be "many"
-       because it is used inside the function at Line 2, characters 2-28
-       which is expected to be "many".
+Error: The value "x" is "once"
+       but is expected to be "many"
+         because it is used inside the function at Line 2, characters 2-28
+         which is expected to be "many".
 |}]
 
 module F2 (M1 : S @ once) : (functor () -> sig end) @ many =
@@ -687,9 +688,10 @@ module F2 (M1 : S @ once) : (functor () -> sig end) @ many =
 Line 2, characters 35-37:
 2 |   functor () -> struct module M2 = M1 end
                                        ^^
-Error: The module "M1" is "once" but is expected to be "many"
-       because it is used inside the functor at Line 2, characters 10-41
-       which is expected to be "many".
+Error: The module "M1" is "once"
+       but is expected to be "many"
+         because it is used inside the functor at Line 2, characters 10-41
+         which is expected to be "many".
 |}]
 
 (* testing functor type inclusion *)

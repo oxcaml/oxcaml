@@ -187,8 +187,9 @@ let set_all_zero arr =
 Line 4, characters 4-7:
 4 |     set i 0
         ^^^
-Error: The value "set" is "once" but is expected to be "many"
-       because it is used in a loop (at Lines 3-5, characters 2-6).
+Error: The value "set" is "once"
+       but is expected to be "many"
+         because it is used in a loop (at Lines 3-5, characters 2-6).
 |}]
 
 let set_all_zero arr =

@@ -52,9 +52,10 @@ let foo (f : (unit -> unit) @ shareable) @ portable = fun () -> f ()
 Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ shareable) @ portable = fun () -> f ()
                                                                     ^
-Error: The value "f" is "shareable" but is expected to be "portable"
-       because it is used inside the function at Line 1, characters 54-68
-       which is expected to be "portable".
+Error: The value "f" is "shareable"
+       but is expected to be "portable"
+         because it is used inside the function at Line 1, characters 54-68
+         which is expected to be "portable".
 |}]
 
 let foo (f : (unit -> unit) @ nonportable) @ shareable = fun () -> f ()
@@ -62,9 +63,10 @@ let foo (f : (unit -> unit) @ nonportable) @ shareable = fun () -> f ()
 Line 1, characters 67-68:
 1 | let foo (f : (unit -> unit) @ nonportable) @ shareable = fun () -> f ()
                                                                        ^
-Error: The value "f" is "nonportable" but is expected to be "shareable"
-       because it is used inside the function at Line 1, characters 57-71
-       which is expected to be "shareable".
+Error: The value "f" is "nonportable"
+       but is expected to be "shareable"
+         because it is used inside the function at Line 1, characters 57-71
+         which is expected to be "shareable".
 |}]
 
 let foo (f : (unit -> unit) @ portable) @ shareable = fun () -> f ()

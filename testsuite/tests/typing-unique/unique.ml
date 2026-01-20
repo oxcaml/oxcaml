@@ -141,8 +141,9 @@ let f () =
 Line 4, characters 4-5:
 4 |     k
         ^
-Error: The value "k" is "once" but is expected to be "many"
-       because it is used in a loop (at Lines 3-5, characters 2-6).
+Error: The value "k" is "once"
+       but is expected to be "many"
+         because it is used in a loop (at Lines 3-5, characters 2-6).
 |}]
 
 (* The following is bad, because k is used uniquely *)

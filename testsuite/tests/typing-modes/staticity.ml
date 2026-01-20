@@ -19,8 +19,7 @@ let f (b @ dynamic) @ static =
 Lines 2-3, characters 4-16:
 2 | ....if b then "hello"
 3 |     else "world"
-Error: The expression is "dynamic"
-       because it has branches.
+Error: The expression is "dynamic" because it has branches.
        However, the expression highlighted is expected to be "static".
 |}]
 
@@ -31,8 +30,7 @@ let f (b @ static) @ static =
 Lines 2-3, characters 4-16:
 2 | ....if b then "hello"
 3 |     else "world"
-Error: The expression is "dynamic"
-       because it has branches.
+Error: The expression is "dynamic" because it has branches.
        However, the expression highlighted is expected to be "static".
 |}]
 
@@ -61,7 +59,7 @@ Line 1, characters 17-23:
 1 | let x @ static = f true
                      ^^^^^^
 Error: The expression is "dynamic"
-       because function applications are always dynamic.
+         because function applications are always dynamic.
        However, the expression highlighted is expected to be "static".
 |}]
 
@@ -111,8 +109,7 @@ Lines 2-4, characters 4-22:
 2 | ....match b with
 3 |     | true -> "hello"
 4 |     | false -> "hello"
-Error: The result of the cases is "dynamic"
-       because it has branches.
+Error: The result of the cases is "dynamic" because it has branches.
        However, the result of the cases highlighted is expected to be "static".
 |}]
 
@@ -210,8 +207,7 @@ Lines 2-4, characters 4-28:
 2 | ....match b with
 3 |     | x -> "hello"
 4 |     | exception _ -> "world"
-Error: The result of the cases is "dynamic"
-       because it has branches.
+Error: The result of the cases is "dynamic" because it has branches.
        However, the result of the cases highlighted is expected to be "static".
 |}]
 
@@ -354,8 +350,7 @@ let foo (b : t @ dynamic) @ static =
 Line 2, characters 4-28:
 2 |     try b with e -> Foo true
         ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The expression is "dynamic"
-       because try-with clauses are always dynamic.
+Error: The expression is "dynamic" because try-with clauses are always dynamic.
        However, the expression highlighted is expected to be "static".
 |}]
 
@@ -365,8 +360,7 @@ let foo (b : t @ static) @ static =
 Line 2, characters 4-28:
 2 |     try b with e -> Foo true
         ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The expression is "dynamic"
-       because try-with clauses are always dynamic.
+Error: The expression is "dynamic" because try-with clauses are always dynamic.
        However, the expression highlighted is expected to be "static".
 |}]
 

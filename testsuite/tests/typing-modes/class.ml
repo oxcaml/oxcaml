@@ -27,8 +27,9 @@ let foo () =
 Line 5, characters 16-17:
 5 |         val k = s
                     ^
-Error: The value "s" is "local" but is expected to be "global"
-       because it is used in a class (at Lines 4-6, characters 16-7).
+Error: The value "s" is "local"
+       but is expected to be "global"
+         because it is used in a class (at Lines 4-6, characters 16-7).
 |}]
 
 (* class can refer to external unique things, but only as aliased. *)

@@ -439,9 +439,10 @@ let foo (f : (unit -> unit) @ stateful portable) @ stateless = fun () -> f ()
 Line 1, characters 73-74:
 1 | let foo (f : (unit -> unit) @ stateful portable) @ stateless = fun () -> f ()
                                                                              ^
-Error: The value "f" is "stateful" but is expected to be "stateless"
-       because it is used inside the function at Line 1, characters 63-77
-       which is expected to be "stateless".
+Error: The value "f" is "stateful"
+       but is expected to be "stateless"
+         because it is used inside the function at Line 1, characters 63-77
+         which is expected to be "stateless".
 |}]
 
 (* The error for [portable] is displayed first. *)
@@ -451,9 +452,10 @@ let foo (f : (unit -> unit) @ stateful) @ stateless = fun () -> f ()
 Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ stateful) @ stateless = fun () -> f ()
                                                                     ^
-Error: The value "f" is "stateful" but is expected to be "stateless"
-       because it is used inside the function at Line 1, characters 54-68
-       which is expected to be "stateless".
+Error: The value "f" is "stateful"
+       but is expected to be "stateless"
+         because it is used inside the function at Line 1, characters 54-68
+         which is expected to be "stateless".
 |}]
 
 let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
@@ -461,9 +463,10 @@ let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
 Line 1, characters 74-75:
 1 | let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
                                                                               ^
-Error: The value "f" is "observing" but is expected to be "stateless"
-       because it is used inside the function at Line 1, characters 64-78
-       which is expected to be "stateless".
+Error: The value "f" is "observing"
+       but is expected to be "stateless"
+         because it is used inside the function at Line 1, characters 64-78
+         which is expected to be "stateless".
 |}]
 
 (* Closing over use of read gives observing *)
@@ -509,9 +512,10 @@ let foo (f : (unit -> unit) @ stateful) @ observing = fun () -> f ()
 Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ stateful) @ observing = fun () -> f ()
                                                                     ^
-Error: The value "f" is "stateful" but is expected to be "observing"
-       because it is used inside the function at Line 1, characters 54-68
-       which is expected to be "observing".
+Error: The value "f" is "stateful"
+       but is expected to be "observing"
+         because it is used inside the function at Line 1, characters 54-68
+         which is expected to be "observing".
 |}]
 
 (* Testing defaulting  *)

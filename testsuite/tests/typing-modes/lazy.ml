@@ -25,10 +25,11 @@ let foo (local_ x) =
 Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
-Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the lazy expression at Line 2, characters 4-26
-       which is expected to be "global"
-       because lazy expressions always need to be allocated on the heap.
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the lazy expression at Line 2, characters 4-26
+         which is expected to be "global"
+         because lazy expressions always need to be allocated on the heap.
 |}]
 
 (* For simplicity, we also require them to be [unyielding]. *)
@@ -38,10 +39,11 @@ let foo (x @ yielding) =
 Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
-Error: The value "x" is "yielding" but is expected to be "unyielding"
-       because it is used inside the lazy expression at Line 2, characters 4-26
-       which is expected to be "unyielding"
-       because lazy expressions always need to be allocated on the heap.
+Error: The value "x" is "yielding"
+       but is expected to be "unyielding"
+         because it is used inside the lazy expression at Line 2, characters 4-26
+         which is expected to be "unyielding"
+         because lazy expressions always need to be allocated on the heap.
 |}]
 
 (* lazy expression is constructed as global *)

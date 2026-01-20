@@ -2135,8 +2135,8 @@ module Report = struct
       | _ -> pp_print_string ppf "it is a lazy value being forced")
     | Function_return ->
       fprintf ppf
-        "it is a function return value.@\n\
-         Hint: Use exclave_ to return a local value"
+        "it is a function return value.@ Hint: Use exclave_ to return a local \
+         value"
     | Stack_expression ->
       fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
     | Module_allocated_on_heap ->
@@ -2463,13 +2463,15 @@ module Error = struct
     let open Format in
     let loc, desc = pp in
     let print ppf () =
+      let open_box = dprintf "@[<hov 2>" in
+      let reopen_box = dprintf "@]@ %t" open_box in
       let print_desc = Report.print_pinpoint_desc desc in
       (let print_desc =
          match print_desc with
          | None -> dprintf "This"
          | Some print_desc -> print_desc ~definite:true ~capitalize:true
        in
-       fprintf ppf "%t is " print_desc);
+       fprintf ppf "%t%t is " open_box print_desc);
       let ({ left; right } : print_error) = print_packed pp packed in
       (match left ppf with
       | Mode_with_hint ->
@@ -2480,10 +2482,10 @@ module Error = struct
             dprintf "%t highlighted"
               (print_desc ~definite:true ~capitalize:false)
         in
-        fprintf ppf ".@\nHowever, %t is expected to be " print_desc
-      | Mode -> fprintf ppf "@ but is expected to be ");
+        fprintf ppf ".%tHowever, %t is expected to be " reopen_box print_desc
+      | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
       ignore (right ppf);
-      pp_print_string ppf "."
+      fprintf ppf ".@]"
     in
     Location.error_of_printer ~loc print ()
 end
