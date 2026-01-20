@@ -39,9 +39,11 @@ module RegisterStamp = struct
 
     let add set (x : pair) = PS.replace set x ()
 
-    let cardinal set = PS.length set
+    module For_debug = struct
+      let cardinal set = PS.length set
 
-    let iter set ~f = PS.iter (fun key () -> f key) set
+      let iter set ~f = PS.iter (fun key () -> f key) set
+    end
   end
 
   module BitMatrix = struct
@@ -80,26 +82,28 @@ module RegisterStamp = struct
         let byte_val = Bytes.get_uint8 t.bits byte_index in
         Bytes.set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position)))
 
-    let cardinal t =
-      (* NOTE: This operation is O(n²) where n is the number of registers,
-         as it scans all bytes in the bit matrix. Unlike PairSet.cardinal
-         which is O(1), this implementation counts set bits on-demand. *)
-      let count = ref 0 in
-      for byte_index = 0 to Bytes.length t.bits - 1 do
-        let byte_val = Bytes.get_uint8 t.bits byte_index in
-        for bit_position = 0 to 7 do
-          if byte_val land (1 lsl bit_position) <> 0 then incr count
-        done
-      done;
-      !count
+    module For_debug = struct
+      let cardinal t =
+        (* NOTE: This operation is O(n²) where n is the number of registers,
+           as it scans all bytes in the bit matrix. Unlike PairSet.cardinal
+           which is O(1), this implementation counts set bits on-demand. *)
+        let count = ref 0 in
+        for byte_index = 0 to Bytes.length t.bits - 1 do
+          let byte_val = Bytes.get_uint8 t.bits byte_index in
+          for bit_position = 0 to 7 do
+            if byte_val land (1 lsl bit_position) <> 0 then incr count
+          done
+        done;
+        !count
 
-    let iter t ~f =
-      for i = 0 to t.num_registers - 2 do
-        for j = i + 1 to t.num_registers - 1 do
-          let pair = (i, j) in
-          if mem t pair then f pair
+      let iter t ~f =
+        for i = 0 to t.num_registers - 2 do
+          for j = i + 1 to t.num_registers - 1 do
+            let pair = (i, j) in
+            if mem t pair then f pair
+          done
         done
-      done
+    end
   end
 end
 
@@ -206,7 +210,8 @@ let[@inline] decr_degree graph reg =
 
 let[@inline] adj_set graph = graph.adj_set
 
-let[@inline] cardinal graph = RegisterStamp.PairSet.cardinal graph.adj_set
+let[@inline] cardinal graph =
+  RegisterStamp.PairSet.For_debug.cardinal graph.adj_set
 
 let[@inline] init_register graph reg =
   Reg.Tbl.replace graph.adj_list reg [];

@@ -35,9 +35,11 @@ module RegisterStamp : sig
 
     val add : t -> pair -> unit
 
-    val cardinal : t -> int
+    module For_debug : sig
+      val cardinal : t -> int
 
-    val iter : t -> f:(pair -> unit) -> unit
+      val iter : t -> f:(pair -> unit) -> unit
+    end
   end
 
   (** Alternative bit matrix representation for edge sets.
@@ -65,11 +67,13 @@ module RegisterStamp : sig
 
     val add : t -> pair -> unit
 
-    (** Returns the number of set bits (edges) in the matrix.
-        WARNING: This is O(n²) where n is the number of registers. *)
-    val cardinal : t -> int
+    module For_debug : sig
+      (** Returns the number of set bits (edges) in the matrix.
+          WARNING: This is O(n²) where n is the number of registers. *)
+      val cardinal : t -> int
 
-    val iter : t -> f:(pair -> unit) -> unit
+      val iter : t -> f:(pair -> unit) -> unit
+    end
   end
 end
 
