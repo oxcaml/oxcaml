@@ -78,34 +78,33 @@ module RegisterStamp = struct
     [@@portable]
 
     let[@inline always] bit_location ((i, j) : pair) num_registers =
+      (* Compute linear bit offset for pair (i,j) in triangular storage.
+         Layout: row i contains pairs (i,i), (i,i+1), ..., (i,n-1).
+         Offset = (elements before row i) + (position within row i)
+                = [i*n - i*(i-1)/2] + (j-i) *)
       let bit_offset =
-        i * num_registers - (i * (i + 1)) / 2 + (j - i - 1)
+        i * num_registers - (i * (i - 1)) / 2 + (j - i)
       in
       let byte_index = bit_offset / 8 in
       let bit_position = bit_offset mod 8 in
       byte_index, bit_position
 
     let make ~num_registers =
-      let num_pairs = (num_registers * (num_registers - 1)) / 2 in
+      let num_pairs = (num_registers * (num_registers + 1)) / 2 in
       let num_bytes = (num_pairs + 7) / 8 in
       { bits = Bytes.make num_bytes '\000'; num_registers }
 
     let clear t = Bytes.fill t.bits 0 (Bytes.length t.bits) '\000'
 
     let mem t ((i, j) : pair) =
-      if i = j
-      then false
-      else (
-        let byte_index, bit_position = bit_location (i, j) t.num_registers in
-        let byte_val = unsafe_get_uint8 t.bits byte_index in
-        byte_val land (1 lsl bit_position) <> 0)
+      let byte_index, bit_position = bit_location (i, j) t.num_registers in
+      let byte_val = unsafe_get_uint8 t.bits byte_index in
+      byte_val land (1 lsl bit_position) <> 0
 
     let add t ((i, j) : pair) =
-      if i <> j
-      then (
-        let byte_index, bit_position = bit_location (i, j) t.num_registers in
-        let byte_val = unsafe_get_uint8 t.bits byte_index in
-        unsafe_set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position)))
+      let byte_index, bit_position = bit_location (i, j) t.num_registers in
+      let byte_val = unsafe_get_uint8 t.bits byte_index in
+      unsafe_set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position))
 
     module For_debug = struct
       let cardinal t =
@@ -122,8 +121,8 @@ module RegisterStamp = struct
         !count
 
       let iter t ~f =
-        for i = 0 to t.num_registers - 2 do
-          for j = i + 1 to t.num_registers - 1 do
+        for i = 0 to t.num_registers - 1 do
+          for j = i to t.num_registers - 1 do
             let pair = (i, j) in
             if mem t pair then f pair
           done
