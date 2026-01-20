@@ -28,4 +28,4 @@ let with_bounds_types ppf w = Jkind.With_bounds.debug_print_types ppf w
 let modalities = Mode.Modality.Const.print
 let longident = Pprintast.longident
 let uid = Shape.Uid.print
-let lazy_lbl_array : Format.formatter -> _ Types.gen_label_description array Lazy.t -> unit = fun ppf _ -> Format.fprintf ppf "<a bunch of labels>"
+let lazy_lbl_iarray : Format.formatter -> _ Types.gen_label_description Iarray_shim.iarray Lazy.t -> unit = fun ppf _ -> Format.fprintf ppf "<a bunch of labels>"
