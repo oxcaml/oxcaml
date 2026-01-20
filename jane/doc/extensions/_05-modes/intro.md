@@ -86,12 +86,22 @@ function's body is a region, as are loop bodies.
 
 The type checker does not allow values that are *local* to escape their scope
 (for example, by being returned from a function or stored in a global
-ref). Values that are *global* may freely escape their scope. The compiler can
-stack allocate values that are local.
+ref). Values that are *global* may freely escape their scope. The compiler may
+stack allocate values that are local (but is not required to do so).
 
-Locality is irrelevant for types that never cause allocation on the OCaml heap,
-like int. Values of such types *mode cross* on the locality axis; they may be
-used as global even when they are local.
+There is a caveat to the scoping restriction: for some types such as `int`, the
+type system does allow *local* values to escape (i.e., they may be used as
+global even when they are local). The basic idea is that if values of the type
+are not allocated in memory at runtime (e.g., they are passed directly via
+registers), then it is safe to let them escape their region. This behavior is
+called *mode crossing* on the locality axis.
+
+If mode crossing is not desired for a type even though it would typically mode
+cross, then type abstraction can be used to prevent its values from escaping
+(i.e., to prevent them from mode crossing the locality axis). For example, even
+though a file descriptor is commonly represented as an `int` at runtime, type
+abstraction can be used to hide this fact from the type system such that a
+function that takes a file descriptor as an argument cannot let it escape.
 
 See also the [documentation on locality and stack
 allocation](../../stack-allocation/intro).
