@@ -1609,6 +1609,49 @@ let triangle_10 = let mutable x = 0 in
 val triangle_10 : int = 55
 |}]
 
+(*****************************)
+(* attributes on type params *)
+
+type 'a[@foo]  t
+[%%expect{|
+type 'a t
+|}]
+
+type ('a[@foo] : any) t
+[%%expect{|
+type ('a : any) t
+|}]
+
+type _[@foo]  t
+[%%expect{|
+type _ t
+|}]
+
+type (_[@foo] : any) t
+[%%expect{|
+type (_ : any) t
+|}]
+
+type ('a, 'b[@foo])  t
+[%%expect{|
+type ('a, 'b) t
+|}]
+
+type ('a, 'b[@foo] : any)  t
+[%%expect{|
+type ('a, 'b : any) t
+|}]
+
+type ('a, _[@foo])  t
+[%%expect{|
+type ('a, _) t
+|}]
+
+type ('a, _[@foo] : any)  t
+[%%expect{|
+type ('a, _ : any) t
+|}]
+
 (*********************)
 (* quotations syntax *)
 

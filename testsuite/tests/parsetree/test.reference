@@ -1,0 +1,152 @@
+source_jane_street.ml:  FAIL, REPARSED AST IS DIFFERENT (test.ml 123:2)
+--- /tmp/ocamlparse9abe65.txt	2026-01-20 17:27:18.021697981 -0500
++++ /tmp/ocamlparse6d5b2e.txt	2026-01-20 17:27:18.183699935 -0500
+@@ -11234,8 +11234,6 @@
+         ptype_params =
+           [
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_var a
+           ]
+         ptype_cstrs =
+@@ -11263,8 +11261,6 @@
+         ptype_params =
+           [
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_var a
+                   jkind (_none_[0,0+-1]..[0,0+-1]) ghost
+                   Pjk_abbreviation "any"
+@@ -11294,8 +11290,6 @@
+         ptype_params =
+           [
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_any
+           ]
+         ptype_cstrs =
+@@ -11323,8 +11317,6 @@
+         ptype_params =
+           [
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_any
+                   jkind (_none_[0,0+-1]..[0,0+-1]) ghost
+                   Pjk_abbreviation "any"
+@@ -11356,8 +11348,6 @@
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+               Ptyp_var a
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_var b
+           ]
+         ptype_cstrs =
+@@ -11387,8 +11377,6 @@
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+               Ptyp_var a
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_var b
+                   jkind (_none_[0,0+-1]..[0,0+-1]) ghost
+                   Pjk_abbreviation "any"
+@@ -11420,8 +11408,6 @@
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+               Ptyp_var a
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_any
+           ]
+         ptype_cstrs =
+@@ -11451,8 +11437,6 @@
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+               Ptyp_var a
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_any
+                   jkind (_none_[0,0+-1]..[0,0+-1]) ghost
+                   Pjk_abbreviation "any"
+=====================================================
+source_jane_street.ml:  FAIL, REPARSED AST IS DIFFERENT (test.ml 131:2)
+--- /tmp/ocamlparse9755f2.txt	2026-01-20 17:27:18.462703301 -0500
++++ /tmp/ocamlparseb6845f.txt	2026-01-20 17:27:18.622705231 -0500
+@@ -11234,8 +11234,6 @@
+         ptype_params =
+           [
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_var a
+           ]
+         ptype_cstrs =
+@@ -11263,8 +11261,6 @@
+         ptype_params =
+           [
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_var a
+                   jkind (_none_[0,0+-1]..[0,0+-1]) ghost
+                   Pjk_abbreviation "any"
+@@ -11294,8 +11290,6 @@
+         ptype_params =
+           [
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_any
+           ]
+         ptype_cstrs =
+@@ -11323,8 +11317,6 @@
+         ptype_params =
+           [
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_any
+                   jkind (_none_[0,0+-1]..[0,0+-1]) ghost
+                   Pjk_abbreviation "any"
+@@ -11356,8 +11348,6 @@
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+               Ptyp_var a
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_var b
+           ]
+         ptype_cstrs =
+@@ -11387,8 +11377,6 @@
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+               Ptyp_var a
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_var b
+                   jkind (_none_[0,0+-1]..[0,0+-1]) ghost
+                   Pjk_abbreviation "any"
+@@ -11420,8 +11408,6 @@
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+               Ptyp_var a
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_any
+           ]
+         ptype_cstrs =
+@@ -11451,8 +11437,6 @@
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+               Ptyp_var a
+             core_type (_none_[0,0+-1]..[0,0+-1]) ghost
+-              attribute "foo"
+-                []
+               Ptyp_any
+                   jkind (_none_[0,0+-1]..[0,0+-1]) ghost
+                   Pjk_abbreviation "any"
+=====================================================
