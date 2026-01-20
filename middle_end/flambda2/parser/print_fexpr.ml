@@ -367,9 +367,10 @@ let static_data_binding ppf { symbol = s; defining_expr = sp } =
   Format.fprintf ppf "%a =@ %a" symbol s static_data sp
 
 let prim_param ppf = function
-  | Flag f -> Format.fprintf ppf ".`%s`" f
+  | Flag f -> Format.fprintf ppf ".%a" ident f
   | Positional p -> Format.fprintf ppf ".[`%s`]" p.txt
-  | Labeled { label; value } -> Format.fprintf ppf ".`%s`[`%s`]" label value.txt
+  | Labeled { label; value } ->
+    Format.fprintf ppf ".%a[`%s`]" ident label value.txt
 
 let prim_params ppf params =
   Format.fprintf ppf "%a"
@@ -469,7 +470,7 @@ let inline_attribute ~space ppf (i : Inline_attribute.t) =
   let str =
     match i with
     | Always_inline -> Some "inline(always)"
-    | Available_inline -> Some "inline(hint)"
+    | Available_inline -> Some "inline(available)"
     | Never_inline -> Some "inline(never)"
     | Unroll i -> Some (Format.sprintf "unroll(%d)" i)
     | Default_inline -> None

@@ -68,6 +68,7 @@ type token =
   | KWD_ID
   | KWD_HINT
   | KWD_HCF
+  | KWD_FLOAT32
   | KWD_FLOAT
   | KWD_EXN
   | KWD_ERROR
@@ -93,7 +94,7 @@ type token =
   | KWD_ALWAYS
   | INT of (string * char option)
   | IDENT of (string)
-  | FLOAT of (float)
+  | FLOAT of (float * char option)
   | EQUAL
   | EOF
   | DOT

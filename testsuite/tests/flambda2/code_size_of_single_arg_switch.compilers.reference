@@ -43,8 +43,8 @@ let code loopify(never) size(7) newer_version_of(switch_converted_to_affine_2)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let scaled_arg = %int_barith.`mul` (x, 1) in
-  let final_arg = %int_barith.`add` (scaled_arg, 7) in
+  let scaled_arg = %int_barith.mul (x, 1) in
+  let final_arg = %int_barith.add (scaled_arg, 7) in
   cont k (final_arg)
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_affine_6 =

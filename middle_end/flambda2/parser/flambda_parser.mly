@@ -64,7 +64,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token COMMA [@symbol ","]
 %token DOT   [@symbol "."]
 %token EQUAL [@symbol "="]
-%token <float> FLOAT
+%token <float * char option> FLOAT
 %token <string> IDENT
 %token <string * char option> INT
 %token LBRACE [@symbol "{"]
@@ -108,6 +108,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_EXN   [@symbol "exn"]
 %token KWD_REGION [@symbol "region"]
 %token KWD_FLOAT [@symbol "float"]
+%token KWD_FLOAT32 [@symbol "float32"]
 %token KWD_HCF   [@symbol "halt_and_catch_fire"]
 %token KWD_HINT  [@symbol "hint"]
 %token KWD_ID    [@symbol "id"]
@@ -353,6 +354,7 @@ switch:
 naked_number_kind:
   | KWD_IMM { Naked_immediate }
   | KWD_FLOAT { Naked_float }
+  | KWD_FLOAT32 { Naked_float32 }
   | KWD_INT32 { Naked_int32 }
   | KWD_INT64 { Naked_int64 }
   | KWD_NATIVEINT { Naked_nativeint }
@@ -378,6 +380,7 @@ kinds_with_subkinds :
 subkind:
   | KWD_VAL { Anything }
   | KWD_FLOAT KWD_BOXED { Boxed_float }
+  | KWD_FLOAT32 KWD_BOXED { Boxed_float32 }
   | KWD_INT32 KWD_BOXED { Boxed_int32 }
   | KWD_INT64 KWD_BOXED { Boxed_int64 }
   | KWD_NATIVEINT KWD_BOXED { Boxed_nativeint }
@@ -645,7 +648,11 @@ static_data:
   | STATIC_CONST_BLOCK; m = mutability; tag = tag; LPAREN;
     elements = separated_list(COMMA, field_of_block); RPAREN
     { (Block { tag; mutability = m; elements } : static_data) }
-  | f = FLOAT { Boxed_float (Const f) }
+  | f = FLOAT {
+    match snd f with
+    | None -> Boxed_float (Const (fst f))
+    | Some 's' -> Boxed_float32 (Const (fst f))
+    | Some c -> Misc.fatal_errorf "Invalid float modifier '%c'" c }
   | i = INT { make_boxed_const_int i }
   | v = variable; COLON; k = static_data_kind { k v }
   | STATIC_CONST_FLOAT_BLOCK; LPAREN;
@@ -667,12 +674,17 @@ static_data:
 
 static_data_kind:
   | KWD_FLOAT KWD_BOXED { fun v -> Boxed_float (Var v) }
+  | KWD_FLOAT32 KWD_BOXED { fun v -> Boxed_float32 (Var v) }
   | KWD_INT32 KWD_BOXED { fun v -> Boxed_int32 (Var v) }
   | KWD_INT64 KWD_BOXED { fun v -> Boxed_int64 (Var v) }
   | KWD_NATIVEINT KWD_BOXED { fun v -> Boxed_nativeint (Var v) }
 
 float_or_variable:
-  | f = FLOAT { Const f }
+  | f = FLOAT {
+     match snd f with
+     | None -> Const (fst f)
+     | Some 's' -> Misc.fatal_error "unsupported float32 blocks"
+     | Some c -> Misc.fatal_errorf "Invalid float modifier '%c'" c }
   | v = variable { Var v }
 
 targetint:
@@ -707,7 +719,11 @@ simple_args:
 
 const:
   | c = INT { make_const_int c }
-  | c = FLOAT { Naked_float c }
+  | f = FLOAT {
+    match snd f with
+    | None -> Naked_float (fst f)
+    | Some 's' -> Naked_float32 (fst f)
+    | Some c -> Misc.fatal_errorf "Invalid float modifier '%c'" c }
   | KWD_NULL { Null }
 ;
 

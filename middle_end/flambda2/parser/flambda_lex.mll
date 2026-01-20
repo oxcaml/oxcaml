@@ -51,6 +51,7 @@ let keyword_table =
     "error", KWD_ERROR;
     "exn", KWD_EXN;
     "float", KWD_FLOAT;
+    "float32", KWD_FLOAT32;
     "halt_and_catch_fire", KWD_HCF;
     "hint", KWD_HINT;
     "id", KWD_ID;
@@ -162,7 +163,7 @@ let hex_float_literal =
   ('.' ['0'-'9' 'A'-'F' 'a'-'f' '_']* )?
   (['p' 'P'] ['+' '-']? ['0'-'9'] ['0'-'9' '_']* )?
 let float_literal = sign? (dec_float_literal | hex_float_literal)
-let int_modifier = ['G'-'Z' 'g'-'z']
+let num_modifier = ['G'-'Z' 'g'-'z']
 
 rule token = parse
   | "\n"
@@ -220,10 +221,10 @@ rule token = parse
          { symbol cunit_ident cunit_linkage_name ident }
   | '%' identchar+ as p
          { PRIM p }
-  | (int_literal as lit) (int_modifier as modif)?
+  | (int_literal as lit) (num_modifier as modif)?
          { INT (lit, modif) }
-  | float_literal as lit
-         { FLOAT (lit |> Float.of_string) }
+  | (float_literal as lit) (num_modifier as modif)?
+         { FLOAT (lit |> Float.of_string, modif) }
   | (float_literal | int_literal) identchar+ as lit
          { error ~lexbuf (Invalid_literal lit) }
   | '"' (([^ '"'] | '\\' '"')* as s) '"'
