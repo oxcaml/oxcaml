@@ -70,6 +70,13 @@ module RegisterStamp = struct
         num_registers : int
       }
 
+    external unsafe_get_uint8 : bytes -> int -> int = "%bytes_unsafe_get"
+    [@@portable]
+
+    external unsafe_set_uint8 : bytes -> int -> int -> unit
+      = "%bytes_unsafe_set"
+    [@@portable]
+
     let make ~num_registers =
       let num_pairs = (num_registers * (num_registers - 1)) / 2 in
       let num_bytes = (num_pairs + 7) / 8 in
@@ -86,7 +93,7 @@ module RegisterStamp = struct
         in
         let byte_index = bit_offset / 8 in
         let bit_position = bit_offset mod 8 in
-        let byte_val = Bytes.get_uint8 t.bits byte_index in
+        let byte_val = unsafe_get_uint8 t.bits byte_index in
         byte_val land (1 lsl bit_position) <> 0)
 
     let add t ((i, j) : pair) =
@@ -97,8 +104,8 @@ module RegisterStamp = struct
         in
         let byte_index = bit_offset / 8 in
         let bit_position = bit_offset mod 8 in
-        let byte_val = Bytes.get_uint8 t.bits byte_index in
-        Bytes.set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position)))
+        let byte_val = unsafe_get_uint8 t.bits byte_index in
+        unsafe_set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position)))
 
     module For_debug = struct
       let cardinal t =
@@ -107,7 +114,7 @@ module RegisterStamp = struct
            which is O(1), this implementation counts set bits on-demand. *)
         let count = ref 0 in
         for byte_index = 0 to Bytes.length t.bits - 1 do
-          let byte_val = Bytes.get_uint8 t.bits byte_index in
+          let byte_val = unsafe_get_uint8 t.bits byte_index in
           for bit_position = 0 to 7 do
             if byte_val land (1 lsl bit_position) <> 0 then incr count
           done
