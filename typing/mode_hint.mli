@@ -72,39 +72,6 @@ type ('d0, 'd1) polarity =
   constraint 'd0 = _ * _ constraint 'd1 = _ * _
 [@@warning "-62"]
 
-(* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
-the RHS". They are similiar to the [Skip] morph hint and should raise when being
-printed. *)
-
-(** Hint for a constant bound. See [Mode.Report.print_const] for what each
-    non-trivial constructor means. *)
-type 'd const =
-  | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
-  | Lazy_allocated_on_heap : (disallowed * 'r) pos const
-  | Legacy : legacy -> ('l * 'r) const
-  | Tailcall_function : (disallowed * 'r) pos const
-  | Tailcall_argument : (disallowed * 'r) pos const
-  | Mutable_read : mutable_part -> (disallowed * 'r) neg const
-  | Mutable_write : mutable_part -> (disallowed * 'r) neg const
-  | Lazy_forced : (disallowed * 'r) neg const
-  | Function_return : (disallowed * 'r) pos const
-  | Stack_expression : ('l * disallowed) pos const
-  | Module_allocated_on_heap : (disallowed * 'r) pos const
-  | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
-  | Branching : ('l * disallowed) neg const
-  | Is_used_in : pinpoint -> (disallowed * 'r) const
-      (** A variant of [Is_closed_by] where the closure mode is constant.
-          INVARIANT: The [pinpoint] cannot be [Unknown]. *)
-  | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
-  | Escape_region : region -> (disallowed * 'r) const
-  constraint 'd = _ * _
-[@@ocaml.warning "-62"]
-
-type closure_details =
-  { closure : pinpoint;
-    closed : pinpoint
-  }
-
 (* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
    resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
    while [Modality] stays in place. *)
@@ -127,6 +94,40 @@ type contains =
 type is_contained_by =
   { containing : containing;
     container : pinpoint
+  }
+
+(* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
+the RHS". They are similiar to the [Skip] morph hint and should raise when being
+printed. *)
+
+(** Hint for a constant bound. See [Mode.Report.print_const] for what each
+    non-trivial constructor means. *)
+type 'd const =
+  | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
+  | Lazy_allocated_on_heap : (disallowed * 'r) pos const
+  | Legacy : legacy -> ('l * 'r) const
+  | Tailcall_function : (disallowed * 'r) pos const
+  | Tailcall_argument : (disallowed * 'r) pos const
+  | Mutable_read : mutable_part -> (disallowed * 'r) neg const
+  | Mutable_write : mutable_part -> (disallowed * 'r) neg const
+  | Lazy_forced : (disallowed * 'r) neg const
+  | Function_return : (disallowed * 'r) pos const
+  | Stack_expression : ('l * disallowed) pos const
+  | Module_allocated_on_heap : (disallowed * 'r) pos const
+  | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
+  | Branching : ('l * disallowed) neg const
+  | Contained_by : is_contained_by -> ('l * 'r) const
+  | Is_used_in : pinpoint -> (disallowed * 'r) const
+      (** A variant of [Is_closed_by] where the closure mode is constant.
+          INVARIANT: The [pinpoint] cannot be [Unknown]. *)
+  | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
+  | Escape_region : region -> (disallowed * 'r) const
+  constraint 'd = _ * _
+[@@ocaml.warning "-62"]
+
+type closure_details =
+  { closure : pinpoint;
+    closed : pinpoint
   }
 
 type allocation_desc =

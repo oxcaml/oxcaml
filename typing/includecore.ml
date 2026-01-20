@@ -82,8 +82,8 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
       (* For children, we only check modality inclusion *)
       Ok All
     | Some moda1 ->
-      let m0 = Mode.Modality.apply moda0 m0 in
-      let m1 = Mode.Modality.Const.apply moda1 m1 in
+      let m0 = Mode.Modality.apply_left moda0 m0 in
+      let m1 = Mode.Modality.Const.apply_right moda1 m1 in
       Ok (Specific ((m0, c), m1))
     end
 
