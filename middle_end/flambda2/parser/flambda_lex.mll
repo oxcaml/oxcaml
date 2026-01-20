@@ -152,7 +152,7 @@ let bin_literal =
 let sign = ['-']
 let int_literal =
   sign? (decimal_literal | hex_literal | oct_literal | bin_literal)
-let float_literal =
+let dec_float_literal =
   ['0'-'9'] ['0'-'9' '_']*
   ('.' ['0'-'9' '_']* )?
   (['e' 'E'] ['+' '-']? ['0'-'9'] ['0'-'9' '_']* )?
@@ -161,6 +161,7 @@ let hex_float_literal =
   ['0'-'9' 'A'-'F' 'a'-'f'] ['0'-'9' 'A'-'F' 'a'-'f' '_']*
   ('.' ['0'-'9' 'A'-'F' 'a'-'f' '_']* )?
   (['p' 'P'] ['+' '-']? ['0'-'9'] ['0'-'9' '_']* )?
+let float_literal = sign? (dec_float_literal | hex_float_literal)
 let int_modifier = ['G'-'Z' 'g'-'z']
 
 rule token = parse
@@ -221,9 +222,9 @@ rule token = parse
          { PRIM p }
   | (int_literal as lit) (int_modifier as modif)?
          { INT (lit, modif) }
-  | float_literal | hex_float_literal as lit
+  | float_literal as lit
          { FLOAT (lit |> Float.of_string) }
-  | (float_literal | hex_float_literal | int_literal) identchar+ as lit
+  | (float_literal | int_literal) identchar+ as lit
          { error ~lexbuf (Invalid_literal lit) }
   | '"' (([^ '"'] | '\\' '"')* as s) '"'
          (* CR-someday lmaurer: Escape sequences, multiline strings *)
