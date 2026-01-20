@@ -838,7 +838,7 @@ Override an attribute in a extension's payload
     }
   }
   [merlin document] output: %swap swaps the first two arguments of a function call
- 
+
   $ test_merlin_overrides "1:22" "./attribute-as-payload.ml"
   [merlin locate] output: {
     "file": "$TESTCASE_ROOT/test/ppx.ml",
