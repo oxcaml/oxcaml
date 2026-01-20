@@ -39,6 +39,38 @@ module RegisterStamp : sig
 
     val iter : t -> f:(pair -> unit) -> unit
   end
+
+  (** Alternative bit matrix representation for edge sets.
+
+      This module provides the same interface as PairSet but uses a compact
+      bit matrix stored in a bytes value. Since the interference graph is
+      symmetric, only the upper triangle is stored (pairs where i < j).
+
+      Memory usage: O(n²/8) bytes where n is the number of registers.
+      This is more compact than PairSet for dense graphs.
+
+      Trade-offs compared to PairSet:
+      - Smaller memory footprint (n²/8 bytes vs hash table overhead)
+      - Better cache locality for membership testing
+      - O(n²) cardinal operation (vs O(1) for PairSet)
+      - O(n²) iter operation (vs O(edges) for PairSet) *)
+  module BitMatrix : sig
+    type t
+
+    val make : num_registers:int -> t
+
+    val clear : t -> unit
+
+    val mem : t -> pair -> bool
+
+    val add : t -> pair -> unit
+
+    (** Returns the number of set bits (edges) in the matrix.
+        WARNING: This is O(n²) where n is the number of registers. *)
+    val cardinal : t -> int
+
+    val iter : t -> f:(pair -> unit) -> unit
+  end
 end
 
 (** Degree tracking *)
