@@ -155,8 +155,8 @@ jobs:
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
             dwarf_tests_only: true
-            oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
-            oxcaml_llvm_source_branch: lldb
+            oxcaml_llvm_tag: oxcaml-lldb-21.1.0minus-0
+            oxcaml_llvm_source_branch: oxcaml-llvm-plugin
 
           - name: runtime5 frame-pointers llvmize-tests (x86_64-linux)
             config: --enable-runtime5 --enable-frame-pointers
