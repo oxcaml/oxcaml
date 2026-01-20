@@ -148,7 +148,15 @@ ocaml/primitives.new
 /emacs/ocamltags
 /emacs/*.elc
 
-/.vscode/
+/.vscode
+
+.bash_profile
+.bashrc
+.idea
+.profile
+.ripgreprc
+.zprofile
+.zshrc
 
 /flexdll-sources
 
