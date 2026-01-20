@@ -77,6 +77,14 @@ module RegisterStamp = struct
       = "%bytes_unsafe_set"
     [@@portable]
 
+    let[@inline always] bit_location ((i, j) : pair) num_registers =
+      let bit_offset =
+        i * num_registers - (i * (i + 1)) / 2 + (j - i - 1)
+      in
+      let byte_index = bit_offset / 8 in
+      let bit_position = bit_offset mod 8 in
+      byte_index, bit_position
+
     let make ~num_registers =
       let num_pairs = (num_registers * (num_registers - 1)) / 2 in
       let num_bytes = (num_pairs + 7) / 8 in
@@ -88,22 +96,14 @@ module RegisterStamp = struct
       if i = j
       then false
       else (
-        let bit_offset =
-          i * t.num_registers - (i * (i + 1)) / 2 + (j - i - 1)
-        in
-        let byte_index = bit_offset / 8 in
-        let bit_position = bit_offset mod 8 in
+        let byte_index, bit_position = bit_location (i, j) t.num_registers in
         let byte_val = unsafe_get_uint8 t.bits byte_index in
         byte_val land (1 lsl bit_position) <> 0)
 
     let add t ((i, j) : pair) =
       if i <> j
       then (
-        let bit_offset =
-          i * t.num_registers - (i * (i + 1)) / 2 + (j - i - 1)
-        in
-        let byte_index = bit_offset / 8 in
-        let bit_position = bit_offset mod 8 in
+        let byte_index, bit_position = bit_location (i, j) t.num_registers in
         let byte_val = unsafe_get_uint8 t.bits byte_index in
         unsafe_set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position)))
 
