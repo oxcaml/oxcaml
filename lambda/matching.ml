@@ -2363,7 +2363,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
     else
       let lbl = all_labels.:(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
-      let lbl_sort = all_sorts.:(pos) in
+      let lbl_sort = label_sort lbl all_sorts in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
@@ -2429,7 +2429,7 @@ let get_expr_args_record_unboxed_product ~scopes head
   in
   let lbl_layouts =
     Iarray.map (fun lbl ->
-      Typeopt.layout_of_sort lbl.lbl_loc all_sorts.:(lbl.lbl_pos)
+      Typeopt.layout_of_sort lbl.lbl_loc (label_sort lbl all_sorts)
     ) all_labels
     |> Iarray.to_list
   in
@@ -2451,7 +2451,7 @@ let get_expr_args_record_unboxed_product ~scopes head
         else
           Alias
       in
-      let lbl_sort = all_sorts.:(pos) in
+      let lbl_sort = label_sort lbl all_sorts in
       let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       (access, str, lbl_sort, layout) :: make_args (pos + 1)
   in

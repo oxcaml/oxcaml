@@ -129,6 +129,10 @@ let aliased_many_use =
   ( Mode.Uniqueness.disallow_left Mode.Uniqueness.aliased,
     Mode.Linearity.disallow_right Mode.Linearity.many )
 
+type record_sorts =
+  | Fixed
+  | Variable of Jkind.Sort.Const.t iarray
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -174,12 +178,12 @@ and 'k pattern_desc =
       value pattern_desc
   | Tpat_record :
       (Longident.t loc * label_description * value general_pattern) list *
-        Jkind.Sort.Const.t iarray * Types.record_representation * closed_flag ->
+        record_sorts * Types.record_representation * closed_flag ->
       value pattern_desc
   | Tpat_record_unboxed_product :
       (Longident.t loc * unboxed_label_description *
         value general_pattern) list
-      * Jkind.Sort.Const.t iarray
+      * record_sorts
       * Types.record_unboxed_product_representation
       * closed_flag ->
       value pattern_desc
@@ -1562,3 +1566,14 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
+
+let label_sort label record_sorts =
+  match record_sorts with
+  | Variable sorts -> sorts.:(label.lbl_pos)
+  | Fixed ->
+      begin match label.lbl_sort with
+      | Some sort -> sort
+      | None ->
+          Misc.fatal_errorf "no sort for label %s in fixed-sort record"
+            label.lbl_name
+      end

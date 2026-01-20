@@ -1705,19 +1705,22 @@ and build_as_type_aux (env : Env.t) p ~mode =
 let pp_lblo ppf (lbl, sort) =
   Format.fprintf ppf "@[<hv 2>%s@ @@ %a@]" lbl.lbl_name
     Jkind.Sort.Const.Debug_printers.t sort
-let pp_lblos ppf lbls =
-  Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@.")
-    pp_lblo ppf (lbls |> Iarray.to_list)
+let pp_lblos ppf (lbls, lblos) =
+  match lblos with
+  | Fixed -> Format.fprintf ppf "<fixed sorts>"
+  | Variable lblos ->
+    Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@.")
+      pp_lblo ppf (List.combine (lbls |> Iarray.to_list) (lblos |> Iarray.to_list))
 
 let update_labels (type rep) env labels (form : rep record_form) ~loc
       ~containing_type
-    : Jkind.Sort.Const.t iarray * rep =
-  begin fun (f : unit -> Jkind.Sort.Const.t iarray * rep) ->
+    : record_sorts * rep =
+  begin fun (f : unit -> record_sorts * rep) ->
     if not (be_noisy ()) then f () else begin
       Format.eprintf "[%d] OH BOY SO MANY LABELS!!@.%a@.%!" (get_current_level ())
         pp_lbls labels;
       let (lblos, _) as ans = f () in
-      Format.eprintf "WELL THAT WAS FUN@.%a@.%!" pp_lblos (Iarray.combine labels lblos);
+      Format.eprintf "WELL THAT WAS FUN@.%a@.%!" pp_lblos (labels, lblos);
       ans
     end
   end @@ fun () ->
@@ -1733,21 +1736,11 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
     Printtyp.raw_type_expr ty_res;
   unify_exp_types loc env containing_type ty_res;
   make_some_noisef "UNIFIED ty_res: %a" Printtyp.raw_type_expr ty_res;
-  let all_sorts, rep =
+  let sorts, rep =
     match labels.:(0).lbl_repres with
     | Some rep ->
         make_some_noisef "DOING IT THE EASY WAY";
-        let all_sorts =
-          (* If one record already had a representation, that means the labels all
-             already had sorts, so we don't need to update anything further. *)
-          Iarray.map
-            (fun label ->
-               match label.lbl_sort with
-               | Some sort -> sort
-               | _ -> Misc.fatal_errorf "missing sort in %s" label.lbl_name)
-            all_labels
-        in
-        all_sorts, rep
+        Fixed, rep
     | None ->
         let lbls_and_ty_args =
           Iarray.map2
@@ -1763,13 +1756,10 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
         with
         | Ok (sorts, rep) ->
             let sorts = sorts |> Iarray.of_list in
-            sorts, rep
+            Variable sorts, rep
         | Error (Unrepresentable_field name) ->
             raise (Error (loc, env,
                           Indeterminate_record_layout(containing_type, name)))
-  in
-  let sorts =
-    Iarray.map (fun label -> all_sorts.:(label.lbl_pos)) labels
   in
   sorts, rep
 
@@ -1784,9 +1774,9 @@ let update_label (type rep) env label (form : rep record_form) ~loc
   in
   let labels as labels0 = Iarray.make 1 label in
   if false then make_some_noisef "BEFORE: %a" pp_labels labels;
-  let labels, rep = update_labels env labels form ~loc ~containing_type in
-  if false then make_some_noisef "AFTAIR: %a" pp_lblos (Iarray.combine labels0 labels);
-  labels.:(0), rep
+  let sorts, rep = update_labels env labels form ~loc ~containing_type in
+  if false then make_some_noisef "AFTAIR: %a" pp_lblos (labels0, sorts);
+  label_sort label sorts, rep
 
 (* Constraint solving during typing of patterns *)
 
@@ -3218,7 +3208,7 @@ and type_pat_aux
             alloc_mode.mode
         in
         let alloc_mode = simple_pat_mode mode in
-        let ty_sort = sorts.:(label.lbl_pos) |> Jkind.Sort.of_const in
+        let ty_sort = label_sort label sorts |> Jkind.Sort.of_const in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
       in
       let make_record_pat

@@ -101,3 +101,15 @@ let make (type a : bits64) (fst : a) (snd : a) = { fst; snd }
 [%%expect{|
 val make : ('a : bits64). 'a -> 'a -> 'a t = <fun>
 |}]
+
+let test =
+  (* Check that projecting from a block with an [any] accounts for the layouts
+     of all previous fields in the block *)
+  let open struct
+    external box_int64 : int64# -> int64 = "%box_int64"
+  end in
+  let t = { fst = #1L; snd = #2L } |> Sys.opaque_identity in
+  t.snd |> box_int64
+[%%expect{|
+val test : int64 = 2L
+|}]

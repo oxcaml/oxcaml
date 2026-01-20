@@ -122,6 +122,17 @@ type texp_field_boxing =
 
 val aliased_many_use : unique_use
 
+(** Sort information for all fields in a record, at the point where the record
+    is being matched against or projected from. Depending on whether the record
+    type has a field of kind `any`, this may differ from value to value. *)
+type record_sorts =
+  | Fixed
+  (** The sorts of this record's fields were determined when the type was
+      declared. Invariant: Every description in [lbl_all] for any field has a
+      [lbl_sort] that's [Some]. *)
+  | Variable of Jkind.Sort.Const.t iarray
+  (** This value has the specified sorts for its fields. *)
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -215,7 +226,7 @@ and 'k pattern_desc =
          *)
   | Tpat_record :
       (Longident.t loc * Types.label_description * value general_pattern) list *
-        Jkind.Sort.Const.t iarray * Types.record_representation * closed_flag ->
+        record_sorts * Types.record_representation * closed_flag ->
       value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -225,8 +236,8 @@ and 'k pattern_desc =
   | Tpat_record_unboxed_product :
       (Longident.t loc * Types.unboxed_label_description *
          value general_pattern) list *
-        Jkind.Sort.Const.t iarray *
-        Types.record_unboxed_product_representation * closed_flag ->
+        record_sorts * Types.record_unboxed_product_representation *
+        closed_flag ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
             #{ l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -1380,3 +1391,6 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 (** Fold over the antiquotations in an expression. This function defines the
     evaluation order of antiquotations. *)
 val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
+
+val label_sort:
+    _ Types.gen_label_description -> record_sorts -> Jkind.Sort.Const.t

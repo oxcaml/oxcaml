@@ -1025,6 +1025,7 @@ let pats_of_type env ty =
           let fake_sorts =
             List.map (fun _ -> fake_sort_const) labels
             |> Iarray.of_list
+            |> fun sorts -> Variable sorts
           in
           [make_pat (Tpat_record (fields, fake_sorts, fake_record_repr,
                                   Closed)) ty env]
@@ -1037,6 +1038,7 @@ let pats_of_type env ty =
           let fake_sorts =
             List.map (fun _ -> fake_sort_const) labels
             |> Iarray.of_list
+            |> fun sorts -> Variable sorts
           in
           [make_pat (Tpat_record_unboxed_product
                        (fields, fake_sorts, fake_unboxed_record_repr,
