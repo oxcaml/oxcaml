@@ -54,6 +54,7 @@ type 'a pos = 'b * 'c constraint 'a = 'b * 'c
 (** Arrange the permissions appropriately for a negative lattice, by swapping
     left and right. *)
 type 'a neg = 'c * 'b constraint 'a = 'b * 'c
+type neither = disallowed * disallowed
 
 module type Allow_disallow = sig
   type ('a, 'b, 'd) sided constraint 'd = 'l * 'r
