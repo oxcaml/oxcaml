@@ -703,9 +703,25 @@ module type S = sig
 
     val proj_monadic : 'a Monadic.Axis.t -> ('l * 'r) t -> ('a, 'r * 'l) mode
 
-    val meet_const : Comonadic.Const.t -> ('l * 'r) t -> ('l * 'r) t
+    val meet_const : Comonadic.Const.t -> ('l * 'r) t -> ('l * disallowed) t
 
-    val join_const : Monadic.Const.t -> ('l * 'r) t -> ('l * 'r) t
+    val join_const : Monadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
+
+    val imply_const : Comonadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
+
+    val subtract_const : Monadic.Const.t -> ('l * 'r) t -> ('l * disallowed) t
+
+    val meet_const_with :
+      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
+
+    val join_const_with :
+      'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> (disallowed * 'r) t
+
+    val imply_const_with :
+      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> (disallowed * 'r) t
+
+    val subtract_const_with :
+      'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
 
     (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
     val max_with_comonadic :
@@ -718,10 +734,6 @@ module type S = sig
     (* [min_with_monadic ax elt] returns [min] but with the monadic axis [ax] set to [elt]. *)
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
-
-    val meet_const_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
-
-    val join_const_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val zap_to_legacy : lr -> Const.t
 
@@ -770,14 +782,8 @@ module type S = sig
     val locality_as_regionality : Locality.Const.t -> Regionality.Const.t
   end
 
-  (** Converts regional to local, identity otherwise *)
-  val regional_to_local : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
-
   (** Inject locality into regionality *)
-  val locality_as_regionality : ('l * 'r) Locality.t -> ('l * 'r) Regionality.t
-
-  (** Converts regional to global, identity otherwise *)
-  val regional_to_global : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
+  val locality_as_regionality : Locality.l -> Regionality.l
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
   val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
@@ -789,11 +795,14 @@ module type S = sig
   val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
-  val value_to_alloc_r2g : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+  val value_to_alloc_r2g :
+    ('l * 'r) Value.t -> (disallowed * 'r) Alloc.t
 
   (** Similar to [value_to_alloc_r2g], but followed by [alloc_as_value]. *)
   val value_r2g :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Value.t
+    ?hint:(disallowed * 'r) Hint.morph
+    -> ('l * 'r) Value.t
+    -> (disallowed * 'r) Value.t
 
   module Modality : sig
     module Comonadic : sig
@@ -870,13 +879,23 @@ module type S = sig
 
       (* CR-soon zqian: make the [hint] below mandatory *)
 
-      (** Apply a modality on mode. *)
-      val apply :
+      (** Apply a modality on left mode. *)
+      val apply_left :
         ?hint:
-          (('l * 'r) neg Hint.morph, ('l * 'r) pos Hint.morph) monadic_comonadic ->
+          ((allowed * 'r) neg Hint.const,
+           left_only Hint.morph) monadic_comonadic ->
         t ->
-        ('l * 'r) Value.t ->
-        ('l * 'r) Value.t
+        (allowed * 'r) Value.t ->
+        Value.l
+
+      (** Apply a modality on right mode. *)
+      val apply_right :
+        ?hint:
+          (right_only neg Hint.morph,
+           ('l * allowed) Hint.const) monadic_comonadic ->
+        t ->
+        ('l * allowed) Value.t ->
+        Value.r
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
@@ -919,10 +938,10 @@ module type S = sig
     (** Apply a modality on a left mode. The calller should ensure that
         [apply t m] is only called for [m >= md_mode] for inferred modalities.
     *)
-    val apply :
+    val apply_left :
       ?hint:
-        ( (allowed * 'r) neg Hint.morph,
-          (allowed * 'r) pos Hint.morph )
+        ( (allowed * 'r) neg Hint.const,
+          left_only Hint.morph )
         monadic_comonadic ->
       t ->
       (allowed * 'r) Value.t ->
@@ -1119,10 +1138,10 @@ module type S = sig
     val to_modality : t -> Modality.Const.t
 
     (** Apply mode crossing on a left mode, making it stronger. *)
-    val apply_left : t -> ('l * 'r) Value.t -> ('l * disallowed) Value.t
+    val apply_left : t -> (allowed * 'r) Value.t -> Value.l
 
     (** Apply mode crossing on a right mode, making it more permissive. *)
-    val apply_right : t -> ('l * 'r) Value.t -> (disallowed * 'r) Value.t
+    val apply_right : t -> ('l * allowed) Value.t -> Value.r
 
     (* We extend mode crossing on [Value] to [Alloc] via [alloc_as_value].
        Concretely, two [Alloc] modes are indistinguishable if their images under

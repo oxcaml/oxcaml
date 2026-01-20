@@ -12,9 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* warn on fragile matches *)
-[@@@warning "+4"]
-
 open Allowance
 open Solver_intf
 open Solver
@@ -185,6 +182,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Contained_by c -> Contained_by c
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -202,6 +200,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Contained_by c -> Contained_by c
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -223,6 +222,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Contained_by c -> Contained_by c
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -244,6 +244,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Contained_by c -> Contained_by c
     end)
   end
 end
@@ -326,18 +327,46 @@ module Lattices = struct
   end
   [@@inline]
 
-  (* Make the type of [Locality] and [Regionality] below distinguishable,
-     so that we can be sure [Comonadic_with] is applied correctly. *)
+  type locality =
+    | Global
+    | Local
+
+  type regionality =
+    | Global
+    | Regional
+    | Local
+
+  type 'a areality =
+    | Locality : locality areality
+    | Regionality : regionality areality
+
+  let equal_areality
+      : type a b. a areality -> b areality -> (a, b) equality =
+    fun a b ->
+      match a, b with
+      | Locality, Locality -> Equal
+      | Regionality, Regionality -> Equal
+      | (Locality | Regionality), _ -> Not_equal
+
+  let compare_areality
+      : type a b. a areality -> b areality -> (a, b) comparison =
+    fun a b ->
+      match a, b with
+      | Locality, Locality -> Equal
+      | Locality, _ -> Less_than
+      | _, Locality -> Greater_than
+      | Regionality, Regionality -> Equal
+
   module type Areality = sig
     include Const
 
     include Heyting with type t := t
 
-    val _is_areality : unit
+    val areality : t areality
   end
 
   module Locality = struct
-    type t =
+    type t = locality =
       | Global
       | Local
 
@@ -357,11 +386,11 @@ module Lattices = struct
       | Global -> Fmt.fprintf ppf "global"
       | Local -> Fmt.fprintf ppf "local"
 
-    let _is_areality = ()
+    let areality = Locality
   end
 
   module Regionality = struct
-    type t =
+    type t = regionality =
       | Global
       | Regional
       | Local
@@ -383,7 +412,7 @@ module Lattices = struct
       | Regional -> Fmt.fprintf ppf "regional"
       | Local -> Fmt.fprintf ppf "local"
 
-    let _is_areality = ()
+    let areality = Regionality
   end
 
   module Uniqueness = struct
@@ -1232,156 +1261,309 @@ module Lattices_mono = struct
       | Staticity -> { t with staticity = r }
   end
 
-  type ('a, 'b, 'd) morph =
-    | Id : ('a, 'a, 'l * 'r) morph  (** identity morphism *)
-    | Meet_const : 'a -> ('a, 'a, 'l * 'r) morph
-        (** Meet the input with the parameter *)
-    | Imply_const : 'a -> ('a, 'a, disallowed * 'r) morph
-        (** The right adjoint of [Meet_const] *)
-    | Proj : 't obj * ('t, 'r_) Axis.t -> ('t, 'r_, 'l * 'r) morph
-        (** Project from a product to an axis *)
-    | Max_with : ('t, 'r_) Axis.t -> ('r_, 't, disallowed * 'r) morph
-        (** Combine an axis with maxima along other axes *)
-    | Min_with : ('t, 'r_) Axis.t -> ('r_, 't, 'l * disallowed) morph
-        (** Combine an axis with minima along other axes *)
-    | Map_comonadic :
-        ('a1, 'a2, 'l * 'r) morph
-        -> ('a1 comonadic_with, 'a2 comonadic_with, 'l * 'r) morph
-        (** Lift an morphism on areality to a morphism on the comonadic fragment
-        *)
-    | Monadic_to_comonadic_min :
-        (Monadic_op.t, 'a comonadic_with, 'l * disallowed) morph
-        (** Dualize the monadic fragment to the comonadic fragment. The areality
-            is set to min. *)
-    | Comonadic_to_monadic_min :
-        'a comonadic_with obj
-        -> ('a comonadic_with, Monadic_op.t, 'l * disallowed) morph
-        (** Dualize the comonadic fragment to the monadic fragment. The
-            staticity_op is set to min. *)
-    | Monadic_to_comonadic_max :
-        (Monadic_op.t, 'a comonadic_with, disallowed * 'r) morph
-        (** Dualize the monadic fragment to the comonadic fragment. The areality
-            is set to max. *)
-    | Comonadic_to_monadic_max :
-        'a comonadic_with obj
-        -> ('a comonadic_with, Monadic_op.t, disallowed * 'r) morph
-        (** Dualize the comonadic fragment to the monadic fragment. The
-            staticity_op is set to max. *)
-    (* Following is a chain of adjunction (complete and cannot extend in
-       either direction) *)
-    | Local_to_regional : (Locality.t, Regionality.t, 'l * disallowed) morph
+  type ('a, 'b, 'd) locality_morph =
+    (* Following is a chain of adjunctions (this can be extended one
+       further, but we never need the missing operation) *)
+    | Local_to_regional :
+        (Locality.t,
+         Regionality.t, 'l * disallowed) locality_morph
         (** Maps local to regional, global to global *)
-    | Regional_to_local : (Regionality.t, Locality.t, 'l * 'r) morph
+    | Regional_to_local :
+        (Regionality.t,
+         Locality.t, 'l * 'r) locality_morph
         (** Maps regional to local, identity otherwise *)
-    | Locality_as_regionality : (Locality.t, Regionality.t, 'l * 'r) morph
-        (** Inject locality into regionality *)
-    | Regional_to_global : (Regionality.t, Locality.t, 'l * 'r) morph
+    | Locality_as_regionality :
+        (Locality.t,
+         Regionality.t, 'l * 'r) locality_morph
+        (** Inject locality into regionality  *)
+    | Regional_to_global :
+        (Regionality.t,
+         Locality.t, disallowed * 'r) locality_morph
         (** Maps regional to global, identity otherwise *)
-    | Global_to_regional : (Locality.t, Regionality.t, disallowed * 'r) morph
-        (** Maps global to regional, local to local *)
-    | Compose :
-        ('b, 'c, 'l * 'r) morph * ('a, 'b, 'l * 'r) morph
-        -> ('a, 'c, 'l * 'r) morph  (** Compoistion of two morphisms *)
-    constraint 'd = _ * _
-  [@@ocaml.warning "-62"]
+    (* Versions of the above morphisms operating on regionality. *)
+    | Local_to_regional_regionality :
+        (Regionality.t,
+         Regionality.t, 'l * disallowed) locality_morph
+        (** Maps regional to local, identity otherwise. *)
+    | Regional_to_local_regionality :
+        (Regionality.t,
+         Regionality.t, 'l * 'r) locality_morph
+        (** Maps regional to local, identity otherwise. *)
+    | Regional_to_global_regionality :
+        (Regionality.t,
+         Regionality.t, disallowed * 'r) locality_morph
+        (** Maps regional to global, identity otherwise. *)
+
+  type ('a, 'b, 'd) core_morph =
+    | Locality_restricted
+      : ('a, 'b, 'l * 'r) locality_morph
+        -> ('a, 'b, 'l * 'r) core_morph
+    | Locality_full
+      : ('a, 'b, 'l * 'r) locality_morph
+        -> ('a comonadic_with, 'b comonadic_with, 'l * 'r) core_morph
+    | Uniqueness_op_to_linearity
+      : (Uniqueness_op.t, Linearity.t, 'l * 'r) core_morph
+    | Linearity_to_uniqueness_op
+      : (Linearity.t, Uniqueness_op.t, 'l * 'r) core_morph
+    | Contention_op_to_portability
+      : (Contention_op.t, Portability.t, 'l * 'r) core_morph
+    | Portability_to_contention_op
+      : (Portability.t, Contention_op.t, 'l * 'r) core_morph
+    | Visibility_op_to_statefulness
+      : (Visibility_op.t, Statefulness.t, 'l * 'r) core_morph
+    | Statefulness_to_visibility_op
+      : (Statefulness.t, Visibility_op.t, 'l * 'r) core_morph
+    | Monadic_to_comonadic_min
+      : (Monadic_op.t, 'a comonadic_with, 'l * disallowed) core_morph
+      (** Dualize the monadic fragment to the comonadic fragment.
+          The areality is set to min. *)
+    | Comonadic_to_monadic_min
+      : 'a areality
+        -> ('a comonadic_with, Monadic_op.t, 'l * disallowed) core_morph
+      (** Dualize the comonadic fragment to the monadic fragment.  The
+          areality axis is ignored, the staticity axis is set to min. *)
+    | Monadic_to_comonadic_max
+      : (Monadic_op.t, 'a comonadic_with, disallowed * 'r) core_morph
+      (** Dualize the monadic fragment to the comonadic fragment.
+          The areality is set to max. *)
+    | Comonadic_to_monadic_max
+      : 'a areality
+        -> ('a comonadic_with, Monadic_op.t, disallowed * 'r) core_morph
+      (** Dualize the comonadic fragment to the monadic fragment.
+          The areality axis is ignored.  *)
+
+  type ('a, 'b, 'd) simple_morph =
+    | Id : ('a, 'a, 'd) simple_morph  (** identity morphism *)
+    | Core : ('a, 'b, 'd) core_morph -> ('a, 'b, 'd) simple_morph
+    | Meet_const : 'a -> ('a, 'a, 'l * disallowed) simple_morph
+        (** Meet the input with the parameter *)
+    | Imply_const : 'a -> ('a, 'a, disallowed * 'r) simple_morph
+        (** The right adjoint of [Meet_const] *)
+    | Core_and_meet_const :
+        'b * ('a, 'b, 'l * disallowed) core_morph
+        -> ('a, 'b, 'l * disallowed) simple_morph
+        (** Composition of [Core] and [Meet_const]. We only need to include one
+            order of composition because currently all our core left morphisms
+            preserve binary meets. *)
+    | Imply_const_and_core :
+        ('a, 'b, disallowed * 'r) core_morph * 'a
+        -> ('a, 'b, disallowed * 'r) simple_morph
+        (** Composition of [Core] and [Imply_const]. We only need to include one
+            order of composition because currently all our core right morphisms
+            commute with implication. *)
+    | Compose : ('b, 'c, neither) simple_morph * ('a, 'b, neither) simple_morph
+                -> ('a, 'c, neither) simple_morph
+        (** Compoistion of two morphisms. We don't allow compositions to
+            appear on either side to ensure that there are a finite
+            number of morphisms we can encounter in practice. *)
+
+  type ('a, 'b, 'd) morph =
+    | Simple : ('a, 'b, 'd) simple_morph -> ('a, 'b, 'd) morph
+    | Proj_and :
+        ('p, 'q, 'd) simple_morph * ('s, 'p) Axis.t * 's obj
+        -> ('s, 'q, 'd) morph
+        (** Composition of projecting out an axis and a simple morphism. *)
+    | And_max_with :
+         ('s, 'q) Axis.t * ('p, 'q, disallowed * 'r) simple_morph
+        -> ('p, 's, disallowed * 'r) morph
+        (** Composition of a morphism and combining an axis with the
+            maxima along other axes. *)
+    | And_min_with :
+        ('s, 'q) Axis.t * ('p, 'q, 'l * disallowed) simple_morph
+        -> ('p, 's, 'l * disallowed) morph
+        (** Composition of a morphism and combining an axis with the
+            minima along other axes. *)
 
   include Magic_allow_disallow (struct
-    type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = 'l * 'r
+    type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph
+      constraint 'd = _ * _
 
-    let rec allow_left : type a b l r.
-        (a, b, allowed * r) morph -> (a, b, l * r) morph = function
-      | Id -> Id
-      | Proj (src, ax) -> Proj (src, ax)
-      | Min_with ax -> Min_with ax
-      | Meet_const c -> Meet_const c
-      | Compose (f, g) ->
-        let f = allow_left f in
-        let g = allow_left g in
-        Compose (f, g)
-      | Monadic_to_comonadic_min -> Monadic_to_comonadic_min
-      | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
+    let allow_left_locality :
+          type a b l r. (a, b, allowed * r) locality_morph
+               -> (a, b, l * r) locality_morph =
+      function
       | Local_to_regional -> Local_to_regional
       | Locality_as_regionality -> Locality_as_regionality
       | Regional_to_local -> Regional_to_local
-      | Regional_to_global -> Regional_to_global
-      | Map_comonadic f ->
-        let f = allow_left f in
-        Map_comonadic f
+      | Local_to_regional_regionality -> Local_to_regional_regionality
+      | Regional_to_local_regionality -> Regional_to_local_regionality
 
-    let rec allow_right : type a b l r.
-        (a, b, l * allowed) morph -> (a, b, l * r) morph = function
+    let allow_left_core :
+          type a b l r. (a, b, allowed * r) core_morph -> (a, b, l * r) core_morph =
+      function
+      | Locality_restricted m -> Locality_restricted (allow_left_locality m)
+      | Locality_full m -> Locality_full (allow_left_locality m)
+      | Uniqueness_op_to_linearity -> Uniqueness_op_to_linearity
+      | Linearity_to_uniqueness_op -> Linearity_to_uniqueness_op
+      | Contention_op_to_portability -> Contention_op_to_portability
+      | Portability_to_contention_op -> Portability_to_contention_op
+      | Visibility_op_to_statefulness -> Visibility_op_to_statefulness
+      | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
+      | Monadic_to_comonadic_min -> Monadic_to_comonadic_min
+      | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
+
+    let allow_left_simple :
+        type a b l r. (a, b, allowed * r) simple_morph -> (a, b, l * r) simple_morph =
+      function
       | Id -> Id
-      | Proj (src, ax) -> Proj (src, ax)
-      | Max_with ax -> Max_with ax
+      | Core m -> Core (allow_left_core m)
       | Meet_const c -> Meet_const c
-      | Imply_const c -> Imply_const c
-      | Compose (f, g) ->
-        let f = allow_right f in
-        let g = allow_right g in
-        Compose (f, g)
+      | Core_and_meet_const(c, m) -> Core_and_meet_const(c, allow_left_core m)
+
+    let allow_left :
+        type a b l r. (a, b, allowed * r) morph -> (a, b, l * r) morph =
+      function
+      | Simple m -> Simple (allow_left_simple m)
+      | Proj_and(m, ax, src) -> Proj_and(allow_left_simple m, ax, src)
+      | And_min_with(ax, m) -> And_min_with(ax, allow_left_simple m)
+
+    let allow_right_locality :
+        type a b l r. (a, b, l * allowed) locality_morph
+             -> (a, b, l * r) locality_morph =
+      function
+      | Regional_to_local -> Regional_to_local
+      | Locality_as_regionality -> Locality_as_regionality
+      | Regional_to_global -> Regional_to_global
+      | Regional_to_local_regionality -> Regional_to_local_regionality
+      | Regional_to_global_regionality -> Regional_to_global_regionality
+
+    let allow_right_core :
+        type a b l r. (a, b, l * allowed) core_morph -> (a, b, l * r) core_morph =
+      function
+      | Locality_restricted m -> Locality_restricted (allow_right_locality m)
+      | Locality_full m -> Locality_full (allow_right_locality m)
+      | Uniqueness_op_to_linearity -> Uniqueness_op_to_linearity
+      | Linearity_to_uniqueness_op -> Linearity_to_uniqueness_op
+      | Contention_op_to_portability -> Contention_op_to_portability
+      | Portability_to_contention_op -> Portability_to_contention_op
+      | Visibility_op_to_statefulness -> Visibility_op_to_statefulness
+      | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
       | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
       | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
-      | Global_to_regional -> Global_to_regional
-      | Locality_as_regionality -> Locality_as_regionality
-      | Regional_to_local -> Regional_to_local
-      | Regional_to_global -> Regional_to_global
-      | Map_comonadic f ->
-        let f = allow_right f in
-        Map_comonadic f
 
-    let rec disallow_left : type a b l r.
-        (a, b, l * r) morph -> (a, b, disallowed * r) morph = function
+    let allow_right_simple :
+        type a b l r. (a, b, l * allowed) simple_morph
+             -> (a, b, l * r) simple_morph =
+      function
       | Id -> Id
-      | Proj (src, ax) -> Proj (src, ax)
-      | Min_with ax -> Min_with ax
-      | Max_with ax -> Max_with ax
-      | Meet_const c -> Meet_const c
+      | Core m -> Core (allow_right_core m)
       | Imply_const c -> Imply_const c
-      | Compose (f, g) ->
-        let f = disallow_left f in
-        let g = disallow_left g in
-        Compose (f, g)
+      | Imply_const_and_core(m, c) -> Imply_const_and_core(allow_right_core m, c)
+
+    let allow_right :
+        type a b l r. (a, b, l * allowed) morph -> (a, b, l * r) morph =
+      function
+      | Simple m -> Simple (allow_right_simple m)
+      | Proj_and(m, ax, src) -> Proj_and(allow_right_simple m, ax, src)
+      | And_max_with(ax, m) -> And_max_with(ax, allow_right_simple m)
+
+    let disallow_left_locality :
+        type a b l r.
+             (a, b, l * r) locality_morph -> (a, b, disallowed * r) locality_morph =
+      function
+      | Local_to_regional -> Local_to_regional
+      | Regional_to_local -> Regional_to_local
+      | Locality_as_regionality -> Locality_as_regionality
+      | Regional_to_global -> Regional_to_global
+      | Local_to_regional_regionality -> Local_to_regional_regionality
+      | Regional_to_local_regionality -> Regional_to_local_regionality
+      | Regional_to_global_regionality -> Regional_to_global_regionality
+
+    let disallow_left_core :
+        type a b l r.
+             (a, b, l * r) core_morph -> (a, b, disallowed * r) core_morph =
+      function
+      | Locality_restricted m -> Locality_restricted (disallow_left_locality m)
+      | Locality_full m -> Locality_full (disallow_left_locality m)
+      | Uniqueness_op_to_linearity -> Uniqueness_op_to_linearity
+      | Linearity_to_uniqueness_op -> Linearity_to_uniqueness_op
+      | Contention_op_to_portability -> Contention_op_to_portability
+      | Portability_to_contention_op -> Portability_to_contention_op
+      | Visibility_op_to_statefulness -> Visibility_op_to_statefulness
+      | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
       | Monadic_to_comonadic_min -> Monadic_to_comonadic_min
       | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
       | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
       | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
-      | Local_to_regional -> Local_to_regional
-      | Global_to_regional -> Global_to_regional
-      | Locality_as_regionality -> Locality_as_regionality
-      | Regional_to_local -> Regional_to_local
-      | Regional_to_global -> Regional_to_global
-      | Map_comonadic f ->
-        let f = disallow_left f in
-        Map_comonadic f
 
-    let rec disallow_right : type a b l r.
-        (a, b, l * r) morph -> (a, b, l * disallowed) morph = function
+    let rec disallow_left_simple :
+        type a b l r. (a, b, l * r) simple_morph
+             -> (a, b, disallowed * r) simple_morph =
+      function
       | Id -> Id
-      | Proj (src, ax) -> Proj (src, ax)
-      | Min_with ax -> Min_with ax
-      | Max_with ax -> Max_with ax
+      | Core m -> Core (disallow_left_core m)
       | Meet_const c -> Meet_const c
       | Imply_const c -> Imply_const c
-      | Compose (f, g) ->
-        let f = disallow_right f in
-        let g = disallow_right g in
-        Compose (f, g)
+      | Core_and_meet_const(c, m) -> Core_and_meet_const(c, disallow_left_core m)
+      | Imply_const_and_core(m, c) -> Imply_const_and_core(disallow_left_core m, c)
+      | Compose (mb, ma) ->
+        let mb = disallow_left_simple mb in
+        let ma = disallow_left_simple ma in
+        Compose (mb, ma)
+
+    let disallow_left :
+        type a b l r. (a, b, l * r) morph -> (a, b, disallowed * r) morph =
+      function
+      | Simple m -> Simple (disallow_left_simple m)
+      | Proj_and(m, ax, src) -> Proj_and(disallow_left_simple m, ax, src)
+      | And_max_with(ax, m) -> And_max_with(ax, disallow_left_simple m)
+      | And_min_with(ax, m) -> And_min_with(ax, disallow_left_simple m)
+
+    let disallow_right_locality :
+        type a b l r.
+             (a, b, l * r) locality_morph -> (a, b, l * disallowed) locality_morph =
+      function
+      | Local_to_regional -> Local_to_regional
+      | Regional_to_local -> Regional_to_local
+      | Locality_as_regionality -> Locality_as_regionality
+      | Regional_to_global -> Regional_to_global
+      | Local_to_regional_regionality -> Local_to_regional_regionality
+      | Regional_to_local_regionality -> Regional_to_local_regionality
+      | Regional_to_global_regionality -> Regional_to_global_regionality
+
+    let disallow_right_core :
+        type a b l r.
+             (a, b, l * r) core_morph -> (a, b, l * disallowed) core_morph =
+      function
+      | Locality_restricted m -> Locality_restricted (disallow_right_locality m)
+      | Locality_full m -> Locality_full (disallow_right_locality m)
+      | Uniqueness_op_to_linearity -> Uniqueness_op_to_linearity
+      | Linearity_to_uniqueness_op -> Linearity_to_uniqueness_op
+      | Contention_op_to_portability -> Contention_op_to_portability
+      | Portability_to_contention_op -> Portability_to_contention_op
+      | Visibility_op_to_statefulness -> Visibility_op_to_statefulness
+      | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
       | Monadic_to_comonadic_min -> Monadic_to_comonadic_min
       | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
       | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
       | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
-      | Local_to_regional -> Local_to_regional
-      | Global_to_regional -> Global_to_regional
-      | Locality_as_regionality -> Locality_as_regionality
-      | Regional_to_local -> Regional_to_local
-      | Regional_to_global -> Regional_to_global
-      | Map_comonadic f ->
-        let f = disallow_right f in
-        Map_comonadic f
+
+    let rec disallow_right_simple :
+        type a b l r. (a, b, l * r) simple_morph
+             -> (a, b, l * disallowed) simple_morph =
+      function
+      | Id -> Id
+      | Core m -> Core (disallow_right_core m)
+      | Meet_const c -> Meet_const c
+      | Imply_const c -> Imply_const c
+      | Core_and_meet_const(c, m) -> Core_and_meet_const(c, disallow_right_core m)
+      | Imply_const_and_core(m, c) -> Imply_const_and_core(disallow_right_core m, c)
+      | Compose (mb, ma) ->
+        let mb = disallow_right_simple mb in
+        let ma = disallow_right_simple ma in
+        Compose (mb, ma)
+
+    let disallow_right :
+        type a b l r. (a, b, l * r) morph -> (a, b, l * disallowed) morph =
+      function
+      | Simple m -> Simple (disallow_right_simple m)
+      | Proj_and(m, ax, src) -> Proj_and(disallow_right_simple m, ax, src)
+      | And_max_with(ax, m) ->
+          And_max_with(ax, disallow_right_simple m)
+      | And_min_with(ax, m) ->
+          And_min_with(ax, disallow_right_simple m)
+
   end)
-
-  let set_areality : type a1 a2. a2 -> a1 comonadic_with -> a2 comonadic_with =
-   fun r t -> { t with areality = r }
 
   let proj_obj : type t r. (t, r) Axis.t -> t obj -> r obj =
    fun ax obj ->
@@ -1403,275 +1585,539 @@ module Lattices_mono = struct
     | Visibility, Monadic_op -> Visibility_op
     | Staticity, Monadic_op -> Staticity_op
 
-  let comonadic_with_obj : type a. a obj -> a comonadic_with obj =
-   fun a0 ->
-    match a0 with
+  let areality_comonadic_obj : type a. a areality -> a comonadic_with obj =
+    function
     | Locality -> Comonadic_with_locality
     | Regionality -> Comonadic_with_regionality
-    | Uniqueness_op | Linearity | Monadic_op | Comonadic_with_regionality
-    | Comonadic_with_locality | Contention_op | Visibility_op | Portability
-    | Forkable | Yielding | Statefulness | Staticity_op ->
-      assert false
 
-  let rec src : type a b l r. b obj -> (a, b, l * r) morph -> a obj =
+  let src_locality_restricted :
+        type a b d. (a, b, d) locality_morph -> a obj = function
+    | Local_to_regional -> Locality
+    | Regional_to_local -> Regionality
+    | Locality_as_regionality -> Locality
+    | Regional_to_global -> Regionality
+    | Local_to_regional_regionality -> Regionality
+    | Regional_to_local_regionality -> Regionality
+    | Regional_to_global_regionality -> Regionality
+
+  let src_locality_full :
+        type a b d. (a, b, d) locality_morph -> (a comonadic_with) obj = function
+    | Local_to_regional -> Comonadic_with_locality
+    | Regional_to_local -> Comonadic_with_regionality
+    | Locality_as_regionality -> Comonadic_with_locality
+    | Regional_to_global -> Comonadic_with_regionality
+    | Local_to_regional_regionality -> Comonadic_with_regionality
+    | Regional_to_local_regionality -> Comonadic_with_regionality
+    | Regional_to_global_regionality -> Comonadic_with_regionality
+
+  let src_core : type a b d. (a, b, d) core_morph -> a obj = function
+    | Locality_restricted m -> src_locality_restricted m
+    | Locality_full m -> src_locality_full m
+    | Uniqueness_op_to_linearity -> Uniqueness_op
+    | Linearity_to_uniqueness_op -> Linearity
+    | Contention_op_to_portability -> Contention_op
+    | Portability_to_contention_op -> Portability
+    | Visibility_op_to_statefulness -> Visibility_op
+    | Statefulness_to_visibility_op -> Statefulness
+    | Monadic_to_comonadic_min -> Monadic_op
+    | Comonadic_to_monadic_min ar -> areality_comonadic_obj ar
+    | Monadic_to_comonadic_max -> Monadic_op
+    | Comonadic_to_monadic_max ar -> areality_comonadic_obj ar
+
+
+  let comonadic_obj_areality : type a. a comonadic_with obj -> a areality =
+    function
+    | Comonadic_with_locality -> Locality
+    | Comonadic_with_regionality -> Regionality
+
+  let rec src_simple
+          : type a b d. b obj -> (a, b, d) simple_morph -> a obj =
    fun dst f ->
     match f with
     | Id -> dst
-    | Proj (src, _) -> src
-    | Max_with ax -> proj_obj ax dst
-    | Min_with ax -> proj_obj ax dst
+    | Core m -> src_core m
     | Meet_const _ -> dst
     | Imply_const _ -> dst
-    | Compose (f, g) ->
-      let mid = src dst f in
-      src mid g
-    | Monadic_to_comonadic_min -> Monadic_op
-    | Comonadic_to_monadic_min src -> src
-    | Comonadic_to_monadic_max src -> src
-    | Monadic_to_comonadic_max -> Monadic_op
-    | Local_to_regional -> Locality
-    | Locality_as_regionality -> Locality
-    | Global_to_regional -> Locality
-    | Regional_to_local -> Regionality
-    | Regional_to_global -> Regionality
-    | Map_comonadic f ->
-      let dst0 = proj_obj Areality dst in
-      let src0 = src dst0 f in
-      comonadic_with_obj src0
+    | Core_and_meet_const(_, m) -> src_core m
+    | Imply_const_and_core(m, _) -> src_core m
+    | Compose (mb, ma) ->
+      let mid = src_simple dst mb in
+      src_simple mid ma
 
-  let rec equal_morph :
-      type a1 l1 r1 a2 b l2 r2.
-      b obj ->
-      (a1, b, l1 * r1) morph ->
-      (a2, b, l2 * r2) morph ->
-      (a1, a2) equality =
-   fun _dst f1 f2 ->
-    match f1, f2 with
-    | Id, Id -> Equal
-    | Proj (src1, ax1), Proj (src2, ax2) -> (
-      match equal_obj src1 src2 with
-      | Equal -> (
-        match Axis.equal ax1 ax2 with Not_equal -> Not_equal | Equal -> Equal)
-      | Not_equal -> Not_equal)
-    | Max_with ax1, Max_with ax2 -> (
-      match Axis.equal ax1 ax2 with Equal -> Equal | Not_equal -> Not_equal)
-    | Min_with ax1, Min_with ax2 -> (
-      match Axis.equal ax1 ax2 with Equal -> Equal | Not_equal -> Not_equal)
-    | Meet_const c1, Meet_const c2 ->
-      (* This polymorphic equality is correct only if runtime representation
-         uniquely identifies a constant, which could be false. For example,
-         the lattice of rational number would be represented as the tuple of
-         numerator and denominator, and (9,4) and (18, 8) means the same
-         thing. However, even in that case, it's not unsound, as [equal_morph] is
-         not requird to be complete: i.e., it's allowed to return [Not_equal] when
-         it should return [Equal]. It would cause duplication but not error. *)
-      if c1 = c2 then Equal else Not_equal
-    | Imply_const c1, Imply_const c2 -> if c1 = c2 then Equal else Not_equal
-    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
-    | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> begin
-        match equal_obj a1 a2 with Not_equal -> Not_equal | Equal -> Equal
-      end
-    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Equal
-    | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> begin
-        match equal_obj a1 a2 with Not_equal -> Not_equal | Equal -> Equal
-      end
-    | Local_to_regional, Local_to_regional -> Equal
-    | Locality_as_regionality, Locality_as_regionality -> Equal
-    | Global_to_regional, Global_to_regional -> Equal
-    | Regional_to_local, Regional_to_local -> Equal
-    | Regional_to_global, Regional_to_global -> Equal
-    | Compose (f1, g1), Compose (f2, g2) -> (
-      match equal_morph _dst f1 f2 with
-      | Not_equal -> Not_equal
-      | Equal -> (
-        match equal_morph (src _dst f1) g1 g2 with Not_equal -> Not_equal | Equal -> Equal))
-    | Map_comonadic f, Map_comonadic g -> (
-      match equal_morph (proj_obj Areality _dst) f g with Equal -> Equal | Not_equal -> Not_equal)
-    | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_const _
-        | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
-        | Monadic_to_comonadic_max | Comonadic_to_monadic_max _
-        | Local_to_regional | Locality_as_regionality
-        | Global_to_regional | Regional_to_local
-        | Regional_to_global | Compose _ | Map_comonadic _ | Imply_const _ ),
-        _ ) ->
-      Not_equal
+  let src : type a b d. b obj -> (a, b, d) morph -> a obj =
+   fun dst f ->
+    match f with
+    | Simple m -> src_simple dst m
+    | Proj_and(_, _, src) -> src
+    | And_max_with(ax, m) -> src_simple (proj_obj ax dst) m
+    | And_min_with(ax, m) -> src_simple (proj_obj ax dst) m
 
-  let rec compare_morph :
-      type a1 l1 r1 a2 b l2 r2.
-      b obj ->
-      (a1, b, l1 * r1) morph ->
-      (a2, b, l2 * r2) morph ->
-      (a1, a2) comparison =
-   fun dst f1 f2 ->
-    match f1, f2 with
-    | Id, Id -> Equal
-    | Id, _ -> Less_than
-    | _, Id -> Greater_than
-    | Proj (src1, ax1), Proj (src2, ax2) -> (
-      match compare_obj src1 src2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal ->
-        match Axis.compare ax1 ax2 with
-        | Less_than -> Less_than
-        | Greater_than -> Greater_than
-        | Equal -> Equal)
-    | Proj _, _ -> Less_than
-    | _, Proj _ -> Greater_than
-    | Max_with ax1, Max_with ax2 -> (
-      match Axis.compare ax1 ax2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Max_with _, _ -> Less_than
-    | _, Max_with _ -> Greater_than
-    | Min_with ax1, Min_with ax2 -> (
-      match Axis.compare ax1 ax2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Min_with _, _ -> Less_than
-    | _, Min_with _ -> Greater_than
-    | Meet_const c1, Meet_const c2 ->
-      if c1 = c2 then Equal
-      else if c1 < c2 then Less_than
-      else Greater_than
-    | Meet_const _, _ -> Less_than
-    | _, Meet_const _ -> Greater_than
-    | Imply_const c1, Imply_const c2 ->
-      if c1 = c2 then Equal
-      else if c1 < c2 then Less_than
-      else Greater_than
-    | Imply_const _, _ -> Less_than
-    | _, Imply_const _ -> Greater_than
-    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
-    | Monadic_to_comonadic_min, _ -> Less_than
-    | _, Monadic_to_comonadic_min -> Greater_than
-    | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> (
-      match compare_obj a1 a2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Comonadic_to_monadic_min _, _ -> Less_than
-    | _, Comonadic_to_monadic_min _ -> Greater_than
-    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Equal
-    | Monadic_to_comonadic_max, _ -> Less_than
-    | _, Monadic_to_comonadic_max -> Greater_than
-    | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> (
-      match compare_obj a1 a2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
-    | Comonadic_to_monadic_max _, _ -> Less_than
-    | _, Comonadic_to_monadic_max _ -> Greater_than
+  let equal_locality_morph :
+        type a1 l1 r1 a2 b l2 r2.
+        (a1, b, l1 * r1) locality_morph ->
+        (a2, b, l2 * r2) locality_morph ->
+        (a1, a2) equality =
+     fun f1 f2 ->
+      match f1, f2 with
+      | Local_to_regional, Local_to_regional -> Equal
+      | Regional_to_local, Regional_to_local -> Equal
+      | Locality_as_regionality, Locality_as_regionality -> Equal
+      | Regional_to_global, Regional_to_global -> Equal
+      | Local_to_regional_regionality, Local_to_regional_regionality -> Equal
+      | Regional_to_local_regionality, Regional_to_local_regionality -> Equal
+      | Regional_to_global_regionality, Regional_to_global_regionality -> Equal
+      | ( ( Local_to_regional | Regional_to_local | Locality_as_regionality
+          | Regional_to_global | Local_to_regional_regionality
+          | Regional_to_local_regionality | Regional_to_global_regionality ),
+          _ ) ->
+        Not_equal
+
+  let equal_core_morph :
+        type a1 l1 r1 a2 b l2 r2.
+        (a1, b, l1 * r1) core_morph ->
+        (a2, b, l2 * r2) core_morph ->
+        (a1, a2) equality =
+     fun f1 f2 ->
+      match f1, f2 with
+      | Locality_restricted l1, Locality_restricted l2 ->
+          equal_locality_morph l1 l2
+      | Locality_full l1, Locality_full l2 -> begin
+          match equal_locality_morph l1 l2 with
+          | Not_equal as eq -> eq
+          | Equal as eq -> eq
+        end
+      | Uniqueness_op_to_linearity, Uniqueness_op_to_linearity -> Equal
+      | Linearity_to_uniqueness_op, Linearity_to_uniqueness_op -> Equal
+      | Contention_op_to_portability, Contention_op_to_portability -> Equal
+      | Portability_to_contention_op, Portability_to_contention_op -> Equal
+      | Visibility_op_to_statefulness, Visibility_op_to_statefulness -> Equal
+      | Statefulness_to_visibility_op, Statefulness_to_visibility_op -> Equal
+      | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
+      | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> begin
+          match equal_areality a1 a2 with
+          | Not_equal as eq -> eq
+          | Equal as eq -> eq
+        end
+      | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Equal
+      | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> begin
+          match equal_areality a1 a2 with
+          | Not_equal as eq -> eq
+          | Equal as eq -> eq
+        end
+      | ( ( Locality_restricted _ | Locality_full _
+          | Uniqueness_op_to_linearity | Linearity_to_uniqueness_op
+          | Contention_op_to_portability | Portability_to_contention_op
+          | Visibility_op_to_statefulness | Statefulness_to_visibility_op
+          | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
+          | Monadic_to_comonadic_max | Comonadic_to_monadic_max _),
+          _ ) ->
+        Not_equal
+
+  let rec equal_simple_morph :
+        type a1 l1 r1 a2 b l2 r2.
+        b obj ->
+        (a1, b, l1 * r1) simple_morph ->
+        (a2, b, l2 * r2) simple_morph ->
+        (a1, a2) equality =
+     fun dst f1 f2 ->
+      match f1, f2 with
+      | Id, Id -> Equal
+      | Core m1, Core m2 -> equal_core_morph m1 m2
+      | Meet_const c1, Meet_const c2 ->
+        if equal dst c1 c2 then Equal else Not_equal
+      | Imply_const c1, Imply_const c2 ->
+          if equal dst c1 c2 then Equal else Not_equal
+      | Core_and_meet_const(c1, m1), Core_and_meet_const(c2, m2) ->
+          if equal dst c1 c2 then begin
+            match equal_core_morph m1 m2 with
+            | Not_equal as eq -> eq
+            | Equal as eq -> eq
+          end else Not_equal
+      | Imply_const_and_core(m1, c1), Imply_const_and_core(m2, c2) -> begin
+          match equal_core_morph m1 m2 with
+          | Not_equal -> Not_equal
+          | Equal ->
+              if equal (src_core m1) c1 c2 then Equal
+              else Not_equal
+        end
+      | Compose(mb1, ma1), Compose(mb2, ma2) -> begin
+          match equal_simple_morph dst mb1 mb2 with
+          | Not_equal -> Not_equal
+          | Equal ->
+              match equal_simple_morph (src_simple dst mb1) ma1 ma2 with
+              | Not_equal as eq -> eq
+              | Equal as eq -> eq
+        end
+      | ( ( Id | Core _ | Meet_const _ | Imply_const _
+            | Core_and_meet_const _ | Imply_const_and_core _
+            | Compose _ ),
+          _ ) ->
+        Not_equal
+
+  let equal_morph :
+        type a1 l1 r1 a2 b l2 r2.
+        b obj ->
+        (a1, b, l1 * r1) morph ->
+        (a2, b, l2 * r2) morph ->
+        (a1, a2) equality =
+     fun dst f1 f2 ->
+      match f1, f2 with
+      | Simple m1, Simple m2 -> equal_simple_morph dst m1 m2
+      | Proj_and(m1, ax1, src1), Proj_and(m2, ax2, src2) -> begin
+          match equal_simple_morph dst m1 m2 with
+          | Not_equal -> Not_equal
+          | Equal ->
+              match equal_obj src1 src2 with
+              | Not_equal -> Not_equal
+              | Equal ->
+                  match Axis.equal ax1 ax2 with
+                  | Not_equal as eq -> eq
+                  | Equal as eq -> eq
+        end
+      | And_max_with(ax1, m1), And_max_with(ax2, m2) -> begin
+          match Axis.equal ax1 ax2 with
+          | Not_equal as eq -> eq
+          | Equal -> equal_simple_morph (proj_obj ax1 dst) m1 m2
+        end
+      | And_min_with(ax1, m1), And_min_with(ax2, m2) -> begin
+          match Axis.equal ax1 ax2 with
+          | Not_equal as eq -> eq
+          | Equal -> equal_simple_morph (proj_obj ax1 dst) m1 m2
+        end
+      | ((Simple _ | Proj_and _ | And_max_with _ | And_min_with _), _) ->
+          Not_equal
+
+  let compare_locality_morph :
+        type a1 l1 r1 a2 b l2 r2.
+        (a1, b, l1 * r1) locality_morph ->
+        (a2, b, l2 * r2) locality_morph ->
+        (a1, a2) comparison =
+    fun m1 m2 ->
+    match m1, m2 with
     | Local_to_regional, Local_to_regional -> Equal
     | Local_to_regional, _ -> Less_than
     | _, Local_to_regional -> Greater_than
-    | Locality_as_regionality, Locality_as_regionality -> Equal
-    | Locality_as_regionality, _ -> Less_than
-    | _, Locality_as_regionality -> Greater_than
-    | Global_to_regional, Global_to_regional -> Equal
-    | Global_to_regional, _ -> Less_than
-    | _, Global_to_regional -> Greater_than
     | Regional_to_local, Regional_to_local -> Equal
     | Regional_to_local, _ -> Less_than
     | _, Regional_to_local -> Greater_than
+    | Locality_as_regionality, Locality_as_regionality -> Equal
+    | Locality_as_regionality, _ -> Less_than
+    | _, Locality_as_regionality -> Greater_than
     | Regional_to_global, Regional_to_global -> Equal
-    | Regional_to_global, _ -> Less_than
-    | _, Regional_to_global -> Greater_than
-    | Compose (f1, g1), Compose (f2, g2) -> (
-      match compare_morph dst f1 f2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal ->
-        match compare_morph (src dst f1) g1 g2 with
+    | Regional_to_global, _ -> .
+    | _, Regional_to_global -> .
+    | Local_to_regional_regionality, Local_to_regional_regionality -> Equal
+    | Local_to_regional_regionality, _ -> Less_than
+    | _, Local_to_regional_regionality -> Greater_than
+    | Regional_to_local_regionality, Regional_to_local_regionality -> Equal
+    | Regional_to_local_regionality, _ -> Less_than
+    | _, Regional_to_local_regionality -> Greater_than
+    | Regional_to_global_regionality, Regional_to_global_regionality -> Equal
+    | Regional_to_global_regionality, _ -> .
+    | _, Regional_to_global_regionality -> .
+
+  let compare_core_morph :
+            type a1 d1 a2 b d2.
+        (a1, b, d1) core_morph ->
+        (a2, b, d2) core_morph ->
+        (a1, a2) comparison =
+    fun m1 m2 ->
+    match m1, m2 with
+    | Locality_restricted l1, Locality_restricted l2 ->
+        compare_locality_morph l1 l2
+    | Locality_restricted _, _ -> .
+    | _, Locality_restricted _ -> .
+    | Locality_full l1, Locality_full l2 -> begin
+        match compare_locality_morph l1 l2 with
+        | Equal as c -> c
+        | Less_than | Greater_than as c -> c
+      end
+    | Locality_full _, _ -> Less_than
+    | _, Locality_full _ -> Greater_than
+    | Uniqueness_op_to_linearity, Uniqueness_op_to_linearity -> Equal
+    | Uniqueness_op_to_linearity, _ -> .
+    | _, Uniqueness_op_to_linearity -> .
+    | Linearity_to_uniqueness_op, Linearity_to_uniqueness_op -> Equal
+    | Linearity_to_uniqueness_op, _ -> .
+    | _, Linearity_to_uniqueness_op -> .
+    | Contention_op_to_portability, Contention_op_to_portability -> Equal
+    | Contention_op_to_portability, _ -> .
+    | _, Contention_op_to_portability -> .
+    | Portability_to_contention_op, Portability_to_contention_op -> Equal
+    | Portability_to_contention_op, _ -> .
+    | _, Portability_to_contention_op -> .
+    | Visibility_op_to_statefulness, Visibility_op_to_statefulness -> Equal
+    | Visibility_op_to_statefulness, _ -> .
+    | _, Visibility_op_to_statefulness -> .
+    | Statefulness_to_visibility_op, Statefulness_to_visibility_op -> Equal
+    | Statefulness_to_visibility_op, _ -> .
+    | _, Statefulness_to_visibility_op -> .
+    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
+    | Monadic_to_comonadic_min, _ -> Less_than
+    | _, Monadic_to_comonadic_min -> Greater_than
+    | Comonadic_to_monadic_min ar1, Comonadic_to_monadic_min ar2 -> begin
+        match compare_areality ar1 ar2 with
+        | Equal -> Equal
         | Less_than -> Less_than
         | Greater_than -> Greater_than
-        | Equal -> Equal)
-    | Compose _, _ -> Less_than
-    | _, Compose _ -> Greater_than
-    | Map_comonadic f, Map_comonadic g -> (
-      match compare_morph (proj_obj Areality dst) f g with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal -> Equal)
+      end
+    | Comonadic_to_monadic_min _, _ -> Less_than
+    | _, Comonadic_to_monadic_min _ -> Greater_than
+    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Equal
+    | Monadic_to_comonadic_max, _ -> .
+    | _, Monadic_to_comonadic_max -> .
+    | Comonadic_to_monadic_max ar1, Comonadic_to_monadic_max ar2 -> begin
+        match compare_areality ar1 ar2 with
+        | Equal -> Equal
+        | Less_than -> Less_than
+        | Greater_than -> Greater_than
+      end
+    | Comonadic_to_monadic_max _, _ -> .
+    | _, Comonadic_to_monadic_max _ -> .
 
-  let rec print_morph : type a b l r.
-      b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =
-   fun dst ppf -> function
-    | Id -> Fmt.fprintf ppf "id"
-    | Meet_const c -> Fmt.fprintf ppf "meet_const(%a)" (print dst) c
-    | Imply_const c -> Fmt.fprintf ppf "imply_const(%a)" (print dst) c
-    | Proj (_, ax) -> Fmt.fprintf ppf "proj_%a" Axis.print ax
-    | Max_with ax -> Fmt.fprintf ppf "max_with_%a" Axis.print ax
-    | Min_with ax -> Fmt.fprintf ppf "min_with_%a" Axis.print ax
-    | Map_comonadic f ->
-      let dst0 = proj_obj Areality dst in
-      Fmt.fprintf ppf "map_comonadic(%a)" (print_morph dst0) f
-    | Monadic_to_comonadic_min -> Fmt.fprintf ppf "monadic_to_comonadic_min"
-    | Comonadic_to_monadic_min _ -> Fmt.fprintf ppf "comonadic_to_monadic_min"
-    | Comonadic_to_monadic_max _ -> Fmt.fprintf ppf "comonadic_to_monadic_max"
-    | Monadic_to_comonadic_max -> Fmt.fprintf ppf "monadic_to_comonadic_max"
+
+  let rec compare_simple_morph :
+            type a1 d1 a2 b d2.
+        b obj ->
+        (a1, b, d1) simple_morph ->
+        (a2, b, d2) simple_morph ->
+        (a1, a2) comparison =
+    fun dst m1 m2 ->
+    match m1, m2 with
+    | Id, Id -> Equal
+    | Id, _ -> Less_than
+    | _, Id -> Greater_than
+    | Core m1, Core m2 -> compare_core_morph m1 m2
+    | Core _, _ -> Less_than
+    | _, Core _ -> Greater_than
+    | Meet_const c1, Meet_const c2 ->
+        if le dst c1 c2 then
+          if equal dst c1 c2 then Equal
+          else Less_than
+        else Greater_than
+    | Meet_const _, _ -> Less_than
+    | _, Meet_const _ -> Greater_than
+    | Imply_const c1, Imply_const c2 ->
+        if le dst c1 c2 then
+          if equal dst c1 c2 then Equal
+          else Less_than
+        else Greater_than
+    | Imply_const _, _ -> Less_than
+    | _, Imply_const _ -> Greater_than
+    | Core_and_meet_const(c1, m1), Core_and_meet_const(c2, m2) ->
+        if le dst c1 c2 then
+          if equal dst c1 c2 then
+            compare_core_morph m1 m2
+          else Less_than
+        else Greater_than
+    | Core_and_meet_const _, _ -> Less_than
+    | _, Core_and_meet_const _ -> Greater_than
+    | Imply_const_and_core(m1, c1), Imply_const_and_core(m2, c2) -> begin
+        match compare_core_morph m1 m2 with
+        | Less_than -> Less_than
+        | Greater_than -> Greater_than
+        | Equal ->
+            let src = src_core m1 in
+            if le src c1 c2 then
+              if equal src c1 c2 then
+                Equal
+              else Less_than
+            else Greater_than
+      end
+    | Imply_const_and_core _, _ -> Less_than
+    | _, Imply_const_and_core _ -> Greater_than
+    | Compose(mb1, ma1), Compose(mb2, ma2) -> begin
+        match compare_simple_morph dst mb1 mb2 with
+        | Greater_than | Less_than as c -> c
+        | Equal -> compare_simple_morph (src_simple dst mb1) ma1 ma2
+      end
+    | Compose _, _ -> .
+    | _, Compose _ -> .
+
+  let compare_morph :
+            type a1 d1 a2 b d2.
+        b obj ->
+        (a1, b, d1) morph ->
+        (a2, b, d2) morph ->
+        (a1, a2) comparison =
+    fun dst m1 m2 ->
+    match m1, m2 with
+    | Simple m1, Simple m2 -> compare_simple_morph dst m1 m2
+    | Simple _, _ -> Less_than
+    | _, Simple _ -> Greater_than
+    | Proj_and(m1, ax1, src1), Proj_and(m2, ax2, src2) -> begin
+          match compare_simple_morph dst m1 m2 with
+          | Less_than | Greater_than as c -> c
+          | Equal ->
+              match compare_obj src1 src2 with
+              | Less_than | Greater_than as c -> c
+              | Equal ->
+                  match Axis.compare ax1 ax2 with
+                  | Less_than | Greater_than as c -> c
+                  | Equal as c -> c
+        end
+    | Proj_and _, _ -> Less_than
+    | _, Proj_and _ -> Greater_than
+    | And_max_with(ax1, m1), And_max_with(ax2, m2) -> begin
+        match Axis.compare ax1 ax2 with
+        | Less_than | Greater_than as c -> c
+        | Equal -> compare_simple_morph (proj_obj ax1 dst) m1 m2
+      end
+    | And_max_with _, _ -> Less_than
+    | _, And_max_with _ -> Greater_than
+    | And_min_with(ax1, m1), And_min_with(ax2, m2) -> begin
+        match Axis.compare ax1 ax2 with
+        | Less_than | Greater_than as c -> c
+        | Equal -> compare_simple_morph (proj_obj ax1 dst) m1 m2
+      end
+    | And_min_with _, _ -> .
+    | _, And_min_with _ -> .
+
+  let print_locality_morph :
+      type a b d. Fmt.formatter -> (a, b, d) locality_morph -> unit =
+    fun ppf -> function
     | Local_to_regional -> Fmt.fprintf ppf "local_to_regional"
     | Regional_to_local -> Fmt.fprintf ppf "regional_to_local"
     | Locality_as_regionality -> Fmt.fprintf ppf "locality_as_regionality"
     | Regional_to_global -> Fmt.fprintf ppf "regional_to_global"
-    | Global_to_regional -> Fmt.fprintf ppf "global_to_regional"
-    | Compose (f1, f2) ->
-      let mid = src dst f1 in
-      Fmt.fprintf ppf "%a ∘ %a" (print_morph dst) f1 (print_morph mid) f2
+    | Local_to_regional_regionality ->
+        Fmt.fprintf ppf "local_to_regional_regionality"
+    | Regional_to_local_regionality ->
+        Fmt.fprintf ppf "regional_to_local_regionality"
+    | Regional_to_global_regionality ->
+        Fmt.fprintf ppf "regional_to_global_regionality"
 
-  let id = Id
+  let print_core_morph :
+      type a b d. Fmt.formatter -> (a, b, d) core_morph -> unit =
+    fun ppf -> function
+    | Locality_restricted l -> print_locality_morph ppf l
+    | Locality_full l ->
+        Fmt.fprintf ppf "%a_full" print_locality_morph l
+    | Uniqueness_op_to_linearity ->
+        Fmt.fprintf ppf "uniqueness_op_to_linearity"
+    | Linearity_to_uniqueness_op ->
+        Fmt.fprintf ppf "linearity_to_uniqueness_op"
+    | Contention_op_to_portability ->
+        Fmt.fprintf ppf "contention_op_to_portability"
+    | Portability_to_contention_op ->
+        Fmt.fprintf ppf "portability_to_contention_op"
+    | Visibility_op_to_statefulness ->
+        Fmt.fprintf ppf "visibility_op_to_statefulness"
+    | Statefulness_to_visibility_op ->
+        Fmt.fprintf ppf "statefulnes_to_visibility_op"
+    | Monadic_to_comonadic_min ->
+        Fmt.fprintf ppf "monadic_to_comonadic_min"
+    | Comonadic_to_monadic_min _ ->
+        Fmt.fprintf ppf "comonadic_to_monadic_min"
+    | Monadic_to_comonadic_max ->
+        Fmt.fprintf ppf "monadic_to_comonadic_max"
+    | Comonadic_to_monadic_max _ ->
+        Fmt.fprintf ppf "comonadic_to_monadic_max"
 
-  let linear_to_unique = function
-    | Linearity.Many -> Uniqueness.Aliased
-    | Linearity.Once -> Uniqueness.Unique
+  let rec print_simple_morph :
+      type a b d. b obj -> Fmt.formatter -> (a, b, d) simple_morph -> unit =
+   fun dst ppf -> function
+    | Id -> Fmt.fprintf ppf "id"
+    | Core m -> print_core_morph ppf m
+    | Meet_const c -> Fmt.fprintf ppf "meet(%a)" (print dst) c
+    | Imply_const c -> Fmt.fprintf ppf "imply(%a)" (print dst) c
+    | Core_and_meet_const(c, m) ->
+        Fmt.fprintf ppf "meet(%a) . %a"
+          (print dst) c print_core_morph m
+    | Imply_const_and_core(m, c) ->
+        Fmt.fprintf ppf "%a . imply(%a)"
+          print_core_morph m (print (src_core m)) c
+    | Compose (mb, ma) ->
+        let mid = src_simple dst mb in
+        Fmt.fprintf ppf "%a . %a"
+          (print_simple_morph dst) mb
+          (print_simple_morph mid) ma
 
-  let unique_to_linear = function
-    | Uniqueness.Unique -> Linearity.Once
-    | Uniqueness.Aliased -> Linearity.Many
+  let print_morph :
+      type a b d. b obj -> Fmt.formatter -> (a, b, d) morph -> unit =
+   fun dst ppf -> function
+    | Simple m -> print_simple_morph dst ppf m
+    | Proj_and(Id, ax, src) ->
+        Fmt.fprintf ppf "proj_%a" print_obj (proj_obj ax src)
+    | Proj_and(m, ax, src) ->
+        Fmt.fprintf ppf "%a . proj_%a"
+          (print_simple_morph dst) m print_obj (proj_obj ax src)
+    | And_max_with(ax, Id) ->
+        Fmt.fprintf ppf "max_with_%a" print_obj (proj_obj ax dst)
+    | And_max_with(ax, m) ->
+        let mid = proj_obj ax dst in
+        Fmt.fprintf ppf "max_with_%a . %a"
+          print_obj mid (print_simple_morph mid) m
+    | And_min_with(ax, Id) ->
+        Fmt.fprintf ppf "min_with_%a" print_obj (proj_obj ax dst)
+    | And_min_with(ax, m) ->
+        let mid = proj_obj ax dst in
+        Fmt.fprintf ppf "min_with_%a . %a"
+          print_obj mid (print_simple_morph mid) m
 
-  let portable_to_contended = function
-    | Portability.Portable -> Contention.Contended
-    | Portability.Shareable -> Contention.Shared
-    | Portability.Nonportable -> Contention.Uncontended
-
-  let contended_to_portable = function
-    | Contention.Contended -> Portability.Portable
-    | Contention.Shared -> Portability.Shareable
-    | Contention.Uncontended -> Portability.Nonportable
+  let id = Simple Id
 
   let local_to_regional = function
     | Locality.Global -> Regionality.Global
     | Locality.Local -> Regionality.Regional
 
+
   let regional_to_local = function
-    | Regionality.Local -> Locality.Local
-    | Regionality.Regional -> Locality.Local
     | Regionality.Global -> Locality.Global
+    | Regionality.Regional -> Locality.Local
+    | Regionality.Local -> Locality.Local
 
   let locality_as_regionality = function
-    | Locality.Local -> Regionality.Local
     | Locality.Global -> Regionality.Global
+    | Locality.Local -> Regionality.Local
 
   let regional_to_global = function
-    | Regionality.Local -> Locality.Local
-    | Regionality.Regional -> Locality.Global
     | Regionality.Global -> Locality.Global
+    | Regionality.Regional -> Locality.Global
+    | Regionality.Local -> Locality.Local
 
-  let global_to_regional = function
-    | Locality.Local -> Regionality.Local
-    | Locality.Global -> Regionality.Regional
+  let local_to_regional_regionality = function
+    | Regionality.Global -> Regionality.Global
+    | Regionality.Regional -> Regionality.Regional
+    | Regionality.Local -> Regionality.Regional
 
-  let statefulness_to_visibility = function
-    | Statefulness.Stateless -> Visibility.Immutable
-    | Statefulness.Observing -> Visibility.Read
-    | Statefulness.Stateful -> Visibility.Read_write
+  let regional_to_local_regionality = function
+    | Regionality.Global -> Regionality.Global
+    | Regionality.Regional -> Regionality.Local
+    | Regionality.Local -> Regionality.Local
 
-  let visibility_to_statefulness = function
+  let regional_to_global_regionality = function
+    | Regionality.Global -> Regionality.Global
+    | Regionality.Regional -> Regionality.Global
+    | Regionality.Local -> Regionality.Local
+
+  let uniqueness_op_to_linearity = function
+    | Uniqueness.Unique -> Linearity.Once
+    | Uniqueness.Aliased -> Linearity.Many
+
+  let linearity_to_uniqueness_op = function
+    | Linearity.Many -> Uniqueness.Aliased
+    | Linearity.Once -> Uniqueness.Unique
+
+  let contention_op_to_portability = function
+    | Contention.Contended -> Portability.Portable
+    | Contention.Shared -> Portability.Shareable
+    | Contention.Uncontended -> Portability.Nonportable
+
+  let portability_to_contention_op = function
+    | Portability.Portable -> Contention.Contended
+    | Portability.Shareable -> Contention.Shared
+    | Portability.Nonportable -> Contention.Uncontended
+
+  let visibility_op_to_statefulness = function
     | Visibility.Immutable -> Statefulness.Stateless
     | Visibility.Read -> Statefulness.Observing
     | Visibility.Read_write -> Statefulness.Stateful
+
+  let statefulness_to_visibility_op = function
+    | Statefulness.Stateless -> Visibility.Immutable
+    | Statefulness.Observing -> Visibility.Read
+    | Statefulness.Stateful -> Visibility.Read_write
 
   let min_with dst ax a = Axis.set ax a (min dst)
 
@@ -1685,30 +2131,21 @@ module Lattices_mono = struct
       | Comonadic_with_locality -> Locality.min
       | Comonadic_with_regionality -> Regionality.min
     in
-    let linearity = unique_to_linear m.uniqueness in
-    let portability = contended_to_portable m.contention in
+    let linearity = uniqueness_op_to_linearity m.uniqueness in
+    let portability = contention_op_to_portability m.contention in
     let forkable = Forkable.min in
     let yielding = Yielding.min in
-    let statefulness = visibility_to_statefulness m.visibility in
+    let statefulness = visibility_op_to_statefulness m.visibility in
     { areality; linearity; portability; forkable; yielding; statefulness }
 
-  let comonadic_to_monadic_min : type a.
-      a comonadic_with obj -> a comonadic_with -> Monadic_op.t =
+  let comonadic_to_monadic_min :
+      type a. a areality -> a comonadic_with -> Monadic_op.t =
    fun _ m ->
-    let uniqueness = linear_to_unique m.linearity in
-    let contention = portable_to_contended m.portability in
-    let visibility = statefulness_to_visibility m.statefulness in
-    let staticity = Staticity.min in
-    { uniqueness; contention; visibility; staticity }
-
-  let comonadic_to_monadic_max : type a.
-      a comonadic_with obj -> a comonadic_with -> Monadic_op.t =
-   fun _ m ->
-    let uniqueness = linear_to_unique m.linearity in
-    let contention = portable_to_contended m.portability in
-    let visibility = statefulness_to_visibility m.statefulness in
-    let staticity = Staticity.max in
-    { uniqueness; contention; visibility; staticity }
+     let uniqueness = linearity_to_uniqueness_op m.linearity in
+     let contention = portability_to_contention_op m.portability in
+     let visibility = statefulness_to_visibility_op m.statefulness in
+     let staticity = Staticity.min in
+     { uniqueness; contention; visibility; staticity }
 
   let monadic_to_comonadic_max : type a.
       a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
@@ -1718,51 +2155,644 @@ module Lattices_mono = struct
       | Comonadic_with_locality -> Locality.max
       | Comonadic_with_regionality -> Regionality.max
     in
-    let linearity = unique_to_linear m.uniqueness in
-    let portability = contended_to_portable m.contention in
+    let linearity = uniqueness_op_to_linearity m.uniqueness in
+    let portability = contention_op_to_portability m.contention in
     let forkable = Forkable.max in
     let yielding = Yielding.max in
-    let statefulness = visibility_to_statefulness m.visibility in
+    let statefulness = visibility_op_to_statefulness m.visibility in
     { areality; linearity; portability; forkable; yielding; statefulness }
 
-  let rec apply : type a b l r. b obj -> (a, b, l * r) morph -> a -> b =
+  let comonadic_to_monadic_max : type a.
+      a areality -> a comonadic_with -> Monadic_op.t =
+   fun _ m ->
+    let uniqueness = linearity_to_uniqueness_op m.linearity in
+    let contention = portability_to_contention_op m.portability in
+    let visibility = statefulness_to_visibility_op m.statefulness in
+    let staticity = Staticity.max in
+    { uniqueness; contention; visibility; staticity }
+
+  let apply_locality : type a b d. (a, b, d) locality_morph -> a -> b =
+   fun f a ->
+     match f with
+     | Local_to_regional -> local_to_regional a
+     | Regional_to_local -> regional_to_local a
+     | Locality_as_regionality -> locality_as_regionality a
+     | Regional_to_global -> regional_to_global a
+     | Local_to_regional_regionality -> local_to_regional_regionality a
+     | Regional_to_local_regionality -> regional_to_local_regionality a
+     | Regional_to_global_regionality -> regional_to_global_regionality a
+
+  let apply_core : type a b d. b obj -> (a, b, d) core_morph -> a -> b =
+   fun dst f a ->
+     match f with
+     | Locality_restricted m -> apply_locality m a
+     | Locality_full m ->
+         let areality = apply_locality m a.areality in
+         { a with areality }
+     | Uniqueness_op_to_linearity -> uniqueness_op_to_linearity a
+     | Linearity_to_uniqueness_op -> linearity_to_uniqueness_op a
+     | Contention_op_to_portability -> contention_op_to_portability a
+     | Portability_to_contention_op -> portability_to_contention_op a
+     | Visibility_op_to_statefulness -> visibility_op_to_statefulness a
+     | Statefulness_to_visibility_op -> statefulness_to_visibility_op a
+     | Monadic_to_comonadic_min -> monadic_to_comonadic_min dst a
+     | Comonadic_to_monadic_min ar -> comonadic_to_monadic_min ar a
+     | Monadic_to_comonadic_max -> monadic_to_comonadic_max dst a
+     | Comonadic_to_monadic_max ar -> comonadic_to_monadic_max ar a
+
+  let rec apply_simple : type a b d. b obj -> (a, b, d) simple_morph -> a -> b =
    fun dst f a ->
     match f with
-    | Compose (f, g) ->
-      let mid = src dst f in
-      let g' = apply mid g in
-      let f' = apply dst f in
-      f' (g' a)
     | Id -> a
-    | Proj (_, ax) -> Axis.proj ax a
-    | Max_with ax -> max_with dst ax a
-    | Min_with ax -> min_with dst ax a
+    | Core m -> apply_core dst m a
     | Meet_const c -> meet dst c a
     | Imply_const c -> imply dst c a
-    | Monadic_to_comonadic_min -> monadic_to_comonadic_min dst a
-    | Comonadic_to_monadic_min src -> comonadic_to_monadic_min src a
-    | Comonadic_to_monadic_max src -> comonadic_to_monadic_max src a
-    | Monadic_to_comonadic_max -> monadic_to_comonadic_max dst a
-    | Local_to_regional -> local_to_regional a
-    | Regional_to_local -> regional_to_local a
-    | Locality_as_regionality -> locality_as_regionality a
-    | Regional_to_global -> regional_to_global a
-    | Global_to_regional -> global_to_regional a
-    | Map_comonadic f ->
-      let dst0 = proj_obj Areality dst in
-      let a0 = Axis.proj Areality a in
-      set_areality (apply dst0 f a0) a
+    | Core_and_meet_const(c, m) ->
+        meet dst c (apply_core dst m a)
+    | Imply_const_and_core(m, c) ->
+        apply_core dst m (imply (src_core m) c a)
+    | Compose (mb, ma) ->
+      let mid = src_simple dst mb in
+      apply_simple dst mb (apply_simple mid ma a)
+
+  let apply : type a b d. b obj -> (a, b, d) morph -> a -> b =
+   fun dst f a ->
+    match f with
+    | Simple m -> apply_simple dst m a
+    | Proj_and(m, ax, _) -> apply_simple dst m (Axis.proj ax a)
+    | And_max_with(ax, m) ->
+        let mid = proj_obj ax dst in
+        max_with dst ax (apply_simple mid m a)
+    | And_min_with(ax, m) ->
+        let mid = proj_obj ax dst in
+        min_with dst ax (apply_simple mid m a)
+
+  let right_adjoint_locality :
+     type a b r.
+       (a, b, allowed * r) locality_morph
+       -> (b, a, disallowed * allowed) locality_morph =
+    function
+     | Local_to_regional -> Regional_to_local
+     | Regional_to_local -> Locality_as_regionality
+     | Locality_as_regionality -> Regional_to_global
+     | Local_to_regional_regionality -> Regional_to_local_regionality
+     | Regional_to_local_regionality -> Regional_to_global_regionality
+
+  let right_adjoint_core :
+     type a b r.
+       b obj
+       -> (a, b, allowed * r) core_morph
+       -> (b, a, disallowed * allowed) core_morph =
+   fun dst -> function
+     | Locality_restricted m -> Locality_restricted (right_adjoint_locality m)
+     | Locality_full m -> Locality_full (right_adjoint_locality m)
+     | Uniqueness_op_to_linearity -> Linearity_to_uniqueness_op
+     | Linearity_to_uniqueness_op -> Uniqueness_op_to_linearity
+     | Contention_op_to_portability -> Portability_to_contention_op
+     | Portability_to_contention_op -> Contention_op_to_portability
+     | Visibility_op_to_statefulness -> Statefulness_to_visibility_op
+     | Statefulness_to_visibility_op -> Visibility_op_to_statefulness
+     | Monadic_to_comonadic_min ->
+         Comonadic_to_monadic_max (comonadic_obj_areality dst)
+     | Comonadic_to_monadic_min _ -> Monadic_to_comonadic_max
+
+  let right_adjoint_simple :
+      type a b r.
+        b obj
+        -> (a, b, allowed * r) simple_morph
+        -> (b, a, disallowed * allowed) simple_morph =
+    fun dst f ->
+    match f with
+    | Id -> Id
+    | Core m -> Core (right_adjoint_core dst m)
+    | Meet_const c -> Imply_const c
+    | Core_and_meet_const(c, m) -> Imply_const_and_core(right_adjoint_core dst m, c)
+
+  let right_adjoint :
+      type a b r.
+      b obj -> (a, b, allowed * r) morph -> (b, a, disallowed * allowed) morph =
+    fun dst f ->
+    match f with
+    | Simple m -> Simple (right_adjoint_simple dst m)
+    | Proj_and(m, ax, _) -> And_max_with(ax, right_adjoint_simple dst m)
+    | And_min_with(ax, m) ->
+        let mid = proj_obj ax dst in
+        Proj_and(right_adjoint_simple mid m, ax, dst)
+
+  let left_adjoint_locality :
+      type a b l.
+        (a, b, l * allowed) locality_morph
+        -> (b, a, allowed * disallowed) locality_morph =
+    function
+    | Regional_to_local -> Local_to_regional
+    | Locality_as_regionality -> Regional_to_local
+    | Regional_to_global -> Locality_as_regionality
+    | Regional_to_local_regionality -> Local_to_regional_regionality
+    | Regional_to_global_regionality -> Regional_to_local_regionality
+
+  let left_adjoint_core :
+      type a b l.
+        b obj
+        -> (a, b, l * allowed) core_morph
+        -> (b, a, allowed * disallowed) core_morph =
+    fun dst -> function
+    | Locality_restricted m -> Locality_restricted (left_adjoint_locality m)
+    | Locality_full m -> Locality_full (left_adjoint_locality m)
+    | Uniqueness_op_to_linearity -> Linearity_to_uniqueness_op
+    | Linearity_to_uniqueness_op -> Uniqueness_op_to_linearity
+    | Contention_op_to_portability -> Portability_to_contention_op
+    | Portability_to_contention_op -> Contention_op_to_portability
+    | Visibility_op_to_statefulness -> Statefulness_to_visibility_op
+    | Statefulness_to_visibility_op -> Visibility_op_to_statefulness
+    | Monadic_to_comonadic_max ->
+        Comonadic_to_monadic_min (comonadic_obj_areality dst)
+    | Comonadic_to_monadic_max _ -> Monadic_to_comonadic_min
+
+  let left_adjoint_simple :
+      type a b l.
+        b obj
+        -> (a, b, l * allowed) simple_morph
+        -> (b, a, allowed * disallowed) simple_morph =
+   fun dst f ->
+    match f with
+    | Id -> Id
+    | Core m -> Core (left_adjoint_core dst m)
+    | Imply_const c -> Meet_const c
+    | Imply_const_and_core(m, c) -> Core_and_meet_const(c, left_adjoint_core dst m)
+
+  let left_adjoint :
+      type a b l.
+      b obj -> (a, b, l * allowed) morph -> (b, a, allowed * disallowed) morph =
+   fun dst f ->
+    match f with
+    | Simple m -> Simple (left_adjoint_simple dst m)
+    | Proj_and(m, ax, _) -> And_min_with(ax, left_adjoint_simple dst m)
+    | And_max_with(ax, m) ->
+        let mid = proj_obj ax dst in
+        Proj_and(left_adjoint_simple mid m, ax, dst)
+
+  type ('a, 'b, 'd) maybe_allowed_right_locality =
+    | Allowed_right :
+        ('a, 'b, 'l * allowed) locality_morph
+        -> ('a, 'b, 'l * 'r) maybe_allowed_right_locality
+    | Not_allowed_right : ('a, 'b, 'l * disallowed) maybe_allowed_right_locality
+
+  let maybe_allowed_right_locality :
+      type a b d.
+        (a, b, d) locality_morph -> (a, b, d) maybe_allowed_right_locality =
+    function
+    | Regional_to_local as m -> Allowed_right m
+    | Locality_as_regionality as m -> Allowed_right m
+    | Regional_to_global as m -> Allowed_right m
+    | Regional_to_local_regionality as m -> Allowed_right m
+    | Regional_to_global_regionality as m -> Allowed_right m
+    | Local_to_regional -> Not_allowed_right
+    | Local_to_regional_regionality -> Not_allowed_right
+
+  type ('a, 'b, 'd) maybe_allowed_left_locality =
+    | Allowed_left :
+        ('a, 'b, allowed * 'r) locality_morph
+        -> ('a, 'b, 'l * 'r) maybe_allowed_left_locality
+    | Not_allowed_left : ('a, 'b, disallowed * 'r) maybe_allowed_left_locality
+
+  let maybe_allowed_left_locality :
+      type a b d.
+        (a, b, d) locality_morph -> (a, b, d) maybe_allowed_left_locality =
+    function
+    | Local_to_regional as m -> Allowed_left m
+    | Regional_to_local as m -> Allowed_left m
+    | Locality_as_regionality as m -> Allowed_left m
+    | Local_to_regional_regionality as m -> Allowed_left m
+    | Regional_to_local_regionality as m -> Allowed_left m
+    | Regional_to_global -> Not_allowed_left
+    | Regional_to_global_regionality -> Not_allowed_left
+
+  type ('a, 'b, 'd) locality_composition =
+    | Id : ('a, 'a, 'd) locality_composition
+    | Morph : ('a, 'b, 'd) locality_morph -> ('a, 'b, 'd) locality_composition
+    | Disallowed : ('a, 'b, disallowed * disallowed) locality_composition
+
+  let compose_locality :
+      type a b c d.
+        (b, c, d) locality_morph
+        -> (a, b, d) locality_morph
+        -> (a, c, d) locality_composition =
+    fun m1 m2 ->
+      match m1, m2 with
+      | Local_to_regional, Regional_to_local ->
+          Morph Local_to_regional_regionality
+      | Regional_to_local, Local_to_regional -> Id
+      | Regional_to_local, Locality_as_regionality -> Id
+      | Regional_to_local, Local_to_regional_regionality ->
+          Morph Regional_to_local
+      | Regional_to_local, Regional_to_local_regionality ->
+          Morph Regional_to_local
+      | Regional_to_local, Regional_to_global_regionality ->
+          Morph Regional_to_global
+      | Locality_as_regionality, Regional_to_local ->
+          Morph Regional_to_local_regionality
+      | Locality_as_regionality, Regional_to_global ->
+          Morph Regional_to_global_regionality
+      | Regional_to_global, Locality_as_regionality -> Id
+      | Regional_to_global, Regional_to_local_regionality ->
+          Morph Regional_to_local
+      | Regional_to_global, Regional_to_global_regionality ->
+          Morph Regional_to_global
+      | Local_to_regional_regionality, Local_to_regional ->
+          Morph Local_to_regional
+      | Local_to_regional_regionality, Locality_as_regionality ->
+          Morph Local_to_regional
+      | Local_to_regional_regionality, Local_to_regional_regionality ->
+          Morph Local_to_regional_regionality
+      | Local_to_regional_regionality, Regional_to_local_regionality ->
+          Morph Local_to_regional_regionality
+      | Regional_to_local_regionality, Local_to_regional ->
+          Morph Locality_as_regionality
+      | Regional_to_local_regionality, Locality_as_regionality ->
+          Morph Locality_as_regionality
+      | Regional_to_local_regionality, Local_to_regional_regionality ->
+          Morph Regional_to_local_regionality
+      | Regional_to_local_regionality, Regional_to_local_regionality ->
+          Morph Regional_to_local_regionality
+      | Regional_to_local_regionality, Regional_to_global_regionality ->
+          Morph Regional_to_global_regionality
+      | Regional_to_global_regionality, Locality_as_regionality ->
+          Morph Locality_as_regionality
+      | Regional_to_global_regionality, Regional_to_local_regionality ->
+          Morph Regional_to_local_regionality
+      | Regional_to_global_regionality, Regional_to_global_regionality ->
+          Morph Regional_to_global_regionality
+      (* Operations that cannot appear on the same side *)
+      | Local_to_regional, Regional_to_global -> Disallowed
+      | Regional_to_global, Local_to_regional -> Disallowed
+      | Regional_to_global, Local_to_regional_regionality -> Disallowed
+      | Local_to_regional_regionality, Regional_to_global_regionality ->
+          Disallowed
+      | Regional_to_global_regionality, Local_to_regional -> Disallowed
+      | Regional_to_global_regionality, Local_to_regional_regionality ->
+          Disallowed
+
+  let compose_core :
+      type a b c d.
+        c obj
+        -> (b, c, d) core_morph
+        -> (a, b, d) core_morph
+        -> (a, c, d) simple_morph =
+    fun dst m1 m2 ->
+      match m1, m2 with
+      | Locality_restricted lm1, Locality_restricted lm2 -> begin
+          match compose_locality lm1 lm2 with
+          | Id -> Id
+          | Morph lm -> Core (Locality_restricted lm)
+          | Disallowed -> Compose(Core m1, Core m2)
+        end
+      | Locality_full lm1, Locality_full lm2 -> begin
+          match compose_locality lm1 lm2 with
+          | Id -> Id
+          | Morph lm -> Core (Locality_full lm)
+          | Disallowed -> Compose(Core m1, Core m2)
+        end
+      | Uniqueness_op_to_linearity, Linearity_to_uniqueness_op -> Id
+      | Linearity_to_uniqueness_op, Uniqueness_op_to_linearity -> Id
+      | Contention_op_to_portability, Portability_to_contention_op -> Id
+      | Portability_to_contention_op, Contention_op_to_portability -> Id
+      | Visibility_op_to_statefulness, Statefulness_to_visibility_op -> Id
+      | Statefulness_to_visibility_op, Visibility_op_to_statefulness -> Id
+      | Comonadic_to_monadic_min areality, Monadic_to_comonadic_min ->
+          let c =
+            match areality with
+            | Locality ->
+                apply_core dst
+                  (Comonadic_to_monadic_min Locality)
+                  Comonadic_with_locality.max
+            | Regionality ->
+                apply_core dst
+                  (Comonadic_to_monadic_min Regionality)
+                  Comonadic_with_regionality.max
+          in
+          Meet_const c
+      | Monadic_to_comonadic_min, Comonadic_to_monadic_min areality -> begin
+          let c = apply_core dst Monadic_to_comonadic_min Monadic_op.max in
+          match areality, dst with
+          | Locality, Comonadic_with_locality -> Meet_const c
+          | Regionality, Comonadic_with_locality ->
+              Core_and_meet_const(c, Locality_full Regional_to_local)
+          | Locality, Comonadic_with_regionality ->
+              Core_and_meet_const(c, Locality_full Locality_as_regionality)
+          | Regionality, Comonadic_with_regionality ->
+              Meet_const c
+        end
+      | Monadic_to_comonadic_max, Comonadic_to_monadic_max areality -> begin
+          let src = areality_comonadic_obj areality in
+          let c = apply_core src Monadic_to_comonadic_min Monadic_op.max in
+          match areality, dst with
+          | Locality, Comonadic_with_locality -> Imply_const c
+          | Regionality, Comonadic_with_locality ->
+              Imply_const_and_core(Locality_full Regional_to_local, c)
+          | Locality, Comonadic_with_regionality ->
+              Imply_const_and_core(Locality_full Locality_as_regionality, c)
+          | Regionality, Comonadic_with_regionality -> Imply_const c
+        end
+      | Comonadic_to_monadic_max areality, Monadic_to_comonadic_max ->
+          let c =
+            match areality with
+            | Locality ->
+                apply_core dst
+                  (Comonadic_to_monadic_min Locality)
+                  Comonadic_with_locality.max
+            | Regionality ->
+                apply_core dst
+                  (Comonadic_to_monadic_min Regionality)
+                  Comonadic_with_regionality.max
+          in
+          Imply_const c
+      | Comonadic_to_monadic_min _, Monadic_to_comonadic_max ->
+          Compose(Core m1, Core m2)
+      | Monadic_to_comonadic_max, Comonadic_to_monadic_min _ ->
+          Compose(Core m1, Core m2)
+      | Comonadic_to_monadic_max _, Monadic_to_comonadic_min ->
+          Compose(Core m1, Core m2)
+      | Monadic_to_comonadic_min, Comonadic_to_monadic_max _ ->
+          Compose(Core m1, Core m2)
+      | Comonadic_to_monadic_min _, Locality_full m2 ->
+          let src = src_locality_full m2 in
+          Core (Comonadic_to_monadic_min (comonadic_obj_areality src))
+      | Comonadic_to_monadic_max _, Locality_full m2 ->
+          let src = src_locality_full m2 in
+          Core (Comonadic_to_monadic_max (comonadic_obj_areality src))
+      | Locality_full lm1, Monadic_to_comonadic_min -> begin
+          match maybe_allowed_left_locality lm1 with
+          | Allowed_left _ ->
+              (* Has a right adjoint so it preserves min *)
+              Core Monadic_to_comonadic_min
+          | Not_allowed_left ->
+              Compose(Core m1, Core Monadic_to_comonadic_min)
+          end
+      | Locality_full lm1, Monadic_to_comonadic_max -> begin
+          match maybe_allowed_right_locality lm1 with
+          | Allowed_right _ ->
+              (* Has a left adjoint so it preserves max *)
+              Core Monadic_to_comonadic_max
+          | Not_allowed_right ->
+              Compose(Core m1, Core Monadic_to_comonadic_max)
+          end
+      | Locality_restricted _, _ -> .
+      | _, Locality_restricted _ -> .
+      | Locality_full _, _ -> .
+      | _, Locality_full _ -> .
+
+  type ('a, 'b, 'd) maybe_allowed_right_core =
+    | Allowed_right :
+        ('a, 'b, 'l * allowed) core_morph
+        -> ('a, 'b, 'l * 'r) maybe_allowed_right_core
+    | Not_allowed_right : ('a, 'b, 'l * disallowed) maybe_allowed_right_core
+
+  let maybe_allowed_right_core :
+      type a b d.
+        (a, b, d) core_morph -> (a, b, d) maybe_allowed_right_core =
+    function
+    | Locality_restricted lm -> begin
+        match maybe_allowed_right_locality lm with
+        | Allowed_right lm -> Allowed_right (Locality_restricted lm)
+        | Not_allowed_right -> Not_allowed_right
+      end
+    | Locality_full lm -> begin
+        match maybe_allowed_right_locality lm with
+        | Allowed_right lm -> Allowed_right (Locality_full lm)
+        | Not_allowed_right -> Not_allowed_right
+      end
+    | Uniqueness_op_to_linearity as m -> Allowed_right m
+    | Linearity_to_uniqueness_op as m -> Allowed_right m
+    | Contention_op_to_portability as m -> Allowed_right m
+    | Portability_to_contention_op as m -> Allowed_right m
+    | Visibility_op_to_statefulness as m -> Allowed_right m
+    | Statefulness_to_visibility_op as m -> Allowed_right m
+    | Monadic_to_comonadic_min -> Not_allowed_right
+    | Comonadic_to_monadic_min _ -> Not_allowed_right
+    | Monadic_to_comonadic_max as m -> Allowed_right m
+    | Comonadic_to_monadic_max a -> Allowed_right (Comonadic_to_monadic_max a)
+
+  let compose_meet_const_left :
+      type a b l.
+      b obj -> b
+      -> (a, b, l * disallowed) simple_morph
+      -> (a, b, l * disallowed) simple_morph =
+    fun dst c m ->
+    match m with
+    | Id -> Meet_const c
+    | Core m -> Core_and_meet_const(c, m)
+    | Meet_const c' -> Meet_const (meet dst c c')
+    | Core_and_meet_const(c', m) ->
+        Core_and_meet_const(meet dst c c', m)
+    | Imply_const _ as m -> Compose(Meet_const c, m)
+    | Imply_const_and_core _ as m -> Compose(Meet_const c, m)
+    | Compose _ as m -> Compose(Meet_const c, m)
+
+  let compose_imply_const_right :
+      type a b r. b obj
+        -> (a, b, disallowed * r) simple_morph
+        -> a -> (a, b, disallowed * r) simple_morph =
+    fun dst m c ->
+    match m with
+    | Id -> Imply_const c
+    | Core m -> Imply_const_and_core(m, c)
+    | Imply_const c' -> Imply_const (meet dst c c')
+    | Imply_const_and_core(m, c') ->
+        Imply_const_and_core(m, meet (src_core m) c' c)
+    | Meet_const _ as m -> Compose(m, Imply_const c)
+    | Core_and_meet_const _ as m -> Compose(m, Imply_const c)
+    | Compose _ as m -> Compose(m, Imply_const c)
+
+  (* Commutes a meet through a morphism from the right, such that:
+     [apply dst m (meet_const c x)] is equivalent to
+     [meet_const (commute_meet_const_from_right dst m c) (apply dst m x)] *)
+  let commute_meet_const_from_right :
+      type a b d.
+      b obj -> (a, b, d) core_morph -> a -> b =
+    fun dst m c ->
+    (* All our morphisms preserve binary meets *)
+    apply_core dst m c
+
+  (* Commutes an implication through a morphism from the left, such that:
+     [apply dst m (meet_const c x)] is equivalent to
+     [meet_const (commute_imply_from_left dst m c) (apply dst m x)] *)
+  let commute_imply_from_left :
+      type a b l.
+      b obj -> b -> (a, b, l * allowed) core_morph -> a =
+    fun dst c m ->
+    (* As all our morphisms preserve binary meets, implications can be
+       pushed inside of [m] by applying the left adjoint of [m] to the
+       implicant. *)
+    apply_core (src_core m) (left_adjoint_core dst m) c
+
+  let compose_meet_const_right :
+      type a b l.
+      b obj -> (a, b, l * disallowed) simple_morph -> a
+      -> (a, b, l * disallowed) simple_morph =
+    fun dst m c ->
+    match m with
+    | Id -> Meet_const c
+    | Core m ->
+        let c = commute_meet_const_from_right dst m c in
+        Core_and_meet_const(c, m)
+    | Meet_const c' -> Meet_const (meet dst c' c)
+    | Core_and_meet_const(c', m) ->
+        let c = commute_meet_const_from_right dst m c in
+        Core_and_meet_const(meet dst c' c, m)
+    | Imply_const _ as m -> Compose(m, Meet_const c)
+    | Imply_const_and_core _ as m -> Compose(m, Meet_const c)
+    | Compose _ as m -> Compose(m, Meet_const c)
+
+  let compose_imply_const_left :
+      type a b r. b obj
+        -> b -> (a, b, disallowed * r) simple_morph
+        -> (a, b, disallowed * r) simple_morph =
+    fun dst c m ->
+    match m with
+    | Id -> Imply_const c
+    | Core m -> begin
+        match maybe_allowed_right_core m with
+        | Not_allowed_right -> Compose(Imply_const c, Core m)
+        | Allowed_right m' ->
+            let c = commute_imply_from_left dst c m' in
+            Imply_const_and_core(m, c)
+      end
+    | Imply_const c' -> Imply_const (meet dst c c')
+    | Imply_const_and_core(m, c') -> begin
+        match maybe_allowed_right_core m with
+        | Not_allowed_right -> Compose(Imply_const c, Imply_const_and_core(m, c'))
+        | Allowed_right m' ->
+            let c = commute_imply_from_left dst c m' in
+            Imply_const_and_core(m, meet (src_core m) c c')
+      end
+    | Meet_const _ as m -> Compose(Imply_const c, m)
+    | Core_and_meet_const _ as m -> Compose(Imply_const c, m)
+    | Compose _ as m -> Compose(Imply_const c, m)
+
+  let compose_core_right :
+      type a b c d. c obj
+        -> (b, c, d) simple_morph
+        -> (a, b, d) core_morph
+        -> (a, c, d) simple_morph =
+    fun dst m1 m2 ->
+    match m1 with
+    | Id -> Core m2
+    | Core m1 -> compose_core dst m1 m2
+    | Imply_const c1 -> begin
+        match maybe_allowed_right_core m2 with
+        | Not_allowed_right -> Compose(Imply_const c1, Core m2)
+        | Allowed_right m2' ->
+            let c1 = commute_imply_from_left dst c1 m2' in
+            Imply_const_and_core(m2, c1)
+      end
+    | Imply_const_and_core(m1, c1) -> begin
+        match maybe_allowed_right_core m2 with
+        | Not_allowed_right -> Compose(Imply_const_and_core(m1, c1), Core m2)
+        | Allowed_right m2' ->
+            let mid = src_core m1 in
+            let c1 = commute_imply_from_left mid c1 m2' in
+            let m = compose_core dst m1 m2 in
+            compose_imply_const_right dst m c1
+      end
+    | Meet_const c1 -> Core_and_meet_const(c1, m2)
+    | Core_and_meet_const(c1, m1) ->
+        compose_meet_const_left dst c1 (compose_core dst m1 m2)
+    | Compose _ as m1 -> Compose(m1, Core m2)
+
+  let compose_core_left :
+      type a b c d. c obj
+        -> (b, c, d) core_morph
+        -> (a, b, d) simple_morph
+        -> (a, c, d) simple_morph =
+    fun dst m1 m2 ->
+    match m2 with
+    | Id -> Core m1
+    | Core m2 -> compose_core dst m1 m2
+    | Imply_const c2 -> Imply_const_and_core(m1, c2)
+    | Imply_const_and_core(m2, c2) ->
+        compose_imply_const_right dst (compose_core dst m1 m2) c2
+    | Meet_const c2 ->
+        let c2 = commute_meet_const_from_right dst m1 c2 in
+        Core_and_meet_const(c2, m1)
+    | Core_and_meet_const(c2, m2) ->
+        let c2 = commute_meet_const_from_right dst m1 c2 in
+        let m = compose_core dst m1 m2 in
+        compose_meet_const_left dst c2 m
+    | Compose _ as m2 -> Compose(Core m1, m2)
+
+  let compose_simple :
+      type a b c d.
+           c obj
+           -> (b, c, d) simple_morph
+           -> (a, b, d) simple_morph
+           -> (a, c, d) simple_morph =
+    fun dst m1 m2 ->
+      match m1, m2 with
+      | m1, Id -> m1
+      | Id, m2 -> m2
+      | m1, Meet_const c2 -> compose_meet_const_right dst m1 c2
+      | Meet_const c1, m2 -> compose_meet_const_left dst c1 m2
+      | m1, Imply_const c2 -> compose_imply_const_right dst m1 c2
+      | Imply_const c1, m2 -> compose_imply_const_left dst c1 m2
+      | m1, Core m2 -> compose_core_right dst m1 m2
+      | Core m1, m2 -> compose_core_left dst m1 m2
+      | m1, Core_and_meet_const(c2, m2) ->
+          compose_core_right dst
+            (compose_meet_const_right dst m1 c2) m2
+      | Core_and_meet_const(c1, m1), m2 ->
+          compose_meet_const_left dst c1
+            (compose_core_left dst m1 m2)
+      | m1, Imply_const_and_core(m2, c2) ->
+          compose_imply_const_right dst
+            (compose_core_right dst m1 m2) c2
+      | Imply_const_and_core(m1, c1), m2 ->
+          let mid = src_core m1 in
+          compose_core_left dst m1
+            (compose_imply_const_left mid c1 m2)
+      | (Compose _ as m1), m2 -> Compose(m1, m2)
+      | _, Compose _ -> .
+
+  let compose :
+      type a b c d.
+      c obj -> (b, c, d) morph -> (a, b, d) morph -> (a, c, d) morph =
+   fun _dst _m0 _m1 ->
+    (*
+    match m0, m1 with
+    | Id, m -> m
+    | m, Id -> m
+    | _, And_max_with(m1, ax1) ->
+        And_max_with(compose dst m0 m1, ax1)
+    | _, And_min_with(m1, ax1) ->
+        And_min_with(compose dst m0 m1, ax1)
+    | Proj_and(obj0, ax0, m0), _ ->
+        Proj_and(obj0, ax0, compose obj0 m0 m1)
+    | And_max_with(m0, ax0), Proj_and(obj1, ax1, m1)-> begin
+        let mid = src dst m0 in
+        let c = min_with mid ax0 (max (proj_obj ax0 mid)) in
+        let m0 = compose_imply_const_right dst m0 c in
+        let m0 = connect_projections dst m0 (src dst m0) ax0 obj1 ax1 in
+        compose dst m0 m1
+      end
+    | And_min_with(m0, ax0), Proj_and(obj1, ax1, m1)-> begin
+        let mid = src dst m0 in
+        let c = min_with mid ax0 (max (proj_obj ax0 mid)) in
+        let m0 = compose_meet_const_right dst m0 c in
+        let m0 = connect_projections dst m0 (src dst m0) ax0 obj1 ax1 in
+        compose dst m0 m1
+      end
+     *)
+   ignore compose_simple;
+   failwith "Not implemented"
 
   module For_hint = struct
     (** Describes the portion of the input that's responsible for a portion of
         the output of a morphism *)
     type 'a responsible_axis =
-      | NoneResponsible : 'a responsible_axis
+      | None_responsible : 'a responsible_axis
           (** The input is not responsible for the output; instead, the morphism
               is solely responsible for the output. *)
-      | SourceIsSingle : 'a responsible_axis
-          (** The input of the morphism is single axis, and is responsible for
-              the output. *)
+      | All_responsible : 'a responsible_axis
+          (** The input of the morphism is all responsible for the output. *)
       | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
           (** The specified axis of the input object is responsible for the
               output. *)
@@ -1777,265 +2807,91 @@ module Lattices_mono = struct
        no axis of [a] being responsible, in which case the morphism is solely
        respoonsible. *)
 
-    (** Given a morphism either from a single axis to a single axis, or from a
-        product object to a single axis, return the portion of the input that's
-        responsible for the output. *)
-    let rec find_responsible_axis_single : type a b l r.
-        (a, b, l * r) morph -> a responsible_axis = function
-      | Proj (_a_obj, ax) -> Axis ax
-      | Compose (g, f) -> (
-        match find_responsible_axis_single g with
-        | NoneResponsible -> NoneResponsible
-        | SourceIsSingle -> find_responsible_axis_single f
-        | Axis c_ax -> find_responsible_axis_prod f c_ax)
-      | Id | Meet_const _ | Imply_const _ -> SourceIsSingle
-      | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
-      | Comonadic_to_monadic_min _ | Monadic_to_comonadic_max
-      | Comonadic_to_monadic_max _ ->
-        assert false
-      | Local_to_regional | Regional_to_local | Locality_as_regionality
-      | Regional_to_global | Global_to_regional ->
-        SourceIsSingle
+    let find_responsible_axis_proj_core : type a b b_ax l r.
+        (a, b, l * r) core_morph -> (b, b_ax) Axis.t -> a responsible_axis =
+      fun m ax ->
+        match m, ax with
+        | Locality_restricted _, _ -> .
+        | Uniqueness_op_to_linearity, _ -> .
+        | Linearity_to_uniqueness_op, _ -> .
+        | Contention_op_to_portability, _ -> .
+        | Portability_to_contention_op, _ -> .
+        | Visibility_op_to_statefulness, _ -> .
+        | Statefulness_to_visibility_op, _ -> .
+        | Locality_full _, (Areality as ax) -> Axis ax
+        | Locality_full _, (Forkable as ax) -> Axis ax
+        | Locality_full _, (Yielding as ax) -> Axis ax
+        | Locality_full _, (Linearity as ax) -> Axis ax
+        | Locality_full _, (Statefulness as ax) -> Axis ax
+        | Locality_full _, (Portability as ax) -> Axis ax
+        | Locality_full _, _ -> .
+        | Monadic_to_comonadic_min, Areality -> None_responsible
+        | Monadic_to_comonadic_min, Forkable -> None_responsible
+        | Monadic_to_comonadic_min, Yielding -> None_responsible
+        | Monadic_to_comonadic_min, Linearity -> Axis Uniqueness
+        | Monadic_to_comonadic_min, Statefulness -> Axis Visibility
+        | Monadic_to_comonadic_min, Portability -> Axis Contention
+        | Comonadic_to_monadic_min _, Uniqueness -> Axis Linearity
+        | Comonadic_to_monadic_min _, Visibility -> Axis Statefulness
+        | Comonadic_to_monadic_min _, Contention -> Axis Portability
+        | Comonadic_to_monadic_min _, Staticity -> None_responsible
+        | Monadic_to_comonadic_max, Areality -> None_responsible
+        | Monadic_to_comonadic_max, Forkable -> None_responsible
+        | Monadic_to_comonadic_max, Yielding -> None_responsible
+        | Monadic_to_comonadic_max, Linearity -> Axis Uniqueness
+        | Monadic_to_comonadic_max, Statefulness -> Axis Visibility
+        | Monadic_to_comonadic_max, Portability -> Axis Contention
+        | Comonadic_to_monadic_max _, Uniqueness -> Axis Linearity
+        | Comonadic_to_monadic_max _, Visibility -> Axis Statefulness
+        | Comonadic_to_monadic_max _, Contention -> Axis Portability
+        | Comonadic_to_monadic_max _, Staticity -> None_responsible
 
-    (** Given a morphism either from a single axis to a product, or from a
-        product to a product, return the portion of the input that's responsible
-        for the specified axis of the output. *)
-    and find_responsible_axis_prod : type a b b_ax l r.
+    let rec find_responsible_axis_proj_simple : type a b b_ax l r.
+        (a, b, l * r) simple_morph -> (b, b_ax) Axis.t -> a responsible_axis =
+      fun m ax ->
+        match m with
+        | Id -> Axis ax
+        | Meet_const _ -> Axis ax
+        | Imply_const _ -> Axis ax
+        | Core m | Core_and_meet_const(_, (m : (_, _, l * r) core_morph))
+        | Imply_const_and_core((m : (_, _, l * r) core_morph), _) ->
+            find_responsible_axis_proj_core m ax
+        | Compose (mb, ma) -> begin
+            match find_responsible_axis_proj_simple mb ax with
+            | None_responsible -> None_responsible
+            | All_responsible -> All_responsible
+            | Axis ax -> find_responsible_axis_proj_simple ma ax
+          end
+
+    (** Given a morphism and an axis, return the portion of the input that's
+        responsible for the specified axis of the output. *)
+    let find_responsible_axis_proj : type a b b_ax l r.
         (a, b, l * r) morph -> (b, b_ax) Axis.t -> a responsible_axis =
      fun m ax ->
-      let handle_monadic_to_comonadic (type x y)
-          (ax : (x comonadic_with, y) Axis.t) =
-        (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
-        match ax with
-        | Areality -> NoneResponsible
-        | Linearity -> Axis Uniqueness
-        | Portability -> Axis Contention
-        | Forkable -> NoneResponsible
-        | Yielding -> NoneResponsible
-        | Statefulness -> Axis Visibility
-      in
-      let handle_comonadic_to_monadic (type y) (ax : (monadic, y) Axis.t) =
-        (* See [Lattices_mono.comonadic_to_monadic_min] for why these are as they are *)
-        match ax with
-        | Uniqueness -> Axis Linearity
-        | Contention -> Axis Portability
-        | Visibility -> Axis Statefulness
-        | Staticity -> NoneResponsible
-      in
-      match m, ax with
-      | Compose (g, f), ax -> (
-        (* Operates similarly to the equivalent branch in [find_responsible_axis_single] *)
-        match find_responsible_axis_prod g ax with
-        | NoneResponsible -> NoneResponsible
-        | SourceIsSingle -> find_responsible_axis_single f
-        | Axis c_ax -> find_responsible_axis_prod f c_ax)
-      | Id, ax -> Axis ax
-      | Meet_const _, ax -> Axis ax
-      | Imply_const _, ax -> Axis ax
-      | Map_comonadic _, ax -> (
-        (* The [Map_comonadic] morphism applies a morphsim to the areality axis and
-           the result is put back into the areality axis. See [Lattices_mono.apply] *)
-        match ax with
-        | Areality -> Axis Areality
-        | Forkable -> Axis Forkable
-        | Yielding -> Axis Yielding
-        | Linearity -> Axis Linearity
-        | Statefulness -> Axis Statefulness
-        | Portability -> Axis Portability)
-      | Max_with m_ax, ax | Min_with m_ax, ax -> begin
-          match Axis.equal m_ax ax with
-          | Not_equal -> NoneResponsible
-          | Equal -> SourceIsSingle
-        end
-      | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
-      | Monadic_to_comonadic_max, ax -> handle_monadic_to_comonadic ax
-      | Comonadic_to_monadic_min _, ax -> handle_comonadic_to_monadic ax
-      | Comonadic_to_monadic_max _, ax -> handle_comonadic_to_monadic ax
-      | Proj _, _
-      | Local_to_regional, _
-      | Regional_to_local, _
-      | Locality_as_regionality, _
-      | Regional_to_global, _
-      | Global_to_regional, _ ->
-        .
+       match m with
+       | Simple m -> find_responsible_axis_proj_simple m ax
+       | Proj_and(_, ax, _) -> Axis ax
+       | And_max_with(m_ax, _) -> begin
+           match Axis.equal m_ax ax with
+           | Not_equal -> None_responsible
+           | Equal -> All_responsible
+         end
+       | And_min_with(m_ax, _) -> begin
+           match Axis.equal m_ax ax with
+           | Not_equal -> None_responsible
+           | Equal -> All_responsible
+         end
+
+    (** Given a morphism return the portion of the input that's
+        responsible for all of the output. *)
+    let find_responsible_axis_all : type a b l r.
+        (a, b, l * r) morph -> a responsible_axis = function
+      | Simple _ -> All_responsible
+      | Proj_and(_, ax, _) -> Axis ax
+      | And_max_with _ | And_min_with _ -> All_responsible
+
   end
 
-  (** Compose m1 after m2. Returns [Some f] if the composition can be
-      represented by [f] instead of [Compose m1 m2]. [None] otherwise. *)
-  let rec maybe_compose : type a b c l r.
-      c obj ->
-      (b, c, l * r) morph ->
-      (a, b, l * r) morph ->
-      (a, c, l * r) morph option =
-   fun dst m1 m2 ->
-    let is_max c = le dst (max dst) c in
-    let is_mid_max c =
-      let mid = src dst m1 in
-      le mid (max mid) c
-    in
-    match m1, m2 with
-    | Id, m -> Some m
-    | m, Id -> Some m
-    | Meet_const c1, Meet_const c2 -> Some (Meet_const (meet dst c1 c2))
-    | Imply_const c1, Imply_const c2 -> Some (Imply_const (meet dst c1 c2))
-    | Imply_const c1, Meet_const c2 when le dst c1 c2 -> Some (Imply_const c1)
-    | Meet_const c1, m2 when is_max c1 -> Some m2
-    | Imply_const c1, m2 when is_max c1 -> Some m2
-    | m2, Meet_const c1 when is_mid_max c1 -> Some m2
-    | m2, Imply_const c1 when is_mid_max c1 -> Some m2
-    | Compose (f1, f2), g -> (
-      let mid = src dst f1 in
-      match maybe_compose mid f2 g with
-      | Some m -> Some (compose dst f1 m)
-      (* the check needed to prevent infinite loop *)
-      | None -> None)
-    | f, Compose (g1, g2) -> (
-      match maybe_compose dst f g1 with
-      | Some m -> Some (compose dst m g2)
-      | None -> None)
-    | Proj (mid, ax), Meet_const c ->
-      Some (compose dst (Meet_const (Axis.proj ax c)) (Proj (mid, ax)))
-    | Proj (_, ax1), Max_with ax2 -> (
-      match Axis.equal ax1 ax2 with Not_equal -> None | Equal -> Some Id)
-    | Proj (_, ax1), Min_with ax2 -> (
-      match Axis.equal ax1 ax2 with Not_equal -> None | Equal -> Some Id)
-    | Proj (mid, ax), Map_comonadic f -> (
-      let src' = src mid m2 in
-      match ax with
-      | Areality -> Some (compose dst f (Proj (src', Areality)))
-      | Linearity -> Some (Proj (src', Linearity))
-      | Portability -> Some (Proj (src', Portability))
-      | Forkable -> Some (Proj (src', Forkable))
-      | Yielding -> Some (Proj (src', Yielding))
-      | Statefulness -> Some (Proj (src', Statefulness)))
-    | Proj _, Monadic_to_comonadic_min -> None
-    | Proj _, Monadic_to_comonadic_max -> None
-    | Proj _, Comonadic_to_monadic_min _ -> None
-    | Proj _, Comonadic_to_monadic_max _ -> None
-    | Map_comonadic f, Map_comonadic g ->
-      let dst0 = proj_obj Areality dst in
-      Some (Map_comonadic (compose dst0 f g))
-    | Regional_to_local, Local_to_regional -> Some Id
-    | Regional_to_local, Global_to_regional -> Some (Imply_const Locality.Global)
-    | Regional_to_local, Locality_as_regionality -> Some Id
-    | Regional_to_local, Meet_const c ->
-      Some (compose dst (Meet_const (regional_to_local c)) Regional_to_local)
-    | Regional_to_global, Meet_const c ->
-      Some (compose dst (Meet_const (regional_to_global c)) Regional_to_global)
-    | Local_to_regional, Meet_const c ->
-      Some (compose dst (Meet_const (local_to_regional c)) Local_to_regional)
-    | Global_to_regional, Meet_const c ->
-      Some (compose dst (Meet_const (global_to_regional c)) Global_to_regional)
-    | Locality_as_regionality, Meet_const c ->
-      Some
-        (compose dst
-           (Meet_const (locality_as_regionality c))
-           Locality_as_regionality)
-    | Map_comonadic f, Meet_const c ->
-      let dst0 = proj_obj Areality dst in
-      let areality = Axis.proj Areality c in
-      Some
-        (compose dst
-           (Meet_const (set_areality (max dst0) c))
-           (Map_comonadic (compose dst0 f (Meet_const areality))))
-    | Map_comonadic f, Imply_const c ->
-      let dst0 = proj_obj Areality dst in
-      let areality = Axis.proj Areality c in
-      Some
-        (compose dst
-           (Imply_const (set_areality (max dst0) c))
-           (Map_comonadic (compose dst0 f (Imply_const areality))))
-    | Regional_to_global, Locality_as_regionality -> Some Id
-    | Regional_to_global, Local_to_regional -> Some (Meet_const Locality.Global)
-    | Local_to_regional, Regional_to_local -> None
-    | Local_to_regional, Regional_to_global -> None
-    | Locality_as_regionality, Regional_to_local -> None
-    | Locality_as_regionality, Regional_to_global -> None
-    | Global_to_regional, Regional_to_local -> None
-    | Regional_to_global, Global_to_regional -> Some Id
-    | Global_to_regional, Regional_to_global -> None
-    | Min_with _, _ -> None
-    | Max_with _, _ -> None
-    | _, Meet_const _ -> None
-    | Meet_const _, _ -> None
-    | _, Imply_const _ -> None
-    | Imply_const _, _ -> None
-    | _, Proj _ -> None
-    | Map_comonadic _, _ -> None
-    | Monadic_to_comonadic_min, _ -> None
-    | Monadic_to_comonadic_max, _ -> None
-    | Comonadic_to_monadic_min _, _ -> None
-    | Comonadic_to_monadic_max _, _ -> None
-    | ( Proj _,
-        ( Local_to_regional | Regional_to_local | Locality_as_regionality
-        | Regional_to_global | Global_to_regional ) ) ->
-      .
-    | ( ( Local_to_regional | Regional_to_local | Locality_as_regionality
-        | Regional_to_global | Global_to_regional ),
-        Min_with _ ) ->
-      .
-    | ( ( Local_to_regional | Regional_to_local | Locality_as_regionality
-        | Regional_to_global | Global_to_regional ),
-        Max_with _ ) ->
-      .
-
-  and compose : type a b c l r.
-      c obj -> (b, c, l * r) morph -> (a, b, l * r) morph -> (a, c, l * r) morph
-      =
-   fun dst f g ->
-    match maybe_compose dst f g with Some m -> m | None -> Compose (f, g)
-
-  let rec left_adjoint : type a b l.
-      b obj -> (a, b, l * allowed) morph -> (b, a, allowed * disallowed) morph =
-   fun dst f ->
-    match f with
-    | Id -> Id
-    | Proj (_, ax) -> Min_with ax
-    | Max_with ax -> Proj (dst, ax)
-    | Compose (f, g) ->
-      let mid = src dst f in
-      let f' = left_adjoint dst f in
-      let g' = left_adjoint mid g in
-      Compose (g', f')
-    | Meet_const _c ->
-      (* The downward closure of [Meet_const c]'s image is all [x <= c].
-         For those, [x <= meet c y] is equivalent to [x <= y]. *)
-      Id
-    | Imply_const c -> Meet_const c
-    | Comonadic_to_monadic_max _ -> Monadic_to_comonadic_min
-    | Monadic_to_comonadic_max -> Comonadic_to_monadic_min dst
-    | Global_to_regional -> Regional_to_global
-    | Regional_to_global -> Locality_as_regionality
-    | Locality_as_regionality -> Regional_to_local
-    | Regional_to_local -> Local_to_regional
-    | Map_comonadic f ->
-      let dst0 = proj_obj Areality dst in
-      let f' = left_adjoint dst0 f in
-      Map_comonadic f'
-
-  and right_adjoint : type a b r.
-      b obj -> (a, b, allowed * r) morph -> (b, a, disallowed * allowed) morph =
-   fun dst f ->
-    match f with
-    | Id -> Id
-    | Proj (_, ax) -> Max_with ax
-    | Min_with ax -> Proj (dst, ax)
-    | Compose (f, g) ->
-      let mid = src dst f in
-      let f' = right_adjoint dst f in
-      let g' = right_adjoint mid g in
-      Compose (g', f')
-    | Meet_const c -> Imply_const c
-    | Comonadic_to_monadic_min _ -> Monadic_to_comonadic_max
-    | Monadic_to_comonadic_min -> Comonadic_to_monadic_max dst
-    | Local_to_regional -> Regional_to_local
-    | Regional_to_local -> Locality_as_regionality
-    | Locality_as_regionality -> Regional_to_global
-    | Regional_to_global -> Global_to_regional
-    | Map_comonadic f ->
-      let dst0 = proj_obj Areality dst in
-      let f' = right_adjoint dst0 f in
-      Map_comonadic f'
 end
 
 module C = Lattices_mono
@@ -2128,21 +2984,21 @@ module Report = struct
      fun obj morph_hint morph ahint res ->
       let obj = C.src obj morph in
       match res with
-      | NoneResponsible -> Irrelevant
-      | SourceIsSingle ->
-        let ahint = ahint_axis obj ahint in
+      | None_responsible -> Irrelevant
+      | All_responsible ->
+        let ahint = ahint_all obj ahint in
         Apply (morph_hint, obj, ahint)
       | Axis ax ->
-        let ahint = ahint_prod obj ax ahint in
+        let ahint = ahint_proj obj ax ahint in
         let obj = C.proj_obj ax obj in
         Apply (morph_hint, obj, ahint)
 
-    and hint_prod : type t a l r.
+    and hint_proj : type t a l r.
         t C.obj -> (t, a) Axis.t -> (t, l * r) S.hint -> (l * r) hint =
      fun obj ax -> function
       | Apply (morph_hint, morph, ahint) ->
         hint_apply obj morph_hint morph ahint
-          (C.For_hint.find_responsible_axis_prod morph ax)
+          (C.For_hint.find_responsible_axis_proj morph ax)
       | Const c -> Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
         let chosen_hint =
@@ -2153,22 +3009,22 @@ module Report = struct
           | `First -> hint1
           | `Second -> hint2
         in
-        hint_prod obj ax chosen_hint
+        hint_proj obj ax chosen_hint
 
-    and ahint_prod : type t a l r.
+    and ahint_proj : type t a l r.
         t C.obj -> (t, a) Axis.t -> (t, l * r) S.ahint -> (a, l * r) ahint =
      fun obj ax (t, hint) ->
       let a = Axis.proj ax t in
-      let hint = hint_prod obj ax hint in
+      let hint = hint_proj obj ax hint in
       a, hint
 
     (** Given a solver hint on a single axis lattice, returns a human-readible
         hint. *)
-    and hint_axis : type a l r. a C.obj -> (a, l * r) S.hint -> (l * r) hint =
+    and hint_all : type a l r. a C.obj -> (a, l * r) S.hint -> (l * r) hint =
      fun obj -> function
       | Apply (morph_hint, morph, ahint) ->
         hint_apply obj morph_hint morph ahint
-          (C.For_hint.find_responsible_axis_single morph)
+          (C.For_hint.find_responsible_axis_all morph)
       | Const c -> Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
         let chosen_hint =
@@ -2176,22 +3032,22 @@ module Report = struct
           | `First -> hint1
           | `Second -> hint2
         in
-        hint_axis obj chosen_hint
+        hint_all obj chosen_hint
 
-    and ahint_axis : type a l r.
+    and ahint_all : type a l r.
         a Lattices_mono.obj -> (a, l * r) S.ahint -> (a, l * r) ahint =
-     fun obj (a, hint) -> a, hint_axis obj hint
+     fun obj (a, hint) -> a, hint_all obj hint
 
-    let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
+    let error_proj : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left; right } ->
-      let left = ahint_prod obj axis left in
-      let right = ahint_prod obj axis right in
+      let left = ahint_proj obj axis left in
+      let right = ahint_proj obj axis right in
       { left; right }
 
-    let error_axis : type a. a C.obj -> a S.error -> a t =
+    let error_all : type a. a C.obj -> a S.error -> a t =
      fun obj { left; right } ->
-      let left = ahint_axis obj left in
-      let right = ahint_axis obj right in
+      let left = ahint_all obj left in
+      let right = ahint_all obj right in
       { left; right }
   end
 
@@ -2302,6 +3158,38 @@ module Report = struct
       (Location.Doc.loc ~capitalize_first:false)
       loc
 
+  let print_containing ppf { containing; container } =
+    match containing with
+    | Tuple ->
+        fprintf ppf "is an element of the tuple at %a"
+          Location.print_loc container
+    | Record (s, _) ->
+        fprintf ppf "is the field %a of the record at %a"
+          Misc.Style.inline_code s
+          Location.print_loc container
+    | Array _ ->
+        fprintf ppf "is an element of the array at %a"
+          Location.print_loc container
+    | Constructor (s, _) ->
+        fprintf ppf "is contained (via constructor %a) in the value at %a"
+          Misc.Style.inline_code s Location.print_loc container
+
+  let print_containing ppf { containing; container } =
+    match containing with
+    | Tuple ->
+        fprintf ppf "is an element of the tuple at %a"
+          Location.print_loc container
+    | Record (s, _) ->
+        fprintf ppf "is the field %a of the record at %a"
+          Misc.Style.inline_code s
+          Location.print_loc container
+    | Array _ ->
+        fprintf ppf "is an element of the array at %a"
+          Location.print_loc container
+    | Constructor (s, _) ->
+        fprintf ppf "is contained (via constructor %a) in the value at %a"
+          Misc.Style.inline_code s Location.print_loc container
+
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
       prints the const to explain the mode on the pinpoint. *)
   let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
@@ -2363,6 +3251,7 @@ module Report = struct
     | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->
       Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
+    | Contained_by c -> print_containing ppf c
 
   let print_allocation_l : allocation -> Fmt.formatter -> unit =
    fun { txt; loc } ->
@@ -2670,27 +3559,27 @@ module Error = struct
   type 'a t = 'a S.error_raw
 
   type packed =
-    | Product : 'r C.obj * ('r, 'a) Axis.t * 'r t -> packed
-    | Axis : 'a C.obj * 'a t -> packed
+    | Proj : 'r C.obj * ('r, 'a) Axis.t * 'r t -> packed
+    | All : 'a C.obj * 'a t -> packed
 
-  let print_product : type r a.
+  let print_proj : type r a.
       Hint.pinpoint -> r C.obj -> (r, a) Axis.t -> r t -> print_error =
    fun pp obj ax err ->
     let err = S.populate_error obj err in
-    let err = Report.Of_solver.error_prod obj ax err in
+    let err = Report.Of_solver.error_proj obj ax err in
     let obj = C.proj_obj ax obj in
     Report.print pp obj err
 
-  let print_axis : type a. Hint.pinpoint -> a C.obj -> a t -> print_error =
+  let print_all : type a. Hint.pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj err ->
     let err = S.populate_error obj err in
-    let err = Report.Of_solver.error_axis obj err in
+    let err = Report.Of_solver.error_all obj err in
     Report.print pp obj err
 
   let print_packed : Hint.pinpoint -> packed -> print_error =
    fun pp -> function
-    | Product (obj, ax, err) -> print_product pp obj ax err
-    | Axis (obj, err) -> print_axis pp obj err
+    | Proj (obj, ax, err) -> print_proj pp obj ax err
+    | All (obj, err) -> print_all pp obj err
 
   let print_packed_simple_context : Hint.pinpoint -> packed -> Location.error =
    fun pp packed ->
@@ -2800,7 +3689,7 @@ let equate_from_submode' submode m1 m2 =
 module Comonadic_gen (Obj : Obj) = struct
   open Obj
 
-  type 'd t = (const, 'l * 'r) S.mode constraint 'd = 'l * 'r
+  type 'd t = (const, 'd) S.mode
 
   type l = (allowed * disallowed) t
 
@@ -2826,9 +3715,9 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let newvar () = S.newvar obj
 
-  let min = S.min obj
+  let min : lr = S.min obj
 
-  let max = S.max obj
+  let max : lr = S.max obj
 
   let newvar_above m = S.newvar_above obj m
 
@@ -2845,9 +3734,9 @@ module Comonadic_gen (Obj : Obj) = struct
   let submode_err pp a b =
     match submode ~pp a b with
     | Ok () -> ()
-    | Error e -> raise (Submode_error_simple_context (pp, Axis (obj, e)))
+    | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
-  let print_error pp err = Error.print_axis pp obj err
+  let print_error pp err = Error.print_all pp obj err
 
   let join l = S.join obj l
 
@@ -2878,13 +3767,17 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
-  let meet_const_unhint c m = S.Unhint.apply obj (Meet_const c) m
+  let meet_const_unhint c m =
+    S.Unhint.apply obj (Simple (Meet_const c)) m
 
-  let meet_const ?hint c m = wrap ?hint (meet_const_unhint c) m
+  let meet_const ?hint c m =
+    wrap ?hint (meet_const_unhint c) (disallow_right m)
 
-  let imply_const_unhint c m = S.Unhint.apply obj (Imply_const c) m
+  let imply_const_unhint c m =
+    S.Unhint.apply obj (Simple (Imply_const c)) m
 
-  let imply_const c m = m |> disallow_left |> wrap (imply_const_unhint c)
+  let imply_const c m =
+    m |> disallow_left |> wrap (imply_const_unhint c)
 
   module Guts = struct
     let get_floor m = S.get_floor obj m
@@ -2928,9 +3821,9 @@ module Monadic_gen (Obj : Obj) = struct
 
   let newvar () = S.newvar obj
 
-  let min = S.max obj
+  let min : lr = S.allow_left (S.max obj)
 
-  let max = S.min obj
+  let max : lr = S.allow_right (S.min obj)
 
   let newvar_above m = S.newvar_below obj m
 
@@ -2947,9 +3840,9 @@ module Monadic_gen (Obj : Obj) = struct
   let submode_err pp a b =
     match submode ~pp a b with
     | Ok () -> ()
-    | Error e -> raise (Submode_error_simple_context (pp, Axis (obj, e)))
+    | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
-  let print_error pp err = Error.print_axis pp obj err
+  let print_error pp err = Error.print_all pp obj err
 
   let join l = S.meet obj l
 
@@ -2980,13 +3873,17 @@ module Monadic_gen (Obj : Obj) = struct
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
-  let join_const_unhint c m = S.Unhint.apply Obj.obj (Meet_const c) m
+  let join_const_unhint c m =
+    S.Unhint.apply Obj.obj (Simple (Meet_const c)) m
 
-  let join_const ?hint c m = wrap ?hint (join_const_unhint c) m
+  let join_const ?hint c m =
+    wrap ?hint (join_const_unhint c) (disallow_left m)
 
-  let subtract_const_unhint c m = S.Unhint.apply obj (Imply_const c) m
+  let subtract_const_unhint c m =
+    S.Unhint.apply obj (Simple (Imply_const c)) m
 
-  let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
+  let subtract_const c m =
+    m |> disallow_right |> wrap (subtract_const_unhint c)
 
   module Guts = struct
     let get_ceil m = S.get_floor obj m
@@ -3238,13 +4135,6 @@ module Staticity = struct
   let zap_to_legacy = zap_to_ceil
 end
 
-let regional_to_local m = S.apply Locality.Obj.obj C.Regional_to_local m
-
-let locality_as_regionality m =
-  S.apply Regionality.Obj.obj C.Locality_as_regionality m
-
-let regional_to_global m = S.apply Locality.Obj.obj C.Regional_to_global m
-
 module type Areality = sig
   module Const : C.Areality
 
@@ -3265,7 +4155,7 @@ module Comonadic_with (Areality : Areality) = struct
   module Obj = struct
     type const = Areality.Const.t C.comonadic_with
 
-    let obj = C.comonadic_with_obj Areality.Obj.obj
+    let obj = C.areality_comonadic_obj Areality.Const.areality
   end
 
   include Comonadic_gen (Obj)
@@ -3349,7 +4239,8 @@ module Comonadic_with (Areality : Areality) = struct
     end
   end
 
-  let proj ax m = S.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m =
+    S.apply ~hint:Skip (proj_obj ax) (Proj_and(Id, ax, Obj.obj)) m
 
   module Per_axis = struct
     let zap_to_floor ax m =
@@ -3362,12 +4253,15 @@ module Comonadic_with (Areality : Areality) = struct
   end
 
   let min_with ax m =
-    S.apply ~hint:Skip Obj.obj (Min_with ax) (S.disallow_right m)
+    S.apply ~hint:Skip Obj.obj (And_min_with(ax, Id)) (disallow_right m)
 
   let max_with ax m =
-    S.apply ~hint:Skip Obj.obj (Max_with ax) (S.disallow_left m)
+    S.apply ~hint:Skip Obj.obj (And_max_with(ax, Id)) (disallow_left m)
 
-  let meet_const_with ax c m = meet_const (Const.max_with ax c) m
+  let meet_const_with ax c m =
+    meet_const (C.max_with Obj.obj ax c) m
+
+  let imply_const_with ax c m = imply_const (C.max_with Obj.obj ax c) m
 
   let zap_to_legacy m : Const.t =
     let areality = proj Areality m |> Areality.zap_to_legacy in
@@ -3376,7 +4270,7 @@ module Comonadic_with (Areality : Areality) = struct
     let portability =
       proj Portability m |> Portability.zap_to_legacy ~statefulness
     in
-    let global = Areality.Const.(equal areality legacy) in
+    let global = Areality.Const.equal areality Areality.Const.legacy in
     let forkable = proj Forkable m |> Forkable.zap_to_legacy ~global in
     let yielding = proj Yielding m |> Yielding.zap_to_legacy ~global in
     { areality; linearity; portability; forkable; yielding; statefulness }
@@ -3405,11 +4299,11 @@ module Comonadic_with (Areality : Areality) = struct
     | Ok () -> ()
     | Error e ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Product (Obj.obj, ax, e)))
+      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
 
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
-    Error.print_product pp Obj.obj ax err
+    Error.print_proj pp Obj.obj ax err
 end
 [@@inline]
 
@@ -3499,7 +4393,8 @@ module Monadic = struct
     end
   end
 
-  let proj ax m = S.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m =
+    S.apply ~hint:Skip (proj_obj ax) (Proj_and(Id, ax, Obj.obj)) m
 
   module Per_axis = struct
     let zap_to_floor ax m =
@@ -3513,10 +4408,12 @@ module Monadic = struct
 
   (* The monadic fragment is inverted. *)
 
-  let join_const_with ax c m = join_const (Const.min_with ax c) m
+  let join_const_with ax c m = join_const (C.min_with Obj.obj ax c) m
+
+  let subtract_const_with ax c m = subtract_const (C.min_with Obj.obj ax c) m
 
   let min_with ax m =
-    S.apply ~hint:Skip Obj.obj (Max_with ax) (S.disallow_left m)
+    S.apply ~hint:Skip Obj.obj (And_max_with(ax, Id)) (S.disallow_left m)
 
   let zap_to_legacy m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
@@ -3552,11 +4449,11 @@ module Monadic = struct
     | Ok () -> ()
     | Error e ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Product (Obj.obj, ax, e)))
+      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
 
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
-    Error.print_product pp Obj.obj ax err
+    Error.print_proj pp Obj.obj ax err
 end
 
 type ('mo, 'como) monadic_comonadic =
@@ -3700,11 +4597,6 @@ module Value_with (Areality : Areality) = struct
     t |> unhint |> f |> hint ?monadic ?comonadic
 
   module Const = struct
-    let comonadic_to_monadic_min = C.comonadic_to_monadic_min Comonadic.Obj.obj
-
-    module Monadic = Monadic.Const
-    module Comonadic = Comonadic.Const
-
     (* CR-soon zqian: make a functor [Mode.Value.Const.Make] to generalize over any type
        operator applied on each mode constants. *)
     type t =
@@ -3720,40 +4612,46 @@ module Value_with (Areality : Areality) = struct
         Staticity.Const.t )
       modes
 
-    let min = merge { comonadic = Comonadic.min; monadic = Monadic.min }
+    let min =
+      merge { comonadic = Comonadic.Const.min; monadic = Monadic.Const.min }
 
-    let max = merge { comonadic = Comonadic.max; monadic = Monadic.max }
+    let max =
+      merge { comonadic = Comonadic.Const.max; monadic = Monadic.Const.max }
 
     let le m1 m2 =
       let m1 = split m1 in
       let m2 = split m2 in
-      Comonadic.le m1.comonadic m2.comonadic && Monadic.le m1.monadic m2.monadic
+      Comonadic.Const.le m1.comonadic m2.comonadic
+      && Monadic.Const.le m1.monadic m2.monadic
 
     let equal m1 m2 =
       let m1 = split m1 in
       let m2 = split m2 in
-      Comonadic.equal m1.comonadic m2.comonadic
-      && Monadic.equal m1.monadic m2.monadic
+      Comonadic.Const.equal m1.comonadic m2.comonadic
+      && Monadic.Const.equal m1.monadic m2.monadic
 
     let print ppf m =
       let { monadic; comonadic } = split m in
-      Fmt.fprintf ppf "%a,%a" Comonadic.print comonadic Monadic.print monadic
+      Fmt.fprintf ppf "%a,%a"
+        Comonadic.Const.print comonadic Monadic.Const.print monadic
 
     let legacy =
-      merge { comonadic = Comonadic.legacy; monadic = Monadic.legacy }
+      merge
+        { comonadic = Comonadic.Const.legacy;
+          monadic = Monadic.Const.legacy }
 
     let meet m1 m2 =
       let m1 = split m1 in
       let m2 = split m2 in
-      let monadic = Monadic.meet m1.monadic m2.monadic in
-      let comonadic = Comonadic.meet m1.comonadic m2.comonadic in
+      let monadic = Monadic.Const.meet m1.monadic m2.monadic in
+      let comonadic = Comonadic.Const.meet m1.comonadic m2.comonadic in
       merge { monadic; comonadic }
 
     let join m1 m2 =
       let m1 = split m1 in
       let m2 = split m2 in
-      let monadic = Monadic.join m1.monadic m2.monadic in
-      let comonadic = Comonadic.join m1.comonadic m2.comonadic in
+      let monadic = Monadic.Const.join m1.monadic m2.monadic in
+      let comonadic = Comonadic.Const.join m1.comonadic m2.comonadic in
       merge { monadic; comonadic }
 
     module Option = struct
@@ -3919,13 +4817,17 @@ module Value_with (Areality : Areality) = struct
         staticity
       }
 
+    let comonadic_to_monadic_min =
+      C.comonadic_to_monadic_min Areality.Const.areality
+
+    let monadic_to_comonadic_min =
+      C.monadic_to_comonadic_min Comonadic.Obj.obj
+
     (** See [Alloc.close_over] for explanation. *)
     let close_over m =
       let { monadic; comonadic } = split m in
-      Comonadic.join comonadic
-        (C.monadic_to_comonadic_min
-           (C.comonadic_with_obj Areality.Obj.obj)
-           monadic)
+      Comonadic.Const.join comonadic
+        (monadic_to_comonadic_min monadic)
 
     (** See [Alloc.partial_apply] for explanation. *)
     let partial_apply m =
@@ -3940,16 +4842,16 @@ module Value_with (Areality : Areality) = struct
     let le_axis : type a. a Axis.t -> a -> a -> bool =
      fun ax m1 m2 ->
       match ax with
-      | Comonadic ax -> Comonadic.Per_axis.le ax m1 m2
-      | Monadic ax -> Monadic.Per_axis.le ax m1 m2
+      | Comonadic ax -> Comonadic.Const.Per_axis.le ax m1 m2
+      | Monadic ax -> Monadic.Const.Per_axis.le ax m1 m2
 
     let min_axis : type a. a Axis.t -> a = function
-      | Comonadic ax -> Comonadic.Per_axis.min ax
-      | Monadic ax -> Monadic.Per_axis.min ax
+      | Comonadic ax -> Comonadic.Const.Per_axis.min ax
+      | Monadic ax -> Monadic.Const.Per_axis.min ax
 
     let max_axis : type a. a Axis.t -> a = function
-      | Comonadic ax -> Comonadic.Per_axis.max ax
-      | Monadic ax -> Monadic.Per_axis.max ax
+      | Comonadic ax -> Comonadic.Const.Per_axis.max ax
+      | Monadic ax -> Monadic.Const.Per_axis.max ax
 
     let is_max : type a. a Axis.t -> a -> bool =
      fun ax m -> le_axis ax (max_axis ax) m
@@ -3967,7 +4869,7 @@ module Value_with (Areality : Areality) = struct
   let max = { comonadic = Comonadic.max; monadic = Monadic.max }
 
   include Magic_allow_disallow (struct
-    type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
+    type (_, _, 'd) sided = 'd t
 
     let allow_left { monadic; comonadic } =
       let monadic = Monadic.allow_left monadic in
@@ -4083,10 +4985,22 @@ module Value_with (Areality : Areality) = struct
 
   let join_const_with ax c { monadic; comonadic } =
     let monadic = Monadic.join_const_with ax c monadic in
+    let comonadic = Comonadic.disallow_left comonadic in
     { monadic; comonadic }
 
   let meet_const_with ax c { monadic; comonadic } =
+    let monadic = Monadic.disallow_right monadic in
     let comonadic = Comonadic.meet_const_with ax c comonadic in
+    { comonadic; monadic }
+
+  let imply_const_with ax c { monadic; comonadic } =
+    let monadic = Monadic.disallow_left monadic in
+    let comonadic = Comonadic.imply_const_with ax c comonadic in
+    { monadic; comonadic }
+
+  let subtract_const_with ax c { monadic; comonadic } =
+    let monadic = Monadic.subtract_const_with ax c monadic in
+    let comonadic = Comonadic.disallow_right comonadic in
     { comonadic; monadic }
 
   let join l =
@@ -4112,22 +5026,38 @@ module Value_with (Areality : Areality) = struct
     { comonadic; monadic }
 
   let comonadic_to_monadic_min ?hint m =
-    S.apply ?hint Monadic.Obj.obj (Comonadic_to_monadic_max Comonadic.Obj.obj)
+    S.apply ?hint Monadic.Obj.obj
+      (Simple (Core (Comonadic_to_monadic_max Areality.Const.areality)))
       (Comonadic.disallow_left m)
 
   let monadic_to_comonadic_min m =
-    S.apply Comonadic.Obj.obj Monadic_to_comonadic_min (Monadic.disallow_left m)
+    S.apply Comonadic.Obj.obj
+      (Simple (Core Monadic_to_comonadic_min))
+      (Monadic.disallow_left m)
 
   let monadic_to_comonadic_max m =
-    S.apply Comonadic.Obj.obj Monadic_to_comonadic_max
+    S.apply Comonadic.Obj.obj
+      (Simple (Core Monadic_to_comonadic_max))
       (Monadic.disallow_right m)
 
   let meet_const c { comonadic; monadic } =
+    let monadic = Monadic.disallow_right monadic in
     let comonadic = Comonadic.meet_const c comonadic in
     { monadic; comonadic }
 
   let join_const c { comonadic; monadic } =
     let monadic = Monadic.join_const c monadic in
+    let comonadic = Comonadic.disallow_left comonadic in
+    { monadic; comonadic }
+
+  let imply_const c { comonadic; monadic } =
+    let monadic = Monadic.disallow_left monadic in
+    let comonadic = Comonadic.imply_const c comonadic in
+    { monadic; comonadic }
+
+  let subtract_const c { comonadic; monadic } =
+    let monadic = Monadic.subtract_const c monadic in
+    let comonadic = Comonadic.disallow_right comonadic in
     { monadic; comonadic }
 
   let zap_to_ceil { comonadic; monadic } =
@@ -4151,9 +5081,9 @@ module Value_with (Areality : Areality) = struct
   let close_over { comonadic; monadic } =
     let comonadic = Comonadic.disallow_right comonadic in
     (* The comonadic of the returned function is constrained by the monadic of the closed argument via the dualizing morphism. *)
-    let comonadic1 = monadic_to_comonadic_min monadic in
+    let comonadic_dual = monadic_to_comonadic_min monadic in
     (* It's also constrained by the comonadic of the closed argument. *)
-    let comonadic = Comonadic.join [comonadic; comonadic1] in
+    let comonadic = Comonadic.join [comonadic; comonadic_dual] in
     (* The closure will access [A] at the specified monadic modes, and thus the
        monadic mode of the closure itself is not constrained by it. *)
     let monadic = Monadic.disallow_right Monadic.min in
@@ -4173,7 +5103,7 @@ module Value_with (Areality : Areality) = struct
     type nonrec 'd t = 'd t list
 
     include Magic_allow_disallow (struct
-      type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
+      type (_, _, 'd) sided = 'd t
 
       let allow_left l = List.map allow_left l
 
@@ -4191,6 +5121,8 @@ module Value = Value_with (Regionality)
 module Alloc = Value_with (Locality)
 
 module Const = struct
+  let locality_as_regionality = C.locality_as_regionality
+
   let alloc_as_value
       ({ areality;
          linearity;
@@ -4239,23 +5171,39 @@ module Const = struct
       | Right ax -> P ax
   end
 
-  let locality_as_regionality = C.locality_as_regionality
 end
 
 (* CR-someday zqian: all the function that converts between [Alloc] and [Value] should
    operate on [Unhint] so they can be composed and assigned hint as a whole. *)
 
 let comonadic_locality_as_regionality comonadic =
-  S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
+  S.Unhint.apply Value.Comonadic.Obj.obj
+    (Simple (Core (Locality_full Locality_as_regionality)))
     comonadic
 
 let comonadic_regional_to_local comonadic =
-  S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
+  S.Unhint.apply Alloc.Comonadic.Obj.obj
+    (Simple (Core (Locality_full Regional_to_local)))
     comonadic
+
+let locality_as_regionality_unhint l =
+  S.Unhint.apply C.Regionality
+    (Simple (Core (Locality_restricted Locality_as_regionality)))
+    l
+
+let locality_as_regionality m =
+  m
+  |> Locality.unhint
+  |> locality_as_regionality_unhint
+  |> Regionality.hint
 
 let alloc_as_value_unhint m =
   let { comonadic; monadic } = m in
-  let comonadic = comonadic_locality_as_regionality comonadic in
+  let comonadic =
+    S.Unhint.apply Value.Comonadic.Obj.obj
+      (Simple (Core (Locality_full Locality_as_regionality)))
+      comonadic
+  in
   { comonadic; monadic }
 
 let alloc_as_value m =
@@ -4264,7 +5212,8 @@ let alloc_as_value m =
 let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
   let comonadic =
-    S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
+    S.Unhint.apply Value.Comonadic.Obj.obj
+      (Simple (Core (Locality_full Local_to_regional)))
       comonadic
   in
   { comonadic; monadic }
@@ -4276,22 +5225,28 @@ let alloc_to_value_l2r m =
 let value_to_alloc_r2g_unhint m =
   let { comonadic; monadic } = m in
   let comonadic =
-    S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
+    S.Unhint.apply Alloc.Comonadic.Obj.obj
+      (Simple (Core (Locality_full Regional_to_global)))
       comonadic
   in
   { comonadic; monadic }
 
 let value_to_alloc_r2g m =
-  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint ~monadic:Skip
+  m |> Value.disallow_left |> Value.unhint |> value_to_alloc_r2g_unhint
+  |> Alloc.hint ~monadic:Skip
 
 let value_r2g ?hint m =
   Value.wrap ~monadic:Skip ?comonadic:hint
     (fun m -> m |> value_to_alloc_r2g_unhint |> alloc_as_value_unhint)
-    m
+    (Value.disallow_left m)
 
 let value_to_alloc_r2l_unhint m =
   let { comonadic; monadic } = m in
-  let comonadic = comonadic_regional_to_local comonadic in
+  let comonadic =
+    S.Unhint.apply Alloc.Comonadic.Obj.obj
+      (Simple (Core (Locality_full Regional_to_local)))
+      comonadic
+  in
   { comonadic; monadic }
 
 let value_to_alloc_r2l m =
@@ -4392,11 +5347,21 @@ module Modality = struct
         match then_, t with
         | Join_const c1, Join_const c2 -> Join_const (Mode.Const.join c1 c2)
 
-      let apply : type l r.
-          ?hint:(l * r) neg Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
-          =
-       fun ?(hint = Hint.Unknown) t x ->
-        match t with Join_const c -> Mode.join_const ~hint c x
+      let apply_right : type l. ?hint:left_only Hint.morph ->
+        t -> (l * allowed) Mode.t -> Mode.r =
+        fun ?(hint = Hint.Unknown_non_rigid) t x ->
+          match t with
+          | Join_const c ->
+              Mode.join_const ~hint c (Mode.disallow_left x)
+
+      let apply_left : type r. ?hint:(allowed * r) neg Hint.const ->
+        t -> (allowed * r) Mode.t -> Mode.l =
+        fun ?(hint = (Hint.Unknown : _ Hint.const)) t x ->
+           match t with
+           | Join_const c ->
+               Mode.join
+                 [Mode.disallow_right (Mode.of_const ~hint c);
+                  Mode.disallow_right x]
 
       let proj ax (Join_const c) : _ Atom.t = Join_const (Axis.proj ax c)
 
@@ -4419,7 +5384,8 @@ module Modality = struct
         (* Check that for any x >= mm, join(x, m) <= join(x, c), which (by
            definition of join) is equivalent to m <= join(x, c). This has to
            hold for all x >= mm, so we check m <= join(mm, c). *)
-        match Mode.submode_log m (Mode.join_const c mm) ~log with
+        match Mode.submode_log m
+                (Mode.join_const c (Mode.disallow_left mm)) ~log with
         | Ok () -> Ok ()
         | Error err ->
           let (Error (ax, { left; _ })) = Mode.to_simple_error err in
@@ -4441,14 +5407,14 @@ module Modality = struct
       | Undefined, _ | _, Undefined ->
         Misc.fatal_error "modality Undefined should not be in sub."
 
-    let apply : type r.
-        ?hint:(allowed * r) neg Hint.morph ->
+    let apply_left : type r.
+        ?hint:(allowed * r) neg Hint.const ->
         t ->
         (allowed * r) Mode.t ->
         Mode.l =
      fun ?hint t x ->
       match t with
-      | Const c -> Const.apply ?hint c x |> Mode.disallow_right
+      | Const c -> Const.apply_left ?hint c x |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Diff (_, m) -> Mode.join [Mode.allow_right m; x]
@@ -4482,7 +5448,7 @@ module Modality = struct
            [subtract_mm m <= c], equivalently [m <= join_mm c], which is
            achieved by the following [submode].
         *)
-        Mode.submode_exn m (Mode.join_const c mm);
+        Mode.submode_exn m (Mode.join_const c (Mode.disallow_left mm));
         Const.Join_const c
 
     let zap_to_id = zap_to_floor
@@ -4538,11 +5504,21 @@ module Modality = struct
         match then_, t with
         | Meet_const c1, Meet_const c2 -> Meet_const (Mode.Const.meet c1 c2)
 
-      let apply : type l r.
-          ?hint:(l * r) pos Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
+      let apply_left : type r.
+          ?hint:left_only Hint.morph -> t -> (allowed * r) Mode.t -> Mode.l
           =
-       fun ?(hint = Hint.Unknown) t x ->
-        match t with Meet_const c -> Mode.meet_const ~hint c x
+       fun ?(hint = Hint.Unknown_non_rigid) t x ->
+        match t with
+        | Meet_const c -> Mode.meet_const ~hint c (Mode.disallow_right x)
+
+      let apply_right : type l. ?hint:(l * allowed) pos Hint.const
+        -> t -> (l * allowed) Mode.t -> Mode.r =
+       fun ?(hint = (Hint.Unknown : _ Hint.const)) t x ->
+        match t with
+        | Meet_const c ->
+            Mode.meet
+              [Mode.disallow_left (Mode.of_const ~hint c);
+               Mode.disallow_left x]
 
       let proj ax (Meet_const c) : _ Atom.t = Meet_const (Axis.proj ax c)
 
@@ -4590,14 +5566,14 @@ module Modality = struct
       | Undefined, _ | _, Undefined ->
         Misc.fatal_error "modality Undefined should not be in sub."
 
-    let apply : type r.
-        ?hint:(allowed * r) pos Hint.morph ->
+    let apply_left : type r.
+        ?hint:left_only Hint.morph ->
         t ->
         (allowed * r) Mode.t ->
         Mode.l =
      fun ?hint t x ->
       match t with
-      | Const c -> Const.apply ?hint c x |> Mode.disallow_right
+      | Const c -> Const.apply_left ?hint c x |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Exactly (_mm, m) ->
@@ -4640,7 +5616,7 @@ module Modality = struct
            [imply_mm m >= c], equivalently [m >= meet_mm c], which is achieved
            by the following [submode].
         *)
-        Mode.submode_exn (Mode.meet_const c mm) m;
+        Mode.submode_exn (Mode.meet_const c (Mode.disallow_right mm)) m;
         Const.Meet_const c
 
     let zap_to_id = zap_to_ceil
@@ -4732,14 +5708,27 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply ?hint t { monadic; comonadic } =
+    let apply_left ?hint t { monadic; comonadic } =
       let monadic =
-        Monadic.apply
+        Monadic.apply_left
           ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
           t.monadic monadic
       in
       let comonadic =
-        Comonadic.apply
+        Comonadic.apply_left
+          ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
+          t.comonadic comonadic
+      in
+      { monadic; comonadic }
+
+    let apply_right ?hint t { monadic; comonadic } =
+      let monadic =
+        Monadic.apply_right
+          ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
+          t.monadic monadic
+      in
+      let comonadic =
+        Comonadic.apply_right
           ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
           t.comonadic comonadic
       in
@@ -4782,14 +5771,14 @@ module Modality = struct
     | _ -> false
   [@@ocaml.warning "-4"]
 
-  let apply ?hint t { monadic; comonadic } =
+  let apply_left ?hint t { monadic; comonadic } =
     let monadic =
-      Monadic.apply
+      Monadic.apply_left
         ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
         t.monadic monadic
     in
     let comonadic =
-      Comonadic.apply
+      Comonadic.apply_left
         ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
         t.comonadic comonadic
     in
@@ -4852,7 +5841,7 @@ module Crossing = struct
   (* The mode crossing capability of a type [t] is characterized by a monotone
      function [f] from modes to some lattice [L], in the following way:
 
-     To check [e : t @ m1<= m2], we should instead check [f m1 <= f m2] to
+     To check [e : t @ m1 <= m2], we should instead check [f m1 <= f m2] to
      allow more programs.
 
      For example, if [f] is the identity function, then [t] does not cross modes
@@ -4936,7 +5925,8 @@ module Crossing = struct
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left (Modality (Join_const c)) m =
-      Mode.subtract_const_unhint c (Mode.join_const_unhint c m)
+      Mode.subtract_const_unhint c
+        (Mode.unhint (Mode.join [Mode.of_const c; m]))
 
     let apply_right (Modality (Join_const c)) m =
       (* The right adjoint of join is a restriction of identity *)
@@ -5038,7 +6028,8 @@ module Crossing = struct
       Mode.meet_const_unhint c m
 
     let apply_right (Modality (Meet_const c)) m =
-      Mode.imply_const_unhint c (Mode.meet_const_unhint c m)
+      Mode.imply_const_unhint c
+        (Mode.unhint (Mode.meet [Mode.of_const c; m]))
 
     let le (Modality (Meet_const c1)) (Modality (Meet_const c2)) =
       Mode.Const.le c1 c2
@@ -5164,21 +6155,23 @@ module Crossing = struct
 
   let apply_left_unhint t { monadic; comonadic } =
     let monadic = Monadic.apply_left t.monadic monadic in
-    let comonadic = Comonadic.apply_left t.comonadic comonadic in
+    let comonadic =
+      Comonadic.apply_left t.comonadic (S.Unhint.unhint comonadic)
+    in
     { monadic; comonadic }
 
   let apply_left t m =
-    m |> Value.disallow_right |> Value.unhint |> apply_left_unhint t
-    |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+    Value.hint ~monadic:Crossing ~comonadic:Crossing
+      (apply_left_unhint t (Value.disallow_right m))
 
   let apply_right_unhint t { monadic; comonadic } =
-    let monadic = Monadic.apply_right t.monadic monadic in
+    let monadic = Monadic.apply_right t.monadic (S.Unhint.unhint monadic) in
     let comonadic = Comonadic.apply_right t.comonadic comonadic in
     { monadic; comonadic }
 
   let apply_right t m =
-    m |> Value.disallow_left |> Value.unhint |> apply_right_unhint t
-    |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+    Value.hint ~monadic:Crossing ~comonadic:Crossing
+      (apply_right_unhint t (Value.disallow_left m))
 
   (* Our mode crossing is for [Value] modes, but can be extended to [Alloc]
      modes via [alloc_as_value], defined as follows:
@@ -5194,12 +6187,16 @@ module Crossing = struct
      [regional_to_local] the left adjoint. *)
 
   let apply_left_alloc t m =
-    m |> Alloc.unhint |> alloc_as_value_unhint |> apply_left_unhint t
+    m
+    |> alloc_as_value
+    |> apply_left_unhint t
     |> value_to_alloc_r2l_unhint
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_right_alloc t m =
-    m |> Alloc.unhint |> alloc_as_value_unhint |> apply_right_unhint t
+    m
+    |> alloc_as_value
+    |> apply_right_unhint t
     |> value_to_alloc_r2g_unhint
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 

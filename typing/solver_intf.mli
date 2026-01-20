@@ -77,7 +77,7 @@ module type Lattices_mono = sig
         adjoint.
       - [disallowed], meaning the morphism cannot be on the left because it does
         not have right adjoint. Similar for ['r]. *)
-  type ('a, 'b, 'd) morph constraint 'd = 'l * 'r
+  type ('a, 'b, 'd) morph
 
   (* Due to the implementation in [solver.ml], a mode doesn't have sufficient
      information to infer the object it lives in,  whether at compile-time or
@@ -194,7 +194,7 @@ module type Solver_mono = sig
 
   (** The morphism type from the [Lattices_mono] we're working with. See
       comments on [Lattices_mono.morph]. *)
-  type ('a, 'b, 'd) morph constraint 'd = 'l * 'r
+  type ('a, 'b, 'd) morph
 
   (** The object type from the [Lattices_mono] we're working with *)
   type 'a obj
