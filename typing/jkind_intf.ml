@@ -340,6 +340,7 @@ module History = struct
     | Antiquotation_result
     | Tquote
     | Tsplice
+    | Teval
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
