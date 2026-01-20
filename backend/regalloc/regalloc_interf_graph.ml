@@ -23,7 +23,25 @@ module RegisterStamp = struct
     let hash ((x, y) : t) = (x lsl 17) lxor y
   end)
 
-  module PairSet = struct
+  module type S = sig
+    type t
+
+    val make : num_registers:int -> t
+
+    val clear : t -> unit
+
+    val mem : t -> pair -> bool
+
+    val add : t -> pair -> unit
+
+    module For_debug : sig
+      val cardinal : t -> int
+
+      val iter : t -> f:(pair -> unit) -> unit
+    end
+  end
+
+  module PairSet : S = struct
     type t = unit PS.t
 
     let default_size = 256
@@ -46,7 +64,7 @@ module RegisterStamp = struct
     end
   end
 
-  module BitMatrix = struct
+  module BitMatrix : S = struct
     type t =
       { bits : bytes;
         num_registers : int

@@ -24,7 +24,11 @@ module RegisterStamp : sig
 
   val snd : pair -> t
 
-  module PairSet : sig
+  (** Common interface for edge set implementations.
+
+      This module type defines the operations supported by both PairSet
+      (hash table-based) and BitMatrix (bit array-based) implementations. *)
+  module type S = sig
     type t
 
     val make : num_registers:int -> t
@@ -41,6 +45,8 @@ module RegisterStamp : sig
       val iter : t -> f:(pair -> unit) -> unit
     end
   end
+
+  module PairSet : S
 
   (** Alternative bit matrix representation for edge sets.
 
@@ -56,25 +62,7 @@ module RegisterStamp : sig
       - Better cache locality for membership testing
       - O(n²) cardinal operation (vs O(1) for PairSet)
       - O(n²) iter operation (vs O(edges) for PairSet) *)
-  module BitMatrix : sig
-    type t
-
-    val make : num_registers:int -> t
-
-    val clear : t -> unit
-
-    val mem : t -> pair -> bool
-
-    val add : t -> pair -> unit
-
-    module For_debug : sig
-      (** Returns the number of set bits (edges) in the matrix.
-          WARNING: This is O(n²) where n is the number of registers. *)
-      val cardinal : t -> int
-
-      val iter : t -> f:(pair -> unit) -> unit
-    end
-  end
+  module BitMatrix : S
 end
 
 (** Degree tracking *)
