@@ -533,17 +533,14 @@ let foo () =
   in
   unique_use x
 [%%expect{|
-Line 3, characters 6-9:
-3 |   let bar () =
-          ^^^
-Warning 26 [unused-var]: unused variable bar.
+Line 10, characters 13-14:
+10 |   unique_use x
+                  ^
+Error: This value is used here as unique, but it has already been borrowed:
+Line 5, characters 24-35:
+5 |       local_aliased_use (borrow_ x);
+                            ^^^^^^^^^^^
 
-Line 4, characters 8-12:
-4 |     let bar' () =
-            ^^^^
-Warning 26 [unused-var]: unused variable bar'.
-
-val foo : unit -> unit = <fun>
 |}]
 
 (* Unique use is allowed after leaving the borrow region *)
@@ -558,7 +555,14 @@ let foo () =
   in
   unique_use x
 [%%expect{|
-val foo : unit -> unit = <fun>
+Line 10, characters 13-14:
+10 |   unique_use x
+                  ^
+Error: This value is used here as unique, but it has already been borrowed:
+Line 5, characters 24-35:
+5 |       local_aliased_use (borrow_ x);
+                            ^^^^^^^^^^^
+
 |}]
 
 (* The function is local *)

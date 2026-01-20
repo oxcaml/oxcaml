@@ -300,6 +300,7 @@ module Aliased : sig
     | Lifted of Maybe_aliased.access
         (** aliased because lifted from implicit borrowing, carries the original
             access *)
+    | Lifted_borrowed  (** aliased because lifted from explicit borrowing. *)
 
   (** The occurrence is only for future error messages. The share_reason must
       corresponds to the occurrence *)
@@ -317,6 +318,7 @@ end = struct
     | Array
     | Constant
     | Lifted of Maybe_aliased.access
+    | Lifted_borrowed
 
   type t = Occurrence.t * reason
 
@@ -334,6 +336,7 @@ end = struct
       | Array -> fprintf ppf "Array"
       | Constant -> fprintf ppf "Constant"
       | Lifted ma -> fprintf ppf "Lifted(%a)" Maybe_aliased.print_access ma
+      | Lifted_borrowed -> fprintf ppf "Lifted_borrowed"
     in
     fprintf ppf "(%a,%a)" Occurrence.print occ print_reason reason
 end
@@ -2242,6 +2245,7 @@ let lift_implicit_borrowing uf =
         let occ = Maybe_aliased.extract_occurrence t in
         let access = Maybe_aliased.extract_access t in
         Usage.aliased occ (Aliased.Lifted access)
+      | Borrowed occ -> Usage.aliased occ Aliased.Lifted_borrowed
       | m ->
         (* other usage stays the same *)
         m)
@@ -2860,7 +2864,8 @@ let report_multi_use inner first_is_of_second =
       | Constant -> "used in a constant pattern"
       | Lifted access ->
         Maybe_aliased.string_of_access access
-        ^ " in a closure that might be called later")
+        ^ " in a closure that might be called later"
+      | Lifted_borrowed -> "borrowed")
     | _ -> "used"
   in
   let first, first_usage, second, second_usage, access_order, second_is_occ =
