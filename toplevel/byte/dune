@@ -25,7 +25,7 @@
   (target stdlib-modules)
   (deps StdlibModules)
   (action (with-stdout-to %{target}
-    (run make -f %{dep:Makefile.modules}))))
+    (run gmake -f %{dep:Makefile.modules}))))
 
 (copy_files ../../stdlib/StdlibModules)
 

@@ -16,8 +16,11 @@
 
 #define CAML_INTERNALS
 
+/* On DragonFly BSD static_assert is not defined under _XOPEN_SOURCE 700 */
+#ifndef __DragonFly__
 /* Needed for uselocale */
 #define _XOPEN_SOURCE 700
+#endif
 
 /* Needed for strtof_l */
 #define _GNU_SOURCE

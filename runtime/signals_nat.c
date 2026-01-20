@@ -125,6 +125,8 @@ DECLARE_SIGNAL_HANDLER(segv_handler)
          exception. */
 #ifdef SYS_macosx
       context->uc_mcontext->__ss.__rip = (unsigned long long) &caml_raise_stack_overflow_nat;
+#elif defined(__DragonFly__)
+      context->uc_mcontext.mc_rip = (unsigned long long) &caml_raise_stack_overflow_nat;
 #else
       context->uc_mcontext.gregs[REG_RIP]= (greg_t) &caml_raise_stack_overflow_nat;
 #endif

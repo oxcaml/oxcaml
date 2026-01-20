@@ -25,7 +25,7 @@
   (action
     (progn
      (bash "rm -f sak")
-     (bash "cd .. && make -f Makefile.upstream V=1 'SAK_LINK=cc -o $(1) $(2)' COMPUTE_DEPS=false runtime/sak")
+     (bash "cd .. && gmake -f Makefile.upstream V=1 'SAK_LINK=cc -o $(1) $(2)' COMPUTE_DEPS=false runtime/sak")
     )
   ))
 
@@ -36,7 +36,7 @@
   (action
     (progn
      (bash "rm -f build_config.h")
-     (bash "cd .. && make V=1 -f Makefile.upstream COMPUTE_DEPS=false runtime/build_config.h")
+     (bash "cd .. && gmake V=1 -f Makefile.upstream COMPUTE_DEPS=false runtime/build_config.h")
     )
   ))
 
@@ -90,7 +90,7 @@
    (progn
      (bash "touch .depend") ; hack.
      (bash "rm -f sak build_config.h") ; hack
-     (bash "cd .. && make V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmruni.a runtime/libasmrun_pic.a \
+     (bash "cd .. && gmake V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmruni.a runtime/libasmrun_pic.a \
     runtime/libasmrun_shared.so runtime/libcamlrun.a runtime/libcamlrund.a runtime/libcamlruni.a runtime/libcamlrun_pic.a \
     runtime/libcamlrun_shared.so runtime/ocamlrun runtime/ocamlrund runtime/ocamlruni runtime/ld.conf COMPUTE_DEPS=false")
      (bash "rm .depend")))))
