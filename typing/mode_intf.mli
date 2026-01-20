@@ -206,7 +206,7 @@ module type Axis = sig
 
   (** Compare two axes in implication order. If A implies B, then A is before B.
   *)
-  val compare : 'a t -> 'b t -> int
+  val compare : 'a t -> 'b t -> ('a, 'b) Solver_intf.comparison
 
   type packed = P : 'a t -> packed
 
@@ -529,7 +529,7 @@ module type S = sig
 
     val print : Fmt.formatter -> ('p, 'r) t -> unit
 
-    val eq : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
+    val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Solver_intf.equality
   end
 
   module type Mode := sig
@@ -577,8 +577,8 @@ module type S = sig
       (** Represents a mode axis in this product whose constant is ['a], and
           whose allowance is ['d1] given the product's allowance ['d0]. *)
       type 'a t =
-        | Monadic : 'a Monadic.Axis.t -> 'a t
         | Comonadic : 'a Comonadic.Axis.t -> 'a t
+        | Monadic : 'a Monadic.Axis.t -> 'a t
 
       include Axis with type 'a t := 'a t
     end
