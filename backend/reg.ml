@@ -41,6 +41,10 @@ module Stamp = struct
   let to_string = string_of_int
 
   let format fmt s = Format.fprintf fmt "%d" s
+
+  let to_int = Fun.id
+
+  let of_int_unsafe = Fun.id
 end
 
 type t =

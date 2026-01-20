@@ -44,6 +44,10 @@ module Stamp : sig
   val to_string : t -> string
 
   val format : Format.formatter -> t -> unit
+
+  val to_int : t -> int
+
+  val of_int_unsafe : int -> t
 end
 
 type t = private
