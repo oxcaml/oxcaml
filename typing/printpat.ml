@@ -72,12 +72,12 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   let pretty_record ~unboxed lvs =
     let filtered_lvs = List.filter
         (function
-          | (_,_,_,{pat_desc=Tpat_any}) -> false (* do not show lbl=_ *)
+          | (_,_,{pat_desc=Tpat_any}) -> false (* do not show lbl=_ *)
           | _ -> true) lvs in
     let hash = if unboxed then "#" else "" in
     begin match filtered_lvs with
     | [] -> fprintf ppf "%s{ _ }" hash
-    | (_, lbl, _, _) :: q ->
+    | (_, lbl, _) :: q ->
         let elision_mark ppf =
           (* we assume that there is no label repetitions here *)
             if Iarray.length (Lazy.force lbl.lbl_all) > 1 + List.length q then
@@ -118,8 +118,8 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "`%s" l
   | Tpat_variant (l, Some w, _) ->
       fprintf ppf "@[<2>`%s@ %a@]" l pretty_arg w
-  | Tpat_record (lvs,_,_) -> pretty_record ~unboxed:false lvs
-  | Tpat_record_unboxed_product (lvs,_,_) -> pretty_record ~unboxed:true lvs
+  | Tpat_record (lvs,_,_,_) -> pretty_record ~unboxed:false lvs
+  | Tpat_record_unboxed_product (lvs,_,_,_) -> pretty_record ~unboxed:true lvs
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
@@ -181,12 +181,12 @@ and pretty_labeled_val_sort ppf (l, p, _) =
   end;
   pretty_val ppf p
 
-and pretty_lvals : 'a. _ -> (_ * 'a gen_label_description * _ * _) list -> _ =
+and pretty_lvals : 'a. _ -> (_ * 'a gen_label_description * _) list -> _ =
   fun ppf -> function
   | [] -> ()
-  | [_,lbl,_,v] ->
+  | [_,lbl,v] ->
       fprintf ppf "%s=%a" lbl.lbl_name pretty_val v
-  | (_, lbl,_,v)::rest ->
+  | (_, lbl,v)::rest ->
       fprintf ppf "%s=%a;@ %a"
         lbl.lbl_name pretty_val v pretty_lvals rest
 

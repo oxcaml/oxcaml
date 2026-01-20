@@ -10,11 +10,19 @@ type ('a : any) t = { fst : 'a; snd : 'a; }
 
 let fst t = t.fst
 [%%expect{|
-Line 1, characters 12-17:
-1 | let fst t = t.fst
-                ^^^^^
-Error: Cannot access record with unrepresentable field.
-       The record has type 'a t, whose field fst is not representable.
+val fst : 'a t -> 'a = <fun>
+|}]
+
+let fst (type a : any) (t : a t) = t.fst
+[%%expect{|
+Line 1, characters 35-40:
+1 | let fst (type a : any) (t : a t) = t.fst
+                                       ^^^^^
+Error: Fields being projected must be representable.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the type of a field being projected.
 |}]
 
 let fst (t : int t) = t.fst

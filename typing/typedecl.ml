@@ -1859,6 +1859,11 @@ let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor
   =
+  (*
+  (* CR lmaurer: Sad about this for the same reason as
+     [update_record_representation] *)
+  let snap = Btype.snapshot () in
+  *)
   let flat_suffix =
     match cd_args with
     | Cstr_tuple arg_types_and_modes ->
@@ -1883,6 +1888,7 @@ let update_constructor_representation
              let bad_field = List.nth fields i in
              Unrepresentable_argument_field (Ident.name bad_field.ld_id))
   in
+  (* Btype.backtrack snap; *)
   match flat_suffix with
   | Error e -> Result.Error e
   | Ok `Not_mixed -> Ok Constructor_uniform_value

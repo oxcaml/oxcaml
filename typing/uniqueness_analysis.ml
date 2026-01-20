@@ -2029,16 +2029,16 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
         let paths = Paths.variant_field lbl paths in
         pattern_match_single arg paths
       | None -> Ienv.Extension.empty, UF.unused)
-    | Tpat_record (pats, _, _) ->
+    | Tpat_record (pats, _, _, _) ->
       List.map
-        (fun (_, l, _, pat) ->
+        (fun (_, l, pat) ->
           let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
           pattern_match_single pat paths)
         pats
       |> conjuncts_pattern_match
-    | Tpat_record_unboxed_product (pats, _, _) ->
+    | Tpat_record_unboxed_product (pats, _, _, _) ->
       List.map
-        (fun (_, l, _, pat) ->
+        (fun (_, l, pat) ->
           let paths =
             Paths.record_unboxed_product_field l.lbl_modalities l.lbl_name paths
           in

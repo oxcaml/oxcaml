@@ -187,7 +187,7 @@ let iter_on_occurrences
       | Kept _ -> ()) fields
   in
   let iter_field_pats ~namespace pat_env fields =
-    List.iter (fun (lid, label_descr, _, pat) ->
+    List.iter (fun (lid, label_descr, pat) ->
       let lid =
         let open Location in
         (* In the presence of punning we want to index the label
@@ -297,9 +297,9 @@ let iter_on_occurrences
       (match pat_desc with
       | Tpat_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description pat_env lid constr_desc
-      | Tpat_record (fields, _, _) ->
+      | Tpat_record (fields, _, _, _) ->
         iter_field_pats ~namespace:Label pat_env fields
-      | Tpat_record_unboxed_product (fields, _, _) ->
+      | Tpat_record_unboxed_product (fields, _, _, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_unboxed_tuple _

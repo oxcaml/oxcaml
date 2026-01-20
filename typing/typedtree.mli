@@ -214,9 +214,8 @@ and 'k pattern_desc =
             See {!Types.row_desc} for an explanation of the last parameter.
          *)
   | Tpat_record :
-      (Longident.t loc * Types.label_description * Jkind.sort *
-          value general_pattern) list *
-        Types.record_representation * closed_flag ->
+      (Longident.t loc * Types.label_description * value general_pattern) list *
+        Jkind.Sort.Const.t iarray * Types.record_representation * closed_flag ->
       value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -224,8 +223,9 @@ and 'k pattern_desc =
             Invariant: n > 0
          *)
   | Tpat_record_unboxed_product :
-      (Longident.t loc * Types.unboxed_label_description * Jkind.sort *
-          value general_pattern) list *
+      (Longident.t loc * Types.unboxed_label_description *
+         value general_pattern) list *
+        Jkind.Sort.Const.t iarray *
         Types.record_unboxed_product_representation * closed_flag ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)

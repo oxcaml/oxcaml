@@ -1571,7 +1571,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
   let build_record_as_type lpl =
     make_some_noisef "I HAS %d LABELS AT LEVEL %d" (List.length lpl) (get_current_level ());
     make_some_noisef "PAT TYPE IS %a" Printtyp.raw_type_expr p.pat_type;
-    let _, lbl, _, _ = List.hd lpl in
+    let _, lbl, _ = List.hd lpl in
     if lbl.lbl_private = Private then p.pat_type, mode else
     (* The jkind here is filled in via unification with [ty_res] in
         [unify_pat]. *)
@@ -1580,7 +1580,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
 
         RAE: why? It looks fine as-is. *)
     let ty = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-    let ppl = List.map (fun (_, l, _, p) -> l.lbl_pos, p) lpl in
+    let ppl = List.map (fun (_, l, p) -> l.lbl_pos, p) lpl in
     let do_label lbl =
       let _, ty_arg, ty_res = instance_label ~fixed:false lbl in
       unify_pat env {p with pat_type = ty} ty_res;
@@ -1667,8 +1667,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
                          ~name:None ~fixed:None ~closed:false))
       in
       ty, mode
-  | Tpat_record (lpl,_,_) -> build_record_as_type lpl
-  | Tpat_record_unboxed_product (lpl,_,_) -> build_record_as_type lpl
+  | Tpat_record (lpl,_,_,_) -> build_record_as_type lpl
+  | Tpat_record_unboxed_product (lpl,_,_,_) -> build_record_as_type lpl
   | Tpat_or(p1, p2, row) ->
       begin match row with
         None ->
@@ -1702,37 +1702,17 @@ and build_as_type_aux (env : Env.t) p ~mode =
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
 
-(* Updated information for a label at a particular occurrence, where its type
-   parameters have been filled in. Its sort and the representation of the outer
-   record must now have been determined. Note that the type here may have a
-   narrow scape, since the sort may reflect equivalences stemming from a GADT
-   pattern match, but the sort may in some cases still escape the scope. This is
-   fine because we don't (currently) need to worry about jkind-level information
-   leading to ambiguities in inference (say, inferring a mode or layout). *)
-type 'a gen_label_occurrence = {
-  lblo_res: type_expr;
-  (* XXX Delete [lblo_arg]? I can't currently think of a use that's not actually
-     a footgun *)
-  lblo_arg: type_expr;
-  lblo_sort: Jkind_types.Sort.Const.t;
-  lblo_repres: 'a;
-}
-(* XXX Remove field or this suppression *)
-[@@warning "-unused-field"]
-
-let pp_lblo ppf (lbl, lblo) =
-  Format.fprintf ppf "@[<hv 2>%s@ :: %a@ @@ %a@ -> %a@]" lbl.lbl_name
-    !Btype.printtyp_type_expr_fwd lblo.lblo_arg
-    Jkind.Sort.Const.Debug_printers.t lblo.lblo_sort
-    !Btype.printtyp_type_expr_fwd lblo.lblo_res
+let pp_lblo ppf (lbl, sort) =
+  Format.fprintf ppf "@[<hv 2>%s@ @@ %a@]" lbl.lbl_name
+    Jkind.Sort.Const.Debug_printers.t sort
 let pp_lblos ppf lbls =
   Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@.")
     pp_lblo ppf (lbls |> Iarray.to_list)
 
 let update_labels (type rep) env labels (form : rep record_form) ~loc
       ~containing_type
-    : rep gen_label_occurrence iarray * rep =
-  begin fun (f : unit -> rep gen_label_occurrence iarray * rep) ->
+    : Jkind.Sort.Const.t iarray * rep =
+  begin fun (f : unit -> Jkind.Sort.Const.t iarray * rep) ->
     if not (be_noisy ()) then f () else begin
       Format.eprintf "[%d] OH BOY SO MANY LABELS!!@.%a@.%!" (get_current_level ())
         pp_lbls labels;
@@ -1753,28 +1733,21 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
     Printtyp.raw_type_expr ty_res;
   unify_exp_types loc env containing_type ty_res;
   make_some_noisef "UNIFIED ty_res: %a" Printtyp.raw_type_expr ty_res;
-  let all_lblos, rep =
+  let all_sorts, rep =
     match labels.:(0).lbl_repres with
     | Some rep ->
         make_some_noisef "DOING IT THE EASY WAY";
-        let all_lblos =
+        let all_sorts =
           (* If one record already had a representation, that means the labels all
              already had sorts, so we don't need to update anything further. *)
-          Iarray.map2
-            (fun label (_vars, ty_arg) ->
-               let sort =
-                 match label.lbl_sort with
-                 | Some sort -> sort
-                 | _ -> Misc.fatal_errorf "missing sort in %s" label.lbl_name
-               in
-               { lblo_res = ty_res;
-                 lblo_arg = ty_arg;
-                 lblo_sort = sort;
-                 lblo_repres = rep; })
+          Iarray.map
+            (fun label ->
+               match label.lbl_sort with
+               | Some sort -> sort
+               | _ -> Misc.fatal_errorf "missing sort in %s" label.lbl_name)
             all_labels
-            vars_and_ty_args
         in
-        all_lblos, rep
+        all_sorts, rep
     | None ->
         let lbls_and_ty_args =
           Iarray.map2
@@ -1790,31 +1763,19 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
         with
         | Ok (sorts, rep) ->
             let sorts = sorts |> Iarray.of_list in
-            let vars_and_ty_args_and_sorts =
-              Iarray.combine vars_and_ty_args sorts
-            in
-            let all_lblos =
-              Iarray.map
-                (fun ((_vars, ty_arg), sort) ->
-                   { lblo_res = ty_res;
-                     lblo_arg = ty_arg;
-                     lblo_sort = sort;
-                     lblo_repres = rep; })
-                vars_and_ty_args_and_sorts
-            in
-            all_lblos, rep
+            sorts, rep
         | Error (Unrepresentable_field name) ->
             raise (Error (loc, env,
                           Indeterminate_record_layout(containing_type, name)))
   in
-  let lblos =
-    Iarray.map (fun label -> all_lblos.:(label.lbl_pos)) labels
+  let sorts =
+    Iarray.map (fun label -> all_sorts.:(label.lbl_pos)) labels
   in
-  lblos, rep
+  sorts, rep
 
 let update_label (type rep) env label (form : rep record_form) ~loc
       ~containing_type
-    : rep gen_label_occurrence * rep =
+    : Jkind.Sort.Const.t * rep =
   let pp_labels ppf labels =
     Format.pp_print_list ~pp_sep:Format.pp_print_space
       (fun ppf lbl -> Format.pp_print_string ppf lbl.lbl_name)
@@ -2811,10 +2772,10 @@ let map_fold_cont f xs k =
 let check_recordpat_labels loc lbl_pat_list closed record_form =
   match lbl_pat_list with
   | [] -> ()                            (* should not happen *)
-  | (_, label1, _, _, _) :: _ ->
+  | (_, label1, _) :: _ ->
       let all = Lazy.force label1.lbl_all in
       let defined = Array.make (Iarray.length all) false in
-      let check_defined (_, label, _, _, _) =
+      let check_defined (_, label, _) =
         if defined.(label.lbl_pos)
         then raise(Error(loc, Env.empty, Label_multiply_defined label.lbl_name))
         else defined.(label.lbl_pos) <- true in
@@ -3015,7 +2976,7 @@ let as_comp_pattern
 let components_have_label (labeled_components : (string option * 'a) list) =
   List.exists (function Some _, _ -> true | _ -> false) labeled_components
 
-let forbid_atomic_field_patterns loc penv (label_lid, label, _, _, pat) =
+let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
   (* Pattern-matching under atomic record fields is not allowed. We
      still allow wildcard patterns, so that it is valid to list all
      record fields exhaustively. *)
@@ -3241,7 +3202,7 @@ and type_pat_aux
           let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
           raise (Error (loc, !!penv, error))
       in
-      let type_label_pat (label_lid, label, sarg) =
+      let type_label_pat sorts (label_lid, label, sarg) =
         let ty_arg =
           solve_Ppat_record_field ~refine:false loc penv label label_lid
             record_ty record_form in
@@ -3257,19 +3218,12 @@ and type_pat_aux
             alloc_mode.mode
         in
         let alloc_mode = simple_pat_mode mode in
-        let lblo, _rep =
-          (* XXX We should somehow be doing this to all the labels at once, but
-             this will splitting this function in two *)
-          update_label !!penv label record_form ~loc
-            ~containing_type:(instance record_ty)
-        in
-        let ty_sort = lblo.lblo_sort |> Jkind.Sort.of_const in
-        let rep = lblo.lblo_repres in
-        (label_lid, label, ty_sort, rep,
-          type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
+        let ty_sort = sorts.:(label.lbl_pos) |> Jkind.Sort.of_const in
+        (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
       in
       let make_record_pat
-            (lbl_pat_list : (_ * rep gen_label_description * _ * rep * _) list) =
+            sorts (rep : rep)
+            (lbl_pat_list : (_ * rep gen_label_description * _) list)=
         making_some_noise begin fun f ->
           let ans = f () in
           Format.eprintf "THE TYPE OF THE RECORD PATTERN IS %a@.%!"
@@ -3278,22 +3232,11 @@ and type_pat_aux
         end @@ fun () ->
         check_recordpat_labels loc lbl_pat_list closed record_form;
         List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
-        let rep =
-          match lbl_pat_list with
-          | [] -> assert false
-          | (_, _, _, rep, _) :: _ -> rep
-        in
-        (* XXX Probably try and refactor out this awkward impedance mismatch *)
-        let lbl_pat_list =
-          List.map
-            (fun (loc, label, sort, _rep, pat) -> loc, label, sort, pat)
-            lbl_pat_list
-        in
         let pat_desc = match record_form with
           | Legacy ->
-            Tpat_record (lbl_pat_list, rep, closed)
+            Tpat_record (lbl_pat_list, sorts, rep, closed)
           | Unboxed_product ->
-            Tpat_record_unboxed_product (lbl_pat_list, rep, closed)
+            Tpat_record_unboxed_product (lbl_pat_list, sorts, rep, closed)
         in
         {
           pat_desc; pat_loc = loc; pat_extra=[];
@@ -3313,8 +3256,17 @@ and type_pat_aux
           lid_sp_list
       in
       the_thing_that_is_not_principal := None;
-      let lbl_a_list = List.map type_label_pat lbl_a_list in
-      rvp @@ solve_expected (make_record_pat lbl_a_list)
+      let all_labels =
+        match lbl_a_list with
+        | [] -> assert false
+        | (_, label, _) :: _ -> Lazy.force label.lbl_all
+      in
+      let sorts, rep =
+        update_labels !!penv all_labels record_form ~loc
+          ~containing_type:(instance record_ty)
+      in
+      let lbl_a_list = List.map (type_label_pat sorts) lbl_a_list in
+      rvp @@ solve_expected (make_record_pat sorts rep lbl_a_list)
   in
   match sp.ppat_desc with
     Ppat_any ->
@@ -3566,11 +3518,10 @@ and type_pat_aux
              let pat =
                let sort =
                  match arg.ca_sort with
-                 | Some sort -> sort
-                 | None -> failwith "TODO after merge: Ppat_construct"
+                 | Some sort -> Jkind.Sort.of_const sort
+                 | None -> Jkind.Sort.new_var ~level:(get_current_level ())
                in
-               type_pat ~alloc_mode tps Value p arg.ca_type
-                 (Jkind.Sort.of_const sort)
+               type_pat ~alloc_mode tps Value p arg.ca_type sort
              in
              let jkind, sort =
                match
@@ -4101,30 +4052,24 @@ let rec check_counter_example_pat
     | Refine_or {inside_nonsplit_or} -> inside_nonsplit_or
   in
   let type_label_pats (type rep)
-        (fields : (_ * rep gen_label_description * _ * _) list) closed
-        (record_form : rep record_form) =
+        (fields : (_ * rep gen_label_description * _) list) sorts (rep : rep)
+        closed (record_form : rep record_form) =
     let record_ty = generic_instance expected_ty in
-    let type_label_pat (label_lid, label, sort, targ) k =
+    let type_label_pat (label_lid, label, targ) k =
       let ty_arg =
         solve_Ppat_record_field ~refine loc penv label label_lid record_ty
           record_form in
-      check_rec targ ty_arg (fun arg -> k (label_lid, label, sort, arg))
-    in
-    let repr_of_fields fields =
-      match fields with
-      | (_, { lbl_repres = Some repr; _ }, _, _) :: _ -> repr
-      | _ -> Misc.fatal_error "no representation"
+      check_rec targ ty_arg (fun arg -> k (label_lid, label, arg))
     in
     match record_form with
     | Legacy ->
       map_fold_cont type_label_pat fields
         (fun fields ->
-           mkp k (Tpat_record (fields, repr_of_fields fields, closed)))
+           mkp k (Tpat_record (fields, sorts, rep, closed)))
     | Unboxed_product ->
       map_fold_cont type_label_pat fields
         (fun fields ->
-           mkp k (Tpat_record_unboxed_product
-                    (fields, repr_of_fields fields, closed)))
+           mkp k (Tpat_record_unboxed_product (fields, sorts, rep, closed)))
   in
   match tp.pat_desc with
     Tpat_any | Tpat_var _ ->
@@ -4203,9 +4148,10 @@ let rec check_counter_example_pat
           Some p, [ty] -> check_rec p ty (fun p -> k (Some p))
         | _            -> k None
       end
-  | Tpat_record(fields, _repr, closed) -> type_label_pats fields closed Legacy
-  | Tpat_record_unboxed_product(fields, _repr, closed) ->
-      type_label_pats fields closed Unboxed_product
+  | Tpat_record(fields, sorts, repr, closed) ->
+      type_label_pats fields sorts repr closed Legacy
+  | Tpat_record_unboxed_product(fields, sorts, repr, closed) ->
+      type_label_pats fields sorts repr closed Unboxed_product
   | Tpat_array (mut, original_arg_sort, tpl) ->
       let ty_elt, arg_sort = solve_Ppat_array ~refine loc penv mut expected_ty in
       assert (Jkind.Sort.equate original_arg_sort arg_sort);
@@ -6933,24 +6879,31 @@ and type_expect_
       let (record, record_sort, rmode, label, _) =
         type_label_access Legacy env srecord Env.Projection lid
       in
-      let ty_arg =
+      let ty_arg, field_sort, record_repres =
         with_local_level_if_principal begin fun () ->
           (* [ty_arg] is the type of field, [ty_res] is the type of record, they
              could share type variables, which are now instantiated *)
           let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
           (* we now link the two record types *)
           unify_exp env record ty_res;
-          ty_arg
-          (*
-          update_label env label Legacy ~loc ~containing_type:record.exp_type
-          *)
-        end ~post:generalize_structure
-      in
-      let field_sort =
-        match type_sort ~why:Field_projection ~fixed:false env ty_arg with
-        | Ok sort -> sort
-        | Error err ->
-          raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
+          let sort =
+            match type_sort ~why:Field_projection ~fixed:false env ty_arg with
+            | Ok sort -> sort
+            | Error err ->
+                raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
+          in
+          let _sort, record_repres =
+            (* This redundantly calculates the sort again. But calling
+               [type_sort] above let us infer that the type is representable,
+               and it also gives a nicer error message *)
+            (* XXX Not entirely sure why it's necessary to do this in the inner
+               level, but weird errors happen if we don't, and it's also
+               necessary to do it in _this_ inner level so that the correct type
+               hits a [generalize_structure] *)
+            update_label env label Legacy ~loc ~containing_type:record.exp_type
+          in
+          ty_arg, sort, record_repres
+        end ~post:(fun (ty_arg, _, _) -> generalize_structure ty_arg)
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut rmode;
@@ -6960,11 +6913,6 @@ and type_expect_
       in
       let mode =
         actual_mode_modality ~is_contained_by label.lbl_modalities rmode
-      in
-      let _, record_repres =
-        with_local_level_if_principal begin fun () ->
-          update_label env label Legacy ~loc ~containing_type:record.exp_type
-        end ~post:(fun (lblo, _) -> generalize_structure lblo.lblo_arg)
       in
       let boxing : texp_field_boxing =
         let is_float_boxing =
@@ -7072,14 +7020,14 @@ and type_expect_
           raise(Error(loc, env, Label_not_mutable lid.txt))
       in
       unify_exp env record ty_record;
-      let lblo, record_repres =
+      let sort, record_repres =
         update_label env label Legacy ~loc ~containing_type:ty_record
       in
       rue {
         exp_desc = Texp_setfield {
           record;
           record_repres;
-          field_sort = lblo.lblo_sort |> Jkind.Sort.of_const;
+          field_sort = sort |> Jkind.Sort.of_const;
           modality =
             Locality.disallow_right (regional_to_local
               (Value.proj_comonadic Areality rmode));

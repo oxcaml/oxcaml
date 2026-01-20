@@ -394,10 +394,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_variant (l, po, _) ->
       line i ppf "Tpat_variant \"%s\"\n" l;
       option i pattern ppf po;
-  | Tpat_record (l, _, _c) ->
+  | Tpat_record (l, _, _, _c) ->
       line i ppf "Tpat_record\n";
       list i longident_x_pattern ppf l;
-  | Tpat_record_unboxed_product (l, _, _c) ->
+  | Tpat_record_unboxed_product (l, _, _, _c) ->
       line i ppf "Tpat_record_unboxed_product\n";
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->
@@ -1226,8 +1226,8 @@ and label_decl i ppf {ld_id; ld_name = _; ld_mutable; ld_type; ld_loc;
 and field_decl i ppf {ca_type=ty; ca_loc=_; ca_modalities=_} =
   core_type (i+1) ppf ty
 
-and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ * _ -> _ =
-  fun i ppf (li, _, _, p) ->
+and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
+  fun i ppf (li, _, p) ->
   line i ppf "%a\n" fmt_longident li;
   pattern (i+1) ppf p;
 

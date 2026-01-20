@@ -271,10 +271,10 @@ let pat
           vs;
         sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
-  | Tpat_record (l, _, _) ->
-      List.iter (fun (lid, _, _, i) -> iter_loc sub lid; sub.pat sub i) l
-  | Tpat_record_unboxed_product (l, _, _) ->
-      List.iter (fun (lid, _, _, i) -> iter_loc sub lid; sub.pat sub i) l
+  | Tpat_record (l, _, _, _) ->
+      List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
+  | Tpat_record_unboxed_product (l, _, _, _) ->
+      List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias (p, _, s, _, _, _, _) -> sub.pat sub p; iter_loc sub s
   | Tpat_lazy p -> sub.pat sub p

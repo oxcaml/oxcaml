@@ -173,13 +173,13 @@ and 'k pattern_desc =
       label * value general_pattern option * row_desc ref ->
       value pattern_desc
   | Tpat_record :
-      (Longident.t loc * label_description * Jkind.sort *
-        value general_pattern) list *
-        Types.record_representation * closed_flag ->
+      (Longident.t loc * label_description * value general_pattern) list *
+        Jkind.Sort.Const.t iarray * Types.record_representation * closed_flag ->
       value pattern_desc
   | Tpat_record_unboxed_product :
-      (Longident.t loc * unboxed_label_description * Jkind.sort *
+      (Longident.t loc * unboxed_label_description *
         value general_pattern) list
+      * Jkind.Sort.Const.t iarray
       * Types.record_unboxed_product_representation
       * closed_flag ->
       value pattern_desc
@@ -1050,10 +1050,10 @@ let shallow_iter_pattern_desc
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
   | Tpat_construct(_, _, _, patl, _) -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_variant(_, pat, _) -> Option.iter f.f pat
-  | Tpat_record (lbl_pat_list, _, _) ->
-      List.iter (fun (_, _, _, pat) -> f.f pat) lbl_pat_list
-  | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
-      List.iter (fun (_, _, _, pat) -> f.f pat) lbl_pat_list
+  | Tpat_record (lbl_pat_list, _, _, _) ->
+      List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
+  | Tpat_record_unboxed_product (lbl_pat_list, _, _, _) ->
+      List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
   | Tpat_lazy p -> f.f p
   | Tpat_any
@@ -1075,12 +1075,12 @@ let shallow_map_pattern_desc
   | Tpat_unboxed_tuple pats ->
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
-  | Tpat_record (lpats, repr, closed) ->
-      Tpat_record (List.map (fun (lid, l, s, p) -> lid, l, s, f.f p) lpats,
-                   repr, closed)
-  | Tpat_record_unboxed_product (lpats, repr, closed) ->
+  | Tpat_record (lpats, sorts, repr, closed) ->
+      Tpat_record (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats,
+                   sorts, repr, closed)
+  | Tpat_record_unboxed_product (lpats, sorts, repr, closed) ->
       Tpat_record_unboxed_product
-        (List.map (fun (lid, l, s, p) -> lid, l, s, f.f p) lpats, repr, closed)
+        (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats, sorts, repr, closed)
   | Tpat_construct (lid, c, r, pats, ty) ->
       Tpat_construct (lid, c, r, List.map (fun (s, p) -> s, f.f p) pats, ty)
   | Tpat_array (am, arg_sort, pats) ->
@@ -1185,11 +1185,11 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       | Tpat_value p -> loop f p
       | Tpat_construct(_, _, _, patl, _) ->
           List.iter (fun (_, pat) -> loop f pat) patl
-      | Tpat_record (lbl_pat_list, _, _) ->
-          List.iter (fun (_, _, _, pat) -> loop f pat)
+      | Tpat_record (lbl_pat_list, _, _, _) ->
+          List.iter (fun (_, _, pat) -> loop f pat)
             lbl_pat_list
-      | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
-          List.iter (fun (_, _, _, pat) -> loop f pat)
+      | Tpat_record_unboxed_product (lbl_pat_list, _, _, _) ->
+          List.iter (fun (_, _, pat) -> loop f pat)
             lbl_pat_list
       | Tpat_variant (_, pat, _) -> Option.iter (loop f) pat
       | Tpat_tuple patl ->

@@ -78,7 +78,6 @@ type mapper =
 let id x = x
 let tuple2 f1 f2 (x, y) = (f1 x, f2 y)
 let tuple3 f1 f2 f3 (x, y, z) = (f1 x, f2 y, f3 z)
-let tuple4 f1 f2 f3 f4 (x, y, z, w) = (f1 x, f2 y, f3 z, f4 w)
 let map_loc sub {loc; txt} = {loc=sub.location sub loc; txt}
 
 let location _sub l = l
@@ -322,12 +321,13 @@ let pat
                         vto)
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
-    | Tpat_record (l, rep, closed) ->
-        Tpat_record (List.map (tuple4 (map_loc sub) id id (sub.pat sub)) l, rep,
-                     closed)
-    | Tpat_record_unboxed_product (l, rep, closed) ->
+    | Tpat_record (l, sorts, rep, closed) ->
+        Tpat_record (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l,
+                     sorts, rep, closed)
+    | Tpat_record_unboxed_product (l, sorts, rep, closed) ->
         Tpat_record_unboxed_product
-          (List.map (tuple4 (map_loc sub) id id (sub.pat sub)) l, rep, closed)
+          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, sorts, rep,
+           closed)
     | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
     | Tpat_alias (p, id, s, uid, sort, m, ty) ->
         Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)

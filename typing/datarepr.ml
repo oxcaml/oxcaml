@@ -109,7 +109,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
 
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
-  let cstr_shapes_and_arg_jkinds, is_unboxed =
+  let cstr_shapes_and_arg_sorts, is_unboxed =
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
     | Variant_boxed x, _ -> x, false
@@ -148,19 +148,25 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
     Iarray.map
-      (function
-       | None ->
-           (* This will be broken when [void] is actually supported since we could learn
-              that all the fields are actually [void] and thus it's a constant *)
-           false
-       | Some (_, sorts) ->
-           let all_void = Iarray.for_all Jkind.Sort.Const.all_void sorts in
-           (* constant constructors are constructors of non-[@@unboxed] variants
-              with 0 bits of payload *)
-           let is_const = all_void && not is_unboxed in
-           if is_const then incr num_consts else incr num_nonconsts;
-           is_const)
-      cstr_shapes_and_arg_jkinds
+      (fun shape_and_arg_sorts_opt ->
+         let all_void =
+           match shape_and_arg_sorts_opt with
+           | None ->
+             (* Someday we'll want to let a constructor be constant iff the type
+                argument is void (after all, [unit# option] is [bool]), but
+                we're not there yet. For now, assume [Some #()] (so to speak) is
+                an empty block, which is to say, assume that unknown sorts
+                aren't all void. *)
+             false
+           | Some (_, sorts) ->
+             Iarray.for_all Jkind.Sort.Const.all_void sorts
+         in
+         (* constant constructors are constructors of non-[@@unboxed] variants
+            with 0 bits of payload *)
+         let is_const = all_void && not is_unboxed in
+         if is_const then incr num_consts else incr num_nonconsts;
+         is_const)
+      cstr_shapes_and_arg_sorts
   in
   let describe_constructor (src_index, const_tag, nonconst_tag, acc)
         {cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid} =
@@ -170,7 +176,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Some ty_res' -> ty_res'
       | None -> ty_res
     in
-    let cstr_shape = Option.map fst cstr_shapes_and_arg_jkinds.:(src_index) in
+    let cstr_shape = Option.map fst cstr_shapes_and_arg_sorts.:(src_index) in
     let cstr_constant = cstr_constant.:(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
       if cstr_constant

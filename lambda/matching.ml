@@ -138,40 +138,34 @@ and may_compats = MayCompat.compats
 let all_record_args lbls =
   match lbls with
   | [] -> fatal_error "Matching.all_record_args"
-  | (_, { lbl_all }, _, _) :: _ ->
+  | (_, { lbl_all }, _) :: _ ->
       let t =
         Iarray.map
           (fun lbl ->
-            (mknoloc (Longident.Lident "?temp?"), lbl, Jkind.Sort.void,
-                      Patterns.omega))
+            (mknoloc (Longident.Lident "?temp?"), lbl, Patterns.omega))
           (Lazy.force lbl_all)
         |> Iarray.to_array
       in
-      List.iter (fun ((_, lbl, _, _) as x) -> t.(lbl.lbl_pos) <- x) lbls;
+      List.iter (fun ((_, lbl, _) as x) -> t.(lbl.lbl_pos) <- x) lbls;
       Array.to_list t
 
 let expand_representable_labels lbls =
   match lbls with
   | [] -> fatal_error "Matching.expand_representable_labels"
-  | ({ lbl_all; _ }, _) :: _ ->
-      (* Since the record has a representation, each label must have a sort *)
-      let get_sort lbl =
-        match lbl.lbl_sort with
-        | None -> fatal_errorf "Unrepresentable label %s" lbl.lbl_name
-        | Some sort -> Jkind.Sort.of_const sort
-      in
+  | { lbl_all; _ } :: _ ->
       Lazy.force lbl_all
-      |> Iarray.map (fun lbl -> lbl, get_sort lbl)
       |> Iarray.to_list
 
 let expand_record_head h =
   let open Patterns.Head in
   match h.pat_desc with
-  | Record (lbls, r) ->
-      { h with pat_desc = Record (expand_representable_labels lbls, r) }
-  | Record_unboxed_product (lbls, r) ->
+  | Record (lbls, sorts, r) ->
       { h with pat_desc =
-                  Record_unboxed_product (expand_representable_labels lbls, r) }
+                  Record (expand_representable_labels lbls, sorts, r) }
+  | Record_unboxed_product (lbls, sorts, r) ->
+      { h with pat_desc =
+                  Record_unboxed_product (expand_representable_labels lbls,
+                                         sorts, r) }
   | _ -> h
 
 let bind_alias p id duid ~arg ~arg_sort ~action =
@@ -240,12 +234,13 @@ end = struct
           p1
         else
           { p with pat_desc = Tpat_or (p1, p2, o) }
-    | Tpat_record (lbls, r, closed) ->
+    | Tpat_record (lbls, sorts, r, closed) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record (all_lbls, r, closed) }
-    | Tpat_record_unboxed_product (lbls, r, closed) ->
+        { p with pat_desc = Tpat_record (all_lbls, sorts, r, closed) }
+    | Tpat_record_unboxed_product (lbls, sorts, r, closed) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record_unboxed_product (all_lbls, r, closed) }
+        { p with pat_desc =
+                   Tpat_record_unboxed_product (all_lbls, sorts, r, closed) }
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)
@@ -266,14 +261,14 @@ end = struct
             ( (General.view p, patl),
               bind_alias p id duid ~arg
                 ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
-      | `Record ([], _, _) as view -> stop p view
-      | `Record (lbls, r, closed) ->
-          let full_view = `Record (all_record_args lbls, r, closed) in
+      | `Record ([], _, _, _) as view -> stop p view
+      | `Record (lbls, sorts, r, closed) ->
+          let full_view = `Record (all_record_args lbls, sorts, r, closed) in
           stop p full_view
-      | `Record_unboxed_product ([], _, _) as view -> stop p view
-      | `Record_unboxed_product (lbls, r, closed) ->
+      | `Record_unboxed_product ([], _, _, _) as view -> stop p view
+      | `Record_unboxed_product (lbls, sorts, r, closed) ->
           let full_view =
-            `Record_unboxed_product (all_record_args lbls, r, closed) in
+            `Record_unboxed_product (all_record_args lbls, sorts, r, closed) in
           stop p full_view
       | `Or _ -> (
           let orpat = General.view (simpl_under_orpat (General.erase p)) in
@@ -327,12 +322,13 @@ end = struct
           `Construct (cstr, cst_descr, r, List.map (alpha_arg env) args)
       | `Variant (cstr, argo, row_desc) ->
           `Variant (cstr, Option.map (alpha_pat env) argo, row_desc)
-      | `Record (fields, r, closed) ->
-          let alpha_field env (lid, l, r, p) = (lid, l, r, alpha_pat env p) in
-          `Record (List.map (alpha_field env) fields, r, closed)
-      | `Record_unboxed_product (fields, r, closed) ->
-          let alpha_field env (lid, l, r, p) = (lid, l, r, alpha_pat env p) in
-          `Record_unboxed_product (List.map (alpha_field env) fields, r, closed)
+      | `Record (fields, sorts, r, closed) ->
+          let alpha_field env (lid, l, p) = (lid, l, alpha_pat env p) in
+          `Record (List.map (alpha_field env) fields, sorts, r, closed)
+      | `Record_unboxed_product (fields, sorts, r, closed) ->
+          let alpha_field env (lid, l, p) = (lid, l, alpha_pat env p) in
+          `Record_unboxed_product (List.map (alpha_field env) fields, sorts, r,
+                                   closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
       | `Lazy p -> `Lazy (alpha_pat env p)
     in
@@ -427,10 +423,11 @@ end
 let expand_record_simple : Simple.pattern -> Simple.pattern =
  fun p ->
   match p.pat_desc with
-  | `Record (l, r, _) ->
-   { p with pat_desc = `Record (all_record_args l, r, Closed) }
-  | `Record_unboxed_product (l, r, _) ->
-   { p with pat_desc = `Record_unboxed_product (all_record_args l, r, Closed) }
+  | `Record (l, sorts, r, _) ->
+   { p with pat_desc = `Record (all_record_args l, sorts, r, Closed) }
+  | `Record_unboxed_product (l, sorts, r, _) ->
+    { p with pat_desc =
+               `Record_unboxed_product (all_record_args l, sorts, r, Closed) }
   | _ -> p
 
 type initial_clause = pattern list clause
@@ -483,10 +480,10 @@ let matcher discr (p : Simple.pattern) rem =
   | Tuple n1, Tuple n2 -> yesif (n1 = n2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
     yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
-  | Record (l, _), Record (l', _) ->
+  | Record (l, _, _), Record (l', _, _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
-  | Record_unboxed_product (l, _), Record_unboxed_product (l', _) ->
+  | Record_unboxed_product (l, _, _), Record_unboxed_product (l', _, _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
   | Lazy, Lazy -> yes ()
@@ -2331,7 +2328,7 @@ let divide_unboxed_tuple ~scopes head shape ctx pm =
 
 let record_matching_line num_fields lbl_pat_list =
   let patv = Array.make num_fields Patterns.omega in
-  List.iter (fun (_, lbl, _, pat) ->
+  List.iter (fun (_, lbl, pat) ->
     patv.(lbl.lbl_pos) <- pat)
     lbl_pat_list;
   Array.to_list patv
@@ -2339,24 +2336,24 @@ let record_matching_line num_fields lbl_pat_list =
 let get_pat_args_record num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
-  | { pat_desc = Tpat_record (lbl_pat_list, _, _) } ->
+  | { pat_desc = Tpat_record (lbl_pat_list, _, _, _) } ->
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
 let get_pat_args_record_unboxed_product num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
-  | { pat_desc = Tpat_record_unboxed_product (lbl_pat_list, _, _) } ->
+  | { pat_desc = Tpat_record_unboxed_product (lbl_pat_list, _, _, _) } ->
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
 let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
   let loc = head_loc ~scopes head in
-  let all_labels =
+  let all_labels, all_sorts, lbl_repres =
     let open Patterns.Head in
     match head.pat_desc with
-    | Record ((lbl, _) :: _, _) -> Lazy.force lbl.lbl_all
-    | Record ([], _)
+    | Record (lbl :: _, sorts, rep) -> Lazy.force lbl.lbl_all, sorts, rep
+    | Record ([], _, _)
     | _ ->
         assert false
   in
@@ -2366,27 +2363,13 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
     else
       let lbl = all_labels.:(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
-      let lbl_sort =
-        match lbl.lbl_sort with
-        | None ->
-            (* TODO: Be more confident that this can't happen *)
-            Misc.fatal_errorf "Unexpected unknown sort in label %s" lbl.lbl_name
-        | Some sort -> sort
-      in
+      let lbl_sort = all_sorts.:(pos) in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
       in
       let ubr = Translmode.transl_unique_barrier head.pat_unique_barrier in
       let sem = add_barrier_to_read ubr sem in
-      let lbl_repres =
-        match lbl.lbl_repres with
-        | None ->
-          (* TODO: Be more confident that this can't happen *)
-          Misc.fatal_errorf "Unexpected unknown record representation in label %s"
-            lbl.lbl_name
-        | Some repres -> repres
-      in
       let access, sort, layout =
         match lbl_repres with
         | Record_boxed _
@@ -2435,25 +2418,18 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
 let get_expr_args_record_unboxed_product ~scopes head
       (arg, _mut, _sort, _layout) rem =
   let loc = head_loc ~scopes head in
-  let all_labels =
+  let all_labels, all_sorts =
     let open Patterns.Head in
     match head.pat_desc with
-    | Record_unboxed_product
-        (({ lbl_all ; lbl_repres = Some (Record_unboxed_product _)}, _) :: _, _) ->
-      Lazy.force lbl_all
+    | Record_unboxed_product (lbl :: _, sorts, _) ->
+        Lazy.force lbl.lbl_all, sorts
+    | Record_unboxed_product ([], _, _)
     | _ ->
-      assert false
+        assert false
   in
   let lbl_layouts =
     Iarray.map (fun lbl ->
-      let lbl_sort =
-        match lbl.lbl_sort with
-        | None ->
-          (* TODO: Be more confident that this can't happen *)
-          Misc.fatal_errorf "Unexpected unknown sort in label %s" lbl.lbl_name
-        | Some sort -> sort
-      in
-      Typeopt.layout_of_sort lbl.lbl_loc lbl_sort
+      Typeopt.layout_of_sort lbl.lbl_loc all_sorts.:(lbl.lbl_pos)
     ) all_labels
     |> Iarray.to_list
   in
@@ -2475,13 +2451,7 @@ let get_expr_args_record_unboxed_product ~scopes head
         else
           Alias
       in
-      let lbl_sort =
-        match lbl.lbl_sort with
-        | None ->
-          (* TODO: Be more confident that this can't happen *)
-          Misc.fatal_errorf "Unexpected unknown sort in label %s" lbl.lbl_name
-        | Some sort -> sort
-      in
+      let lbl_sort = all_sorts.:(pos) in
       let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       (access, str, lbl_sort, layout) :: make_args (pos + 1)
   in
@@ -3981,12 +3951,12 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_no_test ~scopes value_kind
             (divide_unboxed_tuple ~scopes ph shape)
             Context.combine repr partial ctx pm
-      | Record ([], _) | Record_unboxed_product ([], _) -> assert false
-      | Record (((lbl, _) :: _), _) ->
+      | Record ([], _, _) | Record_unboxed_product ([], _, _) -> assert false
+      | Record ((lbl :: _), _, _) ->
           compile_no_test ~scopes value_kind
             (divide_record ~scopes (Lazy.force lbl.lbl_all) ph)
             Context.combine repr partial ctx pm
-      | Record_unboxed_product (((lbl, _) :: _), _) ->
+      | Record_unboxed_product ((lbl :: _), _, _) ->
           compile_no_test ~scopes value_kind
             (divide_record_unboxed_product ~scopes (Lazy.force lbl.lbl_all) ph)
             Context.combine repr partial ctx pm
@@ -4081,11 +4051,11 @@ let has_lazy p = Typedtree.exists_pattern is_lazy_pat p
 
 let is_record_with_mutable_field p =
   let fields_have_mutable_type lps =
-    List.exists (fun (_, lbl, _, _) -> Types.is_mutable lbl.lbl_mut) lps
+    List.exists (fun (_, lbl, _) -> Types.is_mutable lbl.lbl_mut) lps
   in
   match p.pat_desc with
-  | Tpat_record (lps, _, _) -> fields_have_mutable_type lps
-  | Tpat_record_unboxed_product (lps, _, _) -> fields_have_mutable_type lps
+  | Tpat_record (lps, _, _, _) -> fields_have_mutable_type lps
+  | Tpat_record_unboxed_product (lps, _, _, _) -> fields_have_mutable_type lps
   | Tpat_alias _
   | Tpat_variant _
   | Tpat_lazy _

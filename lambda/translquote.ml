@@ -2262,8 +2262,8 @@ let rec with_new_idents_pat pat =
     List.iter (fun (_, pat) -> with_new_idents_pat pat) args
   | Tpat_variant (_, argo, _) -> (
     match argo with None -> () | Some pat -> with_new_idents_pat pat)
-  | Tpat_record (lbl_pats, _, _) ->
-    List.iter (fun (_, _, _, pat) -> with_new_idents_pat pat) lbl_pats
+  | Tpat_record (lbl_pats, _, _, _) ->
+    List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_array (_, _, pats) ->
     List.iter (fun pat -> with_new_idents_pat pat) pats
   | Tpat_or (pat1, pat2, _) ->
@@ -2271,8 +2271,8 @@ let rec with_new_idents_pat pat =
     with_new_idents_pat pat2
   | Tpat_unboxed_tuple args ->
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
-  | Tpat_record_unboxed_product (lbl_pats, _, _) ->
-    List.iter (fun (_, _, _, pat) -> with_new_idents_pat pat) lbl_pats
+  | Tpat_record_unboxed_product (lbl_pats, _, _, _) ->
+    List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> with_new_idents_pat pat
 
 let rec without_idents_pat pat =
@@ -2291,8 +2291,8 @@ let rec without_idents_pat pat =
     List.iter (fun pat -> without_idents_pat pat) (List.map snd args)
   | Tpat_variant (_, argo, _) -> (
     match argo with None -> () | Some pat -> without_idents_pat pat)
-  | Tpat_record (lbl_pats, _, _) ->
-    List.iter (fun (_, _, _, pat) -> without_idents_pat pat) lbl_pats
+  | Tpat_record (lbl_pats, _, _, _) ->
+    List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_array (_, _, pats) ->
     List.iter (fun pat -> without_idents_pat pat) pats
   | Tpat_or (pat1, pat2, _) ->
@@ -2300,8 +2300,8 @@ let rec without_idents_pat pat =
     without_idents_pat pat2
   | Tpat_unboxed_tuple args ->
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
-  | Tpat_record_unboxed_product (lbl_pats, _, _) ->
-    List.iter (fun (_, _, _, pat) -> without_idents_pat pat) lbl_pats
+  | Tpat_record_unboxed_product (lbl_pats, _, _, _) ->
+    List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> without_idents_pat pat
 
 let with_new_param fp =
@@ -2419,10 +2419,10 @@ and quote_value_pattern p =
     | Tpat_variant (variant, argo, _) ->
       let argo = Option.map quote_value_pattern argo in
       Pat.variant loc (Variant.of_string loc variant |> Variant.wrap) argo
-    | Tpat_record (lbl_pats, _, closed) ->
+    | Tpat_record (lbl_pats, _, _, closed) ->
       let lbl_pats =
         List.map
-          (fun (lid, lbl_desc, _, pat) ->
+          (fun (lid, lbl_desc, pat) ->
             let lbl = quote_record_field env Asttypes.(lid.loc) lbl_desc in
             let pat = quote_value_pattern pat in
             lbl, pat)
@@ -2446,10 +2446,10 @@ and quote_value_pattern p =
           pats
       in
       Pat.unboxed_tuple loc pats
-    | Tpat_record_unboxed_product (lbl_pats, _, closed) ->
+    | Tpat_record_unboxed_product (lbl_pats, _, _, closed) ->
       let lbl_pats =
         List.map
-          (fun (lid, lbl_desc, _, pat) ->
+          (fun (lid, lbl_desc, pat) ->
             let lbl = quote_record_field env Asttypes.(lid.loc) lbl_desc in
             let pat = quote_value_pattern pat in
             lbl, pat)

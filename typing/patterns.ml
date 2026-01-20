@@ -14,6 +14,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Iarray_shim
+
 open Asttypes
 open Types
 open Typedtree
@@ -60,12 +62,12 @@ module Simple = struct
         * (Jkind.sort * pattern) list
     | `Variant of label * pattern option * row_desc ref
     | `Record of
-        (Longident.t loc * label_description * Jkind.sort * pattern) list
-        * record_representation * closed_flag
+        (Longident.t loc * label_description * pattern) list
+        * Jkind.Sort.Const.t iarray * record_representation * closed_flag
     | `Record_unboxed_product of
-        (Longident.t loc * unboxed_label_description * Jkind.sort
-         * pattern) list
-        * record_unboxed_product_representation * closed_flag
+        (Longident.t loc * unboxed_label_description * pattern) list
+        * Jkind.Sort.Const.t iarray * record_unboxed_product_representation
+        * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Lazy of pattern
   ]
@@ -110,10 +112,10 @@ module General = struct
        `Construct (cstr, cstr_descr, cstr_repr, args)
     | Tpat_variant (cstr, arg, row_desc) ->
        `Variant (cstr, arg, row_desc)
-    | Tpat_record (fields, repr, closed) ->
-       `Record (fields, repr, closed)
-    | Tpat_record_unboxed_product (fields, repr, closed) ->
-       `Record_unboxed_product (fields, repr, closed)
+    | Tpat_record (fields, sorts, repr, closed) ->
+       `Record (fields, sorts, repr, closed)
+    | Tpat_record_unboxed_product (fields, sorts, repr, closed) ->
+       `Record_unboxed_product (fields, sorts, repr, closed)
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
     | Tpat_lazy p -> `Lazy p
@@ -133,10 +135,10 @@ module General = struct
        Tpat_construct (cstr, cst_descr, cst_repr, args, None)
     | `Variant (cstr, arg, row_desc) ->
        Tpat_variant (cstr, arg, row_desc)
-    | `Record (fields, repr, closed) ->
-       Tpat_record (fields, repr, closed)
-    | `Record_unboxed_product (fields, repr, closed) ->
-       Tpat_record_unboxed_product (fields, repr, closed)
+    | `Record (fields, sorts, repr, closed) ->
+       Tpat_record (fields, sorts, repr, closed)
+    | `Record_unboxed_product (fields, sorts, repr, closed) ->
+       Tpat_record_unboxed_product (fields, sorts, repr, closed)
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
     | `Lazy p -> Tpat_lazy p
@@ -162,9 +164,10 @@ module Head : sig
     | Tuple of string option list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
-        (label_description * Jkind.sort) list * record_representation
+        label_description list * Jkind.Sort.Const.t iarray
+        * record_representation
     | Record_unboxed_product of
-        (unboxed_label_description * Jkind.sort) list
+        unboxed_label_description list * Jkind.Sort.Const.t iarray
         * record_unboxed_product_representation
     | Variant of
         { tag: label; has_arg: bool;
@@ -192,8 +195,11 @@ end = struct
     | Constant of constant
     | Tuple of string option list
     | Unboxed_tuple of (string option * Jkind.sort) list
-    | Record of (label_description * Jkind.sort) list * record_representation
-    | Record_unboxed_product of (unboxed_label_description * Jkind.sort) list
+    | Record of
+        label_description list * Jkind.Sort.Const.t iarray
+        * record_representation
+    | Record_unboxed_product of
+        unboxed_label_description list * Jkind.Sort.Const.t iarray
         * record_unboxed_product_representation
     | Variant of
         { tag: label; has_arg: bool;
@@ -232,14 +238,14 @@ end = struct
           Variant {tag; has_arg; cstr_row; type_row}, pats
       | `Array (am, arg_sort, args) ->
           Array (am, arg_sort, List.length args), args
-      | `Record (largs, repr, _) ->
-          let lbls = List.map (fun (_,lbl,sort,_) -> lbl, sort) largs in
-          let pats = List.map (fun (_,_,_,pat) -> pat) largs in
-          Record (lbls, repr), pats
-      | `Record_unboxed_product (largs, repr, _) ->
-          let lbls = List.map (fun (_,lbl,sort,_) -> lbl, sort) largs in
-          let pats = List.map (fun (_,_,_,pat) -> pat) largs in
-          Record_unboxed_product (lbls, repr), pats
+      | `Record (largs, sorts, repr, _) ->
+          let lbls = List.map (fun (_,lbl,_) -> lbl) largs in
+          let pats = List.map (fun (_,_,pat) -> pat) largs in
+          Record (lbls, sorts, repr), pats
+      | `Record_unboxed_product (largs, sorts, repr, _) ->
+          let lbls = List.map (fun (_,lbl,_) -> lbl) largs in
+          let pats = List.map (fun (_,_,pat) -> pat) largs in
+          Record_unboxed_product (lbls, sorts, repr), pats
       | `Lazy p ->
           Lazy, [p]
     in
@@ -254,8 +260,8 @@ end = struct
       | Tuple l -> List.length l
       | Unboxed_tuple l -> List.length l
       | Array (_, _, n) -> n
-      | Record (l, _) -> List.length l
-      | Record_unboxed_product (l, _) -> List.length l
+      | Record (l, _, _) -> List.length l
+      | Record_unboxed_product (l, _, _) -> List.length l
       | Variant { has_arg; _ } -> if has_arg then 1 else 0
       | Lazy -> 1
 
@@ -279,22 +285,22 @@ end = struct
       | Variant { tag; has_arg; cstr_row } ->
           let arg_opt = if has_arg then Some omega else None in
           Tpat_variant (tag, arg_opt, cstr_row)
-      | Record (lbls, repr) ->
+      | Record (lbls, sorts, repr) ->
           let lst =
-            List.map (fun (lbl, sort) ->
+            List.map (fun lbl ->
               let lid_loc = mkloc (Longident.Lident lbl.lbl_name) in
-              (lid_loc, lbl, sort, omega)
+              (lid_loc, lbl, omega)
             ) lbls
           in
-          Tpat_record (lst, repr, Closed)
-      | Record_unboxed_product (lbls, repr) ->
+          Tpat_record (lst, sorts, repr, Closed)
+      | Record_unboxed_product (lbls, sorts, repr) ->
           let lst =
-            List.map (fun (lbl, sort) ->
+            List.map (fun lbl ->
               let lid_loc = mkloc (Longident.Lident lbl.lbl_name) in
-              (lid_loc, lbl, sort, omega)
+              (lid_loc, lbl, omega)
             ) lbls
           in
-          Tpat_record_unboxed_product (lst, repr, Closed)
+          Tpat_record_unboxed_product (lst, sorts, repr, Closed)
     in
     { t with
       pat_desc;
