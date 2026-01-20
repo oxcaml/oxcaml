@@ -238,7 +238,7 @@ _install: compiler
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
 	find _build/main/ \( -name "flambda2*.cmi" -or -name "flambda2*.cms" \
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
-          -exec cp -f {} _install/lib/ocaml/compiler-libs \;
+          -exec cp -f --remove-destination {} _install/lib/ocaml/compiler-libs \;
 	# CR-sspies: Hack to copy the .cms files into the install directory.
 	# Fix this once the upstream dune has support for -bin-annot-cms.
 	# This only copies part of the files, mainly meant for metrics. It only covers
