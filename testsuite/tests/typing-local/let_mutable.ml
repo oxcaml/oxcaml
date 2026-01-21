@@ -264,11 +264,10 @@ let foo4_8 () =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value is "local"
-       because it is "stack_"-allocated.
+Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* Can't return [x] if it is local in some cases *)
@@ -281,11 +280,10 @@ let foo4_9 b =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value is "local"
-       because it is "stack_"-allocated.
+Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* Test 5: Allowed interactions with locals. *)
@@ -493,8 +491,8 @@ Line 4, characters 19-20:
 4 |   require_portable f
                        ^
 Error: This value is "nonportable"
-       because it contains a usage (of the value "x_13_3" at Line 3, characters 17-23)
-       which is expected to be "uncontended".
+         because it contains a usage (of the value "x_13_3" at Line 3, characters 17-23)
+         which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -509,8 +507,8 @@ Line 5, characters 19-20:
 5 |   require_portable f
                        ^
 Error: This value is "nonportable"
-       because it contains a usage (of the value "x_13_3" at Line 3, characters 17-23)
-       which is expected to be "uncontended".
+         because it contains a usage (of the value "x_13_3" at Line 3, characters 17-23)
+         which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -640,11 +638,10 @@ let foo_20 y =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value is "local"
-       because it is "stack_"-allocated.
+Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* Test 21: Unboxed products not supported yet *)

@@ -29,7 +29,6 @@ type _ t =
   | Labeled_tuples : unit t
   | Small_numbers : maturity t
   | Instances : unit t
-  | Separability : unit t
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t

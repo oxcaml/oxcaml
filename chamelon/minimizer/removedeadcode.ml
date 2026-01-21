@@ -270,7 +270,10 @@ let minimize should_remove map cur_name =
                          let npat =
                            rem_in_pat cur_str vb.vb_pat should_remove
                          in
-                         if var_from_pat npat.pat_desc [] = [] then l
+                         if
+                           var_from_pat npat.pat_desc [] = []
+                           && should_remove ()
+                         then l
                          else { vb with vb_pat = npat } :: l)
                        [] vb_l)
                 in

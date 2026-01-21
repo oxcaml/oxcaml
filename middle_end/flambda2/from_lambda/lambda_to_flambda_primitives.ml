@@ -120,8 +120,7 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
 
 let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   match shape with
-  | All_value ->
-    List.init num_fields (fun _field -> K.With_subkind.any_value)
+  | All_value -> List.init num_fields (fun _field -> K.With_subkind.any_value)
   | Shape shape ->
     let shape_length = Array.length shape in
     if num_fields <> shape_length
@@ -3193,8 +3192,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Pignore | Psequand | Psequor | Pbytes_of_string | Pbytes_to_string
-      | Parray_of_iarray | Parray_to_iarray | Prunstack | Pperform | Presume
-      | Preperform ),
+      | Parray_of_iarray | Parray_to_iarray | Pwith_stack | Pwith_stack_bind
+      | Pperform | Presume | Preperform ),
       _ ) ->
     Misc.fatal_errorf
       "[%a] should have been removed by [Lambda_to_flambda.transform_primitive]"

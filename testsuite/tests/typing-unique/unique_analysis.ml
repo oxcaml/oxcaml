@@ -185,8 +185,8 @@ Line 3, characters 37-38:
 3 |   | z :: _, _ | _, z :: _ -> unique_ z
                                          ^
 Error: This value is "aliased"
-       because it is contained (via constructor "::") in the value at Line 3, characters 19-25
-       which is "aliased".
+         because it is contained (via constructor "::") in the value at Line 3, characters 19-25
+         which is "aliased".
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -199,8 +199,8 @@ Line 3, characters 37-38:
 3 |   | z :: _, _ | _, z :: _ -> unique_ z
                                          ^
 Error: This value is "aliased"
-       because it is contained (via constructor "::") in the value at Line 3, characters 4-10
-       which is "aliased".
+         because it is contained (via constructor "::") in the value at Line 3, characters 4-10
+         which is "aliased".
        However, the highlighted expression is expected to be "unique".
 |}]
 

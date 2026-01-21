@@ -53,16 +53,26 @@ module Effect : sig
           cont : Simple.t;
           last_fiber : Simple.t
         }
-    | Run_stack of
-        { stack : Simple.t;
+    | With_stack of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          f : Simple.t;
+          arg : Simple.t
+        }
+    | With_stack_bind of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          dyn : Simple.t;
+          bind : Simple.t;
           f : Simple.t;
           arg : Simple.t
         }
     | Resume of
-        { stack : Simple.t;
+        { cont : Simple.t;
           f : Simple.t;
-          arg : Simple.t;
-          last_fiber : Simple.t
+          arg : Simple.t
         }
 
   include Contains_names.S with type t := t
@@ -71,10 +81,25 @@ module Effect : sig
 
   val reperform : eff:Simple.t -> cont:Simple.t -> last_fiber:Simple.t -> t
 
-  val run_stack : stack:Simple.t -> f:Simple.t -> arg:Simple.t -> t
+  val with_stack :
+    valuec:Simple.t ->
+    exnc:Simple.t ->
+    effc:Simple.t ->
+    f:Simple.t ->
+    arg:Simple.t ->
+    t
 
-  val resume :
-    stack:Simple.t -> f:Simple.t -> arg:Simple.t -> last_fiber:Simple.t -> t
+  val with_stack_bind :
+    valuec:Simple.t ->
+    exnc:Simple.t ->
+    effc:Simple.t ->
+    dyn:Simple.t ->
+    bind:Simple.t ->
+    f:Simple.t ->
+    arg:Simple.t ->
+    t
+
+  val resume : cont:Simple.t -> f:Simple.t -> arg:Simple.t -> t
 end
 
 (* The allocation mode corresponds to the type of the function that is called:
@@ -88,21 +113,16 @@ end
 (** Whether an application expression corresponds to an OCaml function
     invocation, an OCaml method invocation, or an external call. *)
 type t = private
-  | Function of
-      { function_call : Function_call.t;
-        alloc_mode : Alloc_mode.For_applications.t
-      }
+  | Function of { function_call : Function_call.t }
   | Method of
       { kind : Method_kind.t;
-        obj : Simple.t;
-        alloc_mode : Alloc_mode.For_applications.t
+        obj : Simple.t
       }
   | C_call of
       { needs_caml_c_call : bool;
         is_c_builtin : bool;
         effects : Effects.t;
-        coeffects : Coeffects.t;
-        alloc_mode : Alloc_mode.For_applications.t
+        coeffects : Coeffects.t
       }
   | Effect of Effect.t
 
@@ -110,22 +130,20 @@ include Expr_std.S with type t := t
 
 include Contains_ids.S with type t := t
 
-val direct_function_call : Code_id.t -> Alloc_mode.For_applications.t -> t
+val direct_function_call : Code_id.t -> t
 
-val indirect_function_call_unknown_arity : Alloc_mode.For_applications.t -> t
+val indirect_function_call_unknown_arity : t
 
 val indirect_function_call_known_arity :
-  code_ids:Code_id.Set.t Or_unknown.t -> Alloc_mode.For_applications.t -> t
+  code_ids:Code_id.Set.t Or_unknown.t -> t
 
-val method_call :
-  Method_kind.t -> obj:Simple.t -> Alloc_mode.For_applications.t -> t
+val method_call : Method_kind.t -> obj:Simple.t -> t
 
 val c_call :
   needs_caml_c_call:bool ->
   is_c_builtin:bool ->
   effects:Effects.t ->
   coeffects:Coeffects.t ->
-  Alloc_mode.For_applications.t ->
   t
 
 val effect_ : Effect.t -> t

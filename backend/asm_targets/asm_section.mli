@@ -50,12 +50,25 @@ type t =
   | Sixtyfour_byte_literals
   | Jump_tables
   | Text
+  | Function_text of string
+      (** Individual function section, e.g. ".text.caml.func" *)
   | Stapsdt_base
   | Stapsdt_note
   | Probes
   | Note_ocaml_eh
+  | Note_gnu_stack
+  | Custom of
+      { names : string list;
+        flags : string option;
+        args : string list;
+        is_delayed : bool
+      }
+      (** A custom section with explicit details, for target-specific sections
+          not covered by the other variants. *)
 
 val to_string : t -> string
+
+val of_names : string list -> t option
 
 type section_details = private
   { names : string list;
@@ -71,15 +84,20 @@ val dwarf_sections_in_order : unit -> t list
 val is_delayed : t -> bool
 
 (** The necessary information for a section directive. [first_occurrence] should
-    be [true] iff the corresponding directive will be the first such in the
-    relevant assembly file for the given section. *)
-val details : t -> first_occurrence:bool -> section_details
+    be [`First_occurrence] iff the corresponding directive will be the first
+    such in the relevant assembly file for the given section. *)
+val details :
+  t -> [`First_occurrence | `Not_first_occurrence] -> section_details
 
 val print : Format.formatter -> t -> unit
 
 val compare : t -> t -> int
 
 val equal : t -> t -> bool
+
+val hash : t -> int
+
+module Tbl : Hashtbl.S with type key = t
 
 (** Whether the section holds code. *)
 val section_is_text : t -> bool

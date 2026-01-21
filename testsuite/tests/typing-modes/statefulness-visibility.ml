@@ -23,8 +23,9 @@ let foo (x @ read uncontended) a = x.a <- a
 Line 1, characters 35-36:
 1 | let foo (x @ read uncontended) a = x.a <- a
                                        ^
-Error: This value is "read" but is expected to be "read_write"
-       because its mutable field "a" is being written.
+Error: This value is "read"
+       but is expected to be "read_write"
+         because its mutable field "a" is being written.
 |}]
 
 let foo (x @ immutable uncontended) a = x.a <- a
@@ -32,8 +33,9 @@ let foo (x @ immutable uncontended) a = x.a <- a
 Line 1, characters 40-41:
 1 | let foo (x @ immutable uncontended) a = x.a <- a
                                             ^
-Error: This value is "immutable" but is expected to be "read_write"
-       because its mutable field "a" is being written.
+Error: This value is "immutable"
+       but is expected to be "read_write"
+         because its mutable field "a" is being written.
 |}]
 
 let foo (x @ read uncontended) = x.a
@@ -46,8 +48,9 @@ let foo (x @ immutable uncontended) = x.a
 Line 1, characters 38-39:
 1 | let foo (x @ immutable uncontended) = x.a
                                           ^
-Error: This value is "immutable" but is expected to be "read" or "read_write"
-       because its mutable field "a" is being read.
+Error: This value is "immutable"
+       but is expected to be "read" or "read_write"
+         because its mutable field "a" is being read.
 |}]
 
 let foo (x @ read uncontended) upd = { x with a = upd }
@@ -67,8 +70,9 @@ let foo (x @ immutable uncontended) upd = { x with b = upd }
 Line 1, characters 44-45:
 1 | let foo (x @ immutable uncontended) upd = { x with b = upd }
                                                 ^
-Error: This value is "immutable" but is expected to be "read" or "read_write"
-       because its mutable field "a" is being read.
+Error: This value is "immutable"
+       but is expected to be "read" or "read_write"
+         because its mutable field "a" is being read.
 |}]
 
 (* Errors when mutating a record field prints contention before visibility errors *)
@@ -78,8 +82,9 @@ let foo (x @ read contended) a = x.a <- a
 Line 1, characters 33-34:
 1 | let foo (x @ read contended) a = x.a <- a
                                      ^
-Error: This value is "read" but is expected to be "read_write"
-       because its mutable field "a" is being written.
+Error: This value is "read"
+       but is expected to be "read_write"
+         because its mutable field "a" is being written.
 |}]
 
 let foo (x @ contended read) a = x.a <- a
@@ -87,8 +92,9 @@ let foo (x @ contended read) a = x.a <- a
 Line 1, characters 33-34:
 1 | let foo (x @ contended read) a = x.a <- a
                                      ^
-Error: This value is "read" but is expected to be "read_write"
-       because its mutable field "a" is being written.
+Error: This value is "read"
+       but is expected to be "read_write"
+         because its mutable field "a" is being written.
 |}]
 
 let foo (x @ read shared) a = x.a <- a
@@ -96,8 +102,9 @@ let foo (x @ read shared) a = x.a <- a
 Line 1, characters 30-31:
 1 | let foo (x @ read shared) a = x.a <- a
                                   ^
-Error: This value is "read" but is expected to be "read_write"
-       because its mutable field "a" is being written.
+Error: This value is "read"
+       but is expected to be "read_write"
+         because its mutable field "a" is being written.
 |}]
 
 let foo (x @ immutable contended) a = x.a
@@ -105,8 +112,9 @@ let foo (x @ immutable contended) a = x.a
 Line 1, characters 38-39:
 1 | let foo (x @ immutable contended) a = x.a
                                           ^
-Error: This value is "immutable" but is expected to be "read" or "read_write"
-       because its mutable field "a" is being read.
+Error: This value is "immutable"
+       but is expected to be "read" or "read_write"
+         because its mutable field "a" is being read.
 |}]
 
 (* visibility requirements over refs *)
@@ -116,8 +124,9 @@ let foo (x @ immutable) = x.contents
 Line 1, characters 26-27:
 1 | let foo (x @ immutable) = x.contents
                               ^
-Error: This value is "immutable" but is expected to be "read" or "read_write"
-       because its mutable field "contents" is being read.
+Error: This value is "immutable"
+       but is expected to be "read" or "read_write"
+         because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ immutable shared) = x.contents
@@ -125,8 +134,9 @@ let foo (x @ immutable shared) = x.contents
 Line 1, characters 33-34:
 1 | let foo (x @ immutable shared) = x.contents
                                      ^
-Error: This value is "immutable" but is expected to be "read" or "read_write"
-       because its mutable field "contents" is being read.
+Error: This value is "immutable"
+       but is expected to be "read" or "read_write"
+         because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ immutable uncontended) = x.contents
@@ -134,8 +144,9 @@ let foo (x @ immutable uncontended) = x.contents
 Line 1, characters 38-39:
 1 | let foo (x @ immutable uncontended) = x.contents
                                           ^
-Error: This value is "immutable" but is expected to be "read" or "read_write"
-       because its mutable field "contents" is being read.
+Error: This value is "immutable"
+       but is expected to be "read" or "read_write"
+         because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ read) = x.contents
@@ -148,8 +159,9 @@ let foo (x @ read contended) = x.contents
 Line 1, characters 31-32:
 1 | let foo (x @ read contended) = x.contents
                                    ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because its mutable field "contents" is being read.
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ read uncontended) = x.contents
@@ -167,8 +179,9 @@ let foo (x @ read_write contended) = x.contents
 Line 1, characters 37-38:
 1 | let foo (x @ read_write contended) = x.contents
                                          ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because its mutable field "contents" is being read.
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ read_write shared) = x.contents
@@ -395,8 +408,8 @@ Line 4, characters 24-27:
 4 |     let _ @ stateless = bar in
                             ^^^
 Error: This value is "stateful"
-       because it contains a usage (of the value "a" at Line 3, characters 28-29)
-       which is expected to be "read_write".
+         because it contains a usage (of the value "a" at Line 3, characters 28-29)
+         which is expected to be "read_write".
        However, the highlighted expression is expected to be "stateless".
 |}]
 
@@ -422,8 +435,8 @@ Line 2, characters 25-26:
 2 |     fun () -> Atomic.set a 0
                              ^
 Error: This value is "immutable"
-       because it is used inside the function at Line 2, characters 4-28
-       which is expected to be "stateless".
+         because it is used inside the function at Line 2, characters 4-28
+         which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write".
 |}]
 
@@ -439,9 +452,10 @@ let foo (f : (unit -> unit) @ stateful portable) @ stateless = fun () -> f ()
 Line 1, characters 73-74:
 1 | let foo (f : (unit -> unit) @ stateful portable) @ stateless = fun () -> f ()
                                                                              ^
-Error: The value "f" is "stateful" but is expected to be "stateless"
-       because it is used inside the function at Line 1, characters 63-77
-       which is expected to be "stateless".
+Error: The value "f" is "stateful"
+       but is expected to be "stateless"
+         because it is used inside the function at Line 1, characters 63-77
+         which is expected to be "stateless".
 |}]
 
 (* The error for [portable] is displayed first. *)
@@ -451,9 +465,10 @@ let foo (f : (unit -> unit) @ stateful) @ stateless = fun () -> f ()
 Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ stateful) @ stateless = fun () -> f ()
                                                                     ^
-Error: The value "f" is "stateful" but is expected to be "stateless"
-       because it is used inside the function at Line 1, characters 54-68
-       which is expected to be "stateless".
+Error: The value "f" is "stateful"
+       but is expected to be "stateless"
+         because it is used inside the function at Line 1, characters 54-68
+         which is expected to be "stateless".
 |}]
 
 let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
@@ -461,9 +476,10 @@ let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
 Line 1, characters 74-75:
 1 | let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
                                                                               ^
-Error: The value "f" is "observing" but is expected to be "stateless"
-       because it is used inside the function at Line 1, characters 64-78
-       which is expected to be "stateless".
+Error: The value "f" is "observing"
+       but is expected to be "stateless"
+         because it is used inside the function at Line 1, characters 64-78
+         which is expected to be "stateless".
 |}]
 
 (* Closing over use of read gives observing *)
@@ -487,8 +503,8 @@ Line 4, characters 22-25:
 4 |   let _ @ stateless = bar in
                           ^^^
 Error: This value is "observing"
-       because it contains a usage (of the value "a" at Line 3, characters 26-27)
-       which is expected to be "read" or "read_write".
+         because it contains a usage (of the value "a" at Line 3, characters 26-27)
+         which is expected to be "read" or "read_write".
        However, the highlighted expression is expected to be "stateless".
 |}]
 
@@ -509,9 +525,10 @@ let foo (f : (unit -> unit) @ stateful) @ observing = fun () -> f ()
 Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ stateful) @ observing = fun () -> f ()
                                                                     ^
-Error: The value "f" is "stateful" but is expected to be "observing"
-       because it is used inside the function at Line 1, characters 54-68
-       which is expected to be "observing".
+Error: The value "f" is "stateful"
+       but is expected to be "observing"
+         because it is used inside the function at Line 1, characters 54-68
+         which is expected to be "observing".
 |}]
 
 (* Testing defaulting  *)
@@ -716,10 +733,10 @@ Line 1, characters 42-43:
 1 | let foo (x : int ref) @ stateless = lazy (x.contents)
                                               ^
 Error: This value is "immutable"
-       because it is used inside the lazy expression at Line 1, characters 36-53
-       which is expected to be "stateless".
+         because it is used inside the lazy expression at Line 1, characters 36-53
+         which is expected to be "stateless".
        However, the highlighted expression is expected to be "read" or "read_write"
-       because its mutable field "contents" is being read.
+         because its mutable field "contents" is being read.
 |}]
 
 let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
@@ -728,10 +745,10 @@ Line 1, characters 42-43:
 1 | let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
                                               ^
 Error: This value is "immutable"
-       because it is used inside the lazy expression at Line 1, characters 36-58
-       which is expected to be "stateless".
+         because it is used inside the lazy expression at Line 1, characters 36-58
+         which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write"
-       because its mutable field "contents" is being written.
+         because its mutable field "contents" is being written.
 |}]
 
 (* [lazy_t @ observing] capture values at [read]. *)
@@ -742,10 +759,10 @@ Line 1, characters 42-43:
 1 | let bat (x : int ref) @ observing = lazy (x.contents <- 4)
                                               ^
 Error: This value is "read"
-       because it is used inside the lazy expression at Line 1, characters 36-58
-       which is expected to be "observing".
+         because it is used inside the lazy expression at Line 1, characters 36-58
+         which is expected to be "observing".
        However, the highlighted expression is expected to be "read_write"
-       because its mutable field "contents" is being written.
+         because its mutable field "contents" is being written.
 |}]
 
 let bar (x : int ref) @ observing = lazy (x.contents)
@@ -777,8 +794,9 @@ let () =
 Line 3, characters 4-13:
 3 |   | lazy (-1) -> ()
         ^^^^^^^^^
-Error: This value is "contended" but is expected to be "uncontended"
-       because it is a lazy value being forced.
+Error: This value is "contended"
+       but is expected to be "uncontended"
+         because it is a lazy value being forced.
 |}]
 
 (* But [immutable] lazy values can be, by design. *)
@@ -813,8 +831,9 @@ let () =
 Line 4, characters 4-5:
 4 |     x.contents <- 42;
         ^
-Error: This value is "immutable" but is expected to be "read_write"
-       because its mutable field "contents" is being written.
+Error: This value is "immutable"
+       but is expected to be "read_write"
+         because its mutable field "contents" is being written.
 |}]
 
 (* Forcing a [read] lazy returns a [read] value.*)
@@ -834,6 +853,7 @@ let () =
 Line 5, characters 4-5:
 5 |     y.contents <- 24
         ^
-Error: This value is "read" but is expected to be "read_write"
-       because its mutable field "contents" is being written.
+Error: This value is "read"
+       but is expected to be "read_write"
+         because its mutable field "contents" is being written.
 |}]

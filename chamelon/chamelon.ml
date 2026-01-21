@@ -100,6 +100,7 @@ let all_minimizers =
       Simplifymatch.minimizer;
       Simplifysequences.minimizer;
       Simplifytypes.minimizer;
+      Reducepat.minimizer;
     ]
 
 let default_iteration =
@@ -108,6 +109,7 @@ let default_iteration =
     "reduce-expr";
     "reduce-expr-2";
     "remove-dead-code";
+    "reduce-pat";
     "inline-never";
     "remove-unit";
     "reduce-def";
@@ -204,6 +206,38 @@ let main () =
     Format.eprintf "This command does not raise the error %S. @."
       !Utils.error_str;
     exit 1);
+
+  (* CHECKING ERROR PRESENCE AFTER PRINTING *)
+  let () =
+    let cmd =
+      if !inplace then (
+        List.iter2 update_single file_names file_strs;
+        !command)
+      else
+        let file_names_min =
+          List.map
+            (fun path -> Filename.chop_extension path ^ "_min.ml")
+            file_names
+        in
+        List.iter2 update_single file_names_min file_strs;
+        List.fold_left
+          (fun c output -> c ^ " " ^ output)
+          !command file_names_min
+    in
+    if not (raise_error cmd) then (
+      Format.eprintf "@[<v 2>*** Printing error ***";
+      Format.eprintf "@ @[%a@ %S;@ %a@]@ " Format.pp_print_text
+        "This command raises the error" !Utils.error_str Format.pp_print_text
+        "however, printing the contents from the cmt file does not raise that \
+         same error.";
+      Format.eprintf "@ @[%a@]@ @;<1 2>%s@ " Format.pp_print_text
+        "The following command does *NOT* raise the error:" cmd;
+      Format.eprintf "@ @[%a@]" Format.pp_print_text
+        "Hint: This is likely due to a missing feature in either untypeast.ml \
+         or pprintast.ml.";
+      Format.eprintf "@]@.";
+      exit 1)
+  in
 
   if List.length file_names = 1 then (
     (* MONOFILE MINIMIZATION*)

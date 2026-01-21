@@ -1987,12 +1987,13 @@ let solve_Ppat_variant ~refine loc env tag no_arg expected_ty =
 (* Building the or-pattern corresponding to a polymorphic variant type *)
 let build_or_pat env loc lid =
   let path, decl = Env.lookup_type ~loc:lid.loc lid.txt env in
-  (* CR layouts: the use of value here is wrong:
+  (* CR layouts: the use of value_or_null here is wrong:
      there could be other jkinds in a polymorphic variant argument;
      see Test 24 in tests/typing-layouts/basics_alpha.ml *)
   let arity = List.length decl.type_params in
   let tyl = List.mapi (fun i _ ->
-    newvar (Jkind.Builtin.value ~why:(Type_argument {parent_path = path; position = i+1; arity}))
+    newvar (Jkind.Builtin.value_or_null
+              ~why:(Type_argument {parent_path = path; position = i+1; arity}))
   ) decl.type_params in
   let row0 =
     let ty = expand_head env (newty(Tconstr(path, tyl, ref Mnil))) in
@@ -10743,10 +10744,12 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
             (mut, Jkind.Sort.of_const
                     Jkind.Sort.Const.for_array_comprehension_element, tcomp)),
         comp,
-        (* CR layouts v4: When this changes from [value], you will also have to
-           update the use of [transl_exp] in transl_array_comprehension.ml. See
-           a companion CR layouts v4 at the point of interest in that file. *)
-        Jkind.Builtin.value ~why:Jkind.History.Array_comprehension_element
+        (* CR layouts v4: When this changes from [value_or_null], you will also
+           have to update the use of [transl_exp] in
+           transl_array_comprehension.ml. See a companion CR layouts v4 at the
+           point of interest in that file. *)
+        Jkind.Builtin.value_or_null
+          ~why:Jkind.History.Array_comprehension_element
   in
   let element_ty =
     with_local_level_if_principal begin fun () ->
@@ -10859,14 +10862,14 @@ and type_comprehension_iterator
       Texp_comp_range { ident; ident_debug_uid = uid; pattern; start; stop;
                         direction }
   | Pcomp_in seq ->
-      let value_reason =
+      let item_ty =
         match (comprehension_type : comprehension_type) with
         | Array_comprehension _ ->
-          Jkind.History.Array_comprehension_iterator_element
+          newvar (Jkind.Builtin.value_or_null
+                    ~why:Array_comprehension_iterator_element)
         | List_comprehension ->
-          Jkind.History.List_comprehension_iterator_element
+          newvar (Jkind.Builtin.value ~why:List_comprehension_iterator_element)
       in
-      let item_ty = newvar (Jkind.Builtin.value ~why:value_reason) in
       let seq_ty = container_type item_ty in
       let sequence =
         (* To understand why we can currently only iterate over [mode_global]
@@ -11967,13 +11970,16 @@ let report_error ~loc env =
       let {left; right} : Mode_intf.print_error =
         Value.print_error (loc, Expression) e
       in
-      pp_print_string ppf "This value is ";
+      let open_box = dprintf "@[<hov 2>" in
+      let reopen_box = dprintf "@]@ %t" open_box in
+      fprintf ppf "%tThis value is " open_box;
     (match left ppf with
     | Mode_with_hint ->
-      fprintf ppf ".@\nHowever, the highlighted expression is expected to be "
-    | Mode -> fprintf ppf "@ but is expected to be ");
+      fprintf ppf
+        ".%tHowever, the highlighted expression is expected to be " reopen_box
+    | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
     ignore (right ppf);
-    pp_print_string ppf "."
+    fprintf ppf ".@]"
       ) e
   | Curried_application_complete (lbl, e, loc_kind) ->
       let Mode.Alloc.Error (ax, {left; _}) = Mode.Alloc.to_simple_error e in

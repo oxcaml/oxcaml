@@ -105,6 +105,13 @@ jobs:
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
+          - name: runtime5 regalloc multidomain (aarch64-linux)
+            config: --enable-runtime5 --enable-poll-insertion --enable-multidomain --disable-warn-error
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            run_regalloc_tool: true
+
           - name: runtime4 regalloc (x86_64-linux)
             config: --disable-runtime5
             os: warp-ubuntu-latest-x64-8x

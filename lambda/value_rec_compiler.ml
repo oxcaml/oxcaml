@@ -294,7 +294,8 @@ let compute_static_size lam =
     | Pfield_computed _
     | Pfloatfield _
     | Pmixedfield _
-    | Prunstack
+    | Pwith_stack
+    | Pwith_stack_bind
     | Pperform
     | Presume
     | Preperform

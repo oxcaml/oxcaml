@@ -19,7 +19,7 @@ Line 8, characters 20-21:
 8 |   val bar = unique_ x
                         ^
 Error: This value is "aliased"
-       because it is used in an object (at Lines 7-9, characters 2-5).
+         because it is used in an object (at Lines 7-9, characters 2-5).
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -149,8 +149,8 @@ Line 7, characters 12-17:
 7 |   unique_id M.foo
                 ^^^^^
 Error: This value is "aliased"
-       because it is used inside the function at Lines 6-7, characters 22-17
-       which is expected to be "many".
+         because it is used inside the function at Lines 6-7, characters 22-17
+         which is expected to be "many".
        However, the highlighted expression is expected to be "unique".
 |}]
 

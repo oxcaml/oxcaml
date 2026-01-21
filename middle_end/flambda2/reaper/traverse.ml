@@ -560,23 +560,31 @@ and traverse_apply denv acc apply : rev_expr =
       return_args;
     match Apply.call_kind apply with
     | Function _ -> ()
-    | Method { obj; kind = _; alloc_mode = _ } ->
-      Acc.add_cond_any_usage acc ~denv obj
+    | Method { obj; kind = _ } -> Acc.add_cond_any_usage acc ~denv obj
     | C_call _ -> ()
     | Effect (Perform { eff }) -> Acc.add_cond_any_usage acc ~denv eff
     | Effect (Reperform { eff; cont; last_fiber }) ->
       Acc.add_cond_any_usage acc ~denv eff;
       Acc.add_cond_any_usage acc ~denv cont;
       Acc.add_cond_any_usage acc ~denv last_fiber
-    | Effect (Run_stack { stack; f; arg }) ->
-      Acc.add_cond_any_usage acc ~denv stack;
+    | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
+      Acc.add_cond_any_usage acc ~denv valuec;
+      Acc.add_cond_any_usage acc ~denv exnc;
+      Acc.add_cond_any_usage acc ~denv effc;
       Acc.add_cond_any_usage acc ~denv f;
       Acc.add_cond_any_usage acc ~denv arg
-    | Effect (Resume { stack; f; arg; last_fiber }) ->
-      Acc.add_cond_any_usage acc ~denv stack;
+    | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
+      Acc.add_cond_any_usage acc ~denv valuec;
+      Acc.add_cond_any_usage acc ~denv exnc;
+      Acc.add_cond_any_usage acc ~denv effc;
+      Acc.add_cond_any_usage acc ~denv dyn;
+      Acc.add_cond_any_usage acc ~denv bind;
       Acc.add_cond_any_usage acc ~denv f;
-      Acc.add_cond_any_usage acc ~denv arg;
-      Acc.add_cond_any_usage acc ~denv last_fiber
+      Acc.add_cond_any_usage acc ~denv arg
+    | Effect (Resume { cont; f; arg }) ->
+      Acc.add_cond_any_usage acc ~denv cont;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg
   in
   traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc;
   let expr = Apply apply in

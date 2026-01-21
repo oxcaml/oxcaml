@@ -525,10 +525,8 @@ let apply apply =
   match Apply_expr.call_kind apply with
   | Function { function_call = Direct _; _ } -> direct_call_size
   (* CR mshinwell: Check / fix these numbers *)
-  | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
-    indirect_call_size
-  | Function { function_call = Indirect_known_arity _; alloc_mode = _ } ->
-    indirect_call_size
+  | Function { function_call = Indirect_unknown_arity } -> indirect_call_size
+  | Function { function_call = Indirect_known_arity _ } -> indirect_call_size
   | C_call { needs_caml_c_call = true; _ } -> needs_caml_c_call_extcall_size
   | C_call { needs_caml_c_call = false; _ } ->
     does_not_need_caml_c_call_extcall_size
