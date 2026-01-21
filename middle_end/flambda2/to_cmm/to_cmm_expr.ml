@@ -270,7 +270,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
   match Apply.call_kind apply with
-  | Function { function_call = Direct code_id; alloc_mode = _ } -> (
+  | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
     let params_arity = Code_metadata.params_arity code_metadata in
     if not (C.check_arity params_arity args)
@@ -311,7 +311,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all ))
-  | Function { function_call = Indirect_unknown_arity; alloc_mode } ->
+  | Function { function_call = Indirect_unknown_arity } ->
     fail_if_probe apply;
     let callee =
       match callee with
@@ -322,13 +322,13 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           Apply.print apply
     in
     ( C.indirect_call ~dbg return_ty pos
-        (C.alloc_mode_for_applications_to_cmx alloc_mode)
+        (C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply))
         callee args_ty (split_args ()),
       free_vars,
       env,
       res,
       Ece.all )
-  | Function { function_call = Indirect_known_arity callees; alloc_mode = _ } ->
+  | Function { function_call = Indirect_known_arity callees } ->
     fail_if_probe apply;
     let callee =
       match callee with
@@ -360,12 +360,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all )
-  | C_call
-      { needs_caml_c_call; is_c_builtin; effects; coeffects; alloc_mode = _ } ->
+  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
     translate_external_call env res ~free_vars apply ~callee_simple ~args
       ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
       ~coeffects
-  | Method { kind; obj; alloc_mode } ->
+  | Method { kind; obj } ->
     fail_if_probe apply;
     let callee =
       match callee with
@@ -384,7 +383,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     let free_vars = Backend_var.Set.union free_vars obj_free_vars in
     let kind = Call_kind.Method_kind.to_lambda kind in
-    let alloc_mode = C.alloc_mode_for_applications_to_cmx alloc_mode in
+    let alloc_mode =
+      C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply)
+    in
     ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
         dbg,
       free_vars,

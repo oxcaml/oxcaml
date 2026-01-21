@@ -244,192 +244,121 @@ module Effect = struct
 end
 
 type t =
-  | Function of
-      { function_call : Function_call.t;
-        alloc_mode : Alloc_mode.For_applications.t
-      }
+  | Function of { function_call : Function_call.t }
   | Method of
       { kind : Method_kind.t;
-        obj : Simple.t;
-        alloc_mode : Alloc_mode.For_applications.t
+        obj : Simple.t
       }
   | C_call of
       { needs_caml_c_call : bool;
         is_c_builtin : bool;
         effects : Effects.t;
-        coeffects : Coeffects.t;
-        alloc_mode : Alloc_mode.For_applications.t
+        coeffects : Coeffects.t
       }
   | Effect of Effect.t
 
 let [@ocamlformat "disable"] print ppf t =
   match t with
-  | Function { function_call; alloc_mode } ->
+  | Function { function_call; } ->
     fprintf ppf "@[<hov 1>(Function@ \
-        @[<hov 1>(function_call@ %a)@]@ \
-        @[<hov 1>(alloc_mode@ %a)@]\
+        @[<hov 1>(function_call@ %a)@]\
         )@]"
       Function_call.print function_call
-      Alloc_mode.For_applications.print alloc_mode
-  | Method { kind; obj; alloc_mode } ->
+  | Method { kind; obj } ->
     fprintf ppf "@[<hov 1>(Method@ \
         @[<hov 1>(obj@ %a)@]@ \
-        @[<hov 1>(kind@ %a)@]@ \
-        @[<hov 1>(alloc_mode@ %a)@]\
+        @[<hov 1>(kind@ %a)@]\
         )@]"
       Simple.print obj
       Method_kind.print kind
-      Alloc_mode.For_applications.print alloc_mode
-  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects; alloc_mode } ->
+  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
     fprintf ppf "@[<hov 1>(C@ \
         @[<hov 1>(needs_caml_c_call@ %b)@]@ \
         @[<hov 1>(is_c_builtin@ %b)@]@ \
         @[<hov 1>(effects@ %a)@]@ \
-        @[<hov 1>(coeffects@ %a)@]@ \
-        @[<hov 1>(alloc_mode@ %a)@]\
+        @[<hov 1>(coeffects@ %a)@]\
         )@]"
       needs_caml_c_call
       is_c_builtin
-      Alloc_mode.For_applications.print alloc_mode
       Effects.print effects
       Coeffects.print coeffects
   | Effect effect_op -> Effect.print ppf effect_op
 
-let direct_function_call code_id alloc_mode =
-  Function { function_call = Direct code_id; alloc_mode }
+let direct_function_call code_id = Function { function_call = Direct code_id }
 
-let indirect_function_call_unknown_arity alloc_mode =
-  Function { function_call = Indirect_unknown_arity; alloc_mode }
+let indirect_function_call_unknown_arity =
+  Function { function_call = Indirect_unknown_arity }
 
-let indirect_function_call_known_arity ~code_ids alloc_mode =
-  Function { function_call = Indirect_known_arity code_ids; alloc_mode }
+let indirect_function_call_known_arity ~code_ids =
+  Function { function_call = Indirect_known_arity code_ids }
 
-let method_call kind ~obj alloc_mode = Method { kind; obj; alloc_mode }
+let method_call kind ~obj = Method { kind; obj }
 
-let c_call ~needs_caml_c_call ~is_c_builtin ~effects ~coeffects alloc_mode =
-  C_call { needs_caml_c_call; is_c_builtin; effects; coeffects; alloc_mode }
+let c_call ~needs_caml_c_call ~is_c_builtin ~effects ~coeffects =
+  C_call { needs_caml_c_call; is_c_builtin; effects; coeffects }
 
 let effect_ eff = Effect eff
 
 let free_names t =
   match t with
-  | Function { function_call = Direct code_id; alloc_mode } ->
-    Name_occurrences.add_code_id
-      (Alloc_mode.For_applications.free_names alloc_mode)
-      code_id Name_mode.normal
-  | Function
-      { function_call = Indirect_known_arity (Known code_ids); alloc_mode } ->
-    let free_names = Alloc_mode.For_applications.free_names alloc_mode in
+  | Function { function_call = Direct code_id } ->
+    Name_occurrences.add_code_id Name_occurrences.empty code_id Name_mode.normal
+  | Function { function_call = Indirect_known_arity (Known code_ids) } ->
     Code_id.Set.fold
       (fun code_id free_names ->
         Name_occurrences.add_code_id free_names code_id Name_mode.normal)
-      code_ids free_names
-  | Function { function_call = Indirect_unknown_arity; alloc_mode }
-  | Function { function_call = Indirect_known_arity Unknown; alloc_mode } ->
-    Alloc_mode.For_applications.free_names alloc_mode
+      code_ids Name_occurrences.empty
+  | Function { function_call = Indirect_unknown_arity }
+  | Function { function_call = Indirect_known_arity Unknown } ->
+    Name_occurrences.empty
   | C_call
-      { needs_caml_c_call = _;
-        is_c_builtin = _;
-        effects = _;
-        coeffects = _;
-        alloc_mode
-      } ->
-    Alloc_mode.For_applications.free_names alloc_mode
-  | Method { kind = _; obj; alloc_mode } ->
-    Name_occurrences.union (Simple.free_names obj)
-      (Alloc_mode.For_applications.free_names alloc_mode)
+      { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ } ->
+    Name_occurrences.empty
+  | Method { kind = _; obj } -> Simple.free_names obj
   | Effect op -> Effect.free_names op
 
 let apply_renaming t renaming =
   match t with
-  | Function { function_call = Direct code_id; alloc_mode } ->
+  | Function { function_call = Direct code_id } ->
     let code_id' = Renaming.apply_code_id renaming code_id in
-    let alloc_mode' =
-      Alloc_mode.For_applications.apply_renaming alloc_mode renaming
-    in
-    if code_id == code_id' && alloc_mode == alloc_mode'
+    if code_id == code_id'
     then t
-    else Function { function_call = Direct code_id'; alloc_mode = alloc_mode' }
-  | Function
-      { function_call = Indirect_known_arity (Known code_ids); alloc_mode } ->
+    else Function { function_call = Direct code_id' }
+  | Function { function_call = Indirect_known_arity (Known code_ids) } ->
     let code_ids' =
       Code_id.Set.map (Renaming.apply_code_id renaming) code_ids
     in
-    let alloc_mode' =
-      Alloc_mode.For_applications.apply_renaming alloc_mode renaming
-    in
-    if Code_id.Set.equal code_ids code_ids' && alloc_mode == alloc_mode'
+    if Code_id.Set.equal code_ids code_ids'
     then t
-    else
-      Function
-        { function_call = Indirect_known_arity (Known code_ids');
-          alloc_mode = alloc_mode'
-        }
+    else Function { function_call = Indirect_known_arity (Known code_ids') }
   | Function
-      { function_call =
-          (Indirect_unknown_arity | Indirect_known_arity Unknown) as
-          function_call;
-        alloc_mode
-      } ->
-    let alloc_mode' =
-      Alloc_mode.For_applications.apply_renaming alloc_mode renaming
-    in
-    if alloc_mode == alloc_mode'
-    then t
-    else Function { function_call; alloc_mode = alloc_mode' }
-  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects; alloc_mode }
+      { function_call = Indirect_unknown_arity | Indirect_known_arity Unknown }
     ->
-    let alloc_mode' =
-      Alloc_mode.For_applications.apply_renaming alloc_mode renaming
-    in
-    if alloc_mode == alloc_mode'
-    then t
-    else
-      C_call
-        { needs_caml_c_call;
-          is_c_builtin;
-          effects;
-          coeffects;
-          alloc_mode = alloc_mode'
-        }
-  | Method { kind; obj; alloc_mode } ->
+    t
+  | C_call
+      { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ } ->
+    t
+  | Method { kind; obj } ->
     let obj' = Simple.apply_renaming obj renaming in
-    let alloc_mode' =
-      Alloc_mode.For_applications.apply_renaming alloc_mode renaming
-    in
-    if obj == obj' && alloc_mode == alloc_mode'
-    then t
-    else Method { kind; obj = obj'; alloc_mode = alloc_mode' }
+    if obj == obj' then t else Method { kind; obj = obj' }
   | Effect op ->
     let op' = Effect.apply_renaming op renaming in
     if op == op' then t else Effect op'
 
 let ids_for_export t =
   match t with
-  | Function { function_call = Direct code_id; alloc_mode } ->
-    Ids_for_export.add_code_id
-      (Alloc_mode.For_applications.ids_for_export alloc_mode)
-      code_id
-  | Function
-      { function_call = Indirect_known_arity (Known code_ids); alloc_mode } ->
+  | Function { function_call = Direct code_id } ->
+    Ids_for_export.add_code_id Ids_for_export.empty code_id
+  | Function { function_call = Indirect_known_arity (Known code_ids) } ->
     Code_id.Set.fold
       (fun code_id ids_for_export ->
         Ids_for_export.add_code_id ids_for_export code_id)
-      code_ids
-      (Alloc_mode.For_applications.ids_for_export alloc_mode)
-  | Function { function_call = Indirect_unknown_arity; alloc_mode }
-  | Function { function_call = Indirect_known_arity Unknown; alloc_mode } ->
-    Alloc_mode.For_applications.ids_for_export alloc_mode
+      code_ids Ids_for_export.empty
+  | Function { function_call = Indirect_unknown_arity }
+  | Function { function_call = Indirect_known_arity Unknown } ->
+    Ids_for_export.empty
   | C_call
-      { needs_caml_c_call = _;
-        is_c_builtin = _;
-        effects = _;
-        coeffects = _;
-        alloc_mode
-      } ->
-    Alloc_mode.For_applications.ids_for_export alloc_mode
-  | Method { kind = _; obj; alloc_mode } ->
-    Ids_for_export.union
-      (Ids_for_export.from_simple obj)
-      (Alloc_mode.For_applications.ids_for_export alloc_mode)
+      { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ } ->
+    Ids_for_export.empty
+  | Method { kind = _; obj } -> Ids_for_export.from_simple obj
   | Effect op -> Effect.ids_for_export op

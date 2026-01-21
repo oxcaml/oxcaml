@@ -560,8 +560,7 @@ and traverse_apply denv acc apply : rev_expr =
       return_args;
     match Apply.call_kind apply with
     | Function _ -> ()
-    | Method { obj; kind = _; alloc_mode = _ } ->
-      Acc.add_cond_any_usage acc ~denv obj
+    | Method { obj; kind = _ } -> Acc.add_cond_any_usage acc ~denv obj
     | C_call _ -> ()
     | Effect (Perform { eff }) -> Acc.add_cond_any_usage acc ~denv eff
     | Effect (Reperform { eff; cont; last_fiber }) ->

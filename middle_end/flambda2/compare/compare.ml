@@ -293,9 +293,9 @@ let subst_field env field =
 
 let subst_call_kind env (call_kind : Call_kind.t) : Call_kind.t =
   match call_kind with
-  | Function { function_call = Direct code_id; alloc_mode } ->
+  | Function { function_call = Direct code_id } ->
     let code_id = subst_code_id env code_id in
-    Call_kind.direct_function_call code_id alloc_mode
+    Call_kind.direct_function_call code_id
   | _ -> call_kind
 
 let rec subst_expr env e =
@@ -438,6 +438,7 @@ and subst_apply env apply =
   let exn_continuation = Apply_expr.exn_continuation apply in
   let args = List.map (subst_simple env) (Apply_expr.args apply) in
   let call_kind = subst_call_kind env (Apply_expr.call_kind apply) in
+  let alloc_mode = Apply_expr.alloc_mode apply in
   let dbg = Apply_expr.dbg apply in
   let inlined = Apply_expr.inlined apply in
   let inlining_state = Apply_expr.inlining_state apply in
@@ -445,9 +446,9 @@ and subst_apply env apply =
   let position = Apply_expr.position apply in
   let args_arity = Apply_expr.args_arity apply in
   let return_arity = Apply_expr.return_arity apply in
-  Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind dbg
-    ~inlined ~inlining_state ~probe:None ~position ~relative_history ~args_arity
-    ~return_arity
+  Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind
+    ~alloc_mode dbg ~inlined ~inlining_state ~probe:None ~position
+    ~relative_history ~args_arity ~return_arity
   |> Expr.create_apply
 
 and subst_apply_cont env apply_cont =
@@ -962,72 +963,43 @@ let method_kinds _env (method_kind1 : Call_kind.Method_kind.t)
 
 let call_kinds env (call_kind1 : Call_kind.t) (call_kind2 : Call_kind.t) :
     Call_kind.t Comparison.t =
-  let compare_alloc_modes_then alloc_mode1 alloc_mode2 ~f : _ Comparison.t =
-    if Alloc_mode.For_applications.compare alloc_mode1 alloc_mode2 = 0
-    then f ()
-    else Different { approximant = call_kind1 }
-  in
   match call_kind1, call_kind2 with
-  | ( Function { function_call = Direct code_id1; alloc_mode = alloc_mode1 },
-      Function { function_call = Direct code_id2; alloc_mode = alloc_mode2 } )
-    ->
-    compare_alloc_modes_then alloc_mode1 alloc_mode2 ~f:(fun () ->
-        if code_ids env code_id1 code_id2 |> Comparison.is_equivalent
-        then Equivalent
-        else Different { approximant = call_kind1 })
-  | ( Function
-        { function_call = Indirect_known_arity code_ids1;
-          alloc_mode = alloc_mode1
-        },
-      Function
-        { function_call = Indirect_known_arity code_ids2;
-          alloc_mode = alloc_mode2
-        } ) ->
-    compare_alloc_modes_then alloc_mode1 alloc_mode2 ~f:(fun () ->
-        match code_ids1, code_ids2 with
-        | Unknown, Unknown -> Equivalent
-        | Known code_ids1, Known code_ids2 ->
-          if code_ids_set env code_ids1 code_ids2 |> Comparison.is_equivalent
-          then Equivalent
-          else Different { approximant = call_kind1 }
-        | Unknown, Known _ | Known _, Unknown ->
-          Different { approximant = call_kind1 })
-  | ( Function
-        { function_call = Indirect_unknown_arity; alloc_mode = alloc_mode1 },
-      Function
-        { function_call = Indirect_unknown_arity; alloc_mode = alloc_mode2 } )
-    ->
-    compare_alloc_modes_then alloc_mode1 alloc_mode2 ~f:(fun () -> Equivalent)
-  | ( Method { kind = kind1; obj = obj1; alloc_mode = alloc_mode1 },
-      Method { kind = kind2; obj = obj2; alloc_mode = alloc_mode2 } ) ->
-    if Alloc_mode.For_applications.compare alloc_mode1 alloc_mode2 = 0
-    then
-      pairs ~f1:method_kinds ~f2:simple_exprs ~subst2:subst_simple env
-        (kind1, obj1) (kind2, obj2)
-      |> Comparison.map ~f:(fun (kind, obj) ->
-          Call_kind.method_call kind ~obj alloc_mode1)
-    else
-      Different
-        { approximant =
-            Call_kind.method_call kind1 ~obj:(subst_simple env obj1) alloc_mode1
-        }
+  | ( Function { function_call = Direct code_id1 },
+      Function { function_call = Direct code_id2 } ) ->
+    if code_ids env code_id1 code_id2 |> Comparison.is_equivalent
+    then Equivalent
+    else Different { approximant = call_kind1 }
+  | ( Function { function_call = Indirect_known_arity code_ids1 },
+      Function { function_call = Indirect_known_arity code_ids2 } ) -> (
+    match code_ids1, code_ids2 with
+    | Unknown, Unknown -> Equivalent
+    | Known code_ids1, Known code_ids2 ->
+      if code_ids_set env code_ids1 code_ids2 |> Comparison.is_equivalent
+      then Equivalent
+      else Different { approximant = call_kind1 }
+    | Unknown, Known _ | Known _, Unknown ->
+      Different { approximant = call_kind1 })
+  | ( Function { function_call = Indirect_unknown_arity },
+      Function { function_call = Indirect_unknown_arity } ) ->
+    Equivalent
+  | Method { kind = kind1; obj = obj1 }, Method { kind = kind2; obj = obj2 } ->
+    pairs ~f1:method_kinds ~f2:simple_exprs ~subst2:subst_simple env
+      (kind1, obj1) (kind2, obj2)
+    |> Comparison.map ~f:(fun (kind, obj) -> Call_kind.method_call kind ~obj)
   | ( C_call
         { needs_caml_c_call = needs_caml_c_call1;
           is_c_builtin = is_c_builtin1;
           effects = effects1;
-          coeffects = coeffects1;
-          alloc_mode = alloc_mode1
+          coeffects = coeffects1
         },
       C_call
         { needs_caml_c_call = needs_caml_c_call2;
           is_c_builtin = is_c_builtin2;
           effects = effects2;
-          coeffects = coeffects2;
-          alloc_mode = alloc_mode2
+          coeffects = coeffects2
         } ) ->
     if
       Bool.equal needs_caml_c_call1 needs_caml_c_call2
-      && Alloc_mode.For_applications.compare alloc_mode1 alloc_mode2 = 0
       && Bool.equal is_c_builtin1 is_c_builtin2
       && Effects.compare effects1 effects2 = 0
       && Coeffects.compare coeffects1 coeffects2 = 0
@@ -1058,6 +1030,9 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
     && Flambda_arity.equal_exact
          (Apply.return_arity apply1)
          (Apply.return_arity apply2)
+    && Alloc_mode.For_applications.compare (Apply.alloc_mode apply1)
+         (Apply.alloc_mode apply2)
+       = 0
   in
   let ok = ref atomic_things_equal in
   let callee1' =
@@ -1081,7 +1056,8 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
           Apply.create ~callee:callee1'
             ~continuation:(Apply.continuation apply1)
             (Apply.exn_continuation apply1)
-            ~args:args1' ~call_kind:call_kind1' (Apply.dbg apply1)
+            ~args:args1' ~call_kind:call_kind1'
+            ~alloc_mode:(Apply.alloc_mode apply1) (Apply.dbg apply1)
             ~inlined:(Apply.inlined apply1)
             ~inlining_state:(Apply.inlining_state apply1)
             ~probe:None ~position:(Apply.position apply1)
