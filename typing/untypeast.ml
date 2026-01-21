@@ -456,7 +456,7 @@ let value_binding sub vb =
   Vb.mk ~loc ~attrs ?value_constraint ~modes pat (sub.expr sub vb.vb_expr)
 
 let block_access sub : block_access -> Parsetree.block_access = function
-  | Baccess_field (lid, _) ->
+  | Baccess_field (lid, _, _) ->
     Baccess_field (map_loc sub lid)
   | Baccess_array
       { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort = _ } ->
@@ -466,7 +466,7 @@ let block_access sub : block_access -> Parsetree.block_access = function
     Baccess_block (mut, sub.expr sub idx)
 
 let unboxed_access sub : unboxed_access -> Parsetree.unboxed_access = function
-  | Uaccess_unboxed_field (lid, _) ->
+  | Uaccess_unboxed_field (lid, _, _) ->
     Uaccess_unboxed_field (map_loc sub lid)
 
 let comprehension sub comp =
@@ -633,7 +633,7 @@ let expression sub exp =
                              ])
     | Texp_field { record = exp; lid; _ } ->
         Pexp_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_unboxed_field (exp, _, lid, _label, _) ->
+    | Texp_unboxed_field { record = exp; lid; _ } ->
         Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
     | Texp_setfield { record = exp1; lid; newval = exp2 } ->
         Pexp_setfield (sub.expr sub exp1, map_loc sub lid,

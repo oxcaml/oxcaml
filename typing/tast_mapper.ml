@@ -463,8 +463,8 @@ let expr sub x =
       fields
   in
   let map_block_access sub = function
-    | Baccess_field (lid, ld) ->
-      Baccess_field (map_loc sub lid, ld)
+    | Baccess_field (lid, ld, r) ->
+      Baccess_field (map_loc sub lid, ld, r)
     | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
       let index = sub.expr sub index in
       Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
@@ -472,8 +472,8 @@ let expr sub x =
       Baccess_block (mut, sub.expr sub idx)
   in
   let map_unboxed_access sub = function
-    | Uaccess_unboxed_field (lid, ld) ->
-      Uaccess_unboxed_field (map_loc sub lid, ld)
+    | Uaccess_unboxed_field (lid, ld, sorts) ->
+      Uaccess_unboxed_field (map_loc sub lid, ld, sorts)
   in
   let exp_desc =
     match x.exp_desc with
@@ -547,8 +547,13 @@ let expr sub x =
                      record_sort; record_repres; field_sort; label; boxing;
                      unique_barrier;
                    }
-    | Texp_unboxed_field (exp, sort, lid, ld, uu) ->
-        Texp_unboxed_field (sub.expr sub exp, sort, map_loc sub lid, ld, uu)
+    | Texp_unboxed_field { record; record_sort; record_repres; field_sort; lid;
+                           label; unique_use; } ->
+        Texp_unboxed_field { record = sub.expr sub record;
+                             lid = map_loc sub lid;
+                             record_sort; record_repres; field_sort; label;
+                             unique_use;
+                           }
     | Texp_setfield { record; record_repres; field_sort; modality; lid; label;
                       newval } ->
         Texp_setfield {

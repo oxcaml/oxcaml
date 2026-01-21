@@ -3080,7 +3080,7 @@ and quote_expression_desc transl stage e =
           record.extended_expression
       in
       Exp_desc.unboxed_record_product loc (Iarray.to_list lbl_exps) base
-    | Texp_unboxed_field (rcd, _, lid, lbl, _) ->
+    | Texp_unboxed_field { record = rcd; lid; label = lbl; _ } ->
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in
       Exp_desc.unboxed_field loc rcd lbl

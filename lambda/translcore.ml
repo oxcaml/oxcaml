@@ -749,11 +749,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | None -> targ
       | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
       end
-  | Texp_unboxed_field(arg, arg_sort, _id, lbl, _) ->
-    begin match lbl.lbl_repres with
-    | Some (Record_unboxed_product _) ->
-      let lbl_layout l = layout e.exp_env l.lbl_loc (Option.get l.lbl_sort) l.lbl_arg in
-      let layouts = Iarray.to_list (Iarray.map lbl_layout (Lazy.force lbl.lbl_all)) in
+  | Texp_unboxed_field{ record = arg; record_sort = arg_sort; label = lbl;
+                        record_repres; _ } ->
+    begin match record_repres with
+    | Record_unboxed_product sorts ->
+      let lbl_layout l s = layout e.exp_env l.lbl_loc s l.lbl_arg in
+      let layouts =
+        Iarray.map2 lbl_layout (Lazy.force lbl.lbl_all) sorts
+        |> Iarray.to_list
+      in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       if Iarray.length (Lazy.force lbl.lbl_all) == 1 then
@@ -762,7 +766,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       else
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
-    | None -> fatal_error "Unexpected indeterminate representation of unboxed record"
     end
   | Texp_setfield{ record = arg; record_repres; field_sort; modality = arg_mode;
                    lid = _id; label = lbl; newval } ->
@@ -2373,7 +2376,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
 
 (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
 and transl_idx ~scopes loc env ba uas =
-  let ua_to_pos (Uaccess_unboxed_field (_, lbl)) =
+  let ua_to_pos (Uaccess_unboxed_field (_, lbl, _)) =
     (* erase singleton unboxed products before lambda *)
     if Iarray.length (Lazy.force lbl.lbl_all) == 1
     then None
@@ -2385,21 +2388,14 @@ and transl_idx ~scopes loc env ba uas =
     let idx = transl_exp ~scopes Jkind.Sort.Const.for_idx idx in
     begin match uas with
     | [] -> idx
-    | Uaccess_unboxed_field (_, lbl) :: _ ->
+    | Uaccess_unboxed_field (_, lbl, sorts) :: _ ->
+      let sorts = label_all_sorts lbl sorts in
       (* Preserve the invariant that products have at least two elements *)
       let base_sort =
-        if Int.equal (Iarray.length (Lazy.force lbl.lbl_all)) 1 then
-          lbl.lbl_sort
+        if Int.equal (Iarray.length sorts) 1 then
+          sorts.:(0)
         else
-          Iarray.map (fun lbl -> lbl.lbl_sort) (Lazy.force lbl.lbl_all)
-          |> Misc.Stdlib.Iarray.all_somes
-          |> Option.map
-               (fun sorts -> Jkind.Sort.Const.Product (Iarray.to_list sorts))
-      in
-      let base_sort =
-        match base_sort with
-        | Some base_sort -> base_sort
-        | None -> failwith "TODO after merge: Uaccess_unboxed_field"
+          Jkind.Sort.Const.Product (Iarray.to_list sorts)
       in
       (* CR layouts v8: this might unnecessarily compute the value kind, which
          shouldn't be needed for deepening *)
@@ -2408,18 +2404,13 @@ and transl_idx ~scopes loc env ba uas =
       (* [uas_path] is a path into [mbe] *)
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
-  | Baccess_field (_id, lbl) ->
-    let repres =
-      match lbl.lbl_repres with
-      | Some repres -> repres
-      | None -> failwith "TODO after merge: Baccess_field"
-    in
+  | Baccess_field (_id, lbl, repres) ->
     begin match repres with
     | Record_boxed _
     | Record_float | Record_ufloat ->
       (* Assert that all unboxed fields are of singleton records *)
       List.iter
-        (fun (Uaccess_unboxed_field (_, l)) ->
+        (fun (Uaccess_unboxed_field (_, l, _)) ->
             if Iarray.length (Lazy.force l.lbl_all) <> 1 then
               Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
                 in non-mixed boxed record")

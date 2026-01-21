@@ -2363,7 +2363,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   | Texp_field _ ->
     let value, uf = check_uniqueness_exp_as_value ienv exp in
     UF.seq uf (Value.mark_maybe_unique value)
-  | Texp_unboxed_field (_, _, _, _, _) ->
+  | Texp_unboxed_field _ ->
     let value, uf = check_uniqueness_exp_as_value ienv exp in
     UF.seq uf (Value.mark_maybe_unique value)
   | Texp_setfield { record = rcd; newval = arg; _ } ->
@@ -2584,7 +2584,7 @@ and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
             Value.fresh )
       in
       value, UF.seqs [uf; uf_read; uf_boxing])
-  | Texp_unboxed_field (e, _, _, l, unique_use) -> (
+  | Texp_unboxed_field { record = e; label = l; unique_use; _ } -> (
     let value, uf = check_uniqueness_exp_as_value ienv e in
     match Value.paths value with
     | None -> Value.fresh, uf

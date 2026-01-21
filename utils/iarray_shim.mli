@@ -30,6 +30,7 @@ module Iarray : sig
   val iteri : (int -> 'a -> unit) -> 'a t -> unit
   val for_all : ('a -> bool) -> 'a t -> bool
   val exists : ('a -> bool) -> 'a t -> bool
+  val find_opt : ('a -> bool) -> 'a t -> 'a option
   val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
   val fold_left_map :
     ('acc -> 'a -> 'acc * 'b) -> 'acc -> 'a iarray -> 'acc * 'b iarray

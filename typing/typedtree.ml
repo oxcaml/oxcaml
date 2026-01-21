@@ -274,9 +274,15 @@ and expression_desc =
       boxing : texp_field_boxing;
       unique_barrier : Unique_barrier.t;
     }
-  | Texp_unboxed_field of
-      expression * Jkind.sort * Longident.t loc * unboxed_label_description *
-        unique_use
+  | Texp_unboxed_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_unboxed_product_representation;
+      field_sort : Jkind.sort;
+      lid : Longident.t loc;
+      label : unboxed_label_description;
+      unique_use : unique_use;
+    }
   | Texp_setfield of {
       record : expression;
       record_repres : Types.record_representation;
@@ -356,7 +362,8 @@ and meth =
   | Tmeth_ancestor of Ident.t * Path.t
 
 and block_access =
-  | Baccess_field of Longident.t loc * Types.label_description
+  | Baccess_field of
+      Longident.t loc * Types.label_description * Types.record_representation
   | Baccess_array of {
       mut: mutable_flag;
       index_kind: index_kind;
@@ -368,7 +375,8 @@ and block_access =
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
-  | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description
+  | Uaccess_unboxed_field of
+      Longident.t loc * Types.unboxed_label_description * record_sorts
 
 and comprehension =
   {
@@ -1441,7 +1449,7 @@ let rec fold_antiquote_exp f  acc exp =
         extended_expression
   | Texp_field { record = exp; _ } ->
       fold_antiquote_exp f acc exp
-  | Texp_unboxed_field (exp, _, _, _, _) ->
+  | Texp_unboxed_field { record = exp; } ->
       fold_antiquote_exp f acc exp
   | Texp_setfield { record = exp1; newval = exp2; _ } ->
       let acc = fold_antiquote_exp f acc exp1 in
@@ -1576,4 +1584,25 @@ let label_sort label record_sorts =
       | None ->
           Misc.fatal_errorf "no sort for label %s in fixed-sort record"
             label.lbl_name
+      end
+
+let label_all_sorts label record_sorts =
+  match record_sorts with
+  | Variable sorts -> sorts
+  | Fixed ->
+      let lbl_sorts =
+        Iarray.map (fun lbl -> lbl.lbl_sort) (Lazy.force label.lbl_all)
+      in
+      begin match Misc.Stdlib.Iarray.all_somes lbl_sorts with
+      | Some sorts -> sorts
+      | None ->
+          begin match
+            Iarray.find_opt (fun lbl -> Option.is_none lbl.lbl_sort)
+              (Lazy.force label.lbl_all)
+          with
+          | None -> assert false
+          | Some lbl ->
+              Misc.fatal_errorf "no sort for label %s in fixed-sort record"
+                lbl.lbl_name
+          end
       end

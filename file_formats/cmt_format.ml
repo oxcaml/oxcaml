@@ -202,13 +202,13 @@ let iter_on_occurrences
     fields
   in
   let iter_block_access exp_env = function
-    | Baccess_field (lid, label_desc) ->
+    | Baccess_field (lid, label_desc, _) ->
       add_label ~namespace:Label exp_env lid label_desc
     | Baccess_array _ -> ()
     | Baccess_block _ -> ()
   in
   let iter_unboxed_access exp_env = function
-    | Uaccess_unboxed_field (lid, label_desc) ->
+    | Uaccess_unboxed_field (lid, label_desc, _) ->
       add_label ~namespace:Unboxed_label exp_env lid label_desc
   in
   let with_constraint ~env (_path, _lid, with_constraint) =
@@ -228,7 +228,7 @@ let iter_on_occurrences
       | Texp_field { lid; label = label_desc; _ }
       | Texp_setfield { lid; label = label_desc; _ } ->
           add_label ~namespace:Label exp_env lid label_desc
-      | Texp_unboxed_field (_, _, lid, label_desc, _) ->
+      | Texp_unboxed_field { lid; label = label_desc; _ } ->
           add_label ~namespace:Unboxed_label exp_env lid label_desc
       | Texp_idx (ba, uas) ->
           iter_block_access exp_env ba;

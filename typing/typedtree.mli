@@ -485,9 +485,15 @@ and expression_desc =
           non-value if the record is @@unboxed).
         - [texp_field_boxing] provides extra information depending on if the
           projection requires boxing. *)
-  | Texp_unboxed_field of
-      expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
-        unique_use
+  | Texp_unboxed_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_unboxed_product_representation;
+      field_sort : Jkind.sort;
+      lid : Longident.t loc;
+      label : Types.unboxed_label_description;
+      unique_use : unique_use;
+    }
   | Texp_setfield of {
       record : expression;
       record_repres : Types.record_representation;
@@ -645,7 +651,8 @@ and meth =
   | Tmeth_ancestor of Ident.t * Path.t
 
 and block_access =
-  | Baccess_field of Longident.t loc * Types.label_description
+  | Baccess_field of
+      Longident.t loc * Types.label_description * Types.record_representation
   | Baccess_array of {
       mut: mutable_flag;
       index_kind: index_kind;
@@ -657,7 +664,8 @@ and block_access =
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
-  | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description
+  | Uaccess_unboxed_field of
+      Longident.t loc * Types.unboxed_label_description * record_sorts
 
 and comprehension =
   {
@@ -1394,3 +1402,6 @@ val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
 
 val label_sort:
     _ Types.gen_label_description -> record_sorts -> Jkind.Sort.Const.t
+
+val label_all_sorts:
+    _ Types.gen_label_description -> record_sorts -> Jkind.Sort.Const.t iarray

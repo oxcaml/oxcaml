@@ -335,7 +335,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       fields
   in
   let iter_block_access sub = function
-    | Baccess_field (lid, _) -> iter_loc sub lid
+    | Baccess_field (lid, _, _) -> iter_loc sub lid
     | Baccess_array
       { mut = _; index_kind = _; index; base_ty = _; elt_ty = _; elt_sort = _
       } ->
@@ -343,7 +343,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     | Baccess_block (_, idx) -> sub.expr sub idx
   in
   let iter_unboxed_access sub = function
-    | Uaccess_unboxed_field (lid, _) -> iter_loc sub lid
+    | Uaccess_unboxed_field (lid, _, _) -> iter_loc sub lid
   in
   match exp_desc with
   | Texp_ident (_, lid, _, _, _)  -> iter_loc sub lid
@@ -385,7 +385,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_field { record = exp; lid; _ } ->
       iter_loc sub lid;
       sub.expr sub exp
-  | Texp_unboxed_field (exp, _, lid, _, _) ->
+  | Texp_unboxed_field { record = exp; lid; _ } ->
       iter_loc sub lid;
       sub.expr sub exp
   | Texp_setfield { record = exp1; lid; newval = exp2; _ } ->

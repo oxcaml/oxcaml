@@ -601,10 +601,12 @@ and expression i ppf x =
       sort i ppf record_sort;
       longident i ppf li;
       sort i ppf field_sort;
-  | Texp_unboxed_field (e, _, li, _, _) ->
+  | Texp_unboxed_field { record = e; lid = li; record_sort; field_sort; _ } ->
       line i ppf "Texp_unboxed_field\n";
       expression i ppf e;
+      sort i ppf record_sort;
       longident i ppf li;
+      sort i ppf field_sort;
   | Texp_setfield { record = e1; field_sort; modality = am; lid = li;
                     newval = e2; _ } ->
       line i ppf "Texp_setfield\n";
@@ -1232,7 +1234,7 @@ and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
   pattern (i+1) ppf p;
 
 and block_access i ppf = function
-  | Baccess_field (li, _) ->
+  | Baccess_field (li, _, _) ->
       line i ppf "Baccess_field %a\n" fmt_longident li
   | Baccess_array
         { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort } ->
@@ -1246,7 +1248,7 @@ and block_access i ppf = function
       expression i ppf index
 
 and unboxed_access i ppf = function
-  | Uaccess_unboxed_field (li, _) ->
+  | Uaccess_unboxed_field (li, _, _) ->
       line i ppf "Uaccess_unboxed_field %a\n" fmt_longident li
 
 and comprehension i ppf {comp_body; comp_clauses} =

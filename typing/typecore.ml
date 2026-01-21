@@ -1710,7 +1710,7 @@ let pp_lblos ppf (lbls, lblos) =
   | Fixed -> Format.fprintf ppf "<fixed sorts>"
   | Variable lblos ->
     Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@.")
-      pp_lblo ppf (List.combine (lbls |> Iarray.to_list) (lblos |> Iarray.to_list))
+      pp_lblo ppf (List.map (fun lbl -> lbl, lblos.:(lbl.lbl_pos)) (lbls |> Iarray.to_list))
 
 let update_labels (type rep) env labels (form : rep record_form) ~loc
       ~containing_type
@@ -4815,7 +4815,7 @@ let rec is_nonexpansive exp =
       && is_nonexpansive_opt (Option.map fst extended_expression)
   | Texp_atomic_loc(exp, _, _, _, _) -> is_nonexpansive exp
   | Texp_field { record = exp; _ } -> is_nonexpansive exp
-  | Texp_unboxed_field(exp, _, _, _, _) -> is_nonexpansive exp
+  | Texp_unboxed_field { record = exp; _ } -> is_nonexpansive exp
   | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> true
@@ -6866,34 +6866,9 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
-      let (record, record_sort, rmode, label, _) =
-        type_label_access Legacy env srecord Env.Projection lid
-      in
-      let ty_arg, field_sort, record_repres =
-        with_local_level_if_principal begin fun () ->
-          (* [ty_arg] is the type of field, [ty_res] is the type of record, they
-             could share type variables, which are now instantiated *)
-          let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
-          (* we now link the two record types *)
-          unify_exp env record ty_res;
-          let sort =
-            match type_sort ~why:Field_projection ~fixed:false env ty_arg with
-            | Ok sort -> sort
-            | Error err ->
-                raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
-          in
-          let _sort, record_repres =
-            (* This redundantly calculates the sort again. But calling
-               [type_sort] above let us infer that the type is representable,
-               and it also gives a nicer error message *)
-            (* XXX Not entirely sure why it's necessary to do this in the inner
-               level, but weird errors happen if we don't, and it's also
-               necessary to do it in _this_ inner level so that the correct type
-               hits a [generalize_structure] *)
-            update_label env label Legacy ~loc ~containing_type:record.exp_type
-          in
-          ty_arg, sort, record_repres
-        end ~post:(fun (ty_arg, _, _) -> generalize_structure ty_arg)
+      let (record, record_sort, rmode, label, _, ty_arg, field_sort,
+           record_repres) =
+        type_label_access Legacy loc env srecord Env.Projection lid
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut rmode;
@@ -6953,18 +6928,9 @@ and type_expect_
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      let (record, record_sort, rmode, label, _) =
-        type_label_access Unboxed_product env srecord Env.Projection lid
-      in
-      let ty_arg =
-        with_local_level_if_principal begin fun () ->
-          (* [ty_arg] is the type of field, [ty_res] is the type of record, they
-           could share type variables, which are now instantiated *)
-          let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
-          (* we now link the two record types *)
-          unify_exp env record ty_res;
-          ty_arg
-        end ~post:generalize_structure
+      let (record, record_sort, rmode, label, _, ty_arg, field_sort,
+           record_repres) =
+        type_label_access Unboxed_product loc env srecord Env.Projection lid
       in
       if Types.is_mutable label.lbl_mut then
         fatal_error
@@ -6980,14 +6946,18 @@ and type_expect_
       submode ~loc ~env mode expected_mode;
       let uu = unique_use ~loc ~env mode (as_single_mode expected_mode) in
       rue {
-        exp_desc = Texp_unboxed_field(record, record_sort, lid, label, uu);
+        exp_desc =
+          Texp_unboxed_field
+            { record; record_sort; field_sort; record_repres; lid; label;
+              unique_use = uu };
         exp_loc = loc; exp_extra = [];
         exp_type = ty_arg;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-      let (record, _record_sort, rmode, label, expected_type) =
-        type_label_access Legacy env srecord Env.Mutation lid in
+      let (record, _record_sort, rmode, label, expected_type, _, field_sort,
+           record_repres) =
+        type_label_access Legacy loc env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
         then
@@ -7010,14 +6980,11 @@ and type_expect_
           raise(Error(loc, env, Label_not_mutable lid.txt))
       in
       unify_exp env record ty_record;
-      let sort, record_repres =
-        update_label env label Legacy ~loc ~containing_type:ty_record
-      in
       rue {
         exp_desc = Texp_setfield {
           record;
           record_repres;
-          field_sort = sort |> Jkind.Sort.of_const;
+          field_sort;
           modality =
             Locality.disallow_right (regional_to_local
               (Value.proj_comonadic Areality rmode));
@@ -7086,15 +7053,15 @@ and type_expect_
     in
     let mut =
       match ba with
-      | Baccess_field (_, { lbl_mut = Immutable; _ })
+      | Baccess_field (_, { lbl_mut = Immutable; _ }, _)
       | Baccess_array { mut = Immutable; _ } | Baccess_block (Immutable, _) ->
         false
       | Baccess_field
-          (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ })
+          (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ }, _)
       | Baccess_array { mut = Mutable; _ } | Baccess_block (Mutable, _) ->
         true
       | Baccess_field
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
+          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
         raise (Error(loc, env, Block_index_atomic_unsupported))
     in
     let (el_ty, modality), uas =
@@ -7813,8 +7780,8 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let (record, record_sort, rmode, label, _) =
-            type_label_access Legacy env srecord Env.Mutation lid
+          let (record, record_sort, rmode, label, _, _, _, _) =
+            type_label_access Legacy loc env srecord Env.Mutation lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
           if (not (Types.is_atomic label.lbl_mut))
@@ -8063,7 +8030,11 @@ and type_block_access env expected_base_ty principal
     let mut = is_mutable label.lbl_mut in
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     if mut then Env.mark_label_used Mutation label.lbl_uid;
-    let ba = Baccess_field (lid, label) in
+    let _sort, rep =
+      update_label env label Legacy ~loc:lid.loc
+        ~containing_type:expected_base_ty
+    in
+    let ba = Baccess_field (lid, label, rep) in
     let flat_float  =
       (* whether we change the final el ty to [float#]. we don't set [el_ty]
           to [float#] here because it could be a singleton unboxed record
@@ -8085,7 +8056,8 @@ and type_block_access env expected_base_ty principal
       | Some (Record_inlined _) ->
         Misc.fatal_error "Typecore.type_block_access: inlined record"
       | None ->
-        failwith "TODO after merge: Baccess_field"
+        (* Records with [any] fields are never flattened *)
+        false
     in
     let () =
       match label.lbl_private with
@@ -8169,7 +8141,11 @@ and type_unboxed_access env loc el_ty ua =
         let err = Invalid_unboxed_access { prev_el_type = el_ty; ua } in
         raise (Error (lid.loc, env, err))
     end;
-    (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label)
+    let sorts, _rep =
+      update_labels env (Lazy.force label.lbl_all) Unboxed_product ~loc:lid.loc
+        ~containing_type:el_ty
+    in
+    (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label, sorts)
 
 and expression_constraint pexp =
   { type_without_constraint = (fun env expected_mode ->
@@ -8773,9 +8749,9 @@ and type_function
      }
 
 and type_label_access
-  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * 'rep gen_label_description * _
-  = fun record_form env srecord usage lid ->
+  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ -> _ ->
+    _ * _ * _ * 'rep gen_label_description * _ * _ * _ * 'rep
+  = fun record_form loc env srecord usage lid ->
   let mode = Value.newvar () in
   let record_jkind, record_sort =
     Jkind.of_new_sort_var ~why:Record_projection
@@ -8805,7 +8781,34 @@ and type_label_access
   let label =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
-  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type)
+  let ty_arg, field_sort, record_repres =
+    with_local_level_if_principal begin fun () ->
+      (* [ty_arg] is the type of field, [ty_res] is the type of record, they
+         could share type variables, which are now instantiated *)
+      let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
+      (* we now link the two record types *)
+      unify_exp env record ty_res;
+      let sort =
+        match type_sort ~why:Field_projection ~fixed:false env ty_arg with
+        | Ok sort -> sort
+        | Error err ->
+            raise (Error (loc, env, Field_projection_not_rep(ty_arg, err)))
+      in
+      let _sort, record_repres =
+        (* This redundantly calculates the sort again. But calling
+           [type_sort] above let us infer that the type is representable,
+           and it also gives a nicer error message *)
+        (* XXX Not entirely sure why it's necessary to do this in the inner
+           level, but weird errors happen if we don't, and it's also
+           necessary to do it in _this_ inner level so that the correct type
+           hits a [generalize_structure] *)
+        update_label env label record_form ~loc ~containing_type:record.exp_type
+      in
+      ty_arg, sort, record_repres
+    end ~post:(fun (ty_arg, _, _) -> generalize_structure ty_arg)
+  in
+  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type,
+   ty_arg, field_sort, record_repres)
 
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.

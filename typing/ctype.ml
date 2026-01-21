@@ -1741,6 +1741,17 @@ let instance_labels ~fixed lbls =
     (vars_and_ty_args, ty_res)
   )
 
+let instance_label_declarations ~fixed lds ~params =
+  For_copy.with_scope (fun copy_scope ->
+    let vars_and_ty_args =
+      Iarray.map
+        (fun ld -> instance_label_type' copy_scope ~fixed ld.ld_type)
+        lds
+    in
+    let params = List.map (copy copy_scope) params in
+    (vars_and_ty_args, params)
+  )
+
 (* CR dkalinichenko: we must vary yieldingness together with locality to get
    sane behavior around [@local_opt]. Remove once we have mode polymorphism. *)
 let prim_mode' mvars = function
@@ -2405,37 +2416,49 @@ let mk_jkind_context env jkind_of_type =
 let mk_jkind_context_check_principal_ref env =
   mk_jkind_context env (!type_jkind_purely_if_principal' env)
 
+let maybe_expand_component env ty ~expand_components =
+  match expand_components with
+  | false -> mk_unwrapped_type_expr ty
+  | true -> get_unboxed_type_approximation env ty
+
+let unify' = (* Forward declaration *)
+  ref (fun _env _t1 _t2 -> assert false)
+
 (* We parameterize [estimate_type_jkind] by a function
    [expand_component] because some callers want expansion of types and others
    don't. *)
-let rec estimate_type_jkind ~expand_component env ty =
+let rec estimate_type_jkind ~expand_components env ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
-     let is_open, tys_modalities =
-       List.fold_left_map
-         (fun is_open1 (_lbl, ty) ->
-            let { ty; is_open = is_open2; modality } = expand_component ty in
-            (is_open1 || is_open2), (ty, modality))
-         false ltys
-     in
-     (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
-        just to throw most of it away will go away once we get [layout_of].
-        Internal ticket 2912. *)
-     let layouts =
-       List.map (fun (ty, _modality (* ignore; we just care about layout *)) ->
-         estimate_type_jkind ~expand_component env ty |>
-         Jkind.extract_layout)
-         tys_modalities
-     in
-     Jkind.Builtin.product
-       ~why:Unboxed_tuple tys_modalities layouts |>
-     close_open_jkind ~expand_component ~is_open env
+    let tys = List.map snd ltys in
+    estimate_unboxed_product_jkind ~expand_components env tys
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
-      let jkind = type_decl.type_jkind in
+      let jkind =
+        match type_decl.type_kind with
+        | Type_record_unboxed_product (lbls, None, _) when expand_components ->
+          (* This is an unboxed product with at least one [any] field, so we
+             need to recompute the jkind if we want it to be precise *)
+          let label_params_and_tys, record_params =
+            instance_label_declarations ~fixed:false (Iarray.of_list lbls)
+              ~params:type_decl.type_params
+          in
+          let uenv = Expression { env; in_subst = false } in
+          begin try
+            List.iter2 (!unify' uenv) record_params args
+          with
+          | Unify_trace _ ->
+            (* Shouldn't happen, since [record_params] should just be type
+               variables *)
+            Misc.fatal_errorf "failed to unify %a" Path.print p
+          end;
+          let tys = Iarray.map snd label_params_and_tys |> Iarray.to_list in
+          estimate_unboxed_product_jkind ~expand_components env tys
+        | _ -> type_decl.type_jkind
+      in
       (* Checking [has_with_bounds] here is needed for correctness, because
          intersection types sometimes do not unify with themselves. Removing
          this check causes typing-misc/pr7937.ml to fail. *)
@@ -2465,7 +2488,7 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let context = mk_jkind_context_check_principal_ref env in
-    estimate_type_jkind ~expand_component env ty |>
+    estimate_type_jkind ~expand_components env ty |>
     (* The jkind of [ty] might mention the variables bound in this [Tpoly]
        node, and so just returning it here would be wrong. Instead, we need
        to eliminate these variables. For now, we just [round_up] to eliminate
@@ -2478,28 +2501,50 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tof_kind jkind -> Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 
-and close_open_jkind ~expand_component ~is_open env jkind =
+and estimate_unboxed_product_jkind ~expand_components env tys =
+  let is_open, tys_modalities =
+    List.fold_left_map
+      (fun is_open1 ty ->
+         let { ty; is_open = is_open2; modality } =
+           maybe_expand_component env ty ~expand_components
+         in
+         (is_open1 || is_open2), (ty, modality))
+      false tys
+  in
+  (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
+     just to throw most of it away will go away once we get [layout_of].
+     Internal ticket 2912. *)
+  let layouts =
+    List.map (fun (ty, _modality (* ignore; we just care about layout *)) ->
+      estimate_type_jkind ~expand_components env ty |>
+      Jkind.extract_layout)
+      tys_modalities
+  in
+  Jkind.Builtin.product
+    ~why:Unboxed_tuple tys_modalities layouts |>
+  close_open_jkind ~expand_components ~is_open env
+
+and close_open_jkind ~expand_components ~is_open env jkind =
   if is_open (* if the type has free variables, we can't let these leak into
                 with-bounds *)
     (* CR layouts v2.8: Do better, by tracking the actual free variables and
        rounding only those variables up. Internal ticket 5110. *)
   then
     let context = mk_jkind_context env (fun ty ->
-      Some (estimate_type_jkind ~expand_component env ty)) in
+      Some (estimate_type_jkind ~expand_components env ty)) in
     Jkind.round_up ~context jkind |> Jkind.disallow_right
   else jkind
 
 let estimate_type_jkind_unwrapped
-      ~expand_component env { ty; is_open; modality } =
-  estimate_type_jkind ~expand_component env ty |>
-  close_open_jkind ~expand_component ~is_open env |>
+      ~expand_components env { ty; is_open; modality } =
+  estimate_type_jkind ~expand_components env ty |>
+  close_open_jkind ~expand_components ~is_open env |>
   Jkind.apply_modality_l modality
 
 
 let type_jkind env ty =
   get_unboxed_type_approximation env ty |>
-  estimate_type_jkind_unwrapped
-    ~expand_component:(get_unboxed_type_approximation env) env
+  estimate_type_jkind_unwrapped ~expand_components:true env
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
    gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)
@@ -2524,7 +2569,7 @@ let type_jkind_purely_if_principal env ty =
 let () = type_jkind_purely_if_principal' := type_jkind_purely_if_principal
 
 let estimate_type_jkind =
-  estimate_type_jkind ~expand_component:mk_unwrapped_type_expr
+  estimate_type_jkind ~expand_components:false
 
 (* After type_jkind_purely_if_principal is defined, we can use it directly *)
 let mk_jkind_context_check_principal env =
@@ -4633,6 +4678,8 @@ and unify_row_field uenv fixed1 fixed2 rm1 rm2 l f1 f2 =
   | Rpresent _ , Reither(true, _ :: _, _ ) ->
       (* inconsistent conjunction on a non-absent field *)
       raise_unexplained_for Unify
+
+let _ = unify' := unify
 
 let unify uenv ty1 ty2 =
   let snap = Btype.snapshot () in
