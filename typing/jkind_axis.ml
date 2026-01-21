@@ -210,6 +210,8 @@ module Pointerness = struct
     | Maybe_pointer -> "maybe_pointer"
 
   let print ppf t = Format.fprintf ppf "%s" (to_string t)
+
+  let is_max p = equal p max
 end
 
 module Axis = struct
