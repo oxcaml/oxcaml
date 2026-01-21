@@ -260,8 +260,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
              have to do scan_file first, which in turn would avoid the need to
              snapshot the Linkenv. It also wouldn't capture things like mdx
              which should not receive this special treatment. *)
-          Linkenv.is_required linkenv
-            (Compilation_unit.of_string "Camlinternaleval")
+          Language_extension.is_enabled Runtime_metaprogramming
         in
         if uses_eval && not Backend.supports_metaprogramming
         then

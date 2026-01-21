@@ -131,6 +131,10 @@ let debugger = [add_compiler_subdir ("debugger" ^ runtime_suffix)]
 let extension_universe_lib name =
   make_library_modifier name [compiler_subdir ["otherlibs"; name]]
 
+let camlinternaleval =
+  make_library_modifier
+    "camlinternaleval" [compiler_subdir ["otherlibs"; "camlinternaleval"]]
+
 let init () =
   register_modifiers "principal" principal;
   register_modifiers "config" config;
@@ -162,4 +166,5 @@ let init () =
   register_modifiers "man" man;
   register_modifiers "tool-ocaml-lib" tool_ocaml_lib;
   register_modifiers "debugger" debugger;
+  register_modifiers "camlinternaleval" camlinternaleval;
   ()

@@ -1,10 +1,12 @@
 (* TEST
+  include camlinternaleval;
   flags = "-extension runtime_metaprogramming";
   arch_amd64;
   native;
 *)
 
 #syntax quotations on
+open Camlinternaleval
 
 let () =
   let output = (42 : <[ int ]> eval) in
@@ -12,6 +14,6 @@ let () =
 ;;
 
 let () =
-  let output = [%eval: int] <[ 42 ]> in
+  let output = eval <[ 42 ]> in
   print_int output; print_newline ()
 ;;
