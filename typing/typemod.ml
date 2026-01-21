@@ -1330,8 +1330,8 @@ let rec approx_modtype env smty =
         match param with
         | Unit -> Types.Unit, env
         | Named (param, sarg, marg) ->
-          let marg_raw = Typemode.transl_alloc_mode marg in
-          let marg = Alloc.of_const marg_raw.mode_modes in
+          let tmarg = Typemode.transl_alloc_mode marg in
+          let marg = Alloc.of_const tmarg.mode_modes in
           let arg = approx_modtype env sarg in
           match param.txt with
           | None -> Types.Named (None, arg, marg), env
@@ -1907,14 +1907,14 @@ and transl_modtype_aux env smty =
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
   | Pmty_functor(sarg_opt, sres, mres) ->
-      let raw_mres = Typemode.transl_alloc_mode mres in
-      let mres = raw_mres.mode_modes |> Alloc.of_const in
+      let tmres = Typemode.transl_alloc_mode mres in
+      let mres = tmres.mode_modes |> Alloc.of_const in
       let t_arg, ty_arg, newenv =
         match sarg_opt with
         | Unit -> Unit, Types.Unit, env
         | Named (param, sarg, marg) ->
-          let raw_marg = Typemode.transl_alloc_mode marg in
-          let marg = Alloc.of_const raw_marg.mode_modes in
+          let tmarg = Typemode.transl_alloc_mode marg in
+          let marg = Alloc.of_const tmarg.mode_modes in
           let mode = marg |> alloc_as_value in
           let arg = transl_modtype_functor_arg env sarg in
           let (id, newenv) =
@@ -1936,11 +1936,11 @@ and transl_modtype_aux env smty =
               in
               Some id, newenv
           in
-          Named (id, param, arg, raw_marg), Types.Named (id, arg.mty_type, marg),
+          Named (id, param, arg, tmarg), Types.Named (id, arg.mty_type, marg),
           newenv
       in
       let res = transl_modtype newenv sres in
-      mkmty (Tmty_functor (t_arg, res, raw_mres))
+      mkmty (Tmty_functor (t_arg, res, tmres))
         (Mty_functor(ty_arg, res.mty_type, mres)) env loc
         smty.pmty_attributes
   | Pmty_with(sbody, constraints) ->
@@ -2994,8 +2994,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
           Unit, Types.Unit, newenv, Shape.for_unnamed_functor_param, false
         | Named (param, smty, smode) ->
           (* unspecified mode axes defaults to legacy *)
-          let raw_mode = Typemode.transl_alloc_mode smode in
-          let mode = Alloc.of_const raw_mode.mode_modes in
+          let tmode = Typemode.transl_alloc_mode smode in
+          let mode = Alloc.of_const tmode.mode_modes in
           let mty = transl_modtype_functor_arg env smty in
           let scope = Ctype.create_scope () in
           let (id, newenv, var) =
@@ -3019,7 +3019,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
               in
               Some id, newenv, id
           in
-          Named (id, param, mty, raw_mode),
+          Named (id, param, mty, tmode),
           Types.Named (id, mty.mty_type, mode), newenv, var, true
       in
 
@@ -3041,8 +3041,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
   | Pmod_constraint(sarg, smty, smode) ->
       (* Only hold locks if coercion *)
       let hold_locks = Option.is_some smty in
-      let raw_mode = Typemode.transl_mode_annots smode in
-      let mode = new_mode_var_from_annots raw_mode.mode_modes in
+      let tmode = Typemode.transl_mode_annots smode in
+      let mode = new_mode_var_from_annots tmode.mode_modes in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
           anchor env ~expected_mode:(mode |> Value.disallow_left) sarg
@@ -3062,7 +3062,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         | Some smty ->
             let mty = transl_modtype env smty in
             wrap_constraint_with_shape env true arg mty.mty_type mode
-              arg_shape (Tmodtype_explicit (mty, raw_mode))
+              arg_shape (Tmodtype_explicit (mty, tmode))
       in
       { md with
         mod_loc = smod.pmod_loc;
