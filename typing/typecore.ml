@@ -2861,9 +2861,7 @@ and type_pat_aux
     let ty_elt, arg_sort =
       solve_Ppat_array ~refine:false loc penv mutability expected_ty
     in
-    let modalities =
-      (Typemode.transl_modalities ~maturity:Stable mutability []).moda_modalities
-    in
+    let modalities = Typemode.mutable_modalities mutability in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
       alloc_mode.mode;
     let is_contained_by : Mode.Hint.is_contained_by =
@@ -10503,9 +10501,7 @@ and type_generic_array
     if Types.is_mutable mutability then Predef.type_array
     else Predef.type_iarray
   in
-  let modalities =
-    (Typemode.transl_modalities ~maturity:Stable mutability []).moda_modalities
-  in
+  let modalities = Typemode.mutable_modalities mutability in
   let is_contained_by : Mode.Hint.is_contained_by =
     {containing = Array Modality; container = loc}
   in

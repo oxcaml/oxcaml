@@ -38,6 +38,9 @@ val least_modalities_implying :
 
 val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
 
+(** Get the default modalities implied by the mutability of a field. *)
+val mutable_modalities : Types.mutability -> Mode.Modality.Const.t
+
 val let_mutable_modalities : Mode.Modality.Const.t
 
 (** The (default) modalities for an atomic mutable field *)

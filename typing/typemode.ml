@@ -629,6 +629,9 @@ let transl_modalities ~maturity mut annots =
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   { moda_modalities = modalities; moda_desc = annots }
 
+let mutable_modalities mut =
+  mutable_implied_modalities (Types.is_mutable mut) ~for_mutable_variable:false
+
 let let_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:true
 
