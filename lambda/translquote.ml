@@ -2486,6 +2486,13 @@ let constrain_pat_with_type loc typ pat =
 let maybe_constrain_pat_with_type loc typ exp =
   match typ with Some typ -> constrain_pat_with_type loc typ exp | None -> exp
 
+let assert_no_modes modes =
+  List.iter
+    (fun mode ->
+      fatal_errorf "Translquote [at %a]: no support for open patterns."
+        Location.print_loc (Location.get_loc mode))
+    modes.mode_desc
+
 let rec quote_module_path loc = function
   (* CR metaprogramming jrickard: I think this should probably use
      [Env.find_module_address] at least it should do to register the globals
@@ -2518,7 +2525,8 @@ let rec quote_computation_pattern ~scopes p =
 and quote_pat_extra ~scopes loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
-  | Tpat_constraint (ty, _) ->
+  | Tpat_constraint (ty, ms) ->
+    assert_no_modes ms;
     Pat.constraint_ loc pat_lam (quote_core_type ~scopes ty) |> Pat.wrap
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ ->
@@ -2642,7 +2650,9 @@ and quote_core_type ~scopes ty =
         var
     in
     Type.var loc (Some var) |> Type.wrap
-  | Ttyp_arrow (arg_lab, ty1, _, ty2, _) ->
+  | Ttyp_arrow (arg_lab, ty1, ms1, ty2, ms2) ->
+    assert_no_modes ms1;
+    assert_no_modes ms2;
     let lab = quote_arg_label loc arg_lab
     and ty1 = quote_core_type ~scopes ty1
     and ty2 = quote_core_type ~scopes ty2 in
@@ -3130,7 +3140,9 @@ and quote_expression_desc ~scopes ~transl stage e =
             (fun vb ->
               let cstr =
                 match vb.vb_pat.pat_extra with
-                | [(Tpat_constraint (ct, _), _, _)] -> Some ct
+                | [(Tpat_constraint (ct, ms), _, _)] ->
+                  assert_no_modes ms;
+                  Some ct
                 | [] -> None
                 | _ ->
                   fatal_errorf
