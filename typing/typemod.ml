@@ -2446,7 +2446,7 @@ and transl_modtype_decl_aux env
 and transl_recmodule_modtypes env ~sig_modalities sdecls =
   let make_env curr =
     List.fold_left (fun env (id_shape, _, md, mode, _, _) ->
-      let mode = Option.map Mode.Value.disallow_right mode in
+      let mode = Option.map (fun (m, _) -> Mode.Value.disallow_right m) mode in
       Option.fold ~none:env ~some:(fun (id, shape) ->
         Env.add_module_declaration ~check:true ~shape ~arg:true
           id Mp_present md ?mode env
@@ -2518,15 +2518,17 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
          in
          let mmode =
            Option.map (fun smmode ->
-            smmode
-            |> Typemode.transl_mode_annots
-            |> (fun modes_record -> modes_record.mode_modes)
-            (* CR zqian: mode annotations on rec modules default to legacy for
-            now. We can remove this workaround once [module type of] doesn't
-            require zapping. *)
-            |> Alloc.Const.Option.value ~default:Alloc.Const.legacy
-            |> Alloc.of_const
-            |> alloc_as_value) smmode
+            let tmmode = Typemode.transl_mode_annots smmode in
+            let mmode =
+              tmmode.mode_modes
+              (* CR zqian: mode annotations on rec modules default to legacy for
+              now. We can remove this workaround once [module type of] doesn't
+              require zapping. *)
+              |> Alloc.Const.Option.value ~default:Alloc.Const.legacy
+              |> Alloc.of_const
+              |> alloc_as_value
+            in
+            mmode, tmmode) smmode
           in
          (id_shape, pmd.pmd_name, md, mmode, (), ()))
       ids sdecls
@@ -2730,7 +2732,7 @@ let check_recmodule_inclusion env bindings =
       let bindings1 =
         List.map
           (fun (id, _name, _mty_decl, _modl,
-                mty_actual, _mmode, _attrs, _loc, shape, _uid) ->
+                mty_actual, _mmode, _tmmode, _attrs, _loc, shape, _uid) ->
              let ids =
                Option.map
                  (fun id -> (id, Ident.create_scoped ~scope (Ident.name id))) id
@@ -2766,8 +2768,8 @@ let check_recmodule_inclusion env bindings =
       (* Base case: check inclusion of s(mty_actual) in s(mty_decl)
          and insert coercion if needed *)
       let check_inclusion
-            (id, name, mty_decl, modl, mty_actual, mode_decl, attrs, loc, shape
-            ,uid) =
+            (id, name, mty_decl, modl, mty_actual, mode_decl, tmode_decl, attrs,
+             loc, shape, uid) =
         let mty_decl' = Subst.modtype (Rescope scope) s mty_decl.mty_type
         and mty_actual' = subst_and_strengthen scope s id mty_actual in
         let modes : Includemod.modes = Specific (modl.mod_mode, mode_decl) in
@@ -2779,11 +2781,8 @@ let check_recmodule_inclusion env bindings =
           with Includemod.Error msg ->
             raise(Error(modl.mod_loc, env, Not_included msg)) in
         let modl' =
-            let modes =
-              { mode_modes = Mode.Alloc.Const.Option.none; mode_desc = [] }
-            in
             { mod_desc = Tmod_constraint(modl, mty_decl.mty_type,
-                Tmodtype_explicit (mty_decl, modes), coercion);
+                Tmodtype_explicit (mty_decl, tmode_decl), coercion);
               mod_type = mty_decl.mty_type;
               mod_mode = Value.disallow_right mode_decl, None;
               mod_env = env;
@@ -3680,12 +3679,13 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                let mty' =
                  enrich_module_type anchor name.txt modl.mod_type newenv
                in
-               (id, name, mty, modl, mty', Option.get mode, attrs, loc, shape,
+               let mode, tmode = Option.get mode in
+               (id, name, mty, modl, mty', mode, tmode, attrs, loc, shape,
                 uid))
             decls sbind in
         let newenv = (* allow aliasing recursive modules from outside *)
           List.fold_left
-            (fun env (id_opt, _, mty, _, _, mode, attrs, loc, shape, uid) ->
+            (fun env (id_opt, _, mty, _, _, mode, _, attrs, loc, shape, uid) ->
                match id_opt with
                | None -> env
                | Some id ->
