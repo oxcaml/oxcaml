@@ -123,3 +123,10 @@ let module M = struct type t = {
   fun x -> let M.{ x }  = let open M in { x } in x
 - : unit = ()
 |}];;
+
+run {| let foo : 'a -> 'a = fun x -> x in foo |}
+
+[%%expect{|
+let (foo : 'a -> 'a) = ( (fun x -> x : 'a -> 'a)) in foo
+- : unit = ()
+|}];;
