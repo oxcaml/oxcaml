@@ -254,15 +254,8 @@ let view_texp (e : expression_desc) =
   | Texp_tuple (args, mode) ->
       let labels, args = List.split args in
       Texp_tuple (args, (labels, mode))
-  | Texp_function
-      {
-        params;
-        body;
-        alloc_mode;
-        ret_sort;
-        ret_mode;
-        zero_alloc;
-      } ->
+  | Texp_function { params; body; alloc_mode; ret_sort; ret_mode; zero_alloc }
+    ->
       let params =
         List.map
           (fun param ->
@@ -309,8 +302,7 @@ let view_texp (e : expression_desc) =
               }
       in
       Texp_function
-        ( { params; body },
-          { alloc_mode; ret_sort; ret_mode; zero_alloc } )
+        ({ params; body }, { alloc_mode; ret_sort; ret_mode; zero_alloc })
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
   | _ -> O e

@@ -4754,7 +4754,8 @@ let rec approx_type env sty =
           (* Polymorphic types will only unify with types that match all of their
            polymorphic parts, so we need to fully translate the type here
            unlike in the monomorphic case *)
-          Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false arg_mode.mode_modes arg_sty
+          Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false
+            arg_mode.mode_modes arg_sty
         in
         let ret = approx_type env sty in
         let marg = Alloc.of_const arg_mode.mode_modes in
@@ -8378,7 +8379,8 @@ and type_function
             let body_loc = body.pexp_loc in
             let body, exp_type, exp_extra =
               type_constraint_expect (expression_constraint body)
-                env expected_mode body_loc ~loc_arg:body_loc type_mode.mode_modes constraint_ ty_expected
+                env expected_mode body_loc ~loc_arg:body_loc
+                type_mode.mode_modes constraint_ ty_expected
             in
             let texp_mode =
               match type_mode.mode_desc with
@@ -8432,7 +8434,8 @@ and type_function
               in
               let (body, fun_alloc_mode, ret_info), exp_type, exp_extra =
                 type_constraint_expect function_cases_constraint_arg
-                  env expected_mode loc type_mode.mode_modes constraint_ ty_expected ~loc_arg:loc
+                  env expected_mode loc type_mode.mode_modes constraint_
+                  ty_expected ~loc_arg:loc
               in
               let exp_extra =
                 match type_mode.mode_desc with

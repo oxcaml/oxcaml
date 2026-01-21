@@ -3885,7 +3885,9 @@ let transl_value_decl env loc ~modal ~why valdecl =
           | [] -> { moda_modalities = sig_modalities; moda_desc = [] }
           | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
         in
-        let modalities = Mode.Modality.of_const raw_modalities.moda_modalities in
+        let modalities =
+          Mode.Modality.of_const raw_modalities.moda_modalities
+        in
         md_mode, modalities, Valmi_sig_value raw_modalities
   in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
