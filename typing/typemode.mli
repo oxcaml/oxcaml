@@ -49,8 +49,7 @@ val atomic_mutable_modalities : Mode.Modality.Const.t
 val untransl_modality :
   Mode.Modality.atom Location.loc -> Parsetree.modality Location.loc
 
-val untransl_modalities :
-  Mode.Modality.atom Location.loc list -> Parsetree.modalities
+val untransl_modalities : modalities -> Parsetree.modalities
 
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t

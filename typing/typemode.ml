@@ -642,7 +642,7 @@ let sort_dedup_modalities modalities =
   List.map (fun x -> { txt = x; loc = Location.none }) modalities
   |> sort_dedup_modalities ~warn:false
 
-let untransl_modalities t = List.map untransl_modality t
+let untransl_modalities t = List.map untransl_modality t.moda_desc
 
 let transl_alloc_mode annots =
   let { mode_modes = opt_modes; mode_desc = annots } =
