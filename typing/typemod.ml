@@ -1330,9 +1330,8 @@ let rec approx_modtype env smty =
         match param with
         | Unit -> Types.Unit, env
         | Named (param, sarg, marg) ->
-          let marg =
-            (Typemode.transl_alloc_mode marg).mode_modes |> Alloc.of_const
-          in
+          let marg_raw = Typemode.transl_alloc_mode marg in
+          let marg = Alloc.of_const marg_raw.mode_modes in
           let arg = approx_modtype env sarg in
           match param.txt with
           | None -> Types.Named (None, arg, marg), env
@@ -2089,9 +2088,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         incl_loc = sincl.pincl_loc;
       }
     in
-    ( mksig (Tsig_include (incl, modalities)) env loc
-    , sg
-    , newenv )
+    mksig (Tsig_include (incl, modalities)) env loc, sg, newenv
   in
 
   let transl_sig_item env sig_acc item =
