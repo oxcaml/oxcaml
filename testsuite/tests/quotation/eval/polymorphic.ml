@@ -9,4 +9,4 @@
 open Camlinternaleval
 
 let eval1 (type a) = (eval : a expr -> a eval)
-let eval2 : 'a. 'a expr -> 'a eval = (eval : a expr -> a eval)
+let eval2 : 'a. 'a expr -> 'a eval = eval

@@ -261,9 +261,6 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
-    | Texp_eval { typ = _ } ->
-      (* CR metaprogramming mshinwell: Make sure this is correct *)
-      Static
 
     | Texp_new _
     | Texp_instvar _
@@ -1101,9 +1098,6 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e << Dereference
     | Texp_antiquotation e ->
         expression e << Dereference
-    | Texp_eval { typ = _ } ->
-      (* CR metaprogramming mshinwell: Make sure this is correct *)
-      empty
 
 (* Function bodies.
     G |-{body} b : m

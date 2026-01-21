@@ -41,6 +41,7 @@ val type_floatarray:type_expr
 val type_lexing_position:type_expr
 val type_atomic_loc:type_expr -> type_expr
 val type_code: type_expr -> type_expr
+val type_eval: type_expr -> type_expr
 val type_unboxed_unit: type_expr
 val type_unboxed_float:type_expr
 val type_unboxed_float32:type_expr
