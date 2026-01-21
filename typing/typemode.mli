@@ -17,7 +17,7 @@ type modalities =
 *)
 val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t modes
 
-val untransl_mode : Mode.Alloc.atom Location.loc list -> Parsetree.modes
+val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)

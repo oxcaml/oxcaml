@@ -337,7 +337,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
     | { pat_extra= (Tpat_constraint (ct, modes), _, _attrs) :: rem; _ } ->
-        let modes = Typemode.untransl_mode modes.mode_desc in
+        let modes = Typemode.untransl_mode modes in
         Ppat_constraint (sub.pat sub { pat with pat_extra=rem },
                          Some (sub.typ sub ct), modes)
     | { pat_extra = (Tpat_open (_path, lid, _env), _, _attrs) :: rem; _ } ->
@@ -431,8 +431,7 @@ let exp_extra sub (extra, loc, attrs) sexp =
         Pexp_newtype (label_loc, jkind, sexp)
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
-        Pexp_constraint
-          (sexp, None, Typemode.untransl_mode modes.mode_desc)
+        Pexp_constraint (sexp, None, Typemode.untransl_mode modes)
     | Texp_inspected_type _ ->
         (* Type inspections are unnecessary in a Parsetree,
            as type inference reproduces them *)
@@ -554,9 +553,7 @@ let expression sub exp =
                       | Texp_constraint ty ->
                         [ Pconstraint (sub.typ sub ty) ], []
                       | Texp_mode modes ->
-                        let modes =
-                          Typemode.untransl_mode modes.mode_desc
-                        in
+                        let modes = Typemode.untransl_mode modes in
                         [], modes
                       | Texp_poly _ | Texp_newtype _ | Texp_stack
                       | Texp_inspected_type _ -> [], []
@@ -906,8 +903,7 @@ let functor_parameter sub : functor_parameter -> Parsetree.functor_parameter =
   function
   | Unit -> Unit
   | Named (_, name, mtype, mmode) ->
-    Named (name, sub.module_type sub mtype,
-           Typemode.untransl_mode mmode.mode_desc)
+    Named (name, sub.module_type sub mtype, Typemode.untransl_mode mmode)
 
 let module_type (sub : mapper) mty =
   let loc = sub.location sub mty.mty_loc in
@@ -920,7 +916,7 @@ let module_type (sub : mapper) mty =
   | Tmty_signature sg ->
       Mty.mk ~loc ~attrs (Pmty_signature (sub.signature sub sg))
   | Tmty_functor (arg, mtype2, mmode2) ->
-      let modes = Typemode.untransl_mode mmode2.mode_desc in
+      let modes = Typemode.untransl_mode mmode2 in
       Mty.mk ~loc ~attrs
         (Pmty_functor
           (functor_parameter sub arg, sub.module_type sub mtype2, modes))
@@ -970,7 +966,7 @@ let module_expr (sub : mapper) mexpr =
           | Tmod_apply_unit mexp1 ->
               Pmod_apply_unit (sub.module_expr sub mexp1)
           | Tmod_constraint (mexpr, _, Tmodtype_explicit (mtype, modes), _) ->
-              let modes = Typemode.untransl_mode modes.mode_desc in
+              let modes = Typemode.untransl_mode modes in
               Pmod_constraint (sub.module_expr sub mexpr,
                 Some (sub.module_type sub mtype), modes)
           | Tmod_constraint (_mexpr, _, Tmodtype_implicit, _) ->
@@ -1061,8 +1057,8 @@ let core_type sub ct =
     | Ttyp_var (None, jkind) -> Ptyp_any jkind
     | Ttyp_var (Some s, jkind) -> Ptyp_var (s, jkind)
     | Ttyp_arrow (arg_label, ct1, modes1, ct2, modes2) ->
-        let modes1 = Typemode.untransl_mode modes1.mode_desc in
-        let modes2 = Typemode.untransl_mode modes2.mode_desc in
+        let modes1 = Typemode.untransl_mode modes1 in
+        let modes2 = Typemode.untransl_mode modes2 in
         Ptyp_arrow
           (label arg_label, sub.typ sub ct1, sub.typ sub ct2, modes1, modes2)
     | Ttyp_tuple list ->

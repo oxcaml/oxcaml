@@ -419,12 +419,12 @@ let transl_mode_annots annots =
   in
   { mode_modes = modes; mode_desc = annots }
 
-let untransl_mode annots =
+let untransl_mode modes =
   let untransl_annot =
     Location.map (fun (Atom (ax, mode) : Mode.Alloc.atom) : Parsetree.mode ->
         Mode (Format.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode))
   in
-  List.map untransl_annot annots
+  List.map untransl_annot modes.mode_desc
 
 let mode_annot_to_modality_annot mode_annot =
   Location.map
