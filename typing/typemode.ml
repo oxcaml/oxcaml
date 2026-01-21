@@ -445,18 +445,9 @@ let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   let mode_annot = { txt = mode; loc } in
   mode_annot_to_modality_annot mode_annot
 
-let untransl_modality_atom (a : Modality.atom) : Parsetree.modality =
-  Modality
-    (match a with
-    | Atom (Comonadic ax, Meet_with a) ->
-      Format.asprintf "%a" (Value.Comonadic.Const.Per_axis.print ax) a
-    | Atom (Monadic ax, Join_with a) ->
-      Format.asprintf "%a" (Value.Monadic.Const.Per_axis.print ax) a)
-
-let untransl_modality a =
-  { txt = untransl_modality_atom a; loc = Location.none }
-
-let untransl_modality_annot = Location.map untransl_modality_atom
+let untransl_modality =
+  Location.map (fun (Atom (ax, t) : Modality.atom) : Parsetree.modality ->
+      Modality (Format.asprintf "%a" (Modality.Per_axis.print ax) t))
 
 (* For now, mutable implies:
    1. [global forkable unyielding]. This is for compatibility with existing code
@@ -555,8 +546,8 @@ let untransl_mod_bounds (bounds : Jkind.Mod_bounds.t) : Parsetree.modes =
   let modality = Crossing.to_modality crossing in
   let modality_annots =
     least_modalities_implying Types.Immutable modality
-    |> List.map (fun atom ->
-        let (Parsetree.Modality s) = untransl_modality_atom atom in
+    |> List.map (fun (Atom (ax, m) : Modality.atom) ->
+        let s = Format.asprintf "%a" (Modality.Per_axis.print ax) m in
         { Location.txt = Parsetree.Mode s; loc = Location.none })
   in
   let nonmodal_annots =
@@ -601,7 +592,9 @@ let sort_dedup_modalities ~warn l =
     then
       let (P ax0) = Axis.to_value (P ax0) in
       let axis = Format.asprintf "%a" Mode.Value.Axis.print ax0 in
-      let (Modality overriden_by) = untransl_modality_atom (Atom (ax1, a1)) in
+      let overriden_by =
+        Format.asprintf "%a" (Modality.Per_axis.print ax1) a1
+      in
       Location.prerr_warning loc0
         (Warnings.Modal_axis_specified_twice { axis; overriden_by })
   in
@@ -642,14 +635,11 @@ let let_mutable_modalities =
 let atomic_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:false
 
-let untransl_modalities mut t =
-  t
-  |> least_modalities_implying mut
-  |> List.map (fun x -> { txt = x; loc = Location.none })
+let sort_dedup_modalities modalities =
+  List.map (fun x -> { txt = x; loc = Location.none }) modalities
   |> sort_dedup_modalities ~warn:false
-  |> List.map untransl_modality
 
-let untransl_modalities_annot t = List.map untransl_modality_annot t
+let untransl_modalities t = List.map untransl_modality t
 
 let transl_alloc_mode annots =
   let { mode_modes = opt_modes; mode_desc = annots } =

@@ -1425,12 +1425,15 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Optional l -> Optional l
   | Position l -> Position l
 
-let tree_of_modality (t: Parsetree.modality loc) =
-  let Modality s = t.txt in s
-
+(** Un-interpret modalities back to outcome tree. Takes the mutability and
+    attributes on the field and removes mutable-implied modalities
+    accordingly. *)
 let tree_of_modalities mut t =
-  let t = Typemode.untransl_modalities mut t in
-  List.map tree_of_modality t
+  t
+  |> Typemode.least_modalities_implying mut
+  |> Typemode.sort_dedup_modalities
+  |> List.map (fun (Atom (ax, m) : Modality.atom) ->
+      Format.asprintf "%a" (Modality.Per_axis.print ax) m)
 
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   (* Step 1: Compute the modes to print *)
@@ -1780,9 +1783,7 @@ let typexp mode ppf ty =
 let modality ?(id = fun _ppf -> ()) ax ppf modality =
   if Mode.Modality.Per_axis.is_id ax modality then id ppf
   else
-    Atom (ax, modality)
-    |> Typemode.untransl_modality
-    |> tree_of_modality
+    Format.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
     |> !Oprint.out_modality ppf
 
 let prepared_type_expr ppf ty = typexp Type ppf ty

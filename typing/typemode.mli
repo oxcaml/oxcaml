@@ -33,23 +33,20 @@ val transl_modalities :
   Parsetree.modalities ->
   modalities
 
+val least_modalities_implying :
+  Types.mutability -> Mode.Modality.Const.t -> Mode.Modality.atom list
+
+val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
+
 val let_mutable_modalities : Mode.Modality.Const.t
 
 (** The (default) modalities for an atomic mutable field *)
 val atomic_mutable_modalities : Mode.Modality.Const.t
 
-val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
-
-val untransl_modality_annot :
+val untransl_modality :
   Mode.Modality.atom Location.loc -> Parsetree.modality Location.loc
 
-(** Un-interpret modalities back to parsetree. Takes the mutability and
-    attributes on the field and remove mutable-implied modalities accordingly.
-*)
 val untransl_modalities :
-  Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
-
-val untransl_modalities_annot :
   Mode.Modality.atom Location.loc list -> Parsetree.modalities
 
 (** Interpret a mod-bounds. *)
