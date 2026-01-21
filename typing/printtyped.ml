@@ -312,6 +312,10 @@ let modalities i ppf { moda_modalities = mm; moda_desc = md } =
   line i ppf "%a\n" Mode.Modality.Const.print mm;
   moda_desc i ppf md
 
+let val_description_modal_info i ppf = function
+  | Valmi_sig_value ms -> modalities i ppf ms
+  | Valmi_str_primitive ms -> alloc_modes_opt i ppf ms
+
 let zero_alloc_assume i ppf : Zero_alloc.assume -> unit = function
     { strict; never_returns_normally; never_raises; arity; loc = _ } ->
     line i ppf "assume_zero_alloc arity=%d%s%s%s\n"
@@ -796,6 +800,7 @@ and value_description i ppf x =
   attributes i ppf x.val_attributes;
   core_type (i+1) ppf x.val_desc;
   list (i+1) string ppf x.val_prim;
+  val_description_modal_info (i+1) ppf x.val_modal_info
 
 and binding_op i ppf x =
   line i ppf "binding_op %a %a\n" fmt_path x.bop_op_path
@@ -1278,15 +1283,17 @@ and constructor_arguments i ppf = function
   | Cstr_record l -> list i label_decl ppf l
 
 and label_decl i ppf {ld_id; ld_name = _; ld_mutable; ld_type; ld_loc;
-                      ld_attributes} =
+                      ld_attributes; ld_modalities} =
   line i ppf "%a\n" fmt_location ld_loc;
   attributes i ppf ld_attributes;
   line (i+1) ppf "%a\n" fmt_mutable_mode_flag ld_mutable;
   line (i+1) ppf "%a" fmt_ident ld_id;
-  core_type (i+1) ppf ld_type
+  core_type (i+1) ppf ld_type;
+  modalities (i+1) ppf ld_modalities
 
-and field_decl i ppf {ca_type=ty; ca_loc=_; ca_modalities=_} =
-  core_type (i+1) ppf ty
+and field_decl i ppf {ca_type=ty; ca_loc=_; ca_modalities} =
+  core_type (i+1) ppf ty;
+  modalities (i+1) ppf ca_modalities
 
 and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
   fun i ppf (li, _, p) ->
