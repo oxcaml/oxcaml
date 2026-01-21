@@ -341,7 +341,6 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Eval_format
   | Eval_non_value of type_expr * Jkind.Violation.t
 
 exception Error of Location.t * Env.t * error

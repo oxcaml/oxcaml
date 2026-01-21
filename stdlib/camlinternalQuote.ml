@@ -1327,7 +1327,6 @@ module Ast = struct
     | Immutable_array_comprehension of comprehension
     | Quote of expression
     | Antiquote of expression
-    | Eval of core_type
 
   and case =
     { lhs : pattern;
@@ -1962,7 +1961,6 @@ module Ast = struct
       pp fmt "@[<2>[|@ %a@ |]@]" (print_comprehension env) compr
     | Immutable_array_comprehension compr ->
       pp fmt "@[<2>[:@ %a@ :]@]" (print_comprehension env) compr
-    | Eval typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
     | Unreachable | Src_pos -> pp fmt "."
 
   and print_exp env fmt exp =
@@ -2883,10 +2881,6 @@ module Exp_desc = struct
   let splice code =
     let+ exp = Code.to_exp code in
     Ast.(exp.desc)
-
-  let eval typ =
-    let+ typ = typ in
-    Ast.Eval typ
 end
 
 module Exp = struct
