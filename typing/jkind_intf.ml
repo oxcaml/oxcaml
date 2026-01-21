@@ -338,6 +338,7 @@ module History = struct
     | Array_type_kind
     | Quotation_result
     | Antiquotation_result
+    | Evaluation_result
     | Tquote
     | Tsplice
     | Teval
