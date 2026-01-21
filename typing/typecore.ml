@@ -3392,20 +3392,26 @@ and type_pat_aux
       (* Pretend separate = true *)
       begin match sty with
       | Some sty ->
-        let type_modes_annot = Typemode.transl_mode_annots ms in
         let type_modes =
-          Mode.Alloc.Const.Option.value
-            type_modes_annot.mode_modes
-            ~default:Mode.Alloc.Const.legacy
+          Typemode.transl_mode_annots ms
+        in
+
+        let type_modes =
+          { type_modes with
+            mode_modes =
+              Mode.Alloc.Const.Option.value type_modes.mode_modes
+                ~default:Mode.Alloc.Const.legacy
+          }
         in
         let cty, ty, expected_ty' =
-          solve_Ppat_constraint tps loc !!penv type_modes sty expected_ty
+          solve_Ppat_constraint tps loc !!penv type_modes.mode_modes sty
+            expected_ty
         in
         let p =
           type_pat ~alloc_mode tps category sp_constrained expected_ty' sort
         in
         let extra =
-          Tpat_constraint (cty, type_modes_annot),
+          Tpat_constraint (cty, type_modes),
           loc,
           sp_constrained.ppat_attributes
         in
