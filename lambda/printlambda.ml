@@ -361,29 +361,9 @@ and mixed_block_shape
 
 let block_shape ppf shape = match shape with
   | Default_shape -> ()
-  | Shape arr when Lambda.is_uniform_block_shape shape ->
-      (* Print uniform shapes as value kinds *)
-      let vks = Array.to_list (Array.map (function
-        | Lambda.Value vk -> vk
-        | _ -> assert false) arr)
-      in
-      if List.for_all ((=) Lambda.generic_value) vks then ()
-      else begin
-        match vks with
-        | [elt] ->
-            Format.fprintf ppf " (%a)" field_kind elt
-        | h :: t ->
-            Format.fprintf ppf " (%a" field_kind h;
-            List.iter (fun elt ->
-                Format.fprintf ppf ",%a" field_kind elt)
-              t;
-            Format.fprintf ppf ")"
-        | [] -> ()
-      end
   | Shape arr ->
-      (* Mixed shape - use mixed block printer *)
-      mixed_block_shape (fun _ () -> ()) ppf arr
-
+      if List.for_all ((=) Lamda.Value Lambda.generic_value) vks then ()
+      else mixed_block_shape (fun _ () -> ()) ppf arr
 let field_read_semantics ppf sem =
   match sem with
   | Reads_agree -> ()

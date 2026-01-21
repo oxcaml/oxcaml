@@ -1155,7 +1155,7 @@ val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
 val block_shape_of_value_kinds : value_kind list option -> block_shape
 
-(* Returns whether the block shape reppresents a block containing only values.
+(* Returns whether the block shape represents a block containing only values.
    Errors if there's a splice variable *)
 val is_uniform_block_shape : block_shape -> bool
 
