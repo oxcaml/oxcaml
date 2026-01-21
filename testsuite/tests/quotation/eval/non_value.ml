@@ -1,4 +1,5 @@
 (* TEST
+  include camlinternaleval;
   flags = "-extension runtime_metaprogramming";
   ocamlc_byte_exit_status = "2";
   setup-ocamlc.byte-build-env;
@@ -7,5 +8,6 @@
 *)
 
 #syntax quotations on
+open Camlinternaleval
 
-let eval : <[int64#]> expr -> int64# = [%eval: int64#]
+let eval : <[int64#]> expr -> int64# = eval
