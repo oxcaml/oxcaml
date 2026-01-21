@@ -318,7 +318,8 @@ let output_methods tbl methods lam =
       lsequence (mkappl(oo_prim "set_method", [Lvar tbl; lab; code], layout_unit)) lam
   | _ ->
       let methods =
-        Lprim(Pmakeblock(0,Immutable,All_value,alloc_heap), methods, Loc_unknown)
+        Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap),
+               methods, Loc_unknown)
       in
       lsequence (mkappl(oo_prim "set_methods",
                         [Lvar tbl; Lprim (Popaque layout_block,

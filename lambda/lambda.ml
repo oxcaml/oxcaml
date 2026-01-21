@@ -631,16 +631,18 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   | None -> All_value
   | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
 
-let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option =
+let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
+    =
   match shape with
   | All_value -> None
   | Shape shape ->
-    let is_uniform = Array.for_all
-      (function
-        | Value _ -> true
-        | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
-        | _ -> false)
-      shape
+    let is_uniform =
+      Array.for_all
+        (function
+          | Value _ -> true
+          | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+          | _ -> false)
+        shape
     in
     if is_uniform then None else Some shape
 
