@@ -856,7 +856,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             match rest with
             | [] -> ret_mode
             | _ :: _ ->
-              { mode_modes = acc_mode; mode_desc = arg_mode.mode_desc }
+              { mode_modes = acc_mode; mode_desc = [] }
           in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
