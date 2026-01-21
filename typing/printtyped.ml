@@ -277,7 +277,23 @@ let mode_desc i ppf modes_annot =
   in
   list i print_mode_annot ppf modes_annot
 
-let modality_atoms i ppf modalities_annot =
+let modes ~pr i ppf { mode_modes = mm; mode_desc = md } =
+  pr i ppf mm;
+  mode_desc i ppf md
+
+let alloc_modes i ppf ms =
+  let print_alloc_modes i ppf m =
+    line i ppf "%a\n" Mode.Alloc.Const.print m
+  in
+  modes ~pr:print_alloc_modes i ppf ms
+
+let alloc_modes_opt i ppf ms =
+  let print_alloc_modes_opt i ppf m =
+    line i ppf "%a\n" Mode.Alloc.Const.Option.print m
+  in
+  modes ~pr:print_alloc_modes_opt i ppf ms
+
+let moda_desc i ppf modalities_annot =
   let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.Value.atom =
     match ax, modality with
     | Comonadic ax, Meet_with mode -> Atom (Comonadic ax, mode)
@@ -291,6 +307,10 @@ let modality_atoms i ppf modalities_annot =
       (Mode.Value.Const.print_axis ax) mode
   in
   list i print_mode_annot ppf as_modes_annot
+
+let modalities i ppf { moda_modalities = mm; moda_desc = md } =
+  line i ppf "%a\n" Mode.Modality.Const.print mm;
+  moda_desc i ppf md
 
 let zero_alloc_assume i ppf : Zero_alloc.assume -> unit = function
     { strict; never_returns_normally; never_raises; arity; loc = _ } ->
@@ -312,9 +332,9 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_arrow\n";
       arg_label i ppf l;
       core_type i ppf ct1;
-      mode_desc i ppf m1.mode_desc;
+      alloc_modes i ppf m1;
       core_type i ppf ct2;
-      mode_desc i ppf m2.mode_desc;
+      alloc_modes i ppf m2;
   | Ttyp_tuple l ->
       line i ppf "Ttyp_tuple\n";
       list i labeled_core_type ppf l;
@@ -467,7 +487,7 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
      line i ppf "Tpat_extra_constraint\n";
      attributes i ppf attrs;
      core_type i ppf cty;
-     mode_desc i ppf m.mode_desc;
+     alloc_modes i ppf m;
   | Tpat_type (id, _) ->
      line i ppf "Tpat_extra_type %a\n" fmt_path id;
      attributes i ppf attrs;
@@ -523,7 +543,7 @@ and expression_extra i ppf x attrs =
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;
       alloc_const_option_mode i ppf m.mode_modes;
-      mode_desc i ppf m.mode_desc;
+      alloc_modes_opt i ppf m;
   | Texp_inspected_type ti ->
       line i ppf "Texp_inspected_type\n";
       attributes i ppf attrs;
@@ -1036,13 +1056,13 @@ and module_type i ppf x =
   | Tmty_functor (Unit, mt2, ma2) ->
       line i ppf "Tmty_functor ()\n";
       module_type i ppf mt2;
-      mode_desc i ppf ma2.mode_desc;
+      alloc_modes i ppf ma2;
   | Tmty_functor (Named (s, _, mt1, ma1), mt2, ma2) ->
       line i ppf "Tmty_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt1;
-      mode_desc i ppf ma1.mode_desc;
+      alloc_modes i ppf ma1;
       module_type i ppf mt2;
-      mode_desc i ppf ma2.mode_desc;
+      alloc_modes i ppf ma2;
   | Tmty_with (mt, l) ->
       line i ppf "Tmty_with\n";
       module_type i ppf mt;
@@ -1057,7 +1077,7 @@ and module_type i ppf x =
 
 and signature i ppf x =
   list i signature_item ppf x.sig_items;
-  modality_atoms i ppf x.sig_modalities.moda_desc
+  moda_desc i ppf x.sig_modalities.moda_desc
 
 and signature_item i ppf x =
   line i ppf "signature_item %a\n" fmt_location x.sig_loc;
@@ -1106,7 +1126,7 @@ and signature_item i ppf x =
       line i ppf "Tsig_include\n";
       attributes i ppf incl.incl_attributes;
       module_type i ppf incl.incl_mod;
-      modality_atoms i ppf moda.moda_desc;
+      modalities i ppf moda;
   | Tsig_class (l) ->
       line i ppf "Tsig_class\n";
       list i class_description ppf l;
@@ -1163,7 +1183,7 @@ and module_expr i ppf x =
       line i ppf "Tmod_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt;
       module_expr i ppf me;
-      mode_desc i ppf ma.mode_desc;
+      alloc_modes i ppf ma;
   | Tmod_apply (me1, me2, _) ->
       line i ppf "Tmod_apply\n";
       module_expr i ppf me1;
@@ -1175,7 +1195,7 @@ and module_expr i ppf x =
       line i ppf "Tmod_constraint\n";
       module_expr i ppf me;
       module_type i ppf mt;
-      mode_desc i ppf modes.mode_desc;
+      alloc_modes_opt i ppf modes;
   | Tmod_constraint (me, _, Tmodtype_implicit, _) -> module_expr i ppf me
   | Tmod_unpack (e, _) ->
       line i ppf "Tmod_unpack\n";
