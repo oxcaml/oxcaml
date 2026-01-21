@@ -1348,7 +1348,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         "@[Cannot unquote expression outside of a quotation context:@ \
          %a@]"
         Pprintast.expression (Untypeast.untype_expression exp)
-  | Texp_eval (_, _sort) ->
+  | Texp_eval _ ->
     let loc = of_location ~scopes e.exp_loc in
     Lprim (Pfield (0, Pointer, Reads_agree), [
       Lprim

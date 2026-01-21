@@ -2239,6 +2239,7 @@ module Format_history = struct
         "it's the type of an argument to a debugger printer function"
     | Quotation_result -> fprintf ppf "it's the result type of a quotation"
     | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
+    | Evaluation_result -> fprintf ppf "it's the result of evaluating a quotation"
     | Tquote -> fprintf ppf "it's a staged type"
     | Tsplice -> fprintf ppf "it's a splice of a staged type"
     | Unknown s ->
@@ -3004,6 +3005,7 @@ module Debug_printers = struct
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
     | Quotation_result -> fprintf ppf "Quotation_result"
     | Antiquotation_result -> fprintf ppf "Antiquotation_result"
+    | Evaluation_result -> fprintf ppf "Evaluation_result"
     | Tquote -> fprintf ppf "Tquote"
     | Tsplice -> fprintf ppf "Tsplice"
     | Unknown s -> fprintf ppf "Unknown %s" s

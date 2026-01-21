@@ -297,6 +297,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Eval_non_value of type_expr * Jkind.Violation.t
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -7572,11 +7573,11 @@ and type_expect_
         Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true
           Alloc.Const.legacy typ
       in
-      let sort =
-        match type_sort ~why:Function_result ~fixed:false env typ.ctyp_type with
-        | Ok sort -> sort
+      let () =
+        match constrain_type_jkind env typ.ctyp_type (Jkind.Builtin.value ~why:Quotation_result) with
+        | Ok () -> ()
         | Error err ->
-            raise (Error (loc, env, Function_type_not_rep (typ.ctyp_type, err)))
+            raise (Error (loc, env, Eval_non_value (typ.ctyp_type, err)))
       in
       let eval_type = newty
         (Tarrow
@@ -7586,7 +7587,7 @@ and type_expect_
           , commu_ok))
       in
       rue {
-        exp_desc = Texp_eval (typ, sort);
+        exp_desc = Texp_eval typ;
         exp_loc = loc; exp_extra = [];
         exp_type = eval_type;
         exp_attributes = sexp.pexp_attributes;
@@ -12226,6 +12227,13 @@ let report_error ~loc env =
         "The eval extension takes a single type as its argument, for \
          example %a."
         Style.inline_code "[%eval: int]"
+  | Eval_non_value (ty, violation) ->
+      Location.errorf ~loc
+        "@[Only quotations with value-kinded types may be evaluated.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(get_current_level ())) violation
+
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env
