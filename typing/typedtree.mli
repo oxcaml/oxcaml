@@ -1132,6 +1132,9 @@ and object_field_desc =
   | OTtag of string loc * core_type
   | OTinherit of core_type
 
+(** For a value description, whether user syntax is interpreted as modes or as
+    modalities depends on whether the item is a signature value or a primitive.
+    See the comments on [Typedecl.transl_value_decl_modal] for more info. *)
 and value_description_modal_info =
   | Valmi_sig_value of modalities
   | Valmi_str_primitive of Mode.Alloc.Const.Option.t modes
