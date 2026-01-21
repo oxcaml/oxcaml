@@ -1,0 +1,4 @@
+File "format.ml", line 11, characters 8-21:
+11 | let _ = [%eval 2 + 2]
+             ^^^^^^^^^^^^^
+Error: The eval extension takes a single type as its argument, for example "[%eval: int]".
