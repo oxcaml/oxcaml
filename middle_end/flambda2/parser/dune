@@ -55,45 +55,54 @@
 (alias (name regen-messages))
 
 (rule
- (alias regen-messages)
- (deps flambda_parser.messages flambda_parser.mly)
- (targets)
- (action
-  (progn
-   (with-stdout-to flambda_parser_messages.ml.new
-    (run menhir --compile-errors %{deps}))
-   (diff flambda_parser_messages.ml flambda_parser_messages.ml.new))))
-
-(alias
- (name list-errors))
-
-(rule
  (alias list-errors)
- (target flambda_parser.new-messages)
- (deps flambda_parser.mly)
- (mode promote)
  (action
   (with-stdout-to
-   %{target}
-   (run menhir --list-errors %{deps}))))
+   flambda_parser.messages.new
+   (run
+    menhir
+    %{dep:flambda_parser.mly}
+    --list-errors))))
 
-(alias
- (name check-errors))
+(rule
+ (action
+  (with-stdout-to
+   flambda_parser_messages.ml
+   (run
+    menhir
+    %{dep:flambda_parser.mly}
+    --compile-errors
+    %{dep:flambda_parser.messages}))))
 
 (rule
  (alias check-errors)
- (deps
-  flambda_parser.mly
-  flambda_parser.messages
-  flambda_parser.new-messages)
  (action
   (run
    menhir
-   flambda_parser.mly
+   %{dep:flambda_parser.mly}
    --compare-errors
-   flambda_parser.messages
+   %{dep:flambda_parser.messages}
    --compare-errors
-   flambda_parser.new-messages)))
+   %{dep:flambda_parser.messages.new})))
+
+(rule
+ (alias regen-messages)
+ (action
+  (with-stdout-to
+   flambda_parser.messages.updated
+   (run
+    menhir
+    %{dep:flambda_parser.mly}
+    --merge-errors
+    %{dep:flambda_parser.messages.new}
+    --merge-errors
+    %{dep:flambda_parser.messages}))))
+
+(rule
+ (mode promote)
+ (alias regen-messages)
+ (action
+  (diff flambda_parser.messages %{dep:flambda_parser.messages.updated})))
 
 (include_subdirs unqualified)
 
