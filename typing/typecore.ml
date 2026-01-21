@@ -8175,8 +8175,10 @@ and type_function
              before [split_function_ty] which enters new region. *)
           (* CR lstevenson: We redundantly transl the mode annotations a second
              time in the recursive call to type_function later on. *)
-          (Typemode.transl_mode_annots body_constraint.ret_mode_annotations)
-            .mode_modes
+          let annots =
+            Typemode.transl_mode_annots body_constraint.ret_mode_annotations
+          in
+          annots.mode_modes
 
         | _ :: _ -> Alloc.Const.Option.none
       in
@@ -8366,9 +8368,7 @@ and type_function
         body_constraint
       in
       let mode = Typemode.transl_mode_annots mode_annotations in
-      let ret_mode =
-        Typemode.transl_mode_annots ret_mode_annotations
-      in
+      let ret_mode = Typemode.transl_mode_annots ret_mode_annotations in
       let type_mode =
         match ret_mode_annotations with
         | _ :: _ ->
