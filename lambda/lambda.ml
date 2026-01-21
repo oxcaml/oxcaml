@@ -1454,9 +1454,21 @@ let rec patch_guarded patch = function
       Levent (patch_guarded patch lam, ev)
   | _ -> fatal_error "Lambda.patch_guarded"
 
+let value_kind_of_pointerness = function
+  | Immediate -> Pintval
+  | Pointer -> Pgenval
+
+let pointerness_of_separability sep =
+  if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
+  then Immediate else Pointer
+
 let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   match elt with
-  | Value -> Value generic_value
+  | Scannable { separability; _ } ->
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_separability separability)
+    in
+    Value { generic_value with raw_kind }
   | Float_boxed -> Float_boxed ()
   | Float64 -> Float64
   | Float32 -> Float32
@@ -1479,7 +1491,11 @@ and transl_mixed_product_shape shape =
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
-    | Value -> Value (get_value_kind i)
+    | Scannable { separability; _ } ->
+      let raw_kind =
+        value_kind_of_pointerness (pointerness_of_separability separability)
+      in
+      Value { (get_value_kind i) with raw_kind }
     | Float_boxed -> Float_boxed (get_mode i)
     | Float64 -> Float64
     | Float32 -> Float32
@@ -1506,6 +1522,9 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pmixedfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
+  (* The shape here is potentially an underapproximation, since the scannable
+     axes in [shape] will all be [max]. This should not matter, though, since it
+     is not possible to reassign / directly mutate a [val] in a module. *)
   let shape =
     Array.map
       (fun sort ->
@@ -1516,7 +1535,7 @@ let transl_module_representation repr =
   in
   let is_value (elt : Types.mixed_block_element) =
     match elt with
-    | Value -> true
+    | Scannable _ -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
     | Product _ | Void -> false
@@ -2350,7 +2369,7 @@ let structured_constant_layout = function
 
 let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   match c with
-  | Base Value -> layout_any_value
+  | Base Scannable -> layout_any_value
   | Base Float64 -> layout_unboxed_float Unboxed_float64
   | Base Float32 -> layout_unboxed_float Unboxed_float32
   | Base Word -> layout_unboxed_nativeint
@@ -2467,9 +2486,9 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
   | Psplicevar id -> Splice_variable id
 
-let value_kind_of_value_with_externality ext =
-  let open Jkind_axis.Externality in
-  if le ext (upper_bound_if_is_always_gc_ignorable ()) then Pintval else Pgenval
+let pointerness_of_scannable_with_externality ext =
+  if Jkind_axis.Externality.(le ext (upper_bound_if_is_always_gc_ignorable ()))
+  then Immediate else Pointer
 
 let rec layout_of_mixed_block_element_for_idx_set
   ext (mbe : _ mixed_block_element)
@@ -2481,7 +2500,9 @@ let rec layout_of_mixed_block_element_for_idx_set
       (Array.to_list
         (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
   | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
-    let raw_kind = value_kind_of_value_with_externality ext in
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_scannable_with_externality ext)
+    in
     Pvalue { value_kind with raw_kind }
   | Value value_kind -> Pvalue value_kind
   | Float64 | Float_boxed _ -> Punboxed_float Unboxed_float64
@@ -2829,8 +2850,9 @@ let simple_prim_on_values ~name ~arity ~alloc =
     ~native_name:""
     ~native_repr_args:
       (Primitive.make_prim_repr_args arity
-        (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.value))
-    ~native_repr_res:(Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.value)
+        (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.scannable))
+    ~native_repr_res:
+      (Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.scannable)
     ~is_layout_poly:false
 
 let rec try_to_find_location lam =

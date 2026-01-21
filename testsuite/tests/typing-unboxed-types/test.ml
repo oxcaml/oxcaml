@@ -348,6 +348,36 @@ Error: Signature mismatch:
        The first is a record, but the second is an unboxed record.
 |}]
 
+module M : sig
+  (* the error on r gets reported first, since r's definition occurs first,
+     but the real issue is that t is not bits64 in the struct. *)
+  type r = { r : #(t * s) }
+  and t : bits64
+  and s
+end = struct
+  type r = { r : #(t * s) }
+  and t
+  and s
+end
+[%%expect{|
+Lines 7-11, characters 6-3:
+ 7 | ......struct
+ 8 |   type r = { r : #(t * s) }
+ 9 |   and t
+10 |   and s
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type r = { r : #(t * s); } and t and s end
+       is not included in
+         sig type r = { r : #(t * s); } and t : bits64 and s end
+       Type declarations do not match:
+         type r = { r : #(t * s); }
+       is not included in
+         type r = { r : #(t * s); }
+       Their internal representations differ:
+       This is likely caused by a layout mismatch in a later definition.
+|}]
 
 (* Check interference with representation of float arrays. *)
 type t11 = L of float [@@ocaml.unboxed];;
@@ -610,7 +640,7 @@ end
 [%%expect{|
 module Result_u :
   sig
-    type ('a, 'b) t : value & value
+    type ('a, 'b) t : value non_pointer & value
     val to_result : ('a, 'b) t -> ('a, 'b) Result.t
     val of_result : ('a, 'b) Result.t -> ('a, 'b) t
   end
@@ -648,7 +678,8 @@ end
 [%%expect{|
 module Result_u_VV :
   sig
-    type ('a : value & value, 'b : value & value) t : value & (value & value)
+    type ('a : value & value, 'b : value & value) t
+      : value non_pointer & (value & value)
     val ok_exn : ('a : value & value) ('b : value & value). ('a, 'b) t -> 'a
     val error_exn :
       ('a : value & value) ('b : value & value). ('a, 'b) t -> 'b

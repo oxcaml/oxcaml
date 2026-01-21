@@ -13,7 +13,7 @@ let mk_gen (x : 'a) = [| x |]
 [%%expect{|
 (let (mk_gen = (function {nlocal = 0} x? : genarray (makearray[gen] x)))
   (apply (field_imm 1 (global Toploop!)) "mk_gen" mk_gen))
-val mk_gen : ('a : value_or_null mod separable). 'a -> 'a array = <fun>
+val mk_gen : ('a : value maybe_null). 'a -> 'a array = <fun>
 |}]
 
 let get_gen (xs : 'a array) i = xs.(i)
@@ -23,8 +23,7 @@ let get_gen (xs : 'a array) i = xs.(i)
      (function {nlocal = 0} xs[value<genarray>] i[value<int>]
        (array.get[gen indexed by int] xs i)))
   (apply (field_imm 1 (global Toploop!)) "get_gen" get_gen))
-val get_gen : ('a : value_or_null mod separable). 'a array -> int -> 'a =
-  <fun>
+val get_gen : ('a : value maybe_null). 'a array -> int -> 'a = <fun>
 |}]
 
 let set_gen (xs : 'a array) x i = xs.(i) <- x
@@ -34,8 +33,7 @@ let set_gen (xs : 'a array) x i = xs.(i) <- x
      (function {nlocal = 0} xs[value<genarray>] x? i[value<int>] : int
        (array.set[gen indexed by int] xs i x)))
   (apply (field_imm 1 (global Toploop!)) "set_gen" set_gen))
-val set_gen :
-  ('a : value_or_null mod separable). 'a array -> 'a -> int -> unit = <fun>
+val set_gen : ('a : value maybe_null). 'a array -> 'a -> int -> unit = <fun>
 |}]
 
 (* [non_float] arrays are [addrarray]s. Operations on [addrarray]s
@@ -47,7 +45,7 @@ let mk (type t : value mod non_float) (x : t) = [| x |]
 [%%expect{|
 (let (mk = (function {nlocal = 0} x : addrarray (makearray[addr] x)))
   (apply (field_imm 1 (global Toploop!)) "mk" mk))
-val mk : ('t : value mod non_float). 't -> 't array = <fun>
+val mk : ('t : value non_float). 't -> 't array = <fun>
 |}]
 
 let get (type t : value mod non_float) (xs : t array) i = xs.(i)
@@ -57,7 +55,7 @@ let get (type t : value mod non_float) (xs : t array) i = xs.(i)
      (function {nlocal = 0} xs[value<addrarray>] i[value<int>]
        (array.get[addr indexed by int] xs i)))
   (apply (field_imm 1 (global Toploop!)) "get" get))
-val get : ('t : value mod non_float). 't array -> int -> 't = <fun>
+val get : ('t : value non_float). 't array -> int -> 't = <fun>
 |}]
 
 let set (type t : value mod non_float) (xs : t array) x i = xs.(i) <- x
@@ -68,7 +66,7 @@ let set (type t : value mod non_float) (xs : t array) x i = xs.(i) <- x
      (function {nlocal = 0} xs[value<addrarray>] x i[value<int>] : int
        (array.set[addr indexed by int] xs i x)))
   (apply (field_imm 1 (global Toploop!)) "set" set))
-val set : ('t : value mod non_float). 't array -> 't -> int -> unit = <fun>
+val set : ('t : value non_float). 't array -> 't -> int -> unit = <fun>
 |}]
 
 (* A concrete example. *)

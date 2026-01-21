@@ -287,6 +287,7 @@ type record_mismatch =
   | Ufloat_representation of position
   | Mixed_representation of position
   | Mixed_representation_with_flat_floats of position
+  | Representation_shape_mismatch
 
 type constructor_mismatch =
   | Type of Errortrace.equality_error
@@ -528,6 +529,9 @@ let report_record_mismatch first second decl env ppf err =
       pr "@[<hv>Their internal representations differ:@ %s %s %s.@]"
         (choose ord first second) decl
         "uses a mixed representation where boxed floats are stored flat"
+  | Representation_shape_mismatch ->
+    pr "@[<hv>Their internal representations differ:@;\
+        This is likely caused by a layout mismatch in a later definition.@]"
 
 let report_constructor_mismatch first second decl env ppf err =
   let pr fmt  = Format.fprintf ppf fmt in
@@ -866,7 +870,8 @@ module Record_diffing = struct
   let find_mismatch_in_mixed_record_representations
       (s1 : mixed_product_shape) (s2 : mixed_product_shape)
     =
-    if s1 = s2 then None
+    if Misc.Le_result.is_le (Types.mixed_product_shape_less_or_equal s1 s2)
+    then None
     else
       let has_float_boxed_on_read fields =
         Array.exists (function
@@ -879,10 +884,11 @@ module Record_diffing = struct
       else if has_float_boxed_on_read s2
       then Some (Mixed_representation_with_flat_floats Second)
       else
-        Misc.fatal_error
-          "Impossible: the only way for mixed blocks to differ in \
-           representation is if one is a flat float record with a boxed float \
-           field, and the other isn't."
+        (* Before, this case was thought to be impossible. We report the first
+           error when doing the inclusion check: the real culprit may be a
+           layout mismatch that is actually defined later defined mutually
+           recursively with this record. *)
+        Some Representation_shape_mismatch
 
   let compare_with_representation (type rep) ~loc
         (record_form : rep record_form) env params1 params2 l r

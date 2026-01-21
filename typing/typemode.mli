@@ -37,7 +37,11 @@ val untransl_modalities :
   Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
 
 (** Interpret a mod-bounds. *)
-val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t
+val transl_mod_bounds :
+  Parsetree.modes ->
+  Jkind.Mod_bounds.t
+  * (Jkind_axis.Nullability.t Location.loc option
+    * Jkind_axis.Separability.t Location.loc option)
 
 val untransl_mod_bounds : Jkind.Mod_bounds.t -> Parsetree.modes
 

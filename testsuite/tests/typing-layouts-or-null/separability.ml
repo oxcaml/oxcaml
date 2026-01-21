@@ -14,8 +14,8 @@ type t_nonfloat : any mod non_float
 
 [%%expect{|
 type t_maybesep : any
-type t_sep : any mod separable
-type t_nonfloat : any mod non_float
+type t_sep : any separable
+type t_nonfloat : any non_float
 |}]
 
 type ('a :  any mod maybe_separable) accepts_maybesep
@@ -24,8 +24,8 @@ type ('a : any mod non_float) accepts_nonfloat
 
 [%%expect{|
 type ('a : any) accepts_maybesep
-type ('a : any mod separable) accepts_sep
-type ('a : any mod non_float) accepts_nonfloat
+type ('a : any separable) accepts_sep
+type ('a : any non_float) accepts_nonfloat
 |}]
 
 type succeeds = t_maybesep accepts_maybesep
@@ -44,10 +44,10 @@ Line 1, characters 13-23:
 1 | type fails = t_maybesep accepts_sep
                  ^^^^^^^^^^
 Error: This type "t_maybesep" should be an instance of type
-         "('a : any mod separable)"
-       The kind of t_maybesep is any
+         "('a : any separable)"
+       The layout of t_maybesep is any
          because of the definition of t_maybesep at line 1, characters 0-41.
-       But the kind of t_maybesep must be a subkind of any mod separable
+       But the layout of t_maybesep must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -66,10 +66,10 @@ Line 1, characters 13-23:
 1 | type fails = t_maybesep accepts_nonfloat
                  ^^^^^^^^^^
 Error: This type "t_maybesep" should be an instance of type
-         "('a : any mod non_float)"
-       The kind of t_maybesep is any
+         "('a : any non_float)"
+       The layout of t_maybesep is any
          because of the definition of t_maybesep at line 1, characters 0-41.
-       But the kind of t_maybesep must be a subkind of any mod non_float
+       But the layout of t_maybesep must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -78,10 +78,10 @@ type fails = t_sep accepts_nonfloat
 Line 1, characters 13-18:
 1 | type fails = t_sep accepts_nonfloat
                  ^^^^^
-Error: This type "t_sep" should be an instance of type "('a : any mod non_float)"
-       The kind of t_sep is any mod separable
+Error: This type "t_sep" should be an instance of type "('a : any non_float)"
+       The layout of t_sep is any separable
          because of the definition of t_sep at line 2, characters 0-30.
-       But the kind of t_sep must be a subkind of any mod non_float
+       But the layout of t_sep must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -108,10 +108,10 @@ type fails = t_von accepts_sep
 Line 1, characters 13-18:
 1 | type fails = t_von accepts_sep
                  ^^^^^
-Error: This type "t_von" should be an instance of type "('a : any mod separable)"
-       The kind of t_von is value_or_null
+Error: This type "t_von" should be an instance of type "('a : any separable)"
+       The layout of t_von is value maybe_separable maybe_null
          because of the definition of t_von at line 1, characters 0-26.
-       But the kind of t_von must be a subkind of any mod separable
+       But the layout of t_von must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -121,10 +121,10 @@ type fails = t_von accepts_nonfloat
 Line 1, characters 13-18:
 1 | type fails = t_von accepts_nonfloat
                  ^^^^^
-Error: This type "t_von" should be an instance of type "('a : any mod non_float)"
-       The kind of t_von is value_or_null
+Error: This type "t_von" should be an instance of type "('a : any non_float)"
+       The layout of t_von is value maybe_separable maybe_null
          because of the definition of t_von at line 1, characters 0-26.
-       But the kind of t_von must be a subkind of any mod non_float
+       But the layout of t_von must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -146,10 +146,10 @@ type fails = t_val accepts_nonfloat
 Line 1, characters 13-18:
 1 | type fails = t_val accepts_nonfloat
                  ^^^^^
-Error: This type "t_val" should be an instance of type "('a : any mod non_float)"
-       The kind of t_val is value
+Error: This type "t_val" should be an instance of type "('a : any non_float)"
+       The layout of t_val is value
          because of the definition of t_val at line 1, characters 0-18.
-       But the kind of t_val must be a subkind of any mod non_float
+       But the layout of t_val must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -169,10 +169,10 @@ type fails = t_any accepts_sep
 Line 1, characters 13-18:
 1 | type fails = t_any accepts_sep
                  ^^^^^
-Error: This type "t_any" should be an instance of type "('a : any mod separable)"
-       The kind of t_any is any
+Error: This type "t_any" should be an instance of type "('a : any separable)"
+       The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
-       But the kind of t_any must be a subkind of any mod separable
+       But the layout of t_any must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -182,10 +182,10 @@ type fails = t_any accepts_nonfloat
 Line 1, characters 13-18:
 1 | type fails = t_any accepts_nonfloat
                  ^^^^^
-Error: This type "t_any" should be an instance of type "('a : any mod non_float)"
-       The kind of t_any is any
+Error: This type "t_any" should be an instance of type "('a : any non_float)"
+       The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
-       But the kind of t_any must be a subkind of any mod non_float
+       But the layout of t_any must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -194,7 +194,7 @@ type t_ann : any mod separable
 type succeeds = t_ann accepts_maybesep
 type succeeds = t_ann accepts_sep
 [%%expect{|
-type t_ann : any mod separable
+type t_ann : any separable
 type succeeds = t_ann accepts_maybesep
 type succeeds = t_ann accepts_sep
 |}]
@@ -205,10 +205,10 @@ type fails = t_ann accepts_nonfloat
 Line 1, characters 13-18:
 1 | type fails = t_ann accepts_nonfloat
                  ^^^^^
-Error: This type "t_ann" should be an instance of type "('a : any mod non_float)"
-       The kind of t_ann is any mod separable
+Error: This type "t_ann" should be an instance of type "('a : any non_float)"
+       The layout of t_ann is any separable
          because of the definition of t_ann at line 1, characters 0-30.
-       But the kind of t_ann must be a subkind of any mod non_float
+       But the layout of t_ann must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -382,11 +382,10 @@ type fails = float accepts_nonfloat
 Line 1, characters 13-18:
 1 | type fails = float accepts_nonfloat
                  ^^^^^
-Error: This type "float" should be an instance of type "('a : any mod non_float)"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+Error: This type "float" should be an instance of type "('a : any non_float)"
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of any mod non_float
+       But the layout of float must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -473,13 +472,13 @@ type succeeds = t2 accepts_nonfloat
 type 'a narrowed = 'a or_null accepts_nonfloat
 
 [%%expect{|
-type ('a : value mod non_float) narrowed = 'a or_null accepts_nonfloat
+type ('a : value non_float) narrowed = 'a or_null accepts_nonfloat
 |}]
 
 type 'a narrowed = 'a or_null accepts_sep
 
 [%%expect{|
-type ('a : value mod non_float) narrowed = 'a or_null accepts_sep
+type ('a : value non_float) narrowed = 'a or_null accepts_sep
 |}]
 
 type 'a succeds = 'a or_null accepts_maybesep
@@ -493,7 +492,7 @@ type t_val_nonfloat : value mod non_float
 type succeeds = t_val_nonfloat or_null accepts_nonfloat
 
 [%%expect{|
-type t_val_nonfloat : value mod non_float
+type t_val_nonfloat : value non_float
 type succeeds = t_val_nonfloat or_null accepts_nonfloat
 |}]
 
@@ -504,10 +503,10 @@ Line 1, characters 13-26:
 1 | type fails = t_val or_null accepts_sep
                  ^^^^^^^^^^^^^
 Error: This type "t_val or_null" should be an instance of type
-         "('a : any mod separable)"
-       The kind of t_val or_null is value_or_null mod everything with t_val
+         "('a : any separable)"
+       The layout of t_val or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of t_val or_null must be a subkind of any mod separable
+       But the layout of t_val or_null must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -518,10 +517,10 @@ Line 1, characters 13-18:
 1 | type fails = t_b64 or_null accepts_maybesep
                  ^^^^^
 Error: This type "t_b64" should be an instance of type
-         "('a : value_or_null mod non_null)"
+         "('a : value maybe_separable)"
        The layout of t_b64 is bits64
          because of the definition of t_b64 at line 1, characters 0-19.
-       But the layout of t_b64 must be a sublayout of value
+       But the layout of t_b64 must be a value layout
          because the type argument of or_null has layout value.
 |}]
 
@@ -529,25 +528,25 @@ type t_maybesep_val : value_or_null mod non_null
 type succeeds = t_maybesep_val or_null
 
 [%%expect{|
-type t_maybesep_val : value_or_null mod non_null
+type t_maybesep_val : value maybe_separable
 type succeeds = t_maybesep_val or_null
 |}]
 
 type ('a : value mod non_float) succeeds = 'a or_null accepts_nonfloat
 
 [%%expect{|
-type ('a : value mod non_float) succeeds = 'a or_null accepts_nonfloat
+type ('a : value non_float) succeeds = 'a or_null accepts_nonfloat
 |}]
 
 type ('a : value mod non_float) succeeds = 'a or_null accepts_sep
 [%%expect{|
-type ('a : value mod non_float) succeeds = 'a or_null accepts_sep
+type ('a : value non_float) succeeds = 'a or_null accepts_sep
 |}]
 
 type ('a : value mod non_float) succeeds = 'a or_null accepts_maybesep
 
 [%%expect{|
-type ('a : value mod non_float) succeeds = 'a or_null accepts_maybesep
+type ('a : value non_float) succeeds = 'a or_null accepts_maybesep
 |}]
 
 (* [float or_null] is not separable: *)
@@ -559,21 +558,10 @@ Line 1, characters 13-26:
 1 | type fails = float or_null accepts_sep
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
-         "('a : any mod separable)"
-       The kind of float or_null is
-           value_or_null mod forkable unyielding many stateless immutable
+         "('a : any separable)"
+       The layout of float or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of float or_null must be a subkind of any mod separable
-         because of the definition of accepts_sep at line 2, characters 0-41.
-|}, Principal{|
-Line 1, characters 13-26:
-1 | type fails = float or_null accepts_sep
-                 ^^^^^^^^^^^^^
-Error: This type "float or_null" should be an instance of type
-         "('a : any mod separable)"
-       The kind of float or_null is value_or_null mod everything with float
-         because it is the primitive type or_null.
-       But the kind of float or_null must be a subkind of any mod separable
+       But the layout of float or_null must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -588,10 +576,10 @@ Line 1, characters 13-27:
 1 | type fails = t_maybesep_val array
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybesep_val" should be an instance of type
-         "('a : any mod separable)"
-       The kind of t_maybesep_val is value_or_null mod non_null
+         "('a : any separable)"
+       The layout of t_maybesep_val is value maybe_separable
          because of the definition of t_maybesep_val at line 1, characters 0-48.
-       But the kind of t_maybesep_val must be a subkind of any mod separable
+       But the layout of t_maybesep_val must be a sublayout of any separable
          because it's the type argument to the array type.
 |}]
 
@@ -624,21 +612,10 @@ Line 1, characters 13-26:
 1 | type fails = float or_null array
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
-         "('a : any mod separable)"
-       The kind of float or_null is
-           value_or_null mod forkable unyielding many stateless immutable
+         "('a : any separable)"
+       The layout of float or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of float or_null must be a subkind of any mod separable
-         because it's the type argument to the array type.
-|}, Principal{|
-Line 1, characters 13-26:
-1 | type fails = float or_null array
-                 ^^^^^^^^^^^^^
-Error: This type "float or_null" should be an instance of type
-         "('a : any mod separable)"
-       The kind of float or_null is value_or_null mod everything with float
-         because it is the primitive type or_null.
-       But the kind of float or_null must be a subkind of any mod separable
+       But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
 |}]
 
@@ -698,8 +675,8 @@ type 'a t : value mod non_float with 'a
 type ('a : value mod non_float) req_non_float
 type test = float t req_non_float
 [%%expect{|
-type 'a t : value mod non_float
-type ('a : value mod non_float) req_non_float
+type 'a t : value non_float
+type ('a : value non_float) req_non_float
 type test = float t req_non_float
 |}]
 
@@ -714,7 +691,7 @@ type unbx = { unbx : t_maybesep_val; } [@@unboxed]
 type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
 
 [%%expect{|
-type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
+type ('a : value maybe_separable) unbx' = Unbx of 'a [@@unboxed]
 |}]
 
 (* Separability and unboxed records. *)
@@ -727,9 +704,9 @@ type a : value = #{ a : t_maybesep_val }
 Line 1, characters 0-40:
 1 | type a : value = #{ a : t_maybesep_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "a" is immediate mod dynamic with t_maybesep_val
+Error: The layout of type "a" is value maybe_separable
          because it is an unboxed record.
-       But the kind of type "a" must be a subkind of value
+       But the layout of type "a" must be a sublayout of value
          because of the annotation on the declaration of the type a.
 |}]
 
@@ -739,6 +716,8 @@ type a : value_or_null mod non_null = #{ a : t_maybesep_val }
 type a = #{ a : t_maybesep_val; }
 |}]
 
+(* In the past, [non_null] and [non_float] applied to the whole product and
+   each element was not checked. Now, each element is checked so this fails. *)
 
 type b = #{ a : int; b: t_maybesep_val; c: float# }
 
@@ -746,7 +725,15 @@ type ('b : value & value & float64 mod non_null non_float) fails = unit constrai
 
 [%%expect{|
 type b = #{ a : int; b : t_maybesep_val; c : float#; }
-type 'a fails = unit constraint 'a = b
+Line 3, characters 83-89:
+3 | type ('b : value & value & float64 mod non_null non_float) fails = unit constraint 'b = b
+                                                                                       ^^^^^^
+Error: The type constraints are not consistent.
+       Type "('b : value & value & float64)" is not compatible with type "b"
+       The layout of b is immediate & value maybe_separable & float64
+         because of the definition of b at line 1, characters 0-51.
+       But the layout of b must be a sublayout of value & value & float64
+         because of the annotation on 'b in the declaration of the type fails.
 |}]
 
 type c = #( float * float or_null * float# )
@@ -755,7 +742,16 @@ type ('c : value & value & float64 mod non_null non_float) fails = unit constrai
 
 [%%expect{|
 type c = #(float * float or_null * float#)
-type 'a fails = unit constraint 'a = c
+Line 3, characters 83-89:
+3 | type ('c : value & value & float64 mod non_null non_float) fails = unit constraint 'c = c
+                                                                                       ^^^^^^
+Error: The type constraints are not consistent.
+       Type "('c : value & value & float64)" is not compatible with type
+         "c" = "#(float * float or_null * float#)"
+       The layout of c is value & value maybe_separable maybe_null & float64
+         because it is an unboxed tuple.
+       But the layout of c must be a sublayout of value & value & float64
+         because of the annotation on 'c in the declaration of the type fails.
 |}]
 
 (* Separability and [@@or_null_reexport]. *)
@@ -773,14 +769,13 @@ type 'a narrowed = 'a Or_null_reexport.t accepts_nonfloat
 [%%expect{|
 module Or_null_reexport :
   sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end
-type ('a : value mod non_float) narrowed =
-    'a Or_null_reexport.t accepts_nonfloat
+type ('a : value non_float) narrowed = 'a Or_null_reexport.t accepts_nonfloat
 |}]
 
 type 'a narrowed = 'a Or_null_reexport.t accepts_sep
 
 [%%expect{|
-type ('a : value mod non_float) narrowed = 'a Or_null_reexport.t accepts_sep
+type ('a : value non_float) narrowed = 'a Or_null_reexport.t accepts_sep
 |}]
 
 type 'a succeeds = 'a Or_null_reexport.t accepts_maybesep
@@ -794,8 +789,7 @@ type 'a succeeds = 'a Or_null_reexport.t accepts_maybesep
 type ('a : value mod non_float) succeeds = 'a Or_null_reexport.t accepts_nonfloat
 
 [%%expect{|
-type ('a : value mod non_float) succeeds =
-    'a Or_null_reexport.t accepts_nonfloat
+type ('a : value non_float) succeeds = 'a Or_null_reexport.t accepts_nonfloat
 |}]
 
 (* Specific type instances preserve their separability. *)
@@ -813,24 +807,12 @@ Line 1, characters 13-37:
 1 | type fails = float Or_null_reexport.t accepts_nonfloat
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
-       should be an instance of type "('a : any mod non_float)"
-       The kind of float Or_null_reexport.t is
-           value_or_null mod forkable unyielding many stateless immutable
+       should be an instance of type "('a : any non_float)"
+       The layout of float Or_null_reexport.t is
+           value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of float Or_null_reexport.t must be a subkind of
-           any mod non_float
-         because of the definition of accepts_nonfloat at line 3, characters 0-46.
-|}, Principal{|
-Line 1, characters 13-37:
-1 | type fails = float Or_null_reexport.t accepts_nonfloat
-                 ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type "float Or_null_reexport.t" = "float or_null"
-       should be an instance of type "('a : any mod non_float)"
-       The kind of float Or_null_reexport.t is
-           value_or_null mod everything with float
-         because it is the primitive type or_null.
-       But the kind of float Or_null_reexport.t must be a subkind of
-           any mod non_float
+       But the layout of float Or_null_reexport.t must be a sublayout of
+           any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -841,24 +823,12 @@ Line 1, characters 13-37:
 1 | type fails = float Or_null_reexport.t accepts_sep
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
-       should be an instance of type "('a : any mod separable)"
-       The kind of float Or_null_reexport.t is
-           value_or_null mod forkable unyielding many stateless immutable
+       should be an instance of type "('a : any separable)"
+       The layout of float Or_null_reexport.t is
+           value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of float Or_null_reexport.t must be a subkind of
-           any mod separable
-         because of the definition of accepts_sep at line 2, characters 0-41.
-|}, Principal{|
-Line 1, characters 13-37:
-1 | type fails = float Or_null_reexport.t accepts_sep
-                 ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type "float Or_null_reexport.t" = "float or_null"
-       should be an instance of type "('a : any mod separable)"
-       The kind of float Or_null_reexport.t is
-           value_or_null mod everything with float
-         because it is the primitive type or_null.
-       But the kind of float Or_null_reexport.t must be a subkind of
-           any mod separable
+       But the layout of float Or_null_reexport.t must be a sublayout of
+           any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -885,24 +855,11 @@ Line 1, characters 13-31:
 1 | type fails = float unbx or_null accepts_sep
                  ^^^^^^^^^^^^^^^^^^
 Error: This type "float unbx or_null" should be an instance of type
-         "('a : any mod separable)"
-       The kind of float unbx or_null is
-           value_or_null mod forkable unyielding many stateless immutable
+         "('a : any separable)"
+       The layout of float unbx or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of float unbx or_null must be a subkind of
-           any mod separable
-         because of the definition of accepts_sep at line 2, characters 0-41.
-|}, Principal{|
-Line 1, characters 13-31:
-1 | type fails = float unbx or_null accepts_sep
-                 ^^^^^^^^^^^^^^^^^^
-Error: This type "float unbx or_null" should be an instance of type
-         "('a : any mod separable)"
-       The kind of float unbx or_null is
-           value_or_null mod everything with float unbx
-         because it is the primitive type or_null.
-       But the kind of float unbx or_null must be a subkind of
-           any mod separable
+       But the layout of float unbx or_null must be a sublayout of
+           any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -912,7 +869,7 @@ external[@layout_poly] make_vect : ('a : any mod separable) . int -> 'a -> 'a ar
   "%makearray_dynamic"
 
 [%%expect{|
-external make_vect : ('a : any mod separable). int -> 'a -> 'a array
+external make_vect : ('a : any separable). int -> 'a -> 'a array
   = "%makearray_dynamic" [@@layout_poly]
 |}]
 
@@ -928,11 +885,10 @@ Line 1, characters 30-32:
 1 | let fails = make_vect 3 (This 5.)
                                   ^^
 Error: This expression has type "float" but an expression was expected of type
-         "('a : value mod non_float)"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+         "('a : value non_float)"
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of value mod non_float
+       But the layout of float must be a sublayout of value non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -950,7 +906,7 @@ end
 
 [%%expect{|
 module type S =
-  sig type ('a : value mod non_float) t : value_or_null mod non_float end
+  sig type ('a : value non_float) t : value_or_null non_float end
 module M1 : S
 |}]
 
@@ -979,12 +935,11 @@ Error: Signature mismatch:
        Type declarations do not match:
          type 'a t = float or_null
        is not included in
-         type ('a : value mod non_float) t : value_or_null mod non_float
-       The kind of the first is
-           value_or_null mod forkable unyielding many stateless immutable
+         type ('a : value non_float) t : value_or_null non_float
+       The layout of the first is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of the first must be a subkind of
-           value_or_null mod non_float
+       But the layout of the first must be a sublayout of
+           value non_float maybe_null
          because of the definition of t at line 2, characters 2-65.
 |}]
 
@@ -1001,7 +956,7 @@ module type S0 = sig
 end
 
 [%%expect{|
-module type S0 = sig type t : value_or_null mod separable end
+module type S0 = sig type t : value maybe_null end
 |}]
 
 module M5 : S0 = struct
@@ -1037,12 +992,10 @@ Error: Signature mismatch:
        Type declarations do not match:
          type t = float or_null
        is not included in
-         type t : value_or_null mod separable
-       The kind of the first is
-           value_or_null mod forkable unyielding many stateless immutable
+         type t : value maybe_null
+       The layout of the first is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of the first must be a subkind of
-           value_or_null mod separable
+       But the layout of the first must be a sublayout of value maybe_null
          because of the definition of t at line 2, characters 2-38.
 |}]
 
@@ -1072,7 +1025,7 @@ type 'a non_float : value mod non_float
 type packed = P : 'a non_float -> packed [@@unboxed]
 
 [%%expect{|
-type 'a non_float : value mod non_float
+type 'a non_float : value non_float
 type packed = P : 'a non_float -> packed [@@unboxed]
 |}]
 
@@ -1081,7 +1034,7 @@ type packed = P : 'a non_float -> packed [@@unboxed]
 type exists = E : ('a : value mod non_float) . 'a -> exists [@@unboxed]
 
 [%%expect{|
-type exists = E : ('a : value mod non_float). 'a -> exists [@@unboxed]
+type exists = E : ('a : value non_float). 'a -> exists [@@unboxed]
 |}]
 
 (* Non-value layouts do not trigger the check. *)
@@ -1108,6 +1061,6 @@ type 'a abs1 : value mod non_float with 'a
 type packed = P : 'a abs1 -> packed [@@unboxed]
 
 [%%expect{|
-type 'a abs1 : value mod non_float
+type 'a abs1 : value non_float
 type packed = P : 'a abs1 -> packed [@@unboxed]
 |}]

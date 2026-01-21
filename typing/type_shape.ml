@@ -29,6 +29,11 @@
 [@@@warning "+4"]
 
 module Uid = Shape.Uid
+
+(* CR layouts-scannable: As noted on the CR on [Sort] in [jkind_intf.ml], a
+   sort no longer contains sufficient information to compile: it's missing the
+   scannable axes! Once a better data definition for tracking this is added,
+   the meaning of [Layout] below perhaps should change as well. *)
 module Layout = Jkind_types.Sort.Const
 
 type base_layout = Jkind_types.Sort.base
@@ -360,7 +365,10 @@ end
 
 module Type_decl_shape = struct
   let rec mixed_block_shape_to_layout = function
-    | Types.Value -> Layout.Base Value
+    (* CR layouts-scannable: We forget about the stored scannable axes when
+       converting, since a [Layout.t] (which is a [Sort.Const.t]) doesn't have
+       a place to put them. See the CR on [Layout] at the top of this file. *)
+    | Types.Scannable _ -> Layout.Base Scannable
     | Types.Float_boxed ->
       Layout.Base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
@@ -434,7 +442,7 @@ module Type_decl_shape = struct
             (fun { Shape.field_name = _; field_value = _, ly } ->
               if
                 not
-                  (Layout.equal ly (Layout.Base Value)
+                  (Layout.equal ly (Layout.Base Scannable)
                   || Layout.equal ly (Layout.Base Void))
               then
                 if !Clflags.dwarf_pedantic
@@ -443,7 +451,7 @@ module Type_decl_shape = struct
                     "Type_shape: variant constructor with mismatched layout, \
                      has %a but expected value or void."
                     Layout.format ly
-                else Layout.Base Value
+                else Layout.Base Scannable
               else ly)
             args
         in
@@ -1091,7 +1099,7 @@ let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
     (* CR sspies: [arg_layout] could become unreliable in the future. Consider
        recursively descending in that case. *)
   | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
-    Some (Layout.Base Value)
+    Some (Layout.Base Scannable)
   | Alias t -> estimate_layout_from_type_shape t
   | Mu t ->
     estimate_layout_from_type_shape t

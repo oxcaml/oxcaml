@@ -193,7 +193,7 @@ let extern_repr_of_native_repr:
   poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Lambda.extern_repr
   = fun ~poly_sort r -> match r, poly_sort with
   | Repr_poly, Some s ->
-    Same_as_ocaml_repr (Jkind.Sort.default_to_value_and_get s)
+    Same_as_ocaml_repr (Jkind.Sort.default_to_scannable_and_get s)
   | Repr_poly, None -> Misc.fatal_error "Unexpected Repr_poly"
   | Same_as_ocaml_repr s, _ -> Same_as_ocaml_repr s
   | Unboxed_float f, _ -> Unboxed_float f
@@ -205,7 +205,7 @@ let sort_of_native_repr ~poly_sort repr =
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
       Unboxed_vector _) ->
-    Jkind.Sort.Const.Base Value
+    Jkind.Sort.Const.Base Scannable
 
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =
@@ -1481,7 +1481,7 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
   match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
   | Error _ -> None
   | Ok sort ->
-    let sort = Jkind.Sort.default_to_value_and_get sort in
+    let sort = Jkind.Sort.default_to_scannable_and_get sort in
     let layout = Typeopt.layout env error_loc sort ty in
     match layout with
     | Punboxed_float Unboxed_float32 -> Some Ppp_unboxed_float32
@@ -1560,12 +1560,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       Some (Primitive (Pfield (n, is_int, mut), arity))
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
-      (* CR layouts: [~elt_sort:None] here is not ideal and should be
-         fixed. To do that, we will need more checking of primitives
-         in the front end. *)
       let array_type =
-        glb_array_type loc t
-          (array_type_kind ~elt_sort:None ~elt_ty:None env loc p)
+        glb_array_type loc t (array_type_kind ~elt_ty:None env loc p)
       in
       if t = array_type then None
       else Some (Primitive (Parraylength array_type, arity))
@@ -1574,7 +1570,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let loc = to_location loc in
       let array_ref_type =
         glb_array_ref_type loc rt
-          (array_type_kind ~elt_sort:None ~elt_ty:(Some rest_ty) env loc p1)
+          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1583,8 +1579,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Parraysetu (st, index_kind), arity), p1 :: _ :: p3 :: _ -> begin
       let loc = to_location loc in
       let array_set_type =
-        glb_array_set_type loc st
-          (array_type_kind ~elt_sort:None ~elt_ty:(Some p3) env loc p1)
+        glb_array_set_type loc st (array_type_kind ~elt_ty:(Some p3) env loc p1)
       in
       if st = array_set_type then None
       else Some (Primitive (Parraysetu (array_set_type, index_kind), arity))
@@ -1593,7 +1588,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let loc = to_location loc in
       let array_ref_type =
         glb_array_ref_type loc rt
-          (array_type_kind ~elt_sort:None ~elt_ty:(Some rest_ty) env loc p1)
+          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1602,8 +1597,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Parraysets (st, index_kind), arity), p1 :: _ :: p3 :: _ -> begin
       let loc = to_location loc in
       let array_set_type =
-        glb_array_set_type loc st
-          (array_type_kind ~elt_sort:None ~elt_ty:(Some p3) env loc p1)
+        glb_array_set_type loc st (array_type_kind ~elt_ty:(Some p3) env loc p1)
       in
       if st = array_set_type then None
       else Some (Primitive (Parraysets (array_set_type, index_kind), arity))
@@ -1612,7 +1606,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     _ :: p2 :: [] -> begin
       let loc = to_location loc in
       let new_array_kind =
-        array_kind_of_elt ~elt_sort:None env loc p2
+        array_kind_of_elt env loc p2
         |> glb_array_type loc array_kind
       in
       if array_kind = new_array_kind then None
@@ -1624,7 +1618,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     _ :: [] -> begin
       let loc = to_location loc in
       let new_array_kind =
-        array_type_kind ~elt_sort:None ~elt_ty:None env loc rest_ty
+        array_type_kind ~elt_ty:None env loc rest_ty
         |> glb_array_type loc array_kind
       in
       unboxed_product_uninitialized_array_check loc new_array_kind;
@@ -1645,7 +1639,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
        kind.  If you haven't, then taking the glb of both would be just as
        likely to compound your error (e.g., by treating a Pgenarray as a
        Pfloatarray) as to help you. *)
-    let array_kind = array_type_kind ~elt_sort:None ~elt_ty:None env loc p2 in
+    let array_kind = array_type_kind ~elt_ty:None env loc p2 in
     let new_dst_array_set_kind =
       glb_array_set_type loc dst_array_set_kind array_kind
     in
@@ -1654,7 +1648,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       src_mutability; dst_array_set_kind = new_dst_array_set_kind }, arity))
   | Primitive (Parray_element_size_in_bytes _, arity), p1 :: _ -> (
       let array_kind =
-        array_type_kind ~elt_sort:None ~elt_ty:None env (to_location loc) p1
+        array_type_kind ~elt_ty:None env (to_location loc) p1
       in
       Some (Primitive (Parray_element_size_in_bytes array_kind, arity))
     )
@@ -2164,7 +2158,7 @@ let check_primitive_arity loc p =
   in
   (* By a similar assumption, the sort shouldn't change the arity.  So it's ok
      to lie here. *)
-  let sort = Some (Jkind.Sort.of_base Value) in
+  let sort = Some (Jkind.Sort.of_base Scannable) in
   let prim =
     lookup_primitive loc ~poly_mode:mode ~poly_sort:sort Rc_normal p
   in

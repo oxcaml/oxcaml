@@ -405,8 +405,11 @@ let update_type temp_env env id loc =
    be possible.
 *)
 let is_float env ty =
-  match get_desc (Ctype.get_unboxed_type_approximation env ty).ty with
-    Tconstr(p, _, _) -> Path.same p Predef.path_float
+  match Ctype.get_unboxed_type_approximation env ty with
+  | { ty; or_null = None; modality = _ } -> begin
+    match get_desc ty with
+    | Tconstr(p, _, _) -> Path.same p Predef.path_float
+    | _ -> false end
   | _ -> false
 
 (* Determine if a type definition defines a fixed type. (PW) *)
@@ -993,7 +996,7 @@ let transl_declaration env sdecl (id, uid) =
                      match Types.(cstr.cd_args) with
                      | Cstr_tuple args ->
                        Array.make (List.length args) Jkind.Sort.Const.void
-                     | Cstr_record _ -> [| Jkind.Sort.Const.value |]
+                     | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
                    in
                    Constructor_uniform_value, sorts)
                 (Array.of_list cstrs)
@@ -1069,7 +1072,7 @@ let transl_declaration env sdecl (id, uid) =
       match kind with
       | Type_record_unboxed_product _ ->
         begin match Jkind.get_layout jkind with
-        | Some Any ->
+        | Some (Any _) ->
           (* [jkind_default] has just what we need here *)
           Jkind.set_layout jkind (Jkind.extract_layout jkind_default)
         | _ -> jkind
@@ -1172,7 +1175,7 @@ let record_gets_unboxed_version = function
       Array.exists
         (fun (kind : mixed_block_element) ->
           match kind with
-          | Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+          | Scannable _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
           | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void -> false
           | Float_boxed -> true
           | Product shape -> shape_has_float_boxed shape)
@@ -1610,7 +1613,7 @@ let update_label_sorts env loc lbls named =
       let jkind = Ctype.type_jkind env ld_type in
       (* Next line guaranteed to be safe because of [check_representable] *)
       let sort = Jkind.sort_of_jkind jkind in
-      let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+      let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
       update idx ld_sort;
       {lbl with ld_sort}, jkind
     ) lbls
@@ -1637,7 +1640,7 @@ let update_constructor_arguments_sorts env loc cd_args sorts =
           let jkind = Ctype.type_jkind env ca_type in
           (* Next line guaranteed to be safe because of [check_representable] *)
           let sort = Jkind.sort_of_jkind jkind in
-          let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+          let ca_sort = Jkind.Sort.default_to_scannable_and_get sort in
           update idx ca_sort;
           {arg with ca_sort}, jkind)
         args
@@ -1651,7 +1654,7 @@ let update_constructor_arguments_sorts env loc cd_args sorts =
     let lbls, all_void, jkinds =
       update_label_sorts env loc lbls None
     in
-    update 0 Jkind.Sort.Const.value;
+    update 0 Jkind.Sort.Const.scannable;
     Types.Cstr_record lbls, all_void, jkinds
 
 let assert_mixed_product_support =
@@ -1702,7 +1705,7 @@ module Element_repr = struct
   and t =
     | Unboxed_element of unboxed_element
     | Float_element
-    | Value_element
+    | Value_element of Jkind_types.Scannable_axes.t
     | Void
     (* This type technically permits [Float_element] to appear in an unboxed
        product, but we never generate that and make no attempt to apply the
@@ -1713,7 +1716,10 @@ module Element_repr = struct
   let to_shape_element t : mixed_block_element =
     let rec of_t : t -> mixed_block_element = function
     | Unboxed_element unboxed -> of_unboxed_element unboxed
-    | Float_element | Value_element -> Value
+    | Float_element ->
+      (* A (boxed) [float] is separable and not null *)
+      Scannable Jkind_types.Scannable_axes.value_axes
+    | Value_element sa -> Scannable sa
     | Void -> Void
     and of_unboxed_element : unboxed_element -> mixed_block_element = function
       | Float64 -> Float64
@@ -1735,38 +1741,34 @@ module Element_repr = struct
     if is_float env ty
     then Float_element
     else
-      let layout = Jkind.get_layout_defaulting_to_value jkind in
-      let sort =
-        match Jkind.Layout.Const.get_sort layout with
-        | None ->
-          Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
-        | Some s -> s
-      in
-      let rec sort_to_t : Jkind_types.Sort.Const.t -> t = function
-      | Base Value -> Value_element
-      | Base Float64 -> Unboxed_element Float64
-      | Base Float32 -> Unboxed_element Float32
-      | Base Word -> Unboxed_element Word
-      | Base Bits8 -> Unboxed_element Bits8
-      | Base Bits16 -> Unboxed_element Bits16
-      | Base Bits32 -> Unboxed_element Bits32
-      | Base Bits64 -> Unboxed_element Bits64
-      | Base Untagged_immediate -> Unboxed_element Untagged_immediate
-      | Base Vec128 -> Unboxed_element Vec128
-      | Base Vec256 -> Unboxed_element Vec256
-      | Base Vec512 -> Unboxed_element Vec512
-      | Base Void -> Void
+      let layout = Jkind.get_layout_defaulting_to_scannable jkind in
+      let rec layout_to_t : Jkind_types.Layout.Const.t -> t = function
+      | Any _ ->
+        Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
+      | Base (Scannable, sa) -> Value_element sa
+      | Base (Float64, _) -> Unboxed_element Float64
+      | Base (Float32, _) -> Unboxed_element Float32
+      | Base (Word, _) -> Unboxed_element Word
+      | Base (Bits8, _) -> Unboxed_element Bits8
+      | Base (Bits16, _) -> Unboxed_element Bits16
+      | Base (Bits32, _) -> Unboxed_element Bits32
+      | Base (Bits64, _) -> Unboxed_element Bits64
+      | Base (Untagged_immediate, _) -> Unboxed_element Untagged_immediate
+      | Base (Vec128, _) -> Unboxed_element Vec128
+      | Base (Vec256, _) -> Unboxed_element Vec256
+      | Base (Vec512, _) -> Unboxed_element Vec512
+      | Base (Void, _) -> Void
       | Product l ->
-        Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
+        Unboxed_element (Product (Array.of_list (List.map layout_to_t l)))
       in
-      sort_to_t sort
+      layout_to_t layout
 
   let mixed_product_shape loc ts kind =
     let boxed_elements =
       let rec count_boxed_in_t acc : t -> int = function
         | Unboxed_element u -> count_boxed_in_unboxed_element acc u
         | Void -> acc
-        | Float_element | Value_element -> acc + 1
+        | Float_element | Value_element _ -> acc + 1
       and count_boxed_in_unboxed_element acc : unboxed_element -> int =
         function
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
@@ -1896,7 +1898,7 @@ let rec update_decl_jkind env dpath decl =
       (* This next line is guaranteed to be OK because of a call to
          [check_representable] *)
       let sort = Jkind.sort_of_jkind jkind in
-      let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+      let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
       [{lbl with ld_sort}], Record_unboxed, jkind
     | _, Record_boxed sorts ->
       let lbls, _all_void, jkinds =
@@ -1931,7 +1933,7 @@ let rec update_decl_jkind env dpath decl =
                              | Vec128 | Vec256 | Vec512 | Word
                              | Untagged_immediate | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
-           | Value_element -> repr_summary.values <- true
+           | Value_element _ -> repr_summary.values <- true
            | Void ->
                repr_summary.voids <- true)
         reprs lbls;
@@ -1961,7 +1963,7 @@ let rec update_decl_jkind env dpath decl =
                   | Unboxed_element (Float32 | Bits8 | Bits16 | Bits32 | Bits64
                                     | Vec128 | Vec256 | Vec512 | Word
                                     | Untagged_immediate | Product _)
-                  | Value_element ->
+                  | Value_element _ ->
                       Misc.fatal_error "Expected only floats and float64s")
                 reprs
               |> Array.of_list
@@ -1981,7 +1983,7 @@ let rec update_decl_jkind env dpath decl =
                 List.find_map
                   (fun ((repr : Element_repr.t), lbl) ->
                      match repr with
-                     | Value_element | Float_element -> None
+                     | Value_element _ | Float_element -> None
                      | _ ->
                        if Types.is_atomic lbl.Types.ld_mutable
                        then Some lbl
@@ -2073,7 +2075,7 @@ let rec update_decl_jkind env dpath decl =
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
             let jkind = Ctype.type_jkind env ty in
             let sort = Jkind.sort_of_jkind jkind in
-            let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+            let ca_sort = Jkind.Sort.default_to_scannable_and_get sort in
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
@@ -2081,7 +2083,7 @@ let rec update_decl_jkind env dpath decl =
         | Cstr_record [{ld_type} as lbl] -> begin
             let jkind = Ctype.type_jkind env ld_type in
             let sort = Jkind.sort_of_jkind jkind in
-            let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+            let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
             Variant_unboxed, jkind
@@ -2165,17 +2167,18 @@ let rec update_decl_jkind env dpath decl =
     | Type_record_unboxed_product (lbls, rep, umc) ->
         begin match rep with
         | Record_unboxed_product ->
-          let lbls =
+          let (lbls, layouts) =
             List.map (fun (Types.{ld_type} as lbl) ->
               let jkind = Ctype.type_jkind env ld_type in
               (* This next line is guaranteed to be OK because of a call to
                  [check_representable] *)
               let sort = Jkind.sort_of_jkind jkind in
-              let ld_sort = Jkind.Sort.default_to_value_and_get sort in
-              {lbl with ld_sort}
+              let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
+              {lbl with ld_sort}, Jkind.extract_layout jkind
             ) lbls
+            |> List.split
           in
-          let type_jkind = Jkind.for_unboxed_record lbls in
+          let type_jkind = Jkind.for_unboxed_record lbls layouts in
           (* See Note [Quality of jkinds during inference] for more information about when we
              mark jkinds as best *)
           let type_jkind = Jkind.mark_best type_jkind in
@@ -2579,7 +2582,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
     (* A type whose layout has [any] could contain all its parameters.
        CR layouts v11: update this function for [layout_of] layouts. *)
     let rec has_any : Jkind_types.Layout.Const.t -> bool = function
-      | Any -> true
+      | Any _ -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
     in
@@ -3493,13 +3496,13 @@ let native_repr_of_type env kind ty sort_or_poly =
   | Untagged, Tconstr (_, _, _) ->
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
-    let is_value =
+    let is_scannable =
       match sort_or_poly with
       | Poly -> false
-      | Sort (Base Value) -> true
+      | Sort (Base Scannable) -> true
       | Sort (Base _ | Product _) -> false
     in
-    if is_immediate && is_non_nullable && is_value
+    if is_immediate && is_non_nullable && is_scannable
     then Some (Unboxed_or_untagged_integer Untagged_int)
     else None
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float ->
@@ -3588,7 +3591,7 @@ let error_if_has_deep_native_repr_attributes core_type =
    In such cases, we raise an expection. *)
 let type_sort_external ~is_layout_poly ~why env loc typ =
   match Ctype.type_sort ~why ~fixed:true env typ with
-  | Ok s -> Jkind.Sort.default_to_value_and_get s
+  | Ok s -> Jkind.Sort.default_to_scannable_and_get s
   | Error err ->
     let kloc =
       if is_layout_poly then External_with_layout_poly else External
@@ -3621,7 +3624,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         sort_or_poly with
   | Native_repr_attr_absent, Poly ->
     Repr_poly
-  | Native_repr_attr_absent, Sort (Base (Value | Void) as base) ->
+  | Native_repr_attr_absent, Sort (Base (Scannable | Void) as base) ->
     Same_as_ocaml_repr base
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
@@ -3648,7 +3651,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present kind, (Poly | Sort (Base Value))
+  | Native_repr_attr_present kind, (Poly | Sort (Base Scannable))
   | Native_repr_attr_present (Untagged as kind), Sort _ ->
     begin match native_repr_of_type env kind ty sort_or_poly with
     | None ->

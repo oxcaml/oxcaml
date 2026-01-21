@@ -327,32 +327,19 @@ module Jkind0 : sig
   module Mod_bounds : sig
     module Crossing = Mode.Crossing
     module Externality = Jkind_axis.Externality
-    module Nullability = Jkind_axis.Nullability
-    module Separability = Jkind_axis.Separability
 
     type t = mod_bounds =
       { crossing : Mode.Crossing.t;
         externality: Jkind_axis.Externality.t;
-        nullability: Jkind_axis.Nullability.t;
-        separability: Jkind_axis.Separability.t;
       }
 
-    val create :
-      Crossing.t->
-      externality:Externality.t ->
-      nullability:Nullability.t ->
-      separability:Separability.t ->
-      t
+    val create : Crossing.t -> externality:Externality.t -> t
 
     val crossing : t -> Crossing.t
     val externality : t -> Externality.t
-    val nullability : t -> Nullability.t
-    val separability : t -> Separability.t
 
     val set_crossing : Crossing.t -> t -> t
     val set_externality : Externality.t -> t -> t
-    val set_nullability : Nullability.t -> t -> t
-    val set_separability : Separability.t -> t -> t
 
     (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max]
         within [bounds] *)
@@ -375,7 +362,6 @@ module Jkind0 : sig
     val join : t -> t -> t
 
     val relevant_axes_of_modality :
-      relevant_for_shallow:[ `Irrelevant | `Relevant ] ->
       modality:Mode.Modality.Const.t -> Jkind_axis.Axis_set.t
 
     val debug_print : Format.formatter -> t -> unit
@@ -387,7 +373,6 @@ module Jkind0 : sig
     include Allow_disallow with type (_, _, 'd) sided = 'd t
 
     val add_modality :
-      relevant_for_shallow:[ `Irrelevant | `Relevant ] ->
       modality:Mode.Modality.Const.t ->
       type_expr:type_expr ->
       (allowed * disallowed) t ->
@@ -451,6 +436,10 @@ module Jkind0 : sig
 
       (** Value of types of this jkind are not retained at all at runtime *)
       val void : t
+
+      (** Value of types of this jkind can be scanned by the GC, but no other
+          scannable axis information about them is known. *)
+      val scannable : t
 
       (** This is the jkind of normal ocaml values or null pointers *)
       val value_or_null : t
@@ -639,6 +628,8 @@ module Jkind0 : sig
       val any : why:Jkind_intf.History.any_creation_reason -> 'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
+      val scannable :
+        why:Jkind_intf.History.scannable_creation_reason -> 'd Types.jkind
       val value_or_null :
         why:Jkind_intf.History.value_or_null_creation_reason -> 'd jkind
       val value : why:Jkind_intf.History.value_creation_reason -> 'd jkind

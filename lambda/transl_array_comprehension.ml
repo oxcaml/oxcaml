@@ -463,7 +463,7 @@ let iterator ~transl_exp ~scopes ~loc :
       { ident; ident_debug_uid; pattern = _; start; stop; direction } ->
     let bound name debug_uid value =
       Let_binding.make (Immutable Strict) layout_int name debug_uid
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_value value)
+        (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable value)
     in
     let start = bound "start" Lambda.debug_uid_none start in
     let stop = bound "stop" Lambda.debug_uid_none stop in
@@ -483,13 +483,10 @@ let iterator ~transl_exp ~scopes ~loc :
     let iter_arr =
       Let_binding.make (Immutable Strict) layout_any_value "iter_arr"
         Lambda.debug_uid_none
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_value iter_arr_exp)
+        (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable iter_arr_exp)
     in
     let iter_arr_kind =
-      (* CR layouts v4: [~elt_sort:None] here is not ideal and
-         should be fixed. To do that, we will need to store a sort
-         on [Texp_comp_in]. *)
-      Typeopt.array_type_kind ~elt_sort:None ~elt_ty:(Some pattern.pat_type)
+      Typeopt.array_type_kind ~elt_ty:(Some pattern.pat_type)
         iter_arr_exp.exp_env iter_arr_exp.exp_loc iter_arr_exp.exp_type
     in
     let iter_arr_mut =
@@ -575,7 +572,7 @@ let clause ~transl_exp ~scopes ~loc = function
   | Texp_comp_when cond ->
     fun body ->
       Lifthenelse
-        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
           body,
           lambda_unit,
           layout_unit )

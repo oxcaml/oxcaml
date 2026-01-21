@@ -27,8 +27,7 @@ module M = struct
 end
 
 [%%expect{|
-module M :
-  sig val f : ('elt : value_or_null mod separable). 'elt -> 'elt array end
+module M : sig val f : ('elt : value maybe_null). 'elt -> 'elt array end
 |}]
 
 (* Implicit kind without jkind annotation fails. *)
@@ -397,7 +396,7 @@ Line 4, characters 26-27:
                               ^
 Error: This alias is bound to type "[> `bad ]"
        but is used as an instance of type "('a : bits32)"
-       The layout of [> `bad ] is value
+       The layout of [> `bad ] is value non_float
          because it's a polymorphic variant type.
        But the layout of [> `bad ] must be a sublayout of bits32
          because of the annotation on the implicit kind of type variables named a.
@@ -564,7 +563,7 @@ Line 4, characters 23-31:
                            ^^^^^^^^
 Error: The type constraints are not consistent.
        Type "('w : word)" is not compatible with type "int"
-       The layout of int is value
+       The layout of int is immediate
          because it is the primitive type int.
        But the layout of int must be a sublayout of word
          because of the annotation on the implicit kind of type variables named w.

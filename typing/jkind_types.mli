@@ -47,7 +47,7 @@ module Sort : sig
   (* Comments in [Jkind_intf.ml] *)
   type base =
     | Void
-    | Value
+    | Scannable
     | Untagged_immediate
     | Float64
     | Float32
@@ -89,6 +89,8 @@ module Sort : sig
       [Var v], then [!v] is [None]. *)
   val get : t -> t
 
+  val is_scannable_or_var : t -> bool
+
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
   *)
@@ -101,20 +103,43 @@ module Sort : sig
   end
 end
 
+module Scannable_axes : sig
+  type t =
+    { nullability : Jkind_axis.Nullability.t;
+      separability : Jkind_axis.Separability.t
+    }
+
+  val max : t
+
+  val value_axes : t
+
+  val immediate_axes : t
+
+  val immediate64_axes : t
+
+  val equal : t -> t -> bool
+
+  val less_or_equal : t -> t -> Misc.Le_result.t
+end
+
 module Layout : sig
   (** Note that products have two possible encodings: as [Product ...] or as
       [Sort (Product ...]. This duplication is hard to eliminate because of the
       possibility that a sort variable may be instantiated by a product sort. *)
   type 'sort t =
-    | Sort of 'sort
+    | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const : sig
     type t =
-      | Any
-      | Base of Sort.base
+      | Any of Scannable_axes.t
+      | Base of Sort.base * Scannable_axes.t
       | Product of t list
+
+    module Static : sig
+      val of_base : Sort.base -> Scannable_axes.t -> t
+    end
 
     val equal : t -> t -> bool
 
@@ -125,7 +150,7 @@ module Layout : sig
 
   val of_const : Const.t -> Sort.t t
 
-  val of_new_sort_var : level:int -> Sort.t t * Sort.t
+  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.t
 
   val get_const : Sort.t t -> Const.t option
 

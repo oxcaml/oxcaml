@@ -84,20 +84,25 @@ module Sub_result : sig
   val is_le : t -> bool
 end
 
+module Scannable_axes : sig
+  type t = Jkind_types.Scannable_axes.t
+
+  (** Omits all axes that are max, for printing *)
+  val to_string_list : t -> string list
+end
+
 (* The layout of a type describes its memory layout. A layout is either the
    indeterminate [Any] or a sort, which is a concrete memory layout. *)
 module Layout : sig
   type 'sort t = 'sort Jkind_types.Layout.t =
-    | Sort of 'sort
+    | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
-    val get_sort : t -> Sort.Const.t option
-
-    val of_sort_const : Sort.Const.t -> t
+    val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
   end
@@ -260,6 +265,8 @@ module Builtin : sig
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
 
+  val scannable : why:History.scannable_creation_reason -> 'd Types.jkind
+
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind
 
@@ -337,14 +344,6 @@ val of_new_sort_var :
 val of_new_sort :
   why:History.concrete_creation_reason -> level:int -> 'd Types.jkind
 
-(** Same as [of_new_sort_var], but the jkind is lowered to [Non_null] to mirror
-    "legacy" OCaml values. Defaulting the sort variable produces exactly
-    [value]. *)
-val of_new_legacy_sort_var :
-  why:History.concrete_legacy_creation_reason ->
-  level:int ->
-  'd Types.jkind * sort
-
 (** Same as [of_new_sort], but the jkind is lowered to [Non_null] to mirror
     "legacy" OCaml values. Defaulting the sort variable produces exactly
     [value]. *)
@@ -398,7 +397,8 @@ val of_type_decl_default :
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
 (** Choose an appropriate jkind for an unboxed record type. *)
-val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
+val for_unboxed_record :
+  Types.label_declaration list -> sort Layout.t list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed variant type.
 
@@ -435,9 +435,6 @@ val for_object : Types.jkind_l
 
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
-
-(** The jkind for [or_null] type arguments. *)
-val for_or_null_argument : Ident.t -> 'd Types.jkind
 
 (** The jkind for an abbreviation declaration. This implements the design in
     rule FIND_ABBREV in kind-inference.md, where we consider a definition
@@ -482,15 +479,16 @@ end
 (** Get a description of a jkind. *)
 val get : 'd Types.jkind -> 'd Desc.t
 
-(** [get_layout_defaulting_to_value] extracts a constant layout, defaulting any
-    sort variable to [value]. *)
-val get_layout_defaulting_to_value : 'd Types.jkind -> Layout.Const.t
+(** [get_layout_defaulting_to_scannable] extracts a constant layout, defaulting
+    any sort variable to [scannable]. *)
+val get_layout_defaulting_to_scannable : 'd Types.jkind -> Layout.Const.t
 
-(** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
-val default_to_value : 'd Types.jkind -> unit
+(** [default_to_scannable t] is [ignore (get_layout_defaulting_to_scannable t)]
+*)
+val default_to_scannable : 'd Types.jkind -> unit
 
-(** [is_void t] is [Void = get_layout_defaulting_to_value t]. In particular, it
-    will default the jkind to value if needed to make this false. *)
+(** [is_void t] is [Void = get_layout_defaulting_to_scannable t]. In particular,
+    it will default the jkind to scannable if needed to make this false. *)
 val is_void_defaulting : 'd Types.jkind -> bool
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing
@@ -524,17 +522,16 @@ val set_externality_upper_bound :
   Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
 
 (** Gets the nullability from a jkind. *)
-val get_nullability :
-  context:jkind_context -> Types.jkind_l -> Jkind_axis.Nullability.t
+val get_nullability : Types.jkind_l -> Jkind_axis.Nullability.t option
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the nullability axis *)
-val set_nullability_upper_bound :
+val set_root_nullability :
   Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the separability axis *)
-val set_separability_upper_bound :
+val set_root_separability :
   Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
 
 (** Sets the layout in a jkind. *)
@@ -634,14 +631,14 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds equal,
     if possible. e.g. [equate] on a var and [value] will set the variable to be
     [value] *)
-val equate : Types.jkind_lr -> Types.jkind_lr -> bool
+val equate : level:int -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
-val equal : Types.jkind_lr -> Types.jkind_lr -> bool
+val equal : level:int -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate sort
     variables. Works over any mix of l- and r-jkinds, because the only way not

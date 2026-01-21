@@ -55,7 +55,7 @@ Line 2, characters 0-38:
 Error:
        The layout of bad# is value & value
          because it is an unboxed record.
-       But the layout of bad# must be a sublayout of value
+       But the layout of bad# must be a value layout
          because of the definition of pair at line 1, characters 0-40.
 |}]
 
@@ -421,7 +421,7 @@ Error: Record element types must have a representable layout.
          because it is the type of record field a.
 |}]
 
-(* CR layouts v7.2: improve this error message *)
+(* CR layouts-scannable: improve this error message *)
 type ('a : value & float64) t
 type bad = r# t
 and r = { x:int; y:bool }
@@ -430,9 +430,9 @@ type ('a : value & float64) t
 Line 3, characters 0-25:
 3 | and r = { x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The kind of r# is value_or_null & float64
+Error: The layout of type "r#" is immediate & immediate
          because it is an unboxed record.
-       But the kind of r# must be a subkind of value & float64
-         because of the definition of t at line 1, characters 0-29.
+       But the layout of type "r#" must be a sublayout of
+           value maybe_separable maybe_null & float64
+         because it is an unboxed record.
 |}]

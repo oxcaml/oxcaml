@@ -40,9 +40,9 @@ Line 1, characters 19-38:
                        ^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate_or_null" should be an instance of type
          "('a : immediate)"
-       The kind of t_immediate_or_null is immediate_or_null
+       The layout of t_immediate_or_null is value non_pointer maybe_null
          because of the definition of t_immediate_or_null at line 1, characters 0-44.
-       But the kind of t_immediate_or_null must be a subkind of immediate
+       But the layout of t_immediate_or_null must be a sublayout of immediate
          because of the definition of accept_immediate at line 1, characters 0-38.
 |}]
 
@@ -58,9 +58,9 @@ Line 1, characters 19-38:
                        ^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate_or_null" should be an instance of type
          "('a : value)"
-       The kind of t_immediate_or_null is immediate_or_null
+       The layout of t_immediate_or_null is value non_pointer maybe_null
          because of the definition of t_immediate_or_null at line 1, characters 0-44.
-       But the kind of t_immediate_or_null must be a subkind of value
+       But the layout of t_immediate_or_null must be a sublayout of value
          because of the definition of accept_value at line 1, characters 0-30.
 |}]
 
@@ -122,7 +122,7 @@ type ('a : value_or_null mod non_float) accepts_nonfloat
 type succeeds = t_immediate_or_null accepts_nonfloat
 
 [%%expect{|
-type ('a : value_or_null mod non_float) accepts_nonfloat
+type ('a : value_or_null non_float) accepts_nonfloat
 type succeeds = t_immediate_or_null accepts_nonfloat
 |}]
 
@@ -175,9 +175,10 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : immediate64)"
-       The kind of t_immediate64_or_null is immediate64_or_null
+       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
-       But the kind of t_immediate64_or_null must be a subkind of immediate64
+       But the layout of t_immediate64_or_null must be a sublayout of
+           immediate64
          because of the definition of accept_immediate64 at line 1, characters 0-42.
 |}]
 
@@ -188,9 +189,10 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : immediate)"
-       The kind of t_immediate64_or_null is immediate64_or_null
+       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
-       But the kind of t_immediate64_or_null must be a subkind of immediate
+       But the layout of t_immediate64_or_null must be a sublayout of
+           immediate
          because of the definition of accept_immediate at line 1, characters 0-38.
 |}]
 
@@ -201,9 +203,9 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : value)"
-       The kind of t_immediate64_or_null is immediate64_or_null
+       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
-       But the kind of t_immediate64_or_null must be a subkind of value
+       But the layout of t_immediate64_or_null must be a sublayout of value
          because of the definition of accept_value at line 1, characters 0-30.
 |}]
 
@@ -230,19 +232,10 @@ Line 1, characters 19-30:
                        ^^^^^^^^^^^
 Error: This type "exn or_null" should be an instance of type
          "('a : immediate64_or_null)"
-       The kind of exn or_null is value_or_null mod stateless immutable
+       The layout of exn or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of exn or_null must be a subkind of immediate64_or_null
-         because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
-|}, Principal{|
-Line 1, characters 19-30:
-1 | type should_fail = exn or_null accept_immediate64_or_null
-                       ^^^^^^^^^^^
-Error: This type "exn or_null" should be an instance of type
-         "('a : immediate64_or_null)"
-       The kind of exn or_null is value_or_null mod everything with exn
-         because it is the primitive type or_null.
-       But the kind of exn or_null must be a subkind of immediate64_or_null
+       But the layout of exn or_null must be a sublayout of
+           value non_pointer64 maybe_null
          because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
 |}]
 
@@ -276,9 +269,9 @@ Error: Signature mismatch:
          type t = string or_null
        is not included in
          type t : immediate64_or_null
-       The kind of the first is
-           value_or_null mod forkable unyielding many stateless immutable
+       The layout of the first is value non_float maybe_null
          because it is the primitive type or_null.
-       But the kind of the first must be a subkind of immediate64_or_null
+       But the layout of the first must be a sublayout of
+           value non_pointer64 maybe_null
          because of the definition of t at line 2, characters 2-30.
 |}]
