@@ -1077,7 +1077,7 @@ and module_type i ppf x =
 
 and signature i ppf x =
   list i signature_item ppf x.sig_items;
-  moda_desc i ppf x.sig_modalities.moda_desc
+  modalities i ppf x.sig_modalities
 
 and signature_item i ppf x =
   line i ppf "signature_item %a\n" fmt_location x.sig_loc;
