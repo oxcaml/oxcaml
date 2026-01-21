@@ -243,6 +243,13 @@ val instance_labels:
         _ gen_label_description iarray ->
         (type_expr list * type_expr) iarray * type_expr
         (* Same, for a whole list of labels *)
+val instance_label_declarations:
+        fixed:bool ->
+        label_declaration iarray ->
+        params:type_expr list ->
+        (type_expr list * type_expr) iarray * type_expr list
+        (* Same, but for label declarations and the type parameters from the
+           type declaration *)
 val prim_mode :
         (Mode.allowed * 'r) Mode.Locality.t option -> (Primitive.mode * Primitive.native_repr)
         -> (Mode.allowed * 'r) Mode.Locality.t

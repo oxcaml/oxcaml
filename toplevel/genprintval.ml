@@ -524,14 +524,35 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                         (Out_name.create (Ident.name cd_id)),
                                       [ r ])
                     end
-                | {type_kind = Type_record(lbl_list, rep, _)} ->
-                    begin match check_depth depth obj ty, rep with
-                      Some x, _ -> x
-                    | None, None ->
-                        (* XXX This needs to look up the actual rep using the
-                           type arguments *)
-                        Oval_stuff "<thing with field of kind any>"
-                    | None, Some rep ->
+                | {type_kind = Type_record(lbl_list, rep, _); type_params} ->
+                    begin match check_depth depth obj ty with
+                      Some x -> x
+                    | None ->
+                        let rep =
+                          match rep with
+                          | Some rep -> rep
+                          | None ->
+                              let label_params_and_types, record_params =
+                                Ctype.instance_label_declarations
+                                  ~fixed:false
+                                  (lbl_list |> Iarray.of_list)
+                                  ~params:type_params
+                              in
+                              List.iter2 (Ctype.unify env)
+                                record_params ty_list;
+                              let lds_and_types =
+                                List.map2 (fun lbl (_params, ty) -> lbl, ty)
+                                  lbl_list
+                                  (label_params_and_types |> Iarray.to_list)
+                              in
+                              match
+                                Typedecl.update_record_representation env
+                                  Location.none Legacy lds_and_types None
+                              with
+                              | Ok (_sorts, rep) -> rep
+                              | Error _ ->
+                                  Misc.fatal_error "unrepresentable record"
+                        in
                         let pos =
                           match rep with
                           | Record_inlined (_, _, Variant_extensible) -> 1
