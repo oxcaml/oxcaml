@@ -4761,20 +4761,20 @@ let rec approx_type env sty =
       (* CR layouts v5: value requirement here to be relaxed *)
       if is_optional p then newvar Predef.option_argument_jkind
       else begin
-        let arg_mode = (Typemode.transl_alloc_mode arg_mode).mode_modes in
+        let arg_mode = Typemode.transl_alloc_mode arg_mode in
         let arg_ty =
           (* Polymorphic types will only unify with types that match all of their
            polymorphic parts, so we need to fully translate the type here
            unlike in the monomorphic case *)
-          Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false arg_mode arg_sty
+          Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false arg_mode.mode_modes arg_sty
         in
         let ret = approx_type env sty in
-        let marg = Alloc.of_const arg_mode in
+        let marg = Alloc.of_const arg_mode.mode_modes in
         let mret = Alloc.newvar () in
         newty (Tarrow ((p,marg,mret), arg_ty.ctyp_type, ret, commu_ok))
       end
   | Ptyp_arrow (p, arg_sty, sty, arg_mode, _) ->
-      let arg_mode = (Typemode.transl_alloc_mode arg_mode).mode_modes in
+      let arg_mode = Typemode.transl_alloc_mode arg_mode in
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         if is_optional p
@@ -4782,7 +4782,7 @@ let rec approx_type env sty =
         else newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
       let ret = approx_type env sty in
-      let marg = Alloc.of_const arg_mode in
+      let marg = Alloc.of_const arg_mode.mode_modes in
       let mret = Alloc.newvar () in
       newty (Tarrow ((p,marg,mret), newmono arg, ret, commu_ok))
   | Ptyp_tuple args ->
@@ -4803,12 +4803,10 @@ let type_pattern_approx env spat ty_expected =
       let inferred_ty =
         match sty with
         | {ptyp_desc=Ptyp_poly _} ->
-          let arg_type_mode =
-            (Typemode.transl_alloc_mode arg_type_mode).mode_modes
-          in
+          let arg_type_mode = Typemode.transl_alloc_mode arg_type_mode in
           let inferred_ty =
             Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false
-              arg_type_mode sty
+              arg_type_mode.mode_modes sty
           in
           inferred_ty.ctyp_type
         | _ -> approx_type env sty
@@ -4846,7 +4844,7 @@ let type_approx_fun_one_param
     match spato with
     | None -> None, false
     | Some spat ->
-        let mode_annots = (mode_annots_from_pat spat).mode_modes in
+        let mode_annots = mode_annots_from_pat spat in
         let has_poly = has_poly_constraint spat in
         if has_poly && is_optional label then
           raise(Error(spat.ppat_loc, env, Optional_poly_param));
@@ -4863,7 +4861,7 @@ let type_approx_fun_one_param
   in
   Option.iter
     (fun mode_annots ->
-      apply_mode_annots ~loc ~env mode_annots arg_mode)
+      apply_mode_annots ~loc ~env mode_annots.mode_modes arg_mode)
     mode_annots;
   if has_poly then begin
     match spato with
