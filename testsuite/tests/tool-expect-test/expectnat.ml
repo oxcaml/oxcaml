@@ -3,7 +3,8 @@
 *)
 
 (* Demonstrate that the native backend is used *)
-let x : int = Obj.magic Obj.magic #5s
-[%%expect {|
-val x : int = 2
+let _ = Sys.backend_type
+
+[%%expect{|
+- : Sys.backend_type = Sys.Native
 |}]
