@@ -600,22 +600,18 @@ let sort_dedup_modalities ~warn l =
   in
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map (fun x -> x.txt)
 
-let transl_modalities ~maturity mut annots =
+let transl_modalities_with_default ~maturity ~default annots =
   let modalities_loc =
     match List.map (fun { loc; _ } -> loc) annots with
     | [] -> Location.none
     | _ :: _ as locs -> Location.merge locs
   in
-  let mut_modalities =
-    mutable_implied_modalities (Types.is_mutable mut)
-      ~for_mutable_variable:false
-  in
   let annots = List.map (transl_modality ~maturity) annots in
   (* axes listed in the order of implication. *)
   let modalities = sort_dedup_modalities ~warn:true annots in
   let open Modality in
-  (* - mut_modalities is applied before explicit modalities.
-     - explicit modalities can override mut_modalities.
+  (* - default is applied before explicit modalities.
+     - explicit modalities can override default.
      - For the same axis, later modalities overrides earlier modalities. *)
   let modalities =
     List.fold_left
@@ -624,13 +620,20 @@ let transl_modalities ~maturity mut annots =
         List.fold_left
           (fun m (Atom (ax, a)) -> Const.set ax a m)
           m (implied_modalities t))
-      mut_modalities modalities
+      default modalities
   in
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   { moda_modalities = modalities; moda_desc = annots }
 
 let mutable_modalities mut =
   mutable_implied_modalities (Types.is_mutable mut) ~for_mutable_variable:false
+
+let transl_modalities ~maturity mut annots =
+  let default =
+    mutable_implied_modalities (Types.is_mutable mut)
+      ~for_mutable_variable:false
+  in
+  transl_modalities_with_default ~maturity ~default annots
 
 let let_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:true

@@ -3881,9 +3881,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
         mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
         let raw_modalities =
-          match valdecl.pval_modalities with
-          | [] -> { moda_modalities = sig_modalities; moda_desc = [] }
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
+          Typemode.transl_modalities_with_default
+            ~maturity:Stable ~default:sig_modalities valdecl.pval_modalities
         in
         let modalities =
           Mode.Modality.of_const raw_modalities.moda_modalities
