@@ -67,10 +67,4 @@ let simplify_app_mapper should_remove =
           | _ -> e))
   }
 
-let minimize should_remove map cur_name =
-  let mapper = simplify_app_mapper should_remove in
-  let nstr = mapper.structure mapper (Smap.find cur_name map) in
-  Smap.add cur_name nstr map
-
-let minimizer =
-  { minimizer_name = "simplify-application"; minimizer_func = minimize }
+let minimizer = tast_mapper_minimizer "simplify-application" simplify_app_mapper

@@ -28,7 +28,6 @@
 (** Minimizer **)
 
 open Utils
-open Typedtree
 open Cmt_format
 
 (* ______ COMMAND SETUP ______ *)
@@ -165,32 +164,38 @@ let schedule =
       exit 1);
     Iterator.with_strategy
       (Iterator.test ~pos:!test ~len:1)
-      [Iterator.minimizer (List.hd minimizers_to_run)])
-  else
-    Iterator.list
-      [ Iterator.fix (List.map Iterator.minimizer minimizers_to_run);
-        Iterator.minimizer Remdef.minimizer ]
+      [Context.minimizer (List.hd minimizers_to_run)])
+  else Iterator.fix (List.map Context.minimizer minimizers_to_run)
 
-(* ______ ONE FILE MINIMIZATION ______ *)
-
-let check ~command map =
-  update_output map;
-  if raise_error command
+(* CHECKING ERROR PRESENCE AFTER PRINTING *)
+let must_raise_error command =
+  if !test < 0 && not (raise_error command)
   then (
-    save_outputs map;
-    true)
-  else false
+    Format.eprintf "@[<v 2>*** Printing error ***";
+    Format.eprintf "@ @[%a@ %S;@ %a@]@ " Format.pp_print_text
+      "This command raises the error" !Utils.error_str Format.pp_print_text
+      "however, printing the contents from the cmt file does not raise that \
+       same error.";
+    Format.eprintf "@ @[%a@]@ @;<1 2>%s@ " Format.pp_print_text
+      "The following command does *NOT* raise the error:" command;
+    Format.eprintf "@ @[%a@]" Format.pp_print_text
+      "Hint: This is likely due to a missing feature in either untypeast.ml or \
+       pprintast.ml.";
+    Format.eprintf "@]@.";
+    exit 1)
 
-(** [one_file_minimize c map file] minimizes [file] in the file set [map]
-    regarding to the command [c] *)
-let one_file_minimize c (map : structure Smap.t) file : structure Smap.t * bool
-    =
-  Format.eprintf "Starting to minimize %s @." file;
-  let nmap, has_changed =
-    Iterator.run ~check:(check ~command:c) schedule map file
-  in
-  update_output nmap;
-  nmap, has_changed
+type mode =
+  | Legacy_multi_files of
+      { command : string;
+        input_files : string list;
+        output_dir : string
+      }
+  | Modules of
+      { modname : string;
+        command : string;
+        output_dir : string;
+        context : Context.t
+      }
 
 let main () =
   (* LIST MINIMIZERS *)
@@ -221,9 +226,7 @@ let main () =
       Format.eprintf "Options --cmt and -t are incompatible.@.";
       exit 2)
   in
-  let file_strs =
-    List.map (fun cmt_info -> extract_cmt cmt_info.cmt_annots) cmt_infos
-  in
+  let cmt_files_with_names = List.combine file_names cmt_infos in
   (* CHECKING ERROR PRESENCE *)
   let c =
     if !inplace
@@ -235,110 +238,157 @@ let main () =
     Format.eprintf "This command does not raise the error %S. @."
       !Utils.error_str;
     exit 1);
-  (* CHECKING ERROR PRESENCE AFTER PRINTING *)
-  let () =
-    let cmd =
-      if !inplace
+  let mode =
+    match !inplace, cmt_files_with_names with
+    | false, [(input_file, cmt_info)] ->
+      let sourcefile =
+        if !output_file = ""
+        then
+          let ext = Filename.extension input_file in
+          let stem = Filename.chop_extension input_file in
+          stem ^ "_min" ^ ext
+        else !output_file
+      in
+      let { modname; context } : Context.add_result =
+        Context.add ~sourcefile cmt_info Context.empty
+      in
+      let command = !command ^ " " ^ sourcefile in
+      Modules { modname; command; output_dir = ""; context }
+    | true, [(input_file, cmt_info)] ->
+      if !output_file != ""
       then (
-        List.iter2 update_single file_names file_strs;
-        !command)
-      else
-        let file_names_min =
-          List.map
-            (fun path -> Filename.chop_extension path ^ "_min.ml")
-            file_names
-        in
-        List.iter2 update_single file_names_min file_strs;
-        List.fold_left
-          (fun c output -> c ^ " " ^ output)
-          !command file_names_min
-    in
-    if !test < 0 && not (raise_error cmd)
-    then (
-      Format.eprintf "@[<v 2>*** Printing error ***";
-      Format.eprintf "@ @[%a@ %S;@ %a@]@ " Format.pp_print_text
-        "This command raises the error" !Utils.error_str Format.pp_print_text
-        "however, printing the contents from the cmt file does not raise that \
-         same error.";
-      Format.eprintf "@ @[%a@]@ @;<1 2>%s@ " Format.pp_print_text
-        "The following command does *NOT* raise the error:" cmd;
-      Format.eprintf "@ @[%a@]" Format.pp_print_text
-        "Hint: This is likely due to a missing feature in either untypeast.ml \
-         or pprintast.ml.";
-      Format.eprintf "@]@.";
-      exit 1)
-  in
-  if List.length file_names = 1
-  then (
-    (* MONOFILE MINIMIZATION*)
-    let input = List.hd file_names in
-    let output_file =
+        Format.eprintf "Options -i and -o are not compatible@.";
+        exit 2);
+      let { modname; context } : Context.add_result =
+        Context.add ~sourcefile:input_file cmt_info Context.empty
+      in
+      Modules { modname; command = !command; output_dir = ""; context }
+    | false, _ ->
       if !output_file = ""
-      then
-        if !inplace
-        then input
-        else String.sub input 0 (String.length input - 3) ^ "_min.ml"
-      else if !inplace
       then (
-        Format.eprintf "Options -i and -o are incompatible@.";
-        exit 2)
-      else !output_file
-    in
-    let c = if !inplace then !command else !command ^ " " ^ output_file in
-    let input_str = List.hd file_strs in
-    update_single output_file input_str;
-    ignore
-      (one_file_minimize c (Smap.singleton output_file input_str) output_file))
-  else (
-    if !inplace
+        Format.eprintf
+          "Multi-file minimization requires either --inplace or -o.";
+        exit 2);
+      let output_dir = !output_file in
+      Legacy_multi_files
+        { command = !command; input_files = file_names; output_dir }
+    | true, (first_file, first_cmt) :: other_inputs ->
+      let { modname; context } : Context.add_result =
+        Context.add ~sourcefile:first_file first_cmt Context.empty
+      in
+      let context =
+        List.fold_left
+          (fun context (sourcefile, cmt_file) ->
+            let add_result = Context.add ~sourcefile cmt_file context in
+            add_result.context)
+          context other_inputs
+      in
+      Modules { modname; command = !command; output_dir = ""; context }
+    | true, [] ->
+      Format.eprintf "In-place minimization requires at least one input.@.";
+      exit 2
+  in
+  let check ~path ~command modules =
+    Context.write_to ~path modules;
+    if raise_error command
     then (
-      Format.eprintf
-        "Multi-file minimization is incompatible with inplace minimization for \
-         now@.";
-      exit 2);
-    (* MULTIFILE MINIMIZATION *)
-    let output_dir =
-      if !output_file = "" then "minimized_res" else !output_file
-    in
-    Stdlib.ignore (Sys.command ("cp -R . " ^ output_dir ^ "/"));
+      Context.write_to ~path
+        ~with_open_out:(fun name f ->
+          Out_channel.with_open_bin (name ^ ".tmp") f)
+        modules;
+      true)
+    else false
+  in
+  match mode with
+  | Legacy_multi_files { command; input_files; output_dir } ->
+    Format.eprintf "Running in legacy multi-file mode.@.";
+    ignore
+      (Sys.command (Filename.quote_command "cp" ["-R"; "."; output_dir ^ "/"]));
     Sys.chdir output_dir;
     (* MINIMIZING FILES *)
     let rfile_names = ref file_names in
+    let context =
+      List.fold_left
+        (fun context (sourcefile, cmt_file) ->
+          let add_result = Context.add ~sourcefile cmt_file context in
+          add_result.context)
+        Context.empty cmt_files_with_names
+    in
+    let structures = Context.structures context in
+    let file_strs =
+      List.map
+        (fun input_file ->
+          match Smap.find_opt input_file structures with
+          | None -> failwith "missing structure"
+          | Some structure -> structure)
+        input_files
+    in
     let rfile_strs = ref file_strs in
     let str_map =
-      List.fold_left2
-        (fun map key str -> Smap.add key str map)
-        Smap.empty file_names file_strs
+      Context.of_modules
+        (List.fold_left2
+           (fun map key str -> Smap.add key str map)
+           Smap.empty file_names file_strs)
     in
-    let c =
-      ref
-        (List.fold_left (fun c output -> c ^ " " ^ output) !command file_names)
-    in
-    let has_changed = ref true in
+    let c = ref (make_command command input_files) in
     let nmap = ref str_map in
+    Context.write_to ~path:output_dir !nmap;
+    must_raise_error !c;
+    let has_changed = ref true in
     while !has_changed do
       (* REMOVING FILES *)
-      let fn, fs =
-        Mergefiles.merge_strategy !command
-          (Removefiles.to_remove !command (!rfile_names, !rfile_strs))
+      let modules =
+        List.fold_left2
+          (fun modules name str -> Smap.add name str modules)
+          Smap.empty !rfile_names !rfile_strs
+      in
+      let fn, fs = Removefiles.to_remove command (!rfile_names, !rfile_strs) in
+      let fs =
+        List.map
+          (fun modinfo ->
+            match modinfo.implementation with
+            | Some { annots; _ } -> annots
+            | None -> assert false)
+          fs
+      in
+      let fn, fs = Mergefiles.merge_strategy command (fn, fs) in
+      let fs =
+        List.map2
+          (fun name str ->
+            let modinfo = Smap.find name modules in
+            update_structure modinfo str)
+          fn fs
       in
       rfile_names := fn;
       rfile_strs := fs;
       nmap
-        := List.fold_left2
-             (fun map key str -> Smap.add key str map)
-             Smap.empty file_names file_strs;
-      c := make_command !command fn;
+        := Context.of_modules
+             (List.fold_left2
+                (fun map key str -> Smap.add key str map)
+                Smap.empty fn fs);
+      c := make_command command fn;
       let a, b =
         List.fold_left
           (fun (map, b) name ->
-            let nmap, ch = one_file_minimize !c map name in
+            let nmap, ch =
+              Iterator.run
+                ~check:(check ~path:output_dir ~command:!c)
+                schedule map name
+            in
             nmap, b || ch)
-          (!nmap, false) file_names
+          (!nmap, false) fn
       in
       nmap := a;
       has_changed := b
-    done;
-    Sys.chdir "..")
+    done
+  | Modules { modname; command; output_dir; context } ->
+    Context.write_to ~path:output_dir context;
+    must_raise_error command;
+    let context, _did_change =
+      Iterator.run
+        ~check:(check ~path:output_dir ~command)
+        schedule context modname
+    in
+    if !test < 0 then Context.write_to ~path:output_dir context
 
 let _ = main ()

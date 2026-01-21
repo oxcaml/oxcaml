@@ -259,9 +259,8 @@ let minimize should_remove map cur_name =
   in
   (* Replacing in multifiles *)
   let cons, typ = !name_to_remove in
-  let name_clr = String.sub cur_name 0 (String.length cur_name - 1) in
   let typ_mf =
-    Path.Pdot (Pident (Ident.create_local name_clr), Path.name typ)
+    Path.Pdot (Pident (Ident.create_local cur_name), Path.name typ)
   in
   let mapper_mf = remove_cons_mapper (cons, typ_mf) in
   let nmap =
@@ -270,4 +269,4 @@ let minimize should_remove map cur_name =
   (* Final result*)
   nmap
 
-let minimizer = { minimizer_name = "simplify-types"; minimizer_func = minimize }
+let minimizer = multifile_minimizer "simplify-types" minimize

@@ -265,12 +265,7 @@ let minimize should_remove map cur_name =
     let correcter nstr =
       List.fold_left
         (fun nstr id ->
-          let origin_file =
-            Pident
-              (create_local
-                 (String.capitalize_ascii
-                    (String.sub cur_name 0 (String.length cur_name - 3))))
-          in
+          let origin_file = Pident (create_local cur_name) in
           let to_find =
             Pdot
               ( Pdot (origin_file, String.capitalize_ascii mod_name),
@@ -291,5 +286,4 @@ let minimize should_remove map cur_name =
     let nmap = Smap.add cur_name nstr map in
     nmap
 
-let minimizer =
-  { minimizer_name = "flatten-modules"; minimizer_func = minimize }
+let minimizer = multifile_minimizer "flatten-modules" minimize
