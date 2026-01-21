@@ -374,7 +374,8 @@ end = struct
     in
     begin match Env.find_implicit_jkind name env with
     | Some implicit_jkind
-      when not (Jkind.equate original_jkind implicit_jkind) ->
+      when not (Jkind.equate ~level:(get_current_level ())
+                  original_jkind implicit_jkind) ->
         raise (Error (loc, env,
           Mismatched_jkind_annotation { name; explicit_jkind = original_jkind;
                                         implicit_jkind }))
@@ -419,7 +420,8 @@ end = struct
   let check_jkind env loc name v jkind_info =
     match get_desc v with
     | Tvar { jkind } | Tunivar { jkind } when
-        not (Jkind.equate jkind jkind_info.original_jkind) ->
+        not (Jkind.equate ~level:(get_current_level ()) jkind
+               jkind_info.original_jkind) ->
       let reason =
         Bad_univar_jkind { name; jkind_info; inferred_jkind = jkind }
       in
@@ -675,7 +677,8 @@ let transl_type_param env path jkind_default styp =
         let jkind =
           Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind_annot
         in
-        if not (Jkind.equate jkind implicit_jkind) then
+        if not (Jkind.equate ~level:(get_current_level ()) jkind implicit_jkind)
+        then
           raise (Error (loc, env,
             Mismatched_jkind_annotation
               { name = var_name; explicit_jkind = jkind;
@@ -1261,7 +1264,8 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
     | Some jkind_annot, None -> jkind_of_annot jkind_annot, None
     | Some jkind_annot, Some implicit_jkind ->
       let jkind = jkind_of_annot jkind_annot in
-      if not (Jkind.equate jkind implicit_jkind) then
+      if not (Jkind.equate ~level:(get_current_level ()) jkind implicit_jkind)
+      then
         raise (Error (alias_loc, env,
             Mismatched_jkind_annotation { name = alias; explicit_jkind = jkind;
                                           implicit_jkind }));
@@ -1690,8 +1694,12 @@ let report_error env ppf =
           dprintf "But it was inferred to have %t"
             (fun ppf -> let desc = Jkind.get inferred_jkind in
               match desc.layout with
-              | Sort (Var _) -> fprintf ppf "a representable kind"
-              | Sort (Base _) | Any | Product _ ->
+              | Sort (Var _, sa) ->
+                fprintf ppf "%a representable kind"
+                  (pp_print_list ~pp_sep:(fun f () -> fprintf f " ")
+                    pp_print_string)
+                  ("a" :: Jkind.Scannable_axes.to_string_list sa)
+              | Sort (Base _, _) | Any _ | Product _ ->
                 fprintf ppf "kind %a" Jkind.format
                   inferred_jkind)))
         inferred_jkind
