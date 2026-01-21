@@ -571,13 +571,13 @@ module type S =
   sig
     module type S0 =
       sig
-        val x1 : string -> string
-        val x2 : string -> string @@ portable
-        val x3 : string -> string
+        val x1 : string -> string @@ portable contended
+        val x2 : string -> string @@ portable contended
+        val x3 : string -> string @@ contended
       end
-    val x1 : string -> string @@ many portable
-    val x2 : string -> string @@ many portable
-    val x3 : string -> string @@ many portable
+    val x1 : string -> string @@ many portable contended
+    val x2 : string -> string @@ many portable contended
+    val x3 : string -> string @@ many portable contended
   end
 |}]
 
