@@ -1315,6 +1315,7 @@ module Ast = struct
     | Unreachable
     | Src_pos
     | Stack of expression
+    | Borrow of expression
     | Exclave of expression
     | Unboxed_unit
     | Unboxed_tuple of (tuple_label * expression) list
@@ -1962,6 +1963,7 @@ module Ast = struct
       pp fmt "(@[<2>module@ %a@])" (print_module_exp env) module_exp
     | New ident -> pp fmt "@[<2>new@ %a@]" (print_raw_ident_value env) ident
     | Stack exp -> pp fmt "@[<2>stack_@ %a@]" (print_exp_with_parens env) exp
+    | Borrow exp -> pp fmt "@[<2>borrow_@ %a@]" (print_exp_with_parens env) exp
     | Let_exception (name, exp) ->
       pp fmt "@[<2>let@ exception@ %s@ in@ %a@]" name (print_exp env) exp
     | Extension_constructor name ->
@@ -2918,6 +2920,10 @@ module Exp_desc = struct
   let stack exp =
     let+ exp = exp in
     Ast.Stack exp
+
+  let borrow exp =
+    let+ exp = exp in
+    Ast.Borrow exp
 
   let quote exp =
     let+ exp = exp in
