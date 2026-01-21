@@ -3390,17 +3390,7 @@ and type_pat_aux
       (* Pretend separate = true *)
       begin match sty with
       | Some sty ->
-        let type_modes =
-          Typemode.transl_mode_annots ms
-        in
-
-        let type_modes =
-          { type_modes with
-            mode_modes =
-              Mode.Alloc.Const.Option.value type_modes.mode_modes
-                ~default:Mode.Alloc.Const.legacy
-          }
-        in
+        let type_modes = Typemode.transl_alloc_mode ms in
         let cty, ty, expected_ty' =
           solve_Ppat_constraint tps loc !!penv type_modes.mode_modes sty
             expected_ty
