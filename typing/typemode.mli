@@ -1,5 +1,8 @@
 module Jkind = Btype.Jkind0
 
+(* CR-soon liam923: The [modes] and [modalities] types should be defined in
+   [Typedtree], but can't be due to a dependency cycle. *)
+
 type 'a modes =
   { mode_modes : 'a;
     mode_desc : Mode.Alloc.atom Location.loc list

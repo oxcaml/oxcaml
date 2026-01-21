@@ -111,6 +111,8 @@ val print_unique_use : Format.formatter -> unique_use -> unit
 
 type alloc_mode = Mode.Alloc.r
 
+(* CR-someday liam923: We'd like to split this into an arrow_modes and
+   value_modes type. *)
 type 'a modes = 'a Typemode.modes =
   { mode_modes : 'a;
     mode_desc : Mode.Alloc.atom Location.loc list
