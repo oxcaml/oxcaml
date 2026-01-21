@@ -470,7 +470,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim
-                  ( Pmakeblock (0, Immutable, Default_shape, Lambda.alloc_heap),
+                  ( Pmakeblock (0, Immutable, All_value, Lambda.alloc_heap),
                     fields,
                     loc )
             in

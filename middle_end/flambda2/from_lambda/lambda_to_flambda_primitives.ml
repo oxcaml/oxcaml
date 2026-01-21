@@ -120,7 +120,7 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
 
 let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   match shape with
-  | Default_shape ->
+  | All_value ->
     List.init num_fields (fun _field -> K.With_subkind.any_value)
   | Shape shape ->
     let shape_length = Array.length shape in

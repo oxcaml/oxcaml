@@ -483,9 +483,9 @@ and layout =
   | Psplicevar of Ident.t
 
 and block_shape =
-  | Default_shape
-    (** The default block shape is a uniform block of [generic_value]s, the
-        length can be determined from the application site. *)
+  | All_value
+    (** The block shape is a uniform block of [generic_value]s, the length can
+        be determined from the application site. *)
   | Shape of mixed_block_shape
     (** A specific block shape, this may be a uniform block or a mixed block. *)
 

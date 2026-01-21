@@ -73,7 +73,7 @@ let quote_bool b = if b then true_ else false_
 let none = Lconst (Const_base (Const_int 0))
 
 let some x =
-  Lprim (Pmakeblock (0, Immutable, Default_shape, alloc_heap), [x], Loc_unknown)
+  Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap), [x], Loc_unknown)
 
 let option opt = match opt with None -> none | Some x -> some x
 
@@ -85,7 +85,7 @@ let nil = Lconst (Const_base (Const_int 0))
 
 let cons hd tl =
   Lprim
-    (Pmakeblock (0, Immutable, Default_shape, alloc_heap), [hd; tl], Loc_unknown)
+    (Pmakeblock (0, Immutable, All_value, alloc_heap), [hd; tl], Loc_unknown)
 
 let hd l = Lprim (Pfield (0, Immediate, Reads_vary), [l], Loc_unknown)
 
@@ -96,11 +96,11 @@ let rec mk_list list =
 
 let pair (x, y) =
   Lprim
-    (Pmakeblock (0, Immutable, Default_shape, alloc_heap), [x; y], Loc_unknown)
+    (Pmakeblock (0, Immutable, All_value, alloc_heap), [x; y], Loc_unknown)
 
 let triple (x, y, z) =
   Lprim
-    ( Pmakeblock (0, Immutable, Default_shape, alloc_heap),
+    ( Pmakeblock (0, Immutable, All_value, alloc_heap),
       [x; y; z],
       Loc_unknown )
 

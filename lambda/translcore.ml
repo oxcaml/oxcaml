@@ -103,7 +103,7 @@ let transl_extension_constructor ~scopes env path ext =
          They could be Alloc_local, but that would require changes
          to pattern typing, as patterns can close over them. *)
       Lprim (Pmakeblock
-          (Obj.object_tag, Immutable_unique, Default_shape, alloc_heap),
+          (Obj.object_tag, Immutable_unique, All_value, alloc_heap),
         [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
          Lprim (prim_fresh_oo_id, [lambda_unit], loc)],
         loc)
@@ -234,7 +234,7 @@ let assert_failed loc ~scopes exp =
   in
   let loc = of_location ~scopes exp.exp_loc in
   Lprim(Praise Raise_regular, [event_after ~scopes exp
-    (Lprim(Pmakeblock(0, Immutable, Default_shape, alloc_heap),
+    (Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
           [slot;
            Lconst(Const_block(0,
               [Const_base(Const_string (fname, exp.exp_loc, None));
@@ -638,7 +638,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Lconst(Const_block(0, [const_int tag;
                                    extract_constant lam]))
           with Not_constant ->
-            Lprim(Pmakeblock(0, Immutable, Default_shape,
+            Lprim(Pmakeblock(0, Immutable, All_value,
                              transl_alloc_mode alloc_mode),
                   [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)

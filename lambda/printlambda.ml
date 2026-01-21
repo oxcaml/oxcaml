@@ -284,8 +284,6 @@ let return_kind ppf (mode, kind) =
   | Pbottom -> fprintf ppf ": bottom@ "
   | Psplicevar id -> fprintf ppf ": $%a@ " Ident.print id
 
-let field_kind = value_kind
-
 let locality_kind = function
   | Alloc_heap -> ""
   | Alloc_local -> "[L]"
@@ -360,10 +358,11 @@ and mixed_block_shape
   end
 
 let block_shape ppf shape = match shape with
-  | Default_shape -> ()
+  | All_value -> ()
   | Shape arr ->
-      if List.for_all ((=) Lamda.Value Lambda.generic_value) vks then ()
+      if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) arr then ()
       else mixed_block_shape (fun _ () -> ()) ppf arr
+
 let field_read_semantics ppf sem =
   match sem with
   | Reads_agree -> ()

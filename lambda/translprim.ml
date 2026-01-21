@@ -590,9 +590,9 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
     | "%makeblock" ->
-       Primitive ((Pmakeblock(0, Immutable, Default_shape, mode)), 1)
+       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, Default_shape, mode)), 1)
+       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -1667,7 +1667,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       | Pbigarray_unknown, Pbigarray_unknown_layout -> None
       | _, _ -> Some (Primitive (Pbigarrayset(unsafe, n, k, l), arity))
     end
-  | Primitive (Pmakeblock(tag, mut, Default_shape, mode), arity), fields ->
+  | Primitive (Pmakeblock(tag, mut, All_value, mode), arity), fields ->
     begin
       let shape =
         List.map (fun typ ->
@@ -2088,7 +2088,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, Default_shape, alloc_heap),
+      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
       Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
@@ -2137,7 +2137,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (
         Praise Raise_regular,
         [Lprim (
-          Pmakeblock (0, Immutable, Default_shape, alloc_heap),
+          Pmakeblock (0, Immutable, All_value, alloc_heap),
           [exn; Lconst (Const_immstring msg)],
           loc)],
         loc)
