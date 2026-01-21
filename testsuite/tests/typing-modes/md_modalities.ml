@@ -148,3 +148,52 @@ Error: Signature mismatch:
        The left-hand side is "nonportable"
        but the right-hand side is "portable".
 |}]
+
+(* nested default modalities on different axes *)
+module type S = sig @@ portable
+    val bar : 'a -> 'a
+    module M : sig @@ contended
+        val foo : 'a -> 'a
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    val bar : 'a -> 'a @@ portable
+    module M : sig val foo : 'a -> 'a @@ portable contended end
+  end
+|}]
+
+(* nested default modalities on the same axis *)
+module type S = sig @@ portable
+    val bar : 'a -> 'a
+    module M : sig @@ nonportable
+        val foo : 'a -> 'a
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    val bar : 'a -> 'a @@ portable
+    module M : sig val foo : 'a -> 'a @@ portable end
+  end
+|}]
+
+(* default modality on one axis + explicit modality on val on another axis *)
+module type S = sig @@ portable
+    val foo : 'a -> 'a @@ contended
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig val foo : 'a -> 'a @@ contended val bar : 'a -> 'a @@ portable end
+|}]
+
+(* default modality on one axis + explicit modality on val on the same axis *)
+module type S = sig @@ portable
+    val foo : 'a -> 'a @@ nonportable
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S = sig val foo : 'a -> 'a val bar : 'a -> 'a @@ portable end
+|}]
