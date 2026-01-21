@@ -27,8 +27,6 @@ type expectation =
   ; payload_loc : Location.t (* Location of the whole payload *)
   ; normal      : string_constant (* expectation without -principal *)
   ; principal   : string_constant (* expectation with -principal *)
-  ; print_echo  : bool
-    (* should echoes like `val - : int = 5` be included in the output? *)
   }
 
 (* A list of phrases with the expected toplevel output *)
@@ -45,18 +43,9 @@ type correction =
 
 let match_expect_extension (ext : Parsetree.extension) =
   match ext with
-  | ({Asttypes.txt =
-        "expect" | "ocaml.expect" |
-        "expect.ignore_echo" | "ocaml.expect.ignore_echo" as txt;
-      loc = extid_loc}, payload) ->
+  | ({Asttypes.txt = "expect" | "ocaml.expect"; loc = extid_loc}, payload) ->
     let invalid_payload () =
       Location.raise_errorf ~loc:extid_loc "invalid [%%%%expect payload]"
-    in
-    let print_echo =
-      match txt with
-      | "expect" | "ocaml.expect" -> true
-      | "expect.ignore_echo" | "ocaml.expect.ignore_echo" -> false
-      | _ -> assert false
     in
     let string_constant (e : Parsetree.expression) =
       match e.pexp_desc with
@@ -81,15 +70,13 @@ let match_expect_extension (ext : Parsetree.extension) =
         ; payload_loc = e.pexp_loc
         ; normal
         ; principal
-        ; print_echo
         }
       | PStr [] ->
-        let s = { tag = ""; str = "\n" } in
+        let s = { tag = ""; str = "" } in
         { extid_loc
         ; payload_loc  = { extid_loc with loc_start = extid_loc.loc_end }
         ; normal    = s
         ; principal = s
-        ; print_echo
         }
       | _ -> invalid_payload ()
     in
@@ -158,11 +145,11 @@ let capture_everything buf ppf ~f =
   collect_formatters buf [Format.std_formatter; Format.err_formatter]
                      ~f:(fun () -> Compiler_messages.capture ppf ~f)
 
-let exec_phrase ppf phrase ~print_echo ~execute_phrase =
+let exec_phrase ppf phrase ~execute_phrase =
   Location.reset ();
   if !Clflags.dump_parsetree then Printast. top_phrase ppf phrase;
   if !Clflags.dump_source    then Pprintast.top_phrase ppf phrase;
-  execute_phrase print_echo ppf phrase
+  execute_phrase true ppf phrase
 
 let parse_contents ~fname contents =
   let lexbuf = Lexing.from_string contents in
@@ -219,7 +206,7 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
   let buf = Buffer.create 1024 in
   let ppf = Format.formatter_of_buffer buf in
   let () = Misc.Style.set_tag_handling ppf in
-  let exec_phrases phrases ~print_echo =
+  let exec_phrases phrases =
     let phrases =
       match min_line_number phrases with
       | None -> phrases
@@ -233,7 +220,7 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
         let snap = Btype.snapshot () in
         try
           Sys.with_async_exns
-            (fun () -> exec_phrase ppf phrase ~print_echo ~execute_phrase)
+            (fun () -> exec_phrase ppf phrase ~execute_phrase)
         with exn ->
           let bt = Printexc.get_raw_backtrace () in
           begin try Location.report_exception ppf exn
@@ -259,7 +246,7 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
     capture_everything buf ppf ~f:(fun () ->
       List.fold_left chunks ~init:[] ~f:(fun acc chunk ->
         let output =
-          exec_phrases chunk.phrases ~print_echo:chunk.expectation.print_echo
+          exec_phrases chunk.phrases
         in
         match eval_expectation chunk.expectation ~output with
         | None -> acc
@@ -271,7 +258,7 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> exec_phrases phrases ~print_echo:true)
+        ~f:(fun () -> exec_phrases phrases)
   in
   { corrected_expectations; trailing_output }
 
@@ -286,12 +273,10 @@ let output_corrected oc ~file_contents correction =
     List.fold_left correction.corrected_expectations ~init:0
       ~f:(fun ofs c ->
         output_slice oc file_contents ofs c.payload_loc.loc_start.pos_cnum;
+        output_body oc c.normal;
         if c.normal.str <> c.principal.str then begin
-          output_body oc c.normal;
           output_string oc ", Principal";
           output_body oc c.principal
-        end else if c.normal.str <> "\n" then begin
-          output_body oc c.normal
         end;
         c.payload_loc.loc_end.pos_cnum)
   in

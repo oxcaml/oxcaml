@@ -28,11 +28,6 @@
      output with -principal
      |}]
    ]}
-
-   By default, REPL echoes like [val - : int = 5] are included in the expect
-   output. To disable this, use [[%%expect.ignore_echo ..]]
-   (see examples in testsuite/tests/typing-local/let_mutable.ml).
-   Warnings and errors are still captured with ignore_echo.
 *)
 
 module type Toplevel = sig
