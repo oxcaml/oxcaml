@@ -427,8 +427,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               ~body
               ~my_closure
               ~is_my_closure_used:_
-              ~my_region
-              ~my_ghost_region
+              ~my_alloc_mode
               ~my_depth
               ~free_names_of_body:_
               :
@@ -445,15 +444,13 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
                 (Bound_parameters.to_list params)
             in
             let closure_var, env = Env.bind_var env my_closure in
-            let region_var, env =
-              match my_region with
-              | None -> nowhere "_region", env
-              | Some my_region -> Env.bind_var env my_region
-            in
-            let ghost_region_var, env =
-              match my_ghost_region with
-              | None -> nowhere "_ghost_region", env
-              | Some my_ghost_region -> Env.bind_var env my_ghost_region
+            let region_var, ghost_region_var, env =
+              match my_alloc_mode with
+              | Heap -> nowhere "_region", nowhere "_ghost_region", env
+              | Local { region = my_region; ghost_region = my_ghost_region } ->
+                let region_var, env = Env.bind_var env my_region in
+                let ghost_region_var, env = Env.bind_var env my_ghost_region in
+                region_var, ghost_region_var, env
             in
             let depth_var, env = Env.bind_var env my_depth in
             let body = expr env body in
@@ -791,8 +788,7 @@ module Iter = struct
               ~body
               ~my_closure:_
               ~is_my_closure_used:_
-              ~my_region:_
-              ~my_ghost_region:_
+              ~my_alloc_mode:_
               ~my_depth:_
               ~free_names_of_body:_
             -> expr f_c f_s body))

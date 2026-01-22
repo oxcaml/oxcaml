@@ -420,10 +420,9 @@ module Inlining = struct
         res
 
   let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into ~params
-      ~args ~my_closure ~my_region ~my_ghost_region ~my_depth ~body
-      ~free_names_of_body ~exn_continuation ~return_continuation
-      ~apply_exn_continuation ~apply_return_continuation ~apply_depth ~apply_dbg
-      =
+      ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
+      ~exn_continuation ~return_continuation ~apply_exn_continuation
+      ~apply_return_continuation ~apply_depth ~apply_dbg =
     let my_depth_duid = Flambda_debug_uid.none in
     let my_closure_duid = Flambda_debug_uid.none in
     let rec_info =
@@ -460,9 +459,9 @@ module Inlining = struct
       Inlining_helpers.make_inlined_body ~callee ~called_code_id
         ~region_inlined_into ~params ~args
         ~my_closure:(my_closure, my_closure_duid)
-        ~my_region ~my_ghost_region ~my_depth ~rec_info ~body:(acc, body)
-        ~exn_continuation ~return_continuation ~apply_exn_continuation
-        ~apply_return_continuation ~bind_params ~bind_depth ~apply_renaming
+        ~my_alloc_mode ~my_depth ~rec_info ~body:(acc, body) ~exn_continuation
+        ~return_continuation ~apply_exn_continuation ~apply_return_continuation
+        ~bind_params ~bind_depth ~apply_renaming
     in
     let inlined_debuginfo =
       Inlined_debuginfo.create ~called_code_id ~apply_dbg
@@ -520,8 +519,7 @@ module Inlining = struct
           ~body
           ~my_closure
           ~is_my_closure_used:_
-          ~my_region
-          ~my_ghost_region
+          ~my_alloc_mode
           ~my_depth
           ~free_names_of_body
         ->
@@ -536,9 +534,8 @@ module Inlining = struct
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)
             ~region_inlined_into
             ~params:(Bound_parameters.vars_and_uids params)
-            ~args ~my_closure ~my_region ~my_ghost_region ~my_depth ~body
-            ~free_names_of_body ~exn_continuation ~return_continuation
-            ~apply_depth ~apply_dbg
+            ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
+            ~exn_continuation ~return_continuation ~apply_depth ~apply_dbg
         in
         let acc = Acc.with_free_names Name_occurrences.empty acc in
         let acc = Acc.increment_metrics cost_metrics acc in
@@ -2434,10 +2431,15 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     | None -> make_body return_continuation
     | Some k -> make_return_wrapper (boxing_primitive k alloc_mode)
   in
+  let my_alloc_mode =
+    Alloc_mode.For_applications.from_lambda
+      (Function_decl.result_mode decl)
+      ~current_region:my_region ~current_ghost_region:my_ghost_region
+  in
   let wrapper_params_and_body =
     Function_params_and_body.create ~return_continuation ~exn_continuation
       params ~body ~free_names_of_body:(Known free_names_of_body) ~my_closure
-      ~my_region ~my_ghost_region ~my_depth
+      ~my_alloc_mode ~my_depth
   in
   let free_names_of_params_and_body =
     Name_occurrences.remove_continuation ~continuation:return_continuation
@@ -2643,25 +2645,26 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         env)
       unarized_params closure_env
   in
-  let closure_env, my_region =
-    match my_region with
-    | None -> closure_env, None
-    | Some my_region ->
+  let closure_env, my_region, my_ghost_region, my_alloc_mode =
+    match my_region, my_ghost_region with
+    | None, None -> closure_env, None, None, Alloc_mode.For_applications.heap
+    | Some _, None | None, Some _ ->
+      Misc.fatal_errorf
+        "In [close_one_function], only one of [my_region] and \
+         [my_ghost_region] is local"
+    | Some my_region, Some my_ghost_region ->
       let env, region =
         Env.add_var_like closure_env my_region Not_user_visible
           K.With_subkind.region
       in
-      env, Some region
-  in
-  let closure_env, my_ghost_region =
-    match my_ghost_region with
-    | None -> closure_env, None
-    | Some my_ghost_region ->
-      let env, region =
-        Env.add_var_like closure_env my_ghost_region Not_user_visible
+      let env, ghost_region =
+        Env.add_var_like env my_ghost_region Not_user_visible
           K.With_subkind.region
       in
-      env, Some region
+      ( env,
+        Some region,
+        Some ghost_region,
+        Alloc_mode.For_applications.local ~region ~ghost_region )
   in
   let closure_env = Env.with_depth closure_env my_depth in
   let closure_env, absolute_history, relative_history =
@@ -2804,8 +2807,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let params_and_body =
     Function_params_and_body.create ~return_continuation
       ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
-      main_code_unarized_params ~body ~my_closure ~my_region ~my_ghost_region
-      ~my_depth ~free_names_of_body:(Known free_names_of_body)
+      main_code_unarized_params ~body ~my_closure ~my_alloc_mode ~my_depth
+      ~free_names_of_body:(Known free_names_of_body)
   in
   let result_mode = Function_decl.result_mode decl in
   (match my_region with

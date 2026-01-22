@@ -700,17 +700,16 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
         ~body
         ~my_closure
         ~is_my_closure_used:_
-        ~my_region
-        ~my_ghost_region
+        ~my_alloc_mode
         ~my_depth
         ~free_names_of_body:_
       ->
       traverse_function_params_and_body acc code_id code ~return_continuation
-        ~exn_continuation params ~body ~my_closure ~my_region ~my_ghost_region
-        ~my_depth ~le_monde_exterieur ~all_constants)
+        ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~my_depth
+        ~le_monde_exterieur ~all_constants)
 
 and traverse_function_params_and_body acc code_id code ~return_continuation
-    ~exn_continuation params ~body ~my_closure ~my_region ~my_ghost_region
+    ~exn_continuation params ~body ~my_closure ~my_alloc_mode
     ~le_monde_exterieur ~all_constants ~my_depth : rev_code =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
@@ -763,10 +762,11 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   in
   Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) params;
   Acc.kind acc (Name.var my_closure) K.value;
-  Option.iter (fun region -> Acc.kind acc (Name.var region) K.region) my_region;
-  Option.iter
-    (fun region -> Acc.kind acc (Name.var region) K.region)
-    my_ghost_region;
+  (match (my_alloc_mode : Alloc_mode.For_applications.t) with
+  | Heap -> ()
+  | Local { region; ghost_region } ->
+    Acc.kind acc (Name.var region) Flambda_kind.region;
+    Acc.kind acc (Name.var ghost_region) Flambda_kind.region);
   Acc.kind acc (Name.var my_depth) K.rec_info;
   if not is_opaque
   then (
@@ -791,8 +791,11 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
       (Bound_parameters.to_list params);
     any_source my_closure;
     any_source my_depth;
-    Option.iter any_source my_region;
-    Option.iter any_source my_ghost_region;
+    (match (my_alloc_mode : Alloc_mode.For_applications.t) with
+    | Heap -> ()
+    | Local { region; ghost_region } ->
+      any_source region;
+      any_source ghost_region);
     List.iter any_source (code_dep.exn :: code_dep.return);
     Acc.add_cond_any_usage acc ~denv (Simple.var code_dep.my_closure));
   let body = traverse denv acc body in
@@ -802,8 +805,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
       params;
       body;
       my_closure;
-      my_region;
-      my_ghost_region;
+      my_alloc_mode;
       my_depth
     }
   in

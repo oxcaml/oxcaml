@@ -458,8 +458,8 @@ let transl_cold_attrib (cold : bool) : Cmm.codegen_option list =
 
 let params_and_body0 env res code_id ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~return_continuation ~exn_continuation params ~body
-    ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_region
-    ~my_ghost_region ~(translate_expr : translate_expr) =
+    ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_alloc_mode
+    ~(translate_expr : translate_expr) =
   let params =
     let is_my_closure_used =
       match is_my_closure_used with
@@ -492,26 +492,19 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
      so we don't need any binder for it (this is why we can ignore
      [_bound_var]). If it does end up in generated code, Selection will complain
      and refuse to compile the code. *)
-  let env, my_region_var =
-    match my_region with
-    | None -> env, None
-    | Some my_region ->
+  let env, my_region_var, my_ghost_region_var =
+    match (my_alloc_mode : Alloc_mode.For_applications.t) with
+    | Heap -> env, None, None
+    | Local { region = my_region; ghost_region = my_ghost_region } ->
       let my_region_duid = Flambda_debug_uid.none in
       let env, region =
         Env.create_bound_parameter env (my_region, my_region_duid)
       in
-      env, Some region
-  in
-  (* Similarly for [my_ghost_region]. *)
-  let env, my_ghost_region_var =
-    match my_ghost_region with
-    | None -> env, None
-    | Some my_ghost_region ->
       let my_ghost_region_duid = Flambda_debug_uid.none in
-      let env, region =
+      let env, ghost_region =
         Env.create_bound_parameter env (my_ghost_region, my_ghost_region_duid)
       in
-      env, Some region
+      env, Some region, Some ghost_region
   in
   (* Translate the arg list and body *)
   let env, fun_params = C.function_bound_parameters env params in
@@ -583,16 +576,14 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
         ~body
         ~my_closure
         ~is_my_closure_used
-        ~my_region
-        ~my_ghost_region
+        ~my_alloc_mode
         ~my_depth:_
         ~free_names_of_body:_
       ->
       try
         params_and_body0 env res code_id ~result_arity ~fun_dbg
           ~zero_alloc_attribute ~return_continuation ~exn_continuation params
-          ~body ~my_closure ~is_my_closure_used ~my_region ~my_ghost_region
-          ~translate_expr
+          ~body ~my_closure ~is_my_closure_used ~my_alloc_mode ~translate_expr
       with Misc.Fatal_error as e ->
         let bt = Printexc.get_raw_backtrace () in
         Format.eprintf
