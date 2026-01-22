@@ -72,6 +72,7 @@ let default_executable_name =
 
 type name_mangling_scheme =
   | Flat
+  | Structured
 
 exception Invalid_name_mangling_scheme of string
 
@@ -195,4 +196,5 @@ let merlin = false
 let name_mangling_scheme =
   match name_mangling_scheme_string with
   | "flat" -> Flat
+  | "structured" -> Structured
   | s -> raise (Invalid_name_mangling_scheme s)
