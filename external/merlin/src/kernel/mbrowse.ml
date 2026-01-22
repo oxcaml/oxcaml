@@ -274,6 +274,16 @@ let deepest_before ?(let_pun_behavior = Let_pun_behavior.default)
     in
     aux root
 
+let enclosing_from ~start ~stop roots =
+  List.filter
+    ~f:(fun (_, node) ->
+      let loc = node_loc node in
+      let nstart = loc.loc_start and nend = loc.loc_end in
+      let a = Lexing.compare_pos start nstart
+      and b = Lexing.compare_pos stop nend in
+      a >= 0 && b <= 0)
+    (enclosing start roots)
+
 (* Select open nodes *)
 
 let rec select_open_node = function[@warning "-9"]

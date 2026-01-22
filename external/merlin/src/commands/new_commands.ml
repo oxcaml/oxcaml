@@ -259,17 +259,25 @@ let all_commands =
       end;
     command "enclosing"
       ~spec:
-        [ arg "-position" "<position> Position to complete"
-            (marg_position (fun pos _pos -> pos))
+        [ arg "-position" "<position> Position of the enclosing"
+            (marg_position (fun pos (_pos, stop) -> (pos, stop)));
+          arg "-stop" "<position> End of the enclosing range"
+            (marg_position (fun stop (pos, _stop) -> (pos, stop)))
         ]
       ~doc:
         "Returns a list of locations `{'start': position, 'end': position}` in \
          increasing size of all entities surrounding the position.\n\
          (In a lisp, this would be the locations of all s-exps that contain \
-         the cursor.)" ~default:`None begin fun buffer pos ->
+         the cursor.)" ~default:(`None, `None) begin fun buffer (pos, stop) ->
       match pos with
       | `None -> failwith "-position <pos> is mandatory"
-      | #Msource.position as pos -> run buffer (Query_protocol.Enclosing pos)
+      | #Msource.position as pos ->
+        let stop =
+          match stop with
+          | `None -> None
+          | #Msource.position as stop -> Some stop
+        in
+        run buffer (Query_protocol.Enclosing (pos, stop))
       end;
     command "errors"
       ~spec:
