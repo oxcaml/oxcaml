@@ -293,6 +293,12 @@ let alloc_modes_opt i ppf ms =
   in
   modes ~pr:print_alloc_modes_opt i ppf ms
 
+let alloc_modes_var i ppf ms =
+  let print_alloc_modes_opt i ppf m =
+    line i ppf "%a\n" (Mode.Alloc.print ()) m
+  in
+  modes ~pr:print_alloc_modes_opt i ppf ms
+
 let moda_desc i ppf modalities_annot =
   let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.Value.atom =
     match ax, modality with
@@ -597,9 +603,10 @@ and expression i ppf x =
       line i ppf "Texp_letmutable\n";
       value_binding Nonrecursive i ppf vb;
       expression i ppf e
-  | Texp_function { params; body; alloc_mode = am } ->
+  | Texp_function { params; body; alloc_mode = am; ret_mode } ->
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
+      alloc_modes_var i ppf ret_mode;
       list i function_param ppf params;
       function_body i ppf body;
   | Texp_apply (e, l, m, am, za) ->
@@ -810,7 +817,7 @@ and binding_op i ppf x =
 and function_param i ppf x =
   let p = x.fp_arg_label in
   arg_label i ppf p;
-  match x.fp_kind with
+  (match x.fp_kind with
   | Tparam_pat pat ->
       line i ppf "Param_pat%a\n"
         fmt_partiality x.fp_partial;
@@ -820,7 +827,8 @@ and function_param i ppf x =
         fmt_partiality x.fp_partial;
       line i ppf "%a\n" Jkind.Sort.format sort;
       pattern (i+1) ppf pat;
-      expression (i+1) ppf expr
+      expression (i+1) ppf expr);
+  alloc_modes_var (i+1) ppf x.fp_mode
 
 and type_parameter i ppf (x, _variance) = core_type i ppf x
 

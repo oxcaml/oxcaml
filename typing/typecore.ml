@@ -5613,7 +5613,7 @@ type type_function_result =
 
 and type_function_ret_info =
   { (* The mode the function returns at. *)
-    ret_mode: Mode.Alloc.l;
+    ret_mode: Mode.Alloc.l modes;
     (* The sort returned by the function. *)
     ret_sort: Jkind.sort;
   }
@@ -8134,7 +8134,7 @@ and type_function
       let typed_arg_label, pat =
         Typetexp.transl_label_from_pat arg_label pat
       in
-      let mode_annots = (mode_annots_from_pat pat).mode_modes in
+      let mode_annots = mode_annots_from_pat pat in
       let has_poly = has_poly_constraint pat in
       if has_poly && is_optional_parsetree arg_label then
         raise(Error(pat.ppat_loc, env, Optional_poly_param));
@@ -8164,12 +8164,9 @@ and type_function
              before [split_function_ty] which enters new region. *)
           (* CR lstevenson: We redundantly transl the mode annotations a second
              time in the recursive call to type_function later on. *)
-          let annots =
-            Typemode.transl_mode_annots body_constraint.ret_mode_annotations
-          in
-          annots.mode_modes
-
-        | _ :: _ -> Alloc.Const.Option.none
+          Typemode.transl_mode_annots body_constraint.ret_mode_annotations
+        | _ :: _ ->
+          { mode_modes = Alloc.Const.Option.none; mode_desc = [] }
       in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
@@ -8179,7 +8176,9 @@ and type_function
           } =
         split_function_ty env expected_mode ty_expected loc
           ~is_first_val_param:first ~is_final_val_param
-          ~arg_label:typed_arg_label ~in_function ~has_poly ~mode_annots ~ret_mode_annots
+          ~arg_label:typed_arg_label ~in_function ~has_poly
+          ~mode_annots:mode_annots.mode_modes
+          ~ret_mode_annots:ret_mode_annots.mode_modes
       in
       (* [ty_arg_internal] is the type of the parameter viewed internally
          to the function. This is different than [ty_arg_mono] exactly for
@@ -8336,7 +8335,8 @@ and type_function
               fp_partial = partial;
               fp_newtypes = newtypes;
               fp_sort = arg_sort;
-              fp_mode = Alloc.disallow_right arg_mode;
+              fp_mode =
+                { mode_annots with mode_modes = Alloc.disallow_right arg_mode };
               fp_curry = curry;
               fp_loc = pparam_loc;
             };
@@ -8345,7 +8345,11 @@ and type_function
       let ret_info =
         match ret_info with
         | Some _ as x -> x
-        | None -> Some { ret_sort; ret_mode = Alloc.disallow_right ret_mode }
+        | None ->
+          let ret_mode =
+            {ret_mode_annots with mode_modes = Alloc.disallow_right ret_mode }
+          in
+          Some { ret_sort ; ret_mode }
       in
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
@@ -9038,7 +9042,8 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                     fc_arg_mode = Alloc.disallow_right marg;
                     fc_arg_sort = arg_sort;
                   };
-              ret_mode = Alloc.disallow_right mret;
+              ret_mode =
+                { mode_modes = Alloc.disallow_right mret; mode_desc = [] };
               ret_sort;
               alloc_mode;
               zero_alloc = Zero_alloc.default
@@ -10028,7 +10033,8 @@ and type_function_cases_expect
     in
     cases, ty_fun, alloc_mode,
       { ret_sort;
-        ret_mode = Alloc.disallow_right ret_mode }
+        ret_mode =
+          {mode_modes = Alloc.disallow_right ret_mode; mode_desc = []} }
   end
 
 (* Typing of let bindings *)
