@@ -1187,6 +1187,7 @@ type error =
         reason : boundary_reason
       }
   | Overwrite_changed_tag of Overwrites.error
+  | Borrowed_out_of_context of Location.t
 
 exception Error of error
 
@@ -2253,8 +2254,19 @@ let lift_implicit_borrowing uf =
     (fun t -> t)
     uf
 
-let is_borrowed exp_extra =
-  List.exists (function Texp_borrowed, _, _ -> true | _ -> false) exp_extra
+let is_borrowed loc exp_extra =
+  List.exists
+    (fun (extra, extra_loc, _) ->
+      match extra with
+      | Texp_borrowed r ->
+        if not !r
+        then begin
+          let loc = if extra_loc = Location.none then loc else extra_loc in
+          raise (Error (Borrowed_out_of_context loc))
+        end;
+        true
+      | _ -> false)
+    exp_extra
 
 let has_ghost_region exp_extra =
   List.exists
@@ -2627,7 +2639,7 @@ and check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   let loc = exp.exp_loc in
   let desc = exp.exp_desc in
   let uf =
-    if is_borrowed exp.exp_extra
+    if is_borrowed loc exp.exp_extra
     then
       let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc desc in
       let occ = Occurrence.mk loc in
@@ -2700,7 +2712,7 @@ and check_uniqueness_exp_as_value (ienv : Ienv.t) exp : Value.t * UF.t =
   let loc = exp.exp_loc in
   let desc = exp.exp_desc in
   let value, uf =
-    if is_borrowed exp.exp_extra
+    if is_borrowed loc exp.exp_extra
     then Value.fresh, check_uniqueness_exp_desc ~overwrite:None ienv ~loc desc
     else check_uniqueness_exp_desc_as_value ienv ~loc desc
   in
@@ -2729,7 +2741,7 @@ and check_uniqueness_exp_for_match ienv exp : value_to_match * UF.t =
   let loc = exp.exp_loc in
   let desc = exp.exp_desc in
   let value_to_match, uf =
-    if is_borrowed exp.exp_extra
+    if is_borrowed loc exp.exp_extra
     then
       let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc desc in
       let occ = Occurrence.mk loc in
@@ -2973,7 +2985,13 @@ let report_error err =
       | Usage { inner; first_is_of_second } ->
         report_multi_use inner first_is_of_second
       | Boundary { cannot_force; reason } -> report_boundary cannot_force reason
-      | Overwrite_changed_tag err -> report_tag_change err)
+      | Overwrite_changed_tag err -> report_tag_change err
+      | Borrowed_out_of_context loc ->
+        Location.errorf ~loc
+          "The borrow_ operator must appear directly in a valid borrowing \
+           context:@ - As an argument to a function application@ - On the \
+           right-hand side of a let binding@ - As the scrutinee of a pattern \
+           match")
 
 let () =
   Location.register_error_of_exn (function

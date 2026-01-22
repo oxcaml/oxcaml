@@ -54,17 +54,13 @@ let foo () =
   let y0, y1 = borrow_ y, borrow_ y in
   ()
 [%%expect{|
-Line 3, characters 6-8:
+Line 3, characters 15-24:
 3 |   let y0, y1 = borrow_ y, borrow_ y in
-          ^^
-Warning 26 [unused-var]: unused variable y0.
-
-Line 3, characters 10-12:
-3 |   let y0, y1 = borrow_ y, borrow_ y in
-              ^^
-Warning 26 [unused-var]: unused variable y1.
-
-val foo : unit -> unit = <fun>
+                   ^^^^^^^^^
+Error: The borrow_ operator must appear directly in a valid borrowing context:
+       - As an argument to a function application
+       - On the right-hand side of a let binding
+       - As the scrutinee of a pattern match
 |}]
 
 (* borrowed values are aliased and cannot be used as unique *)
