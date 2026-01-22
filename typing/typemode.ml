@@ -639,6 +639,8 @@ let atomic_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:false
 
 let sort_dedup_modalities modalities =
+  (* CR-someday lstevenson: Improve this. It's not great that we're just passing
+     a none location and disabling warnings. We should find a nicer solution. *)
   List.map (fun x -> { txt = x; loc = Location.none }) modalities
   |> sort_dedup_modalities ~warn:false
 
