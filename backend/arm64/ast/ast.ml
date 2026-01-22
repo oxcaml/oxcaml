@@ -1816,6 +1816,12 @@ module Instruction_name = struct
           * [`Imm of [`Six]]
           * [`Imm of [`Six]] )
         t
+    | UDIV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
+        t
     | UMAX_vector :
         ( triple,
           [ `Reg of
@@ -2079,6 +2085,7 @@ module Instruction_name = struct
         | TST -> "tst"
         | UADDLP_vector -> "uaddlp"
         | UBFM -> "ubfm"
+        | UDIV -> "udiv"
         | UMAX_vector -> "umax"
         | UMIN_vector -> "umin"
         | UMOV _ -> "umov"
@@ -2573,6 +2580,9 @@ module Instruction_name = struct
       | UBFM ->
         let (Quad (rd, rn, immr, imms)) = ops in
         [| o rd; o rn; o immr; o imms |]
+      | UDIV ->
+        let (Triple (rd, rn, rm)) = ops in
+        [| o rd; o rn; o rm |]
       | UMAX_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
