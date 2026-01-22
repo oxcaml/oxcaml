@@ -56,7 +56,7 @@ let sequence (unique_ x) = unique_ let y = x in (x, y)
 Line 1, characters 52-53:
 1 | let sequence (unique_ x) = unique_ let y = x in (x, y)
                                                         ^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique:
 Line 1, characters 49-50:
 1 | let sequence (unique_ x) = unique_ let y = x in (x, y)
                                                      ^
@@ -121,7 +121,7 @@ Line 4, characters 35-37:
 4 |   | x :: xs as gs -> (unique_ gs), xs
                                        ^^
 Error: This value is used here,
-       but it is part of a value that is already being used as unique:
+       but it is part of a value that is also being used as unique:
 Line 4, characters 21-33:
 4 |   | x :: xs as gs -> (unique_ gs), xs
                          ^^^^^^^^^^^^
@@ -137,7 +137,7 @@ Line 4, characters 25-35:
 4 |   | x :: xs as gs -> gs, unique_ xs
                              ^^^^^^^^^^
 Error: This value is used here as unique,
-       but it is part of a value that is already being used:
+       but it is part of a value that is also being used:
 Line 4, characters 21-23:
 4 |   | x :: xs as gs -> gs, unique_ xs
                          ^^
@@ -151,8 +151,7 @@ let dup_child (unique_ fs : 'a list) =
 Line 4, characters 35-37:
 4 |   | x :: xs as gs -> (unique_ xs), gs
                                        ^^
-Error: This value is used here,
-       but part of it is already being used as unique:
+Error: This value is used here, but part of it is also being used as unique:
 Line 4, characters 21-33:
 4 |   | x :: xs as gs -> (unique_ xs), gs
                          ^^^^^^^^^^^^
@@ -166,8 +165,7 @@ let dup_child (unique_ fs : 'a list) =
 Line 4, characters 25-35:
 4 |   | x :: xs as gs -> xs, unique_ gs
                              ^^^^^^^^^^
-Error: This value is used here as unique,
-       but part of it is already being used:
+Error: This value is used here as unique, but part of it is also being used:
 Line 4, characters 21-23:
 4 |   | x :: xs as gs -> xs, unique_ gs
                          ^^
@@ -384,8 +382,7 @@ let match_function : unique_ 'a * 'b -> 'a * ('a * 'b) =
 Line 3, characters 31-32:
 3 |   | (a, b) as t -> unique_ (a, t)
                                    ^
-Error: This value is used here,
-       but part of it is already being used as unique:
+Error: This value is used here, but part of it is also being used as unique:
 Line 3, characters 28-29:
 3 |   | (a, b) as t -> unique_ (a, t)
                                 ^
@@ -399,8 +396,7 @@ let tuple_parent_marked a b =
 Line 3, characters 36-37:
 3 |   | ((_, a), b) as t -> unique_ (a, t)
                                         ^
-Error: This value is used here,
-       but part of it is already being used as unique:
+Error: This value is used here, but part of it is also being used as unique:
 Line 3, characters 33-34:
 3 |   | ((_, a), b) as t -> unique_ (a, t)
                                      ^
@@ -415,7 +411,7 @@ let or_patterns6 flag f x y =
 Line 3, characters 66-67:
 3 |   | true, a, (_, b) | false, b, (_, a) -> (unique_id a, unique_id b)
                                                                       ^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique:
 Line 3, characters 53-54:
 3 |   | true, a, (_, b) | false, b, (_, a) -> (unique_id a, unique_id b)
                                                          ^

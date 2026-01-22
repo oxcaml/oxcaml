@@ -338,11 +338,11 @@ end = struct
     fprintf ppf "(%a,%a)" Occurrence.print occ print_reason reason
 end
 
-(** For error messages, we keep track of whether an access was sequential or
-    parallel *)
-type access_order =
-  | Seq
-  | Par
+(** For error messages, we keep track of the relationship between two usages *)
+type usage_order =
+  | Seq_before  (** Sequential: here occurs before there *)
+  | Seq_after  (** Sequential: here occurs after there *)
+  | Par  (** Parallel: order doesn't matter *)
 
 (** Usage algebra
 
@@ -408,17 +408,12 @@ module Usage : sig
   (** Extract an arbitrary occurrence from a usage *)
   val extract_occurrence : t -> Occurrence.t option
 
-  type first_or_second =
-    | First
-    | Second
-
   type error =
     { cannot_force : Maybe_unique.cannot_force;
       there : t;  (** The other usage *)
-      first_or_second : first_or_second;
-          (** Is it the first or second usage that's failing force? *)
-      access_order : access_order
-          (** Are the accesses in sequence or parallel? *)
+      order : usage_order
+          (** Relationship between the usage that's failing force and the other
+              usage *)
     }
 
   exception Error of error
@@ -535,24 +530,18 @@ end = struct
     | Antiquote t1, t2 -> choose t1 t2
     | t1, Antiquote t2 -> choose t1 t2
 
-  type first_or_second =
-    | First
-    | Second
-
   type error =
     { cannot_force : Maybe_unique.cannot_force;
       there : t;
-      first_or_second : first_or_second;
-      access_order : access_order
+      order : usage_order
     }
 
   exception Error of error
 
-  let force_aliased_multiuse t there first_or_second access_order =
+  let force_aliased_multiuse t there order =
     match Maybe_unique.mark_multi_use t with
     | Ok () -> ()
-    | Error cannot_force ->
-      raise (Error { cannot_force; there; first_or_second; access_order })
+    | Error cannot_force -> raise (Error { cannot_force; there; order })
 
   let rec par m0 m1 =
     match m0, m1 with
@@ -562,7 +551,7 @@ end = struct
       Maybe_aliased t
     | Borrowed _, Aliased t | Aliased t, Borrowed _ -> Aliased t
     | Borrowed occ, Maybe_unique t | Maybe_unique t, Borrowed occ ->
-      force_aliased_multiuse t (Borrowed occ) First Par;
+      force_aliased_multiuse t (Borrowed occ) Par;
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Maybe_aliased t0, Maybe_aliased t1 ->
       Maybe_aliased (Maybe_aliased.meet t0 t1)
@@ -572,20 +561,20 @@ end = struct
       Aliased occ
     | Maybe_aliased t0, Maybe_unique t1 | Maybe_unique t1, Maybe_aliased t0 ->
       (* t1 must be aliased *)
-      force_aliased_multiuse t1 (Maybe_aliased t0) First Par;
+      force_aliased_multiuse t1 (Maybe_aliased t0) Par;
       (* The barrier stays empty; if there is any unique after this,
          the analysis will error *)
       aliased (Maybe_unique.extract_occurrence t1) Aliased.Forced
     | Aliased t0, Aliased _ -> Aliased t0
     | Aliased t0, Maybe_unique t1 ->
-      force_aliased_multiuse t1 (Aliased t0) Second Par;
+      force_aliased_multiuse t1 (Aliased t0) Par;
       Aliased t0
     | Maybe_unique t1, Aliased t0 ->
-      force_aliased_multiuse t1 (Aliased t0) First Par;
+      force_aliased_multiuse t1 (Aliased t0) Par;
       Aliased t0
     | Maybe_unique t0, Maybe_unique t1 ->
-      force_aliased_multiuse t0 m1 First Par;
-      force_aliased_multiuse t1 m0 Second Par;
+      force_aliased_multiuse t0 m1 Par;
+      force_aliased_multiuse t1 m0 Par;
       aliased (Maybe_unique.extract_occurrence t0) Aliased.Forced
     | Antiquote t1, Antiquote t2 -> Antiquote (par t1 t2)
     | Antiquote t1, t2 -> par t1 t2
@@ -628,7 +617,7 @@ end = struct
       m1
     | Aliased _, Borrowed _ -> m0
     | Maybe_unique l, Borrowed occ ->
-      force_aliased_multiuse l m1 First Seq;
+      force_aliased_multiuse l m1 Seq_before;
       aliased occ Aliased.Forced
     | Aliased _, Maybe_aliased _ ->
       (* The barrier stays empty; if there is any unique after this,
@@ -647,18 +636,18 @@ end = struct
           the analysis will error.
       *)
       let occ = Maybe_aliased.extract_occurrence l1 in
-      force_aliased_multiuse l0 m1 First Seq;
+      force_aliased_multiuse l0 m1 Seq_before;
       aliased occ Aliased.Forced
     | Aliased _, Aliased _ -> m0
     | Maybe_unique l, Aliased _ ->
-      force_aliased_multiuse l m1 First Seq;
+      force_aliased_multiuse l m1 Seq_before;
       m1
     | Aliased _, Maybe_unique l ->
-      force_aliased_multiuse l m0 Second Seq;
+      force_aliased_multiuse l m0 Seq_after;
       m0
     | Maybe_unique l0, Maybe_unique l1 ->
-      force_aliased_multiuse l0 m1 First Seq;
-      force_aliased_multiuse l1 m0 Second Seq;
+      force_aliased_multiuse l0 m1 Seq_before;
+      force_aliased_multiuse l1 m0 Seq_after;
       aliased (Maybe_unique.extract_occurrence l0) Aliased.Forced
     | Antiquote t1, Antiquote t2 -> Antiquote (seq t1 t2)
     | Antiquote t1, t2 -> seq t1 t2
@@ -808,7 +797,7 @@ module Overwrites : sig
   type old_tag =
     | Old_tag_unknown
     | Old_tag_was of Tag.t
-    | Old_tag_mutated of access_order
+    | Old_tag_mutated of usage_order
 
   type error =
     | Changed_tag of
@@ -889,7 +878,7 @@ end = struct
   type old_tag =
     | Old_tag_unknown
     | Old_tag_was of Tag.t
-    | Old_tag_mutated of access_order
+    | Old_tag_mutated of usage_order
 
   type error =
     | Changed_tag of
@@ -928,7 +917,7 @@ end = struct
       Tags { overwritten; was_mutated = true }
     | Tag_was_mutated, Tag_was_mutated -> Tag_was_mutated
 
-  let seq_or_par access_order t0 t1 =
+  let seq_or_par order t0 t1 =
     match t0, t1 with
     | Tag_was_mutated, Tag_was_mutated -> Tag_was_mutated
     | Tags t0, Tags t1 when (not t0.was_mutated) && not t1.was_mutated ->
@@ -941,13 +930,12 @@ end = struct
       | None -> Tag_was_mutated
       | Some (t, _) ->
         raise
-          (Error
-             (Changed_tag
-                { old_tag = Old_tag_mutated access_order; new_tag = t })))
+          (Error (Changed_tag { old_tag = Old_tag_mutated order; new_tag = t }))
+      )
 
   let par t0 t1 = seq_or_par Par t0 t1
 
-  let seq t0 t1 = seq_or_par Seq t0 t1
+  let seq t0 t1 = seq_or_par Seq_after t0 t1
 
   (* This is effectively the set difference [overwrite - learned].
      However, we also store the newly learned tags on the overwrites
@@ -2711,13 +2699,7 @@ let check_uniqueness_value_bindings vbs =
   ()
 
 let report_multi_use inner first_is_of_second =
-  let { Usage.cannot_force = { occ; axis };
-        there;
-        first_or_second;
-        access_order
-      } =
-    inner
-  in
+  let { Usage.cannot_force = { occ; axis }; there; order } = inner in
   let here_usage = "used" in
   let there_usage =
     match there with
@@ -2734,12 +2716,34 @@ let report_multi_use inner first_is_of_second =
         ^ " in a closure that might be called later")
     | _ -> "used"
   in
-  let first, first_usage, second, second_usage =
-    match first_or_second with
-    | Usage.First ->
-      occ, here_usage, Option.get (Usage.extract_occurrence there), there_usage
-    | Usage.Second ->
-      Option.get (Usage.extract_occurrence there), there_usage, occ, here_usage
+  let first, first_usage, second, second_usage, access_order, second_is_occ =
+    match order with
+    | Seq_before ->
+      (* occ happens before there, so there is later - show there as main error *)
+      ( occ,
+        here_usage,
+        Option.get (Usage.extract_occurrence there),
+        there_usage,
+        "has already been",
+        false )
+    | Seq_after ->
+      (* occ happens after there, so occ is later - show occ as main error *)
+      ( Option.get (Usage.extract_occurrence there),
+        there_usage,
+        occ,
+        here_usage,
+        "has already been",
+        true )
+    | Par ->
+      (* For parallel accesses, show the later usage first *)
+      let there_occ = Option.get (Usage.extract_occurrence there) in
+      if Location.compare occ.loc there_occ.loc < 0
+      then
+        (* occ comes first in source, so show there (later) as main error *)
+        occ, here_usage, there_occ, there_usage, "is also being", false
+      else
+        (* there comes first in source, so show occ (later) as main error *)
+        there_occ, there_usage, occ, here_usage, "is also being", true
   in
   let first_is_of_second =
     match first_is_of_second with
@@ -2750,26 +2754,22 @@ let report_multi_use inner first_is_of_second =
     | Descendant _ -> "part of it"
     | Ancestor _ -> "it is part of a value that"
   in
-  let access_order =
-    match access_order with
-    | Par -> "is already being"
-    | Seq -> "has already been"
-  in
-  (* English is sadly not very composible, we write out all four cases
-     manually *)
+  (* English is sadly not very composible, we write out all cases manually *)
   let error =
-    match first_or_second, axis with
-    | First, Uniqueness ->
+    match second_is_occ, axis with
+    | false, Uniqueness ->
+      (* second is there, so first is occ - occ is "used as unique" *)
       Format.dprintf "This value is %s here,@ but %s %s %s as unique:"
         second_usage first_is_of_second access_order first_usage
-    | First, Linearity ->
+    | false, Linearity ->
       Format.dprintf
         "This value is %s here,@ but %s is defined as once and %s %s:"
         second_usage first_is_of_second access_order first_usage
-    | Second, Uniqueness ->
+    | true, Uniqueness ->
+      (* second is occ (the failing force), so it's "used as unique" *)
       Format.dprintf "This value is %s here as unique,@ but %s %s %s:"
         second_usage first_is_of_second access_order first_usage
-    | Second, Linearity ->
+    | true, Linearity ->
       Format.dprintf "This value is defined as once and %s here,@ but %s %s %s:"
         second_usage first_is_of_second access_order first_usage
   in
@@ -2803,10 +2803,11 @@ let report_tag_change (err : Overwrites.error) =
       | Old_tag_unknown -> Format.dprintf "is unknown."
       | Old_tag_was l ->
         Format.dprintf "is %a." Pprintast.longident l.name_for_error.txt
-      | Old_tag_mutated access_order -> (
-        match access_order with
+      | Old_tag_mutated order -> (
+        match order with
         | Par -> Format.dprintf "is being changed through mutation."
-        | Seq -> Format.dprintf "was changed through mutation.")
+        | Seq_before | Seq_after ->
+          Format.dprintf "was changed through mutation.")
     in
     Location.errorf ~loc:new_tag.name_for_error.loc
       "@[Overwrite may not change the tag to %t.\n\
