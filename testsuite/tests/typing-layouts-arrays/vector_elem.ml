@@ -147,10 +147,20 @@ module Int64x4 = struct
 
   let of_int i = of_i64s (Int64.of_int i) (Int64.of_int i)
                          (Int64.of_int i) (Int64.of_int i)
-  let max_val = of_i64s Int64.max_int Int64.max_int
-                        Int64.max_int Int64.max_int
-  let min_val = of_i64s Int64.min_int Int64.min_int
-                        Int64.min_int Int64.min_int
+
+  let max_val =
+    match Sys.backend_type with
+    | Bytecode | Other _ -> Obj.magic ()
+    | Native ->
+      of_i64s Int64.max_int Int64.max_int
+              Int64.max_int Int64.max_int
+  let min_val =
+    match Sys.backend_type with
+    | Bytecode | Other _ -> Obj.magic ()
+    | Native ->
+      of_i64s Int64.min_int Int64.min_int
+              Int64.min_int Int64.min_int
+
   let rand x =
     let (l, h) = split x in
     let ll, lh = low_to l, high_to l in
