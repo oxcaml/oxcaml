@@ -2128,7 +2128,7 @@ let open_variables ienv f =
       expr =
         (fun self e ->
           (match e.exp_desc with
-          | Texp_ident (path, _, _, _, unique_use) -> (
+          | Texp_ident (path, _, _, _, unique_use, _) -> (
             (* We test if a variable is open by looking it up in the current
                [ienv]: the [ienv] does not contain the internally-bound
                variables in the module. In other words, open variables will be
@@ -2533,7 +2533,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
 and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
   let loc = exp.exp_loc in
   match exp.exp_desc with
-  | Texp_ident (p, _, _, _, unique_use) ->
+  | Texp_ident (p, _, _, _, unique_use, _) ->
     let occ = Occurrence.mk loc in
     let value =
       match value_of_ident ienv unique_use occ p with

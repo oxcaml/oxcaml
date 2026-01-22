@@ -535,7 +535,7 @@ and expression i ppf x =
     List.iter (fun (x, _, attrs) -> expression_extra (i+1) ppf x attrs) extra;
   end;
   match x.exp_desc with
-  | Texp_ident (li,_,_,_,_) -> line i ppf "Texp_ident %a\n" fmt_path li;
+  | Texp_ident (li,_,_,_,_,_) -> line i ppf "Texp_ident %a\n" fmt_path li;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
   | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;

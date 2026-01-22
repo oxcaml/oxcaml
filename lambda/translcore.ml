@@ -337,7 +337,7 @@ let zero_alloc_of_application
   | Some assume, _ ->
     (* The user wrote a zero_alloc attribute on the application - keep it. *)
     Builtin_attributes.assume_zero_alloc ~inferred:false assume
-  | None, Texp_ident (_, _, { val_zero_alloc; _ }, _, _) ->
+  | None, Texp_ident (_, _, { val_zero_alloc; _ }, _, _, _) ->
     (* We assume the call is zero_alloc if the function is known to be
        zero_alloc. If the function is zero_alloc opt, then we need to be sure
        that the opt checks were run to license this assumption. We judge
@@ -385,7 +385,7 @@ and transl_exp1 ~scopes ~in_new_scope sort e =
 
 and transl_exp0 ~in_new_scope ~scopes sort e =
   match e.exp_desc with
-  | Texp_ident(path, _, desc, kind, _) ->
+  | Texp_ident(path, _, desc, kind, _, _) ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
   | Texp_constant cst -> Lconst (Const_base cst)
@@ -403,7 +403,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
   | Texp_apply({ exp_desc = Texp_ident(path, _, {val_kind = Val_prim p},
-                                       Id_prim (pmode, psort), _);
+                                       Id_prim (pmode, psort), _, _);
                  exp_type = prim_type; } as funct,
                oargs, pos, ap_mode, zero_alloc)
     when can_apply_primitive p pmode pos oargs ->
