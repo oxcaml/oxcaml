@@ -38,7 +38,7 @@ val attributes : string -> Dwarf_attribute_values.Attribute_value.t list
 val add_root :
   Dwarf_state.t ->
   parent:Proto_die.t ->
-  demangled_name:string ->
+  demangled_name:string option ->
   Asm_symbol.t ->
   location_attributes:Dwarf_attribute_values.Attribute_value.t list ->
   Proto_die.t * Asm_symbol.t
