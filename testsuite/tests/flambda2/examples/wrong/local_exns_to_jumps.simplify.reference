@@ -2,18 +2,18 @@ let code f1_0 deleted in
 let code f2_1 deleted in
 let code f3_2 deleted in
 let code f4_3 deleted in
-let $camlLocal_exns_to_jumps__immstring143 = "Local_exns_to_jumps.Exit2" in
-let $camlLocal_exns_to_jumps__immstring6 = "Local_exns_to_jumps.Exit" in
+let $camlLocal_exns_to_jumps__immstring147 = "Local_exns_to_jumps.Exit2" in
+let $camlLocal_exns_to_jumps__immstring7 = "Local_exns_to_jumps.Exit" in
 apply ccall noalloc
   ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
   where k (Pccall) =
-    let $camlLocal_exns_to_jumps__Exit209 =
+    let $camlLocal_exns_to_jumps__Exit214 =
       Block immutable_unique
-      248 ($camlLocal_exns_to_jumps__immstring6, Pccall)
+      248 ($camlLocal_exns_to_jumps__immstring7, Pccall)
     in
     let code loopify(never) size(53) newer_version_of(f1_0)
           f1_0_1 (x : imm tagged, g : val)
-            my_closure _region _ghost_region my_depth
+            my_closure &my_alloc_region my_depth
             -> k * k1
             : imm tagged =
       let try_region = %begin_try_region () in
@@ -27,7 +27,7 @@ apply ccall noalloc
                   | 0 -> k pop(k2) (0)
                   | 1 -> k4
                   where k4 =
-                    (apply g (r_unboxed0) -> k6 * k2
+                    (apply &my_alloc_region g (r_unboxed0) -> k6 * k2
                        where k6 (param : [ 0 |1 ]) =
                          let unboxed_field = %untag_imm (param) in
                          cont k5 (unboxed_field)
@@ -38,22 +38,24 @@ apply ccall noalloc
                            | 1 ->
                              k2
                                pop(regular k2)
-                               ($camlLocal_exns_to_jumps__Exit209)
+                               ($camlLocal_exns_to_jumps__Exit214)
                        where k4 =
                          let int_add = %int_barith.add (r_unboxed0, 1) in
                          cont k3 (int_add))))
         where k2 exn (`exn` : val) =
           let `unit` = %end_try_region (try_region) in
           let unit_1 = %end_try_ghost_region (try_ghost_region) in
-          let prim = %phys_eq (`exn`, $camlLocal_exns_to_jumps__Exit209) in
+          let prim = %phys_eq (`exn`, $camlLocal_exns_to_jumps__Exit214) in
           switch prim
             | 0 -> k1 pop(reraise k1) (`exn`)
             | 1 -> k (42)
     in
-    let $camlLocal_exns_to_jumps__f1_4 = closure f1_0_1 @f1 in
+    let $camlLocal_exns_to_jumps__f1_4 =
+      closure f1_0_1 @f1 &toplevel.alloc_region
+    in
     let code loopify(never) size(47) newer_version_of(f2_1)
           f2_1_1 (x : imm tagged, g : val)
-            my_closure _region _ghost_region my_depth
+            my_closure &my_alloc_region my_depth
             -> k * k1
             : imm tagged =
       let try_region = %begin_try_region () in
@@ -70,7 +72,7 @@ apply ccall noalloc
                  cont k7 push(k6)
                    where k7 =
                      let r_unboxed0_1 = r_unboxed0 in
-                     (apply g (r_unboxed0) -> k8 * k6
+                     (apply &my_alloc_region g (r_unboxed0) -> k8 * k6
                         where k8 (param : [ 0 |1 ]) =
                           let unboxed_field = %untag_imm (param) in
                           cont k7 (unboxed_field)
@@ -97,10 +99,12 @@ apply ccall noalloc
           let unit_1 = %end_try_ghost_region (try_ghost_region) in
           cont k (42)
     in
-    let $camlLocal_exns_to_jumps__f2_5 = closure f2_1_1 @f2 in
+    let $camlLocal_exns_to_jumps__f2_5 =
+      closure f2_1_1 @f2 &toplevel.alloc_region
+    in
     let code loopify(never) size(47) newer_version_of(f3_2)
           f3_2_1 (x : imm tagged, g : val)
-            my_closure _region _ghost_region my_depth
+            my_closure &my_alloc_region my_depth
             -> k * k1
             : imm tagged =
       let try_region = %begin_try_region () in
@@ -117,7 +121,7 @@ apply ccall noalloc
                  cont k7 push(k6)
                    where k7 =
                      let r_unboxed0_1 = r_unboxed0 in
-                     (apply g (r_unboxed0) -> k8 * k6
+                     (apply &my_alloc_region g (r_unboxed0) -> k8 * k6
                         where k8 (param : [ 0 |1 ]) =
                           let unboxed_field = %untag_imm (param) in
                           cont k7 (unboxed_field)
@@ -144,17 +148,19 @@ apply ccall noalloc
           let unit_1 = %end_try_ghost_region (try_ghost_region) in
           cont k (42)
     in
-    let $camlLocal_exns_to_jumps__f3_6 = closure f3_2_1 @f3 in
+    let $camlLocal_exns_to_jumps__f3_6 =
+      closure f3_2_1 @f3 &toplevel.alloc_region
+    in
     (apply ccall noalloc
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall_1) =
-         let $camlLocal_exns_to_jumps__Exit2391 =
+         let $camlLocal_exns_to_jumps__Exit2399 =
            Block immutable_unique
-           248 ($camlLocal_exns_to_jumps__immstring143, Pccall_1)
+           248 ($camlLocal_exns_to_jumps__immstring147, Pccall_1)
          in
          let code loopify(never) size(55) newer_version_of(f4_3)
                f4_3_1 (x : imm tagged, g : val)
-                 my_closure _region _ghost_region my_depth
+                 my_closure &my_alloc_region my_depth
                  -> k * k1
                  : imm tagged =
            let try_region = %begin_try_region () in
@@ -171,7 +177,7 @@ apply ccall noalloc
                       cont k7 push(k6)
                         where k7 =
                           let r_unboxed0_1 = r_unboxed0 in
-                          (apply g (r_unboxed0) -> k8 * k6
+                          (apply &my_alloc_region g (r_unboxed0) -> k8 * k6
                              where k8 (param : [ 0 |1 ]) =
                                let unboxed_field = %untag_imm (param) in
                                cont k7 (unboxed_field)
@@ -197,26 +203,28 @@ apply ccall noalloc
                                let int_add_1 =
                                  %int_barith.add (r_unboxed0_1, 2)
                                in
-                               cont k2 (int_add_1, int_add)))
+                               cont k2 (int_add, int_add_1)))
                        where k4 =
                          let r_unboxed0_1 = r_unboxed0 in
                          let int_add = %int_barith.add (r_unboxed0_1, 1) in
                          cont k3 (int_add)))
              where k2 (int_add, int_add_1) =
-               let cse_param = int_add_1 in
-               let cse_param_1 = int_add in
+               let cse_param = int_add in
+               let cse_param_1 = int_add_1 in
                let `unit` = %end_try_region (try_region) in
                let unit_1 = %end_try_ghost_region (try_ghost_region) in
                let int_add_2 = %int_barith.add (cse_param_1, cse_param) in
                cont k (int_add_2)
          in
-         let $camlLocal_exns_to_jumps__f4_7 = closure f4_3_1 @f4 in
+         let $camlLocal_exns_to_jumps__f4_7 =
+           closure f4_3_1 @f4 &toplevel.alloc_region
+         in
          let $camlLocal_exns_to_jumps =
-           Block 0 ($camlLocal_exns_to_jumps__Exit209,
+           Block 0 ($camlLocal_exns_to_jumps__Exit214,
                     $camlLocal_exns_to_jumps__f1_4,
                     $camlLocal_exns_to_jumps__f2_5,
                     $camlLocal_exns_to_jumps__f3_6,
-                    $camlLocal_exns_to_jumps__Exit2391,
+                    $camlLocal_exns_to_jumps__Exit2399,
                     $camlLocal_exns_to_jumps__f4_7)
          in
          cont done ($camlLocal_exns_to_jumps))

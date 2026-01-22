@@ -1,7 +1,7 @@
 let code f_0 deleted in
 let code loopify(never) size(41) newer_version_of(f_0)
       f_0_1 (t : [ 0 |1 | 0 of imm tagged |1 of imm tagged * imm tagged ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let prim = %is_int (t) in
@@ -27,6 +27,6 @@ let code loopify(never) size(41) newer_version_of(f_0)
       let Pfield = %block_load.[`0`] (t) in
       cont k (Pfield)
 in
-let $camlVariants__f_1 = closure f_0_1 @f in
+let $camlVariants__f_1 = closure f_0_1 @f &toplevel.alloc_region in
 let $camlVariants = Block 0 ($camlVariants__f_1) in
 cont done ($camlVariants)
