@@ -26,8 +26,8 @@ module RegisterStamp : sig
 
   (** Common interface for edge set implementations.
 
-      This module type defines the operations supported by both PairSet
-      (hash table-based) and BitMatrix (bit array-based) implementations. *)
+      This module type defines the operations supported by both PairSet (hash
+      table-based) and BitMatrix (bit array-based) implementations. *)
   module type S = sig
     type t
 
@@ -50,12 +50,12 @@ module RegisterStamp : sig
 
   (** Alternative bit matrix representation for edge sets.
 
-      This module provides the same interface as PairSet but uses a compact
-      bit matrix stored in a bytes value. Since the interference graph is
-      symmetric, only the upper triangle is stored (pairs where i < j).
+      This module provides the same interface as PairSet but uses a compact bit
+      matrix stored in a bytes value. Since the interference graph is symmetric,
+      only the upper triangle is stored (pairs where i < j).
 
-      Memory usage: O(n²/8) bytes where n is the number of registers.
-      This is more compact than PairSet for dense graphs.
+      Memory usage: O(n²/8) bytes where n is the number of registers. This is
+      more compact than PairSet for dense graphs.
 
       Trade-offs compared to PairSet:
       - Smaller memory footprint (n²/8 bytes vs hash table overhead)
@@ -181,17 +181,6 @@ val incr_degree : t -> Reg.t -> unit
     during IRC simplification phase. Does nothing if the degree is infinite. *)
 val decr_degree : t -> Reg.t -> unit
 
-(** {2 Bulk operations} *)
-
-(** [adj_set graph] returns the underlying edge set.
-
-    This is exposed for iteration and debugging purposes. Modifications to the
-    returned set will affect the graph (no defensive copy is made). *)
-val adj_set : t -> RegisterStamp.PairSet.t
-
-(** [cardinal graph] returns the total number of edges in the graph. *)
-val cardinal : t -> int
-
 (** {2 Initialization} *)
 
 (** [init_register graph reg] initializes storage for [reg] in the graph. Sets
@@ -205,3 +194,14 @@ val init_register : t -> Reg.t -> unit
 
     This is used for precolored registers which have infinite degree. *)
 val init_register_with_degree : t -> Reg.t -> degree:int -> unit
+
+(** {2 Debugging} *)
+
+module For_debug : sig
+  (** [cardinal_pairs graph] returns the total number of edges in the graph. *)
+  val cardinal_pairs : t -> int
+
+  (** [iter_pairs graph ~f] iterates over all edges in the graph, applying [f]
+      to each pair of register stamps. *)
+  val iter_pairs : t -> f:(RegisterStamp.pair -> unit) -> unit
+end

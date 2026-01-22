@@ -110,13 +110,15 @@ val mem_adj_set : t -> Reg.t -> Reg.t -> bool
 
 val adj_list : t -> Reg.t -> Reg.t list
 
-val adj_set : t -> RegisterStamp.PairSet.t
-
 val add_edge : t -> Reg.t -> Reg.t -> unit
 
 val iter_adjacent : t -> Reg.t -> f:(Reg.t -> unit) -> unit
 
 val for_all_adjacent : t -> Reg.t -> f:(Reg.t -> bool) -> bool
+
+val cardinal_pairs : t -> int
+
+val iter_pairs : t -> f:(RegisterStamp.pair -> unit) -> unit
 
 val is_empty_node_moves : t -> Reg.t -> bool
 

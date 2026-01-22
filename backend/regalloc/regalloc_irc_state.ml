@@ -390,7 +390,11 @@ let[@inline] for_all_adjacent state reg ~f =
   in
   Regalloc_interf_graph.for_all_adjacent_if state.graph reg ~should_visit ~f
 
-let[@inline] adj_set state = Regalloc_interf_graph.adj_set state.graph
+let[@inline] cardinal_pairs state =
+  Regalloc_interf_graph.For_debug.cardinal_pairs state.graph
+
+let[@inline] iter_pairs state ~f =
+  Regalloc_interf_graph.For_debug.iter_pairs state.graph ~f
 
 let[@inline] is_empty_node_moves state reg =
   match Reg.Tbl.find_opt state.move_list reg with

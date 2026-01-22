@@ -463,15 +463,13 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   if debug
   then (
-    let adj_set = State.adj_set state in
-    log "(%d pairs in adj_set)"
-      (RegisterStamp.PairSet.For_debug.cardinal adj_set);
+    log "(%d pairs in adj_set)" (State.cardinal_pairs state);
     (* CR-someday xclerc for xclerc: remove (kept for the moment for debugging,
        but does not deserve to be controlled by a variable) *)
     if false
     then
       (* may produce a *lot* of lines... *)
-      RegisterStamp.PairSet.For_debug.iter adj_set ~f:(fun p ->
+      State.iter_pairs state ~f:(fun p ->
           log "(%d, %d) <- adj_set" (RegisterStamp.fst p) (RegisterStamp.snd p)));
   make_work_list state;
   State.invariant state;
