@@ -32,7 +32,8 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
       Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
         item.dinfo_scopes
       |> Misc.remove_double_underscores
-    (* XXX Not sure what to do in the cases below; see Note [Debuginfo items] *)
+    (* XXX Not sure what to do in the cases below; see comment in
+       [Debuginfo.to_structured_mangling_path] *)
     | [] | _ :: _ -> fun_name
   in
   let linkage_name =

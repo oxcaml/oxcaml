@@ -453,21 +453,32 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~fallback_name dbg : Structured_mangling.path =
-  (* Ensure the path finishes with the [fallback_name], dropping the last item
-     if it's a (anonymous or not) function, as:
-     - it should be redundant with the [fallback_name] (otherwise some debug
+let to_structured_mangling_path ~name dbg : Structured_mangling.path =
+  (* Ensure the path finishes with the [name], dropping the last item
+     if it's a (anonymous or not) function and the whole prefix of partial
+     functions, as:
+     - it should be redundant with the [name] (otherwise some debug
        information is missing),
      - it makes it more uniform across cases when we have access to a full name
        in the path and cases when we do not *)
-  let[@tail_mod_cons] rec force_last_fallback :
-      Structured_mangling.path -> Structured_mangling.path = function
-    | [] | [Function _] | [Anonymous_function _] | [Partial_function _] ->
-      [Function fallback_name]
-    | item :: path -> item :: force_last_fallback path
+  let rec drop_partials = function
+    | Structured_mangling.Partial_function _ :: path -> drop_partials path
+    | path -> path
   in
-  force_last_fallback
+  let force_last_name path =
+    let open Structured_mangling in
+    match List.rev path with
+    | Partial_function _ :: rpath ->
+      List.rev (Function name :: drop_partials rpath)
+    | Function _ :: rpath | Anonymous_function _ :: rpath | rpath ->
+      List.rev (Function name :: rpath)
+  in
+  force_last_name
     (match to_items dbg with
-    (* See Note [Debuginfo items] *)
     | [] -> []
-    | item :: _ -> path_of_debug_info_scopes [] item.dinfo_scopes)
+    | item :: _ ->
+      (* The list of debuginfo items can contain more than one item in case of
+         inlining. The first item is the location it was inlined into, the last
+         item is the location it was inlined from. See PR #5099 for a longer
+         discussion. *)
+      path_of_debug_info_scopes [] item.dinfo_scopes)

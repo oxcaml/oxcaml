@@ -205,13 +205,12 @@ let mangle_path_item buf path_item =
   in
   match path_item with
   | Compilation_unit cu ->
-    (* CR sspies: Use the Flat mangling scheme for parameterised libraries for
-       now, a Structured version is postponed to a future PR. *)
-    let instance_separator = "____" in
-    let instance_separator_depth_char = '_' in
-    Compilation_unit.full_path_with_arguments_as_strings ~instance_separator
-      ~instance_separator_depth_char cu
-    |> List.iter (tag_prefixed ~tag:tag_compilation_unit)
+    (* CR sspies: Use the Flat mangling scheme for parameterised libraries (and
+       [-for-pack] prefixes, with the [__] separator) for now, a Structured
+       version is postponed to a future PR. *)
+    let pack_separator () = "__" in
+    let sym = Compilation_unit.mangle_for_linkage_name ~pack_separator cu in
+    tag_prefixed ~tag:tag_compilation_unit sym
   | Inline_marker -> Buffer.add_string buf tag_inline_marker
   | Module sym -> tag_prefixed ~tag:tag_module sym
   | Anonymous_module (line, col, file_opt) ->

@@ -4251,7 +4251,7 @@ let make_symbol ?compilation_unit name =
      other parts of the compiler currently hardcode the symbol names for (at
      least) frame tables.
 
-     Currently [make_symbol] is called only for [code_begin], [code_end],
+     [make_symbol] is called for example for [code_begin], [code_end],
      [data_begin], [data_end], [entry], [frametable], [gc_roots], and
      [jump_tables]. *)
   Symbol.for_name compilation_unit name
