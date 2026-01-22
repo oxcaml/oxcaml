@@ -48,6 +48,23 @@ Error: This value is "local"
        However, the highlighted expression is expected to be "global".
 |}]
 
+let foo () =
+  let unique_ y = "hello" in
+  let x = borrow_ y in
+  unique_use y
+[%%expect{|
+Line 4, characters 13-14:
+4 |   unique_use y
+                 ^
+Error: This value is used here as unique, but it has already been borrowed:
+Line 3, characters 10-19:
+3 |   let x = borrow_ y in
+              ^^^^^^^^^
+
+|}]
+
+
+
 (* CR-someday zqian: support non-shallow borrowing *)
 let foo () =
   let unique_ y = "hello" in
@@ -120,7 +137,7 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been borrowed:
 Line 3, characters 10-19:
 3 |   let y = borrow_ x in
               ^^^^^^^^^
@@ -137,7 +154,7 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been borrowed:
 Line 3, characters 10-19:
 3 |   let _ = borrow_ x in
               ^^^^^^^^^
@@ -223,7 +240,7 @@ let foo () =
 Line 5, characters 13-14:
 5 |   unique_use x
                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been borrowed:
 Line 3, characters 10-19:
 3 |   let y = borrow_ x in
               ^^^^^^^^^
@@ -322,7 +339,7 @@ let foo () =
 Line 4, characters 29-30:
 4 |   | _y -> ignore (unique_use x)
                                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been borrowed:
 Line 3, characters 8-17:
 3 |   match borrow_ x with
             ^^^^^^^^^
@@ -341,7 +358,7 @@ let foo () =
 Line 4, characters 28-29:
 4 |   | _ -> ignore (unique_use x)
                                 ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been borrowed:
 Line 3, characters 8-17:
 3 |   match borrow_ x with
             ^^^^^^^^^
@@ -515,7 +532,7 @@ let foo () =
 Line 3, characters 33-34:
 3 |   aliased_unique_use (borrow_ x) x;
                                      ^
-Error: This value is used here as unique, but it is already being used:
+Error: This value is used here as unique, but it is already being borrowed:
 Line 3, characters 21-32:
 3 |   aliased_unique_use (borrow_ x) x;
                          ^^^^^^^^^^^
