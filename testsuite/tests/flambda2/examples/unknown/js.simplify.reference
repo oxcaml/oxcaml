@@ -1,39 +1,43 @@
-let $camlJs__immstring13 = "js.ml" in
-let $camlJs__const_block15 = Block 0 ($camlJs__immstring13, 14, 17) in
-let $camlJs__Pmakeblock18 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlJs__const_block15)
+let $camlJs__immstring15 = "js.ml" in
+let $camlJs__const_block17 = Block 0 ($camlJs__immstring15, 14, 17) in
+let $camlJs__Pmakeblock20 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlJs__const_block17)
 in
 let code init_0 deleted in
-let $camlJs__const_block26 = Block 0 ($camlJs__immstring13, 16, 21) in
-let $camlJs__Pmakeblock29 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlJs__const_block26)
+let $camlJs__const_block29 = Block 0 ($camlJs__immstring15, 16, 21) in
+let $camlJs__Pmakeblock32 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlJs__const_block29)
 in
 let code of__unsafe_1 deleted in
-let $camlJs__const_block37 = Block 0 ($camlJs__immstring13, 18, 20) in
-let $camlJs__Pmakeblock40 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlJs__const_block37)
+let $camlJs__const_block41 = Block 0 ($camlJs__immstring15, 18, 20) in
+let $camlJs__Pmakeblock44 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlJs__const_block41)
 in
 let code of__debug_2 deleted in
 let code loopify(never) size(3) newer_version_of(init_0)
-      init_0_1 (x, y) my_closure _region _ghost_region my_depth -> k * k1 =
-  cont k1 pop(regular k1) ($camlJs__Pmakeblock18)
+      init_0_1 (x, y) my_closure &my_alloc_region my_depth -> k * k1 =
+  cont k1 pop(regular k1) ($camlJs__Pmakeblock20)
 in
-let $camlJs__init_3 = closure init_0_1 @init in
+let $camlJs__init_3 = closure init_0_1 @init &toplevel.alloc_region in
 let code loopify(never) size(3) newer_version_of(of__unsafe_1)
-      of__unsafe_1_1 (a) my_closure _region _ghost_region my_depth -> k * k1 =
-  cont k1 pop(regular k1) ($camlJs__Pmakeblock29)
+      of__unsafe_1_1 (a) my_closure &my_alloc_region my_depth -> k * k1 =
+  cont k1 pop(regular k1) ($camlJs__Pmakeblock32)
 in
-let $camlJs__of__unsafe_4 = closure of__unsafe_1_1 @of__unsafe in
+let $camlJs__of__unsafe_4 =
+  closure of__unsafe_1_1 @of__unsafe &toplevel.alloc_region
+in
 let code loopify(never) size(3) newer_version_of(of__debug_2)
-      of__debug_2_1 (a) my_closure _region _ghost_region my_depth -> k * k1 =
-  cont k1 pop(regular k1) ($camlJs__Pmakeblock40)
+      of__debug_2_1 (a) my_closure &my_alloc_region my_depth -> k * k1 =
+  cont k1 pop(regular k1) ($camlJs__Pmakeblock44)
 in
-let $camlJs__of__debug_5 = closure of__debug_2_1 @of__debug in
-let $camlJs__Pmakeblock70 =
+let $camlJs__of__debug_5 =
+  closure of__debug_2_1 @of__debug &toplevel.alloc_region
+in
+let $camlJs__Pmakeblock77 =
   Block 0 ($camlJs__init_3,
            $camlJs__of__unsafe_4,
            $camlJs__of__debug_5,
            $camlJs__of__unsafe_4)
 in
-let $camlJs = Block 0 (0, $camlJs__Pmakeblock70) in
+let $camlJs = Block 0 (0, $camlJs__Pmakeblock77) in
 cont done ($camlJs)

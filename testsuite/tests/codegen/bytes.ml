@@ -202,7 +202,7 @@ bytes_safe_get_int32:
   movslq (%rax,%rbx), %rax
   ret
 .L0:
-  movq  camlTOP18__block602@GOTPCREL(%rip), %rax
+  movq  camlTOP18__block671@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

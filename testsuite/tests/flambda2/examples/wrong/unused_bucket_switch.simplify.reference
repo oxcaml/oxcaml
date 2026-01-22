@@ -1,27 +1,29 @@
 let code opaque_0 deleted in
-let $camlUnused_bucket_switch__immstring27 = "urk" in
+let $camlUnused_bucket_switch__immstring30 = "urk" in
 let code f_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(opaque_0)
-      opaque_0_1 (x) my_closure _region _ghost_region my_depth -> k * k1 =
+      opaque_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (x)
 in
-let $camlUnused_bucket_switch__opaque_2 = closure opaque_0_1 @opaque in
+let $camlUnused_bucket_switch__opaque_2 =
+  closure opaque_0_1 @opaque &toplevel.alloc_region
+in
 let `region` = %begin_region () in
 let ghost_region = %begin_ghost_region () in
 (let try_region = %begin_try_region (`region`) in
  let try_ghost_region = %begin_try_ghost_region (ghost_region) in
  cont k3 push(k1)
    where k3 =
-     let $camlUnused_bucket_switch__Pmakeblock68 =
+     let $camlUnused_bucket_switch__Pmakeblock74 =
        Block 0 ($`*predef*`.caml_exn_Failure,
-                $camlUnused_bucket_switch__immstring27)
+                $camlUnused_bucket_switch__immstring30)
      in
      let code loopify(never) size(16) newer_version_of(f_1)
            f_1_1 (param : imm tagged)
-             my_closure _region _ghost_region my_depth
+             my_closure &my_alloc_region my_depth
              -> k3 * k4
              : imm tagged =
-       apply direct(opaque_0_1)
+       apply direct(opaque_0_1 &my_alloc_region)
          ($camlUnused_bucket_switch__opaque_2 : _ -> imm tagged)
            (1)
            -> k6 * k4
@@ -32,11 +34,13 @@ let ghost_region = %begin_ghost_region () in
            let naked_immediate = unboxed_field in
            switch naked_immediate
              | 0 ->
-               k4 pop(reraise k4) ($camlUnused_bucket_switch__Pmakeblock68)
+               k4 pop(reraise k4) ($camlUnused_bucket_switch__Pmakeblock74)
              | 1 -> k3 (42)
      in
-     let $camlUnused_bucket_switch__f_3 = closure f_1_1 @f in
-     apply direct(f_1_1)
+     let $camlUnused_bucket_switch__f_3 =
+       closure f_1_1 @f &toplevel.alloc_region
+     in
+     apply direct(f_1_1 &toplevel.alloc_region)
        ($camlUnused_bucket_switch__f_3 : _ -> imm tagged) (0) -> k2 * k1
    where k2 (body_result : imm tagged) =
      cont k pop(k1) (body_result)

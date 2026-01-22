@@ -67,7 +67,7 @@ arr_sum:
   jle   .L0
   ret
 .L1:
-  movq  camlTOP2__block101@GOTPCREL(%rip), %rax
+  movq  camlTOP2__block109@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

@@ -130,7 +130,7 @@ let map_to_constants (t : t) : int =
   | D -> 7
 [%%expect_asm X86_64{|
 map_to_constants:
-  movq  camlTOP7__switch_block207@GOTPCREL(%rip), %rbx
+  movq  camlTOP7__switch_block231@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -143,7 +143,7 @@ let map_to_float_constants (t : t) : float# =
   | D -> #7.0
 [%%expect_asm X86_64{|
 map_to_float_constants:
-  movq  camlTOP8__switch_block235@GOTPCREL(%rip), %rbx
+  movq  camlTOP8__switch_block263@GOTPCREL(%rip), %rbx
   vmovsd -4(%rbx,%rax,4), %xmm0
   ret
 |}]

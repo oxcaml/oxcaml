@@ -535,11 +535,13 @@ let extended_machtype_of_return_arity arity =
 let alloc_mode_for_applications_to_cmx t =
   match t with
   | Alloc_mode.For_applications.Local _ -> Cmx_format.Alloc_local
-  | Alloc_mode.For_applications.Heap -> Cmx_format.Alloc_heap
+  | Alloc_mode.For_applications.Heap _ -> Cmx_format.Alloc_heap
 
 let alloc_mode_for_allocations_to_cmm t =
   match t with
-  | Alloc_mode.For_allocations.Heap -> Cmm.Alloc_mode.Heap
+  | Alloc_mode.For_allocations.Heap _ ->
+    (* XXX todo propagate alloc_modes in cmm *)
+    Cmm.Alloc_mode.Heap
   | Alloc_mode.For_allocations.Local _ ->
     assert (Flambda_features.stack_allocation_enabled ());
     Cmm.Alloc_mode.Local

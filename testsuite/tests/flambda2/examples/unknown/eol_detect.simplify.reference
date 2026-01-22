@@ -1,7 +1,7 @@
 let code f_0 deleted in
 let code loopify(never) size(48) newer_version_of(f_0)
       f_0_1 (read : val, x : [ 0 | 0 of val ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let try_region = %begin_try_region () in
@@ -10,7 +10,7 @@ let code loopify(never) size(48) newer_version_of(f_0)
     where k4 =
       (cont k5
          where rec k5 =
-           (apply read (0) -> k6 * k2
+           (apply &my_alloc_region read (0) -> k6 * k2
               where k6 (return_val0 : imm tagged) =
                 let prim = %phys_ne (return_val0, 10) in
                 switch prim
@@ -34,6 +34,6 @@ let code loopify(never) size(48) newer_version_of(f_0)
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
       cont k (0)
 in
-let $camlEol_detect__f_1 = closure f_0_1 @f in
+let $camlEol_detect__f_1 = closure f_0_1 @f &toplevel.alloc_region in
 let $camlEol_detect = Block 0 ($camlEol_detect__f_1) in
 cont done ($camlEol_detect)

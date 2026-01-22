@@ -1123,7 +1123,11 @@ let unary_primitive env res dbg f arg =
   match (f : P.unary_primitive) with
   | Block_load { kind; mut; field } ->
     None, res, block_load ~dbg kind mut ~field ~block:arg
-  | Duplicate_array _ | Duplicate_block _ | Obj_dup ->
+  | Duplicate_array { alloc_region; _ }
+  | Duplicate_block { alloc_region; _ }
+  | Obj_dup { alloc_region } ->
+    (* XXX TODO *)
+    let () = ignore alloc_region in
     ( None,
       res,
       (C.extcall ~dbg ~alloc:true ~returns:true ~is_c_builtin:false
@@ -1246,7 +1250,7 @@ let unary_primitive env res dbg f arg =
       |> C.memory_chunk_of_kind
     in
     None, res, C.load ~dbg memory_chunk Mutable ~addr:arg
-  | Make_lazy lazy_tag ->
+  | Make_lazy { lazy_tag; alloc_region = _ } ->
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
 

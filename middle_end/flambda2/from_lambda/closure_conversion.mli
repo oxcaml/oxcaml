@@ -36,6 +36,7 @@ val close_let_rec :
   Env.t ->
   function_declarations:Function_decl.t list ->
   body:(Acc.t -> Env.t -> Expr_with_acc.t) ->
+  current_alloc_region:Ident.t ->
   current_region:Ident.t option ->
   Expr_with_acc.t
 
@@ -110,4 +111,5 @@ val close_program :
   exn_continuation:Continuation.t ->
   toplevel_my_region:Ident.t ->
   toplevel_my_ghost_region:Ident.t ->
+  toplevel_my_alloc_region:Ident.t ->
   'mode close_program_result
