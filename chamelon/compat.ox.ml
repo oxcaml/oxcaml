@@ -174,7 +174,7 @@ let mkTexp_function ?(id = texp_function_defaults)
               fp_param_debug_uid = Lambda.debug_uid_none;
               fp_partial = partial;
               fp_sort = id.param_sort;
-              fp_mode = id.param_mode;
+              fp_mode = { mode_modes = id.param_mode; mode_desc = [] };
               fp_curry = id.param_curry;
               fp_newtypes = id.param_newtypes;
               fp_loc = Location.none;
@@ -201,7 +201,7 @@ let mkTexp_function ?(id = texp_function_defaults)
               });
       alloc_mode = id.alloc_mode;
       ret_sort = id.ret_sort;
-      ret_mode = id.ret_mode;
+      ret_mode = { mode_modes = id.ret_mode; mode_desc = [] };
       zero_alloc = id.zero_alloc;
     }
 
@@ -274,7 +274,7 @@ let view_texp (e : expression_desc) =
               param_identifier =
                 {
                   param_sort = param.fp_sort;
-                  param_mode = param.fp_mode;
+                  param_mode = param.fp_mode.mode_modes;
                   param_curry = param.fp_curry;
                   param_newtypes = param.fp_newtypes;
                 };
@@ -302,7 +302,8 @@ let view_texp (e : expression_desc) =
               }
       in
       Texp_function
-        ({ params; body }, { alloc_mode; ret_sort; ret_mode; zero_alloc })
+        ( { params; body }
+        , { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc })
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
   | _ -> O e
