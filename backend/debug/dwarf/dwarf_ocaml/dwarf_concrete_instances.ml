@@ -32,12 +32,22 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
       Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
         item.dinfo_scopes
       |> Misc.remove_double_underscores
-    (* XXX Not sure what to do in the cases below *)
+    (* XXX Not sure what to do in the cases below; see comment in
+       [Debuginfo.to_structured_mangling_path] *)
     | [] | _ :: _ -> fun_name
   in
   let linkage_name =
     match Config.name_mangling_version with
     | Flat -> Some (linkage_name_from_debug ())
+    | Structured -> None
+    (* When structured mangling is used, there is no need for additional linkage
+       names on non-inlined functions, because the module path can be
+       reconstructed from the assembly symbol name. *)
+    (* CR sspies: This removes the linkage name for some symbols that still use
+       the old mangling scheme (see the comment in [make_symbol] in
+       cmm_helpers.ml). I observed this for the linkage name of the module entry
+       point, but for that one the linkage name is currently just the symbol
+       name (e.g., "camlTest__entry"). *)
   in
   let start_sym = Asm_symbol.create_global fun_name in
   let location_attributes =
