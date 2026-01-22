@@ -26,7 +26,7 @@ let uses_unique (t @ unique) : _ @ unique =
 Line 2, characters 41-42:
 2 |   [%atomic.loc t.contents], [%atomic.loc t.contents]
                                              ^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique:
 Line 2, characters 15-16:
 2 |   [%atomic.loc t.contents], [%atomic.loc t.contents]
                    ^
@@ -79,7 +79,7 @@ let atomic_loc_consumes_record (t : _ atomic @ unique) : _ @ unique =
 Line 2, characters 28-29:
 2 |   [%atomic.loc t.contents], t
                                 ^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique:
 Line 2, characters 15-16:
 2 |   [%atomic.loc t.contents], t
                    ^

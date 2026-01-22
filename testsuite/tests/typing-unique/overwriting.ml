@@ -776,13 +776,13 @@ let guards_bad = function
   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
   | _ -> false
 [%%expect{|
-Line 2, characters 4-13:
-2 |   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
-        ^^^^^^^^^
-Error: This value is read from here, but it is already being used as unique:
 Line 2, characters 48-49:
 2 |   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
                                                     ^
+Error: This value is used here as unique, but it is also being read from:
+Line 2, characters 4-13:
+2 |   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
+        ^^^^^^^^^
 
 |}]
 
