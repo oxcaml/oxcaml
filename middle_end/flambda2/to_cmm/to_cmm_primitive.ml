@@ -261,6 +261,19 @@ let make_array ~dbg kind alloc_mode args =
 
 let array_length ~dbg arr (kind : P.Array_kind.t) =
   match kind with
+  | Naked_float32s -> C.unboxed_float32_array_length arr dbg
+  | Naked_int8s -> C.untagged_int8_array_length arr dbg
+  | Naked_int16s -> C.untagged_int16_array_length arr dbg
+  | Naked_int32s -> C.unboxed_int32_array_length arr dbg
+  | Naked_ints | Naked_int64s | Naked_nativeints ->
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_length arr dbg
+  | Naked_vec128s
+  | Unboxed_product
+      ( [Naked_vec128s; Naked_vec128s]
+      | [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s] ) ->
+    C.unboxed_vec128_array_length arr dbg
+  | Naked_vec256s -> C.unboxed_vec256_array_length arr dbg
+  | Naked_vec512s -> C.unboxed_vec512_array_length arr dbg
   | Immediates | Gc_ignorable_values | Values | Naked_floats | Unboxed_product _
     ->
     (* [Paddrarray] may be a lie sometimes, but we know for certain that the bit
@@ -273,15 +286,6 @@ let array_length ~dbg arr (kind : P.Array_kind.t) =
        elements occupy 64 bits). *)
     assert (C.wordsize_shift = C.numfloat_shift);
     C.addr_array_length arr dbg
-  | Naked_float32s -> C.unboxed_float32_array_length arr dbg
-  | Naked_int8s -> C.untagged_int8_array_length arr dbg
-  | Naked_int16s -> C.untagged_int16_array_length arr dbg
-  | Naked_int32s -> C.unboxed_int32_array_length arr dbg
-  | Naked_ints | Naked_int64s | Naked_nativeints ->
-    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_length arr dbg
-  | Naked_vec128s -> C.unboxed_vec128_array_length arr dbg
-  | Naked_vec256s -> C.unboxed_vec256_array_length arr dbg
-  | Naked_vec512s -> C.unboxed_vec512_array_length arr dbg
 
 let array_load_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
     arr index =
@@ -361,8 +365,13 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | Naked_vec128s, Naked_vec128s ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec256s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec512s ->
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+  | ( Unboxed_product
+        ( [Naked_vec128s; Naked_vec128s]
+        | [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s] ),
+      Naked_vec128s ) ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | (Immediates | Naked_floats), Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
@@ -375,11 +384,11 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | Naked_int8s, Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:0 arr index
   | Naked_vec256s, Naked_vec128s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec512s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | (Immediates | Naked_floats), Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_ints | Naked_int64s | Naked_nativeints), Naked_vec512s ->
@@ -391,9 +400,9 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | Naked_int8s, Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:0 arr index
   | Naked_vec512s, Naked_vec128s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec256s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
@@ -521,6 +530,12 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
       new_value
   | Naked_vec128s, Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+      new_value
+  | ( Unboxed_product
+        ( [Naked_vec128s; Naked_vec128s]
+        | [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s] ),
+      Naked_vec128s ) ->
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
       new_value
   | (Immediates | Naked_floats), Naked_vec256s ->
     array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index

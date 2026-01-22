@@ -1,6 +1,8 @@
 open Stdlib
 open! Stdlib_stable
 
+let () = Printexc.record_backtrace true
+
 [@@@ocaml.warning "-unused-value-declaration"]
 [@@@ocaml.warning "-unused-module"]
 
@@ -48,6 +50,7 @@ let assert_raises_out_of_bounds thunk =
     assert false
   with
   | Invalid_argument s when s = "index out of bounds" -> ()
+  | Invalid_argument s -> failwith s
   | _ -> assert false
 ;;
 

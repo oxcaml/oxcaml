@@ -475,6 +475,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                 Lconst (Const_base (Const_int64 0L))
               | Punboxedoruntaggedint_ignorable Unboxed_nativeint ->
                 Lconst (Const_base (Const_nativeint 0n))
+              | Punboxedvector_ignorable _ -> raise Not_found
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim
@@ -809,7 +810,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pfloat_array_set_vec _ | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
     | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _ ->
+    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _
+    | Pjoin_vec256 | Psplit_vec256 ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
       if Target_system.is_64_bit ()

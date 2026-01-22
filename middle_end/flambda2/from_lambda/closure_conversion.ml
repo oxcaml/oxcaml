@@ -610,7 +610,7 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
         } ])
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
-let unarize_extern_repr ~machine_width alloc_mode
+let rec unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
   match extern_repr with
   | Same_as_ocaml_repr (Base Void) -> []
@@ -683,6 +683,8 @@ let unarize_extern_repr ~machine_width alloc_mode
         arg_transformer = Some P.Untag_immediate;
         return_transformer = Some P.Tag_immediate
       } ]
+  | Unboxed_product reprs ->
+    List.concat_map (unarize_extern_repr ~machine_width alloc_mode) reprs
 
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
@@ -1234,7 +1236,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
       | Popaque _ | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
       | Pmakelazyblock _ | Punbox_vector _ | Punbox_unit
-      | Pbox_vector (_, _)
+      | Pbox_vector (_, _) | Pjoin_vec256 | Psplit_vec256
       | Pmake_unboxed_product _ | Punboxed_product_field _
       | Parray_element_size_in_bytes _ | Pget_header _ | Prunstack | Pperform
       | Presume | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _

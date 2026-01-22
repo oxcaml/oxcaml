@@ -79,6 +79,7 @@ let rec ignorable_product_element_kinds kinds =
 and ignorable_product_element_kind = function
   | Pint_ignorable -> "int"
   | Punboxedfloat_ignorable f -> unboxed_float f
+  | Punboxedvector_ignorable v -> unboxed_vector v
   | Punboxedoruntaggedint_ignorable i -> unboxed_integer i
   | Pproduct_ignorable kinds -> ignorable_product_element_kinds kinds
 
@@ -712,9 +713,9 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbigstring_load_vec { size; unsafe; aligned; mode; boxed; index_kind } ->
+  | Pbigstring_load_vec { size; safety; aligned; mode; boxed; index_kind } ->
      fprintf ppf "bigarray.array1.%s%sget%s%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
+       (if Option.is_none safety then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
        (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
@@ -734,9 +735,9 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbigstring_set_vec { size; unsafe; aligned; boxed; index_kind } ->
+  | Pbigstring_set_vec { size; safety; aligned; boxed; index_kind } ->
      fprintf ppf "bigarray.array1.%s%sset%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
+       (if Option.is_none safety then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
        (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
@@ -843,6 +844,8 @@ let primitive ppf = function
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_vector bi) (locality_kind m)
+  | Pjoin_vec256 -> fprintf ppf "join_vec256"
+  | Psplit_vec256 -> fprintf ppf "split_vec256"
   | Parray_to_iarray -> fprintf ppf "array_to_iarray"
   | Parray_of_iarray -> fprintf ppf "array_of_iarray"
   | Pget_header m -> fprintf ppf "get_header%s" (locality_kind m)
@@ -1024,6 +1027,8 @@ let name_of_primitive = function
   | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
+  | Pjoin_vec256 -> "Pjoin_vec256"
+  | Psplit_vec256 -> "Psplit_vec256"
   | Parray_of_iarray -> "Parray_of_iarray"
   | Parray_to_iarray -> "Parray_to_iarray"
   | Pget_header _ -> "Pget_header"

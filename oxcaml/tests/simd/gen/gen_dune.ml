@@ -157,8 +157,8 @@ let () =
       "int128", enabled_if_main_amd64_not_macos;
       "basic", enabled_if_main;
       "basic_u", enabled_if_main;
-      "basic256", enabled_if_main_amd64_not_macos;
-      "basic256_u", enabled_if_main_amd64_not_macos;
+      "basic256", enabled_if_main;
+      "basic256_u", enabled_if_main;
       "load_store", enabled_if_main_amd64_not_macos;
       "let_mutable", enabled_if_main;
       "let_mutable_u", enabled_if_main;
@@ -199,11 +199,11 @@ let () =
       "consts", enabled_if_main;
       "consts_u", enabled_if_main;
       "callback", enabled_if_main;
-      "callback256", enabled_if_main_amd64_not_macos;
+      "callback256", enabled_if_main;
       "test_callee_save_neon_regs", enabled_if_main;
       "probes", enabled_if_main_amd64_not_macos;
-      "arrays256", enabled_if_main_amd64_not_macos;
-      "arrays256_u", enabled_if_main_amd64_not_macos;
+      "arrays256", enabled_if_main;
+      "arrays256_u", enabled_if_main;
       "consts256", enabled_if_main_amd64_not_macos;
       "consts256_u", enabled_if_main_amd64_not_macos;
       "probes256", enabled_if_main_amd64_not_macos;

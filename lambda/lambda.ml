@@ -257,8 +257,13 @@ type primitive =
       mode : locality_mode; boxed : bool }
   | Pbigstring_load_64 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
-  | Pbigstring_load_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
-      index_kind : array_index_kind; mode : locality_mode; boxed : bool }
+  | Pbigstring_load_vec of {
+      size : boxed_vector;
+      safety : (int * int) option;
+      index_kind : array_index_kind;
+      mode : locality_mode;
+      aligned : bool;
+      boxed : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_set_32 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
@@ -266,8 +271,12 @@ type primitive =
       boxed : bool }
   | Pbigstring_set_64 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
-  | Pbigstring_set_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
-      index_kind : array_index_kind; boxed : bool }
+  | Pbigstring_set_vec of {
+      size : boxed_vector;
+      safety : (int * int) option;
+      index_kind : array_index_kind;
+      aligned : bool;
+      boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
@@ -341,6 +350,8 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Pjoin_vec256
+  | Psplit_vec256
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64
   (* Jane Street extensions *)
@@ -365,6 +376,7 @@ and extern_repr =
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Unboxed_product of extern_repr list
 
 and external_call_description = extern_repr Primitive.description_gen
 
@@ -465,6 +477,7 @@ and array_set_kind =
 and ignorable_product_element_kind =
   | Pint_ignorable
   | Punboxedfloat_ignorable of unboxed_float
+  | Punboxedvector_ignorable of unboxed_vector
   | Punboxedoruntaggedint_ignorable of unboxed_or_untagged_integer
   | Pproduct_ignorable of ignorable_product_element_kind list
 
@@ -637,12 +650,15 @@ let rec equal_ignorable_product_element_kind k1 k2 =
   | Pint_ignorable, Pint_ignorable -> true
   | Punboxedfloat_ignorable f1, Punboxedfloat_ignorable f2 ->
     Primitive.equal_unboxed_float f1 f2
+  | Punboxedvector_ignorable v1, Punboxedvector_ignorable v2 ->
+    Primitive.equal_unboxed_vector v1 v2
   | Punboxedoruntaggedint_ignorable i1, Punboxedoruntaggedint_ignorable i2 ->
     Primitive.equal_unboxed_or_untagged_integer i1 i2
   | Pproduct_ignorable p1, Pproduct_ignorable p2 ->
     List.equal equal_ignorable_product_element_kind p1 p2
   | ( Pint_ignorable | Punboxedfloat_ignorable _
-    | Punboxedoruntaggedint_ignorable _ | Pproduct_ignorable _), _ -> false
+    | Punboxedoruntaggedint_ignorable _ | Pproduct_ignorable _
+    | Punboxedvector_ignorable _), _ -> false
 
 let must_be_value layout =
   match layout with
@@ -985,13 +1001,96 @@ type arg_descr =
 
 let const_int n = Const_base (Const_int n)
 
+let const_int8 n = Const_base (Const_int8 n)
+
+let const_int16 n = Const_base (Const_int16 n)
+
+let const_int32 n = Const_base (Const_int32 n)
+
+let const_int64 n = Const_base (Const_int64 n)
+
+let const_nativeint n = Const_base (Const_nativeint n)
+
+let const_untagged_int n = Const_base (Const_untagged_int n)
+
+let const_untagged_int8 n = Const_base (Const_untagged_int8 n)
+
+let const_untagged_int16 n = Const_base (Const_untagged_int16 n)
+
+let const_unboxed_int32 n = Const_base (Const_unboxed_int32 n)
+
+let const_unboxed_int64 n = Const_base (Const_unboxed_int64 n)
+
+let const_unboxed_nativeint n = Const_base (Const_unboxed_nativeint n)
+
 let tagged_immediate n = Lconst (const_int n)
 
 let int = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
 
+let untagged_int = Scalar.Maybe_naked.Naked (Scalar.Integral.Width.Taggable Int)
+
+let untagged_int8 =
+  Scalar.Maybe_naked.Naked (Scalar.Integral.Width.Taggable Int8)
+
+let untagged_int16 =
+  Scalar.Maybe_naked.Naked (Scalar.Integral.Width.Taggable Int16)
+
+let unboxed_int32 =
+  Scalar.Maybe_naked.Naked
+    (Scalar.Integral.Width.Boxable (Int32 Any_locality_mode))
+
+let unboxed_int64 =
+  Scalar.Maybe_naked.Naked
+    (Scalar.Integral.Width.Boxable (Int64 Any_locality_mode))
+
+let unboxed_nativeint =
+  Scalar.Maybe_naked.Naked
+    (Scalar.Integral.Width.Boxable (Nativeint Any_locality_mode))
+
 let const_unit = const_int 0
 
 let dummy_constant = tagged_immediate (0xBBBB / 2)
+
+let array_index_to_layout = function
+  | Ptagged_int_index -> Pvalue { raw_kind = Pintval; nullable = Non_nullable }
+  | Punboxed_or_untagged_integer_index Untagged_int ->
+    Punboxed_or_untagged_integer Untagged_int
+  | Punboxed_or_untagged_integer_index Untagged_int8 ->
+    Punboxed_or_untagged_integer Untagged_int8
+  | Punboxed_or_untagged_integer_index Untagged_int16 ->
+    Punboxed_or_untagged_integer Untagged_int16
+  | Punboxed_or_untagged_integer_index Unboxed_int32 ->
+    Punboxed_or_untagged_integer Unboxed_int32
+  | Punboxed_or_untagged_integer_index Unboxed_int64 ->
+    Punboxed_or_untagged_integer Unboxed_int64
+  | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
+    Punboxed_or_untagged_integer Unboxed_nativeint
+
+let array_index_to_scalar = function
+  | Ptagged_int_index -> int
+  | Punboxed_or_untagged_integer_index Untagged_int -> untagged_int
+  | Punboxed_or_untagged_integer_index Untagged_int8 -> untagged_int8
+  | Punboxed_or_untagged_integer_index Untagged_int16 -> untagged_int16
+  | Punboxed_or_untagged_integer_index Unboxed_int32 -> unboxed_int32
+  | Punboxed_or_untagged_integer_index Unboxed_int64 -> unboxed_int64
+  | Punboxed_or_untagged_integer_index Unboxed_nativeint -> unboxed_nativeint
+
+let const_scalar (kind : locality_mode Scalar.Integral.t) n =
+  Lconst
+    (match kind with
+    | Value (Taggable Int) -> const_int n
+    | Value (Taggable Int8) -> const_int8 n
+    | Value (Taggable Int16) -> const_int16 n
+    | Value (Boxable (Int32 _)) -> const_int32 (Int32.of_int n)
+    | Value (Boxable (Int64 _)) -> const_int64 (Int64.of_int n)
+    | Value (Boxable (Nativeint _)) -> const_nativeint (Nativeint.of_int n)
+    | Naked (Taggable Int) -> const_untagged_int n
+    | Naked (Taggable Int8) -> const_untagged_int8 n
+    | Naked (Taggable Int16) -> const_untagged_int16 n
+    | Naked (Boxable (Int32 _)) -> const_unboxed_int32 (Int32.of_int n)
+    | Naked (Boxable (Int64 _)) -> const_unboxed_int64 (Int64.of_int n)
+    | Naked (Boxable (Nativeint _)) ->
+      const_unboxed_nativeint (Nativeint.of_int n))
 
 let max_arity () =
   if !Clflags.native_code then 126 else max_int
@@ -1039,6 +1138,13 @@ let non_null_value raw_kind =
 let nullable_value raw_kind =
   Pvalue { raw_kind; nullable = Nullable }
 
+let split_vectors =
+  match Target_system.architecture () with
+  | X86_64 -> false
+  | AArch64 -> true
+  | IA32 | ARM | POWER | Z | Riscv ->
+    Misc.fatal_error "Only x86-64 and arm64 are supported"
+
 let layout_unit = non_null_value Pintval
 let layout_unboxed_unit = Punboxed_product []
 let layout_int = non_null_value Pintval
@@ -1075,7 +1181,26 @@ let layout_unboxed_int8 = Punboxed_or_untagged_integer Untagged_int8
 let layout_string = non_null_value Pgenval
 let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
-let layout_unboxed_vector v = Punboxed_vector v
+
+let layout_unboxed_vector v =
+  match v with
+  | Unboxed_vec128 -> Punboxed_vector Unboxed_vec128
+  | Unboxed_vec256 ->
+    if split_vectors
+    then
+      Punboxed_product
+        [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
+    else Punboxed_vector Unboxed_vec256
+  | Unboxed_vec512 ->
+    if split_vectors
+    then
+      Punboxed_product
+        [ Punboxed_vector Unboxed_vec128;
+          Punboxed_vector Unboxed_vec128;
+          Punboxed_vector Unboxed_vec128;
+          Punboxed_vector Unboxed_vec128 ]
+    else Punboxed_vector Unboxed_vec512
+
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
 let layout_predef_value = nullable_value Pgenval
 
@@ -1441,7 +1566,10 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Bits32 -> Bits32
   | Bits64 -> Bits64
   | Vec128 -> Vec128
-  | Vec256 -> Vec256
+  | Vec256 ->
+    if split_vectors
+    then Product [|Vec128; Vec128|]
+    else Vec256
   | Vec512 -> Vec512
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
@@ -1464,7 +1592,10 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Bits32 -> Bits32
     | Bits64 -> Bits64
     | Vec128 -> Vec128
-    | Vec256 -> Vec256
+    | Vec256 ->
+      if split_vectors
+      then Product [|Vec128; Vec128|]
+      else Vec256
     | Vec512 -> Vec512
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
@@ -2109,6 +2240,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pobj_magic _ -> None
   | Punbox_vector _ -> None
   | Pbox_vector (_, m) -> Some m
+  | Pjoin_vec256
+  | Psplit_vec256
   | Punbox_unit -> None
   | Prunstack | Presume | Pperform | Preperform
     (* CR mshinwell: check *)
@@ -2172,12 +2305,12 @@ let primitive_can_raise prim =
   | Pbigstring_load_32 { unsafe = false; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_f32 { unsafe = false; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_64 { unsafe = false; index_kind = _; mode = _; boxed = _ }
-  | Pbigstring_load_vec { unsafe = false; _ }
+  | Pbigstring_load_vec { safety = Some _; _ }
   | Pbigstring_set_16 { unsafe = false; index_kind = _ }
   | Pbigstring_set_32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbigstring_set_f32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbigstring_set_64 { unsafe = false; index_kind = _; boxed = _ }
-  | Pbigstring_set_vec { unsafe = false; _ }
+  | Pbigstring_set_vec { safety = Some _; _ }
   | Pfloatarray_load_vec { unsafe = false; _ }
   | Pfloat_array_load_vec { unsafe = false; _ }
   | Pint_array_load_vec { unsafe = false; _ }
@@ -2253,12 +2386,12 @@ let primitive_can_raise prim =
   | Pbigstring_load_32 { unsafe = true; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_f32 { unsafe = true; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_64 { unsafe = true; index_kind = _; mode = _; boxed = _ }
-  | Pbigstring_load_vec { unsafe = true; _ }
+  | Pbigstring_load_vec { safety = None; _ }
   | Pbigstring_set_16 { unsafe = true; _ }
   | Pbigstring_set_32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbigstring_set_f32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbigstring_set_64 { unsafe = true; index_kind = _; boxed = _ }
-  | Pbigstring_set_vec { unsafe = true; _ }
+  | Pbigstring_set_vec { safety = None; _ }
   | Pfloatarray_load_vec { unsafe = true; _ }
   | Pfloat_array_load_vec { unsafe = true; _ }
   | Pint_array_load_vec { unsafe = true; _ }
@@ -2277,8 +2410,9 @@ let primitive_can_raise prim =
   | Punboxed_nativeint_array_set_vec { unsafe = true; _ }
   | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
-  | Pbox_vector (_, _)
-  | Punbox_vector _ | Punbox_unit | Pmake_unboxed_product _
+  | Pbox_vector (_, _) | Punbox_vector _
+  | Pjoin_vec256 | Psplit_vec256
+  | Punbox_unit | Pmake_unboxed_product _
   | Punboxed_product_field _ | Pget_header _ ->
     false
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
@@ -2342,7 +2476,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
 
-let layout_of_extern_repr : extern_repr -> _ = function
+let rec layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
   | Unboxed_float bf -> layout_boxed_float bf
   | Unboxed_or_untagged_integer
@@ -2354,11 +2488,14 @@ let layout_of_extern_repr : extern_repr -> _ = function
     layout_boxed_int Boxed_int32
   | Unboxed_or_untagged_integer Unboxed_nativeint ->
     layout_boxed_int Boxed_nativeint
+  | Unboxed_product reprs ->
+    Punboxed_product (List.map layout_of_extern_repr reprs)
   | Same_as_ocaml_repr s -> layout_of_const_sort s
 
 let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
-  | Same_as_ocaml_repr (Product _) -> true
+  | Same_as_ocaml_repr (Product _)
+  | Unboxed_product _ -> true
   | Same_as_ocaml_repr (Base _)
   | Unboxed_vector _ | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
@@ -2378,6 +2515,7 @@ let rec layout_of_ignorable_kinds kinds =
 and layout_of_ignorable_kind = function
   | Pint_ignorable -> layout_int
   | Punboxedfloat_ignorable f -> layout_unboxed_float f
+  | Punboxedvector_ignorable v -> layout_unboxed_vector v
   | Punboxedoruntaggedint_ignorable i -> layout_unboxed_int i
   | Pproduct_ignorable kinds -> layout_of_ignorable_kinds kinds
 
@@ -2467,9 +2605,9 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Bits16 -> Punboxed_or_untagged_integer Untagged_int16
   | Bits8 -> Punboxed_or_untagged_integer Untagged_int8
   | Word -> Punboxed_or_untagged_integer Unboxed_nativeint
-  | Vec128 -> Punboxed_vector Unboxed_vec128
-  | Vec256 -> Punboxed_vector Unboxed_vec256
-  | Vec512 -> Punboxed_vector Unboxed_vec512
+  | Vec128 -> layout_unboxed_vector Unboxed_vec128
+  | Vec256 -> layout_unboxed_vector Unboxed_vec256
+  | Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
   | Splice_variable id -> Psplicevar id
 
@@ -2565,6 +2703,10 @@ let primitive_result_layout (p : primitive) =
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
   | Pbox_vector (v, _) -> layout_boxed_vector v
   | Punbox_vector v -> layout_unboxed_vector (Primitive.unboxed_vector v)
+  | Pjoin_vec256 -> layout_unboxed_vector Unboxed_vec256
+  | Psplit_vec256 ->
+    Punboxed_product
+      [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
   | Pmixedfield (path, shape, _) -> layout_of_mixed_block_shape shape ~path
   | Pccall { prim_native_repr_res = _, repr_res } -> layout_of_extern_repr repr_res
   | Praise _ -> layout_bottom
@@ -2859,8 +3001,12 @@ let rec count_initializers_scannable
 let rec count_initializers_ignorable
     (ignorable : ignorable_product_element_kind) =
   match ignorable with
-  | Pint_ignorable | Punboxedfloat_ignorable _ |
-    Punboxedoruntaggedint_ignorable _ -> 1
+  | Pint_ignorable
+  | Punboxedfloat_ignorable _
+  | Punboxedoruntaggedint_ignorable _ -> 1
+  | Punboxedvector_ignorable Unboxed_vec128 -> 2
+  | Punboxedvector_ignorable Unboxed_vec256 -> 4
+  | Punboxedvector_ignorable Unboxed_vec512 -> 8
   | Pproduct_ignorable ignorables ->
     List.fold_left
       (fun acc ignorable -> acc + count_initializers_ignorable ignorable)
@@ -2870,7 +3016,10 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
   match lambda_array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray _
-  | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ -> 1
+  | Punboxedoruntaggedintarray _  -> 1
+  | Punboxedvectorarray Unboxed_vec128 -> 2
+  | Punboxedvectorarray Unboxed_vec256 -> 4
+  | Punboxedvectorarray Unboxed_vec512 -> 8
   | Pgcscannableproductarray scannables ->
     List.fold_left
       (fun acc scannable -> acc + count_initializers_scannable scannable)
@@ -2912,7 +3061,9 @@ let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with
   | Pint_ignorable -> true
-  | Punboxedfloat_ignorable _ | Punboxedoruntaggedint_ignorable _ -> false
+  | Punboxedfloat_ignorable _
+  | Punboxedvector_ignorable _
+  | Punboxedoruntaggedint_ignorable _ -> false
   | Pproduct_ignorable kinds ->
     List.exists ignorable_product_element_kind_involves_int kinds
 
