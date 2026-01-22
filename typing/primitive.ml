@@ -922,6 +922,12 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.vec256; Same_as_ocaml_repr C.value]
     | "%unbox_vec256" ->
       exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.vec256]
+    | "%join_vec256" ->
+      exactly [Same_as_ocaml_repr (Product [C.vec128; C.vec128]);
+               Same_as_ocaml_repr C.vec256]
+    | "%split_vec256" ->
+      exactly [Same_as_ocaml_repr C.vec256;
+               Same_as_ocaml_repr (Product [C.vec128; C.vec128])]
     | "%box_vec512" ->
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.value]
     | "%unbox_vec512" ->

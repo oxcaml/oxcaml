@@ -204,7 +204,7 @@ let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-      Unboxed_vector _) ->
+     Unboxed_vector _ | Unboxed_product _) ->
     Jkind.Sort.Const.Base Value
 
 let to_lambda_prim prim ~poly_sort =
@@ -1027,6 +1027,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%box_vec128" -> Primitive(Pbox_vector (Boxed_vec128, mode), 1)
     | "%unbox_vec256" -> Primitive(Punbox_vector Boxed_vec256, 1)
     | "%box_vec256" -> Primitive(Pbox_vector (Boxed_vec256, mode), 1)
+    | "%join_vec256" -> Primitive(Pjoin_vec256, 2)
+    | "%split_vec256" -> Primitive(Psplit_vec256, 1)
     | "%unbox_vec512" -> Primitive(Punbox_vector Boxed_vec512, 1)
     | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, mode), 1)
     | "%get_header" -> Primitive (Pget_header mode, 1)
@@ -2361,6 +2363,7 @@ let lambda_primitive_needs_event_after = function
   | Punboxed_float_array_set_vec _| Punboxed_float32_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
+  | Pjoin_vec256 | Psplit_vec256
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pwith_stack | Pwith_stack_bind | Pperform | Preperform | Presume

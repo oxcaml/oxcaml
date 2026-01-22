@@ -716,6 +716,163 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
   | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
     arrayblit_expanded env ~src_mutability ~dst_array_set_kind args loc
 
+let cast_vec128_to_vec256 =
+  Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
+    ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
+    ~native_name:"caml_vec256_low_of_vec128"
+    ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr (Base Vec128)]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec256))
+    ~is_layout_poly:false
+
+let cast_vec256_to_vec128 =
+  Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
+    ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
+    ~native_name:"caml_vec256_low_to_vec128"
+    ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr (Base Vec256)]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec128))
+    ~is_layout_poly:false
+
+let vec256_insert_vec128 =
+  Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
+    ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
+    ~native_name:"caml_avx_vec256_insert_128"
+    ~native_repr_args:
+      [ Prim_global, L.Same_as_ocaml_repr (Base Bits64);
+        Prim_global, L.Same_as_ocaml_repr (Base Vec256);
+        Prim_global, L.Same_as_ocaml_repr (Base Vec128) ]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec256))
+    ~is_layout_poly:false
+
+let vec256_extract_vec128 =
+  Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
+    ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
+    ~native_name:"caml_avx_vec256_extract_128"
+    ~native_repr_args:
+      [ Prim_global, L.Same_as_ocaml_repr (Base Bits64);
+        Prim_global, L.Same_as_ocaml_repr (Base Vec256) ]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec128))
+    ~is_layout_poly:false
+
+let offset ~loc ~idx ~index_kind n =
+  let kind = L.array_index_to_scalar index_kind in
+  L.add kind idx (L.const_scalar kind n) ~loc
+
+let make_boxed_vec256 ~loc ~mode args =
+  L.Lprim
+    ( Pobj_magic
+        (Pvalue
+           { raw_kind = Pboxedvectorval Boxed_vec256; nullable = Non_nullable }),
+      [ Lprim
+          (Pmakemixedblock (0, Immutable, [| Vec128; Vec128 |], mode), args, loc)
+      ],
+      loc )
+
+let boxed_vec256_mixed_layout =
+  L.Pvalue
+    { raw_kind =
+        Pvariant
+          { consts = [];
+            non_consts = [0, Constructor_mixed [| Vec128; Vec128 |]]
+          };
+      nullable = Non_nullable
+    }
+
+let unboxed_vec256_pair_layout =
+  L.Punboxed_product
+    [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
+
+let boxed_vec256_to_mixed ~loc arg =
+  L.Lprim (Pobj_magic boxed_vec256_mixed_layout, [arg], loc)
+
+let unboxed_vec256_field ~loc i arg =
+  L.Lprim
+    ( Punboxed_product_field
+        (i, [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]),
+      [arg],
+      loc )
+
+let boxed_vec256_field ~loc i arg =
+  L.Lprim (Pmixedfield ([i], [| Vec128; Vec128 |], Reads_agree), [arg], loc)
+
+let split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride ~load =
+  let idx_id = Ident.create_local "idx" in
+  let idx_duid = Lambda.debug_uid_none in
+  let low_id = Ident.create_local "low" in
+  let low_duid = Lambda.debug_uid_none in
+  let low = L.Lprim (load true, [arr; Lvar idx_id], loc) in
+  let high =
+    let idx = offset ~loc ~index_kind ~idx:(Lvar idx_id) (16 / stride) in
+    L.Lprim (load false, [arr; idx], loc)
+  in
+  (* Rebind low to do its load first *)
+  let prim =
+    if boxed
+    then make_boxed_vec256 ~loc ~mode [Lvar low_id; high]
+    else
+      L.Lprim
+        ( Pmake_unboxed_product
+            [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
+          [Lvar low_id; high],
+          loc )
+  in
+  Transformed
+    (Llet
+       ( Strict,
+         L.array_index_to_layout index_kind,
+         idx_id,
+         idx_duid,
+         idx,
+         Llet
+           (Strict, Punboxed_vector Unboxed_vec128, low_id, low_duid, low, prim)
+       ))
+
+let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
+  let idx_id = Ident.create_local "idx" in
+  let idx_duid = Lambda.debug_uid_none in
+  let value_id = Ident.create_local "value" in
+  let value_duid = Lambda.debug_uid_none in
+  let value = if boxed then boxed_vec256_to_mixed ~loc value else value in
+  let low, high, value_layout =
+    if boxed
+    then
+      ( boxed_vec256_field ~loc 0 (Lvar value_id),
+        boxed_vec256_field ~loc 1 (Lvar value_id),
+        boxed_vec256_mixed_layout )
+    else
+      ( unboxed_vec256_field ~loc 0 (Lvar value_id),
+        unboxed_vec256_field ~loc 1 (Lvar value_id),
+        unboxed_vec256_pair_layout )
+  in
+  let low = L.Lprim (store true, [arr; Lvar idx_id; low], loc) in
+  let high =
+    let idx = offset ~loc ~index_kind ~idx:(Lvar idx_id) (16 / stride) in
+    L.Lprim (store false, [arr; idx; high], loc)
+  in
+  Transformed
+    (Llet
+       ( Strict,
+         value_layout,
+         value_id,
+         value_duid,
+         value,
+         Llet
+           ( Strict,
+             L.array_index_to_layout index_kind,
+             idx_id,
+             idx_duid,
+             idx,
+             Lsequence (low, high) ) ))
+
+let ccall_involves_vec256 (desc : L.external_call_description) =
+  let repr_vec256 = function[@warning "-4"]
+    | _, L.Unboxed_vector Boxed_vec256 | _, L.Same_as_ocaml_repr (Base Vec256)
+      ->
+      true
+    | _ -> false
+  in
+  repr_vec256 desc.prim_native_repr_res
+  || List.exists repr_vec256 desc.prim_native_repr_args
+
 let transform_primitive0 env (prim : L.primitive) args loc =
   match prim, args with
   (* For Psequor and Psequand, earlier passes (notably for region handling)
@@ -839,6 +996,319 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     let name = Format.sprintf "caml_sys_const_%s" name in
     let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
     Primitive (L.Pccall desc, [L.lambda_unit], loc)
+  | ( Pstring_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
+      ~load:(fun _ ->
+        L.Pstring_load_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Pbytes_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
+      ~load:(fun _ ->
+        L.Pbytes_load_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Pbigstring_load_vec
+        ({ size = Boxed_vec256; safety; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
+      ~load:(fun low ->
+        let safety =
+          Option.map
+            (fun (~len, ~align) ->
+              if low then ~len, ~align else ~len:(len / 2), ~align:(align / 2))
+            safety
+        in
+        L.Pbigstring_load_vec
+          { desc with size = Boxed_vec128; safety; boxed = false })
+  | ( Pfloatarray_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+      ~load:(fun _ ->
+        L.Pfloatarray_load_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Pfloat_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+      ~load:(fun _ ->
+        L.Pfloat_array_load_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Pint_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+      ~load:(fun _ ->
+        L.Pint_array_load_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_float_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+      ~load:(fun _ ->
+        L.Punboxed_float_array_load_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_float32_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:4
+      ~load:(fun _ ->
+        L.Punboxed_float32_array_load_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_int32_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:4
+      ~load:(fun _ ->
+        L.Punboxed_int32_array_load_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_int64_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+      ~load:(fun _ ->
+        L.Punboxed_int64_array_load_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_nativeint_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
+      ~load:(fun _ ->
+        L.Punboxed_nativeint_array_load_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Pbytes_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:1
+      ~store:(fun _ ->
+        L.Pbytes_set_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Pbigstring_set_vec
+        ({ size = Boxed_vec256; safety; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:1
+      ~store:(fun low ->
+        let safety =
+          Option.map
+            (fun (~len, ~align) ->
+              if low then ~len, ~align else ~len:(len / 2), ~align:(align / 2))
+            safety
+        in
+        L.Pbigstring_set_vec
+          { desc with size = Boxed_vec128; safety; boxed = false })
+  | ( Pfloatarray_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
+      ~store:(fun _ ->
+        L.Pfloatarray_set_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Pfloat_array_set_vec
+        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
+      ~store:(fun _ ->
+        L.Pfloat_array_set_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Pint_array_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
+      ~store:(fun _ ->
+        L.Pint_array_set_vec { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_float_array_set_vec
+        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
+      ~store:(fun _ ->
+        L.Punboxed_float_array_set_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_float32_array_set_vec
+        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:4
+      ~store:(fun _ ->
+        L.Punboxed_float32_array_set_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_int32_array_set_vec
+        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:4
+      ~store:(fun _ ->
+        L.Punboxed_int32_array_set_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_int64_array_set_vec
+        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
+      ~store:(fun _ ->
+        L.Punboxed_int64_array_set_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Punboxed_nativeint_array_set_vec
+        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
+      ~store:(fun _ ->
+        L.Punboxed_nativeint_array_set_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | Pjoin_vec256, [low; high] ->
+    if L.split_vectors
+    then
+      Transformed
+        (Lprim
+           ( Pmake_unboxed_product
+               [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
+             [low; high],
+             loc ))
+    else
+      let low = L.Lprim (Pccall cast_vec128_to_vec256, [low], loc) in
+      Transformed
+        (Lprim
+           ( Pccall vec256_insert_vec128,
+             [Lconst (L.const_unboxed_int64 1L); low; high],
+             loc ))
+  | Psplit_vec256, [arg] ->
+    if L.split_vectors
+    then Transformed arg
+    else
+      let low = L.Lprim (Pccall cast_vec256_to_vec128, [arg], loc) in
+      let high =
+        L.Lprim
+          ( Pccall vec256_extract_vec128,
+            [Lconst (L.const_unboxed_int64 1L); arg],
+            loc )
+      in
+      Transformed
+        (Lprim
+           ( Pmake_unboxed_product
+               [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
+             [low; high],
+             loc ))
+  | Punbox_vector Boxed_vec256, [arg] when L.split_vectors ->
+    (* vec256 -> vec256# as #(vec128# * vec128#) *)
+    let arg_id = Ident.create_local "arg" in
+    let arg_duid = Lambda.debug_uid_none in
+    let prim =
+      L.Lprim
+        ( Pmake_unboxed_product
+            [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
+          [ boxed_vec256_field ~loc 0 (Lvar arg_id);
+            boxed_vec256_field ~loc 1 (Lvar arg_id) ],
+          loc )
+    in
+    Transformed
+      (Llet
+         ( Strict,
+           boxed_vec256_mixed_layout,
+           arg_id,
+           arg_duid,
+           boxed_vec256_to_mixed ~loc arg,
+           prim ))
+  | Pbox_vector (Boxed_vec256, mode), [arg] when L.split_vectors ->
+    (* vec256# as #(vec128# * vec128#) -> vec256 *)
+    let arg_id = Ident.create_local "arg" in
+    let arg_duid = Lambda.debug_uid_none in
+    let prim =
+      make_boxed_vec256 ~loc ~mode
+        [ unboxed_vec256_field ~loc 0 (Lvar arg_id);
+          unboxed_vec256_field ~loc 1 (Lvar arg_id) ]
+    in
+    Transformed
+      (Llet (Strict, unboxed_vec256_pair_layout, arg_id, arg_duid, arg, prim))
+  | Pccall desc, _ when L.split_vectors && ccall_involves_vec256 desc -> (
+    let bindings = ref [] in
+    let prim_native_repr_args, args =
+      let rebind_arg arg kind =
+        let arg_id =
+          Ident.create_local (Printf.sprintf "arg/%d" (List.length !bindings))
+        in
+        let arg_duid = Lambda.debug_uid_none in
+        bindings := (arg, arg_id, arg_duid, kind) :: !bindings;
+        arg_id
+      in
+      let expand (mode, repr) arg =
+        match (repr : L.extern_repr) with
+        (* vec256[@unboxed] => vec128#, vec128# *)
+        | Unboxed_vector Boxed_vec256 ->
+          let arg_id =
+            rebind_arg
+              (boxed_vec256_to_mixed ~loc arg)
+              boxed_vec256_mixed_layout
+          in
+          (* Tell flambda2 not to unbox the components *)
+          let ext = mode, L.Same_as_ocaml_repr (Base Vec128) in
+          [ ext, boxed_vec256_field ~loc 0 (Lvar arg_id);
+            ext, boxed_vec256_field ~loc 1 (Lvar arg_id) ]
+        (* vec256# as #(vec128# * vec128#) => vec128#, vec128# *)
+        | Same_as_ocaml_repr (Base Vec256) ->
+          let arg_id = rebind_arg arg unboxed_vec256_pair_layout in
+          let ext = mode, L.Same_as_ocaml_repr (Base Vec128) in
+          [ ext, unboxed_vec256_field ~loc 0 (Lvar arg_id);
+            ext, unboxed_vec256_field ~loc 1 (Lvar arg_id) ]
+        | _ -> [(mode, repr), arg]
+      in
+      List.map2 expand desc.prim_native_repr_args args
+      |> List.concat |> List.split
+    in
+    let make_ccall prim_native_repr_res =
+      let desc =
+        Primitive.make ~name:desc.prim_name ~alloc:desc.prim_alloc
+          ~c_builtin:desc.prim_c_builtin ~effects:desc.prim_effects
+          ~coeffects:desc.prim_coeffects ~native_name:desc.prim_native_name
+          ~native_repr_args:prim_native_repr_args
+          ~native_repr_res:prim_native_repr_res
+          ~is_layout_poly:desc.prim_is_layout_poly
+      in
+      let rec rebind = function
+        | [] -> L.Lprim (Pccall desc, args, loc)
+        | (arg, arg_id, arg_duid, layout) :: bindings ->
+          L.Llet (Strict, layout, arg_id, arg_duid, arg, rebind bindings)
+      in
+      rebind !bindings
+    in
+    match desc.prim_native_repr_res with
+    (* #(vec128# x vec128#) -> vec256[@unboxed] *)
+    | mode, Unboxed_vector Boxed_vec256 ->
+      let repr_res =
+        (* Tell flambda2 not to box the components *)
+        mode, L.Same_as_ocaml_repr (Product [Base Vec128; Base Vec128])
+      in
+      let res = Ident.create_local "res" in
+      let res_duid = Lambda.debug_uid_none in
+      let alloc_mode =
+        Lambda.locality_mode_of_primitive_description desc
+        |> Option.value ~default:L.alloc_heap
+      in
+      Transformed
+        (Llet
+           ( Strict,
+             unboxed_vec256_pair_layout,
+             res,
+             res_duid,
+             make_ccall repr_res,
+             make_boxed_vec256 ~loc ~mode:alloc_mode
+               [ unboxed_vec256_field ~loc 0 (Lvar res);
+                 unboxed_vec256_field ~loc 1 (Lvar res) ] ))
+    (* #(vec128# * vec128#) -> vec256# as #(vec128# * vec128#) *)
+    | mode, Same_as_ocaml_repr (Base Vec256) ->
+      let repr_res =
+        mode, L.Same_as_ocaml_repr (Product [Base Vec128; Base Vec128])
+      in
+      Transformed (make_ccall repr_res)
+    | repr_res -> Transformed (make_ccall repr_res))
   | _, _ -> Primitive (prim, args, loc)
 [@@ocaml.warning "-fragile-match"]
 

@@ -828,6 +828,8 @@ let primitive ppf = function
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_vector bi) (locality_kind m)
+  | Pjoin_vec256 -> fprintf ppf "join_vec256"
+  | Psplit_vec256 -> fprintf ppf "split_vec256"
   | Parray_to_iarray -> fprintf ppf "array_to_iarray"
   | Parray_of_iarray -> fprintf ppf "array_of_iarray"
   | Pget_header m -> fprintf ppf "get_header%s" (locality_kind m)
@@ -1009,6 +1011,8 @@ let name_of_primitive = function
   | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
+  | Pjoin_vec256 -> "Pjoin_vec256"
+  | Psplit_vec256 -> "Psplit_vec256"
   | Parray_of_iarray -> "Parray_of_iarray"
   | Parray_to_iarray -> "Parray_to_iarray"
   | Pget_header _ -> "Pget_header"

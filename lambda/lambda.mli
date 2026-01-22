@@ -349,6 +349,8 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Pjoin_vec256
+  | Psplit_vec256
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64
     (** At present [Preinterpret_unboxed_int64_as_tagged_int63] and
@@ -393,6 +395,7 @@ and extern_repr =
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Unboxed_product of extern_repr list
 
 and external_call_description = extern_repr Primitive.description_gen
 
@@ -1049,11 +1052,15 @@ val make_key: lambda -> lambda option
 
 val const_unit: structured_constant
 val const_int : int -> structured_constant
+val const_unboxed_int64 : int64 -> structured_constant
 
 val tagged_immediate : int -> lambda
 val lambda_unit: lambda
 
 val of_bool : bool -> lambda
+
+(* Whether to translate the vec256 layout to #(vec128 * vec128). *)
+val split_vectors : bool
 
 val layout_unit : layout
 val layout_unboxed_unit : layout
@@ -1353,6 +1360,12 @@ val ignorable_product_element_kind_involves_int :
 val array_element_size_in_bytes : array_kind -> int
 
 (** Construction helpers *)
+
+val array_index_to_layout : array_index_kind -> layout
+
+val array_index_to_scalar : array_index_kind -> locality_mode Scalar.Integral.t
+
+val const_scalar : locality_mode Scalar.Integral.t -> int -> lambda
 
 (** A tagged immediate. *)
 val int : _ Scalar.Integral.t

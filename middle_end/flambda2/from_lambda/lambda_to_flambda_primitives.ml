@@ -2041,10 +2041,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
                   List.map unbox_float args ),
               Variadic (Make_array (Values, mutability, mode), args),
               [K.With_subkind.any_value] ) ]))
-  | Pmakearray_dynamic _, _ | Parrayblit _, _ ->
+  | Pmakearray_dynamic _, _
+  | Parrayblit _, _
+  | Pjoin_vec256, _
+  | Psplit_vec256, _ ->
     Misc.fatal_error
-      "Lambda_to_flambda_primitives.convert_lprim: Pmakearray_dynamic and \
-       Parrayblit should have been expanded in [Lambda_to_lambda_transforms]"
+      "Lambda_to_flambda_primitives.convert_lprim: Pmakearray_dynamic, \
+       Parrayblit, Pjoin_vec256, or Psplit_vec256 should have been expanded in \
+       [Lambda_to_lambda_transforms]"
   | Popaque layout, [arg] ->
     opaque ~machine_width layout arg ~middle_end_only:false
   | Pobj_magic layout, [arg] ->

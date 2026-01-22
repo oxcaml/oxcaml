@@ -612,7 +612,7 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
         } ])
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
-let unarize_extern_repr ~machine_width alloc_mode
+let rec unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
   match extern_repr with
   | Same_as_ocaml_repr (Base Void) -> []
@@ -685,6 +685,8 @@ let unarize_extern_repr ~machine_width alloc_mode
         arg_transformer = Some P.Untag_immediate;
         return_transformer = Some P.Tag_immediate
       } ]
+  | Unboxed_product reprs ->
+    List.concat_map (unarize_extern_repr ~machine_width alloc_mode) reprs
 
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
@@ -1246,15 +1248,16 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Popaque _ | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
       | Pmakelazyblock _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
-      | Pmake_unboxed_product _ | Punboxed_product_field _
-      | Parray_element_size_in_bytes _ | Pget_header _ | Pwith_stack
-      | Pwith_stack_bind | Pperform | Presume | Preperform | Pmake_idx_field _
-      | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _
-      | Pset_idx _ | Pget_ptr _ | Pset_ptr _ | Patomic_exchange_field _
-      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
-      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
-      | Ptls_get | Ppoll | Patomic_load_field _ | Patomic_set_field _
+      | Pjoin_vec256 | Psplit_vec256 | Pmake_unboxed_product _
+      | Punboxed_product_field _ | Parray_element_size_in_bytes _
+      | Pget_header _ | Pwith_stack | Pwith_stack_bind | Pperform | Presume
+      | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
+      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
+      | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+      | Patomic_compare_set_field _ | Patomic_fetch_add_field
+      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
+      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get | Ppoll
+      | Patomic_load_field _ | Patomic_set_field _
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pscalar _ | Pphys_equal _ | Pcpu_relax ->

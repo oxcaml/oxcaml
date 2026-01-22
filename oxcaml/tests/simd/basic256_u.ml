@@ -41,12 +41,18 @@ let () =
 
 (* Unboxed *)
 
+external join_int64x4 : int64x2# -> int64x2# -> int64x4# = "%join_vec256"
+external split_int64x4 : int64x4# -> #(int64x2# * int64x2#) = "%split_vec256"
+
 type nonrec int8x32 = int8x32#
 type nonrec int16x16 = int16x16#
 type nonrec int32x8 = int32x8#
 type nonrec int64x4 = int64x4#
 type nonrec float32x8 = float32x8#
 type nonrec float64x4 = float64x4#
+
+external int64x2_low_int64 : int64x2# -> int64 = "" "vec128_low_int64" [@@noalloc] [@@unboxed]
+external int64x2_high_int64 : int64x2# -> int64 = "" "vec128_high_int64" [@@noalloc] [@@unboxed]
 
 external int64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> int64x4 = "" "vec256_of_int64s" [@@noalloc] [@@unboxed]
 external int64x4_first_int64 : int64x4 -> int64 = "" "vec256_first_int64" [@@noalloc] [@@unboxed]
@@ -62,6 +68,19 @@ let[@inline never] check v a b c d =
   eq v2 b;
   eq v3 c;
   eq v4 d
+;;
+
+(* Join/Split *)
+let () =
+  let #(v0,v1) = split_int64x4 (int64x4_of_int64s 1L 2L 3L 4L) in
+  eq (int64x2_low_int64 v0) 1L;
+  eq (int64x2_high_int64 v0) 2L;
+  eq (int64x2_low_int64 v1) 3L;
+  eq (int64x2_high_int64 v1) 4L;
+  let v0 = Sys.opaque_identity v0 in
+  let v1 = Sys.opaque_identity v1 in
+  let v = join_int64x4 v0 v1 in
+  check v 1L 2L 3L 4L
 ;;
 
 (* Box/Unbox *)
@@ -174,6 +193,33 @@ let () =
   let f = f v0 v1 17. v2 in
   let v = f 18. v3 in
   check v 45L 50L 36L 40L
+;;
+
+(* Store in module *)
+module type M = sig
+  val prefix : string
+  val a : int64x4
+  val b : float#
+  val c : int64x4
+end
+
+module M : M = struct
+  let prefix = "prefix"
+  let a = int64x4_of_int64s 1L 2L 3L 4L
+  let b = #9.
+  let c = int64x4_of_int64s 5L 6L 7L 8L
+end
+
+let () =
+  check M.a 1L 2L 3L 4L;
+  check M.c 5L 6L 7L 8L;
+  assert (M.prefix = "prefix");
+  let (module M) = Sys.opaque_identity (module M : M) in
+  check M.a 1L 2L 3L 4L;
+  check M.c 5L 6L 7L 8L;
+  assert (M.prefix = "prefix");
+  let v = combine_with_floats M.a (box_float M.b) M.c 14. in
+  check v 15L 22L 10L 12L
 ;;
 
 (* Store in record *)
