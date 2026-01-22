@@ -242,6 +242,12 @@ module Block_access_kind : sig
   val element_subkind_for_load : t -> Flambda_kind.With_subkind.t
 
   val to_block_shape : t -> Flambda_kind.Block_shape.t
+
+  val from_block_shape :
+    Flambda_kind.Block_shape.t ->
+    index:Target_ocaml_int.t ->
+    result_kind:Flambda_kind.With_subkind.t ->
+    t
 end
 
 (* CR-someday mshinwell: We should have unboxed arrays of int32, int64 and
