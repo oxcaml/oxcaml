@@ -538,7 +538,7 @@ end = struct
 
   exception Error of error
 
-  let force_aliased_multiuse t there order =
+  let force_aliased_multiuse t order there =
     match Maybe_unique.mark_multi_use t with
     | Ok () -> ()
     | Error cannot_force -> raise (Error { cannot_force; there; order })
@@ -551,7 +551,7 @@ end = struct
       Maybe_aliased t
     | Borrowed _, Aliased t | Aliased t, Borrowed _ -> Aliased t
     | Borrowed occ, Maybe_unique t | Maybe_unique t, Borrowed occ ->
-      force_aliased_multiuse t (Borrowed occ) Par;
+      force_aliased_multiuse t Par (Borrowed occ);
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Maybe_aliased t0, Maybe_aliased t1 ->
       Maybe_aliased (Maybe_aliased.meet t0 t1)
@@ -561,20 +561,20 @@ end = struct
       Aliased occ
     | Maybe_aliased t0, Maybe_unique t1 | Maybe_unique t1, Maybe_aliased t0 ->
       (* t1 must be aliased *)
-      force_aliased_multiuse t1 (Maybe_aliased t0) Par;
+      force_aliased_multiuse t1 Par (Maybe_aliased t0);
       (* The barrier stays empty; if there is any unique after this,
          the analysis will error *)
       aliased (Maybe_unique.extract_occurrence t1) Aliased.Forced
     | Aliased t0, Aliased _ -> Aliased t0
     | Aliased t0, Maybe_unique t1 ->
-      force_aliased_multiuse t1 (Aliased t0) Par;
+      force_aliased_multiuse t1 Par (Aliased t0);
       Aliased t0
     | Maybe_unique t1, Aliased t0 ->
-      force_aliased_multiuse t1 (Aliased t0) Par;
+      force_aliased_multiuse t1 Par (Aliased t0);
       Aliased t0
     | Maybe_unique t0, Maybe_unique t1 ->
-      force_aliased_multiuse t0 m1 Par;
-      force_aliased_multiuse t1 m0 Par;
+      force_aliased_multiuse t0 Par m1;
+      force_aliased_multiuse t1 Par m0;
       aliased (Maybe_unique.extract_occurrence t0) Aliased.Forced
     | Antiquote t1, Antiquote t2 -> Antiquote (par t1 t2)
     | Antiquote t1, t2 -> par t1 t2
@@ -617,7 +617,7 @@ end = struct
       m1
     | Aliased _, Borrowed _ -> m0
     | Maybe_unique l, Borrowed occ ->
-      force_aliased_multiuse l m1 Seq_before;
+      force_aliased_multiuse l Seq_before m1;
       aliased occ Aliased.Forced
     | Aliased _, Maybe_aliased _ ->
       (* The barrier stays empty; if there is any unique after this,
@@ -636,18 +636,18 @@ end = struct
           the analysis will error.
       *)
       let occ = Maybe_aliased.extract_occurrence l1 in
-      force_aliased_multiuse l0 m1 Seq_before;
+      force_aliased_multiuse l0 Seq_before m1;
       aliased occ Aliased.Forced
     | Aliased _, Aliased _ -> m0
     | Maybe_unique l, Aliased _ ->
-      force_aliased_multiuse l m1 Seq_before;
+      force_aliased_multiuse l Seq_before m1;
       m1
     | Aliased _, Maybe_unique l ->
-      force_aliased_multiuse l m0 Seq_after;
+      force_aliased_multiuse l Seq_after m0;
       m0
     | Maybe_unique l0, Maybe_unique l1 ->
-      force_aliased_multiuse l0 m1 Seq_before;
-      force_aliased_multiuse l1 m0 Seq_after;
+      force_aliased_multiuse l0 Seq_before m1;
+      force_aliased_multiuse l1 Seq_after m0;
       aliased (Maybe_unique.extract_occurrence l0) Aliased.Forced
     | Antiquote t1, Antiquote t2 -> Antiquote (seq t1 t2)
     | Antiquote t1, t2 -> seq t1 t2
