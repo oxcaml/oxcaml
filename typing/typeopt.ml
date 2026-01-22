@@ -605,15 +605,17 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
        fix it, we need a place to store the sort on a [Tconstr]. *)
     let ak = array_type_kind ~elt_ty:(Some arg) ~elt_sort:None env loc ty in
     num_nodes_visited, non_nullable (Parrayval ak)
-  | Tconstr(p, _, _) -> begin
-      (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
-         with with-kinds, [decl.type_jkind] will mention variables bound
-         by the parameters of the declaration. The code below loses this
-         connection and will continue processing with e.g. ['a : value]
-         instead of [string] when looking at a [string list]. This should
-         probably just call a [type_jkind] function. Internal ticket 5101. *)
+  | Tconstr(p, params, _) -> begin
       let decl =
-        try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
+        try
+          Env.find_type p env
+          (* CR dkalinichenko: this uses a [generic_instance_] function to
+             ensure that unification succeeds regardless of levels. It's unclear
+             why this is necessary (we can't even compile Stdlib otherwise),
+             and I haven't been able to determine the reason. At least,
+             I think this may be unnecessary after the rebase to 5.4. *)
+          |> Ctype.generic_instance_declaration_with_params env params
+        with Not_found -> raise Missing_cmi_fallback
       in
       if cannot_proceed () then
         num_nodes_visited,
