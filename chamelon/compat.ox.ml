@@ -302,8 +302,9 @@ let view_texp (e : expression_desc) =
               }
       in
       Texp_function
-        ( { params; body }
-        , { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc })
+        ( { params; body },
+          { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc }
+        )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
   | _ -> O e
