@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -25,42 +25,24 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR mshinwell: This file needs to be code reviewed *)
+(** Generate EH frame registration code for manual runtime registration.
 
-(** Generate linker scripts for the dissector.
+    When using the dissector with LLD that lacks 64-bit EH frame support, we
+    suppress LLD's 32-bit .eh_frame_hdr generation and instead register the
+    .eh_frame section manually at runtime using libgcc's frame registration
+    functions. *)
 
-    This module generates a linker script that places partition sections in the
-    correct output sections. It optionally incorporates an existing linker
-    script provided via --script= on the linker command line. *)
+(** Linker script sections that define __EH_FRAME_BEGIN__ and provide an empty
+    .eh_frame_hdr table. This should be included in the SECTIONS block of the
+    linker script when manual EH frame registration is used. *)
+val linker_script_sections : string
 
-(** [generate ~existing_script ~partitions ~assume_lld_without_64_bit_eh_frames]
-    generates a linker script string.
+(** [generate ~temp_dir] creates a C file with .init/.fini constructors that
+    call __register_frame_info_bases and __deregister_frame_info_bases, compiles
+    it, and returns the path to the resulting object file.
 
-    @param existing_script
-      Optional path to an existing linker script to include. This is extracted
-      from -Wl,-T,<path> or -Wl,--script=<path> in Clflags.all_ccopts by the
-      dissector.
+    @param temp_dir Directory where the C and object files will be created
+    @return Path to the compiled object file
 
-    @param partitions
-      List of linked partitions. The first partition (Main) is skipped.
-      Subsequent partitions get sections named .caml.p1.*, .caml.p2.*, etc.
-
-    @param assume_lld_without_64_bit_eh_frames
-      When true, generates a custom .eh_frame section with __EH_FRAME_BEGIN__
-      symbol and an empty .eh_frame_hdr section to work around LLD's inability
-      to generate 64-bit .eh_frame_hdr tables. *)
-val generate :
-  existing_script:string option ->
-  partitions:Partition.Linked.t list ->
-  assume_lld_without_64_bit_eh_frames:bool ->
-  string
-
-(** [write ~output_file ~existing_script ~partitions
-     ~assume_lld_without_64_bit_eh_frames] generates a linker script and writes
-    it to the specified file. *)
-val write :
-  output_file:string ->
-  existing_script:string option ->
-  partitions:Partition.Linked.t list ->
-  assume_lld_without_64_bit_eh_frames:bool ->
-  unit
+    @raise Misc.Fatal_error if compilation fails *)
+val generate : temp_dir:string -> string

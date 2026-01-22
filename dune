@@ -545,6 +545,7 @@
   dissector_log
   build_igot_and_iplt
   build_linker_args
+  eh_frame_registration
   dissector
   extract_relocations
   form_rewrite_plan

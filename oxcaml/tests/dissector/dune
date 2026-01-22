@@ -180,7 +180,7 @@
        gen_module_c.cmx gen_module_c.o
        gen_main.cmx gen_main.o)
  (action
-  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.002
+  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.003
        gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx
        -o %{target})))
 
@@ -230,7 +230,7 @@
        gen_module_c.cmx gen_module_c.o
        gen_main.cmx gen_main.o)
  (action
-  (run %{bin:ocamlopt.opt} -function-sections -dissector -dissector-partition-size 0.002
+  (run %{bin:ocamlopt.opt} -function-sections -dissector -dissector-partition-size 0.003
        gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx
        -o %{target})))
 
@@ -269,7 +269,7 @@
      set -e
      set +o pipefail
      # Build with -ddissector-partitions and capture partition dir
-     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.002 -ddissector-partitions \
+     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.003 -ddissector-partitions \
        gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx \
        -o cross_partition_igot.exe 2>&1)
      PARTITION_DIR=$(echo \"$OUTPUT\" | grep 'Dissector partition files' | sed 's/.*in \\(.*\\)):/\\1/')
@@ -388,7 +388,7 @@
      set -e
      set +o pipefail
      # Build with -ddissector-partitions and capture partition dir from stderr
-     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.002 -ddissector-partitions \
+     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.003 -ddissector-partitions \
        gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx \
        -o igot_verify.exe 2>&1)
      PARTITION_DIR=$(echo \"$OUTPUT\" | grep 'Dissector partition files' | sed 's/.*in \\(.*\\)):/\\1/')
@@ -438,7 +438,7 @@
      set -e
      set +o pipefail
      # Build with -ddissector-partitions and capture partition dir
-     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.002 -ddissector-partitions \
+     OUTPUT=$(%{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.003 -ddissector-partitions \
        gen_module_a.cmx gen_module_b.cmx gen_module_c.cmx gen_main.cmx \
        -o iplt_verify.exe 2>&1)
      PARTITION_DIR=$(echo \"$OUTPUT\" | grep 'Dissector partition files' | sed 's/.*in \\(.*\\)):/\\1/')
@@ -565,7 +565,7 @@
  (target cmxa_test.exe)
  (deps mylib.cmxa mylib.a mylib_a.cmi mylib_b.cmi cmxa_main.ml)
  (action
-  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.004
+  (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.005
        mylib.cmxa cmxa_main.ml -o %{target})))
 
 (rule
