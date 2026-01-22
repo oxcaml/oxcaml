@@ -597,6 +597,9 @@ let rela_entry_size = 24
 (* ELF64 symbol entry size: 24 bytes *)
 let sym_entry_size = 24
 
+(* Symbol type for section symbols (ELF64_ST_TYPE extracts lower 4 bits) *)
+let stt_section = 3
+
 (* Extract symbol index from r_info (upper 32 bits) *)
 let sym_index_of_r_info r_info =
   Int64.to_int (Int64.shift_right_logical r_info 32)
@@ -617,20 +620,27 @@ let build_symbol_names buf sections =
       let st_info = Owee_buf.Read.u8 cursor in
       let _st_other = Owee_buf.Read.u8 cursor in
       let st_shndx = Owee_buf.Read.u16 cursor in
+      (* ELF64_ST_TYPE: symbol type is in lower 4 bits of st_info *)
       let st_type = st_info land 0xf in
       let name =
-        if st_type = 3 (* STT_SECTION *)
+        if st_type = stt_section
         then
           (* Section symbol: get name from section header table *)
           if st_shndx > 0 && st_shndx < Array.length sections
           then sections.(st_shndx).sh_name_str
-          else ""
+          else
+            Owee_buf.invalid_format
+              (Printf.sprintf
+                 "Section symbol %d has invalid section index %d" i st_shndx)
         else
           (* Regular symbol: get name from string table *)
           let name_cursor = Owee_buf.cursor strtab_body ~at:st_name in
           match Owee_buf.Read.zero_string name_cursor () with
           | Some s -> s
-          | None -> ""
+          | None ->
+            Owee_buf.invalid_format
+              (Printf.sprintf
+                 "Symbol %d has invalid string table offset %d" i st_name)
       in
       names.(i) <- name
     done;
@@ -655,15 +665,20 @@ let extract_rela_relocations buf sections ~rela_section_name =
       let symbol_name =
         match symbol_names with
         | Some names when sym_idx < Array.length names -> names.(sym_idx)
-        | _ -> Printf.sprintf "sym_%d" sym_idx
+        | Some names ->
+          Owee_buf.invalid_format
+            (Printf.sprintf
+               "Relocation %d references symbol index %d, but only %d symbols"
+               i sym_idx (Array.length names))
+        | None ->
+          Owee_buf.invalid_format
+            "Cannot resolve relocation symbols: .symtab or .strtab not found"
       in
-      (* Only include non-empty symbol names *)
-      if symbol_name <> "" then
-        relocs := {
-          r_offset = Int64.to_int r_offset;
-          r_symbol = symbol_name;
-          r_addend;
-        } :: !relocs
+      relocs := {
+        r_offset = Int64.to_int r_offset;
+        r_symbol = symbol_name;
+        r_addend;
+      } :: !relocs
     done;
     (* Sort by offset *)
     List.sort (fun a b -> compare a.r_offset b.r_offset) !relocs

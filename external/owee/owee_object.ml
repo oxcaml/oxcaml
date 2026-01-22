@@ -37,7 +37,9 @@ type relocation = {
 let relocs_equal a b =
   String.equal a.r_symbol b.r_symbol && a.r_addend = b.r_addend
 
-let is_text_section_name name =
+(* Check if an ELF section name is a text section (name starts with ".text").
+   This is only meaningful for ELF; Mach-O uses __text in __TEXT segment. *)
+let is_elf_text_section_name name =
   String.length name >= 5 && String.sub name 0 5 = ".text"
 
 let extract_elf_text_section buf =
@@ -62,10 +64,7 @@ let extract_macho_text_section buf =
     match Owee_macho.find_section seg "__text" with
     | Some sec -> Some (Owee_macho.section_body_string buf seg sec)
     | None -> None)
-  | None -> (
-    match Owee_macho.find_section_any_segment commands "__text" with
-    | Some (seg, sec) -> Some (Owee_macho.section_body_string buf seg sec)
-    | None -> None)
+  | None -> None
 
 let extract_macho_data_section buf =
   let _header, commands = Owee_macho.read buf in
@@ -79,13 +78,7 @@ let extract_macho_data_section buf =
   in
   match try_section "__DATA" "__data" with
   | Some _ as result -> result
-  | None -> (
-    match try_section "__DATA" "__const" with
-    | Some _ as result -> result
-    | None -> (
-      match Owee_macho.find_section_any_segment commands "__data" with
-      | Some (seg, sec) -> Some (Owee_macho.section_body_string buf seg sec)
-      | None -> None))
+  | None -> try_section "__DATA" "__const"
 
 let extract_text_section buf =
   match detect_format buf with
@@ -115,45 +108,41 @@ let extract_elf_data_relocations buf =
   Owee_elf.extract_section_relocations buf sections ~section_name:".data"
   |> List.map convert_elf_reloc
 
-let extract_macho_relocations_by_section buf sect_name =
+let extract_macho_relocations buf ~seg_name ~sect_name =
   let _header, commands = Owee_macho.read buf in
   match Owee_macho.get_symbol_table commands with
   | None -> []
-  | Some (symbols, _strtab) ->
-    let relocs = ref [] in
-    List.iter
-      (function
-        | Owee_macho.LC_SEGMENT_64 seg ->
-          let seg = Lazy.force seg in
-          Array.iter
-            (fun section ->
-              if String.equal section.Owee_macho.sec_sectname sect_name
-              then
-                relocs
-                  := Owee_macho.extract_section_relocations symbols section
-                     @ !relocs)
-            seg.Owee_macho.seg_sections
-        | _ -> ())
-      commands;
-    List.map convert_macho_reloc !relocs
-    |> List.sort (fun a b -> compare a.r_offset b.r_offset)
+  | Some (symbols, _strtab) -> (
+    match Owee_macho.find_segment commands seg_name with
+    | None -> []
+    | Some seg ->
+      let relocs =
+        Array.fold_left
+          (fun acc section ->
+            if String.equal section.Owee_macho.sec_sectname sect_name
+            then Owee_macho.extract_section_relocations symbols section @ acc
+            else acc)
+          [] seg.Owee_macho.seg_sections
+      in
+      List.map convert_macho_reloc relocs
+      |> List.sort (fun a b -> compare a.r_offset b.r_offset))
 
 let extract_text_relocations buf =
   match detect_format buf with
   | Elf -> extract_elf_text_relocations buf
-  | Macho -> extract_macho_relocations_by_section buf "__text"
+  | Macho -> extract_macho_relocations buf ~seg_name:"__TEXT" ~sect_name:"__text"
   | Unknown -> []
 
 let extract_data_relocations buf =
   match detect_format buf with
   | Elf -> extract_elf_data_relocations buf
-  | Macho -> extract_macho_relocations_by_section buf "__data"
+  | Macho -> extract_macho_relocations buf ~seg_name:"__DATA" ~sect_name:"__data"
   | Unknown -> []
 
 let extract_elf_individual_text_sections buf =
   let _header, sections = Owee_elf.read_elf buf in
   Array.to_list sections
-  |> List.filter (fun sec -> is_text_section_name sec.Owee_elf.sh_name_str)
+  |> List.filter (fun sec -> is_elf_text_section_name sec.Owee_elf.sh_name_str)
   |> List.map (fun sec ->
          sec.Owee_elf.sh_name_str, Owee_elf.section_body_string buf sec)
 
@@ -166,7 +155,7 @@ let extract_individual_text_sections buf =
 let extract_elf_individual_text_relocations buf =
   let _header, sections = Owee_elf.read_elf buf in
   Array.to_list sections
-  |> List.filter (fun sec -> is_text_section_name sec.Owee_elf.sh_name_str)
+  |> List.filter (fun sec -> is_elf_text_section_name sec.Owee_elf.sh_name_str)
   |> List.map (fun sec ->
          let relocs =
            Owee_elf.extract_section_relocations buf sections
