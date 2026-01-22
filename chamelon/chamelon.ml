@@ -101,10 +101,12 @@ let all_minimizers =
       Simplifysequences.minimizer;
       Simplifytypes.minimizer;
       Reducepat.minimizer;
+      Stub.minimizer;
     ]
 
 let default_iteration =
   [
+    "stub";
     "delete-lines";
     "reduce-expr";
     "reduce-expr-2";
