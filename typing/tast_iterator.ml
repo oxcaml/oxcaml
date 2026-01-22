@@ -172,7 +172,8 @@ let value_description sub x =
    | Valmi_sig_value moda -> sub.modalities sub moda
    | Valmi_str_primitive modes -> sub.modes sub modes)
 
-let label_decl sub ({ld_loc; ld_name; ld_type; ld_attributes; ld_modalities} as ld) =
+let label_decl sub
+    ({ld_loc; ld_name; ld_type; ld_attributes; ld_modalities} as ld) =
   sub.item_declaration sub (Label ld);
   sub.location sub ld_loc;
   sub.attributes sub ld_attributes;
