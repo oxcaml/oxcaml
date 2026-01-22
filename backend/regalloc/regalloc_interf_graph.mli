@@ -24,7 +24,11 @@ module RegisterStamp : sig
 
   val snd : pair -> t
 
-  module PairSet : sig
+  (** Common interface for edge set implementations.
+
+      This module type defines the operations supported by both PairSet (hash
+      table-based) and BitMatrix (bit array-based) implementations. *)
+  module type S = sig
     type t
 
     val make : num_registers:int -> t
@@ -35,10 +39,32 @@ module RegisterStamp : sig
 
     val add : t -> pair -> unit
 
-    val cardinal : t -> int
+    val capacity : t -> int
 
-    val iter : t -> f:(pair -> unit) -> unit
+    module For_debug : sig
+      val cardinal : t -> int
+
+      val iter : t -> f:(pair -> unit) -> unit
+    end
   end
+
+  module PairSet : S
+
+  (** Alternative bit matrix representation for edge sets.
+
+      This module provides the same interface as PairSet but uses a compact bit
+      matrix stored in a bytes value. Since the interference graph is symmetric,
+      only the upper triangle is stored (pairs where i < j).
+
+      Memory usage: O(n²/8) bytes where n is the number of registers. This is
+      more compact than PairSet for dense graphs.
+
+      Trade-offs compared to PairSet:
+      - Smaller memory footprint (n²/8 bytes vs hash table overhead)
+      - Better cache locality for membership testing
+      - O(n²) cardinal operation (vs O(1) for PairSet)
+      - O(n²) iter operation (vs O(edges) for PairSet) *)
+  module BitMatrix : S
 end
 
 (** Degree tracking *)
@@ -70,10 +96,16 @@ type t
 
 (** Create a new empty interference graph.
 
-    @param num_registers Initial capacity hint for the number of registers *)
-val make : num_registers:int -> t
+    The graph is sized based on the current register stamp (Reg.For_testing.get_stamp).
+    This ensures it can accommodate all registers that have been allocated so far. *)
+val make : unit -> t
 
-(** Clear all edges from the graph, resetting it to empty state. *)
+(** Clear all edges from the graph, resetting it to empty state.
+
+    If new registers have been allocated since graph creation (detected via
+    Reg.For_testing.get_stamp), the underlying BitMatrix representation (if used)
+    will be reallocated to accommodate the larger stamp range. PairSet grows
+    dynamically so no reallocation is needed. *)
 val clear : t -> unit
 
 (** [add_edge graph u v] adds an undirected edge between registers [u] and [v].
@@ -157,17 +189,6 @@ val incr_degree : t -> Reg.t -> unit
     during IRC simplification phase. Does nothing if the degree is infinite. *)
 val decr_degree : t -> Reg.t -> unit
 
-(** {2 Bulk operations} *)
-
-(** [adj_set graph] returns the underlying edge set.
-
-    This is exposed for iteration and debugging purposes. Modifications to the
-    returned set will affect the graph (no defensive copy is made). *)
-val adj_set : t -> RegisterStamp.PairSet.t
-
-(** [cardinal graph] returns the total number of edges in the graph. *)
-val cardinal : t -> int
-
 (** {2 Initialization} *)
 
 (** [init_register graph reg] initializes storage for [reg] in the graph. Sets
@@ -181,3 +202,14 @@ val init_register : t -> Reg.t -> unit
 
     This is used for precolored registers which have infinite degree. *)
 val init_register_with_degree : t -> Reg.t -> degree:int -> unit
+
+(** {2 Debugging} *)
+
+module For_debug : sig
+  (** [cardinal_pairs graph] returns the total number of edges in the graph. *)
+  val cardinal_pairs : t -> int
+
+  (** [iter_pairs graph ~f] iterates over all edges in the graph, applying [f]
+      to each pair of register stamps. *)
+  val iter_pairs : t -> f:(RegisterStamp.pair -> unit) -> unit
+end

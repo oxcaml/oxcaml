@@ -54,6 +54,16 @@ let bool_of_param ?guard ?(default = false) param_name =
           then fatal "%s is set but %s is not" param_name guard_name);
      res)
 
+let int_of_param ?(default = 0) param_name =
+  lazy
+    (match find_param_value param_name with
+    | None -> default
+    | Some value -> (
+      try int_of_string value
+      with Failure _ ->
+        Misc.fatal_errorf "the %s variable is %S but should be an integer"
+          param_name value))
+
 let debug = false
 
 let invariants : bool Lazy.t =
