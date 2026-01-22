@@ -1,4 +1,4 @@
-type 'a iarray = private 'a array (* XXX exposed as debugging measure *)
+type 'a iarray
 
 val (.:()) : 'a iarray -> int -> 'a
 
