@@ -326,8 +326,10 @@ end = struct
     | Add -> always_some I.Num.add
     | Sub -> always_some I.Num.sub
     | Mul -> always_some I.Num.mul
-    | Div -> I.Num.div n1 n2
-    | Mod -> I.Num.mod_ n1 n2
+    | Div Signed -> I.Num.div n1 n2
+    | Mod Signed -> I.Num.mod_ n1 n2
+    | Div Unsigned -> I.Num.unsigned_div n1 n2
+    | Mod Unsigned -> I.Num.unsigned_mod n1 n2
     | And -> always_some I.Num.and_
     | Or -> always_some I.Num.or_
     | Xor -> always_some I.Num.xor
@@ -385,7 +387,7 @@ end = struct
       if Num.equal rhs (Num.zero machine_width)
       then The_other_side
       else Cannot_simplify
-    | Div ->
+    | Div signedness ->
       (* Division ("safe" division, strictly speaking, in Lambda terminology) is
          translated to a conditional on the denominator followed by an unsafe
          division (the "Div" seen here) on the way into Flambda 2. So if the
@@ -397,16 +399,18 @@ end = struct
       else if Num.equal rhs (Num.one machine_width)
       then The_other_side
       else if Num.equal rhs (Num.minus_one machine_width)
+              && match signedness with Signed -> true | Unsigned -> false
       then
         Negation_of_the_other_side (* CR mshinwell: Add 0 / x = 0 when x <> 0 *)
       else Cannot_simplify
-    | Mod ->
+    | Mod signedness ->
       (* CR mshinwell: We could be more clever for Mod and And *)
       if Num.equal rhs (Num.zero machine_width)
       then Invalid
       else if Num.equal rhs (Num.one machine_width)
       then Exactly (Num.zero machine_width)
       else if Num.equal rhs (Num.minus_one machine_width)
+              && match signedness with Signed -> true | Unsigned -> false
       then Exactly (Num.zero machine_width)
       else Cannot_simplify
 
@@ -422,7 +426,7 @@ end = struct
       if Num.equal lhs (Num.zero machine_width)
       then Negation_of_the_other_side
       else Cannot_simplify
-    | Div | Mod -> Cannot_simplify
+    | Div (Signed | Unsigned) | Mod (Signed | Unsigned) -> Cannot_simplify
 end
 [@@inline always]
 

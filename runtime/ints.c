@@ -136,6 +136,22 @@ CAMLprim value caml_int_compare(value v1, value v2)
   return Val_long(COMPARE_INT(v1, v2));
 }
 
+CAMLprim value caml_int_unsigned_div(value v1, value v2)
+{
+  uintnat dividend = Unsigned_long_val(v1);
+  uintnat divisor = Unsigned_long_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
+  return Val_long(dividend / divisor);
+}
+
+CAMLprim value caml_int_unsigned_mod(value v1, value v2)
+{
+  uintnat dividend = Unsigned_long_val(v1);
+  uintnat divisor = Unsigned_long_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
+  return Val_long(dividend % divisor);
+}
+
 CAMLprim value caml_int_of_string(value s)
 {
     return Val_long(parse_intnat(s, 8 * sizeof(value) - 1, INT_ERRMSG));
@@ -267,6 +283,14 @@ CAMLprim value caml_int32_div(value v1, value v2)
   return caml_copy_int32(dividend / divisor);
 }
 
+CAMLprim value caml_int32_unsigned_div(value v1, value v2)
+{
+  uint32_t dividend = Int32_val(v1);
+  uint32_t divisor = Int32_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
+  return caml_copy_int32(dividend / divisor);
+}
+
 CAMLprim value caml_int32_mod(value v1, value v2)
 {
   int32_t dividend = Int32_val(v1);
@@ -275,6 +299,14 @@ CAMLprim value caml_int32_mod(value v1, value v2)
   /* PR#4740: on some processors, modulus crashes if division overflows.
      Implement the same behavior as for type "int". */
   if (dividend == (1<<31) && divisor == -1) return caml_copy_int32(0);
+  return caml_copy_int32(dividend % divisor);
+}
+
+CAMLprim value caml_int32_unsigned_mod(value v1, value v2)
+{
+  uint32_t dividend = Int32_val(v1);
+  uint32_t divisor = Int32_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
   return caml_copy_int32(dividend % divisor);
 }
 
@@ -480,6 +512,14 @@ CAMLprim value caml_int64_div(value v1, value v2)
   return caml_copy_int64(dividend / divisor);
 }
 
+CAMLprim value caml_int64_unsigned_div(value v1, value v2)
+{
+  uint64_t dividend = Int64_val(v1);
+  uint64_t divisor = Int64_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
+  return caml_copy_int64(dividend / divisor);
+}
+
 CAMLprim value caml_int64_mod(value v1, value v2)
 {
   int64_t dividend = Int64_val(v1);
@@ -490,6 +530,14 @@ CAMLprim value caml_int64_mod(value v1, value v2)
   if (dividend == ((int64_t)1 << 63) && divisor == -1){
     return caml_copy_int64(0);
   }
+  return caml_copy_int64(dividend % divisor);
+}
+
+CAMLprim value caml_int64_unsigned_mod(value v1, value v2)
+{
+  uint64_t dividend = Int64_val(v1);
+  uint64_t divisor = Int64_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
   return caml_copy_int64(dividend % divisor);
 }
 
@@ -766,6 +814,14 @@ CAMLprim value caml_nativeint_div(value v1, value v2)
   return caml_copy_nativeint(dividend / divisor);
 }
 
+CAMLprim value caml_nativeint_unsigned_div(value v1, value v2)
+{
+  uintnat dividend = Nativeint_val(v1);
+  uintnat divisor = Nativeint_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
+  return caml_copy_nativeint(dividend / divisor);
+}
+
 CAMLprim value caml_nativeint_mod(value v1, value v2)
 {
   intnat dividend = Nativeint_val(v1);
@@ -776,6 +832,14 @@ CAMLprim value caml_nativeint_mod(value v1, value v2)
   if (dividend == Nativeint_min_int && divisor == -1){
     return caml_copy_nativeint(0);
   }
+  return caml_copy_nativeint(dividend % divisor);
+}
+
+CAMLprim value caml_nativeint_unsigned_mod(value v1, value v2)
+{
+  uintnat dividend = Nativeint_val(v1);
+  uintnat divisor = Nativeint_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
   return caml_copy_nativeint(dividend % divisor);
 }
 

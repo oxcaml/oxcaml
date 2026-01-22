@@ -3,6 +3,11 @@
 *)
 open Nativeint
 
+(* CR-someday jrayman: when [Nativeint.unsigned_div/rem] are defined using the
+   primitives, delete this. *)
+external unsigned_divide : nativeint -> nativeint -> nativeint = "%nativeint_unsigned_div"
+external unsigned_remainder : nativeint -> nativeint -> nativeint = "%nativeint_unsigned_mod"
+
 let test_cases =
   let rng = Random.State.make_self_init () in
   (* sparse test cases, concentrated around 0, the limits, and powers of 2 *)
@@ -37,6 +42,51 @@ let[@inline never] check_result ~dividend ~divisor ~quotient ~remainder =
       remainder;
     exit 1)
 
+let[@inline never] check_result_unsigned
+                     ~dividend ~divisor ~quotient ~remainder =
+  let fma_overflows a b c =
+    let exception Overflow in
+    try
+      let checked_add x y =
+        let z = add x y in
+        if unsigned_compare z x < 0 then raise Overflow else z
+      in
+      (* Calculate [x*y] using only checked addition.
+         (like binary exponentiation) *)
+      let total = ref 0n in
+      let mask = ref 0x8000_0000_0000_0000n in
+      for _ = 0 to 63 do
+        let doubled = checked_add !total !total in
+        total :=
+          if logand !mask b = 0n
+          then doubled
+          else checked_add doubled a;
+        mask := shift_right_logical !mask 1
+      done;
+      assert (!total = mul a b);
+      let _ = checked_add !total c in
+      false
+    with
+    | Overflow -> true
+  in
+  assert (fma_overflows 0x5678_0000_0000n 0x1234_0000n 0n);
+  assert (fma_overflows 0x1_0001_0001_0002n 0xFFFFn 0n);
+  assert (fma_overflows 0x1_0001_0001_0001n 0xFFFFn 1n);
+  let identity = dividend = add (mul quotient divisor) remainder in
+  let magnitude = unsigned_compare remainder divisor < 0 in
+  let no_overflow =
+    (* [quotient * divisor + remainder] should not overflow *)
+    not (fma_overflows quotient divisor remainder)
+  in
+  if not (identity && magnitude && no_overflow) then (
+    Printf.fprintf
+      stderr
+      "FAILED: dividend=%nu, divisor=%nu, quotient=%nu, remainder=%nu\n%!"
+      dividend
+      divisor
+      quotient
+      remainder;
+    exit 1)
 
 (* test that the order of side effects are preserved in all cases *)
 
@@ -96,9 +146,18 @@ let () =
 let[@inline always] check ~divisor =
   let[@inline always] quotient ~dividend = div dividend divisor in
   let[@inline always] remainder ~dividend = rem dividend divisor in
+  let[@inline always] unsigned_quotient ~dividend =
+    unsigned_divide dividend divisor
+  in
+  let[@inline always] unsigned_remainder ~dividend =
+    unsigned_remainder dividend divisor
+  in
   ArrayLabels.iter test_cases ~f:(fun dividend ->
     check_result ~dividend ~divisor ~quotient:(quotient ~dividend)
-      ~remainder:(remainder ~dividend))
+      ~remainder:(remainder ~dividend);
+    check_result_unsigned ~dividend ~divisor
+      ~quotient:(unsigned_quotient ~dividend)
+      ~remainder:(unsigned_remainder ~dividend))
 
 (* manual tests *)
 

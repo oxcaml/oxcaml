@@ -1091,19 +1091,19 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Floatop (Float32, Icompf _)) -> 2
     | Lop (Intop_imm (Icomp _, _)) -> 2
     | Lop (Int128op (Iadd128 | Isub128 | Imul64 _)) -> 2
-    | Lop (Intop Imod) -> 2
+    | Lop (Intop (Imod _)) -> 2
     | Lop (Intop (Imulh _)) -> 1
     | Lop (Intop (Iclz _)) -> 1
     | Lop (Intop (Ictz _)) -> if !Arch.feat_cssc then 1 else 2
     | Lop (Intop Ipopcnt) -> if !Arch.feat_cssc then 1 else 4
     | Lop
         (Intop
-           (Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
+           (Iadd | Isub | Imul | Idiv _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
       ->
       1
     | Lop
         (Intop_imm
-           ( ( Iadd | Isub | Imul | Idiv | Imod | Imulh _ | Iand | Ior | Ixor
+           ( ( Iadd | Isub | Imul | Idiv _ | Imod | Imulh _ | Iand | Ior | Ixor
              | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
              _ )) ->
       1

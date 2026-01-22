@@ -3,9 +3,13 @@
    modules = "test_smallint.ml";
 *)
 
-(* External declarations for unsigned comparison primitives *)
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
+
+(* External declarations for unsigned primitives *)
 external unsigned_lt : int8 -> int8 -> bool = "%int8_unsigned_lessthan"
 external unsigned_gt : int8 -> int8 -> bool = "%int8_unsigned_greaterthan"
+external unsigned_div : int8 -> int8 -> int8 = "%int8_unsigned_div"
+external unsigned_mod : int8 -> int8 -> int8 = "%int8_unsigned_mod"
 
 let () =
   Test_smallint.run
@@ -62,3 +66,46 @@ let () =
   assert (unsigned_gt I.zero I.minus_one = false); (* 0 not > 255 *)
   assert (unsigned_gt I.min_int I.max_int = true); (* 128 > 127 *)
   assert (unsigned_gt I.max_int I.min_int = false); (* 127 not > 128 *)
+
+  (* Test unsigned div/mod primitives *)
+  let two_hundred_42 = 0xf2s in
+  (* = 242s, but we don't have unsigned decimal literals *)
+
+  assert (I.equal (unsigned_div two_hundred_42 100s) 2s);
+  assert (I.equal (unsigned_div two_hundred_42 (id 100s)) 2s);
+  assert (I.equal (unsigned_div (id two_hundred_42) 100s) 2s);
+  assert (I.equal (unsigned_div (id two_hundred_42) (id 100s)) 2s);
+  assert (I.equal (unsigned_mod two_hundred_42 100s) 42s);
+  assert (I.equal (unsigned_mod two_hundred_42 (id 100s)) 42s);
+  assert (I.equal (unsigned_mod (id two_hundred_42) 100s) 42s);
+  assert (I.equal (unsigned_mod (id two_hundred_42) (id 100s)) 42s);
+
+  (* Test right-shift optimization *)
+  assert (I.equal (unsigned_div 0xFFs 16s) 0xFs);
+  assert (I.equal (unsigned_div 0xFFs (id 16s)) 0xFs);
+  assert (I.equal (unsigned_div (id 0xFFs) 16s) 0xFs);
+  assert (I.equal (unsigned_div (id 0xFFs) (id 16s)) 0xFs);
+  assert (I.equal (unsigned_mod 0xFFs 16s) 15s);
+  assert (I.equal (unsigned_mod 0xFFs (id 16s)) 15s);
+  assert (I.equal (unsigned_mod (id 0xFFs) 16s) 15s);
+  assert (I.equal (unsigned_mod (id 0xFFs) (id 16s)) 15s);
+
+  (* Test div-by-minus-one optimization does not occur *)
+  assert (I.equal (unsigned_div 42s I.minus_one) 0s);
+  assert (I.equal (unsigned_div 42s (id I.minus_one)) 0s);
+  assert (I.equal (unsigned_div (id 42s) I.minus_one) 0s);
+  assert (I.equal (unsigned_div (id 42s) (id I.minus_one)) 0s);
+  assert (I.equal (unsigned_mod 42s I.minus_one) 42s);
+  assert (I.equal (unsigned_mod 42s (id I.minus_one)) 42s);
+  assert (I.equal (unsigned_mod (id 42s) I.minus_one) 42s);
+  assert (I.equal (unsigned_mod (id 42s) (id I.minus_one)) 42s);
+
+  (* Test div-by-min-int optimization does not occur *)
+  assert (I.equal (unsigned_div 0x82s I.min_int) 1s);
+  assert (I.equal (unsigned_div 0x82s (id I.min_int)) 1s);
+  assert (I.equal (unsigned_div (id 0x82s) I.min_int) 1s);
+  assert (I.equal (unsigned_div (id 0x82s) (id I.min_int)) 1s);
+  assert (I.equal (unsigned_mod 0x82s I.min_int) 0x2s);
+  assert (I.equal (unsigned_mod 0x82s (id I.min_int)) 0x2s);
+  assert (I.equal (unsigned_mod (id 0x82s) I.min_int) 0x2s);
+  assert (I.equal (unsigned_mod (id 0x82s) (id I.min_int)) 0x2s)
