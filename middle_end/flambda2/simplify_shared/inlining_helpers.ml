@@ -17,10 +17,10 @@
 open! Flambda.Import
 module RC = Apply.Result_continuation
 
-let make_inlined_body ~callee ~called_code_id ~region_inlined_into ~params ~args
-    ~my_closure ~my_region ~my_ghost_region ~my_depth ~rec_info ~body
-    ~exn_continuation ~return_continuation ~apply_exn_continuation
-    ~apply_return_continuation ~bind_params ~bind_depth ~apply_renaming =
+let make_inlined_body ~callee ~called_code_id:_ ~region_inlined_into ~params
+    ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body ~exn_continuation
+    ~return_continuation ~apply_exn_continuation ~apply_return_continuation
+    ~bind_params ~bind_depth ~apply_renaming =
   let renaming = Renaming.empty in
   let renaming =
     match (apply_return_continuation : RC.t) with
@@ -41,15 +41,12 @@ let make_inlined_body ~callee ~called_code_id ~region_inlined_into ~params ~args
          parameter is fresh for [body], so we can use a permutation without fear
          of swapping out existing occurrences of such argument within [body].
          Similarly for [ghost_region]. *)
-      match my_region, my_ghost_region with
-      | Some my_region, Some my_ghost_region ->
+      match (my_alloc_mode : Alloc_mode.For_applications.t) with
+      | Local { region = my_region; ghost_region = my_ghost_region } ->
         Renaming.add_variable
           (Renaming.add_variable renaming my_region region)
           my_ghost_region ghost_region
-      | None, None -> renaming
-      | None, Some _ | Some _, None ->
-        Misc.fatal_errorf "When inlining %a: Mismatched regions" Code_id.print
-          called_code_id)
+      | Heap -> renaming)
   in
   let body =
     match callee with

@@ -572,23 +572,17 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           match result_mode with Alloc_heap -> true | Alloc_local -> false
         in
         let my_closure = Variable.create "my_closure" K.value in
-        let my_region =
+        let my_alloc_mode =
           if contains_no_escaping_local_allocs
-          then None
-          else Some (Variable.create "my_region" K.region)
-        in
-        let my_ghost_region =
-          if contains_no_escaping_local_allocs
-          then None
-          else Some (Variable.create "my_ghost_region" K.region)
+          then Alloc_mode.For_applications.heap
+          else
+            Alloc_mode.For_applications.local
+              ~region:(Variable.create "my_region" K.region)
+              ~ghost_region:(Variable.create "my_ghost_region" K.region)
         in
         let my_depth = Variable.create "my_depth" K.rec_info in
         let exn_continuation =
           Apply.exn_continuation apply |> Exn_continuation.without_extra_args
-        in
-        let apply_alloc_mode =
-          Alloc_mode.For_applications.from_lambda result_mode
-            ~current_region:my_region ~current_ghost_region:my_ghost_region
         in
         let call_kind = Call_kind.direct_function_call callee's_code_id in
         let body, cost_metrics_of_body, free_names =
@@ -607,7 +601,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
-              ~return_arity:result_arity ~call_kind ~alloc_mode:apply_alloc_mode
+              ~return_arity:result_arity ~call_kind ~alloc_mode:my_alloc_mode
               dbg ~inlined:Default_inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
@@ -663,8 +657,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           (* Note that [exn_continuation] has no extra args -- see above. *)
           Function_params_and_body.create ~return_continuation
             ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
-            remaining_params ~body ~my_closure ~my_region ~my_ghost_region
-            ~my_depth ~free_names_of_body:Unknown
+            remaining_params ~body ~my_closure ~my_alloc_mode ~my_depth
+            ~free_names_of_body:Unknown
         in
         let name =
           Function_slot.to_string callee's_function_slot ^ "_partial"

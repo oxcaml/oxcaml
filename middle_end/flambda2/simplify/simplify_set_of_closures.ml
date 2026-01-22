@@ -26,11 +26,10 @@ open! Simplify_import
 
 module C = Simplify_set_of_closures_context
 
-let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_region
-    ~my_ghost_region ~my_depth function_slot_opt
-    ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
-    code_id ~return_continuation ~exn_continuation ~loopify_state code_metadata
-    =
+let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
+    ~my_depth function_slot_opt ~closure_bound_names_inside_function
+    ~inlining_arguments ~absolute_history code_id ~return_continuation
+    ~exn_continuation ~loopify_state code_metadata =
   let dacc = C.dacc_inside_functions context in
   let alloc_modes = Code_metadata.param_modes code_metadata in
   let denv =
@@ -67,19 +66,14 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_region
           (T.alias_type_of K.value (Simple.name name)))
   in
   let denv =
-    match my_region with
-    | None -> denv
-    | Some my_region ->
+    match (my_alloc_mode : Alloc_mode.For_applications.t) with
+    | Heap -> denv
+    | Local { region = my_region; ghost_region = my_ghost_region } ->
       let my_region_duid = Flambda_debug_uid.none in
       let my_region =
         Bound_var.create my_region my_region_duid Name_mode.normal
       in
-      DE.add_variable denv my_region (T.unknown K.region)
-  in
-  let denv =
-    match my_ghost_region with
-    | None -> denv
-    | Some my_ghost_region ->
+      let denv = DE.add_variable denv my_region (T.unknown K.region) in
       let my_ghost_region_duid = Flambda_debug_uid.none in
       let my_ghost_region =
         Bound_var.create my_ghost_region my_ghost_region_duid Name_mode.normal
@@ -173,19 +167,17 @@ type simplify_function_body_result =
 let simplify_function_body context ~outer_dacc function_slot_opt
     ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
     code_id code ~return_continuation ~exn_continuation params ~body ~my_closure
-    ~is_my_closure_used:_ ~my_region ~my_ghost_region ~my_depth
-    ~free_names_of_body:_ =
+    ~is_my_closure_used:_ ~my_alloc_mode ~my_depth ~free_names_of_body:_ =
   let loopify_state =
     if Loopify_attribute.should_loopify (Code.loopify code)
     then Loopify_state.loopify (Continuation.create ~name:"self" ())
     else Loopify_state.do_not_loopify
   in
   let dacc_at_function_entry =
-    dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_region
-      ~my_ghost_region ~my_depth function_slot_opt
-      ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
-      code_id ~return_continuation ~exn_continuation ~loopify_state
-      (Code.code_metadata code)
+    dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
+      ~my_depth function_slot_opt ~closure_bound_names_inside_function
+      ~inlining_arguments ~absolute_history code_id ~return_continuation
+      ~exn_continuation ~loopify_state (Code.code_metadata code)
   in
   let dacc = dacc_at_function_entry in
   if not (DA.no_lifted_constants dacc)
@@ -196,15 +188,13 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   let my_region_duid = Flambda_debug_uid.none in
   let my_ghost_region_duid = Flambda_debug_uid.none in
   let region_params =
-    let region_param region region_debug_duid =
-      match region with
-      | None -> []
-      | Some region ->
-        [ Bound_parameter.create region Flambda_kind.With_subkind.region
-            region_debug_duid ]
-    in
-    region_param my_region my_region_duid
-    @ region_param my_ghost_region my_ghost_region_duid
+    match (my_alloc_mode : Alloc_mode.For_applications.t) with
+    | Heap -> []
+    | Local { region; ghost_region } ->
+      [ Bound_parameter.create region Flambda_kind.With_subkind.region
+          my_region_duid;
+        Bound_parameter.create ghost_region Flambda_kind.With_subkind.region
+          my_ghost_region_duid ]
   in
   let my_closure_duid = Flambda_debug_uid.none in
   let my_depth_duid = Flambda_debug_uid.none in
@@ -231,7 +221,7 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     let params_and_body =
       RE.Function_params_and_body.create ~free_names_of_body
         ~return_continuation ~exn_continuation params ~body ~my_closure
-        ~my_region ~my_ghost_region ~my_depth
+        ~my_alloc_mode ~my_depth
     in
     let is_my_closure_used = NO.mem_var free_names_of_body my_closure in
     let previously_free_depth_variables =
@@ -247,8 +237,7 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       |> NO.remove_continuation ~continuation:return_continuation
       |> NO.remove_continuation ~continuation:exn_continuation
       |> NO.remove_var ~var:my_closure
-      |> NO.remove_var_opt ~var:my_region
-      |> NO.remove_var_opt ~var:my_ghost_region
+      |> NO.diff ~without:(Alloc_mode.For_applications.free_names my_alloc_mode)
       |> NO.remove_var ~var:my_depth
       |> NO.diff ~without:(Bound_parameters.free_names params)
       |> NO.diff ~without:previously_free_depth_variables
@@ -261,14 +250,11 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       Misc.fatal_errorf
         "Unexpected free name(s):@ %a@ in:@ \n\
          %a@ \n\
-         Simplified version:@ fun %a %a %a %a %a ->@ \n\
+         Simplified version:@ fun %a %a %a %a ->@ \n\
         \  %a"
         NO.print free_names_of_code Code_id.print code_id Bound_parameters.print
-        params Variable.print my_closure
-        (Format.pp_print_option Variable.print)
-        my_region
-        (Format.pp_print_option Variable.print)
-        my_ghost_region Variable.print my_depth
+        params Variable.print my_closure Alloc_mode.For_applications.print
+        my_alloc_mode Variable.print my_depth
         (RE.print (UA.are_rebuilding_terms uacc))
         body;
     { params;

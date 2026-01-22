@@ -1013,7 +1013,7 @@ module Function_params_and_body = struct
   type t = function_params_and_body
 
   let create ~return_continuation ~exn_continuation params ~body
-      ~free_names_of_body ~my_closure ~my_region ~my_ghost_region ~my_depth =
+      ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth =
     Bound_parameters.check_no_duplicates params;
     let is_my_closure_used =
       Or_unknown.map free_names_of_body ~f:(fun free_names_of_body ->
@@ -1022,7 +1022,7 @@ module Function_params_and_body = struct
     let base : Base.t = { expr = body; free_names = free_names_of_body } in
     let bound_for_function =
       Bound_for_function.create ~return_continuation ~exn_continuation ~params
-        ~my_closure ~my_region ~my_ghost_region ~my_depth
+        ~my_closure ~my_alloc_mode ~my_depth
     in
     let abst = A.create bound_for_function base in
     { abst; is_my_closure_used }
@@ -1037,8 +1037,8 @@ module Function_params_and_body = struct
       ~return_continuation:(BFF.return_continuation bff)
       ~exn_continuation:(BFF.exn_continuation bff) (BFF.params bff) ~body:expr
       ~my_closure:(BFF.my_closure bff) ~is_my_closure_used:t.is_my_closure_used
-      ~my_region:(BFF.my_region bff) ~my_ghost_region:(BFF.my_ghost_region bff)
-      ~my_depth:(BFF.my_depth bff) ~free_names_of_body:free_names
+      ~my_alloc_mode:(BFF.my_alloc_mode bff) ~my_depth:(BFF.my_depth bff)
+      ~free_names_of_body:free_names
 
   let pattern_match_pair t1 t2 ~f =
     A.pattern_match_pair t1.abst t2.abst
@@ -1055,9 +1055,7 @@ module Function_params_and_body = struct
           (Bound_for_function.params bound_for_function)
           ~body1 ~body2
           ~my_closure:(Bound_for_function.my_closure bound_for_function)
-          ~my_region:(Bound_for_function.my_region bound_for_function)
-          ~my_ghost_region:
-            (Bound_for_function.my_ghost_region bound_for_function)
+          ~my_alloc_mode:(Bound_for_function.my_alloc_mode bound_for_function)
           ~my_depth:(Bound_for_function.my_depth bound_for_function))
 
   let apply_renaming = apply_renaming_function_params_and_body
