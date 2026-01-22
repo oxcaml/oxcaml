@@ -44,33 +44,27 @@ module RegisterStamp = struct
   end
 
   module PairSet : S = struct
-    type t =
-      { set : unit PS.t;
-        capacity : int
-      }
+    type t = unit PS.t
 
     let default_size = 256
 
     let make ~num_registers =
       let estimated_size = (num_registers * num_registers) asr 5 in
-      { set =
-          PS.create
-            (if estimated_size < default_size then default_size else estimated_size);
-        capacity = num_registers
-      }
+      PS.create
+        (if estimated_size < default_size then default_size else estimated_size)
 
-    let clear t = PS.clear t.set
+    let clear set = PS.clear set
 
-    let mem t (x : pair) = PS.mem t.set x
+    let mem set (x : pair) = PS.mem set x
 
-    let add t (x : pair) = PS.replace t.set x ()
+    let add set (x : pair) = PS.replace set x ()
 
-    let capacity t = t.capacity
+    let capacity _set = max_int
 
     module For_debug = struct
-      let cardinal t = PS.length t.set
+      let cardinal set = PS.length set
 
-      let iter t ~f = PS.iter (fun key () -> f key) t.set
+      let iter set ~f = PS.iter (fun key () -> f key) set
     end
   end
 
