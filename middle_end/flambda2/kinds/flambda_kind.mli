@@ -122,6 +122,8 @@ module Mixed_block_shape : sig
   val equal : t -> t -> bool
 
   val compare : t -> t -> int
+
+  val print : Format.formatter -> t -> unit
 end
 
 module Scannable_block_shape : sig

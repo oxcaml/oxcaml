@@ -648,6 +648,30 @@ module Block_access_kind = struct
     | Naked_floats _ -> Float_record
     | Mixed { shape; _ } -> Scannable (Mixed_record shape)
 
+  let from_block_shape (block_shape : K.Block_shape.t)
+      ~(index : Target_ocaml_int.t) ~(result_kind : K.With_subkind.t) : t =
+    let field_kind_of_value_subkind () : Block_access_field_kind.t =
+      if K.With_subkind.equal result_kind K.With_subkind.tagged_immediate
+      then Immediate
+      else Any_value
+    in
+    match block_shape with
+    | Scannable Value_only ->
+      let field_kind = field_kind_of_value_subkind () in
+      Values { tag = Unknown; size = Unknown; field_kind }
+    | Float_record -> Naked_floats { size = Unknown }
+    | Scannable (Mixed_record shape) ->
+      let value_prefix_size = K.Mixed_block_shape.value_prefix_size shape in
+      let index_int = Target_ocaml_int.to_int_exn index in
+      let field_kind : Mixed_block_access_field_kind.t =
+        if index_int < value_prefix_size
+        then Value_prefix (field_kind_of_value_subkind ())
+        else
+          let flat_suffix = K.Mixed_block_shape.flat_suffix shape in
+          Flat_suffix flat_suffix.(index_int - value_prefix_size)
+      in
+      Mixed { tag = Unknown; size = Unknown; field_kind; shape }
+
   let element_kind_for_set = element_kind_for_load
 
   let compare t1 t2 =
