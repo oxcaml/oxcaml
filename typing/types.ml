@@ -1272,14 +1272,7 @@ module Transient_expr = struct
     | _ -> assert false);
     ty.desc <- d
   let set_level ty lv = ty.level <- lv
-  let set_scope ty sc =
-    begin match Sys.getenv_opt "NOISY" with
-    | Some ("scope" | "please") ->
-      Format.eprintf "SETTING SCOPE %d -> %d@.%a@." ty.scope sc !print_type_fwd ty
-    | _ ->
-      ()
-    end;
-    ty.scope <- sc
+  let set_scope ty sc = ty.scope <- sc
   let set_var_jkind ty jkind' =
     match ty.desc with
     | Tvar { name; _ } ->
