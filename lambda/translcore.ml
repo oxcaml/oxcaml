@@ -659,7 +659,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let repres =
         match lbl.lbl_repres with
         | Some repres -> repres
-        | None -> failwith "TODO after merge: Texp_atomic_loc"
+        | None ->
+            Misc.fatal_errorf "Texp_atomic_loc on record with [any] field %s"
+              lbl.lbl_name
       in
       let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl repres in
       let loc = of_location ~scopes e.exp_loc in
