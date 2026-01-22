@@ -3091,7 +3091,7 @@ and quote_expression_extra ~scopes _stage extra lambda =
          (type_constraint_of_ambiguity loc ambiguity)
   | Texp_inspected_type Polymorphic_parameter -> lambda
   | Texp_ghost_region -> lambda
-  | Texp_borrowed ->
+  | Texp_borrowed _ ->
     Exp_desc.borrow loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
 
 and update_env_with_extra ~loc extra =
@@ -3106,7 +3106,7 @@ and update_env_with_extra ~loc extra =
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type Polymorphic_parameter -> ()
   | Texp_ghost_region -> ()
-  | Texp_borrowed -> ()
+  | Texp_borrowed _ -> ()
 
 and update_env_without_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3120,7 +3120,7 @@ and update_env_without_extra ~loc extra =
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type Polymorphic_parameter -> ()
   | Texp_ghost_region -> ()
-  | Texp_borrowed -> ()
+  | Texp_borrowed _ -> ()
 
 and quote_expression_desc ~scopes ~transl stage e =
   let env = e.exp_env in
