@@ -4833,11 +4833,12 @@ let print_unsupported_quotation ppf =
   | Sig_qt ->
       fprintf ppf "Module type definition using %a"
         (Style.inline_code) "sig..end"
-  | Open_qt -> fprintf ppf "Opening modules"
+  | Open_qt ->
+      fprintf ppf "Opening modules"
   | Object_field_with_attribute_qt ->
-    fprintf ppf "Adding attributes on fields in object types"
+      fprintf ppf "Adding attributes on fields in object types"
   | Variant_tag_with_attribute_qt ->
-    fprintf ppf "Adding attributes on tags in polymorphic variant types"
+      fprintf ppf "Adding attributes on tags in polymorphic variant types"
 
 let print_unbound_in_quotation ppf =
   function
