@@ -860,8 +860,7 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
   match call_kind with
   | Function _ as ck -> ck
-  | Method { kind; obj; alloc_mode } ->
-    Call_kind.method_call kind ~obj:(rewrite_simple obj) alloc_mode
+  | Method { kind; obj } -> Call_kind.method_call kind ~obj:(rewrite_simple obj)
   | C_call _ as ck -> ck
   | Effect (Perform { eff }) ->
     Call_kind.effect_ (Call_kind.Effect.perform ~eff:(rewrite_simple eff))
@@ -889,7 +888,7 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
 let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in
   let code_id_actually_called, call_kind =
-    let called c alloc_mode call_kind_if_unknown =
+    let called c call_kind_if_unknown =
       let code_ids =
         Simple.pattern_match c
           ~const:(fun _ -> Or_unknown.Unknown)
@@ -912,15 +911,15 @@ let decide_whether_apply_needs_calling_convention_change env apply =
         let singleton_code_id = Code_id.Set.get_singleton code_ids in
         let new_call_kind =
           match singleton_code_id with
-          | Some code_id -> Call_kind.direct_function_call code_id alloc_mode
+          | Some code_id -> Call_kind.direct_function_call code_id
           | None ->
             Call_kind.indirect_function_call_known_arity
-              ~code_ids:(Known code_ids) alloc_mode
+              ~code_ids:(Known code_ids)
         in
         singleton_code_id, new_call_kind
     in
     match call_kind with
-    | Function { function_call = Direct code_id; alloc_mode } -> (
+    | Function { function_call = Direct code_id } -> (
       match Apply.callee apply with
       | None -> Some code_id, call_kind
       | Some c ->
@@ -933,9 +932,7 @@ let decide_whether_apply_needs_calling_convention_change env apply =
                 (Compilation_unit.is_current
                    (Code_id.get_compilation_unit code_id))
             then call_kind
-            else
-              Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
-                alloc_mode
+            else Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
           | Auto ->
             (* In [auto] mode, the direct call is preserved if and only if we
                cannot identify which set of code_ids can be called. Since this
@@ -943,16 +940,14 @@ let decide_whether_apply_needs_calling_convention_change env apply =
                the call_kind, we can leave the direct call here. *)
             call_kind
         in
-        called c alloc_mode call_kind_if_unknown)
-    | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
+        called c call_kind_if_unknown)
+    | Function { function_call = Indirect_unknown_arity } ->
       (* CR-someday ncourant: when possible, try to identify direct calls. *)
       None, call_kind
-    | Function { function_call = Indirect_known_arity _; alloc_mode } ->
+    | Function { function_call = Indirect_known_arity _ } ->
       called
         (Option.get (Apply.callee apply))
-        alloc_mode
-        (Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
-           alloc_mode)
+        (Call_kind.indirect_function_call_known_arity ~code_ids:Unknown)
     | C_call _ | Method _ | Effect _ -> None, call_kind
   in
   match code_id_actually_called with
@@ -1072,7 +1067,8 @@ let rebuild_apply env apply =
            the call kind and produce an invalid. *)
           ~callee:(rewrite_simple_opt env (Apply.callee apply))
           exn_continuation ~args ~args_arity ~return_arity ~call_kind
-          (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+          ~alloc_mode:(Apply.alloc_mode apply) (Apply.dbg apply)
+          ~inlined:(Apply.inlined apply)
           ~inlining_state:(Apply.inlining_state apply)
           ~probe:(Apply.probe apply) ~position:(Apply.position apply)
           ~relative_history:(Apply.relative_history apply)
@@ -1140,8 +1136,8 @@ let rebuild_apply env apply =
     let args = List.map fst (List.flatten args) in
     let make_apply ~continuation =
       Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
-        ~return_arity ~call_kind (Apply.dbg apply)
-        ~inlined:(Apply.inlined apply)
+        ~return_arity ~call_kind ~alloc_mode:(Apply.alloc_mode apply)
+        (Apply.dbg apply) ~inlined:(Apply.inlined apply)
         ~inlining_state:(Apply.inlining_state apply)
         ~probe:(Apply.probe apply) ~position:(Apply.position apply)
         ~relative_history:(Apply.relative_history apply)

@@ -623,8 +623,9 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value is "local" but is expected to be "global"
-       because it is the field "x" (with some modality) of the record at Line 1, characters 46-54.
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "x" (with some modality) of the record at Line 1, characters 46-54.
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -809,8 +810,8 @@ Line 1, characters 10-24:
               ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 type t = { a : int }
@@ -838,14 +839,13 @@ let make_tuple x y z = stack_ (x, y), z
 Line 1, characters 23-36:
 1 | let make_tuple x y z = stack_ (x, y), z
                            ^^^^^^^^^^^^^
-Error: This value is "local"
-       because it is "stack_"-allocated.
+Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global"
-       because it is an element of the tuple at Line 1, characters 23-39
-       which is expected to be "global" because it is an allocation
-       which is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is an element of the tuple at Line 1, characters 23-39
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 type u = A of unit | C of int | B of int * int | D
@@ -1607,6 +1607,49 @@ let triangle_10 = let mutable x = 0 in
 
 [%%expect{|
 val triangle_10 : int = 55
+|}]
+
+(*****************************)
+(* attributes on type params *)
+
+type 'a[@foo]  t
+[%%expect{|
+type 'a t
+|}]
+
+type ('a[@foo] : any) t
+[%%expect{|
+type ('a : any) t
+|}]
+
+type _[@foo]  t
+[%%expect{|
+type _ t
+|}]
+
+type (_[@foo] : any) t
+[%%expect{|
+type (_ : any) t
+|}]
+
+type ('a, 'b[@foo])  t
+[%%expect{|
+type ('a, 'b) t
+|}]
+
+type ('a, 'b[@foo] : any)  t
+[%%expect{|
+type ('a, 'b : any) t
+|}]
+
+type ('a, _[@foo])  t
+[%%expect{|
+type ('a, _) t
+|}]
+
+type ('a, _[@foo] : any)  t
+[%%expect{|
+type ('a, _ : any) t
 |}]
 
 (*********************)

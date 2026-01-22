@@ -177,8 +177,10 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
 
 # flags.sexp
-	echo '(:standard $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
-	echo '(:standard $(OXCAML_DWARF_FLAGS_FOR_COMPILER) -bin-annot-cms $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
+# Do not include :standard as it is ignored
+# See: https://github.com/ocaml/dune/issues/13225
+	echo '($(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
+	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) -bin-annot-cms $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
 	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
 	echo '( $(OC_CPPFLAGS) )' > oc_cppflags.sexp
@@ -236,7 +238,7 @@ _install: compiler
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
 	find _build/main/ \( -name "flambda2*.cmi" -or -name "flambda2*.cms" \
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
-          -exec cp -f {} _install/lib/ocaml/compiler-libs \;
+          -exec cp -f --remove-destination {} _install/lib/ocaml/compiler-libs \;
 	# CR-sspies: Hack to copy the .cms files into the install directory.
 	# Fix this once the upstream dune has support for -bin-annot-cms.
 	# This only copies part of the files, mainly meant for metrics. It only covers

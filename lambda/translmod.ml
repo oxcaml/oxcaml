@@ -1050,7 +1050,7 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
     add_arg_block_to_module_block ~loc lam repr cc2
 
 let wrap_toplevel_functor_in_struct code =
-  Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
+  Lprim(Pmakeblock(0, Immutable, All_value, Lambda.alloc_heap),
         [ code ],
         Loc_unknown)
 

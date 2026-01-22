@@ -870,19 +870,21 @@ fun_decl:
 ;
 
 apply_expr:
-  | call_kind = call_kind;
+  | call_kind_and_alloc_mode = call_kind;
     inlined = option(inlined);
     inlining_state = option(inlining_state);
     func = func_name_with_optional_arities;
     args = simple_args;
     MINUSGREATER
     r = result_continuation e = exn_continuation
-     { let (func, arities) = func in {
+     { let (func, arities) = func in
+       let (call_kind, alloc_mode) = call_kind_and_alloc_mode in {
        func;
           continuation = r;
           exn_continuation = e;
           args = args;
           call_kind;
+          alloc_mode;
           inlined;
           inlining_state;
           arities;
@@ -890,15 +892,15 @@ apply_expr:
 ;
 
 call_kind:
-  | alloc = alloc_mode_for_applications_opt; { Function (Indirect alloc) }
+  | alloc = alloc_mode_for_applications_opt; { (Function Indirect, alloc) }
   | KWD_DIRECT; LPAREN;
       code_id = code_id;
       function_slot = function_slot_opt;
       alloc = alloc_mode_for_applications_opt;
     RPAREN
-    { Function (Direct { code_id; function_slot; alloc }) }
+    { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC)
-    { C_call { alloc = not noalloc } }
+    { (C_call { alloc = not noalloc }, (Heap : alloc_mode_for_applications)) }
 ;
 
 inline:

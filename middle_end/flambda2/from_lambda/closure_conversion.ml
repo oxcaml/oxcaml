@@ -482,14 +482,15 @@ module Inlining = struct
   let inline acc ~apply ~apply_depth ~func_desc:code =
     let apply_dbg = Apply.dbg apply in
     let callee = Apply.callee apply in
-    let region_inlined_into =
+    let () =
       match Apply.call_kind apply with
-      | Function { alloc_mode; _ } -> alloc_mode
+      | Function _ -> ()
       | Method _ | C_call _ | Effect _ ->
         Misc.fatal_error
           "Trying to call [Closure_conversion.Inlining.inline] on a non-OCaml \
            function call."
     in
+    let region_inlined_into = Apply.alloc_mode apply in
     let args = Apply.args apply in
     let apply_return_continuation = Apply.continuation apply in
     let apply_exn_continuation = Apply.exn_continuation apply in
@@ -788,7 +789,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
   let coeffects = Coeffects.from_lambda prim_coeffects in
   let call_kind =
     Call_kind.c_call ~needs_caml_c_call:prim_alloc ~is_c_builtin:prim_c_builtin
-      ~effects ~coeffects alloc_mode_app
+      ~effects ~coeffects
   in
   let call_symbol =
     let prim_name =
@@ -852,8 +853,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       let apply =
         Apply.create ~callee:(Some callee)
           ~continuation:(Return return_continuation) exn_continuation ~args
-          ~args_arity:param_arity ~return_arity ~call_kind dbg
-          ~inlined:Default_inlined
+          ~args_arity:param_arity ~return_arity ~call_kind
+          ~alloc_mode:alloc_mode_app dbg ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
           ~probe:None ~position:Normal
           ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -1085,7 +1086,8 @@ let close_effect_primitive acc env ~dbg exn_continuation
         ~return_arity:
           (Flambda_arity.create_singletons
              [Flambda_kind.With_subkind.any_value])
-        ~call_kind dbg ~inlined:Never_inlined
+        ~call_kind ~alloc_mode:Alloc_mode.For_applications.heap dbg
+        ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
@@ -1185,28 +1187,31 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Some exn_continuation -> exn_continuation
     in
     close_raise0 acc env ~raise_kind ~arg ~dbg exn_continuation
-  | ( ( Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _
-      | Pmakemixedblock _ ),
-      [] ) ->
+  | (Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _), []
+    ->
     (* Special case for liftable empty block or array *)
     let acc, sym =
       match prim with
-      | Pmakeblock (tag, _, _, _mode) ->
+      | Pmakeblock (tag, _, shape, _mode) ->
         if tag <> 0
         then
           (* There should not be any way to reach this from Ocaml code. *)
           Misc.fatal_error
             "Non-zero tag on empty block allocation in [Closure_conversion]"
-        else
-          register_const0 acc
-            (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-            "empty_block"
+        else begin
+          if Lambda.is_uniform_block_shape shape
+          then
+            register_const0 acc
+              (Static_const.block Tag.Scannable.zero Immutable Value_only [])
+              "empty_block"
+          else
+            Misc.fatal_error
+              "Unexpected empty mixed block in [Closure_conversion]"
+        end
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
         Misc.fatal_error "Unexpected empty float# block in [Closure_conversion]"
-      | Pmakemixedblock _ ->
-        Misc.fatal_error "Unexpected empty mixed block in [Closure_conversion]"
       | Pmakearray (array_kind, _, _mode) ->
         let array_kind = Empty_array_kind.of_lambda array_kind in
         register_const0 acc (Static_const.empty_array array_kind) "empty_array"
@@ -1742,7 +1747,7 @@ let close_exact_or_unknown_apply acc env
           (* CR keryan : We could do better here since we know the arity, but we
              would have to untuple the arguments and we lack information for
              now *)
-          acc, Call_kind.indirect_function_call_unknown_arity mode, false
+          acc, Call_kind.indirect_function_call_unknown_arity, false
         else
           let result_arity_from_code = Code_metadata.result_arity meta in
           if
@@ -1763,15 +1768,15 @@ let close_exact_or_unknown_apply acc env
             Flambda_features.classic_mode ()
             && not (Code_metadata.is_my_closure_used meta)
           in
-          acc, Call_kind.direct_function_call code_id mode, can_erase_callee
-      | None -> acc, Call_kind.indirect_function_call_unknown_arity mode, false
+          acc, Call_kind.direct_function_call code_id, can_erase_callee
+      | None -> acc, Call_kind.indirect_function_call_unknown_arity, false
       | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
         ->
         assert false (* See [close_apply] *))
     | Method { kind; obj } ->
       let acc, obj = find_simple acc env obj in
       ( acc,
-        Call_kind.method_call (Call_kind.Method_kind.from_lambda kind) ~obj mode,
+        Call_kind.method_call (Call_kind.Method_kind.from_lambda kind) ~obj,
         false )
   in
   let acc, apply_exn_continuation =
@@ -1789,7 +1794,8 @@ let close_exact_or_unknown_apply acc env
     Apply.create
       ~callee:(if can_erase_callee then None else Some callee)
       ~continuation:(Return continuation) apply_exn_continuation ~args
-      ~args_arity ~return_arity ~call_kind dbg ~inlined:inlined_call
+      ~args_arity ~return_arity ~call_kind ~alloc_mode:mode dbg
+      ~inlined:inlined_call
       ~inlining_state:(Inlining_state.default ~round:0)
       ~probe ~position
       ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -2294,11 +2300,11 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         ~continuation:(Return cont)
         (Exn_continuation.create ~exn_handler:exn_continuation ~extra_args:[])
         ~args ~args_arity ~return_arity:result_arity_main_code
-        ~call_kind:
-          (Call_kind.direct_function_call main_code_id
-             (Alloc_mode.For_applications.from_lambda
-                (Function_decl.result_mode decl)
-                ~current_region:my_region ~current_ghost_region:my_ghost_region))
+        ~call_kind:(Call_kind.direct_function_call main_code_id)
+        ~alloc_mode:
+          (Alloc_mode.For_applications.from_lambda
+             (Function_decl.result_mode decl)
+             ~current_region:my_region ~current_ghost_region:my_ghost_region)
         Debuginfo.none ~inlined:Inlined_attribute.Default_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
@@ -3445,10 +3451,9 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
-    let call_kind =
-      Call_kind.indirect_function_call_unknown_arity
-        (Alloc_mode.For_applications.from_lambda apply.mode
-           ~current_region:apply_region ~current_ghost_region:apply_ghost_region)
+    let alloc_mode =
+      Alloc_mode.For_applications.from_lambda apply.mode
+        ~current_region:apply_region ~current_ghost_region:apply_ghost_region
     in
     let continuation =
       match needs_region with
@@ -3459,7 +3464,8 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       Apply.create
         ~callee:(Some (Simple.var returned_func))
         ~continuation apply_exn_continuation ~args:remaining
-        ~args_arity:remaining_arity ~return_arity:apply.return_arity ~call_kind
+        ~args_arity:remaining_arity ~return_arity:apply.return_arity
+        ~call_kind:Call_kind.indirect_function_call_unknown_arity ~alloc_mode
         apply_dbg ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position

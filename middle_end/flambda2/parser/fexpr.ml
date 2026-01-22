@@ -448,10 +448,9 @@ type arity = kind_with_subkind list
 type function_call =
   | Direct of
       { code_id : code_id;
-        function_slot : function_slot option;
-        alloc : alloc_mode_for_applications
+        function_slot : function_slot option
       }
-  | Indirect of alloc_mode_for_applications
+  | Indirect
 (* Will translate to indirect_known_arity or indirect_unknown_arity depending on
    whether the apply record's arities field has a value *)
 
@@ -499,6 +498,7 @@ type apply =
     exn_continuation : continuation;
     args : simple list;
     call_kind : call_kind;
+    alloc_mode : alloc_mode_for_applications;
     arities : function_arities option;
     inlined : inlined_attribute option;
     inlining_state : inlining_state option

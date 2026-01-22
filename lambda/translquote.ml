@@ -71,7 +71,8 @@ let transl_bool b = if b then true_ else false_
 
 let none = Lconst (Const_base (Const_int 0))
 
-let some ~loc x = Lprim (Pmakeblock (0, Immutable, None, alloc_heap), [x], loc)
+let some ~loc x =
+  Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap), [x], loc)
 
 let option ~loc opt = match opt with None -> none | Some x -> some ~loc x
 
@@ -82,7 +83,7 @@ let string_option ~loc s = option ~loc (Option.map (string ~loc) s)
 let nil = Lconst (Const_base (Const_int 0))
 
 let cons ~loc hd tl =
-  Lprim (Pmakeblock (0, Immutable, None, alloc_heap), [hd; tl], loc)
+  Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap), [hd; tl], loc)
 
 let hd ~loc l = Lprim (Pfield (0, Pointer, Reads_agree), [l], loc)
 
@@ -92,10 +93,10 @@ let rec mk_list ~loc list =
   match list with [] -> nil | hd :: tl -> cons ~loc hd (mk_list ~loc tl)
 
 let pair ~loc (x, y) =
-  Lprim (Pmakeblock (0, Immutable, None, alloc_heap), [x; y], loc)
+  Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap), [x; y], loc)
 
 let triple ~loc (x, y, z) =
-  Lprim (Pmakeblock (0, Immutable, None, alloc_heap), [x; y; z], loc)
+  Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap), [x; y; z], loc)
 
 (* Let-expressions *)
 

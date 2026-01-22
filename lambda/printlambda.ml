@@ -285,8 +285,6 @@ let return_kind ppf (mode, kind) =
   | Pbottom -> fprintf ppf ": bottom@ "
   | Psplicevar id -> fprintf ppf ": $%a@ " Ident.print id
 
-let field_kind = value_kind
-
 let locality_kind = function
   | Alloc_heap -> ""
   | Alloc_local -> "[L]"
@@ -322,18 +320,6 @@ let record_rep ppf r = match r with
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
-
-let block_shape ppf shape = match shape with
-  | None | Some [] -> ()
-  | Some l when List.for_all ((=) Lambda.generic_value) l -> ()
-  | Some [elt] ->
-      Format.fprintf ppf " (%a)" field_kind elt
-  | Some (h :: t) ->
-      Format.fprintf ppf " (%a" field_kind h;
-      List.iter (fun elt ->
-          Format.fprintf ppf ",%a" field_kind elt)
-        t;
-      Format.fprintf ppf ")"
 
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
@@ -371,6 +357,12 @@ and mixed_block_shape
       shape;
     fprintf ppf ")"
   end
+
+let block_shape ppf shape = match shape with
+  | All_value -> ()
+  | Shape arr ->
+      if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) arr then ()
+      else mixed_block_shape (fun _ () -> ()) ppf arr
 
 let field_read_semantics ppf sem =
   match sem with
@@ -433,15 +425,6 @@ let primitive ppf = function
   | Pmakeufloatblock (Mutable, mode) ->
      fprintf ppf "make%sufloatblock Mutable"
         (locality_mode_if_local mode)
-  | Pmakemixedblock (tag, Immutable, abs, mode) ->
-      fprintf ppf "make%amixedblock %i Immutable%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
-  | Pmakemixedblock (tag, Immutable_unique, abs, mode) ->
-     fprintf ppf "make%amixedblock %i Immutable_unique%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
-  | Pmakemixedblock (tag, Mutable, abs, mode) ->
-     fprintf ppf "make%amixedblock %i Mutable%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
   | Pmakelazyblock Lazy_tag ->
       fprintf ppf "makelazyblock"
   | Pmakelazyblock Forward_tag ->
@@ -893,7 +876,6 @@ let name_of_primitive = function
   | Pmakeblock _ -> "Pmakeblock"
   | Pmakefloatblock _ -> "Pmakefloatblock"
   | Pmakeufloatblock _ -> "Pmakeufloatblock"
-  | Pmakemixedblock _ -> "Pmakemixedblock"
   | Pmakelazyblock _ -> "Pmakelazyblock"
   | Pfield _ -> "Pfield"
   | Pfield_computed _ -> "Pfield_computed"

@@ -11970,13 +11970,16 @@ let report_error ~loc env =
       let {left; right} : Mode_intf.print_error =
         Value.print_error (loc, Expression) e
       in
-      pp_print_string ppf "This value is ";
+      let open_box = dprintf "@[<hov 2>" in
+      let reopen_box = dprintf "@]@ %t" open_box in
+      fprintf ppf "%tThis value is " open_box;
     (match left ppf with
     | Mode_with_hint ->
-      fprintf ppf ".@\nHowever, the highlighted expression is expected to be "
-    | Mode -> fprintf ppf "@ but is expected to be ");
+      fprintf ppf
+        ".%tHowever, the highlighted expression is expected to be " reopen_box
+    | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
     ignore (right ppf);
-    pp_print_string ppf "."
+    fprintf ppf ".@]"
       ) e
   | Curried_application_complete (lbl, e, loc_kind) ->
       let Mode.Alloc.Error (ax, {left; _}) = Mode.Alloc.to_simple_error e in

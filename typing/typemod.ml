@@ -2960,8 +2960,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       in
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
-      let _, mode = register_allocation () in
-      Option.iter (fun x -> Value.submode mode x |> ignore) expected_mode;
+      let alloc_mode, mode = register_allocation () in
+      Option.iter (fun x -> Value.submode_exn mode x) expected_mode;
       let newenv =
         Env.add_closure_lock (smod.pmod_loc, Functor) mode.comonadic env
       in
@@ -3004,8 +3004,16 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       let body_mode = mode_without_locks_exn body.mod_mode in
       let ret_mode = Alloc.newvar () in
       Value.submode_exn body_mode (ret_mode |> alloc_as_value);
-      (* CR-soon zqian: if the body is another functor, should constrain its
-         mode wrt the outer functor and the parameter. *)
+      (* Apply currying constraints if the body is a functor,
+         similar to constraints for functions. *)
+      (match body.mod_type with
+       | Mty_functor _ ->
+         (match ty_arg with
+          | Unit -> ()
+          | Named (_, _, param_mode) ->
+            Alloc.submode_exn (Alloc.close_over param_mode) ret_mode);
+         Alloc.submode_exn (Alloc.partial_apply alloc_mode) ret_mode
+       | _ -> ());
       { mod_desc = Tmod_functor(t_arg, body);
         mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode);
         mod_mode = Value.disallow_right mode, None;
@@ -3193,6 +3201,25 @@ and type_application loc strengthen funct_body env smod =
 
 and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     funct_body env (funct, funct_shape) app_view =
+  (* CR modes: Apply currying constraints if the application is partial
+     and returns a functor, similar to constraints for functions.
+
+     Since functors don't have syntactic arity, here we guess conservatively
+     and always assume a returned functor is curried. If the body is, e.g.,
+     just some identifier that happens to be a functor, this is unnecessary.
+
+     Internal ticket 1534. *)
+  let check_curried_application_complete ~loc ~mty_res ~mode_res ~mode_arg =
+    match Mtype.scrape_alias env mty_res with
+    | Mty_functor _ ->
+        let mode_fun = mode_without_locks_exn funct.mod_mode in
+        submode ~loc ~env (Value.partial_apply mode_fun) mode_res;
+        Option.iter
+          (fun mode_arg ->
+            submode ~loc ~env (Value.close_over mode_arg) mode_res)
+          mode_arg
+    | _ -> ()
+  in
   match Mtype.scrape_alias env funct.mod_type with
   | Mty_functor (Unit, mty_res, mm_res) ->
       begin match app_view.arg with
@@ -3211,6 +3238,9 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       end;
       if funct_body && Mtype.contains_type env funct.mod_type then
         raise (Error (apply_loc, env, Not_allowed_in_functor_body));
+      check_curried_application_complete
+        ~loc:app_view.loc ~mty_res ~mode_res:(alloc_as_value mm_res)
+        ~mode_arg:None;
       { mod_desc = Tmod_apply_unit funct;
         mod_type = mty_res;
         mod_mode = alloc_as_value (Alloc.disallow_right mm_res), None;
@@ -3285,6 +3315,9 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       in
       check_well_formed_module env apply_loc
         "the signature of this functor application" mty_appl;
+      check_curried_application_complete
+        ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
+        ~mode_arg:(Some mm_param);
       { mod_desc = Tmod_apply(funct, arg, coercion);
         mod_type = mty_appl;
         mod_mode = Value.disallow_right mm_res, None;

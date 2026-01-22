@@ -102,7 +102,8 @@ let transl_extension_constructor ~scopes env path ext =
       (* Extension constructors are currently always Alloc_heap.
          They could be Alloc_local, but that would require changes
          to pattern typing, as patterns can close over them. *)
-      Lprim (Pmakeblock (Obj.object_tag, Immutable_unique, None, alloc_heap),
+      Lprim (Pmakeblock
+          (Obj.object_tag, Immutable_unique, All_value, alloc_heap),
         [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
          Lprim (prim_fresh_oo_id, [lambda_unit], loc)],
         loc)
@@ -233,7 +234,7 @@ let assert_failed loc ~scopes exp =
   in
   let loc = of_location ~scopes exp.exp_loc in
   Lprim(Praise Raise_regular, [event_after ~scopes exp
-    (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
+    (Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
           [slot;
            Lconst(Const_block(0,
               [Const_base(Const_string (fname, exp.exp_loc, None));
@@ -494,7 +495,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       begin try
         Lconst(Const_block(0, List.map extract_constant ll))
       with Not_constant ->
-        Lprim(Pmakeblock(0, Immutable, Some shape,
+        Lprim(Pmakeblock(0, Immutable,
+                         Lambda.block_shape_of_value_kinds (Some shape),
                          transl_alloc_mode alloc_mode),
               ll,
               (of_location ~scopes e.exp_loc))
@@ -567,13 +569,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                           Lambda.must_be_value (layout_exp sort e))
                         args_with_sorts
                     in
-                    Pmakeblock(runtime_tag, Immutable, Some shape, alloc_mode)
+                    Pmakeblock(runtime_tag, Immutable,
+                               Lambda.block_shape_of_value_kinds (Some shape),
+                               alloc_mode)
                 | Constructor_mixed shape ->
                     (* CR layouts v5: once all-void records are allowed, handle
                        constructors with all-void inline records, which are
                        stored as immediates *)
                     let shape = Lambda.transl_mixed_product_shape shape in
-                    Pmakemixedblock(runtime_tag, Immutable, shape, alloc_mode)
+                    Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
           end
@@ -600,8 +604,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                         Lambda.must_be_value (layout_exp sort e))
                       args_with_sorts
                   in
-                  Pmakeblock(0, Immutable, Some (Lambda.generic_value :: shape),
-                            alloc_mode)
+                  Pmakeblock(0, Immutable,
+                             Lambda.block_shape_of_value_kinds
+                               (Some (Lambda.generic_value :: shape)),
+                             alloc_mode)
               | Constructor_mixed shape ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
@@ -614,7 +620,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                        value prefix of a mixed block. *)
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
-                  Pmakemixedblock(0, Immutable, shape, alloc_mode)
+                  Pmakeblock(0, Immutable, Shape shape, alloc_mode)
             in
             Lprim (makeblock, lam :: ll, of_location ~scopes e.exp_loc)
       | Extension _, (Variant_boxed _ | Variant_unboxed | Variant_with_null)
@@ -632,7 +638,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Lconst(Const_block(0, [const_int tag;
                                    extract_constant lam]))
           with Not_constant ->
-            Lprim(Pmakeblock(0, Immutable, None,
+            Lprim(Pmakeblock(0, Immutable, All_value,
                              transl_alloc_mode alloc_mode),
                   [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)
@@ -647,10 +653,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         fields representation extended_expression
   | Texp_atomic_loc (arg, arg_sort, _id, lbl, alloc_mode) ->
       let shape =
-        Some
-          [ Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type;
-            { raw_kind = Pintval; nullable = Non_nullable }
-          ]
+        (Shape
+            [| Value (Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type);
+               Value { raw_kind = Pintval; nullable = Non_nullable }
+            |])
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl in
@@ -2234,12 +2240,15 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         match repres with
           Record_boxed _ ->
             let shape = List.map must_be_value shape in
-            Lprim(Pmakeblock(0, mut, Some shape, Option.get mode), ll, loc)
+            Lprim(Pmakeblock(0, mut,
+                             Lambda.block_shape_of_value_kinds (Some shape),
+                             Option.get mode), ll, loc)
         | Record_inlined (Ordinary {runtime_tag},
                           Constructor_uniform_value, Variant_boxed _) ->
             let shape = List.map must_be_value shape in
-            Lprim(Pmakeblock(runtime_tag, mut, Some shape, Option.get mode),
-                  ll, loc)
+            Lprim(Pmakeblock(runtime_tag, mut,
+                             Lambda.block_shape_of_value_kinds (Some shape),
+                             Option.get mode), ll, loc)
         | Record_unboxed | Record_inlined (Ordinary _, _, Variant_unboxed) ->
             (match ll with [v] -> v | _ -> assert false)
         | Record_float ->
@@ -2257,7 +2266,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             let slot = transl_extension_path loc env path in
             Lprim(Pmakeblock(0,
                              mut,
-                             Some (Lambda.generic_value :: shape),
+                             Lambda.block_shape_of_value_kinds
+                               (Some (Lambda.generic_value :: shape)),
                              Option.get mode),
                   slot :: ll, loc)
         | Record_inlined (Extension _, _, (Variant_unboxed | Variant_boxed _))
@@ -2265,14 +2275,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             assert false
         | Record_mixed shape ->
             let shape = Lambda.transl_mixed_product_shape shape in
-            Lprim (Pmakemixedblock (0, mut, shape, Option.get mode), ll, loc)
+            Lprim (Pmakeblock (0, mut, Shape shape, Option.get mode), ll, loc)
         | Record_inlined (Ordinary { runtime_tag },
                           Constructor_mixed shape, Variant_boxed _) ->
             (* CR layouts v5: once all-void records are allowed, handle
               constructors with all-void inline records, which are stored as
               immediates *)
             let shape = Lambda.transl_mixed_product_shape shape in
-            Lprim (Pmakemixedblock (runtime_tag, mut, shape, Option.get mode),
+            Lprim (Pmakeblock (runtime_tag, mut, Shape shape, Option.get mode),
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_inlined (Null, _, _) -> assert false

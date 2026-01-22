@@ -70,9 +70,10 @@ let f : local_ _ -> bar =
 Line 2, characters 21-22:
 2 |   fun n -> Bar0 (42, n)
                          ^
-Error: This value is "local" to the parent region but is expected to be "global"
-       because it is contained (via constructor "Bar0") in the value at Line 2, characters 11-23
-       which is expected to be "global".
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is contained (via constructor "Bar0") in the value at Line 2, characters 11-23
+         which is expected to be "global".
 |}]
 
 (* 3. record field crosses mode at construction *)
@@ -88,9 +89,10 @@ let f : local_ _ -> foo =
 Line 2, characters 24-25:
 2 |   fun n -> {x = 42; y = n}
                             ^
-Error: This value is "local" to the parent region but is expected to be "global"
-       because it is the field "y" of the record at Line 2, characters 11-26
-       which is expected to be "global".
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "y" of the record at Line 2, characters 11-26
+         which is expected to be "global".
 |}]
 
 (* 4. expression crosses mode when being constrained *)
@@ -138,9 +140,10 @@ let f : local_ _ -> string * string =
 Line 2, characters 12-13:
 2 |   fun n -> (n, n)
                 ^
-Error: This value is "local" to the parent region but is expected to be "global"
-       because it is an element of the tuple at Line 2, characters 11-17
-       which is expected to be "global".
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is an element of the tuple at Line 2, characters 11-17
+         which is expected to be "global".
 |}]
 
 (* array elements crosses mode at construction *)
@@ -156,9 +159,10 @@ let f: local_ _ -> string array =
 Line 2, characters 13-14:
 2 |   fun n -> [|n; n|]
                  ^
-Error: This value is "local" to the parent region but is expected to be "global"
-       because it is an element of the array at Line 2, characters 11-19
-       which is expected to be "global".
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is an element of the array at Line 2, characters 11-19
+         which is expected to be "global".
 |}]
 
 (* after discussion with sdolan, we agree that
@@ -170,9 +174,10 @@ let f: local_ _ -> int lazy_t =
 Line 2, characters 16-17:
 2 |   fun n -> lazy n
                     ^
-Error: The value "n" is "local" to the parent region but is expected to be "global"
-       because it is used inside the lazy expression at Line 2, characters 11-17
-       which is expected to be "global".
+Error: The value "n" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the lazy expression at Line 2, characters 11-17
+         which is expected to be "global".
 |}]
 
 (* record field crosses mode at projection  *)
@@ -189,8 +194,8 @@ Line 2, characters 11-14:
 2 |   fun r -> r.y
                ^^^
 Error: This value is "local" to the parent region
-       because it is the field "y" of the record at Line 2, characters 11-12
-       which is "local" to the parent region.
+         because it is the field "y" of the record at Line 2, characters 11-12
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -288,8 +293,8 @@ Line 4, characters 21-22:
 4 |     | Bar0 (_, y) -> y
                          ^
 Error: This value is "local" to the parent region
-       because it is contained (via constructor "Bar0") in the value at Line 4, characters 6-17
-       which is "local" to the parent region.
+         because it is contained (via constructor "Bar0") in the value at Line 4, characters 6-17
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -321,8 +326,8 @@ Line 4, characters 16-17:
 4 |     | {y; _} -> y
                     ^
 Error: This value is "local" to the parent region
-       because it is the field "y" of the record at Line 4, characters 6-12
-       which is "local" to the parent region.
+         because it is the field "y" of the record at Line 4, characters 6-12
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
 
