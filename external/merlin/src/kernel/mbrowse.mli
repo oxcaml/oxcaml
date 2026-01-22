@@ -73,6 +73,9 @@ val enclosing :
   t list ->
   t
 
+val enclosing_from :
+  start:Lexing.position -> stop:Lexing.position -> t list -> t
+
 val of_structure : Typedtree.structure -> t
 val of_signature : Typedtree.signature -> t
 
