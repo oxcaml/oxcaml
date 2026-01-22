@@ -441,7 +441,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
         | path :: _ -> Some path
         | [] -> None
       in
-      let* overall_ty =
+      let+ overall_ty =
         Locate.log ~title:"query_commands Locate_types" "inspecting node: %s"
           (Browse_raw.string_of_node node);
         match node with
@@ -451,7 +451,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
         | Value_description { val_desc = { ctyp_type = ty; _ }; _ } -> Some ty
         | _ -> None
       in
-      let+ type_tree = Locate_types.create_type_tree overall_ty in
+      let type_tree = Locate_types.create_type_tree overall_ty in
       let type_to_string ~env ty =
         Printtyp.wrap_printing_env env ~verbosity (fun () ->
             Type_utils.print_type_with_decl ~verbosity env Format.str_formatter
@@ -459,10 +459,8 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
         Format.flush_str_formatter ()
       in
       let rec make_result ({ data; children } : Locate_types.Type_tree.t) :
-          Locate_types_result.type_ref_payload Locate_types_result.Tree.t =
-        let data :
-            Locate_types_result.type_ref_payload
-            Locate_types_result.Tree.node_data =
+          Locate_types_result.Tree.t =
+        let data : Locate_types_result.Tree.node_data =
           match data with
           | Arrow -> Arrow
           | Tuple -> Tuple
@@ -490,6 +488,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
             in
             let type_ = type_to_string ~env ty in
             Type_ref { type_; result }
+          | Other ty -> Other (type_to_string ~env ty)
         in
         let children = List.map children ~f:make_result in
         { data; children }
