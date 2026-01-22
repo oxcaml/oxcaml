@@ -1330,8 +1330,8 @@ let rec approx_modtype env smty =
         match param with
         | Unit -> Types.Unit, env
         | Named (param, sarg, marg) ->
-          let tmarg = Typemode.transl_alloc_mode marg in
-          let marg = Alloc.of_const tmarg.mode_modes in
+          let {mode_modes = marg} = Typemode.transl_alloc_mode marg in
+          let marg = Alloc.of_const marg in
           let arg = approx_modtype env sarg in
           match param.txt with
           | None -> Types.Named (None, arg, marg), env
@@ -1345,9 +1345,8 @@ let rec approx_modtype env smty =
             Types.Named (Some id, arg, marg), newenv
       in
       let res = approx_modtype newenv sres in
-      let mres =
-        (Typemode.transl_alloc_mode mres).mode_modes |> Alloc.of_const
-      in
+      let {mode_modes = mres} = Typemode.transl_alloc_mode mres in
+      let mres = Alloc.of_const mres in
       Mty_functor(param, res, mres)
   | Pmty_with(sbody, constraints) ->
       (* the module type body is approximated and resolved to a signature.*)
@@ -1496,9 +1495,8 @@ and approx_sig_items env ssg=
                 match moda with
                 | [] -> sg
                 | _ ->
-                  let modalities =
-                    (Typemode.transl_modalities ~maturity:Stable Immutable moda)
-                      .moda_modalities
+                  let {moda_modalities = modalities} =
+                    Typemode.transl_modalities ~maturity:Stable Immutable moda
                   in
                   let recursive =
                     not @@ Builtin_attributes.has_attribute "no_recursive_modalities" attrs
@@ -2446,9 +2444,7 @@ and transl_modtype_decl_aux env
 and transl_recmodule_modtypes env ~sig_modalities sdecls =
   let make_env curr =
     List.fold_left (fun env (id_shape, _, md, mode, _, _) ->
-      let mode =
-        Option.map (fun m -> Mode.Value.disallow_right m.mode_modes) mode
-      in
+      let mode = Option.map (fun m -> m.mode_modes) mode in
       Option.fold ~none:env ~some:(fun (id, shape) ->
         Env.add_module_declaration ~check:true ~shape ~arg:true
           id Mp_present md ?mode env
@@ -2770,8 +2766,8 @@ let check_recmodule_inclusion env bindings =
       (* Base case: check inclusion of s(mty_actual) in s(mty_decl)
          and insert coercion if needed *)
       let check_inclusion
-            (id, name, mty_decl, modl, mty_actual, mode_decl, attrs,
-             loc, shape, uid) =
+            (id, name, mty_decl, modl, mty_actual, mode_decl, attrs, loc, shape
+            ,uid) =
         let mty_decl' = Subst.modtype (Rescope scope) s mty_decl.mty_type
         and mty_actual' = subst_and_strengthen scope s id mty_actual in
         let modes : Includemod.modes =
@@ -3023,8 +3019,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
               in
               Some id, newenv, id
           in
-          Named (id, param, mty, tmode),
-          Types.Named (id, mty.mty_type, mode), newenv, var, true
+          Named (id, param, mty, tmode), Types.Named (id, mty.mty_type, mode),
+          newenv, var, true
       in
 
       let body, body_shape = type_module true funct_body None newenv sbody in
