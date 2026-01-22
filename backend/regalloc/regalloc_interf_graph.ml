@@ -34,6 +34,8 @@ module RegisterStamp = struct
 
     val add : t -> pair -> unit
 
+    val capacity : t -> int
+
     module For_debug : sig
       val cardinal : t -> int
 
@@ -42,25 +44,33 @@ module RegisterStamp = struct
   end
 
   module PairSet : S = struct
-    type t = unit PS.t
+    type t =
+      { set : unit PS.t;
+        capacity : int
+      }
 
     let default_size = 256
 
     let make ~num_registers =
       let estimated_size = (num_registers * num_registers) asr 5 in
-      PS.create
-        (if estimated_size < default_size then default_size else estimated_size)
+      { set =
+          PS.create
+            (if estimated_size < default_size then default_size else estimated_size);
+        capacity = num_registers
+      }
 
-    let clear set = PS.clear set
+    let clear t = PS.clear t.set
 
-    let mem set (x : pair) = PS.mem set x
+    let mem t (x : pair) = PS.mem t.set x
 
-    let add set (x : pair) = PS.replace set x ()
+    let add t (x : pair) = PS.replace t.set x ()
+
+    let capacity t = t.capacity
 
     module For_debug = struct
-      let cardinal set = PS.length set
+      let cardinal t = PS.length t.set
 
-      let iter set ~f = PS.iter (fun key () -> f key) set
+      let iter t ~f = PS.iter (fun key () -> f key) t.set
     end
   end
 
@@ -102,6 +112,8 @@ module RegisterStamp = struct
       let byte_index, bit_position = bit_location (i, j) t.num_registers in
       let byte_val = unsafe_get_uint8 t.bits byte_index in
       unsafe_set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position))
+
+    let capacity t = t.num_registers
 
     module For_debug = struct
       let cardinal t =
@@ -153,12 +165,13 @@ type edge_set =
   | BitMatrix of RegisterStamp.BitMatrix.t
 
 type t =
-  { adj_set : edge_set;
+  { mutable adj_set : edge_set;
     adj_list : Reg.t list Reg.Tbl.t;
     degree : int Reg.Tbl.t
   }
 
-let[@inline] make ~num_registers =
+let[@inline] make () =
+  let num_registers = Reg.For_testing.get_stamp () in
   let adj_set =
     if num_registers < Lazy.force bit_matrix_threshold
     then BitMatrix (RegisterStamp.BitMatrix.make ~num_registers)
@@ -170,9 +183,13 @@ let[@inline] make ~num_registers =
   }
 
 let[@inline] clear graph =
+  let num_registers = Reg.For_testing.get_stamp () in
   (match graph.adj_set with
   | PairSet set -> RegisterStamp.PairSet.clear set
-  | BitMatrix matrix -> RegisterStamp.BitMatrix.clear matrix);
+  | BitMatrix matrix ->
+    if RegisterStamp.BitMatrix.capacity matrix < num_registers
+    then graph.adj_set <- BitMatrix (RegisterStamp.BitMatrix.make ~num_registers)
+    else RegisterStamp.BitMatrix.clear matrix);
   Reg.Tbl.clear graph.adj_list;
   Reg.Tbl.clear graph.degree
 

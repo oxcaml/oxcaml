@@ -58,7 +58,7 @@ type t =
 
 let[@inline] make ~initial ~stack_slots ~affinity () =
   let num_registers = List.length (Reg.all_relocatable_regs ()) in
-  let graph = Regalloc_interf_graph.make ~num_registers in
+  let graph = Regalloc_interf_graph.make () in
   let reg_work_list = Reg.Tbl.create num_registers in
   let reg_color = Reg.Tbl.create num_registers in
   let reg_alias = Reg.Tbl.create num_registers in

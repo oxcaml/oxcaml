@@ -39,6 +39,8 @@ module RegisterStamp : sig
 
     val add : t -> pair -> unit
 
+    val capacity : t -> int
+
     module For_debug : sig
       val cardinal : t -> int
 
@@ -94,10 +96,16 @@ type t
 
 (** Create a new empty interference graph.
 
-    @param num_registers Initial capacity hint for the number of registers *)
-val make : num_registers:int -> t
+    The graph is sized based on the current register stamp (Reg.For_testing.get_stamp).
+    This ensures it can accommodate all registers that have been allocated so far. *)
+val make : unit -> t
 
-(** Clear all edges from the graph, resetting it to empty state. *)
+(** Clear all edges from the graph, resetting it to empty state.
+
+    If new registers have been allocated since graph creation (detected via
+    Reg.For_testing.get_stamp), the underlying BitMatrix representation (if used)
+    will be reallocated to accommodate the larger stamp range. PairSet grows
+    dynamically so no reallocation is needed. *)
 val clear : t -> unit
 
 (** [add_edge graph u v] adds an undirected edge between registers [u] and [v].
