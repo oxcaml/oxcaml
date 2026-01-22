@@ -2119,6 +2119,7 @@ let safe_abbrev env ty =
    This ensures type unification works correctly. *)
 let rec quote_splice_cancel ty =
   (* CR metaprogramming aivaskovic: try to remove type_desc mutation here *)
+  (* FIXME jbachurski: one of these is probably wrong -- one is [ty], and the other [t]. *)
   match get_desc ty with
   | Tquote t -> begin
       match get_desc t with
@@ -2134,18 +2135,75 @@ let rec quote_splice_cancel ty =
     end
   | _ -> raise Cannot_expand
 
+and new_quote_eval_ty t =
+  let t = newty2 ~level:(get_level t) (Tquote t) in
+  newty2 ~level:(get_level t) (Teval t)
+
+(* Apply eval equations to a type term, distributing [eval] to subterms
+   if the type former is valid at all stages *)
+and eval_distribute t0 =
+  let normalised t desc = newty2 ~level:(get_level t) desc in
+  match get_desc t0 with
+  | Teval t -> begin
+    match get_desc t with
+    | Teval t ->
+      (* if normalising the nested [Teval] fails, we also fail *)
+      set_type_desc t (eval_distribute t |> get_desc);
+      eval_distribute t0
+    | Tquote t -> begin
+      match get_desc t with
+      | Tconstr (p, tl, a) ->
+        Tconstr (p, List.map new_quote_eval_ty tl, a)
+      | Ttuple tl ->
+        Ttuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+      | Tunboxed_tuple tl ->
+        Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+      (* handling Tpoly is kinda awkward, since
+         we rewrite <[ 'a. t ]> to 'a. <[ t ]> *)
+      | Tarrow (a, t1, t2, c) ->
+        let t1' =
+          match get_desc t1 with
+          | Tpoly (t, tl) -> Tpoly (new_quote_eval_ty t, tl) |> normalised t1
+          | _ -> t1
+        in
+        Tarrow (a, t1', new_quote_eval_ty t2, c)
+      | Tpoly (t, tl) ->
+        Tpoly (new_quote_eval_ty t, tl)
+      | Tobject (t, ct) ->
+        Tobject (
+          new_quote_eval_ty t,
+          ref (
+            Option.map
+              (fun (p, tl) -> p, List.map new_quote_eval_ty tl)
+              !ct))
+      | Tfield (s, k, t1, t2) ->
+        Tfield (s, k, new_quote_eval_ty t1, new_quote_eval_ty t2)
+      (* TODO jbachurski: Tvariant *)
+      | Tpackage (p, fl) ->
+        Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
+      (* TODO jbachurski: Tof_kind, once we have quoted kinds *)
+      | _ -> raise Cannot_expand
+      end |> normalised t0
+    | Tsplice _ ->
+      set_type_desc t (quote_splice_cancel t |> get_desc);
+      eval_distribute t0
+    | _ -> raise Cannot_expand
+    end
+  | _ -> raise Cannot_expand
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
 let rec try_expand_once env ty =
-  let expand_and_cancel t =
+  let try_expand_once_and ~then_ t =
     match try_expand_once env t with
-    | _ | exception Cannot_expand -> quote_splice_cancel ty
+    | _ | exception Cannot_expand -> then_ ty
   in
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
-  | Tsplice t -> expand_and_cancel t
-  | Tquote t -> expand_and_cancel t
+  | Tsplice t -> try_expand_once_and ~then_:quote_splice_cancel t
+  | Tquote t -> try_expand_once_and ~then_:quote_splice_cancel t
+  | Teval t -> try_expand_once_and ~then_:eval_distribute t
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2208,6 +2266,7 @@ let rec extract_concrete_typedecl env ty =
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
+  | Teval ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2235,6 +2294,7 @@ let rec try_expand_once_opt env ty =
     Tconstr _ -> expand_abbrev_opt env ty
   | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Teval t -> ignore (try_expand_once_opt env t); eval_distribute ty
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -2352,7 +2412,7 @@ let contained_without_boxing env ty =
   | Tpoly (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
-  | Tquote _ | Tsplice _ -> []
+  | Tquote _ | Tsplice _ | Teval _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -2464,6 +2524,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
   | Tquote _ -> Jkind.Builtin.value ~why:Tquote
   | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
+  | Teval _ -> Jkind.Builtin.value ~why:Teval
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3546,6 +3607,8 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs env t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->
             mcomp type_pairs env t1 t2
+        | (Teval t1, Teval t2, _, _) ->
+            mcomp type_pairs env t1 t2
         | (Tsplice t1, _, _, _) ->
             mcomp type_pairs env t1 t2'
         | (_, Tsplice t2, _, _) ->
@@ -3914,12 +3977,11 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
-(* Checks if a type is a type variable under some quotes or splices *)
+(* Checks if a type is a type variable under some quotes, splices, or evals *)
 let rec is_flexible ty =
   match get_desc ty with
   | Tvar _ -> true
-  | Tquote ty' -> is_flexible ty'
-  | Tsplice ty' -> is_flexible ty'
+  | Tquote ty' | Tsplice ty' -> is_flexible ty'
   | _ -> false
 
 (* raise Not_found rather than Unify if the module types are incompatible *)
@@ -4047,6 +4109,8 @@ let rec unify uenv t1 t2 =
         unify2 uenv t1 t2
     | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
+    (* CR jbachurski: Should [Teval] have special [unify2] cases here?
+       Why do [Tquote] and [Tsplice]? *)
     | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
@@ -4297,7 +4361,8 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
       | (Tquote t1, Tquote t2)
-      | (Tsplice t1, Tsplice t2) ->
+      | (Tsplice t1, Tsplice t2)
+      | (Teval t1, Teval t2) ->
           unify uenv t1 t2
       | (Tsplice s1, _) when is_flexible s1 ->
           set_type_desc t2' d2;
@@ -5454,9 +5519,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 (moregen inst_nongen variance type_pairs env)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
-          | (Tquote t1, Tquote t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
-          | (Tsplice t1, Tsplice t2) ->
+          | (Tquote t1, Tquote t2)
+          | (Tsplice t1, Tsplice t2)
+          | (Teval t1, Teval t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tquote t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
@@ -5921,6 +5986,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote t1, Tquote t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Teval t1, Teval t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
@@ -6632,6 +6699,10 @@ let rec build_subtype env (visited : transient_expr list)
   | Tsplice t1 ->
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tsplice t1'), c)
+      else (t, Unchanged)
+  | Teval t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Teval t1'), c)
       else (t, Unchanged)
   | Tnil ->
       if posi then
