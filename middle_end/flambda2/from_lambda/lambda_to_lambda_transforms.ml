@@ -763,8 +763,9 @@ let make_boxed_vec256 ~loc ~mode args =
         (Pvalue
            { raw_kind = Pboxedvectorval Boxed_vec256; nullable = Non_nullable }),
       [ Lprim
-          (Pmakemixedblock (0, Immutable, [| Vec128; Vec128 |], mode), args, loc)
-      ],
+          ( Pmakeblock (0, Immutable, Shape [| Vec128; Vec128 |], mode),
+            args,
+            loc ) ],
       loc )
 
 let boxed_vec256_mixed_layout =
