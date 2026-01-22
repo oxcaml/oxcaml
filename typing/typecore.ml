@@ -4018,7 +4018,8 @@ let rec final_subexpression exp =
 
 let is_prim ~name funct =
   match funct.exp_desc with
-  | Texp_ident (_, _, {val_kind=Val_prim{Primitive.prim_name; _}}, Id_prim _, _, _) ->
+  | Texp_ident (_, _, {val_kind=Val_prim{Primitive.prim_name; _}}, Id_prim _, _,
+      _) ->
       prim_name = name
   | _ -> false
 
@@ -4607,8 +4608,9 @@ let rec is_nonexpansive exp =
   | Texp_assert (exp, _) ->
       is_nonexpansive exp
   | Texp_apply (
-      { exp_desc = Texp_ident (_, _, {val_kind = Val_prim prim}, Id_prim _, _, _) },
-      args, _, _, _) ->
+      { exp_desc =
+        Texp_ident (_, _, {val_kind = Val_prim prim}, Id_prim _, _, _) },
+        args, _, _, _) ->
      is_nonexpansive_prim prim args
   | Texp_array (_, _, _ :: _, _)
   | Texp_apply _
@@ -7568,8 +7570,8 @@ and type_expect_
       | Texp_lazy _ -> unsupported Lazy
       | Texp_object _ -> unsupported Object
       | Texp_pack _ -> unsupported Module
-      | Texp_apply({ exp_desc = Texp_ident(_, _, {val_kind = Val_prim _}, _, _, _)},
-          _, _, _, _)
+      | Texp_apply({ exp_desc =
+          Texp_ident(_, _, {val_kind = Val_prim _}, _, _, _)}, _, _, _, _)
           (* [stack_ (prim foo)] will be checked by [transl_primitive_application]. *)
           (* CR zqian: Move/Copy [Lambda.primitive_may_allocate] to [typing], then we can
           check primitive allocation here, and also improve the logic in [type_ident]. *)
