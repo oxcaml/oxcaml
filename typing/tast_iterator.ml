@@ -37,6 +37,8 @@ type iterator =
     jkind_annotation: iterator -> Parsetree.jkind_annotation -> unit;
     location: iterator -> Location.t -> unit;
     modalities: iterator -> modalities -> unit;
+    (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
+       we should add an gadt parameter that determines the type of 'a. *)
     modes: 'a. iterator -> 'a modes -> unit;
     module_binding: iterator -> module_binding -> unit;
     module_coercion: iterator -> module_coercion -> unit;

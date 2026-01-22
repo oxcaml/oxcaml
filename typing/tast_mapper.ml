@@ -43,6 +43,8 @@ type mapper =
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
+    (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
+       we should add an gadt parameter that determines the type of 'a. *)
     modes: 'a. mapper -> 'a modes -> 'a modes;
     module_binding: mapper -> module_binding -> module_binding;
     module_coercion: mapper -> module_coercion -> module_coercion;
