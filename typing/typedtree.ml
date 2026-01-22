@@ -548,7 +548,7 @@ and module_expr =
 
 and module_type_constraint =
   Tmodtype_implicit
-| Tmodtype_explicit of module_type * Mode.Alloc.Const.Option.t modes
+| Tmodtype_explicit of module_type * Mode.Value.lr modes
 
 and functor_parameter =
   | Unit

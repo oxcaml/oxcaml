@@ -831,7 +831,7 @@ and module_expr =
 and module_type_constraint =
   | Tmodtype_implicit
   (** The module type constraint has been synthesized during typechecking. *)
-  | Tmodtype_explicit of module_type * Mode.Alloc.Const.Option.t modes
+  | Tmodtype_explicit of module_type * Mode.Value.lr modes
   (** The module type was in the source file. *)
 
 and functor_parameter =

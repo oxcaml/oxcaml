@@ -2446,7 +2446,9 @@ and transl_modtype_decl_aux env
 and transl_recmodule_modtypes env ~sig_modalities sdecls =
   let make_env curr =
     List.fold_left (fun env (id_shape, _, md, mode, _, _) ->
-      let mode = Option.map (fun (m, _) -> Mode.Value.disallow_right m) mode in
+      let mode =
+        Option.map (fun m -> Mode.Value.disallow_right m.mode_modes) mode
+      in
       Option.fold ~none:env ~some:(fun (id, shape) ->
         Env.add_module_declaration ~check:true ~shape ~arg:true
           id Mp_present md ?mode env
@@ -2528,7 +2530,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
               |> Alloc.of_const
               |> alloc_as_value
             in
-            mmode, tmmode) smmode
+            { tmmode with mode_modes = mmode }) smmode
           in
          (id_shape, pmd.pmd_name, md, mmode, (), ()))
       ids sdecls
@@ -2732,7 +2734,7 @@ let check_recmodule_inclusion env bindings =
       let bindings1 =
         List.map
           (fun (id, _name, _mty_decl, _modl,
-                mty_actual, _mmode, _tmmode, _attrs, _loc, shape, _uid) ->
+                mty_actual, _mmode, _attrs, _loc, shape, _uid) ->
              let ids =
                Option.map
                  (fun id -> (id, Ident.create_scoped ~scope (Ident.name id))) id
@@ -2768,11 +2770,13 @@ let check_recmodule_inclusion env bindings =
       (* Base case: check inclusion of s(mty_actual) in s(mty_decl)
          and insert coercion if needed *)
       let check_inclusion
-            (id, name, mty_decl, modl, mty_actual, mode_decl, tmode_decl, attrs,
+            (id, name, mty_decl, modl, mty_actual, mode_decl, attrs,
              loc, shape, uid) =
         let mty_decl' = Subst.modtype (Rescope scope) s mty_decl.mty_type
         and mty_actual' = subst_and_strengthen scope s id mty_actual in
-        let modes : Includemod.modes = Specific (modl.mod_mode, mode_decl) in
+        let modes : Includemod.modes =
+          Specific (modl.mod_mode, mode_decl.mode_modes)
+        in
         let coercion, shape =
           try
             Includemod.modtypes_constraint ~shape
@@ -2782,9 +2786,9 @@ let check_recmodule_inclusion env bindings =
             raise(Error(modl.mod_loc, env, Not_included msg)) in
         let modl' =
             { mod_desc = Tmod_constraint(modl, mty_decl.mty_type,
-                Tmodtype_explicit (mty_decl, tmode_decl), coercion);
+                Tmodtype_explicit (mty_decl, mode_decl), coercion);
               mod_type = mty_decl.mty_type;
-              mod_mode = Value.disallow_right mode_decl, None;
+              mod_mode = Value.disallow_right mode_decl.mode_modes, None;
               mod_env = env;
               mod_loc = modl.mod_loc;
               mod_attributes = [];
@@ -3042,10 +3046,12 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       (* Only hold locks if coercion *)
       let hold_locks = Option.is_some smty in
       let tmode = Typemode.transl_mode_annots smode in
-      let mode = new_mode_var_from_annots tmode.mode_modes in
+      let mode =
+        { tmode with mode_modes = new_mode_var_from_annots tmode.mode_modes }
+      in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
-          anchor env ~expected_mode:(mode |> Value.disallow_left) sarg
+          anchor env ~expected_mode:(mode.mode_modes |> Value.disallow_left) sarg
       in
       let md, final_shape =
         match smty with
@@ -3056,13 +3062,13 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
             currently impossible because inferred modalities can't be on the
             RHS. *)
             let arg_mode = Typedtree.mode_without_locks_exn arg.mod_mode in
-            submode ~loc:sarg.pmod_loc ~env arg_mode mode;
-            { arg with mod_mode = (Mode.Value.disallow_right mode, None)},
+            submode ~loc:sarg.pmod_loc ~env arg_mode mode.mode_modes;
+            { arg with mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
             arg_shape
         | Some smty ->
             let mty = transl_modtype env smty in
-            wrap_constraint_with_shape env true arg mty.mty_type mode
-              arg_shape (Tmodtype_explicit (mty, tmode))
+            wrap_constraint_with_shape env true arg mty.mty_type mode.mode_modes
+              arg_shape (Tmodtype_explicit (mty, mode))
       in
       { md with
         mod_loc = smod.pmod_loc;
@@ -3679,13 +3685,12 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                let mty' =
                  enrich_module_type anchor name.txt modl.mod_type newenv
                in
-               let mode, tmode = Option.get mode in
-               (id, name, mty, modl, mty', mode, tmode, attrs, loc, shape,
+               (id, name, mty, modl, mty', Option.get mode, attrs, loc, shape,
                 uid))
             decls sbind in
         let newenv = (* allow aliasing recursive modules from outside *)
           List.fold_left
-            (fun env (id_opt, _, mty, _, _, mode, _, attrs, loc, shape, uid) ->
+            (fun env (id_opt, _, mty, _, _, mode, attrs, loc, shape, uid) ->
                match id_opt with
                | None -> env
                | Some id ->
@@ -3699,7 +3704,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                      }
                    in
                    Env.add_module_declaration ~check:true ~shape
-                     id Mp_present mdecl ~mode env
+                     id Mp_present mdecl ~mode:mode.mode_modes env
             )
             env bindings1
         in

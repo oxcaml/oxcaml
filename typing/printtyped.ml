@@ -294,10 +294,16 @@ let alloc_modes_opt i ppf ms =
   modes ~pr:print_alloc_modes_opt i ppf ms
 
 let alloc_modes_var i ppf ms =
-  let print_alloc_modes_opt i ppf m =
+  let print_alloc_modes_var i ppf m =
     line i ppf "%a\n" (Mode.Alloc.print ()) m
   in
-  modes ~pr:print_alloc_modes_opt i ppf ms
+  modes ~pr:print_alloc_modes_var i ppf ms
+
+let value_modes_var i ppf ms =
+  let print_value_modes_var i ppf m =
+    line i ppf "%a\n" (Mode.Value.print ()) m
+  in
+  modes ~pr:print_value_modes_var i ppf ms
 
 let moda_desc i ppf modalities_annot =
   let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.Value.atom =
@@ -1208,7 +1214,7 @@ and module_expr i ppf x =
       line i ppf "Tmod_constraint\n";
       module_expr i ppf me;
       module_type i ppf mt;
-      alloc_modes_opt i ppf modes;
+      value_modes_var i ppf modes;
   | Tmod_constraint (me, _, Tmodtype_implicit, _) -> module_expr i ppf me
   | Tmod_unpack (e, _) ->
       line i ppf "Tmod_unpack\n";
