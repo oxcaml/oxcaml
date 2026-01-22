@@ -13,8 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
-
 module Layout = Jkind_types.Sort.Const
 type base_layout = Jkind_types.Sort.base
 
@@ -584,7 +582,7 @@ and 'a complex_constructor_argument =
 
 and constructor_representation = mixed_product_shape
 
-and mixed_product_shape = Layout.t iarray
+and mixed_product_shape = Layout.t array
 
 let poly_variant_constructors_map f pvs =
   List.map
@@ -612,7 +610,7 @@ let equal_complex_constructor eq
     { name = name1; kind = kind1; args = args1 }
     { name = name2; kind = kind2; args = args2 } =
   String.equal name1 name2 &&
-  Misc.Stdlib.Iarray.equal Layout.equal kind1 kind2 &&
+  Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
 
 let rec equal_desc0 d1 d2 =
@@ -687,7 +685,7 @@ and equal_record_kind k1 k2 =
   | Record_unboxed_product, Record_unboxed_product -> true
   | Record_boxed, Record_boxed -> true
   | Record_mixed lys1, Record_mixed lys2 ->
-    Misc.Stdlib.Iarray.equal Layout.equal lys1 lys2
+    Misc.Stdlib.Array.equal Layout.equal lys1 lys2
   | Record_floats, Record_floats -> true
   | (Record_unboxed | Record_unboxed_product | Record_boxed | Record_mixed _ |
      Record_floats), _

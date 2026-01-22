@@ -15,7 +15,6 @@
 
 (* Auxiliaries for type-based optimizations, e.g. array kinds *)
 
-open Iarray_shim
 open Path
 open Types
 open Typedtree
@@ -749,7 +748,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   | Word -> num_nodes_visited, Word
   | Untagged_immediate -> num_nodes_visited, Untagged_immediate
   | Product fs ->
-    let unknown () = Iarray.init (Iarray.length fs) (fun _ -> None) in
+    let unknown () = Array.init (Array.length fs) (fun _ -> None) in
     let types =
       match ty with
       | None -> unknown ()
@@ -757,12 +756,12 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         let ty = scrape_ty env ty in
         match get_desc ty with
         | Tunboxed_tuple fields ->
-          Misc.Stdlib.Iarray.of_list_map (fun (_, field) -> Some field) fields
+          Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
         | Tconstr(p, _, _) ->
           begin match (Env.find_type p env).type_kind with
           | exception Not_found -> unknown ()
           | Type_record_unboxed_product (lbls, _, _) ->
-            Misc.Stdlib.Iarray.of_list_map (fun {Types.ld_type} -> Some ld_type)
+            Misc.Stdlib.Array.of_list_map (fun {Types.ld_type} -> Some ld_type)
               lbls
           | Type_variant _ | Type_record _ | Type_abstract _ | Type_open ->
             (* We don't need to handle [@@unboxed] records/variants here,
@@ -774,16 +773,16 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         | Tquote _ | Tsplice _ | Tof_kind _ -> unknown ()
     in
     let (_, num_nodes_visited), kinds =
-      Iarray.fold_left_map (fun (i, num_nodes_visited) field ->
+      Array.fold_left_map (fun (i, num_nodes_visited) field ->
         let num_nodes_visited, kind =
           value_kind_mixed_block_field env ~loc ~visited ~depth
-            ~num_nodes_visited field types.:(i)
+            ~num_nodes_visited field types.(i)
         in
         (i + 1, num_nodes_visited), kind
       ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
-  | Void -> num_nodes_visited, Product Iarray.empty
+  | Void -> num_nodes_visited, Product [||]
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =
@@ -792,12 +791,12 @@ and value_kind_mixed_block
       (fun (i, num_nodes_visited) typ ->
          let num_nodes_visited, kind =
            value_kind_mixed_block_field env ~loc ~visited ~depth
-             ~num_nodes_visited shape.:(i) typ
+             ~num_nodes_visited shape.(i) typ
          in
          (i+1, num_nodes_visited), kind)
       (0, num_nodes_visited) types
   in
-  num_nodes_visited, Constructor_mixed (Iarray.of_list shape)
+  num_nodes_visited, Constructor_mixed (Array.of_list shape)
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       (cstrs : Types.constructor_declaration list) rep =
@@ -887,7 +886,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         List.for_all (fun lbl -> all_void_opt lbl.ld_sort) lbls
     in
     let rec mixed_block_shape_is_empty shape =
-      Iarray.for_all mixed_block_element_is_empty shape
+      Array.for_all mixed_block_element_is_empty shape
     and mixed_block_element_is_empty (element : _ mixed_block_element) =
       match element with
       | Product shape -> mixed_block_shape_is_empty shape
@@ -904,7 +903,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            match cstrs_and_sorts.:(idx) with
+            match cstrs_and_sorts.(idx) with
             | None -> None
             | Some (cstr_shape, _) ->
                 let (is_mutable, num_nodes_visited), fields =

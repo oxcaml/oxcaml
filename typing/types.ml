@@ -15,8 +15,6 @@
 
 (* Representation of types and declarations *)
 
-open Iarray_shim
-
 open Allowance
 open Asttypes
 
@@ -578,23 +576,23 @@ and mixed_block_element =
   | Product of mixed_product_shape
   | Void
 
-and mixed_product_shape = mixed_block_element iarray
+and mixed_product_shape = mixed_block_element array
 
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
-  | Record_boxed of Jkind_types.Sort.Const.t iarray
+  | Record_boxed of Jkind_types.Sort.Const.t array
   | Record_float
   | Record_ufloat
   | Record_mixed of mixed_product_shape
 
 and record_unboxed_product_representation =
-  | Record_unboxed_product of Jkind_types.Sort.Const.t iarray
+  | Record_unboxed_product of Jkind_types.Sort.Const.t array
 
 and variant_representation =
   | Variant_unboxed
   | Variant_boxed of (constructor_representation *
-                      Jkind_types.Sort.Const.t iarray) option iarray
+                      Jkind_types.Sort.Const.t array) option array
   | Variant_extensible
   | Variant_with_null
 
@@ -909,7 +907,7 @@ let rec equal_mixed_block_element e1 e2 =
   | Void, Void
     -> true
   | Product es1, Product es2
-    -> Misc.Stdlib.Iarray.equal equal_mixed_block_element es1 es2
+    -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
   | ( Value | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
     | Product _ | Void ), _
@@ -925,7 +923,7 @@ let rec compare_mixed_block_element e1 e2 =
   | Void, Void
     -> 0
   | Product es1, Product es2
-    -> Misc.Stdlib.Iarray.compare compare_mixed_block_element es1 es2
+    -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
   | Value, _ -> -1
   | _, Value -> 1
   | Float_boxed, _ -> -1
@@ -956,7 +954,7 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Void -> 1
 
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  Misc.Stdlib.Iarray.equal equal_mixed_block_element r1 r2
+  Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
 
 let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
   | Constructor_uniform_value, Constructor_uniform_value -> true
@@ -968,9 +966,9 @@ let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
       true
   | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
-      Misc.Stdlib.Iarray.equal (Option.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
+      Misc.Stdlib.Array.equal (Option.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
           equal_constructor_representation cstr1 cstr2
-          && Misc.Stdlib.Iarray.equal Jkind_types.Sort.Const.equal
+          && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
                sorts1 sorts2))
         cstrs_and_sorts1
         cstrs_and_sorts2
@@ -990,7 +988,7 @@ let equal_record_representation r1 r2 = match r1, r2 with
       ignore (cr2 : constructor_representation);
       equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
   | Record_boxed sorts1, Record_boxed sorts2 ->
-      Misc.Stdlib.Iarray.equal Jkind_types.Sort.Const.equal sorts1 sorts2
+      Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
@@ -1002,7 +1000,7 @@ let equal_record_representation r1 r2 = match r1, r2 with
 
 let equal_record_unboxed_product_representation r1 r2 = match r1, r2 with
   | Record_unboxed_product sorts1, Record_unboxed_product sorts2 ->
-      Misc.Stdlib.Iarray.equal Jkind_types.Sort.Const.equal sorts1 sorts2
+      Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
 
 let may_equal_constr c1 c2 =
   c1.cstr_arity = c2.cstr_arity
@@ -1022,7 +1020,7 @@ type 'a gen_label_description =
     lbl_sort: Jkind_types.Sort.Const.t option;
                                         (* Sort of the argument *)
     lbl_pos: int;                       (* Position in type *)
-    lbl_all: 'a gen_label_description iarray Lazy.t;
+    lbl_all: 'a gen_label_description array;
                                         (* All the labels in this type *)
     lbl_repres: 'a option;              (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
@@ -1131,7 +1129,7 @@ let rec mixed_block_element_to_string = function
   | Product es ->
     "Product ["
     ^ (String.concat ", "
-         (Iarray.to_list (Iarray.map mixed_block_element_to_string es)))
+         (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
   | Void -> "Void"
 
@@ -1152,7 +1150,7 @@ let mixed_block_element_to_lowercase_string = function
   | Product es ->
     "product ["
     ^ (String.concat ", "
-         (Iarray.to_list (Iarray.map mixed_block_element_to_string es)))
+         (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
   | Void -> "void"
 

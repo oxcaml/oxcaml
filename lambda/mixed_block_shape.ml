@@ -26,8 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open Iarray_shim
-
 type path = int list
 
 module Singleton_mixed_block_element = struct
@@ -65,22 +63,22 @@ module Singleton_mixed_block_element = struct
     | Untagged_immediate -> Format.fprintf ppf "Untagged_immediate"
 end
 
-type 'a shape = 'a Singleton_mixed_block_element.t iarray
+type 'a shape = 'a Singleton_mixed_block_element.t array
 
-type 'a shape_with_paths = ('a Singleton_mixed_block_element.t * path) iarray
+type 'a shape_with_paths = ('a Singleton_mixed_block_element.t * path) array
 
 type 'a tree =
   | Leaf of
       { element : 'a Singleton_mixed_block_element.t;
         new_index : int
       }
-  | Node of { children : 'a tree iarray }
+  | Node of { children : 'a tree array }
 
 type 'a t =
   { prefix : 'a shape;
     suffix : 'a shape;
     flattened_reordered_shape : 'a shape_with_paths;
-    forest : 'a tree iarray;
+    forest : 'a tree array;
     print_locality : Format.formatter -> 'a -> unit
   }
 
@@ -88,11 +86,11 @@ let value_prefix t = t.prefix
 
 let flat_suffix t = t.suffix
 
-let value_prefix_len t = Iarray.length t.prefix
+let value_prefix_len t = Array.length t.prefix
 
-let flat_suffix_len t = Iarray.length t.suffix
+let flat_suffix_len t = Array.length t.suffix
 
-let flattened_reordered_shape t = Iarray.map fst t.flattened_reordered_shape
+let flattened_reordered_shape t = Array.map fst t.flattened_reordered_shape
 
 let print_indentation ppf k =
   for _ = 1 to k do
@@ -116,7 +114,7 @@ let rec print_tree print_locality ~indent ~index ppf tree =
     print_trees print_locality ~indent:(succ indent) ppf children
 
 and print_trees print_locality ~indent ppf trees =
-  Iarray.iteri
+  Array.iteri
     (fun index tree -> print_tree print_locality ~indent ~index ppf tree)
     trees
 
@@ -125,7 +123,7 @@ let print ppf { forest; print_locality; _ } =
   print_trees print_locality ~indent:0 ppf forest
 
 let rec flatten_tree_array arr =
-  Iarray.to_list arr
+  Array.to_list arr
   |> List.concat_map (fun tree ->
          match tree with
          | Leaf { new_index; _ } -> [new_index]
@@ -133,30 +131,30 @@ let rec flatten_tree_array arr =
 
 let new_indexes_to_old_indexes t =
   let old_indexes_to_new_indexes =
-    flatten_tree_array t.forest |> Iarray.of_list
+    flatten_tree_array t.forest |> Array.of_list
   in
-  let result = Array.make (Iarray.length old_indexes_to_new_indexes) (-1) in
-  Iarray.iteri
+  let result = Array.make (Array.length old_indexes_to_new_indexes) (-1) in
+  Array.iteri
     (fun old_index new_index -> result.(new_index) <- old_index)
     old_indexes_to_new_indexes;
-  result |> Iarray.of_array
+  result
 
 let new_index_to_old_path t new_index =
-  snd t.flattened_reordered_shape.:(new_index)
+  snd t.flattened_reordered_shape.(new_index)
 
-let new_block_length t = Iarray.length t.flattened_reordered_shape
+let new_block_length t = Array.length t.flattened_reordered_shape
 
 let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
   let original_path = path in
   match path with
   | [] -> Misc.fatal_errorf "No path provided:@ %a" print t
   | index :: path ->
-    let tree = forest.:(index) in
+    let tree = forest.(index) in
     let rec lookup_path' path tree =
       match path, tree with
       | [], Leaf { new_index; _ } -> [new_index]
       | index :: path, Node { children; _ } ->
-        lookup_path' path children.:(index)
+        lookup_path' path children.(index)
       | [], Node { children } -> flatten_tree_array children
       | _ :: _, Leaf _ ->
         Misc.fatal_errorf "Invalid path:@ %a@ shape: %a"
@@ -194,14 +192,14 @@ let rec flatten_one :
     int -> 'a Lambda.mixed_block_element -> 'a shape_with_paths =
  fun index element ->
   match singleton_or_product_of_mixed_block_element element with
-  | Singleton element -> Iarray.make 1 (element, [index])
+  | Singleton element -> [| element, [index] |]
   | Product sub_elements ->
     flatten_list sub_elements
-    |> Iarray.map (fun (sub_element, path) -> sub_element, index :: path)
+    |> Array.map (fun (sub_element, path) -> sub_element, index :: path)
 
-and flatten_list : 'a Lambda.mixed_block_element iarray -> 'a shape_with_paths =
+and flatten_list : 'a Lambda.mixed_block_element array -> 'a shape_with_paths =
  fun sub_elements ->
-  Iarray.mapi flatten_one sub_elements |> Misc.Stdlib.Iarray.concat_iarrays
+  Array.mapi flatten_one sub_elements |> Misc.Stdlib.Array.concat_arrays
 
 let rec build_tree_one :
     (path, int) Hashtbl.t ->
@@ -227,21 +225,21 @@ let rec build_tree_one :
 and build_tree_list :
     (path, int) Hashtbl.t ->
     path ->
-    'a Lambda.mixed_block_element iarray ->
-    'a tree iarray =
+    'a Lambda.mixed_block_element array ->
+    'a tree array =
  fun old_path_to_new_index path sub_elements ->
-  Iarray.mapi
+  Array.mapi
     (fun i sub_element ->
       build_tree_one old_path_to_new_index path i sub_element)
     sub_elements
 
 let of_mixed_block_elements ~print_locality
-    (original_shape : 'a Lambda.mixed_block_element iarray) : 'a t =
+    (original_shape : 'a Lambda.mixed_block_element array) : 'a t =
   let flattened_shape_with_paths = flatten_list original_shape in
   let prefix = ref [] in
   let suffix = ref [] in
-  for idx = Iarray.length flattened_shape_with_paths - 1 downto 0 do
-    let elem, path = flattened_shape_with_paths.:(idx) in
+  for idx = Array.length flattened_shape_with_paths - 1 downto 0 do
+    let elem, path = flattened_shape_with_paths.(idx) in
     let is_value =
       match elem with
       | Value _ -> true
@@ -253,21 +251,21 @@ let of_mixed_block_elements ~print_locality
     then prefix := (elem, path) :: !prefix
     else suffix := (elem, path) :: !suffix
   done;
-  let prefix = Iarray.of_list !prefix in
-  let suffix = Iarray.of_list !suffix in
-  let flattened_reordered_shape = Iarray.append prefix suffix in
+  let prefix = Array.of_list !prefix in
+  let suffix = Array.of_list !suffix in
+  let flattened_reordered_shape = Array.append prefix suffix in
   let new_index_to_old_path =
-    Array.make (Iarray.length flattened_reordered_shape) []
+    Array.make (Array.length flattened_reordered_shape) []
   in
-  let old_path_to_new_index = Hashtbl.create (Iarray.length original_shape) in
-  Iarray.iteri
+  let old_path_to_new_index = Hashtbl.create (Array.length original_shape) in
+  Array.iteri
     (fun new_index (_elem, old_path) ->
       new_index_to_old_path.(new_index) <- old_path;
       Hashtbl.replace old_path_to_new_index old_path new_index)
     flattened_reordered_shape;
   let forest = build_tree_list old_path_to_new_index [] original_shape in
-  { prefix = Iarray.map fst prefix;
-    suffix = Iarray.map fst suffix;
+  { prefix = Array.map fst prefix;
+    suffix = Array.map fst suffix;
     flattened_reordered_shape;
     forest;
     print_locality

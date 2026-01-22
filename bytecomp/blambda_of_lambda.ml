@@ -12,7 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
 open Blambda
 
 type tagged_integer = Scalar.Integral.Taggable.Width.t
@@ -399,7 +398,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          no ceremony is needed to box values before inserting them into
          the (normal, unmixed) block.
       *)
-      let total_len = Iarray.length shape in
+      let total_len = Array.length shape in
       pseudo_event (variadic (Make_faux_mixedblock { total_len; tag }))
     | Pmakearray (kind, _, _) ->
       pseudo_event

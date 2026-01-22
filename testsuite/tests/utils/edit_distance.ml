@@ -1,8 +1,7 @@
 (* TEST
  include config;
  include testing;
- binary_modules =
-   "config build_path_prefix_map iarray_shim misc identifiable numbers";
+ binary_modules = "config build_path_prefix_map misc identifiable numbers";
  bytecode;
 *)
 

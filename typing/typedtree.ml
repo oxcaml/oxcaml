@@ -15,7 +15,6 @@
 
 (* Abstract syntax tree after typing *)
 
-open Iarray_shim
 open Asttypes
 open Types
 open Mode
@@ -131,7 +130,7 @@ let aliased_many_use =
 
 type record_sorts =
   | Fixed
-  | Variable of Jkind.Sort.Const.t iarray
+  | Variable of Jkind.Sort.Const.t array
 
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
@@ -250,14 +249,14 @@ and expression_desc =
       (Jkind.sort * expression) list * alloc_mode option
   | Texp_variant of label * (expression * alloc_mode) option
   | Texp_record of {
-      fields : ( Types.label_description * Jkind.sort * record_label_definition ) iarray;
+      fields : ( Types.label_description * Jkind.sort * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
     }
   | Texp_record_unboxed_product of {
       fields :
-        ( Types.unboxed_label_description * Jkind.sort * record_label_definition ) iarray;
+        ( Types.unboxed_label_description * Jkind.sort * record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -1436,13 +1435,13 @@ let rec fold_antiquote_exp f  acc exp =
         ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
         expo
   | Texp_record { fields; extended_expression; _} ->
-      let acc = Iarray.fold_left (fold_antiquote_field f) acc fields in
+      let acc = Array.fold_left (fold_antiquote_field f) acc fields in
       Option.fold
         ~none:acc
         ~some:(fun (e, _, _) -> fold_antiquote_exp f acc e)
         extended_expression
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
-      let acc = Iarray.fold_left (fold_antiquote_field f) acc fields in
+      let acc = Array.fold_left (fold_antiquote_field f) acc fields in
       Option.fold
         ~none:acc
         ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
@@ -1577,7 +1576,7 @@ and fold_antiquote_binding_op f acc op =
 
 let label_sort label record_sorts =
   match record_sorts with
-  | Variable sorts -> sorts.:(label.lbl_pos)
+  | Variable sorts -> sorts.(label.lbl_pos)
   | Fixed ->
       begin match label.lbl_sort with
       | Some sort -> sort
@@ -1590,15 +1589,13 @@ let label_all_sorts label record_sorts =
   match record_sorts with
   | Variable sorts -> sorts
   | Fixed ->
-      let lbl_sorts =
-        Iarray.map (fun lbl -> lbl.lbl_sort) (Lazy.force label.lbl_all)
-      in
-      begin match Misc.Stdlib.Iarray.all_somes lbl_sorts with
+      let lbl_sorts = Array.map (fun lbl -> lbl.lbl_sort) label.lbl_all in
+      begin match Misc.Stdlib.Array.all_somes lbl_sorts with
       | Some sorts -> sorts
       | None ->
           begin match
-            Iarray.find_opt (fun lbl -> Option.is_none lbl.lbl_sort)
-              (Lazy.force label.lbl_all)
+            Array.find_opt (fun lbl -> Option.is_none lbl.lbl_sort)
+              label.lbl_all
           with
           | None -> assert false
           | Some lbl ->

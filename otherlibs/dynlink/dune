@@ -85,7 +85,6 @@
   zero_alloc_annotations
   clflags
   debug
-  iarray_shim
   language_extension_kernel
   language_extension
   profile
@@ -211,8 +210,6 @@
 (copy_files ../../utils/clflags.ml)
 
 (copy_files ../../utils/debug.ml)
-
-(copy_files ../../utils/iarray_shim.ml)
 
 (copy_files ../../utils/language_extension_kernel.ml)
 
@@ -375,8 +372,6 @@
 (copy_files ../../utils/clflags.mli)
 
 (copy_files ../../utils/debug.mli)
-
-(copy_files ../../utils/iarray_shim.mli)
 
 (copy_files ../../utils/language_extension_kernel.mli)
 
@@ -584,7 +579,6 @@
    %{deps}))
  (deps
   ; NOTE: Be sure to keep these arguments in dependency order!
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Iarray_shim.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Runtimetags.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Binutils.cmo
@@ -684,7 +678,6 @@
    %{deps}))
  (deps
   ; NOTE: Be sure to keep these arguments in dependency order!
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Iarray_shim.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Runtimetags.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Binutils.cmx

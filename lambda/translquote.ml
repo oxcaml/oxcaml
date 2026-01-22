@@ -28,7 +28,6 @@
 
 (* CR metaprogramming aivaskovic: This file has not been code reviewed *)
 
-open Iarray_shim
 open Asttypes
 open Lambda
 open Misc
@@ -2954,7 +2953,7 @@ and quote_expression_desc transl stage e =
       Exp_desc.variant loc variant argo
     | Texp_record record ->
       let lbl_exps =
-        Iarray.map
+        Array.map
           (fun (lbl, _, def) ->
             let lbl = quote_record_field env loc lbl in
             let exp =
@@ -2971,7 +2970,7 @@ and quote_expression_desc transl stage e =
           (fun (e, _, _) -> quote_expression transl stage e)
           record.extended_expression
       in
-      Exp_desc.record loc (Iarray.to_list lbl_exps) base
+      Exp_desc.record loc (Array.to_list lbl_exps) base
     | Texp_field { record = rcd; lid; label = lbl; _ } ->
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in
@@ -3062,7 +3061,7 @@ and quote_expression_desc transl stage e =
       Exp_desc.unboxed_tuple loc tups
     | Texp_record_unboxed_product record ->
       let lbl_exps =
-        Iarray.map
+        Array.map
           (fun (lbl, _, def) ->
             let lbl = quote_record_field env loc lbl in
             let exp =
@@ -3079,7 +3078,7 @@ and quote_expression_desc transl stage e =
           (fun (e, _) -> quote_expression transl stage e)
           record.extended_expression
       in
-      Exp_desc.unboxed_record_product loc (Iarray.to_list lbl_exps) base
+      Exp_desc.unboxed_record_product loc (Array.to_list lbl_exps) base
     | Texp_unboxed_field { record = rcd; lid; label = lbl; _ } ->
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in

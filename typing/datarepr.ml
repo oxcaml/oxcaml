@@ -16,8 +16,6 @@
 (* Compute constructor and label descriptions from type declarations,
    determining their representation. *)
 
-open Iarray_shim
-
 open Types
 open Btype
 
@@ -126,7 +124,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       begin match cd_args with
       | Cstr_tuple [{ ca_sort = Some sort }]
       | Cstr_record [{ ld_sort = Some sort }] ->
-        Iarray.make 1 (Some (Constructor_uniform_value, Iarray.make 1 sort)),
+        [| Some (Constructor_uniform_value, [| sort |]) |],
         true
       | Cstr_tuple [{ ca_sort = None }]
       | Cstr_record [{ ld_sort = None }] ->
@@ -140,14 +138,13 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       (* CR layouts v3.5: this hardcodes ['a or_null]. Fix when we allow
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
-      [| Some (Constructor_uniform_value, Iarray.empty)
-       ; Some (Constructor_uniform_value, Iarray.make 1 Jkind.Sort.Const.value) |]
-      |> Iarray.of_array,
+      [| Some (Constructor_uniform_value, [| |])
+       ; Some (Constructor_uniform_value, [| Jkind.Sort.Const.value |]) |],
       false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
-    Iarray.map
+    Array.map
       (fun shape_and_arg_sorts_opt ->
          let all_void =
            match shape_and_arg_sorts_opt with
@@ -159,7 +156,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
                 aren't all void. *)
              false
            | Some (_, sorts) ->
-             Iarray.for_all Jkind.Sort.Const.all_void sorts
+             Array.for_all Jkind.Sort.Const.all_void sorts
          in
          (* constant constructors are constructors of non-[@@unboxed] variants
             with 0 bits of payload *)
@@ -176,8 +173,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Some ty_res' -> ty_res'
       | None -> ty_res
     in
-    let cstr_shape = Option.map fst cstr_shapes_and_arg_sorts.:(src_index) in
-    let cstr_constant = cstr_constant.:(src_index) in
+    let cstr_shape = Option.map fst cstr_shapes_and_arg_sorts.(src_index) in
+    let cstr_constant = cstr_constant.(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
       if cstr_constant
       then const_tag, 1 + const_tag, nonconst_tag
@@ -252,38 +249,50 @@ let extension_descr ~current_unit path_ext ext =
       cstr_uid = ext.ext_uid;
     }
 
-let label_descrs ty_res lbls repres priv =
-  let rec ids_and_labels =
-    lazy begin
-      List.mapi
-        (fun pos l ->
-          let lbl =
-            { lbl_name = Ident.name l.ld_id;
-              lbl_res = ty_res;
-              lbl_arg = l.ld_type;
-              lbl_mut = l.ld_mutable;
-              lbl_modalities = l.ld_modalities;
-              lbl_sort = l.ld_sort;
-              lbl_pos = pos;
-              lbl_all = all_labels;
-              lbl_repres = repres;
-              lbl_private = priv;
-              lbl_loc = l.ld_loc;
-              lbl_attributes = l.ld_attributes;
-              lbl_uid = l.ld_uid;
-            } in
-          l.ld_id, lbl)
-      lbls
-    end
-  and all_labels =
-    lazy begin
-      List.map (fun (_, lbl) -> lbl) (Lazy.force ids_and_labels)
-      |> Iarray.of_list
-    end
+let none =
+  create_expr (Ttuple []) ~level:(-1) ~scope:Btype.generic_level ~id:(-1)
+    (* Clearly ill-formed type *)
+
+let dummy_label (type rep) (record_form : rep record_form)
+    : rep gen_label_description =
+  let repres : rep = match record_form with
+  | Legacy -> Record_unboxed
+  | Unboxed_product -> Record_unboxed_product [||]
   in
-  (* Make sure this can all be marshalled by forcing it now *)
-  ignore (Lazy.force all_labels : _ gen_label_description iarray);
-  Lazy.force ids_and_labels
+  { lbl_name = ""; lbl_res = none; lbl_arg = none;
+    lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
+    lbl_sort = Some Jkind.Sort.Const.void;
+    lbl_pos = -1; lbl_all = [||];
+    lbl_repres = Some repres;
+    lbl_private = Public;
+    lbl_loc = Location.none;
+    lbl_attributes = [];
+    lbl_uid = Uid.internal_not_actually_unique;
+  }
+
+let label_descrs record_form ty_res lbls repres priv =
+  let all_labels = Array.make (List.length lbls) (dummy_label record_form) in
+  let rec describe_labels pos = function
+      [] -> []
+    | l :: rest ->
+        let lbl =
+          { lbl_name = Ident.name l.ld_id;
+            lbl_res = ty_res;
+            lbl_arg = l.ld_type;
+            lbl_mut = l.ld_mutable;
+            lbl_modalities = l.ld_modalities;
+            lbl_sort = l.ld_sort;
+            lbl_pos = pos;
+            lbl_all = all_labels;
+            lbl_repres = repres;
+            lbl_private = priv;
+            lbl_loc = l.ld_loc;
+            lbl_attributes = l.ld_attributes;
+            lbl_uid = l.ld_uid;
+          } in
+        all_labels.(pos) <- lbl;
+        (l.ld_id, lbl) :: describe_labels (pos+1) rest in
+  describe_labels 0 lbls
 
 exception Constr_not_found
 
@@ -313,7 +322,7 @@ let constructors_of_type ~current_unit ty_path decl =
 let labels_of_type ty_path decl =
   match decl.type_kind with
   | Type_record(labels, rep, _) ->
-      label_descrs (newgenconstr ty_path decl.type_params)
+      label_descrs Legacy (newgenconstr ty_path decl.type_params)
         labels rep decl.type_private
   | Type_record_unboxed_product _
   | Type_variant _ | Type_abstract _ | Type_open -> []
@@ -321,7 +330,7 @@ let labels_of_type ty_path decl =
 let unboxed_labels_of_type ty_path decl =
   match decl.type_kind with
   | Type_record_unboxed_product(labels, rep, _) ->
-      label_descrs (newgenconstr ty_path decl.type_params)
+      label_descrs Unboxed_product (newgenconstr ty_path decl.type_params)
         labels rep decl.type_private
   | Type_record _
   | Type_variant _ | Type_abstract _ | Type_open -> []

@@ -183,7 +183,6 @@
   language_extension
   zero_alloc_utils
   zero_alloc_annotations
-  iarray_shim
   ;; PARSING
   location
   longident

@@ -15,8 +15,6 @@
 
 (* The "lambda" intermediate code *)
 
-open Iarray_shim
-
 open Asttypes
 
 module Scalar = Scalar
@@ -497,12 +495,12 @@ and 'a mixed_block_element =
   | Vec512
   | Word
   | Untagged_immediate
-  | Product of 'a mixed_block_element iarray
+  | Product of 'a mixed_block_element array
 
-and mixed_block_shape = unit mixed_block_element iarray
+and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element iarray
+  = locality_mode mixed_block_element array
 
 and constructor_shape =
   | Constructor_uniform of value_kind list

@@ -1,6 +1,6 @@
 (* TEST
  include config;
- binary_modules = "config build_path_prefix_map iarray_shim misc";
+ binary_modules = "config build_path_prefix_map misc";
  bytecode;
 *)
 

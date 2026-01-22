@@ -15,7 +15,6 @@
 
 (* Detection of partial matches and unused match cases. *)
 
-open Iarray_shim
 open Misc
 open Asttypes
 open Types
@@ -198,12 +197,10 @@ let all_coherent column =
       List.equal
         (fun (lbl1, _) (lbl2, _) -> Option.equal String.equal lbl1 lbl2) l1 l2
     | Record ((lbl1 :: _), _, _), Record ((lbl2 :: _), _, _) ->
-      Iarray.length (Lazy.force lbl1.lbl_all)
-      = Iarray.length (Lazy.force lbl2.lbl_all)
+      Array.length lbl1.lbl_all = Array.length lbl2.lbl_all
     | Record_unboxed_product (lbl1 :: _, _, _),
       Record_unboxed_product (lbl2 :: _, _, _) ->
-      Iarray.length (Lazy.force lbl1.lbl_all)
-      = Iarray.length (Lazy.force lbl2.lbl_all)
+      Array.length lbl1.lbl_all = Array.length lbl2.lbl_all
     | Array (am1, _, _), Array (am2, _, _) -> am1 = am2
     | Any, _
     | _, Any
@@ -974,13 +971,13 @@ let should_extend ext env = match ext with
 let fake_sort_const : Jkind.Sort.Const.t = Base Bits16
 
 let fake_cstr_repr : constructor_representation =
-  Constructor_mixed (Iarray.make 1 Float32)
+  Constructor_mixed [| Float32 |]
 
 let fake_record_repr : record_representation =
-  Record_mixed (Iarray.make 1 Bits32)
+  Record_mixed [| Bits32 |]
 
 let fake_unboxed_record_repr : record_unboxed_product_representation =
-  Record_unboxed_product (Iarray.make 1 Jkind.Sort.Const.vec128)
+  Record_unboxed_product [| Jkind.Sort.Const.vec128 |]
 
 (* build a pattern from a constructor description *)
 let pat_of_constr ex_pat cstr =
@@ -1024,7 +1021,7 @@ let pats_of_type env ty =
           in
           let fake_sorts =
             List.map (fun _ -> fake_sort_const) labels
-            |> Iarray.of_list
+            |> Array.of_list
             |> fun sorts -> Variable sorts
           in
           [make_pat (Tpat_record (fields, fake_sorts, fake_record_repr,
@@ -1037,7 +1034,7 @@ let pats_of_type env ty =
           in
           let fake_sorts =
             List.map (fun _ -> fake_sort_const) labels
-            |> Iarray.of_list
+            |> Array.of_list
             |> fun sorts -> Variable sorts
           in
           [make_pat (Tpat_record_unboxed_product

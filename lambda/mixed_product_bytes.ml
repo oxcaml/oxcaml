@@ -26,8 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open Iarray_shim
-
 module Byte_count = struct
   type t = int
 
@@ -61,7 +59,7 @@ let rec count (el : _ Lambda.mixed_block_element) : t =
   | Vec256 -> { value = 0; flat = 32 }
   | Vec512 -> { value = 0; flat = 64 }
   | Product layouts ->
-    Iarray.fold_left (fun cts l -> add cts (count l)) zero layouts
+    Array.fold_left (fun cts l -> add cts (count l)) zero layouts
 
 let has_value_and_flat { value; flat } = value > 0 && flat > 0
 
@@ -89,7 +87,7 @@ module Wrt_path = struct
 
   and count_shape_wrt_path (shape : Lambda.mixed_block_shape) pos path =
     let _, totals =
-      Iarray.fold_left
+      Array.fold_left
         (fun (i, totals) el ->
           ( i + 1,
             add totals

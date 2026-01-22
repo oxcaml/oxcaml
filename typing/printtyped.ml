@@ -13,7 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
 open Asttypes
 open Format
 open Lexing
@@ -168,9 +167,6 @@ let array i f ppf a =
     line i ppf "]\n"
   end
 
-let iarray i f ppf a =
-  array i f ppf (Iarray.to_array a)
-
 let option i f ppf x =
   match x with
   | None -> line i ppf "None\n"
@@ -211,7 +207,7 @@ let sort i ppf sort =
   line i ppf "%a\n" Jkind.Sort.format sort
 
 let sort_array i ppf sorts =
-  iarray (i+1) (fun _ ppf l -> fprintf ppf "%a;@ " Jkind.Sort.Const.format l)
+  array (i+1) (fun _ ppf l -> fprintf ppf "%a;@ " Jkind.Sort.Const.format l)
     ppf sorts
 
 let tag ppf = let open Types in function
@@ -225,7 +221,7 @@ let variant_representation i ppf = let open Types in function
     line i ppf "Variant_unboxed\n"
   | Variant_boxed cstrs ->
     line i ppf "Variant_boxed %a\n"
-      (iarray (i+1) (fun _ ppf o ->
+      (array (i+1) (fun _ ppf o ->
          option (i+1) (fun _ ppf (_cstr, sorts) ->
            sort_array (i+1) ppf sorts) ppf o))
       cstrs
@@ -246,7 +242,7 @@ let record_representation i ppf = let open Types in function
   | Record_ufloat -> line i ppf "Record_ufloat\n"
   | Record_mixed shape ->
     line i ppf "Record_mixed\n";
-    iarray (i+1) mixed_block_element ppf shape
+    array (i+1) mixed_block_element ppf shape
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product _ ->
@@ -580,7 +576,7 @@ and expression i ppf x =
       let i = i+1 in
       alloc_mode_option i ppf am;
       line i ppf "fields =\n";
-      iarray (i+1) record_field ppf fields;
+      array (i+1) record_field ppf fields;
       line i ppf "representation =\n";
       record_representation (i+1) ppf representation;
       line i ppf "extended_expression =\n";
@@ -590,7 +586,7 @@ and expression i ppf x =
       line i ppf "Texp_record_unboxed_product\n";
       let i = i+1 in
       line i ppf "fields =\n";
-      iarray (i+1) record_field ppf fields;
+      array (i+1) record_field ppf fields;
       line i ppf "representation =\n";
       record_unboxed_product_representation (i+1) ppf representation;
       line i ppf "extended_expression =\n";

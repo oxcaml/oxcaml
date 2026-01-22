@@ -14,7 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
 module H = Lambda_to_flambda_primitives_helpers
 module K = Flambda_kind
 module I = K.Standard_int
@@ -1898,23 +1897,23 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       in
       let args = List.flatten args |> Array.of_list in
       Array.init (Array.length args) (fun new_index ->
-          args.(new_indexes_to_old_indexes.:(new_index)))
+          args.(new_indexes_to_old_indexes.(new_index)))
       |> Array.to_list
     in
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
     in
-    if List.length args <> Iarray.length flattened_reordered_shape
+    if List.length args <> Array.length flattened_reordered_shape
     then
       Misc.fatal_errorf
         "Pmakemixedblock: number of arguments (%d) is not consistent with \
          shape length (%d)"
         (List.length args)
-        (Iarray.length flattened_reordered_shape);
+        (Array.length flattened_reordered_shape);
     let args =
       List.mapi
         (fun new_index arg ->
-          match flattened_reordered_shape.:(new_index) with
+          match flattened_reordered_shape.(new_index) with
           | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
           | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
             arg
@@ -2428,7 +2427,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         let mutability = convert_field_read_semantics sem in
         let block_access : P.Block_access_kind.t =
           let field_kind : P.Mixed_block_access_field_kind.t =
-            match flattened_reordered_shape.:(new_index) with
+            match flattened_reordered_shape.(new_index) with
             | Value value_kind ->
               Value_prefix
                 (convert_block_access_field_kind_from_value_kind value_kind)
@@ -2448,7 +2447,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             ( Block_load { kind = block_access; mut = mutability; field = imm },
               arg )
         in
-        match flattened_reordered_shape.:(new_index) with
+        match flattened_reordered_shape.(new_index) with
         | Float_boxed (mode : Lambda.locality_mode) ->
           box_float mode block_access ~current_region
         | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
@@ -2519,7 +2518,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           let block_access : P.Block_access_kind.t =
             Mixed
               { field_kind =
-                  (match flattened_reordered_shape.:(new_index) with
+                  (match flattened_reordered_shape.(new_index) with
                   | Value value_kind ->
                     Value_prefix
                       (convert_block_access_field_kind_from_value_kind
@@ -2541,7 +2540,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             convert_init_or_assign initialization_or_assignment
           in
           let value : H.simple_or_prim =
-            match flattened_reordered_shape.:(new_index) with
+            match flattened_reordered_shape.(new_index) with
             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
               value

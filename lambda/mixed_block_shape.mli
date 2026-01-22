@@ -26,8 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open Iarray_shim
-
 (** A mixed block shape is essentially the runtime representation of a block
     ({i i.e.}) value prefix and flat suffix), and the permutation from the
     type definition in the surface language to that representation. *)
@@ -59,24 +57,23 @@ val print : Format.formatter -> _ t -> unit
 
 val of_mixed_block_elements :
   print_locality:(Format.formatter -> 'a -> unit) ->
-  'a Lambda.mixed_block_element iarray ->
+  'a Lambda.mixed_block_element array ->
   'a t
 
-val value_prefix : 'a t -> 'a Singleton_mixed_block_element.t iarray
+val value_prefix : 'a t -> 'a Singleton_mixed_block_element.t array
 
-val flat_suffix : 'a t -> 'a Singleton_mixed_block_element.t iarray
+val flat_suffix : 'a t -> 'a Singleton_mixed_block_element.t array
 
 val value_prefix_len : 'a t -> int
 
 val flat_suffix_len : 'a t -> int
 
 (** Access to the shape, as flattened and following the runtime restriction. *)
-val flattened_reordered_shape :
-  'a t -> 'a Singleton_mixed_block_element.t iarray
+val flattened_reordered_shape : 'a t -> 'a Singleton_mixed_block_element.t array
 
 val lookup_path_producing_new_indexes : 'a t -> int list -> int list
 
-val new_indexes_to_old_indexes : 'a t -> int iarray
+val new_indexes_to_old_indexes : 'a t -> int array
 
 val new_block_length : 'a t -> int
 

@@ -102,7 +102,6 @@ desired mode of use [m] as *input*, and returns a context [G] as
 of modes [G] for the variables of [e] such that [G |- e : m] holds.
 *)
 
-open Iarray_shim
 open Asttypes
 open Typedtree
 open Types
@@ -180,40 +179,16 @@ let classify_expression : Typedtree.expression -> sd =
         Static
 
     | Texp_record { representation = Record_unboxed;
-                    fields }
-      (* CR-someday lmaurer: replace this fake pattern guard with a real iarray
-         pattern *)
-      when
-        match Iarray.to_array fields with
-        | [| _, _, Overridden (_, _e) |] -> true
-        | _ -> false
-      ->
-        begin match Iarray.to_array fields with
-        | [| _, _, Overridden (_, e) |] ->
-            classify_expression env e
-        | _ ->
-            assert false
-        end
+                    fields = [| _, _, Overridden (_,e) |] } ->
+        classify_expression env e
     | Texp_record { representation = Record_ufloat; _ } ->
-        Dynamic
+      Dynamic
     | Texp_record _ ->
-        Static
+      Static
 
     | Texp_record_unboxed_product { representation = Record_unboxed_product _;
-                                    fields }
-      (* CR-someday lmaurer: replace this fake pattern guard with a real iarray
-         pattern *)
-      when
-        match Iarray.to_array fields with
-        | [| _, _, Overridden (_, _e) |] -> true
-        | _ -> false
-      ->
-        begin match Iarray.to_array fields with
-        | [| _, _, Overridden (_, e) |] ->
-            classify_expression env e
-        | _ ->
-            assert false
-        end
+                                    fields = [| _, _, Overridden (_,e) |] } ->
+        classify_expression env e
     | Texp_record_unboxed_product _ ->
         Dynamic
 
@@ -615,9 +590,9 @@ let listi : 'a. (int -> 'a -> term_judg) -> 'a list -> term_judg =
     List.fold_left (fun (idx, env) item -> idx+1, Env.join env (f idx item m))
       (0, Env.empty) li
     |> (snd : (int * Env.t) -> Env.t)
-let iarray : 'a. ('a -> term_judg) -> 'a iarray -> term_judg =
+let array : 'a. ('a -> term_judg) -> 'a array -> term_judg =
   fun f ar m ->
-    Iarray.fold_left (fun env item -> Env.join env (f item m)) Env.empty ar
+    Array.fold_left (fun env item -> Env.join env (f item m)) Env.empty ar
 
 let single : Ident.t -> term_judg = Env.single
 let remove_id : Ident.t -> term_judg -> term_judg =
@@ -811,7 +786,7 @@ let rec expression : Typedtree.expression -> term_judg =
            (match shape with
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
-                (match mixed_shape.:(i) with
+                (match mixed_shape.(i) with
                  | Value | Float_boxed -> Guard
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
                  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
@@ -839,7 +814,7 @@ let rec expression : Typedtree.expression -> term_judg =
               Guard
           | Record_inlined (_, Constructor_mixed mixed_shape, _)
           | Record_mixed mixed_shape ->
-            (match mixed_shape.:(i) with
+            (match mixed_shape.(i) with
              | Value | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
              | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
@@ -855,7 +830,7 @@ let rec expression : Typedtree.expression -> term_judg =
           env << field_mode label.lbl_pos
         in
         join [
-          iarray field es;
+          array field es;
           option expression (Option.map Misc.fst3 eo) << Dereference
         ]
     | Texp_record_unboxed_product { fields = es; extended_expression = eo;
@@ -871,7 +846,7 @@ let rec expression : Typedtree.expression -> term_judg =
           env << Return
         in
         join [
-          iarray field es;
+          array field es;
           option expression (Option.map fst eo) << Dereference
         ]
       end

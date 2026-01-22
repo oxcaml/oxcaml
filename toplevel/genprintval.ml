@@ -15,7 +15,6 @@
 
 (* To print values *)
 
-open Iarray_shim
 open Misc
 open Format
 open Longident
@@ -535,7 +534,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                               let label_params_and_types, record_params =
                                 Ctype.instance_label_declarations
                                   ~fixed:false
-                                  (lbl_list |> Iarray.of_list)
+                                  (lbl_list |> Array.of_list)
                                   ~params:type_params
                               in
                               List.iter2 (Ctype.unify env)
@@ -543,7 +542,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                               let lds_and_types =
                                 List.map2 (fun lbl (_params, ty) -> lbl, ty)
                                   lbl_list
-                                  (label_params_and_types |> Iarray.to_list)
+                                  (label_params_and_types |> Array.to_list)
                               in
                               match
                                 Typedecl.update_record_representation env
@@ -669,7 +668,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       nest tree_of_val (depth - 1) fld ty_arg
                   | Outval_record_mixed_block shape ->
                       let fld =
-                        match shape.:(pos) with
+                        match shape.(pos) with
                         | Value -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))

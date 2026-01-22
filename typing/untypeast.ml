@@ -16,7 +16,6 @@
 [@@@ocaml.warning "-60"] module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 
-open Iarray_shim
 open Asttypes
 open Parsetree
 open Ast_helper
@@ -608,7 +607,7 @@ let expression sub exp =
     | Texp_variant (label, expo) ->
         Pexp_variant (label, Option.map (fun (e, _) -> sub.expr sub e) expo)
     | Texp_record { fields; extended_expression; _ } ->
-        let list = Iarray.fold_left (fun l -> function
+        let list = Array.fold_left (fun l -> function
             | _, _, Kept _ -> l
             | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields
@@ -616,7 +615,7 @@ let expression sub exp =
         Pexp_record (list, Option.map (fun (exp, _, _) -> sub.expr sub exp)
                              extended_expression)
     | Texp_record_unboxed_product { fields; extended_expression; _ } ->
-        let list = Iarray.fold_left (fun l -> function
+        let list = Array.fold_left (fun l -> function
             | _, _, Kept _ -> l
             | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields

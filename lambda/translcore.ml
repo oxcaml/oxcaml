@@ -16,7 +16,6 @@
 (* Translation from typed abstract syntax to lambda terms,
    for the core language *)
 
-open Iarray_shim
 open Misc
 open Asttypes
 open Primitive
@@ -612,7 +611,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                        always stay in the same place because the reordering
                        sorting is stable and immediates are always put in the
                        value prefix of a mixed block. *)
-                    Iarray.append (Iarray.make 1 (Lambda.Value Lambda.generic_value)) shape
+                    Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
                   Pmakemixedblock(0, Immutable, shape, alloc_mode)
               | None ->
@@ -756,13 +755,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
     begin match record_repres with
     | Record_unboxed_product sorts ->
       let lbl_layout l s = layout e.exp_env l.lbl_loc s l.lbl_arg in
-      let layouts =
-        Iarray.map2 lbl_layout (Lazy.force lbl.lbl_all) sorts
-        |> Iarray.to_list
-      in
+      let layouts = Array.map2 lbl_layout lbl.lbl_all sorts |> Array.to_list in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
-      if Iarray.length (Lazy.force lbl.lbl_all) == 1 then
+      if Array.length lbl.lbl_all == 1 then
         (* erase singleton unboxed records before lambda *)
         targ
       else
@@ -828,11 +824,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_mixed shape ->
           let field_shape =
             Typeopt.transl_mixed_block_element newval.exp_env newval.exp_loc
-              newval.exp_type shape.:(lbl.lbl_pos)
+              newval.exp_type shape.(lbl.lbl_pos)
           in
           let shape = Lambda.transl_mixed_product_shape shape in
           (* Update the shape with details for the modified field. *)
-          let shape = Misc.Stdlib.Iarray.update shape lbl.lbl_pos field_shape in
+          shape.(lbl.lbl_pos) <- field_shape;
           Psetmixedfield([lbl.lbl_pos], shape, mode),
           [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -2056,7 +2052,7 @@ and transl_setinstvar ~scopes loc self var expr =
 and transl_record ~scopes loc env mode fields repres opt_init_expr =
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
-  let size = Iarray.length fields in
+  let size = Array.length fields in
   let on_heap = match mode with
     | None -> false (* unboxed is not on heap *)
     | Some m -> is_heap_mode m
@@ -2101,13 +2097,11 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_mixed shape ->
                 let field_shape =
                   Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
-                    expr.exp_type shape.:(lbl.lbl_pos)
+                    expr.exp_type shape.(lbl.lbl_pos)
                 in
                 let shape = Lambda.transl_mixed_product_shape shape in
                 (* Update the shape with details for the modified field. *)
-                let shape =
-                  Misc.Stdlib.Iarray.update shape lbl.lbl_pos field_shape
-                in
+                shape.(lbl.lbl_pos) <- field_shape;
                 Psetmixedfield
                   ([lbl.lbl_pos], shape, Assignment modify_heap)
             | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -2125,7 +2119,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
          Lprim(Pduprecord (repres, size),
                [transl_exp ~scopes init_expr_sort init_expr],
                of_location ~scopes loc),
-         Iarray.fold_left update_field (Lvar copy_id) fields)
+         Array.fold_left update_field (Lvar copy_id) fields)
   | Some _ | None ->
     (* Allocate new record with given fields (and remaining fields
        taken from init_expr if any *)
@@ -2133,7 +2127,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     let init_id = Ident.create_local "init" in
     let init_id_duid = Lambda.debug_uid_none in
     let lv =
-      Iarray.mapi
+      Array.mapi
         (fun i (lbl, lbl_sort, definition) ->
            let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
            match definition with
@@ -2202,9 +2196,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                transl_exp ~scopes lbl_sort expr, field_layout)
         fields
     in
-    let ll, shape = List.split (Iarray.to_list lv) in
+    let ll, shape = List.split (Array.to_list lv) in
     let mut : Lambda.mutable_flag =
-      if Iarray.exists (fun (lbl, _, _) -> Types.is_mutable lbl.lbl_mut) fields
+      if Array.exists (fun (lbl, _, _) -> Types.is_mutable lbl.lbl_mut) fields
       then Mutable
       else Immutable in
     let lam =
@@ -2325,17 +2319,17 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
     let init_id = Ident.create_local "init" in
     let init_id_duid = Lambda.debug_uid_none in
     let shape =
-      Iarray.map
+      Array.map
         (fun (lbl, lbl_sort, definition) ->
             let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
             match definition with
             | Kept (typ, _mut, _) -> layout env lbl.lbl_loc lbl_sort typ
             | Overridden (_lid, expr) -> layout_exp lbl_sort expr)
         fields
-      |> Iarray.to_list
+      |> Array.to_list
     in
     let ll =
-      Iarray.mapi
+      Array.mapi
         (fun i (_lbl, lbl_sort, definition) ->
             let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
             match definition with
@@ -2345,7 +2339,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
             | Overridden (_lid, expr) ->
               transl_exp ~scopes lbl_sort expr)
         fields
-      |> Iarray.to_list
+      |> Array.to_list
     in
     let lam = match ll with
       | [l] -> l (* erase singleton unboxed records before lambda *)
@@ -2365,7 +2359,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
 and transl_idx ~scopes loc env ba uas =
   let ua_to_pos (Uaccess_unboxed_field (_, lbl, _)) =
     (* erase singleton unboxed products before lambda *)
-    if Iarray.length (Lazy.force lbl.lbl_all) == 1
+    if Array.length lbl.lbl_all == 1
     then None
     else Some lbl.lbl_pos
   in
@@ -2379,10 +2373,10 @@ and transl_idx ~scopes loc env ba uas =
       let sorts = label_all_sorts lbl sorts in
       (* Preserve the invariant that products have at least two elements *)
       let base_sort =
-        if Int.equal (Iarray.length sorts) 1 then
-          sorts.:(0)
+        if Int.equal (Array.length sorts) 1 then
+          sorts.(0)
         else
-          Jkind.Sort.Const.Product (Iarray.to_list sorts)
+          Jkind.Sort.Const.Product (Array.to_list sorts)
       in
       (* CR layouts v8: this might unnecessarily compute the value kind, which
          shouldn't be needed for deepening *)
@@ -2398,7 +2392,7 @@ and transl_idx ~scopes loc env ba uas =
       (* Assert that all unboxed fields are of singleton records *)
       List.iter
         (fun (Uaccess_unboxed_field (_, l, _)) ->
-            if Iarray.length (Lazy.force l.lbl_all) <> 1 then
+            if Array.length l.lbl_all <> 1 then
               Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
                 in non-mixed boxed record")
         uas;

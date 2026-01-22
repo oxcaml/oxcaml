@@ -15,8 +15,6 @@
 
 (**** Typing of type definitions ****)
 
-open Iarray_shim
-
 open Misc
 open Asttypes
 open Parsetree
@@ -996,16 +994,16 @@ let transl_declaration env sdecl (id, uid) =
                and will be updated later.
             *)
             Variant_boxed (
-              Iarray.map
+              Array.map
                 (fun cstr ->
                    let sorts =
                      match Types.(cstr.cd_args) with
                      | Cstr_tuple args ->
-                       Iarray.make (List.length args) Jkind.Sort.Const.void
-                     | Cstr_record _ -> Iarray.make 1 Jkind.Sort.Const.value
+                       Array.make (List.length args) Jkind.Sort.Const.void
+                     | Cstr_record _ -> [| Jkind.Sort.Const.value |]
                    in
                    Some (Constructor_uniform_value, sorts))
-                (Iarray.of_list cstrs)
+                (Array.of_list cstrs)
             ),
           Jkind.for_non_float ~why:Boxed_variant
         in
@@ -1025,7 +1023,7 @@ let transl_declaration env sdecl (id, uid) =
                correct representation is [Record_float], [Record_ufloat], or
                [Record_mixed].  Those cases are fixed up after we can get
                accurate sorts for the fields, in [update_decl_jkind]. *)
-              Record_boxed (Iarray.make (List.length lbls) Jkind.Sort.Const.void),
+              Record_boxed (Array.make (List.length lbls) Jkind.Sort.Const.void),
               Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', Some rep, None), jkind
@@ -1041,7 +1039,7 @@ let transl_declaration env sdecl (id, uid) =
              [update_decl_jkind]. *)
           let rep : record_unboxed_product_representation =
             Record_unboxed_product
-              (Iarray.make (List.length lbls) Jkind.Sort.Const.void)
+              (Array.make (List.length lbls) Jkind.Sort.Const.void)
           in
           let jkind =
             Jkind.Builtin.product_of_any ~why:Unboxed_record
@@ -1181,7 +1179,7 @@ let record_gets_unboxed_version = function
   | Record_boxed _ -> true
   | Record_mixed shape ->
     let rec shape_has_float_boxed shape =
-      Iarray.exists
+      Array.exists
         (fun (kind : mixed_block_element) ->
           match kind with
           | Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
@@ -1262,9 +1260,9 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
                | Void -> void
                | Untagged_immediate -> untagged_immediate
                | Product elements ->
-                 Product (Iarray.map transl elements |> Iarray.to_list)
+                 Product (Array.map transl elements |> Array.to_list)
              in
-             Types.Record_unboxed_product (Iarray.map transl elements)
+             Types.Record_unboxed_product (Array.map transl elements)
            | _ -> assert false (* impossible cases *))
         rep
     in
@@ -1698,12 +1696,12 @@ let update_constructor_arguments_sorts env loc cd_args =
     List.for_all
       (fun { ca_sort } -> all_void_sort_option ca_sort) args,
     jkinds,
-    (Misc.Stdlib.List.map_option (fun arg -> arg.ca_sort) args) |> Option.map Iarray.of_list
+    (Misc.Stdlib.List.map_option (fun arg -> arg.ca_sort) args) |> Option.map Array.of_list
   | Types.Cstr_record lbls ->
     let lbls, jkinds =
       update_label_sorts_in_place env loc lbls ~form:Legacy
     in
-    Types.Cstr_record lbls, false, jkinds, Some (Iarray.make 1 Jkind.Sort.Const.value)
+    Types.Cstr_record lbls, false, jkinds, Some [| Jkind.Sort.Const.value |]
 
 let assert_mixed_product_support =
   let required_reserved_header_bits = 8 in
@@ -1748,7 +1746,7 @@ module Element_repr = struct
     | Vec512
     | Word
     | Untagged_immediate
-    | Product of t iarray
+    | Product of t array
 
   and t =
     | Unboxed_element of unboxed_element
@@ -1778,7 +1776,7 @@ module Element_repr = struct
       | Vec512 -> Vec512
       | Word -> Word
       | Untagged_immediate -> Untagged_immediate
-      | Product l -> Product (Iarray.map of_t l)
+      | Product l -> Product (Array.map of_t l)
     in
     of_t t
 
@@ -1805,7 +1803,7 @@ module Element_repr = struct
       | Base Vec512 -> Unboxed_element Vec512
       | Base Void -> Void
       | Product l ->
-        Unboxed_element (Product (Iarray.of_list (List.map sort_to_t l)))
+        Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
       in
       Option.map sort_to_t sort
 
@@ -1819,7 +1817,7 @@ module Element_repr = struct
         function
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
         | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
-        | Product l -> Iarray.fold_left count_boxed_in_t acc l
+        | Product l -> Array.fold_left count_boxed_in_t acc l
       in
       List.fold_left (fun acc (t,_) -> count_boxed_in_t acc t) 0 ts
     in
@@ -1829,7 +1827,7 @@ module Element_repr = struct
     in
     if not mixed then `Not_mixed else begin
       assert_mixed_product_support loc kind ~value_prefix_len:boxed_elements;
-      `Mixed (List.map (fun (t,_) -> to_shape_element t) ts |> Iarray.of_list)
+      `Mixed (List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list)
     end
 
   type unrepresentable_element =
@@ -2032,7 +2030,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
                 | Some Value_element | None ->
                     Misc.fatal_error "Expected only floats and float64s")
               reprs
-            |> Iarray.of_list
+            |> Array.of_list
           in
           assert_mixed_product_support loc Record ~value_prefix_len:0;
           Ok (Record_mixed shape)
@@ -2099,12 +2097,12 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       | Unboxed_product, _
         ->
           let sorts =
-            Iarray.map
+            Array.map
               (fun t ->
                  match t with
                  | None -> Misc.fatal_error "expected sort"
                  | Some t -> t)
-              (sorts |> Iarray.of_list)
+              (sorts |> Array.of_list)
           in
           begin match form with
           | Legacy ->
@@ -2245,7 +2243,6 @@ let rec update_decl_jkind env dpath decl =
           assert false
       end
     | cstrs, Variant_boxed cstr_shapes ->
-      let cstr_shapes = Iarray.to_array cstr_shapes in
       let cstrs =
         List.mapi (fun idx cstr ->
           let cd_args, _all_void, jkinds, arg_sorts =
@@ -2269,7 +2266,6 @@ let rec update_decl_jkind env dpath decl =
           cstr
         ) cstrs
       in
-      let cstr_shapes = Iarray.of_array cstr_shapes in
       let jkind = Jkind.for_boxed_variant ~loc (List.rev cstrs) in
       cstrs, Variant_boxed cstr_shapes, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->

@@ -18,8 +18,6 @@
 [@@@ocaml.warning "-60"] module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 
-open Iarray_shim
-
 open Misc
 open Asttypes
 open Parsetree
@@ -1568,7 +1566,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
         unify_pat env p ty_res'
       end;
       in
-    Iarray.iter do_label (Lazy.force lbl.lbl_all);
+    Array.iter do_label lbl.lbl_all;
     ty, mode
   in
   match p.pat_desc with
@@ -1657,17 +1655,17 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
   (* Might be good to short-circuit this. Possible we could do so by noticing
      that [containing_type] has no arguments (or only variables as
      arguments). *)
-  let all_labels = Lazy.force labels.:(0).lbl_all in
+  let all_labels = labels.(0).lbl_all in
   let vars_and_ty_args, ty_res =
     Ctype.instance_labels ~fixed:false all_labels
   in
   unify_exp_types loc env containing_type ty_res;
   let sorts, rep =
-    match labels.:(0).lbl_repres with
+    match labels.(0).lbl_repres with
     | Some rep -> Fixed, rep
     | None ->
         let lbls_and_ty_args =
-          Iarray.map2
+          Array.map2
             (fun lbl (_vars, ty_arg) ->
                (lbl |> Types.label_declaration_of_label_description),
                ty_arg)
@@ -1676,10 +1674,10 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
         in
         match
           Typedecl.update_record_representation env loc form
-            (lbls_and_ty_args |> Iarray.to_list) None
+            (lbls_and_ty_args |> Array.to_list) None
         with
         | Ok (sorts, rep) ->
-            let sorts = sorts |> Iarray.of_list in
+            let sorts = sorts |> Array.of_list in
             Variable sorts, rep
         | Error (Unrepresentable_field name) ->
             raise (Error (loc, env,
@@ -1690,7 +1688,7 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
 let update_label (type rep) env label (form : rep record_form) ~loc
       ~containing_type
     : Jkind.Sort.Const.t * rep =
-  let labels = Iarray.make 1 label in
+  let labels = [| label |] in
   let sorts, rep = update_labels env labels form ~loc ~containing_type in
   label_sort label sorts, rep
 
@@ -2507,11 +2505,10 @@ let label_get_type_path
 let disambiguate_label_by_ids closed ids labels  : (_, _) result =
   let check_ids (lbl, _) =
     let lbls = Hashtbl.create 8 in
-    Iarray.iter (fun lbl -> Hashtbl.add lbls lbl.lbl_name ())
-      (Lazy.force lbl.lbl_all);
+    Array.iter (fun lbl -> Hashtbl.add lbls lbl.lbl_name ()) lbl.lbl_all;
     List.for_all (Hashtbl.mem lbls) ids
   and check_closed (lbl, _) =
-    (not closed || List.length ids = Iarray.length (Lazy.force lbl.lbl_all))
+    (not closed || List.length ids = Array.length lbl.lbl_all)
   in
   match List.filter check_ids labels with
   | [] -> Error labels
@@ -2658,8 +2655,8 @@ let check_recordpat_labels loc lbl_pat_list closed record_form =
   match lbl_pat_list with
   | [] -> ()                            (* should not happen *)
   | (_, label1, _) :: _ ->
-      let all = Lazy.force label1.lbl_all in
-      let defined = Array.make (Iarray.length all) false in
+      let all = label1.lbl_all in
+      let defined = Array.make (Array.length all) false in
       let check_defined (_, label, _) =
         if defined.(label.lbl_pos)
         then raise(Error(loc, Env.empty, Label_multiply_defined label.lbl_name))
@@ -2670,8 +2667,8 @@ let check_recordpat_labels loc lbl_pat_list closed record_form =
            (Warnings.Missing_record_field_pattern { form = ""; unbound = "" })
       then begin
         let undefined = ref [] in
-        for i = 0 to Iarray.length all - 1 do
-          if not defined.(i) then undefined := all.:(i).lbl_name :: !undefined
+        for i = 0 to Array.length all - 1 do
+          if not defined.(i) then undefined := all.(i).lbl_name :: !undefined
         done;
         if !undefined <> [] then begin
           let unbound = String.concat ", " (List.rev !undefined) in
@@ -3118,7 +3115,7 @@ and type_pat_aux
       let all_labels =
         match lbl_a_list with
         | [] -> assert false
-        | (_, label, _) :: _ -> Lazy.force label.lbl_all
+        | (_, label, _) :: _ -> label.lbl_all
       in
       let sorts, rep =
         update_labels !!penv all_labels record_form ~loc
@@ -4663,7 +4660,7 @@ let rec is_nonexpansive exp =
       List.for_all (fun (_, e) -> is_nonexpansive e) el
   | Texp_variant(_, arg) -> is_nonexpansive_opt (Option.map fst arg)
   | Texp_record { fields; extended_expression } ->
-      Iarray.for_all
+      Array.for_all
         (fun (lbl, _sort, definition) ->
            match definition with
            | Overridden (_, exp) ->
@@ -4672,7 +4669,7 @@ let rec is_nonexpansive exp =
         fields
       && is_nonexpansive_opt (Option.map Misc.fst3 extended_expression)
   | Texp_record_unboxed_product { fields; extended_expression } ->
-      Iarray.for_all
+      Array.for_all
         (fun (lbl, _sort, definition) ->
            match definition with
            | Overridden (_, exp) ->
@@ -6148,7 +6145,7 @@ and type_expect_
         match opt_exp, overwrite with
         | None, (No_overwrite | Assigning _) ->
             let label_definitions =
-              Iarray.map (fun lbl ->
+              Array.map (fun lbl ->
                   match matching_label lbl with
                   | (lid, _lbl, lbl_exp) ->
                       let definition = Overridden (lid, lbl_exp) in
@@ -6173,23 +6170,23 @@ and type_expect_
                       raise
                         (Error(loc, env,
                                Label_missing (P record_form, missing))))
-                (Lazy.force lbl.lbl_all)
+                lbl.lbl_all
             in
             None, label_definitions
         | None, Overwriting(exp_loc, exp_type, mode) ->
             let ty_exp = instance exp_type in
             let label_definitions =
-              Iarray.map
+              Array.map
                 (type_label_and_exp loc exp_loc ty_exp mode ~update:false)
-                (Lazy.force lbl.lbl_all)
+                lbl.lbl_all
             in
             None, label_definitions
         | Some (exp, mode), _ ->
             let ty_exp = instance exp.exp_type in
             let label_definitions =
-              Iarray.map
+              Array.map
                 (type_label_and_exp loc exp.exp_loc ty_exp mode ~update:true)
-                (Lazy.force lbl.lbl_all)
+                lbl.lbl_all
             in
             let ubr = Unique_barrier.not_computed () in
             let sort =
@@ -6205,21 +6202,21 @@ and type_expect_
       in
       let num_fields =
         match lbl_exp_list with [] -> assert false
-        | (_, lbl,_)::_ -> Iarray.length (Lazy.force lbl.lbl_all) in
+        | (_, lbl,_)::_ -> Array.length lbl.lbl_all in
       (if opt_sexp <> None && List.length lid_sexp_list = num_fields then
          Location.prerr_warning loc
            (Warnings.Useless_record_with (record_form_to_string record_form)));
       let label_descriptions, representation =
         let (_, { lbl_all; lbl_repres; _ }, _) = List.hd lbl_exp_list in
-        Lazy.force lbl_all, lbl_repres
+        lbl_all, lbl_repres
       in
       let representation =
         let labels_with_updated_types =
-          Iarray.map2
+          Array.map2
             (fun ld (arg, _jkind, _sort, _def) ->
                Types.label_declaration_of_label_description ld, arg)
             label_descriptions label_definitions
-          |> Iarray.to_list
+          |> Array.to_list
         in
         begin match
           (* XXX This is redundantly going to get the sort and jkind for each
@@ -6238,7 +6235,7 @@ and type_expect_
         end
       in
       let fields =
-        Iarray.map2 (fun descr (_arg, _jkind, sort, def) -> descr, sort, def)
+        Array.map2 (fun descr (_arg, _jkind, sort, def) -> descr, sort, def)
           label_descriptions label_definitions
       in
       let exp_desc =
@@ -6732,7 +6729,7 @@ and type_expect_
           match record_repres with
           | Record_float -> true
           | Record_mixed mixed -> begin
-              match mixed.:(label.lbl_pos) with
+              match mixed.(label.lbl_pos) with
               | Float_boxed -> true
               | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
               | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void
@@ -7890,7 +7887,7 @@ and type_block_access env expected_base_ty principal
       match label.lbl_repres with
       | Some (Record_boxed _) -> false
       | Some (Record_mixed mixed) ->
-        begin match mixed.:(label.lbl_pos) with
+        begin match mixed.(label.lbl_pos) with
         | Float_boxed -> true
         | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
         | Vec128 | Vec256 | Vec512 | Word | Product _ | Void
@@ -7990,7 +7987,7 @@ and type_unboxed_access env loc el_ty ua =
         raise (Error (lid.loc, env, err))
     end;
     let sorts, _rep =
-      update_labels env (Lazy.force label.lbl_all) Unboxed_product ~loc:lid.loc
+      update_labels env label.lbl_all Unboxed_product ~loc:lid.loc
         ~containing_type:el_ty
     in
     (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label, sorts)
@@ -9610,7 +9607,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
           let dummy_repres =
             (* This shouldn't be used anywhere, so make it highly unlikely to be
                accidentally correct *)
-            Types.Constructor_mixed (Iarray.make 1 Float32)
+            Types.Constructor_mixed [| Float32 |]
           in
           let texp =
             re {

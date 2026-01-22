@@ -20,8 +20,6 @@
 
 *)
 
-open Iarray_shim
-
 (** {1 Reporting fatal errors} *)
 
 val fatal_error: string -> 'a
@@ -305,26 +303,6 @@ module Stdlib : sig
     val of_list_map : ('a -> 'b) -> 'a list -> 'b array
 
     val concat_arrays : 'a array array -> 'a array
-    (** Concatenate an array of arrays into a single array. *)
-  end
-
-  (** {2 Extensions to the Iarray module} *)
-  module Iarray : sig
-    val update : 'a iarray -> int -> 'a -> 'a iarray
-    (* Functional update of iarray *)
-
-    val equal : ('a -> 'a -> bool) -> 'a iarray -> 'a iarray -> bool
-    (** Compare two arrays for equality, using the supplied predicate for
-        element equality *)
-
-    val compare : ('a -> 'a -> int) -> 'a iarray -> 'a iarray -> int
-    (** Compare two arrays, using the supplied predicate for element equality *)
-
-    val all_somes : 'a option iarray -> 'a iarray option
-
-    val of_list_map : ('a -> 'b) -> 'a list -> 'b iarray
-
-    val concat_iarrays : 'a iarray iarray -> 'a iarray
     (** Concatenate an array of arrays into a single array. *)
   end
 

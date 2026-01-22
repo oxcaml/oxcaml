@@ -13,8 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
-
 open Misc
 open Asttypes
 
@@ -414,12 +412,12 @@ and 'a mixed_block_element =
   | Vec512
   | Word
   | Untagged_immediate
-  | Product of 'a mixed_block_element iarray
+  | Product of 'a mixed_block_element array
 
-and mixed_block_shape = unit mixed_block_element iarray
+and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element iarray
+  = locality_mode mixed_block_element array
 
 and constructor_shape =
   | Constructor_uniform of value_kind list
@@ -599,14 +597,14 @@ and equal_mixed_block_element :
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
-    Misc.Stdlib.Iarray.equal (equal_mixed_block_element eq_param)
+    Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
      | Vec256 | Vec512 | Word | Untagged_immediate | Product _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
-  Misc.Stdlib.Iarray.equal (equal_mixed_block_element Unit.equal) shape1 shape2
+  Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
 
 and equal_constructor_shape x y =
   match x, y with
@@ -1462,7 +1460,7 @@ let transl_prim mod_name name =
       fatal_error ("Primitive " ^ name ^ " not found.")
 
 let rec transl_mixed_product_shape shape =
-  Iarray.map (fun (elt : Types.mixed_block_element) ->
+  Array.map (fun (elt : Types.mixed_block_element) ->
     match elt with
     | Value -> Value generic_value
     | Float_boxed -> Float_boxed ()
@@ -1479,11 +1477,11 @@ let rec transl_mixed_product_shape shape =
     | Untagged_immediate -> Untagged_immediate
     | Product shapes ->
       Product (transl_mixed_product_shape shapes)
-    | Void -> Product Iarray.empty
+    | Void -> Product [||]
   ) shape
 
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Iarray.mapi (fun i (elt : Types.mixed_block_element) ->
+  Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
     | Value -> Value (get_value_kind i)
     | Float_boxed -> Float_boxed (get_mode i)
@@ -1502,7 +1500,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
       let get_value_kind _ = generic_value in
       Product
         (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-    | Void -> Product Iarray.empty
+    | Void -> Product [||]
   ) shape
 
 (* Compile a sequence of expressions *)
@@ -1864,7 +1862,7 @@ let locality_mode_of_primitive_description (p : external_call_description) =
       if p.prim_alloc then Some alloc_heap else None
 
 let project_from_mixed_block_shape
-    : 'a. 'a mixed_block_element iarray -> path:int list
+    : 'a. 'a mixed_block_element array -> path:int list
           -> 'a mixed_block_element
     = fun shape ~path ->
   match path with
@@ -1873,13 +1871,13 @@ let project_from_mixed_block_shape
   | field :: path ->
     (* Perform the initial projection to identify which boxed field is
        requested. *)
-    if field < 0 || field >= Iarray.length shape
+    if field < 0 || field >= Array.length shape
     then
       Misc.fatal_errorf
         "project_from_mixed_block_shape: field index %d out of bounds for \
          shape of %d elements"
-        field (Iarray.length shape);
-    let element = shape.:(field) in
+        field (Array.length shape);
+    let element = shape.(field) in
     (* Now follow the path through any unboxed product nodes. *)
     let rec project_from_mixed_block_element_by_path element path =
       match path with
@@ -1891,13 +1889,13 @@ let project_from_mixed_block_shape
            Extract the relevant projection and continue. *)
         match element with
         | Product shape ->
-          if field < 0 || field >= Iarray.length shape
+          if field < 0 || field >= Array.length shape
           then
             Misc.fatal_errorf
               "project_from_mixed_block_element: field index %d out of bounds \
                for (nested) shape of %d elements"
-              field (Iarray.length shape);
-          project_from_mixed_block_element_by_path shape.:(field) path
+              field (Array.length shape);
+          project_from_mixed_block_element_by_path shape.(field) path
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
@@ -1914,7 +1912,7 @@ let mixed_block_projection_may_allocate shape ~path =
     | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
     | Untagged_immediate | Vec128 | Vec256 | Vec512 -> None
     | Product shape ->
-      Iarray.fold_left (fun alloc_mode element ->
+      Array.fold_left (fun alloc_mode element ->
           let alloc_mode' = allocates element in
           match alloc_mode, alloc_mode' with
           | None, None -> None
@@ -2325,7 +2323,7 @@ let array_ref_kind_result_layout = function
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
 
 let layout_of_mixed_block_shape
-    : 'a. 'a mixed_block_element iarray -> path:int list -> layout
+    : 'a. 'a mixed_block_element array -> path:int list -> layout
     = fun shape ~path ->
   let rec layout_of_mixed_block_element element =
     match element with
@@ -2344,7 +2342,7 @@ let layout_of_mixed_block_shape
     | Vec512 -> layout_unboxed_vector Unboxed_vec512
     | Product shape ->
       Punboxed_product
-        (Iarray.to_list (Iarray.map layout_of_mixed_block_element shape))
+        (Array.to_list (Array.map layout_of_mixed_block_element shape))
   in
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
@@ -2352,7 +2350,7 @@ let rec mixed_block_element_of_layout (layout : layout) :
     unit mixed_block_element =
   match layout with
   | Punboxed_product layouts ->
-    Product (List.map mixed_block_element_of_layout layouts |> Iarray.of_list)
+    Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
   | Ptop | Pbottom -> Misc.fatal_error "Pidxdeepen"
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
@@ -2378,8 +2376,8 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Product mbes ->
     (* Propagate known externality to components *)
     Punboxed_product
-      (Iarray.to_list
-        (Iarray.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
+      (Array.to_list
+        (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
   | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
     let raw_kind = value_kind_of_value_with_externality ext in
     Pvalue { value_kind with raw_kind }
@@ -2400,7 +2398,7 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   : _ mixed_block_element list =
   match el with
   | Product els ->
-    List.concat_map mixed_block_element_leaves (Iarray.to_list els)
+    List.concat_map mixed_block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
     [el]

@@ -14,7 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open! Iarray_shim
 module Mixed_block_lambda_shape = Mixed_block_shape
 
 module Naked_number_kind = struct
@@ -337,13 +336,11 @@ module Mixed_block_shape = struct
 
   let from_mixed_block_shape (shape : _ Mixed_block_lambda_shape.t) : t =
     let value_prefix_kinds =
-      Iarray.map (fun _ -> value) (Mixed_block_shape.value_prefix shape)
-      |> Iarray.to_array
+      Array.map (fun _ -> value) (Mixed_block_shape.value_prefix shape)
     in
     let flat_suffix =
-      Iarray.map Flat_suffix_element0.from_singleton_mixed_block_element
+      Array.map Flat_suffix_element0.from_singleton_mixed_block_element
         (Mixed_block_shape.flat_suffix shape)
-      |> Iarray.to_array
     in
     let flat_suffix_kinds = Array.map Flat_suffix_element0.kind flat_suffix in
     { flat_suffix;
@@ -1022,12 +1019,12 @@ module With_subkind = struct
                         | Word -> naked_nativeint
                         | Untagged_immediate -> naked_immediate
                       in
-                      let fields : t iarray =
+                      let fields : t array =
                         let flattened_reordered_shape =
                           Mixed_block_lambda_shape.flattened_reordered_shape
                             mixed_block_shape
                         in
-                        Iarray.map from_mixed_block_element
+                        Array.map from_mixed_block_element
                           flattened_reordered_shape
                       in
                       let mixed_block_shape =
@@ -1035,7 +1032,7 @@ module With_subkind = struct
                           mixed_block_shape
                       in
                       ( Scannable (Mixed_record mixed_block_shape),
-                        Iarray.to_list fields )
+                        Array.to_list fields )
                   in
                   Tag.Scannable.Map.add tag shape_and_fields non_consts
                 | None ->

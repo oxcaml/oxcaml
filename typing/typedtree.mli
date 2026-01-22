@@ -21,7 +21,6 @@
 
 *)
 
-open Iarray_shim
 open Asttypes
 module Uid = Shape.Uid
 
@@ -130,7 +129,7 @@ type record_sorts =
   (** The sorts of this record's fields were determined when the type was
       declared. Invariant: Every description in [lbl_all] for any field has a
       [lbl_sort] that's [Some]. *)
-  | Variable of Jkind.Sort.Const.t iarray
+  | Variable of Jkind.Sort.Const.t array
   (** This value has the specified sorts for its fields. *)
 
 type pattern = value general_pattern
@@ -432,7 +431,7 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record of {
-      fields : ( Types.label_description * Jkind.sort * record_label_definition ) iarray;
+      fields : ( Types.label_description * Jkind.sort * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
@@ -453,7 +452,7 @@ and expression_desc =
           *)
   | Texp_record_unboxed_product of {
       fields : ( Types.unboxed_label_description * Jkind.sort *
-                 record_label_definition ) iarray;
+                 record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -1404,4 +1403,4 @@ val label_sort:
     _ Types.gen_label_description -> record_sorts -> Jkind.Sort.Const.t
 
 val label_all_sorts:
-    _ Types.gen_label_description -> record_sorts -> Jkind.Sort.Const.t iarray
+    _ Types.gen_label_description -> record_sorts -> Jkind.Sort.Const.t array

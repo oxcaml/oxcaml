@@ -28,7 +28,6 @@
 
 [@@@warning "+4"]
 
-open Iarray_shim
 module Uid = Shape.Uid
 module Layout = Jkind_types.Sort.Const
 
@@ -380,7 +379,7 @@ module Type_decl_shape = struct
     | Types.Void -> Layout.Base Void
     | Types.Product args ->
       Layout.Product
-        (Iarray.to_list (Iarray.map mixed_block_shape_to_layout args))
+        (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
   let of_complex_constructor type_subst name
       (cstr_args : Types.constructor_declaration) arg_layout shape_for_constr =
@@ -445,8 +444,8 @@ module Type_decl_shape = struct
                    %a but expected %a"
                   Layout.format ly Layout.format ly2
               else ())
-          (Iarray.to_list shapes) args;
-        Iarray.map mixed_block_shape_to_layout shapes
+          (Array.to_list shapes) args;
+        Array.map mixed_block_shape_to_layout shapes
       | Constructor_uniform_value ->
         let lys =
           List.map
@@ -465,7 +464,7 @@ module Type_decl_shape = struct
               else ly)
             args
         in
-        Iarray.of_list lys
+        Array.of_list lys
     in
     { Shape.name;
       constr_uid = Some cstr_args.cd_uid;
@@ -518,7 +517,7 @@ module Type_decl_shape = struct
         | Type_variant (cstr_list, Variant_boxed layouts, _unsafe_mode_crossing)
           ->
           let cstrs_with_layouts =
-            List.combine cstr_list (Iarray.to_list layouts)
+            List.combine cstr_list (Array.to_list layouts)
           in
           let constructors =
             List.map
@@ -566,7 +565,7 @@ module Type_decl_shape = struct
             record_of_labels ~shape_for_constr ~type_subst Record_boxed lbl_list
           | Some (Record_mixed fields) ->
             record_of_labels ~shape_for_constr ~type_subst
-              (Record_mixed (Iarray.map mixed_block_shape_to_layout fields))
+              (Record_mixed (Array.map mixed_block_shape_to_layout fields))
               lbl_list
           | Some Record_unboxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_unboxed

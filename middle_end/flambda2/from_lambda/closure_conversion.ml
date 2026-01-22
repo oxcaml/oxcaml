@@ -16,7 +16,6 @@
 
 [@@@ocaml.warning "-fragile-match"]
 
-open Iarray_shim
 open! Flambda
 module BP = Bound_parameter
 module IR = Closure_conversion_aux.IR
@@ -267,10 +266,10 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       let new_indexes_to_old_indexes =
         Mixed_block_shape.new_indexes_to_old_indexes shape
       in
-      let args = Iarray.of_list args in
-      Iarray.init (Iarray.length args) (fun new_index ->
-          args.:(new_indexes_to_old_indexes.:(new_index)))
-      |> Iarray.to_list
+      let args = Array.of_list args in
+      Array.init (Array.length args) (fun new_index ->
+          args.(new_indexes_to_old_indexes.(new_index)))
+      |> Array.to_list
     in
     let args =
       let flattened_reordered_shape =
@@ -278,7 +277,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       in
       List.mapi
         (fun new_index arg ->
-          match flattened_reordered_shape.:(new_index) with
+          match flattened_reordered_shape.(new_index) with
           | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
           | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
             arg

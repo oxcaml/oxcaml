@@ -13,7 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
 open Asttypes
 open Typedtree
 
@@ -329,7 +328,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   List.iter (fun (e, loc, _) -> extra e; sub.location sub loc) exp_extra;
   sub.env sub exp_env;
   let iter_fields fields =
-    Iarray.iter (function
+    Array.iter (function
       | _, _, Kept _ -> ()
       | _, _, Overridden (lid, exp) -> iter_loc sub lid; sub.expr sub exp)
       fields

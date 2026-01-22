@@ -15,8 +15,6 @@
 
 (* Type inference for the core language *)
 
-open Iarray_shim
-
 open Asttypes
 open Types
 
@@ -388,6 +386,6 @@ val check_recursive_class_bindings :
 val src_pos : Location.t -> Typedtree.attributes -> Env.t -> Typedtree.expression
 
 val update_labels :
-  Env.t -> 'rep gen_label_description iarray -> 'rep record_form ->
+  Env.t -> 'rep gen_label_description array -> 'rep record_form ->
   loc:Location.t -> containing_type:type_expr ->
   Typedtree.record_sorts * 'rep

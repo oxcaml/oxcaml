@@ -15,8 +15,6 @@
 
 (* Operations on core types *)
 
-open Iarray_shim
-
 open Asttypes
 open Types
 open Mode
@@ -240,14 +238,14 @@ val instance_label:
         (* Same, for a label *)
 val instance_labels:
         fixed:bool ->
-        _ gen_label_description iarray ->
-        (type_expr list * type_expr) iarray * type_expr
+        _ gen_label_description array ->
+        (type_expr list * type_expr) array * type_expr
         (* Same, for a whole list of labels *)
 val instance_label_declarations:
         fixed:bool ->
-        label_declaration iarray ->
+        label_declaration array ->
         params:type_expr list ->
-        (type_expr list * type_expr) iarray * type_expr list
+        (type_expr list * type_expr) array * type_expr list
         (* Same, but for label declarations and the type parameters from the
            type declaration *)
 val prim_mode :

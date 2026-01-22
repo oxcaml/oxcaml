@@ -15,7 +15,6 @@
 
 (* Values as patterns pretty printer *)
 
-open Iarray_shim
 open Asttypes
 open Typedtree
 open Types
@@ -80,7 +79,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
     | (_, lbl, _) :: q ->
         let elision_mark ppf =
           (* we assume that there is no label repetitions here *)
-            if Iarray.length (Lazy.force lbl.lbl_all) > 1 + List.length q then
+            if Array.length lbl.lbl_all > 1 + List.length q then
               fprintf ppf ";@ _@ "
             else () in
         fprintf ppf "@[%s{%a%t}@]"

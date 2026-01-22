@@ -15,8 +15,6 @@
 
 (** {0 Representation of types and declarations} *)
 
-open Iarray_shim
-
 (** [Types] defines the representation of types and declarations (that is, the
     content of module signatures).
 
@@ -832,7 +830,7 @@ and mixed_block_element =
   (* Invariant: the array has at least two things in it. *)
   | Void
 
-and mixed_product_shape = mixed_block_element iarray
+and mixed_product_shape = mixed_block_element array
 
 and type_origin =
     Definition
@@ -845,7 +843,7 @@ and record_representation =
   (* For an inlined record, we record the representation of the variant that
      contains it and the tag/representation of the relevant constructor of that
      variant. *)
-  | Record_boxed of Jkind_types.Sort.Const.t iarray
+  | Record_boxed of Jkind_types.Sort.Const.t array
   | Record_float (* All fields are floats *)
   | Record_ufloat
   (* All fields are [float#]s.  Same runtime representation as [Record_float],
@@ -857,12 +855,12 @@ and record_representation =
   *)
 
 and record_unboxed_product_representation =
-  | Record_unboxed_product of Jkind_types.Sort.Const.t iarray
+  | Record_unboxed_product of Jkind_types.Sort.Const.t array
 
 and variant_representation =
   | Variant_unboxed
   | Variant_boxed of (constructor_representation *
-                      Jkind_types.Sort.Const.t iarray) option iarray
+                      Jkind_types.Sort.Const.t array) option array
   (* The outer array has an element for each constructor. Each inner array
      has a jkind for each argument of the corresponding constructor.
 
@@ -1145,7 +1143,7 @@ type 'a gen_label_description =
     lbl_sort: Jkind_types.Sort.Const.t option;
                                         (* Sort of the argument *)
     lbl_pos: int;                       (* Position in type *)
-    lbl_all: 'a gen_label_description iarray Lazy.t;
+    lbl_all: 'a gen_label_description array;
                                         (* All the labels in this type *)
     lbl_repres: 'a option;              (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)

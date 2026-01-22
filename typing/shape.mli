@@ -49,8 +49,6 @@
     a talk about the reduction strategy
 *)
 
-open Iarray_shim
-
 module Layout = Jkind_types.Sort.Const
 type base_layout = Jkind_types.Sort.base
 
@@ -327,7 +325,7 @@ and 'a complex_constructor_argument =
     represent flattened floats simply as float64 in the debugger. *)
 and constructor_representation = mixed_product_shape
 
-and mixed_product_shape = Layout.t iarray
+and mixed_product_shape = Layout.t array
 
 
 

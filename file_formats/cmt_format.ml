@@ -13,7 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
 open Cmi_format
 open Typedtree
 
@@ -173,7 +172,7 @@ let iter_on_occurrences
     Option.iter (fun path -> f ~namespace env path lid) path
   in
   let iter_field_exps ~namespace exp_env fields =
-    Iarray.iter (fun (label_descr, _, record_label_definition) ->
+    Array.iter (fun (label_descr, _, record_label_definition) ->
       match record_label_definition with
       | Overridden ({ Location.txt; loc}, {exp_loc; _})
           when not exp_loc.loc_ghost

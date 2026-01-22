@@ -15,7 +15,6 @@
 
 (* Predefined type constructors (with special typing rules in typecore) *)
 
-open Iarray_shim
 open Path
 open Types
 open Btype
@@ -500,22 +499,22 @@ let mk_add_extension add_extension id args =
       ext_uid = Uid.of_predef_id id;
     }
 
-let iarray_of_list_map_option f (l : 'a list) : 'b iarray option =
-  Misc.Stdlib.List.map_option f l |> Option.map Iarray.of_list
+let array_of_list_map_option f (l : 'a list) : 'b array option =
+  Misc.Stdlib.List.map_option f l |> Option.map Array.of_list
 
 let variant constrs =
   let mk_elt { cd_args } =
     let sorts = match cd_args with
       | Cstr_tuple args ->
-        iarray_of_list_map_option (fun { ca_sort } -> ca_sort) args
+        array_of_list_map_option (fun { ca_sort } -> ca_sort) args
       | Cstr_record lbls ->
-        iarray_of_list_map_option (fun { ld_sort } -> ld_sort) lbls
+        array_of_list_map_option (fun { ld_sort } -> ld_sort) lbls
     in
     sorts |> Option.map (fun sorts -> Constructor_uniform_value, sorts)
   in
   Type_variant (
     constrs,
-    Variant_boxed (Misc.Stdlib.Iarray.of_list_map mk_elt constrs),
+    Variant_boxed (Misc.Stdlib.Array.of_list_map mk_elt constrs),
     None)
 
 let unrestricted tvar ca_sort =
@@ -659,7 +658,7 @@ let build_initial_env add_type add_extension empty_env =
            ("pos_cnum", type_int) ]
          in
          let repres =
-           iarray_of_list_map_option (fun label -> label.ld_sort) labels
+           array_of_list_map_option (fun label -> label.ld_sort) labels
            |> Option.map (fun sorts -> Record_boxed sorts)
          in
          Type_record (labels, repres, None)

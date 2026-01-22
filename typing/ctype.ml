@@ -15,7 +15,6 @@
 
 (* Operations on core types *)
 
-open Iarray_shim
 open Misc
 open Asttypes
 open Types
@@ -1733,18 +1732,18 @@ let instance_label ~fixed lbl =
 let instance_labels ~fixed lbls =
   For_copy.with_scope (fun copy_scope ->
     let vars_and_ty_args =
-      Iarray.map
+      Array.map
         (fun lbl -> instance_label_type' copy_scope ~fixed lbl.lbl_arg)
         lbls
     in
-    let ty_res = copy copy_scope lbls.:(0).lbl_res in
+    let ty_res = copy copy_scope lbls.(0).lbl_res in
     (vars_and_ty_args, ty_res)
   )
 
 let instance_label_declarations ~fixed lds ~params =
   For_copy.with_scope (fun copy_scope ->
     let vars_and_ty_args =
-      Iarray.map
+      Array.map
         (fun ld -> instance_label_type' copy_scope ~fixed ld.ld_type)
         lds
     in
@@ -2443,7 +2442,7 @@ let rec estimate_type_jkind ~expand_components env ty =
           (* This is an unboxed product with at least one [any] field, so we
              need to recompute the jkind if we want it to be precise *)
           let label_params_and_tys, record_params =
-            instance_label_declarations ~fixed:false (Iarray.of_list lbls)
+            instance_label_declarations ~fixed:false (Array.of_list lbls)
               ~params:type_decl.type_params
           in
           let uenv = Expression { env; in_subst = false } in
@@ -2455,7 +2454,7 @@ let rec estimate_type_jkind ~expand_components env ty =
                variables *)
             Misc.fatal_errorf "failed to unify %a" Path.print p
           end;
-          let tys = Iarray.map snd label_params_and_tys |> Iarray.to_list in
+          let tys = Array.map snd label_params_and_tys |> Array.to_list in
           estimate_unboxed_product_jkind ~expand_components env tys
         | _ -> type_decl.type_jkind
       in

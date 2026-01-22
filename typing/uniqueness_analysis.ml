@@ -80,7 +80,6 @@
   [module UsageForest].
 *)
 
-open Iarray_shim
 open Asttypes
 open Types
 open Mode
@@ -2322,7 +2321,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
         value, UF.par uf_exp uf_read
     in
     let uf_fields =
-      Iarray.map
+      Array.map
         (fun field ->
           match field with
           | l, _, Kept (_, _, unique_use) ->
@@ -2338,7 +2337,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
               ienv e)
         fields
     in
-    UF.par uf_ext (UF.pars (Iarray.to_list uf_fields))
+    UF.par uf_ext (UF.pars (Array.to_list uf_fields))
   | Texp_record_unboxed_product { fields; extended_expression } ->
     let value, uf_ext =
       match extended_expression with
@@ -2346,7 +2345,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
       | Some (exp, _) -> check_uniqueness_exp_as_value ienv exp
     in
     let uf_fields =
-      Iarray.map
+      Array.map
         (fun field ->
           match field with
           | l, _, Kept (_, _, unique_use) ->
@@ -2359,7 +2358,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
             check_uniqueness_exp ~overwrite:None ienv e)
         fields
     in
-    UF.par uf_ext (UF.pars (Iarray.to_list uf_fields))
+    UF.par uf_ext (UF.pars (Array.to_list uf_fields))
   | Texp_field _ ->
     let value, uf = check_uniqueness_exp_as_value ienv exp in
     UF.seq uf (Value.mark_maybe_unique value)

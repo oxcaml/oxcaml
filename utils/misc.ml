@@ -13,8 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
-
 (* Errors *)
 
 exception Fatal_error
@@ -452,51 +450,6 @@ module Stdlib = struct
           dst_pos := !dst_pos + len
         done;
         dst
-  end
-
-  module Iarray = struct
-    let update t i a =
-      Iarray.mapi (fun i' old -> if i = i' then a else old) t
-
-    let equal eq_elt l1 l2 =
-      (* Basically inlines [Array.for_all2] to avoid the [raise] *)
-      let n = Iarray.length l1 in
-      Int.equal n (Iarray.length l2) &&
-      let rec loop i =
-        if Int.equal i n then
-          true
-        else if eq_elt (Iarray.unsafe_get l1 i) (Iarray.unsafe_get l2 i) then
-          loop (succ i)
-        else
-          false
-      in
-      loop 0
-
-    let compare compare arr1 arr2 =
-      let len1 = Iarray.length arr1 in
-      let len2 = Iarray.length arr2 in
-      if len1 <> len2 then
-        Int.compare len1 len2
-      else
-        let rec loop i =
-          if i >= len1 then 0
-          else
-            let cmp = compare arr1.:(i) arr2.:(i) in
-            if cmp <> 0 then cmp else loop (i + 1)
-        in
-        loop 0
-
-    let all_somes a =
-      try
-        Some (Iarray.map (function None -> raise_notrace Exit | Some x -> x) a)
-      with
-      | Exit -> None
-
-    let of_list_map f l =
-      Array.of_list_map f l |> Iarray.unsafe_of_array
-
-    let concat_iarrays a =
-      a |> Iarray.to_list |> Iarray.concat
   end
 
   module String = struct

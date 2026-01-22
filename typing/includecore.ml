@@ -13,8 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
-
 (* Inclusion checks for the core language *)
 
 open Asttypes
@@ -872,7 +870,7 @@ module Record_diffing = struct
     if s1 = s2 then None
     else
       let has_float_boxed_on_read fields =
-        Iarray.exists (function
+        Array.exists (function
             | Float_boxed -> true
             | _ -> false)
           fields

@@ -13,7 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
 open Asttypes
 open Typedtree
 
@@ -456,7 +455,7 @@ let expr sub x =
     }
   in
   let map_fields fields =
-    Iarray.map (function
+    Array.map (function
       | label, sort, Kept (t, mut, uu) -> label, sort, Kept (t, mut, uu)
       | label, sort, Overridden (lid, exp) ->
           label, sort, Overridden (map_loc sub lid, sub.expr sub exp))

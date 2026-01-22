@@ -12,7 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Iarray_shim
 open! Dwarf_low
 open! Dwarf_high
 module Uid = Flambda2_identifiers.Flambda_debug_uid
@@ -438,9 +437,8 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Vec512 -> Vec512
     | Word -> Word
     | Untagged_immediate -> Word
-    | Void -> Product Iarray.empty)
-  | Product lys ->
-    Product (Iarray.of_list (List.map layout_to_types_layout lys))
+    | Void -> Product [||])
+  | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
 
 let rec project_layout (layout : Layout.t) path =
   match layout, path with
@@ -463,7 +461,7 @@ let rec field_name_with_path base path =
 
 type 'layout projected_field = string option * S.t * 'layout
 
-let project_field_given_path (fields : Layout.t projected_field iarray) path :
+let project_field_given_path (fields : Layout.t projected_field array) path :
     base_layout projected_field =
   match path with
   | [] ->
@@ -477,11 +475,11 @@ let project_field_given_path (fields : Layout.t projected_field iarray) path :
       Misc.fatal_errorf
         "Empty path provided to [field_project_path] for projecting from %a"
         (Format.pp_print_list ~pp_sep:Format.pp_print_space pp_projected_field)
-        (Iarray.to_list fields)
+        (Array.to_list fields)
       (* field should exist *)
     else None, Shape.leaf' None, Sort.Value
   | [i] -> (
-    match Iarray.get fields i with
+    match Array.get fields i with
     | name, sh, Base ly -> name, sh, ly
     | name, sh, Product prod_layouts ->
       if !Clflags.dwarf_pedantic
@@ -496,7 +494,7 @@ let project_field_given_path (fields : Layout.t projected_field iarray) path :
         (* If this is a product type, then the flattening of the record fields
            has failed. *))
   | i :: subpath ->
-    let field_name, field_type, field_layout = Iarray.get fields i in
+    let field_name, field_type, field_layout = Array.get fields i in
     let field_name = Option.value ~default:("." ^ Int.to_string i) field_name in
     let field_name_with_projection = field_name_with_path field_name subpath in
     ( Some field_name_with_projection,
@@ -505,13 +503,13 @@ let project_field_given_path (fields : Layout.t projected_field iarray) path :
          need to propagate the right shape information here. *)
       project_layout field_layout subpath )
 
-let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t iarray)
+let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t array)
     (fields : Layout.t projected_field list) =
   (* We go to arrays and back because it makes the reordering of the fields via
      accesses O(n) instead of O(n^2) *)
-  let fields = Iarray.of_list fields in
+  let fields = Array.of_list fields in
   let mixed_block_shapes =
-    Iarray.map layout_to_types_layout mixed_block_shapes
+    Array.map layout_to_types_layout mixed_block_shapes
   in
   let reordering =
     Mixed_block_shape.of_mixed_block_elements
@@ -519,11 +517,11 @@ let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t iarray)
       (Lambda.transl_mixed_product_shape mixed_block_shapes)
   in
   let fields =
-    Iarray.init (Mixed_block_shape.new_block_length reordering) (fun i ->
+    Array.init (Mixed_block_shape.new_block_length reordering) (fun i ->
         let old_path = Mixed_block_shape.new_index_to_old_path reordering i in
         project_field_given_path fields old_path)
   in
-  Iarray.to_list fields
+  Array.to_list fields
 
 (* CR sspies: This is a very hacky way of doing an unboxed variant with just a
    single constructor. DWARF variants expect to have a discriminator. So what we
