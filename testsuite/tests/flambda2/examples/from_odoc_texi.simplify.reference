@@ -1,22 +1,19 @@
 let code `!_0` deleted in
 let code foo_1 deleted in
-let $camlFrom_odoc_texi__immstring23 = "b" in
-let $camlFrom_odoc_texi__immstring21 = "a" in
+let $camlFrom_odoc_texi__immstring26 = "b" in
+let $camlFrom_odoc_texi__immstring24 = "a" in
 let code loopify(never) size(2) newer_version_of(`!_0`)
       `!_0_1` (param : val)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
   let Pfield = %block_load.mut.[`0`] (param) in
   cont k (Pfield)
 in
 let $`camlFrom_odoc_texi__!_2` = closure `!_0_1` @`!` in
-let esc_8bits = %block.mut.[`0`] (0) in
+let esc_8bits = %block.mut.[`0`].`toplevel` (0) in
 let code inline(never) loopify(never) size(1) newer_version_of(foo_1)
-      foo_1_1 (x : val)
-        my_closure _region _ghost_region my_depth
-        -> k * k1
-        : val =
+      foo_1_1 (x : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
   let Popaque = %opaque (x) in
   cont k (Popaque)
 in
@@ -27,15 +24,16 @@ let $camlFrom_odoc_texi__foo_3 = closure foo_1_1 @foo in
     | 0 -> k (0)
     | 1 -> k1)
    where k1 =
-     (apply direct(foo_1_1)
+     (apply direct(foo_1_1 &toplevel.alloc_region)
         ($camlFrom_odoc_texi__foo_3 : _ -> val)
-          ($camlFrom_odoc_texi__immstring21)
+          ($camlFrom_odoc_texi__immstring24)
           -> k1 * error
         where k1 (apply_result : val) =
           let Pmakeblock =
-            %block.[`0`] (apply_result, $camlFrom_odoc_texi__immstring23)
+            %block.[`0`].`toplevel`
+              (apply_result, $camlFrom_odoc_texi__immstring26)
           in
-          let Pmakeblock_1 = %block.[`0`] (Pmakeblock, 0) in
+          let Pmakeblock_1 = %block.[`0`].`toplevel` (Pmakeblock, 0) in
           cont k (Pmakeblock_1)))
   where k (y : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
     let $camlFrom_odoc_texi =

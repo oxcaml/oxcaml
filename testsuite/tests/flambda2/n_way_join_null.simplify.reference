@@ -1,7 +1,7 @@
 let code main_0 deleted in
 let code loopify(never) size(4) newer_version_of(main_0)
       main_0_1 (x)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let prim = %is_null (x) in

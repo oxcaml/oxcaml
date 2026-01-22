@@ -21,6 +21,14 @@ module Float = Numeric_types.Float_by_bit_pattern
 module Int32 = Numeric_types.Int32
 module Int64 = Numeric_types.Int64
 
+let get_my_alloc_region dacc =
+  match DE.closure_info (DA.denv dacc) with
+  | Closure { my_alloc_region; _ } -> my_alloc_region
+  | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
+    Misc.fatal_error
+      "Inconsistent closure_info in [simplify_immutable_block_load0]"
+  | Not_in_a_closure -> DE.unit_toplevel_alloc_region (DA.denv dacc)
+
 let simplify_project_function_slot ~move_from ~move_to ~min_name_mode dacc
     ~original_term ~arg:closure ~arg_ty:closure_ty ~result_var =
   match
@@ -143,12 +151,14 @@ let simplify_unbox_number (boxable_number_kind : K.Boxable_number.t) dacc
       match alloc_mode with
       | Unknown | Proved (Local | Heap_or_local) -> dacc
       | Proved Heap ->
+        let alloc_region = get_my_alloc_region dacc in
         DA.map_denv dacc ~f:(fun denv ->
             DE.add_cse denv
               (P.Eligible_for_cse.create_exn
                  (Unary
                     ( Box_number
-                        (boxable_number_kind, Alloc_mode.For_allocations.heap),
+                        ( boxable_number_kind,
+                          Alloc_mode.For_allocations.heap ~alloc_region ),
                       Simple.var result_var' )))
               ~bound_to:arg
               ~name_mode:(Bound_var.name_mode result_var)))
@@ -709,8 +719,8 @@ let simplify_bigarray_length ~dimension:_ dacc ~original_term ~arg:_ ~arg_ty:_
   SPR.create_unknown dacc ~result_var K.naked_immediate ~original_term
 
 let simplify_duplicate_array ~kind:_ ~(source_mutability : Mutability.t)
-    ~(destination_mutability : Mutability.t) dacc ~original_term ~arg:_ ~arg_ty
-    ~result_var =
+    ~(destination_mutability : Mutability.t) ~alloc_region:_ dacc ~original_term
+    ~arg:_ ~arg_ty ~result_var =
   (* This simplification should eliminate bounds checks on array literals. *)
   let denv = DA.denv dacc in
   let machine_width = DE.machine_width denv in
@@ -735,15 +745,16 @@ let simplify_duplicate_array ~kind:_ ~(source_mutability : Mutability.t)
       "Combination of mutabilities not supported for [Duplicate_array]:@ %a"
       Named.print original_term
 
-let simplify_duplicate_block ~kind:_ dacc ~original_term ~arg:_ ~arg_ty
-    ~result_var =
+let simplify_duplicate_block ~kind:_ ~alloc_region:_ dacc ~original_term ~arg:_
+    ~arg_ty ~result_var =
   (* Any alias in the type to the whole block will be dropped, but aliases
      inside the type (e.g. in fields) can remain. *)
   let ty = T.remove_outermost_alias (DA.typing_env dacc) arg_ty in
   let dacc = DA.add_variable dacc result_var ty in
   SPR.create original_term ~try_reify:false dacc
 
-let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
+let simplify_obj_dup ~alloc_region dbg dacc ~original_term ~arg ~arg_ty
+    ~result_var =
   (* This must respect the semantics of physical equality. *)
   let typing_env = DA.typing_env dacc in
   let[@inline] elide_primitive () =
@@ -781,7 +792,8 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
       let box_expr =
         Named.create_prim
           (Unary
-             ( Box_number (boxable_number, Alloc_mode.For_allocations.heap),
+             ( Box_number
+                 (boxable_number, Alloc_mode.For_allocations.heap ~alloc_region),
                contents_simple ))
           dbg
       in
@@ -812,7 +824,8 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
       SPR.create
         (Named.create_prim
            (Unary
-              ( Box_number (boxable_number, Alloc_mode.For_allocations.heap),
+              ( Box_number
+                  (boxable_number, Alloc_mode.For_allocations.heap ~alloc_region),
                 contents ))
            dbg)
         ~try_reify:true dacc)
@@ -916,11 +929,15 @@ let[@inline always] simplify_immutable_block_load0
                       "Block access kind disagrees with block shape from type");
                   Mixed (tag, shape)
               in
+              (* XXXXX *)
+              let alloc_region = get_my_alloc_region dacc in
               let prim =
                 P.Eligible_for_cse.create
                   (Variadic
                      ( Make_block
-                         (block_kind, Immutable, Alloc_mode.For_allocations.heap),
+                         ( block_kind,
+                           Immutable,
+                           Alloc_mode.For_allocations.heap ~alloc_region ),
                        field_simples ))
               in
               match prim with
@@ -1030,14 +1047,17 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | Is_flat_float_array -> simplify_is_flat_float_array
     | Int_as_pointer mode -> simplify_int_as_pointer ~mode
     | Bigarray_length { dimension } -> simplify_bigarray_length ~dimension
-    | Duplicate_array { kind; source_mutability; destination_mutability } ->
+    | Duplicate_array
+        { kind; source_mutability; destination_mutability; alloc_region } ->
       simplify_duplicate_array ~kind ~source_mutability ~destination_mutability
-    | Duplicate_block { kind } -> simplify_duplicate_block ~kind
+        ~alloc_region
+    | Duplicate_block { kind; alloc_region } ->
+      simplify_duplicate_block ~kind ~alloc_region
     | Opaque_identity { middle_end_only = _; kind } ->
       simplify_opaque_identity ~kind
     | End_region { ghost = _ } -> simplify_end_region
     | End_try_region { ghost = _ } -> simplify_end_try_region
-    | Obj_dup -> simplify_obj_dup dbg
+    | Obj_dup { alloc_region } -> simplify_obj_dup dbg ~alloc_region
     | Get_header -> simplify_get_header ~original_prim
     | Peek _ -> simplify_peek ~original_prim
     | Make_lazy _ -> simplify_lazy ~original_prim

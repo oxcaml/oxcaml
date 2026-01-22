@@ -413,7 +413,7 @@ double_loop_no_definition_at_beginning.f:
   movl  $1, %eax
   ret
 .L0:
-  movq  camlTOP15__block741@GOTPCREL(%rip), %rax
+  movq  camlTOP15__block807@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

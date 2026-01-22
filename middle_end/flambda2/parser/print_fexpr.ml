@@ -133,7 +133,9 @@ let result_continuation ppf rcont =
 let region ppf (r : region) =
   match r with
   | Named v -> variable ppf v
-  | Toplevel -> Format.pp_print_string ppf "toplevel"
+  | Toplevel_alloc_region -> Format.pp_print_string ppf "toplevel.alloc_region"
+  | Toplevel_region -> Format.pp_print_string ppf "toplevel.region"
+  | Toplevel_ghost_region -> Format.pp_print_string ppf "toplevel.ghost_region"
 
 let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   Format.pp_print_string ppf
@@ -337,12 +339,12 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
   in
   pp_option ~space Format.pp_print_string ppf str
 
-let alloc_mode_for_applications_opt ppf (alloc : alloc_mode_for_applications)
+let alloc_mode_for_applications pp ppf (alloc : _ alloc_mode_for_applications)
     ~space =
   match alloc with
-  | Heap -> ()
-  | Local { region = r; ghost_region = r' } ->
-    pp_spaced ~space ppf "&%a &%a" region r region r'
+  | Heap { alloc_region } -> pp_spaced ~space ppf "&%a" pp alloc_region
+  | Local { alloc_region; region; ghost_region } ->
+    pp_spaced ~space ppf "&%a &%a &%a" pp alloc_region pp region pp ghost_region
 
 let boxed_variable ppf var ~kind =
   Format.fprintf ppf "%a : %s boxed" variable var kind
@@ -491,12 +493,13 @@ let static_closure_binding ppf (scb : static_closure_binding) =
 
 let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
   match ck with
-  | Function Indirect -> alloc_mode_for_applications_opt ppf alloc_mode ~space
+  | Function Indirect ->
+    (alloc_mode_for_applications region) ppf alloc_mode ~space
   | Function (Direct { code_id = c; function_slot = cl }) ->
     pp_spaced ~space ppf "@[direct(%a%a%a)@]" code_id c
       (pp_option ~space:Before (pp_like "@@%a" function_slot))
       cl
-      (alloc_mode_for_applications_opt ~space:Before)
+      (alloc_mode_for_applications region ~space:Before)
       alloc_mode
   | C_call { alloc } ->
     let noalloc_kwd = if alloc then None else Some "noalloc" in
@@ -756,22 +759,17 @@ and code_binding ppf
     is_tupled
     (fun ppf stub -> if stub then Format.fprintf ppf "@ stub")
     stub Flambda_colours.pop code_id id;
-  let { params;
-        closure_var;
-        region_var;
-        ghost_region_var;
-        depth_var;
-        ret_cont;
-        exn_cont;
-        body
-      } =
+  let { params; closure_var; region_vars; depth_var; ret_cont; exn_cont; body }
+      =
     params_and_body
   in
   Format.fprintf ppf
-    "%a@]@ @[<hov 2>%a@ %a@ %a %a@]@ @[<hv 2>-> %a@ * %a@]%a%s@]@] =@ %a"
+    "%a@]@ @[<hov 2>%a%a@ %a@]@ @[<hv 2>-> %a@ * %a@]%a%s@]@] =@ %a"
     (kinded_parameters ~space:Before)
-    params variable closure_var variable region_var variable ghost_region_var
-    variable depth_var continuation_id ret_cont continuation_id exn_cont
+    params variable closure_var
+    (alloc_mode_for_applications variable ~space:Before)
+    region_vars variable depth_var continuation_id ret_cont continuation_id
+    exn_cont
     (pp_option ~space:Before (pp_like ": %a" arity))
     ret_arity
     (match result_mode with Heap -> "" | Local -> " local")

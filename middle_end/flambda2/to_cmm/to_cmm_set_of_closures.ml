@@ -493,9 +493,12 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
      [_bound_var]). If it does end up in generated code, Selection will complain
      and refuse to compile the code. *)
   let env, my_region_var, my_ghost_region_var =
+    (* CR bclement: put it in CMM *)
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap -> env, None, None
-    | Local { region = my_region; ghost_region = my_ghost_region } ->
+    | Heap { alloc_region = _ } -> env, None, None
+    | Local
+        { alloc_region = _; region = my_region; ghost_region = my_ghost_region }
+      ->
       let my_region_duid = Flambda_debug_uid.none in
       let env, region =
         Env.create_bound_parameter env (my_region, my_region_duid)
@@ -754,7 +757,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   let effs : Ece.t =
     ( Only_generative_effects Immutable,
       (match closure_alloc_mode with
-      | Heap -> No_coeffects
+      | Heap _ -> No_coeffects
       | Local _ -> Has_coeffects),
       Strict,
       Can_move_anywhere )

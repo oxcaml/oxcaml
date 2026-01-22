@@ -3,7 +3,7 @@ let code `fn[symbol_projections2.ml:21,8--17]_2` deleted in
 let code g_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(ignore_0)
       ignore_0_1 (param)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   cont k (0)
@@ -18,10 +18,10 @@ let set_of_closures
     end
 and code loopify(never) size(5) newer_version_of(g_1)
       g_1_1 (param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
-  apply direct(ignore_0_1)
+  apply direct(ignore_0_1 &my_alloc_region)
     ($camlSymbol_projections2__ignore_3 : _ -> imm tagged) (0) -> k2 * k1
     where k2 (param_1 : imm tagged) =
       cont k
@@ -34,7 +34,7 @@ and set_of_closures
     end
 and code loopify(never) size(4) newer_version_of(`fn[symbol_projections2.ml:21,8--17]_2`)
       `fn[symbol_projections2.ml:21,8--17]_2_1` (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let v_2 =

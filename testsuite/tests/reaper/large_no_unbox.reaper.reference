@@ -4,7 +4,7 @@ let code f_0 deleted in
 let code inline(never) loopify(never) size(11) newer_version_of(large_2)
       large_2_1
         (param : [ 0 of imm tagged * imm tagged * imm tagged * imm tagged ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let Pfield = %block_load.[`3`] (param) in
@@ -22,7 +22,7 @@ let code inline(never) loopify(never) size(5) newer_version_of(small_1)
         (Pmakeblock_into_param_field_0,
          Pmakeblock_into_param_field_1,
          Pmakeblock_into_param_field_2)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let Pfield = Pmakeblock_into_param_field_2 in
@@ -35,7 +35,7 @@ in
 let $camlLarge_no_unbox__small_4 = closure small_1_1 @small in
 let code loopify(never) size(36) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
@@ -44,10 +44,10 @@ let code loopify(never) size(36) newer_version_of(f_0)
    let int_add_2 = %int_barith.add (x, 6) in
    let int_add_3 = %int_barith.add (x, 5) in
    let Pmakeblock =
-     %block.[`0`].`local`[`region`]
+     %block.[`0`].my_alloc_region.`local`[`region`]
        (int_add_3, int_add_2, int_add_1, int_add)
    in
-   apply direct(large_2_1)
+   apply direct(large_2_1 &my_alloc_region)
      ($camlLarge_no_unbox__large_5 : _ -> imm tagged) (Pmakeblock) -> k2 * k1)
     where k2 (apply_result : imm tagged) =
       ((let int_add = %int_barith.add (x, 3) in
@@ -56,7 +56,7 @@ let code loopify(never) size(36) newer_version_of(f_0)
         let Pmakeblock_into_Pmakeblock_field_2 = int_add in
         let Pmakeblock_into_Pmakeblock_field_1 = int_add_1 in
         let Pmakeblock_into_Pmakeblock_field_0 = int_add_2 in
-        apply direct(small_1_1)
+        apply direct(small_1_1 &my_alloc_region)
           ($camlLarge_no_unbox__small_4 : _ -> imm tagged)
             (Pmakeblock_into_Pmakeblock_field_0,
              Pmakeblock_into_Pmakeblock_field_1,

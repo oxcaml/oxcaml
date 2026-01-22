@@ -35,18 +35,32 @@ let make_inlined_body ~callee ~called_code_id:_ ~region_inlined_into ~params
        value, and as such, never allocate in the caller's region. As such,
        [my_region] should be unused in the body. *)
     match (region_inlined_into : Alloc_mode.For_applications.t) with
-    | Heap -> renaming
-    | Local { region; ghost_region } -> (
+    | Heap { alloc_region } -> (
+      match (my_alloc_mode : Alloc_mode.For_applications.t) with
+      | Heap { alloc_region = my_alloc_region } ->
+        Renaming.add_variable renaming my_alloc_region alloc_region
+      | Local _ ->
+        Misc.fatal_error
+          "Nathanaëlle says: Inlining local returning function into a global \
+           function is verboten.")
+    | Local { alloc_region; region; ghost_region } -> (
       (* Unlike for parameters, we know that the argument for the [my_region]
          parameter is fresh for [body], so we can use a permutation without fear
          of swapping out existing occurrences of such argument within [body].
          Similarly for [ghost_region]. *)
       match (my_alloc_mode : Alloc_mode.For_applications.t) with
-      | Local { region = my_region; ghost_region = my_ghost_region } ->
+      | Local
+          { alloc_region = my_alloc_region;
+            region = my_region;
+            ghost_region = my_ghost_region
+          } ->
         Renaming.add_variable
-          (Renaming.add_variable renaming my_region region)
-          my_ghost_region ghost_region
-      | Heap -> renaming)
+          (Renaming.add_variable
+             (Renaming.add_variable renaming my_region region)
+             my_ghost_region ghost_region)
+          my_alloc_region alloc_region
+      | Heap { alloc_region = my_alloc_region } ->
+        Renaming.add_variable renaming my_alloc_region alloc_region)
   in
   let body =
     match callee with

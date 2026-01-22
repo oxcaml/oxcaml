@@ -16,11 +16,11 @@ let code main_no_if_14 deleted in
 let code main_no_if_tuple_15 deleted in
 let code main_hand_inline_16 deleted in
 let code main_hand_inline_tuple_17 deleted in
-let $camlIfs_and_records__empty_block4 = Block 0 () in
+let $camlIfs_and_records__empty_block5 = Block 0 () in
 let code inline(always) loopify(never) size(27) newer_version_of(help_desired_0)
       help_desired_0_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   (let untagged = %untag_imm (should_swap) in
@@ -28,10 +28,10 @@ let code inline(always) loopify(never) size(27) newer_version_of(help_desired_0)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let Pmakeblock = %block.[`0`] (b, a) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (b, a) in
       cont k (Pmakeblock)
     where k2 =
-      let Pmakeblock = %block.[`0`] (a, b) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
       cont k (Pmakeblock)
 in
 let $camlIfs_and_records__help_desired_18 =
@@ -40,7 +40,7 @@ in
 let code inline(always) loopify(never) size(19) newer_version_of(help_wrap_1)
       help_wrap_1_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   (let untagged = %untag_imm (should_swap) in
@@ -48,14 +48,14 @@ let code inline(always) loopify(never) size(19) newer_version_of(help_wrap_1)
      | 0 -> k2 (a, b)
      | 1 -> k2 (b, a))
     where k2 (a_1 : imm tagged, b_1 : imm tagged) =
-      let Pmakeblock = %block.[`0`] (a_1, b_1) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (a_1, b_1) in
       cont k (Pmakeblock)
 in
 let $camlIfs_and_records__help_wrap_19 = closure help_wrap_1_1 @help_wrap in
 let code inline(always) loopify(never) size(27) newer_version_of(help_variant_2)
       help_variant_2_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   (let untagged = %untag_imm (should_swap) in
@@ -63,10 +63,10 @@ let code inline(always) loopify(never) size(27) newer_version_of(help_variant_2)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let Pmakeblock = %block.[`0`] (b, a) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (b, a) in
       cont k (Pmakeblock)
     where k2 =
-      let Pmakeblock = %block.[`0`] (a, b) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
       cont k (Pmakeblock)
 in
 let $camlIfs_and_records__help_variant_20 =
@@ -75,7 +75,7 @@ in
 let code inline(always) loopify(never) size(19) newer_version_of(help_wrap_variant_3)
       help_wrap_variant_3_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   (let untagged = %untag_imm (should_swap) in
@@ -83,7 +83,7 @@ let code inline(always) loopify(never) size(19) newer_version_of(help_wrap_varia
      | 0 -> k2 (a, b)
      | 1 -> k2 (b, a))
     where k2 (a_1 : imm tagged, b_1 : imm tagged) =
-      let Pmakeblock = %block.[`0`] (a_1, b_1) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (a_1, b_1) in
       cont k (Pmakeblock)
 in
 let $camlIfs_and_records__help_wrap_variant_21 =
@@ -91,7 +91,7 @@ let $camlIfs_and_records__help_wrap_variant_21 =
 in
 let code inline(always) loopify(never) size(27) newer_version_of(help_tuple_4)
       help_tuple_4_1 (should_swap : imm tagged, a, b)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of val * val ] =
   (let untagged = %untag_imm (should_swap) in
@@ -99,10 +99,10 @@ let code inline(always) loopify(never) size(27) newer_version_of(help_tuple_4)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let Pmakeblock = %block.[`0`] (b, a) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (b, a) in
       cont k (Pmakeblock)
     where k2 =
-      let Pmakeblock = %block.[`0`] (a, b) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
       cont k (Pmakeblock)
 in
 let $camlIfs_and_records__help_tuple_22 = closure help_tuple_4_1 @help_tuple
@@ -110,7 +110,7 @@ in
 let code inline(always) loopify(never) size(30) newer_version_of(help_interior_if_5)
       help_interior_if_5_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   (let untagged = %untag_imm (should_swap) in
@@ -123,7 +123,9 @@ let code inline(always) loopify(never) size(30) newer_version_of(help_interior_i
           | 0 -> k2 (a)
           | 1 -> k2 (b))
          where k2 (switch_result_1 : imm tagged) =
-           let Pmakeblock = %block.[`0`] (switch_result_1, switch_result) in
+           let Pmakeblock =
+             %block.[`0`].my_alloc_region (switch_result_1, switch_result)
+           in
            cont k (Pmakeblock))
 in
 let $camlIfs_and_records__help_interior_if_23 =
@@ -131,20 +133,20 @@ let $camlIfs_and_records__help_interior_if_23 =
 in
 let code inline(always) loopify(never) size(8) newer_version_of(help_no_if_6)
       help_no_if_6_1 (param, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
-  let Pmakeblock = %block.[`0`] (a, b) in
+  let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
   cont k (Pmakeblock)
 in
 let $camlIfs_and_records__help_no_if_24 = closure help_no_if_6_1 @help_no_if
 in
 let code inline(always) loopify(never) size(8) newer_version_of(help_no_if_tuple_7)
       help_no_if_tuple_7_1 (param, a, b)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of val * val ] =
-  let Pmakeblock = %block.[`0`] (a, b) in
+  let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
   cont k (Pmakeblock)
 in
 let $camlIfs_and_records__help_no_if_tuple_25 =
@@ -153,7 +155,7 @@ in
 let code loopify(never) size(14) newer_version_of(main_desired_8)
       main_desired_8_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (should_swap) in
@@ -170,7 +172,7 @@ in
 let code loopify(never) size(14) newer_version_of(main_wrap_9)
       main_wrap_9_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (should_swap) in
@@ -185,7 +187,7 @@ let $camlIfs_and_records__main_wrap_27 = closure main_wrap_9_1 @main_wrap in
 let code loopify(never) size(14) newer_version_of(main_variant_10)
       main_variant_10_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (should_swap) in
@@ -202,7 +204,7 @@ in
 let code loopify(never) size(14) newer_version_of(main_wrap_variant_11)
       main_wrap_variant_11_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (should_swap) in
@@ -219,7 +221,7 @@ in
 let code loopify(never) size(14) newer_version_of(main_tuple_12)
       main_tuple_12_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (should_swap) in
@@ -235,7 +237,7 @@ in
 let code loopify(never) size(25) newer_version_of(main_interior_if_13)
       main_interior_if_13_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (should_swap) in
@@ -256,7 +258,7 @@ let $camlIfs_and_records__main_interior_if_31 =
 in
 let code loopify(never) size(3) newer_version_of(main_no_if_14)
       main_no_if_14_1 (should_swap, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let int_sub = %int_barith.sub (a, b) in
@@ -266,7 +268,7 @@ let $camlIfs_and_records__main_no_if_32 = closure main_no_if_14_1 @main_no_if
 in
 let code loopify(never) size(3) newer_version_of(main_no_if_tuple_15)
       main_no_if_tuple_15_1 (should_swap, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let int_sub = %int_barith.sub (a, b) in
@@ -278,7 +280,7 @@ in
 let code loopify(never) size(14) newer_version_of(main_hand_inline_16)
       main_hand_inline_16_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (should_swap) in
@@ -295,7 +297,7 @@ in
 let code loopify(never) size(14) newer_version_of(main_hand_inline_tuple_17)
       main_hand_inline_tuple_17_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (should_swap) in
@@ -310,8 +312,8 @@ let $camlIfs_and_records__main_hand_inline_tuple_35 =
   closure main_hand_inline_tuple_17_1 @main_hand_inline_tuple
 in
 let $camlIfs_and_records =
-  Block 0 ($camlIfs_and_records__empty_block4,
-           $camlIfs_and_records__empty_block4,
+  Block 0 ($camlIfs_and_records__empty_block5,
+           $camlIfs_and_records__empty_block5,
            $camlIfs_and_records__help_desired_18,
            $camlIfs_and_records__help_wrap_19,
            $camlIfs_and_records__help_variant_20,

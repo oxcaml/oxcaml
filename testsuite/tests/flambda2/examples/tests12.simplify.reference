@@ -5,7 +5,7 @@ let code bar_0 deleted in
 let code map_foo_4 deleted in
 let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,39--51]_3`)
       `fn[tests12.ml:25,39--51]_3_1` (x)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1 =
   cont k (x)
 in
@@ -14,7 +14,7 @@ let $`camlTests12__fn[tests12.ml:25,39--51]_7` =
 in
 let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,52--67]_2`)
       `fn[tests12.ml:25,52--67]_2_1` (param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 | 0 of val * val ] =
   cont k (0)
@@ -24,12 +24,12 @@ let $`camlTests12__fn[tests12.ml:25,52--67]_6` =
 in
 let code loopify(never) size(7) newer_version_of(`fn[tests12.ml:25,2--70]_1`)
       `fn[tests12.ml:25,2--70]_1_1` (param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1 =
   let map_foo =
     %project_value_slot.[`fn[tests12.ml:25,2--70]`].[map_foo] (my_closure)
   in
-  apply inlined(never)
+  apply &my_alloc_region inlined(never)
     map_foo
       ($`camlTests12__fn[tests12.ml:25,39--51]_7`,
        $`camlTests12__fn[tests12.ml:25,52--67]_6`,
@@ -38,7 +38,7 @@ let code loopify(never) size(7) newer_version_of(`fn[tests12.ml:25,2--70]_1`)
 in
 let code inline(always) loopify(never) size(16) newer_version_of(bar_0)
       bar_0_1 (map_foo : val)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
   let `fn[tests12.ml:25,2--70]` =
@@ -52,10 +52,10 @@ let $camlTests12__map_foo_8 =
   closure map_foo_4_1 @map_foo
 and code rec loopify(never) size(75) newer_version_of(map_foo_4)
       map_foo_4_1 (f : val, seq : val, param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 | 0 of val * val ] =
-  apply seq (0) -> k2 * k1
+  apply &my_alloc_region seq (0) -> k2 * k1
     where k2 (`*match*` : [ 0 | 0 of val * val ]) =
       let prim = %is_int (`*match*`) in
       (switch prim
@@ -88,19 +88,22 @@ and code rec loopify(never) size(75) newer_version_of(map_foo_4)
                  in
                  cont k2 (`fn[tests12.ml:25,2--70]`))
               where k2 (g : val) =
-                (apply inlined(always) g (0) -> k2 * k1
+                (apply &my_alloc_region inlined(always) g (0) -> k2 * k1
                    where k2 (g_result : [ 0 | 0 of val * val ]) =
                      let Popaque = %opaque (g_result) in
                      ((let Pfield = %block_load.[`0`] (`*match*`) in
-                       apply f (Pfield) -> k2 * k1)
+                       apply &my_alloc_region f (Pfield) -> k2 * k1)
                         where k2 (apply_result : val) =
-                          let Pmakeblock = %block.[`0`] (apply_result, g) in
+                          let Pmakeblock =
+                            %block.[`0`].my_alloc_region (apply_result, g)
+                          in
                           cont k (Pmakeblock)))))
 and code loopify(never) size(4) newer_version_of(`fn[tests12.ml:25,2--70]_1_1`)
       `fn[tests12.ml:25,2--70]_1_2` (param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1 =
-  apply direct(map_foo_4_1) inlined(never) inlining_state(depth(1))
+  apply direct(map_foo_4_1 &my_alloc_region) inlined(never)
+         inlining_state(depth(1))
     $camlTests12__map_foo_8 ~ depth do_not_inline -> do_not_inline
       ($`camlTests12__fn[tests12.ml:25,39--51]_7`,
        $`camlTests12__fn[tests12.ml:25,52--67]_6`,
@@ -108,9 +111,10 @@ and code loopify(never) size(4) newer_version_of(`fn[tests12.ml:25,2--70]_1_1`)
       -> k * k1
 and code loopify(never) size(4) newer_version_of(`fn[tests12.ml:25,2--70]_1_1`)
       `fn[tests12.ml:25,2--70]_1_3` (param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1 =
-  apply direct(map_foo_4_1) inlined(never) inlining_state(depth(1))
+  apply direct(map_foo_4_1 &my_alloc_region) inlined(never)
+         inlining_state(depth(1))
     $camlTests12__map_foo_8 ~ depth do_not_inline -> do_not_inline
       ($`camlTests12__fn[tests12.ml:25,39--51]_7`,
        $`camlTests12__fn[tests12.ml:25,52--67]_6`,

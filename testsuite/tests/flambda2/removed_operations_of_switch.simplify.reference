@@ -2,7 +2,7 @@ let code f_0 deleted in
 let code g_1 deleted in
 let code loopify(never) size(27) newer_version_of(f_0)
       f_0_1 (b : imm tagged, x, y)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of val * val ] =
   (let untagged = %untag_imm (b) in
@@ -10,19 +10,19 @@ let code loopify(never) size(27) newer_version_of(f_0)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let Pmakeblock = %block.[`0`] (x, y) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (x, y) in
       cont k (Pmakeblock)
     where k2 =
-      let Pmakeblock = %block.[`0`] (y, x) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (y, x) in
       cont k (Pmakeblock)
 in
 let $camlRemoved_operations_of_switch__f_2 = closure f_0_1 @f in
 let code loopify(never) size(4) newer_version_of(g_1)
       g_1_1 (b : imm tagged, x, y)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of val * val ] =
-  apply direct(f_0_1)
+  apply direct(f_0_1 &my_alloc_region)
     ($camlRemoved_operations_of_switch__f_2 : _ -> [ 0 of val * val ])
       (b, x, y)
       -> k * k1

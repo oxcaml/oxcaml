@@ -173,19 +173,25 @@ let recursive_flag (r : Recursive.t) : Fexpr.is_recursive =
 let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
     Fexpr.alloc_mode_for_allocations =
   match alloc with
-  | Heap -> Heap
-  | Local { region = r } ->
-    let r = Env.find_region_exn env r in
-    Local { region = r }
+  | Heap { alloc_region } ->
+    let alloc_region = Env.find_region_exn env alloc_region in
+    Heap { alloc_region }
+  | Local { alloc_region; region } ->
+    let alloc_region = Env.find_region_exn env alloc_region in
+    let region = Env.find_region_exn env region in
+    Local { alloc_region; region }
 
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
-    Fexpr.alloc_mode_for_applications =
+    Fexpr.region Fexpr.alloc_mode_for_applications =
   match alloc with
-  | Heap -> Heap
-  | Local { region = r; ghost_region = r' } ->
-    let r = Env.find_region_exn env r in
-    let r' = Env.find_region_exn env r' in
-    Local { region = r; ghost_region = r' }
+  | Heap { alloc_region } ->
+    let alloc_region = Env.find_region_exn env alloc_region in
+    Heap { alloc_region }
+  | Local { alloc_region; region; ghost_region } ->
+    let alloc_region = Env.find_region_exn env alloc_region in
+    let region = Env.find_region_exn env region in
+    let ghost_region = Env.find_region_exn env ghost_region in
+    Local { alloc_region; region; ghost_region }
 
 let prim env (p : Flambda_primitive.t) : Fexpr.prim =
   let p, args = Fexpr_prim.OfFlambda.prim env p in
@@ -375,7 +381,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       Data { symbol; defining_expr }
     | Set_of_closures closure_symbols, Static_const const ->
       let set = Static_const.must_be_set_of_closures const in
-      let fun_decls, elements = set_of_closures env set Heap in
+      let fun_decls, elements =
+        set_of_closures env set (Heap { alloc_region = Toplevel_alloc_region })
+      in
       let symbols_by_function_slot =
         closure_symbols |> Function_slot.Lmap.bindings
         |> Function_slot.Map.of_list
@@ -444,13 +452,20 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
                 (Bound_parameters.to_list params)
             in
             let closure_var, env = Env.bind_var env my_closure in
-            let region_var, ghost_region_var, env =
+            let (region_vars : _ Fexpr.alloc_mode_for_applications), env =
               match my_alloc_mode with
-              | Heap -> nowhere "_region", nowhere "_ghost_region", env
-              | Local { region = my_region; ghost_region = my_ghost_region } ->
-                let region_var, env = Env.bind_var env my_region in
-                let ghost_region_var, env = Env.bind_var env my_ghost_region in
-                region_var, ghost_region_var, env
+              | Heap { alloc_region } ->
+                let alloc_region, env = Env.bind_var env alloc_region in
+                Heap { alloc_region }, env
+              | Local
+                  { alloc_region = my_alloc_region;
+                    region = my_region;
+                    ghost_region = my_ghost_region
+                  } ->
+                let alloc_region, env = Env.bind_var env my_alloc_region in
+                let region, env = Env.bind_var env my_region in
+                let ghost_region, env = Env.bind_var env my_ghost_region in
+                Local { alloc_region; region; ghost_region }, env
             in
             let depth_var, env = Env.bind_var env my_depth in
             let body = expr env body in
@@ -459,8 +474,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               ret_cont;
               exn_cont;
               closure_var;
-              region_var;
-              ghost_region_var;
+              region_vars;
               depth_var;
               body
             })
@@ -818,11 +832,20 @@ let bind_all_code_ids env unit =
 let conv flambda_unit =
   let done_ = Flambda_unit.return_continuation flambda_unit in
   let error = Flambda_unit.exn_continuation flambda_unit in
-  let toplevel = Flambda_unit.toplevel_my_region flambda_unit in
   let env = Env.create () in
   let env = Env.bind_special_continuation env done_ ~to_:Done in
   let env = Env.bind_special_continuation env error ~to_:Error in
-  let env = Env.bind_toplevel_region env toplevel in
+  let env =
+    Env.bind_toplevel_alloc_region env
+      (Flambda_unit.toplevel_my_alloc_region flambda_unit)
+  in
+  let env =
+    Env.bind_toplevel_region env (Flambda_unit.toplevel_my_region flambda_unit)
+  in
+  let env =
+    Env.bind_toplevel_ghost_region env
+      (Flambda_unit.toplevel_my_ghost_region flambda_unit)
+  in
   (* Bind all code ids in toplevel let bindings at the start, since they don't
      necessarily occur in dependency order *)
   let env = bind_all_code_ids env flambda_unit in

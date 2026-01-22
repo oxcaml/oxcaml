@@ -154,19 +154,25 @@ let or_variable f env (ov : _ Fexpr.or_variable) : _ Or_variable.t =
 
 let alloc_mode_for_allocations env (alloc : Fexpr.alloc_mode_for_allocations) =
   match alloc with
-  | Heap -> Alloc_mode.For_allocations.heap
-  | Local { region = r } ->
-    let r = find_region env r in
-    Alloc_mode.For_allocations.local ~region:r
+  | Heap { alloc_region } ->
+    let alloc_region = find_region env alloc_region in
+    Alloc_mode.For_allocations.heap ~alloc_region
+  | Local { alloc_region; region } ->
+    let alloc_region = find_region env alloc_region in
+    let region = find_region env region in
+    Alloc_mode.For_allocations.local ~alloc_region ~region
 
-let alloc_mode_for_applications env (alloc : Fexpr.alloc_mode_for_applications)
-    =
+let alloc_mode_for_applications env
+    (alloc : Fexpr.region Fexpr.alloc_mode_for_applications) =
   match alloc with
-  | Heap -> Alloc_mode.For_applications.heap
-  | Local { region = r; ghost_region = r' } ->
-    let r = find_region env r in
-    let r' = find_region env r' in
-    Alloc_mode.For_applications.local ~region:r ~ghost_region:r'
+  | Heap { alloc_region } ->
+    let alloc_region = find_region env alloc_region in
+    Alloc_mode.For_applications.heap ~alloc_region
+  | Local { alloc_region; region; ghost_region } ->
+    let alloc_region = find_region env alloc_region in
+    let region = find_region env region in
+    let ghost_region = find_region env ghost_region in
+    Alloc_mode.For_applications.local ~alloc_region ~region ~ghost_region
 
 let prim env ((p, args) : Fexpr.prim) : Flambda_primitive.t =
   let args = List.map (simple env) args in
@@ -625,8 +631,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               acc ) =
           let { Fexpr.params;
                 closure_var;
-                region_var;
-                ghost_region_var;
+                region_vars;
                 depth_var;
                 ret_cont;
                 exn_cont;
@@ -648,11 +653,26 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           let my_closure, _my_closure_duid, env =
             fresh_var env closure_var Flambda_kind.value
           in
-          let my_region, _my_region_duid, env =
-            fresh_var env region_var Flambda_kind.region
-          in
-          let my_ghost_region, _my_ghost_region, env =
-            fresh_var env ghost_region_var Flambda_kind.region
+          let my_alloc_mode, env =
+            match region_vars with
+            | Heap { alloc_region } ->
+              let alloc_region, _duid, env =
+                fresh_var env alloc_region Flambda_kind.region
+              in
+              Alloc_mode.For_applications.heap ~alloc_region, env
+            | Local { alloc_region; region; ghost_region } ->
+              let alloc_region, _duid, env =
+                fresh_var env alloc_region Flambda_kind.region
+              in
+              let region, _duid, env =
+                fresh_var env region Flambda_kind.region
+              in
+              let ghost_region, _duid, env =
+                fresh_var env ghost_region Flambda_kind.region
+              in
+              ( Alloc_mode.For_applications.local ~alloc_region ~region
+                  ~ghost_region,
+                env )
           in
           let my_depth, _my_depth, env =
             fresh_var env depth_var Flambda_kind.rec_info
@@ -670,11 +690,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             Flambda.Function_params_and_body.create ~return_continuation
               ~exn_continuation
               (Bound_parameters.create params)
-              ~body ~my_closure
-              ~my_alloc_mode:
-                (Alloc_mode.For_applications.local ~region:my_region
-                   ~ghost_region:my_ghost_region)
-              ~my_depth ~free_names_of_body:Unknown
+              ~body ~my_closure ~my_alloc_mode ~my_depth
+              ~free_names_of_body:Unknown
           in
           let free_names =
             (* CR mshinwell: This needs fixing XXX *)
@@ -685,6 +702,11 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             free_names,
             Flambda.Function_params_and_body.is_my_closure_used params_and_body,
             acc )
+        in
+        let result_mode =
+          match result_mode with
+          | Heap -> Lambda.alloc_heap
+          | Local -> Lambda.alloc_local
         in
         let recursive = convert_recursive_flag recursive in
         let inline =
@@ -703,11 +725,6 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           List.map
             (fun _ -> Alloc_mode.For_types.heap)
             (Flambda_arity.unarize params_arity)
-        in
-        let result_mode =
-          match result_mode with
-          | Heap -> Lambda.alloc_heap
-          | Local -> Lambda.alloc_local
         in
         let code =
           (* CR mshinwell: [inlining_decision] should maybe be set properly *)
@@ -917,6 +934,9 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
       ~toplevel_my_region:toplevel_region
       ~toplevel_my_ghost_region:
         (Variable.create "my_ghost_region" Flambda_kind.region)
+      ~toplevel_my_alloc_region:
+        (Variable.create "my_alloc_region" Flambda_kind.region)
+        (* XXX *)
       ~body ~module_symbol ~used_value_slots:Unknown
   in
   { unit; code_slot_offsets }

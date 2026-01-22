@@ -1,7 +1,7 @@
 let code foo_0 deleted in
 let code loopify(never) size(25) newer_version_of(foo_0)
       foo_0_1 (b : imm tagged, x : imm tagged, y : float boxed)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (b) in
