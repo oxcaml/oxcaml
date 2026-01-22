@@ -3047,7 +3047,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
-          anchor env ~expected_mode:(mode.mode_modes |> Value.disallow_left) sarg
+          anchor env ~expected_mode:(mode.mode_modes |> Value.disallow_left)
+          sarg
       in
       let md, final_shape =
         match smty with
@@ -3059,7 +3060,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
             RHS. *)
             let arg_mode = Typedtree.mode_without_locks_exn arg.mod_mode in
             submode ~loc:sarg.pmod_loc ~env arg_mode mode.mode_modes;
-            { arg with mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
+            { arg with
+              mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
             arg_shape
         | Some smty ->
             let mty = transl_modtype env smty in
