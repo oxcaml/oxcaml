@@ -7,4 +7,3 @@
    ocamlc.byte;
    check-ocamlc.byte-output;
 *)
-(* CR layouts v2.8: This should be accepted *)

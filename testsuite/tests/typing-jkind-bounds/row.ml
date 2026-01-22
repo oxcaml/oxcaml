@@ -324,7 +324,7 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
+(* CR layouts v2.8: This should be accepted (principal poly-variant case). *)
 [%%expect{|
 type t3 = C of string
 |}, Principal{|

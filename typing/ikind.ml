@@ -25,6 +25,7 @@ let enable_crossing = true
 let enable_sub_jkind_l = true
 
 let enable_sub_or_intersect = false
+(* Disabled: or_null intersections regress; keep Jkind path for now. *)
 
 let enable_sub_or_error = false
 
@@ -856,10 +857,8 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
    Keep Jkind as the single source for classification and error reporting. *)
-(* CR jujacobs: fix this *)
 type sub_or_intersect = Jkind.sub_or_intersect
 
-(* CR jujacobs: performance issue here. *)
 let sub_or_intersect ?origin:_origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) ~level
