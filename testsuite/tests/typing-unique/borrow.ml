@@ -558,7 +558,8 @@ let foo () =
 Line 10, characters 13-14:
 10 |   unique_use x
                   ^
-Error: This value is used here as unique, but it has already been borrowed:
+Error: This value is used here as unique,
+       but it has already been borrowed in a closure that might be called later:
 Line 5, characters 24-35:
 5 |       local_aliased_use (borrow_ x);
                             ^^^^^^^^^^^
@@ -580,7 +581,8 @@ let foo () =
 Line 10, characters 13-14:
 10 |   unique_use x
                   ^
-Error: This value is used here as unique, but it has already been borrowed:
+Error: This value is used here as unique,
+       but it has already been borrowed in a closure that might be called later:
 Line 5, characters 24-35:
 5 |       local_aliased_use (borrow_ x);
                             ^^^^^^^^^^^
