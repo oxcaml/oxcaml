@@ -75,6 +75,7 @@ let parameter_list_from_arrows typ =
     | Types.Tfield _
     | Types.Tquote _
     | Types.Tsplice _
+    | Types.Teval _
     | Types.Tnil
     | Types.Tunivar _
     | Types.Tpackage _

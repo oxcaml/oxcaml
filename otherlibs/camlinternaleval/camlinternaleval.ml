@@ -260,5 +260,7 @@ let eval code =
         Location.report_exception Format.std_formatter exn;
         Printexc.raise_with_backtrace exn backtrace)
 
+let eval (expr : 'a expr) : 'a eval = Obj.magic expr |> eval |> Obj.magic
+
 let use_existing_compilerlibs_state_for_artifacts () =
   use_existing_compilerlibs_state_for_artifacts := true
