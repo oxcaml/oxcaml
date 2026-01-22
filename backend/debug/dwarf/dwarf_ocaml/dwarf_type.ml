@@ -1410,6 +1410,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
     | At_layout (sh, _) ->
+      (* CR sspies: Currently, the layout is unused. Should be used in a future
+         PR.*)
       let reference' =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
           type_layout ~rec_env
