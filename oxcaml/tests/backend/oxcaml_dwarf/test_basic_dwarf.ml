@@ -278,6 +278,8 @@ let _ = f_poly [| 'p'; 'o'; 'l'; 'y' |]
 (* CR sspies: char arrays in polymorphic context show as ASCII codes instead of
    characters *)
 
+let _ = f_poly [||]
+
 let _ = f_poly ['p'; 'o'; 'l'; 'y']
 
 let _ = f_poly (Some 'p')
