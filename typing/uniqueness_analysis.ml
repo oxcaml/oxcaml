@@ -2878,7 +2878,7 @@ let report_multi_use inner first_is_of_second =
       | Lifted access ->
         Maybe_aliased.string_of_access access
         ^ " in a closure that might be called later"
-      | Lifted_borrowed -> "borrowed")
+      | Lifted_borrowed -> "borrowed in a closure that might be called later")
     | _ -> "used"
   in
   let first, first_usage, second, second_usage, access_order, second_is_occ =
