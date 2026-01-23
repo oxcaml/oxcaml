@@ -193,6 +193,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Mutable_read m -> Mutable_read m
         | Mutable_write m -> Mutable_write m
         | Lazy_forced -> Lazy_forced
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -207,6 +208,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Escape_region x -> Escape_region x
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -226,6 +229,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Escape_region x -> Escape_region x
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -245,6 +251,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Escape_region x -> Escape_region x
     end)
   end
 end
@@ -2102,6 +2111,15 @@ module Report = struct
     | Application -> dprintf "function applications"
     | Try_with -> dprintf "try-with clauses"
 
+  let print_region_desc : region_desc -> _ = function
+    | Borrow -> print_article_noun Consonant "borrow region"
+
+  let print_region : capitalize:_ -> region -> _ =
+   fun ~capitalize (loc, desc) ->
+    dprintf "%t at %a"
+      (print_region_desc desc ~definite:true ~capitalize)
+      Location.print_loc loc
+
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
       prints the const to explain the mode on the pinpoint. *)
   let print_const (type l r) (_, pp_desc) ppf : (l * r) const -> unit = function
@@ -2153,6 +2171,9 @@ module Report = struct
     | Always_dynamic x ->
       fprintf ppf "%t are always dynamic" (print_always_dynamic x)
     | Branching -> fprintf ppf "it has branches"
+    | Borrowed _ -> fprintf ppf "it is borrowed"
+    | Escape_region reg ->
+      fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
 
   let print_allocation_l : allocation -> formatter -> unit =
    fun { txt; loc } ->

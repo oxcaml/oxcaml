@@ -386,6 +386,20 @@ let mk_expected ?explanation ty = { ty; explanation; }
 let case lhs rhs =
   {c_lhs = lhs; c_guard = None; c_rhs = rhs}
 
+let is_borrow e =
+  match e.pexp_desc with
+  | Pexp_borrow _ -> true
+  | _ -> false
+
+(* Mark all Texp_borrowed nodes in an expression as being in a valid
+   borrowing context *)
+let mark_borrowed_in_context exp =
+  List.iter (fun (extra, _, _) ->
+    match extra with
+    | Texp_borrowed r -> r := true
+    | _ -> ()
+  ) exp.exp_extra
+
 type position_in_function = FTail | FNontail
 
 
@@ -569,13 +583,23 @@ let mode_return mode =
       (Value.proj_comonadic Areality mode), FTail);
   }
 
-(* used when entering a region.*)
-let mode_region mode =
-  { (mode_default (meet_regional mode)) with
+(** Given the expected mode of a region, gives the [expected_mode] of the body
+    inside the region. *)
+let mode_region ?region mode =
+  let hint = Option.map (fun x -> Hint.Escape_region x) region in
+  { (mode_default (mode |> value_r2g |> meet_regional ?hint)) with
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
   }
+
+let enter_region_if cond ?region env expected_mode =
+  if cond then
+    Env.add_region_lock env,
+    mode_region ?region (as_single_mode expected_mode),
+    [(Texp_ghost_region, Location.none, [])]
+  else
+    env, expected_mode, []
 
 let mode_max =
   mode_default Value.max
@@ -6177,6 +6201,16 @@ and type_expect_
          pexp_desc = Pexp_match (sval, [Ast_helper.Exp.case spat sbody])}
         ty_expected_explained
   | Pexp_let(mutable_flag, rec_flag, spat_sexp_list, sbody) ->
+      let is_bor, spat_sexp_list =
+        List.fold_left_map
+          (fun acc pvb ->
+            let is_bor = is_borrow pvb.pvb_expr in
+            acc || is_bor, pvb)
+          false spat_sexp_list
+      in
+      let env, expected_mode, exp_extra =
+        enter_region_if is_bor ~region:(loc, Borrow) env expected_mode
+      in
       let restriction = match rec_flag with
         | Recursive -> Some In_rec
         | Nonrecursive -> None
@@ -6208,6 +6242,12 @@ and type_expect_
             type_let existential_context env mutable_flag rec_flag
               spat_sexp_list allow_modules
           in
+          (* Mark borrowed expressions as being in a valid borrowing
+             context *)
+          if is_bor then
+            List.iter
+              (fun vb -> mark_borrowed_in_context vb.vb_expr)
+              pat_exp_list;
           let body =
             type_expect
               new_env expected_mode sbody ty_expected_explained
@@ -6260,7 +6300,7 @@ and type_expect_
       in
       re {
         exp_desc = exp;
-        exp_loc = loc; exp_extra = [];
+        exp_loc = loc; exp_extra;
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
@@ -6301,8 +6341,36 @@ and type_expect_
             exp_attributes = sexp.pexp_attributes;
           }
       end
+  | Pexp_borrow body ->
+    let mode =
+      { Mode.Value.Const.min with
+        areality = Local;
+        uniqueness = Aliased }
+      |> Value.of_const ~hint_monadic:(Borrowed (loc, Monadic))
+          ~hint_comonadic:(Borrowed (loc, Comonadic))
+    in
+    submode ~loc ~env mode expected_mode;
+    let exp =
+      type_expect ~recarg env expected_mode body ty_expected_explained
+    in
+    { exp with
+      exp_loc = loc;
+      exp_extra =
+        (Texp_borrowed (ref false), Location.none, []) :: exp.exp_extra;
+      exp_attributes = sexp.pexp_attributes @ exp.exp_attributes;
+    }
   | Pexp_apply(sfunct, sargs) ->
       (* See Note [Type-checking applications] *)
+      let is_bor, sargs =
+        List.fold_left_map
+          (fun acc (label, sarg) ->
+            let is_bor = is_borrow sarg in
+            acc || is_bor, (label, sarg))
+          false sargs
+      in
+      let env, expected_mode, exp_extra =
+        enter_region_if is_bor ~region:(loc, Borrow) env expected_mode
+      in
       assert (sargs <> []);
       check_dynamic (loc, Expression) (Always_dynamic Application)
         expected_mode;
@@ -6382,6 +6450,13 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
+      (* Mark borrowed expressions as being in a valid borrowing context *)
+      if is_bor then
+        List.iter (fun (_, arg) ->
+          match arg with
+          | Arg (exp, _) -> mark_borrowed_in_context exp
+          | Omitted _ -> ()
+        ) args;
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
@@ -6395,7 +6470,7 @@ and type_expect_
       let exp = rue {
         exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode,
                               zero_alloc);
-        exp_loc = loc; exp_extra = [];
+        exp_loc = loc; exp_extra;
         exp_type = ty_ret;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
@@ -6404,6 +6479,10 @@ and type_expect_
       check_tail_call_local_returning loc env ap_mode pm;
       exp
   | Pexp_match(sarg, caselist) ->
+      let is_bor = is_borrow sarg in
+      let env, expected_mode, exp_extra =
+        enter_region_if is_bor ~region:(loc, Borrow) env expected_mode
+      in
       let arg_pat_mode, arg_expected_mode =
         match cases_tuple_arity caselist with
         | Not_local_tuple | Maybe_local_tuple ->
@@ -6425,6 +6504,8 @@ and type_expect_
         end ~post:(fun (arg, _) ->
           may_lower_contravariant_then_generalize env arg)
       in
+      (* Mark borrowed expressions as being in a valid borrowing context *)
+      if is_bor then mark_borrowed_in_context arg;
       let cases, partial =
         type_cases Computation env arg_pat_mode expected_mode
           arg.exp_type sort ty_expected_explained
@@ -6435,7 +6516,7 @@ and type_expect_
       then check_partial_application ~statement:false arg;
       re {
         exp_desc = Texp_match(arg, sort, cases, partial);
-        exp_loc = loc; exp_extra = [];
+        exp_loc = loc; exp_extra;
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }

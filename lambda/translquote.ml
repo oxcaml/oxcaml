@@ -1865,6 +1865,8 @@ and Exp_desc : sig
 
   val stack : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
+  val borrow : Debuginfo.Scoped_location.t -> Exp.t -> t'
+
   val extension_constructor : Debuginfo.Scoped_location.t -> Name.t -> t'
 
   val let_exception : Debuginfo.Scoped_location.t -> Name.t -> Exp.t -> t'
@@ -2010,6 +2012,8 @@ end = struct
   let src_pos = use "Exp_desc" "src_pos"
 
   let stack loc a1 = apply1 "Exp_desc" "stack" loc (extract a1)
+
+  let borrow loc a1 = apply1 "Exp_desc" "borrow" loc (extract a1)
 
   let extension_constructor loc a1 =
     apply1 "Exp_desc" "extension_constructor" loc (extract a1)
@@ -3086,6 +3090,9 @@ and quote_expression_extra ~scopes _stage extra lambda =
     |> maybe_constrain_exp_desc_with_type loc
          (type_constraint_of_ambiguity loc ambiguity)
   | Texp_inspected_type Polymorphic_parameter -> lambda
+  | Texp_ghost_region -> lambda
+  | Texp_borrowed _ ->
+    Exp_desc.borrow loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
 
 and update_env_with_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3098,6 +3105,8 @@ and update_env_with_extra ~loc extra =
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type Polymorphic_parameter -> ()
+  | Texp_ghost_region -> ()
+  | Texp_borrowed _ -> ()
 
 and update_env_without_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3110,6 +3119,8 @@ and update_env_without_extra ~loc extra =
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type Polymorphic_parameter -> ()
+  | Texp_ghost_region -> ()
+  | Texp_borrowed _ -> ()
 
 and quote_expression_desc ~scopes ~transl stage e =
   let env = e.exp_env in
