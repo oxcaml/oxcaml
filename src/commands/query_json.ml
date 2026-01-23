@@ -78,6 +78,14 @@ let dump (type a) : a t -> json =
           | Some n -> `Int n );
         ("position", mk_position pos)
       ]
+  | Kind_enclosing { position; index } ->
+    mk "kind-enclosing"
+      [ ( "index",
+          match index with
+          | None -> `String "all"
+          | Some n -> `Int n );
+        ("position", mk_position position)
+      ]
   | Locate_type pos -> mk "locate-type" [ ("position", mk_position pos) ]
   | Locate_types pos -> mk "locate-types" [ ("position", mk_position pos) ]
   | Enclosing pos -> mk "enclosing" [ ("position", mk_position pos) ]
@@ -271,6 +279,14 @@ let json_of_type_loc (loc, desc, tail) =
           | `No -> "no"
           | `Tail_position -> "position"
           | `Tail_call -> "call") )
+    ]
+
+let json_of_kind_enclosing_res (loc, desc) =
+  with_location loc
+    [ ( "kind",
+        match desc with
+        | `Kind k -> `String k
+        | `Index n -> `Int n )
     ]
 
 let json_of_error (error : Location.error) =
@@ -491,6 +507,8 @@ let json_of_response (type a) (query : a t) (response : a) : json =
   | Stack_or_heap_enclosing _, results ->
     `List (List.map ~f:json_of_stack_or_heap results)
   | Type_enclosing _, results -> `List (List.map ~f:json_of_type_loc results)
+  | Kind_enclosing _, results ->
+    `List (List.map ~f:json_of_kind_enclosing_res results)
   | Enclosing _, results ->
     `List (List.map ~f:(fun loc -> with_location loc []) results)
   | Complete_prefix _, compl -> json_of_completions compl
