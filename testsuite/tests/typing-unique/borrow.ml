@@ -431,7 +431,7 @@ let foo () =
 Line 4, characters 20-31:
 4 |   local_aliased_use (borrow_ x);
                         ^^^^^^^^^^^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is borrowed here, but it has already been used as unique:
 Line 3, characters 13-14:
 3 |   unique_use x;
                  ^
