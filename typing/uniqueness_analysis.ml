@@ -581,10 +581,10 @@ end = struct
       aliased occ Aliased.Forced
     | Borrowing _, Aliased t | Aliased t, Borrowing _ -> Aliased t
     | Borrowing _, Maybe_unique t ->
-      force_aliased_multiuse t m0 Second Par;
+      force_aliased_multiuse t Par m0;
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Maybe_unique t, Borrowing _ ->
-      force_aliased_multiuse t m1 First Par;
+      force_aliased_multiuse t Par m1;
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Maybe_aliased t0, Maybe_aliased t1 ->
       Maybe_aliased (Maybe_aliased.meet t0 t1)
@@ -706,10 +706,10 @@ end = struct
      [ let y = borrow_ x in
        unique_use x; aliased_use y
      ] *)
-      force_aliased_multiuse t m0 Second Seq;
+      force_aliased_multiuse t Seq_after m0;
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Maybe_unique t, Borrowing _ ->
-      force_aliased_multiuse t m1 First Seq;
+      force_aliased_multiuse t Seq_before m1;
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Aliased _, Aliased _ -> m0
     | Maybe_unique l, Aliased _ ->
