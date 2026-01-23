@@ -560,7 +560,7 @@ val section_body_string : Owee_buf.t -> segment -> section -> string
 val get_symbol_table : command list -> (symbol array * Owee_buf.t) option
 
 (** A resolved relocation with offset, symbol name, and addend.
-    For Mach-O, addend is always 0 since it uses REL format. *)
+    Addend is always 0 since Mach-O uses REL format. *)
 type resolved_relocation = {
   r_offset : int;
   r_symbol : string;

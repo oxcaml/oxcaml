@@ -629,18 +629,16 @@ let build_symbol_names buf sections =
           if st_shndx > 0 && st_shndx < Array.length sections
           then sections.(st_shndx).sh_name_str
           else
-            Owee_buf.invalid_format
-              (Printf.sprintf
-                 "Section symbol %d has invalid section index %d" i st_shndx)
+            Owee_buf.invalid_formatf
+            "Section symbol %d has invalid section index %d" i st_shndx
         else
           (* Regular symbol: get name from string table *)
           let name_cursor = Owee_buf.cursor strtab_body ~at:st_name in
           match Owee_buf.Read.zero_string name_cursor () with
           | Some s -> s
           | None ->
-            Owee_buf.invalid_format
-              (Printf.sprintf
-                 "Symbol %d has invalid string table offset %d" i st_name)
+            Owee_buf.invalid_formatf
+              "Symbol %d has invalid string table offset %d" i st_name
       in
       names.(i) <- name
     done;
@@ -666,10 +664,9 @@ let extract_rela_relocations buf sections ~rela_section_name =
         match symbol_names with
         | Some names when sym_idx < Array.length names -> names.(sym_idx)
         | Some names ->
-          Owee_buf.invalid_format
-            (Printf.sprintf
-               "Relocation %d references symbol index %d, but only %d symbols"
-               i sym_idx (Array.length names))
+          Owee_buf.invalid_formatf
+            "Relocation %d references symbol index %d, but only %d symbols"
+            i sym_idx (Array.length names)
         | None ->
           Owee_buf.invalid_format
             "Cannot resolve relocation symbols: .symtab or .strtab not found"

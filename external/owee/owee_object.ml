@@ -14,7 +14,7 @@
 
 type format =
   | Elf
-  | Macho
+  | Mach_o
   | Unknown
 
 let detect_format buf =
@@ -25,7 +25,7 @@ let detect_format buf =
   | "\x7FELF" -> Elf
   | "\xfe\xed\xfa\xcf" | "\xcf\xfa\xed\xfe" | "\xfe\xed\xfa\xce"
   | "\xce\xfa\xed\xfe" ->
-    Macho
+    Mach_o
   | _ -> Unknown
 
 type relocation = {
@@ -39,8 +39,7 @@ let relocs_equal a b =
 
 (* Check if an ELF section name is a text section (name starts with ".text").
    This is only meaningful for ELF; Mach-O uses __text in __TEXT segment. *)
-let is_elf_text_section_name name =
-  String.length name >= 5 && String.sub name 0 5 = ".text"
+let is_elf_text_section_name name = String.starts_with ~prefix:".text" name
 
 let extract_elf_text_section buf =
   let _header, sections = Owee_elf.read_elf buf in
@@ -57,45 +56,42 @@ let extract_elf_data_section buf =
     | Some sec -> Some (Owee_elf.section_body_string buf sec)
     | None -> None)
 
-let extract_macho_text_section buf =
-  let _header, commands = Owee_macho.read buf in
-  match Owee_macho.find_segment commands "__TEXT" with
+let find_macho_section_body buf commands ~seg_name ~sect_name =
+  match Owee_macho.find_segment commands seg_name with
   | Some seg -> (
-    match Owee_macho.find_section seg "__text" with
+    match Owee_macho.find_section seg sect_name with
     | Some sec -> Some (Owee_macho.section_body_string buf seg sec)
     | None -> None)
   | None -> None
 
+let extract_macho_text_section buf =
+  let _header, commands = Owee_macho.read buf in
+  find_macho_section_body buf commands ~seg_name:"__TEXT" ~sect_name:"__text"
+
 let extract_macho_data_section buf =
   let _header, commands = Owee_macho.read buf in
-  let try_section seg_name sect_name =
-    match Owee_macho.find_segment commands seg_name with
-    | Some seg -> (
-      match Owee_macho.find_section seg sect_name with
-      | Some sec -> Some (Owee_macho.section_body_string buf seg sec)
-      | None -> None)
-    | None -> None
-  in
-  match try_section "__DATA" "__data" with
+  match find_macho_section_body buf commands ~seg_name:"__DATA" ~sect_name:"__data"
+  with
   | Some _ as result -> result
-  | None -> try_section "__DATA" "__const"
+  | None -> find_macho_section_body buf commands ~seg_name:"__DATA" ~sect_name:"__const"
 
 let extract_text_section buf =
   match detect_format buf with
   | Elf -> extract_elf_text_section buf
-  | Macho -> extract_macho_text_section buf
+  | Mach_o -> extract_macho_text_section buf
   | Unknown -> None
 
 let extract_data_section buf =
   match detect_format buf with
   | Elf -> extract_elf_data_section buf
-  | Macho -> extract_macho_data_section buf
+  | Mach_o -> extract_macho_data_section buf
   | Unknown -> None
 
 let convert_elf_reloc (r : Owee_elf.relocation) : relocation =
   { r_offset = r.r_offset; r_symbol = r.r_symbol; r_addend = r.r_addend }
 
 let convert_macho_reloc (r : Owee_macho.resolved_relocation) : relocation =
+  assert (r.r_addend = 0L);
   { r_offset = r.r_offset; r_symbol = r.r_symbol; r_addend = r.r_addend }
 
 let extract_elf_text_relocations buf =
@@ -130,13 +126,13 @@ let extract_macho_relocations buf ~seg_name ~sect_name =
 let extract_text_relocations buf =
   match detect_format buf with
   | Elf -> extract_elf_text_relocations buf
-  | Macho -> extract_macho_relocations buf ~seg_name:"__TEXT" ~sect_name:"__text"
+  | Mach_o -> extract_macho_relocations buf ~seg_name:"__TEXT" ~sect_name:"__text"
   | Unknown -> []
 
 let extract_data_relocations buf =
   match detect_format buf with
   | Elf -> extract_elf_data_relocations buf
-  | Macho -> extract_macho_relocations buf ~seg_name:"__DATA" ~sect_name:"__data"
+  | Mach_o -> extract_macho_relocations buf ~seg_name:"__DATA" ~sect_name:"__data"
   | Unknown -> []
 
 let extract_elf_individual_text_sections buf =
@@ -149,7 +145,7 @@ let extract_elf_individual_text_sections buf =
 let extract_individual_text_sections buf =
   match detect_format buf with
   | Elf -> extract_elf_individual_text_sections buf
-  | Macho -> []
+  | Mach_o -> []
   | Unknown -> []
 
 let extract_elf_individual_text_relocations buf =
@@ -167,11 +163,11 @@ let extract_elf_individual_text_relocations buf =
 let extract_individual_text_relocations buf =
   match detect_format buf with
   | Elf -> extract_elf_individual_text_relocations buf
-  | Macho -> []
+  | Mach_o -> []
   | Unknown -> []
 
 let uses_rela_relocations buf =
   match detect_format buf with
   | Elf -> true
-  | Macho -> false
+  | Mach_o -> false
   | Unknown -> false

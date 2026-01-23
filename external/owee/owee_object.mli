@@ -17,7 +17,7 @@
 (** The detected object file format. *)
 type format =
   | Elf
-  | Macho
+  | Mach_o
   | Unknown
 
 (** Detect the format of an object file from its buffer. *)

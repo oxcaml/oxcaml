@@ -1262,36 +1262,31 @@ let section_body buffer seg sec =
 
 (* Find a segment by name in the load commands *)
 let find_segment commands seg_name =
-  let rec loop = function
-    | [] -> None
-    | LC_SEGMENT_64 seg :: _ when String.equal (Lazy.force seg).seg_segname seg_name ->
-      Some (Lazy.force seg)
-    | _ :: rest -> loop rest
-  in
-  loop commands
+  List.find_map
+    (function
+      | LC_SEGMENT_64 seg ->
+        let seg = Lazy.force seg in
+        if String.equal seg.seg_segname seg_name then Some seg else None
+      | _ -> None)
+    commands
 
 (* Find a section by name within a segment *)
 let find_section segment sect_name =
-  let sections = segment.seg_sections in
-  let rec loop i =
-    if i >= Array.length sections then None
-    else if String.equal sections.(i).sec_sectname sect_name then Some sections.(i)
-    else loop (i + 1)
-  in
-  loop 0
+  Array.find_opt
+    (fun sec -> String.equal sec.sec_sectname sect_name)
+    segment.seg_sections
 
 (* Find a section by name in any segment (useful for object files with unnamed segments) *)
 let find_section_any_segment commands sect_name =
-  let rec loop = function
-    | [] -> None
-    | LC_SEGMENT_64 seg :: rest ->
-      let seg = Lazy.force seg in
-      (match find_section seg sect_name with
-       | Some sec -> Some (seg, sec)
-       | None -> loop rest)
-    | _ :: rest -> loop rest
-  in
-  loop commands
+  List.find_map
+    (function
+      | LC_SEGMENT_64 seg ->
+        let seg = Lazy.force seg in
+        (match find_section seg sect_name with
+         | Some sec -> Some (seg, sec)
+         | None -> None)
+      | _ -> None)
+    commands
 
 (* Extract section body as a string *)
 let section_body_string buf seg sec =
@@ -1302,15 +1297,14 @@ let section_body_string buf seg sec =
 
 (* Get symbol table from load commands *)
 let get_symbol_table commands =
-  let rec loop = function
-    | [] -> None
-    | LC_SYMTAB syms :: _ -> Some (Lazy.force syms)
-    | _ :: rest -> loop rest
-  in
-  loop commands
+  List.find_map
+    (function
+      | LC_SYMTAB syms -> Some (Lazy.force syms)
+      | _ -> None)
+    commands
 
 (* A resolved relocation with offset, symbol name, and addend.
-   For Mach-O, addend is always 0 since it uses REL format. *)
+   Addend is always 0 since Mach-O uses REL format. *)
 type resolved_relocation = {
   r_offset : int;
   r_symbol : string;
