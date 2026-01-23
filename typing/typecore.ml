@@ -3037,7 +3037,7 @@ and type_pat_aux
       in
       let make_record_pat
             sorts (rep : rep)
-            (lbl_pat_list : (_ * rep gen_label_description * _) list)=
+            (lbl_pat_list : (_ * rep gen_label_description * _) list) =
         check_recordpat_labels loc lbl_pat_list closed record_form;
         List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
         let pat_desc = match record_form with
@@ -6037,7 +6037,7 @@ and type_expect_
           unify_exp_types extended_expr_loc env ty_exp ty_res1;
           match matching_label lbl with
           | lid, _lbl, lbl_exp ->
-            (* do not connect result types for overridden labels *)
+              (* do not connect result types for overridden labels *)
               Overridden (lid, lbl_exp)
           | exception Not_found -> begin
               let _, ty_arg2, ty_res2 = instance_label ~fixed:false lbl in
@@ -6750,7 +6750,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-      let (record, _record_sort, rmode, label, expected_type) =
+      let (record, _, rmode, label, expected_type) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
