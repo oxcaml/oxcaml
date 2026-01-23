@@ -10,6 +10,7 @@ unreleased
     - Add initial support for project-wide renaming: occurrences can now return
       all usages of all related definitions. (#1877)
     - Fix issues with ident validation and Lid comparison for occurrences (#1924)
+    - Fix record field autocompletion (https://github.com/ocaml/merlin/pull/2028)
   + ocaml-index
     - Bump magic number after index file format change. Index can now be read lazilly (#1886)
 
