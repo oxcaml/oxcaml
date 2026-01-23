@@ -15,13 +15,20 @@ end
 
 let rec flatten_arrow ret_ty =
   match Types.get_desc ret_ty with
-  | Tarrow (label, ty1, ty2, _) ->
+  | Tarrow ((label, _, _), ty1, ty2, _) ->
     let ty1 =
       match label with
       | Optional _ ->
-        (match Types.get_desc ty1 with
-        | Tconstr (path, [ ty1 ], _) when Path.same path Predef.path_option -> ty1
-        | _ -> ty1)
+        let rec strip_option ty =
+          match Types.get_desc ty with
+          | Tconstr (path, [ ty ], _) when Path.same path Predef.path_option ->
+            ty
+          | Tpoly (ty, vars) ->
+            Types.newty3 ~level:(Types.get_level ty) ~scope:(Types.get_scope ty)
+              (Tpoly (strip_option ty, vars))
+          | _ -> ty
+        in
+        strip_option ty1
       | _ -> ty1
     in
     ty1 :: flatten_arrow ty2
