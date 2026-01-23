@@ -2867,7 +2867,9 @@ let report_multi_use inner first_is_of_second =
   let there_usage =
     match there with
     | Usage.Borrowed _ -> "borrowed"
-    | Usage.Borrowing _ -> "borrowed"
+    | Usage.Borrowing _ ->
+      (* CR-soon zqian: needs better printing for this case *)
+      "borrowed"
     | Usage.Maybe_aliased t ->
       Maybe_aliased.string_of_access (Maybe_aliased.extract_access t)
     | Usage.Aliased t -> (
