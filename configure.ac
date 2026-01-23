@@ -1781,11 +1781,11 @@ AS_IF([test x"$enable_assembler_suitable_for_dissector" != "x" && \
       [AC_MSG_ERROR([llvm-mc not found on PATH])])
     AS_IF([test ! -x "$llvm_mc"],
       [AC_MSG_ERROR([llvm-mc is not executable])])
-    AS="$llvm_mc -large-code-mode"],
+    AS="$llvm_mc -large-code-model"],
     [AS_IF([test ! -x "$enable_assembler_suitable_for_dissector"],
       [AC_MSG_ERROR(m4_normalize([Assembler
         $enable_assembler_suitable_for_dissector is not executable]))])
-    AS="$enable_assembler_suitable_for_dissector -large-code-mode"])
+    AS="$enable_assembler_suitable_for_dissector -large-code-model"])
   AC_MSG_NOTICE([Using LLVM assembler for dissector: $AS])])
 
 AS_IF([test -z "$AS"], [AS="$default_as"])
