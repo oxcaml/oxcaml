@@ -541,7 +541,8 @@ let least_modalities_implying mut (t : Modality.Const.t) =
   in
   exclude_implied @ overridden
 
-let untransl_mod_bounds (bounds : Jkind.Mod_bounds.t) : Parsetree.modes =
+let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
+    Parsetree.modes =
   let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
   let modality_annots =
@@ -553,7 +554,7 @@ let untransl_mod_bounds (bounds : Jkind.Mod_bounds.t) : Parsetree.modes =
   let nonmodal_annots =
     let open Jkind.Mod_bounds in
     let mk_annot default print value =
-      if value = default
+      if not verbose && value = default
       then None
       else
         let s = Format.asprintf "%a" print value in

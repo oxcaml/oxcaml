@@ -54,6 +54,8 @@ val untransl_modalities : modalities -> Parsetree.modalities
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t
 
-val untransl_mod_bounds : Jkind.Mod_bounds.t -> Parsetree.modes
+(** Translate an algebraic representation of mod bounds into user syntax. If
+    [verbose] is true, redundant annotations are included. *)
+val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> Parsetree.modes
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t

@@ -616,9 +616,19 @@ val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 
 val format : Format.formatter -> 'd Types.jkind -> unit
 
+module Format_verbosity : sig
+  type t =
+    | Not_verbose  (** Normal, user-friendly printing *)
+    | Expanded  (** Don't write the jkind in terms of any aliases. *)
+    | Expanded_with_all_mod_bounds
+        (** Like [Expanded], but also explicitly write all mod bounds, even top
+            ones. *)
+end
+
 (** Similar to [format], but the kind is expanded as much as possible rather
     than written in terms of a kind abbreviation. This is used by Merlin. *)
-val format_expanded : Format.formatter -> 'd Types.jkind -> unit
+val format_verbose :
+  verbosity:Format_verbosity.t -> Format.formatter -> 'd Types.jkind -> unit
 
 (** Format the history of this jkind: what interactions it has had and why it is
     the jkind that it is. Might be a no-op: see [display_histories] in the
