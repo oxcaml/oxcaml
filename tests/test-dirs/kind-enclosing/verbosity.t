@@ -1,8 +1,10 @@
   $ run() {
   >   cat > test.ml
-  >   for i in {0..2}; do
-  >   $MERLIN single kind-enclosing -position "$1" -verbosity "$i" < test.ml \
-  >     | jq -r "\"Verbosity $i: \(.value[0].kind)\""
+  >   i=0
+  >   while [ "$i" -le 2 ]; do
+  >     $MERLIN single kind-enclosing -position "$1" -verbosity "$i" < test.ml \
+  >       | jq -r "\"Verbosity $i: \(.value[0].kind)\""
+  >     i=$(($i+1))
   >   done
   > }
 

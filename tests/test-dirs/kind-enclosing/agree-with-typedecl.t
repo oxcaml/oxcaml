@@ -10,7 +10,7 @@ kind-enclosing in a hover if it is for the same expression as the type-enclosing
   >   type=$(
   >     $MERLIN single type-enclosing -position $1 -filename test.ml < test.ml \
   >     | jq -r '.value[0] | "\(.start.line):\(.start.col)-\(.end.line):\(.end.col)"')
-  >   if [[ "$kind" == "$type" ]]; then
+  >   if [ "$kind" == "$type" ]; then
   >     echo "Agree"
   >   else
   >     echo "Disagree: kind=$kind, type=$type"
