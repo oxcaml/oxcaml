@@ -31,8 +31,9 @@ jobs:
     name: ${{ matrix.name }} (${{ matrix.system }})
     needs: nix-matrix
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix: ${{fromJSON(needs.nix-matrix.outputs.matrix)}}
 
     permissions:
