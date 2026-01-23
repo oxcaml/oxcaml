@@ -1641,7 +1641,7 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
      void.  just needs a bit of refactoring in translcore *)
   let sorts_and_jkinds =
     List.map (fun ld_type ->
-      let jkind = Ctype.type_jkind_purely env ld_type in
+      let jkind = Ctype.type_jkind env ld_type in
       let sort = Jkind.sort_option_of_jkind jkind in
       let ld_sort = Option.map Jkind.Sort.default_to_value_and_get sort in
       ld_sort, jkind
@@ -1980,7 +1980,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
                 if Types.is_atomic lbl.Types.ld_mutable
                 then repr_summary.atomic_floats <- true;
             | Unboxed_element Float64 -> repr_summary.float64s <- true
-            | Unboxed_element (Float32 | Bits8 | Bits16 | Bits32 | Bits64
+            | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
                               | Vec128 | Vec256 | Vec512 | Word
                               | Untagged_immediate | Product _ ) ->
                 repr_summary.non_float64_unboxed_fields <- true
