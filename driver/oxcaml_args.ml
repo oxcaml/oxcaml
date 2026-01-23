@@ -1595,7 +1595,15 @@ module Oxcaml_options_impl = struct
 
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let dissector = set' Clflags.dissector
-  let dissector_partition_size f = Clflags.dissector_partition_size := Some f
+
+  let dissector_partition_size f =
+    if f <= 0.0 || f >= 2.0 then
+      raise
+        (Arg.Bad
+           "-dissector-partition-size must be greater than 0 and less than 2 \
+            GiB");
+    Clflags.dissector_partition_size := Some f
+
   let ddissector = set' Clflags.ddissector
   let ddissector_sizes = set' Clflags.ddissector_sizes
   let ddissector_verbose = set' Clflags.ddissector_verbose
@@ -2281,6 +2289,11 @@ module Extra_params = struct
     | "dissector-partition-size" -> (
         match float_of_string_opt v with
         | Some f ->
+            if f <= 0.0 || f >= 2.0 then
+              raise
+                (Arg.Bad
+                   "-dissector-partition-size must be greater than 0 and less \
+                    than 2 GiB");
             Clflags.dissector_partition_size := Some f;
             true
         | None ->
