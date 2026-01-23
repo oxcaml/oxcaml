@@ -554,7 +554,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
   let nonmodal_annots =
     let open Jkind.Mod_bounds in
     let mk_annot default print value =
-      if not verbose && value = default
+      if (not verbose) && value = default
       then None
       else
         let s = Format.asprintf "%a" print value in
