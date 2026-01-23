@@ -336,13 +336,6 @@ module Stdlib = struct
       | None -> Format.pp_print_string ppf "None"
       | Some contents ->
         Format.fprintf ppf "@[(Some@ %a)@]" print_contents contents
-
-    exception Option_is_none
-
-    let get_exn t =
-      match t with
-      | Some a -> a
-      | None -> raise Option_is_none
   end
 
   module Array = struct

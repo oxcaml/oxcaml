@@ -760,12 +760,6 @@ val check_and_update_generalized_ty_jkind :
    True otherwise. *)
 val is_principal : type_expr -> bool
 
-(* XXX Probably delete this *)
-
-(* False if running in principal mode and the type is a non-principal
-   variable. True otherwise. *)
-val is_structurally_principal : type_expr -> bool
-
 (* For use with ocamldebug *)
 type global_state
 val global_state : global_state

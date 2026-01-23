@@ -1714,14 +1714,7 @@ let instance_label_type' copy_scope ~fixed lbl_arg =
       [], copy copy_scope lbl_arg
 
 let instance_label' copy_scope ~fixed lbl =
-  let vars, ty_arg =
-    try instance_label_type' copy_scope ~fixed lbl.lbl_arg with
-    | Btype.Fold_type_expr_of_subst ty ->
-      Misc.fatal_errorf "lbl %s@.lbl ty %a@.ty %a@.%!"
-        lbl.lbl_name
-        !Btype.printtyp_type_expr_fwd lbl.lbl_arg
-        !Btype.printtyp_type_expr_fwd ty
-  in
+  let vars, ty_arg = instance_label_type' copy_scope ~fixed lbl.lbl_arg in
   (* call [copy] after [instance_poly] to avoid introducing [Tsubst] *)
   let ty_res = copy copy_scope lbl.lbl_res in
   (vars, ty_arg, ty_res)
@@ -2934,14 +2927,6 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
 
 let is_principal ty =
   not !Clflags.principal || get_level ty = generic_level
-
-let get_structure_level t =
-  match get_desc t with
-  | Tvar _ -> get_level t
-  | _ -> generic_level
-
-let is_structurally_principal ty =
-  not !Clflags.principal || get_structure_level ty = generic_level
 
 (* Recursively expand the head of a type.
    Also expand #-types.

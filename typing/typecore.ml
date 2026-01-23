@@ -1540,7 +1540,7 @@ and build_as_type_and_mode_extra env p ~mode : _ -> _ * _ = function
 and build_as_type_aux (env : Env.t) p ~mode =
   let build_as_type env p = fst (build_as_type_and_mode env p ~mode) in
   let build_record_as_type lpl =
-    let _, lbl, _ = List.hd lpl in
+    let lbl = snd3 (List.hd lpl) in
     if lbl.lbl_private = Private then p.pat_type, mode else
     (* The jkind here is filled in via unification with [ty_res] in
         [unify_pat]. *)
@@ -1559,13 +1559,12 @@ and build_as_type_aux (env : Env.t) p ~mode =
       if refinable then begin
         let arg = List.assoc lbl.lbl_pos ppl in
         unify_pat env
-          {arg with pat_type = build_as_type env arg} ty_arg;
+          {arg with pat_type = build_as_type env arg} ty_arg
       end else begin
         let _, ty_arg', ty_res' = instance_label ~fixed:false lbl in
         unify_pat_types p.pat_loc env ty_arg ty_arg';
         unify_pat env p ty_res'
-      end;
-      in
+      end in
     Array.iter do_label lbl.lbl_all;
     ty, mode
   in
@@ -1964,7 +1963,7 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
 let solve_Ppat_record_field ~refine loc penv label label_lid record_ty
       record_form =
   with_local_level_iter ~post:generalize_structure begin fun () ->
-    let _, ty_arg, ty_res = instance_label ~fixed:false label in
+    let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     begin try
       unify_pat_types_refine ~refine loc penv ty_res (instance record_ty)
     with Error(_loc, _env, Pattern_type_clash(err, _)) ->
@@ -1972,20 +1971,6 @@ let solve_Ppat_record_field ~refine loc penv label label_lid record_ty
                   Label_mismatch(P record_form, label_lid.txt, err)))
     end;
     (ty_arg, [ty_res; ty_arg])
-    (*
-    let _, _ty_arg, ty_res = instance_label ~fixed:false label in
-    let record_ty_instance = instance record_ty in
-    begin try
-      unify_pat_types_refine ~refine loc penv ty_res record_ty_instance
-    with Error(_loc, _env, Pattern_type_clash(err, _)) ->
-      raise(Error(label_lid.loc, !!penv,
-                  Label_mismatch(P record_form, label_lid.txt, err)))
-    end;
-    let label, _rep =
-      update_label !!penv label record_form ~loc ~containing_type:(instance record_ty)
-    in
-    (label, [label.lblo_res; label.lblo_arg])
-    *)
   end
 
 let solve_Ppat_array ~refine loc env mutability expected_ty =
@@ -2313,8 +2298,9 @@ end) = struct
   (* a non-principal type was used for disambiguation *)
   let warn_non_principal warn lid =
     let name = Datatype_kind.label_name kind in
-    warn lid.loc (Warnings.Not_principal
-                    ("this type-based " ^ name ^ " disambiguation"))
+    warn lid.loc
+      (Warnings.Not_principal
+         ("this type-based " ^ name ^ " disambiguation"))
 
   (* we selected a name out of the lexical scope *)
   let warn_out_of_scope warn lid env tpath =
@@ -2456,7 +2442,6 @@ let wrap_disambiguate msg ty f x =
 
 module Label = NameChoice (struct
   type t = label_description
-
   type usage = Env.label_usage
   let kind = Datatype_kind.Record
   let get_name lbl = lbl.lbl_name
@@ -2538,12 +2523,12 @@ let disambiguate_sort_lid_a_list
       (type rep) (record_form : rep record_form) loc closed env usage
       expected_type lid_a_list =
   let ids = List.map (fun (lid, _) -> Longident.last lid.txt) lid_a_list in
-  let w_pr = ref [] and w_amb = ref []
+  let w_pr = ref false and w_amb = ref []
   and w_scope = ref [] and w_scope_ty = ref "" in
   let warn loc msg =
     let open Warnings in
     match msg with
-    | Not_principal s -> w_pr := s :: !w_pr
+    | Not_principal _ -> w_pr := true
     | Ambiguous_name([s], l, _, ex) -> w_amb := (s, l, ex) :: !w_amb
     | Name_out_of_scope(ty, Name s) ->
         w_scope := s :: !w_scope; w_scope_ty := ty
@@ -2603,20 +2588,12 @@ let disambiguate_sort_lid_a_list
             lid, process_label qual_lid, a
       ) lid_a_list lbl_list
   in
-  begin match !w_pr with
-  | _ :: _ ->
-    (*
-    let all = String.concat ", " !w_pr in
+  if !w_pr then
     Location.prerr_warning loc
       (Warnings.Not_principal
          ("this type-based " ^ (record_form_to_string record_form)
-       ^ " disambiguation (" ^ all ^ ")"))
-    *)
-    Location.prerr_warning loc
-      (Warnings.Not_principal
-         ("this type-based " ^ (record_form_to_string record_form)
-       ^ " disambiguation"))
-  | [] -> begin
+          ^ " disambiguation"))
+  else begin
     match List.rev !w_amb with
       (_,types,ex)::_ as amb ->
         let paths =
@@ -2633,7 +2610,7 @@ let disambiguate_sort_lid_a_list
                 (Warnings.Ambiguous_name ([s],l,false, ex)))
             amb
     | _ -> ()
-  end end;
+  end;
   (if !w_scope <> [] then
     let record_form = record_form_to_string record_form in
     let warning = Warnings.Fields { record_form; fields = List.rev !w_scope} in
@@ -2677,7 +2654,6 @@ let check_recordpat_labels loc lbl_pat_list closed record_form =
             (Warnings.Missing_record_field_pattern { form; unbound })
         end
       end
-
 
 (* Constructors *)
 
@@ -2868,31 +2844,6 @@ let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
   in
   if Types.is_atomic label.lbl_mut && not (wildcard pat) then
     raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
-
-(*
-let representation_for_label (type rep) env label (form : rep record_form) ~loc
-      ~containing_type : rep =
-  match label.lbl_repres with
-  | Some rep -> rep
-  | None ->
-      let labels =
-        Ctype.instance_labels_update ~fixed:false (Lazy.force label.lbl_all)
-      in
-      unify_exp_types loc env containing_type labels.:(0).lbl_res;
-      let labels =
-        labels
-        |> Iarray.map Types.label_declaration_of_label_description
-        |> Iarray.to_list
-      in
-      match
-        Typedecl.update_record_representation env loc form labels None
-      with
-      | Ok rep -> rep
-      | Error (Unrepresentable_field name) ->
-          raise (Error (loc, env,
-                        Indeterminate_record_layout(
-                          containing_type, name)))
-*)
 
 (** [type_pat] propagates the expected type, and
     unification may update the typing environment. *)
@@ -3090,8 +3041,7 @@ and type_pat_aux
         check_recordpat_labels loc lbl_pat_list closed record_form;
         List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
         let pat_desc = match record_form with
-          | Legacy ->
-            Tpat_record (lbl_pat_list, sorts, rep, closed)
+          | Legacy -> Tpat_record (lbl_pat_list, sorts, rep, closed)
           | Unboxed_product ->
             Tpat_record_unboxed_product (lbl_pat_list, sorts, rep, closed)
         in

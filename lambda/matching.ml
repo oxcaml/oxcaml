@@ -1830,13 +1830,13 @@ let add_in_div make_matching_fun eq_key key patl_action division =
 
 let divide get_expr_args eq_key get_key get_pat_args ctx
     (pm : Simple.clause pattern_matching) =
-  let add ((p, (patl : ((* Jkind_types.Sort.Const.t * *) pattern) list)), action) division =
+  let add ((p, patl), action) division =
     let ph = Simple.head p in
     let p = General.erase p in
     add_in_div
       (make_matching get_expr_args ph pm.default ctx)
       eq_key (get_key p)
-      (((get_pat_args p patl) : ((* Jkind_types.Sort.Const.t * *) pattern) list), action)
+      (get_pat_args p patl, action)
       division
   in
   List.fold_right add pm.cases { args = pm.args; cells = [] }
@@ -2421,7 +2421,7 @@ let get_expr_args_record_unboxed_product ~scopes head
         lbl.lbl_all, sorts
     | Record_unboxed_product ([], _, _)
     | _ ->
-        assert false
+      assert false
   in
   let lbl_layouts =
     Array.map (fun lbl ->

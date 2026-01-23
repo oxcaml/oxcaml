@@ -1421,8 +1421,6 @@ let tree_of_modalities mut t =
   let t = Typemode.untransl_modalities mut t in
   List.map tree_of_modality t
 
-let type_expr_fwd = ref (fun _ _ -> assert false)
-
 let tree_of_mode (t: Parsetree.mode loc) =
   let Mode s = t.txt in s
 
@@ -1664,7 +1662,7 @@ and tree_of_qtvs qtvs =
     match v.desc with
     | Tvar { jkind } when v.level = generic_level -> tree jkind
     | Tunivar { jkind } -> tree jkind
-    | _ -> if false then begin Format.eprintf "DROP IT LIKE IT'S HOT: %a@.%!" !type_expr_fwd (Transient_expr.type_expr v) end; None
+    | _ -> None
   in
   List.filter_map tree_of_qtv qtvs
 
@@ -2061,7 +2059,6 @@ let tree_of_type_decl id decl =
     | Type_record(lbls, rep, umc) ->
         tree_of_manifest (Otyp_record (List.map tree_of_label lbls)),
         decl.type_private,
-        (* XXX This is wrong in the None case *)
         (match rep with Some Record_unboxed -> true | Some _ | None -> false),
         false,
         (Option.is_some umc)
@@ -3503,9 +3500,3 @@ let type_expansion mode ppf ty_exp =
 let tree_of_type_declaration ident td rs =
   with_hidden_items [{hide=true; ident}]
     (fun () -> tree_of_type_declaration ident td rs)
-
-let () = Btype.printtyp_type_expr_fwd := raw_type_expr
-
-let () = type_expr_fwd := raw_type_expr
-
-let () = Types.print_type_fwd := raw_type_expr

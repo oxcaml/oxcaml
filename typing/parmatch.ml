@@ -559,8 +559,7 @@ let discr_pat q pss =
     | ((head, _), _) :: rows ->
       let append_unique lbls lbls_unique =
         List.fold_right (fun lbl lbls_unique ->
-          if List.exists (fun l -> l.lbl_pos = lbl.lbl_pos) lbls_unique
-          then
+          if List.exists (fun l -> l.lbl_pos = lbl.lbl_pos) lbls_unique then
             lbls_unique
           else
             lbl :: lbls_unique
@@ -628,7 +627,7 @@ let do_set_args ~erase_mutable q r = match q with
     let args,rest = read_args omegas r in
     make_pat
       (Tpat_record
-         (List.map2 (fun (lid, lbl, _) arg ->
+         (List.map2 (fun (lid, lbl,_) arg ->
            if erase_mutable && Types.is_mutable lbl.lbl_mut
            then
              lid, lbl, omega
@@ -641,7 +640,7 @@ let do_set_args ~erase_mutable q r = match q with
     let args,rest = read_args omegas r in
     make_pat
       (Tpat_record_unboxed_product
-         (List.map2 (fun (lid, lbl, _) arg ->
+         (List.map2 (fun (lid, lbl,_) arg ->
            if Types.is_mutable lbl.lbl_mut then
              fatal_error
                "Parmatch.do_set_args: unboxed record labels are never mutable"
@@ -963,7 +962,7 @@ let should_extend ext env = match ext with
       | Array _ | Lazy -> false
       | Any -> assert false
       end
-  end
+end
 
 (* These sorts and reprs should never be used (so we make them unlikely to be
    accidentally correct) *)
@@ -2036,7 +2035,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
 | Tpat_construct (lid,c1,repr,ps1,_), Tpat_construct (_,c2,_,ps2,_)
       when  Types.equal_tag c1.cstr_tag c2.cstr_tag  ->
         let rs = arg_lubs ps1 ps2 in
-        (* TODO: Need to check [repr] is the same?? *)
+        (* CR-someday lmaurer: Take lub of reprs? *)
         make_pat (Tpat_construct (lid, c1, repr, rs, None))
           p.pat_type p.pat_env
 | Tpat_variant(l1,Some p1,row), Tpat_variant(l2,Some p2,_)
@@ -2048,7 +2047,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
               when l1 = l2 -> p
 | Tpat_record (l1,sorts,repr,closed),Tpat_record (l2,_,_,_) ->
     let rs = record_lubs l1 l2 in
-    (* TODO: Need to check [repr] is the same?? *)
+    (* CR-someday lmaurer: Take lubs of sorts and reprs? *)
     make_pat (Tpat_record (rs, sorts, repr, closed))
       p.pat_type p.pat_env
 | Tpat_array (am1, arg_sort, ps), Tpat_array (am2, _, qs)
@@ -2073,13 +2072,13 @@ and record_lubs l1 l2 =
   let rec lub_rec l1 l2 = match l1,l2 with
   | [],_ -> l2
   | _,[] -> l1
-  | (lid1, lbl1, p1)::rem1, (lid2, lbl2, p2)::rem2 ->
+  | (lid1, lbl1,p1)::rem1, (lid2, lbl2,p2)::rem2 ->
       if lbl1.lbl_pos < lbl2.lbl_pos then
-        (lid1, lbl1, p1)::lub_rec rem1 l2
+        (lid1, lbl1,p1)::lub_rec rem1 l2
       else if lbl2.lbl_pos < lbl1.lbl_pos  then
-        (lid2, lbl2, p2)::lub_rec l1 rem2
+        (lid2, lbl2,p2)::lub_rec l1 rem2
       else
-        (lid1, lbl1, lub p1 p2)::lub_rec rem1 rem2 in
+        (lid1, lbl1,lub p1 p2)::lub_rec rem1 rem2 in
   lub_rec l1 l2
 
 and tuple_lubs ps qs = match ps,qs with
@@ -2097,8 +2096,10 @@ and unboxed_tuple_lubs ps qs = match ps,qs with
 | _,_ -> raise Empty
 
 and arg_lubs ps qs = match ps,qs with
-  | (sort, p)::ps, (_, q)::qs -> (sort, lub p q) :: arg_lubs ps qs
-  | _,_ -> []
+| (sort, p)::ps, (_, q)::qs ->
+    (* CR-someday lmaurer: Take lub of sorts? *)
+    (sort, lub p q) :: arg_lubs ps qs
+| _,_ -> []
 
 and lubs ps qs = match ps,qs with
 | p::ps, q::qs -> lub p q :: lubs ps qs

@@ -119,20 +119,17 @@ type ('a, 'variety) t = ('a, 'variety) elt list
 type 'variety trace = (type_expr,     'variety) t
 type 'variety error = (expanded_type, 'variety) t
 
-let map_elt (type variety) (f : 'a -> 'b) : ('a, variety) elt -> ('b, variety) elt = function
+let map_elt (type variety) f : ('a, variety) elt -> ('b, variety) elt = function
   | Diff x -> Diff (map_diff f x)
   | Escape {kind = Equation x; context} ->
       Escape { kind = Equation (f x); context }
-  | Escape ({kind = (Univ _ | Self | Constructor _ | Module_type _ | Constraint);
-            _} as escape) -> Escape escape
-  | Variant v -> Variant v
-  | Obj o -> Obj o
-  | Incompatible_fields { name; diff } -> Incompatible_fields { name; diff }
-  | Rec_occur (t1, t2) -> Rec_occur (t1, t2)
-  | Bad_jkind (t, v) -> Bad_jkind (t, v)
-  | Bad_jkind_sort (t, v) -> Bad_jkind_sort (t, v)
-  | Unequal_var_jkinds (x1, x2, x3, x4) -> Unequal_var_jkinds (x1, x2, x3, x4)
-  | Unequal_tof_kind_jkinds (x1, x2) -> Unequal_tof_kind_jkinds (x1, x2)
+  | Escape {kind = (Univ _ | Self | Constructor _ | Module_type _ | Constraint);
+            _}
+  | Variant _ | Obj _ | Incompatible_fields _ | Rec_occur (_, _) as x -> x
+  | Bad_jkind _ as x -> x
+  | Bad_jkind_sort _ as x -> x
+  | Unequal_var_jkinds _ as x -> x
+  | Unequal_tof_kind_jkinds _ as x -> x
 
 let map f t = List.map (map_elt f) t
 

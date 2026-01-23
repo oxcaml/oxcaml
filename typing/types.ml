@@ -1259,8 +1259,6 @@ let get_id t = (repr t).id
 
 (* transient type_expr *)
 
-let print_type_fwd = ref (fun _ _ -> assert false)
-
 module Transient_expr = struct
   let create desc ~level ~scope ~id = {desc; level; scope; id}
   let set_desc ty d = ty.desc <- d

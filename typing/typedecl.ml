@@ -407,15 +407,6 @@ let is_float env ty =
     Tconstr(p, _, _) -> Path.same p Predef.path_float
   | _ -> false
 
-(* XXX Consider that this might be very bad *)
-(* XXX Also consider that it may be unnecessary now that we're doing all of
-   [update_record_representation] purely *)
-let is_float_purely env ty =
-  let snap = Btype.snapshot () in
-  let is_float = is_float env ty in
-  Btype.backtrack snap;
-  is_float
-
 (* Determine if a type definition defines a fixed type. (PW) *)
 let is_fixed_type sd =
   let rec has_row_var sty =
@@ -1781,9 +1772,7 @@ module Element_repr = struct
     of_t t
 
   let classify env ty jkind =
-    (* XXX Using [is_float_purely] here to try and push through [any] in blocks
-       but it might be bad *)
-    if is_float_purely env ty
+    if is_float env ty
     then Some Float_element
     else
       let layout = Jkind.get_layout_defaulting_to_value jkind in
@@ -1857,11 +1846,6 @@ let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor
   =
-  (*
-  (* CR lmaurer: Sad about this for the same reason as
-     [update_record_representation] *)
-  let snap = Btype.snapshot () in
-  *)
   let flat_suffix =
     match cd_args with
     | Cstr_tuple arg_types_and_modes ->
@@ -1886,7 +1870,6 @@ let update_constructor_representation
              let bad_field = List.nth fields i in
              Unrepresentable_argument_field (Ident.name bad_field.ld_id))
   in
-  (* Btype.backtrack snap; *)
   match flat_suffix with
   | Error e -> Result.Error e
   | Ok `Not_mixed -> Ok Constructor_uniform_value
@@ -2224,7 +2207,7 @@ let rec update_decl_jkind env dpath decl =
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
-            let jkind = Ctype.type_jkind_purely env ty in
+            let jkind = Ctype.type_jkind env ty in
             let sort = Jkind.sort_option_of_jkind jkind in
             let ca_sort = Option.map Jkind.Sort.default_to_value_and_get sort in
             [{ cstr with Types.cd_args =
@@ -2232,7 +2215,7 @@ let rec update_decl_jkind env dpath decl =
             Variant_unboxed, jkind
           end
         | Cstr_record [{ld_type} as lbl] -> begin
-            let jkind = Ctype.type_jkind_purely env ld_type in
+            let jkind = Ctype.type_jkind env ld_type in
             let sort = Jkind.sort_option_of_jkind jkind in
             let ld_sort = Option.map Jkind.Sort.default_to_value_and_get sort in
             [{ cstr with Types.cd_args =

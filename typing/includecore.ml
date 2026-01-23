@@ -704,7 +704,7 @@ let report_type_mismatch first second decl env ppf err =
   | With_null_representation ord ->
       pr "Their internal representations differ:@ %s %s %s."
          (choose ord first second) decl
-          "has a constructor represented as a null pointer";
+         "has a constructor represented as a null pointer";
       pr "@ Hint: add [%@%@or_null_reexport]."
   | Fixed_representation ord ->
       pr "Their internal representations differ:@ %s %s %s."

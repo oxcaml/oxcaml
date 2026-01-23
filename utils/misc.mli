@@ -262,11 +262,6 @@ module Stdlib : sig
       -> Format.formatter
       -> 'a t
       -> unit
-
-    exception Option_is_none
-
-    (** Raises [Option_is_none] specifically *)
-    val get_exn : 'a option -> 'a
   end
 
 (** {2 Extensions to the Array module} *)

@@ -140,7 +140,7 @@ and pretty_car ppf v = match v.pat_desc with
 | _ -> pretty_val ppf v
 
 and pretty_cdr ppf v = match v.pat_desc with
-  | Tpat_construct (_,cstr, _, [(_, v1) ; (_, v2)], None)
+| Tpat_construct (_,cstr, _, [(_, v1) ; (_, v2)], None)
     when is_cons cstr ->
       fprintf ppf "%a::@,%a" pretty_car v1 pretty_cdr v2
 | _ -> pretty_val ppf v

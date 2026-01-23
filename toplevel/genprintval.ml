@@ -688,7 +688,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         in
         Oval_record (tree_of_fields (pos = 0) pos lbl_list)
 
-      (* CR lmaurer: Please for the love of God make it stop. *)
+      (* CR lmaurer: *Pretty please* let's cut down on the duplication here. *)
       and tree_of_record_unboxed_product_fields depth env path type_params
             ty_list lbl_list pos obj =
         let rec tree_of_fields first pos = function
