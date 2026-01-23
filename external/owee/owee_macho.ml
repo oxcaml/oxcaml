@@ -1304,24 +1304,81 @@ let get_symbol_table commands =
     commands
 
 (* A resolved relocation with offset, symbol name, and addend.
-   Addend is always 0 since Mach-O uses REL format. *)
+   Addend is typically 0 for Mach-O (which uses REL format), but can be
+   non-zero when ARM64_RELOC_ADDEND relocations are present. *)
 type resolved_relocation = {
   r_offset : int;
   r_symbol : string;
   r_addend : int64;
 }
 
-(* Extract relocations from a section, resolving symbol names *)
-let extract_section_relocations symbols section =
+(* Extract relocations from a section, resolving symbol names.
+   [section_names] is an array mapping section ordinal (1-based) to section name,
+   used for non-extern relocations. Pass [||] if section ordinal resolution is
+   not needed. *)
+let extract_section_relocations ?(section_names = [||]) symbols section =
   let relocs = section.sec_relocs in
-  Array.to_list relocs
-  |> List.filter_map (fun reloc ->
-    match reloc with
-    | `Relocation_info ri when ri.ri_extern ->
-      let sym_idx = ri.ri_symbolnum in
-      if sym_idx < Array.length symbols then
-        let sym = symbols.(sym_idx) in
-        (* Mach-O uses implicit addends in the instruction/data *)
-        Some { r_offset = ri.ri_address; r_symbol = sym.sym_name; r_addend = 0L }
-      else None
-    | _ -> None)
+  let n = Array.length relocs in
+  let result = ref [] in
+  let i = ref 0 in
+  while !i < n do
+    match relocs.(!i) with
+    | `Relocation_info ri -> (
+      (* Check for ARM64_RELOC_ADDEND which carries an addend for the next reloc *)
+      match ri.ri_type with
+      | `ARM64_RELOC_ADDEND ->
+        (* ri_symbolnum contains the signed 24-bit addend *)
+        let addend =
+          let v = ri.ri_symbolnum in
+          (* Sign-extend from 24 bits *)
+          if v land 0x800000 <> 0 then Int64.of_int (v lor 0xFF000000)
+          else Int64.of_int v
+        in
+        (* The next relocation is the actual one that uses this addend *)
+        incr i;
+        if !i < n then (
+          match relocs.(!i) with
+          | `Relocation_info ri2 ->
+            let symbol_name =
+              if ri2.ri_extern then
+                let sym_idx = ri2.ri_symbolnum in
+                if sym_idx < Array.length symbols then symbols.(sym_idx).sym_name
+                else ""
+              else
+                (* Non-extern: ri_symbolnum is 1-based section ordinal *)
+                let ordinal = ri2.ri_symbolnum in
+                if ordinal > 0 && ordinal <= Array.length section_names then
+                  section_names.(ordinal - 1)
+                else ""
+            in
+            if symbol_name <> "" then
+              result :=
+                { r_offset = ri2.ri_address; r_symbol = symbol_name;
+                  r_addend = addend }
+                :: !result
+          | `Scattered_relocation_info _ -> ())
+      | _ ->
+        (* Regular relocation *)
+        let symbol_name =
+          if ri.ri_extern then
+            let sym_idx = ri.ri_symbolnum in
+            if sym_idx < Array.length symbols then symbols.(sym_idx).sym_name
+            else ""
+          else
+            (* Non-extern: ri_symbolnum is 1-based section ordinal *)
+            let ordinal = ri.ri_symbolnum in
+            if ordinal > 0 && ordinal <= Array.length section_names then
+              section_names.(ordinal - 1)
+            else ""
+        in
+        if symbol_name <> "" then
+          result :=
+            { r_offset = ri.ri_address; r_symbol = symbol_name; r_addend = 0L }
+            :: !result)
+    | `Scattered_relocation_info _ ->
+      (* Scattered relocations are not used on ARM64 *)
+      ()
+    ;
+    incr i
+  done;
+  List.rev !result

@@ -36,17 +36,22 @@ val relocs_equal : relocation -> relocation -> bool
 (** Extract the main text section content. Returns None if not found. *)
 val extract_text_section : Owee_buf.t -> string option
 
-(** Extract the main data section content.
-    For ELF, tries .data then .rodata.
-    For Mach-O, tries __data then __const.
+(** Extract the data section content (.data for ELF, __data for Mach-O).
     Returns None if not found. *)
 val extract_data_section : Owee_buf.t -> string option
+
+(** Extract the read-only data section content (.rodata for ELF, __const for Mach-O).
+    Returns None if not found. *)
+val extract_rodata_section : Owee_buf.t -> string option
 
 (** Extract relocations for the text section. *)
 val extract_text_relocations : Owee_buf.t -> relocation list
 
-(** Extract relocations for the data section. *)
+(** Extract relocations for the data section (.data for ELF, __data for Mach-O). *)
 val extract_data_relocations : Owee_buf.t -> relocation list
+
+(** Extract relocations for the read-only data section (.rodata for ELF, __const for Mach-O). *)
+val extract_rodata_relocations : Owee_buf.t -> relocation list
 
 (** Extract individual text sections (for function-sections mode).
     Returns a list of (section_name, content) pairs.

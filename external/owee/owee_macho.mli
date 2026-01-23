@@ -560,12 +560,19 @@ val section_body_string : Owee_buf.t -> segment -> section -> string
 val get_symbol_table : command list -> (symbol array * Owee_buf.t) option
 
 (** A resolved relocation with offset, symbol name, and addend.
-    Addend is always 0 since Mach-O uses REL format. *)
+    Addend is typically 0 for Mach-O (which uses REL format), but can be
+    non-zero when ARM64_RELOC_ADDEND relocations are present. *)
 type resolved_relocation = {
   r_offset : int;
   r_symbol : string;
   r_addend : int64;
 }
 
-(** Extract relocations from a section, resolving symbol names. *)
-val extract_section_relocations : symbol array -> section -> resolved_relocation list
+(** Extract relocations from a section, resolving symbol names.
+    [section_names] is an optional array mapping section ordinal (1-based) to
+    section name, used for non-extern relocations on ARM64. If not provided,
+    non-extern relocations are skipped.
+    Handles ARM64_RELOC_ADDEND pairs by combining the addend with the following
+    relocation. *)
+val extract_section_relocations :
+  ?section_names:string array -> symbol array -> section -> resolved_relocation list
