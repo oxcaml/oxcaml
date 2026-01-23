@@ -6713,7 +6713,7 @@ and type_expect_
   | Pexp_field(srecord, lid) ->
       let (record, record_sort, rmode, label, _, ty_arg, field_sort,
            record_repres) =
-        type_label_access Legacy loc env srecord Env.Projection lid
+        type_label_projection Legacy loc env srecord lid
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut rmode;
@@ -6775,7 +6775,7 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       let (record, record_sort, rmode, label, _, ty_arg, field_sort,
            record_repres) =
-        type_label_access Unboxed_product loc env srecord Env.Projection lid
+        type_label_projection Unboxed_product loc env srecord lid
       in
       if Types.is_mutable label.lbl_mut then
         fatal_error
@@ -6800,9 +6800,8 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-      let (record, _record_sort, rmode, label, expected_type, _, field_sort,
-           record_repres) =
-        type_label_access Legacy loc env srecord Env.Mutation lid in
+      let (record, _record_sort, rmode, label, expected_type) =
+        type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
         then
@@ -6825,11 +6824,14 @@ and type_expect_
           raise(Error(loc, env, Label_not_mutable lid.txt))
       in
       unify_exp env record ty_record;
+      let sort, record_repres =
+        update_label env label Legacy ~loc ~containing_type:ty_record
+      in
       rue {
         exp_desc = Texp_setfield {
           record;
           record_repres;
-          field_sort;
+          field_sort = sort |> Jkind.Sort.of_const;
           modality =
             Locality.disallow_right (regional_to_local
               (Value.proj_comonadic Areality rmode));
@@ -7625,8 +7627,8 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let (record, record_sort, rmode, label, _, _, _, _) =
-            type_label_access Legacy loc env srecord Env.Mutation lid
+          let (record, record_sort, rmode, label, _) =
+            type_label_access Legacy env srecord Env.Mutation lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
           if (not (Types.is_atomic label.lbl_mut))
@@ -8594,9 +8596,9 @@ and type_function
      }
 
 and type_label_access
-  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * 'rep gen_label_description * _ * _ * _ * 'rep
-  = fun record_form loc env srecord usage lid ->
+  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
+    _ * _ * _ * 'rep gen_label_description * _
+  = fun record_form env srecord usage lid ->
   let mode = Value.newvar () in
   let record_jkind, record_sort =
     Jkind.of_new_sort_var ~why:Record_projection
@@ -8626,7 +8628,21 @@ and type_label_access
   let label =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
+  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type)
+
+and type_label_projection
+  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
+    _ * _ * _ * 'rep gen_label_description * _ * _ * _ * 'rep
+  = fun record_form loc env srecord lid ->
+  let record, record_sort, mode, label, expected_type =
+    type_label_access record_form env srecord Env.Projection lid
+  in
   let ty_arg, field_sort, record_repres =
+    (* XXX Not clear to me why this can't be done in [type_label_access] so that
+       the [Texp_setfield] case wouldn't have to have its own call to
+       [update_label], but doing it that way causes principality issues.
+       Notably, this call to [update_label] happens inside a local level and the
+       [Texp_setfield] call does not. *)
     with_local_level_if_principal begin fun () ->
       (* [ty_arg] is the type of field, [ty_res] is the type of record, they
          could share type variables, which are now instantiated *)
