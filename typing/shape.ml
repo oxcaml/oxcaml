@@ -68,9 +68,7 @@ module Uid = struct
           Format.fprintf fmt "%a%s.%d" pp_intf_or_impl from comp_unit id
       | Unboxed_version t -> Format.fprintf fmt "%a#" print t
 
-    let output oc t =
-      let fmt = Format.formatter_of_out_channel oc in
-      print fmt t
+    let output = Misc.output_of_print print
   end)
 
   let id = ref (-1)
@@ -850,9 +848,9 @@ let rec print fmt t =
 
   in
   if t.approximated then
-    Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
+    Format.fprintf fmt "@[(approx)@ %a@]" aux t
   else
-    Format.fprintf fmt "@[%a@]@;" aux t
+    Format.fprintf fmt "@[%a@]" aux t
 
 (* We use custom strings as separators instead of pp_print_space, because the
    latter introduces line breaks that can mess up the tables with all shapes. *)
