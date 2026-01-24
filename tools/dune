@@ -84,6 +84,12 @@
   (libraries ocamlcommon ocamlbytecomp))
 
 (executable
+  (name listprims)
+  (modes native)
+  (modules listprims)
+  (libraries ocamlcommon))
+
+(executable
   (name ocamlmklib)
   (modes byte native)
   (modules ocamlmklib)
