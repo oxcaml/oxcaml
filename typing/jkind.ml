@@ -1317,21 +1317,34 @@ module Const = struct
         | "value_or_null" -> Builtin.value_or_null.jkind
         | "value" -> Builtin.value.jkind
         | "void" -> Builtin.void.jkind
+        | "void_internal" -> Builtin.void_internal.jkind
         | "immediate64" -> Builtin.immediate64.jkind
         | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
         | "immediate" -> Builtin.immediate.jkind
         | "immediate_or_null" -> Builtin.immediate_or_null.jkind
         | "float64" -> Builtin.float64.jkind
+        | "float64_internal" -> Builtin.float64_internal.jkind
         | "float32" -> Builtin.float32.jkind
+        | "float32_internal" -> Builtin.float32_internal.jkind
         | "word" -> Builtin.word.jkind
+        | "word_internal" -> Builtin.word_internal.jkind
         | "untagged_immediate" -> Builtin.untagged_immediate.jkind
+        | "untagged_immediate_internal" ->
+          Builtin.untagged_immediate_internal.jkind
         | "bits8" -> Builtin.bits8.jkind
+        | "bits8_internal" -> Builtin.bits8_internal.jkind
         | "bits16" -> Builtin.bits16.jkind
+        | "bits16_internal" -> Builtin.bits16_internal.jkind
         | "bits32" -> Builtin.bits32.jkind
+        | "bits32_internal" -> Builtin.bits32_internal.jkind
         | "bits64" -> Builtin.bits64.jkind
+        | "bits64_internal" -> Builtin.bits64_internal.jkind
         | "vec128" -> Builtin.vec128.jkind
+        | "vec128_internal" -> Builtin.vec128_internal.jkind
         | "vec256" -> Builtin.vec256.jkind
+        | "vec256_internal" -> Builtin.vec256_internal.jkind
         | "vec512" -> Builtin.vec512.jkind
+        | "vec512_internal" -> Builtin.vec512_internal.jkind
         | "immutable_data" -> Builtin.immutable_data.jkind
         | "sync_data" -> Builtin.sync_data.jkind
         | "mutable_data" -> Builtin.mutable_data.jkind
