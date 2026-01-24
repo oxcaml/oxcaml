@@ -1863,8 +1863,7 @@ module Lattices_mono = struct
 end
 
 module C = Lattices_mono
-module Solver = Solver_mono (Hint_for_solver) (C)
-module S = Solver
+module S = Solver_mono (Hint_for_solver) (C)
 
 let erase_hints () = S.erase_hints ()
 
@@ -2625,7 +2624,7 @@ let equate_from_submode' submode m1 m2 =
 module Comonadic_gen (Obj : Obj) = struct
   open Obj
 
-  type 'd t = (const, 'l * 'r) Solver.mode constraint 'd = 'l * 'r
+  type 'd t = (const, 'l * 'r) S.mode constraint 'd = 'l * 'r
 
   type l = (allowed * disallowed) t
 
@@ -2641,26 +2640,26 @@ module Comonadic_gen (Obj : Obj) = struct
 
   type (_, _, 'd) sided = 'd t
 
-  let disallow_right m = Solver.disallow_right m
+  let disallow_right m = S.disallow_right m
 
-  let disallow_left m = Solver.disallow_left m
+  let disallow_left m = S.disallow_left m
 
-  let allow_left m = Solver.allow_left m
+  let allow_left m = S.allow_left m
 
-  let allow_right m = Solver.allow_right m
+  let allow_right m = S.allow_right m
 
-  let newvar () = Solver.newvar obj
+  let newvar () = S.newvar obj
 
-  let min = Solver.min obj
+  let min = S.min obj
 
-  let max = Solver.max obj
+  let max = S.max obj
 
-  let newvar_above m = Solver.newvar_above obj m
+  let newvar_above m = S.newvar_above obj m
 
-  let newvar_below m = Solver.newvar_below obj m
+  let newvar_below m = S.newvar_below obj m
 
   let submode_log ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b ~log =
-    Solver.submode pp obj a b ~log
+    S.submode pp obj a b ~log
 
   let to_simple_error ({ left; right; _ } : error) : simple_error =
     { left; right }
@@ -2674,9 +2673,9 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let print_error pp err = Error.print_axis pp obj err
 
-  let join l = Solver.join obj l
+  let join l = S.join obj l
 
-  let meet l = Solver.meet obj l
+  let meet l = S.meet obj l
 
   let submode_exn ?pp m1 m2 = submode ?pp m1 m2 |> Result.get_ok
 
@@ -2684,41 +2683,41 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
-  let print ?verbose () ppf m = Solver.print ?verbose obj ppf m
+  let print ?verbose () ppf m = S.print ?verbose obj ppf m
 
-  let zap_to_ceil m = with_log (Solver.zap_to_ceil obj m)
+  let zap_to_ceil m = with_log (S.zap_to_ceil obj m)
 
-  let zap_to_floor m = with_log (Solver.zap_to_floor obj m)
+  let zap_to_floor m = with_log (S.zap_to_floor obj m)
 
   let of_const : type l r. ?hint:(l * r) pos Hint.const -> const -> (l * r) t =
-   fun ?hint a -> Solver.of_const ?hint obj a
+   fun ?hint a -> S.of_const ?hint obj a
 
-  let to_const_exn m = Solver.to_const_exn obj m
+  let to_const_exn m = S.to_const_exn obj m
 
-  let unhint = Solver.Unhint.unhint
+  let unhint = S.Unhint.unhint
 
-  let hint ?hint = Solver.Unhint.hint obj ?hint
+  let hint ?hint = S.Unhint.hint obj ?hint
 
   let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
-  let meet_const_unhint c m = Solver.Unhint.apply obj (Meet_const c) m
+  let meet_const_unhint c m = S.Unhint.apply obj (Meet_const c) m
 
   let meet_const ?hint c m = wrap ?hint (meet_const_unhint c) m
 
-  let imply_const_unhint c m = Solver.Unhint.apply obj (Imply_const c) m
+  let imply_const_unhint c m = S.Unhint.apply obj (Imply_const c) m
 
   let imply_const c m = m |> disallow_left |> wrap (imply_const_unhint c)
 
   module Guts = struct
-    let get_floor m = Solver.get_floor obj m
+    let get_floor m = S.get_floor obj m
 
-    let get_ceil m = Solver.get_ceil obj m
+    let get_ceil m = S.get_ceil obj m
 
-    let get_loose_floor m = Solver.get_loose_floor obj m
+    let get_loose_floor m = S.get_loose_floor obj m
 
-    let get_loose_ceil m = Solver.get_loose_ceil obj m
+    let get_loose_ceil m = S.get_loose_ceil obj m
   end
 end
 [@@inline]
@@ -2727,7 +2726,7 @@ module Monadic_gen (Obj : Obj) = struct
   (* Monadic lattices are flipped. See "Notes on flipping". *)
   open Obj
 
-  type 'd t = (const, 'r * 'l) Solver.mode constraint 'd = 'l * 'r
+  type 'd t = (const, 'r * 'l) S.mode constraint 'd = 'l * 'r
 
   type l = (allowed * disallowed) t
 
@@ -2743,26 +2742,26 @@ module Monadic_gen (Obj : Obj) = struct
 
   type (_, _, 'd) sided = 'd t
 
-  let disallow_right m = Solver.disallow_left m
+  let disallow_right m = S.disallow_left m
 
-  let disallow_left m = Solver.disallow_right m
+  let disallow_left m = S.disallow_right m
 
-  let allow_left m = Solver.allow_right m
+  let allow_left m = S.allow_right m
 
-  let allow_right m = Solver.allow_left m
+  let allow_right m = S.allow_left m
 
-  let newvar () = Solver.newvar obj
+  let newvar () = S.newvar obj
 
-  let min = Solver.max obj
+  let min = S.max obj
 
-  let max = Solver.min obj
+  let max = S.min obj
 
-  let newvar_above m = Solver.newvar_below obj m
+  let newvar_above m = S.newvar_below obj m
 
-  let newvar_below m = Solver.newvar_above obj m
+  let newvar_below m = S.newvar_above obj m
 
   let submode_log ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b ~log =
-    Solver.submode pp obj b a ~log
+    S.submode pp obj b a ~log
 
   let to_simple_error ({ left; right; _ } : error) : simple_error =
     { left = right; right = left }
@@ -2776,9 +2775,9 @@ module Monadic_gen (Obj : Obj) = struct
 
   let print_error pp err = Error.print_axis pp obj err
 
-  let join l = Solver.meet obj l
+  let join l = S.meet obj l
 
-  let meet l = Solver.join obj l
+  let meet l = S.join obj l
 
   let submode_exn ?pp m1 m2 = submode ?pp m1 m2 |> Result.get_ok
 
@@ -2786,35 +2785,35 @@ module Monadic_gen (Obj : Obj) = struct
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
-  let print ?verbose () ppf m = Solver.print ?verbose obj ppf m
+  let print ?verbose () ppf m = S.print ?verbose obj ppf m
 
-  let zap_to_ceil m = with_log (Solver.zap_to_floor obj m)
+  let zap_to_ceil m = with_log (S.zap_to_floor obj m)
 
-  let zap_to_floor m = with_log (Solver.zap_to_ceil obj m)
+  let zap_to_floor m = with_log (S.zap_to_ceil obj m)
 
   let of_const : type l r. ?hint:(l * r) neg Hint.const -> const -> (l * r) t =
-   fun ?hint a -> Solver.of_const ?hint obj a
+   fun ?hint a -> S.of_const ?hint obj a
 
-  let to_const_exn m = Solver.to_const_exn obj m
+  let to_const_exn m = S.to_const_exn obj m
 
-  let unhint = Solver.Unhint.unhint
+  let unhint = S.Unhint.unhint
 
-  let hint ?hint = Solver.Unhint.hint obj ?hint
+  let hint ?hint = S.Unhint.hint obj ?hint
 
   let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
-  let join_const_unhint c m = Solver.Unhint.apply Obj.obj (Meet_const c) m
+  let join_const_unhint c m = S.Unhint.apply Obj.obj (Meet_const c) m
 
   let join_const ?hint c m = wrap ?hint (join_const_unhint c) m
 
-  let subtract_const_unhint c m = Solver.Unhint.apply obj (Imply_const c) m
+  let subtract_const_unhint c m = S.Unhint.apply obj (Imply_const c) m
 
   let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
 
   module Guts = struct
-    let get_ceil m = Solver.get_floor obj m
+    let get_ceil m = S.get_floor obj m
   end
 end
 [@@inline]
@@ -3075,7 +3074,7 @@ module type Areality = sig
 
   module Obj : Obj with type const = Const.t
 
-  val zap_to_legacy : (Const.t, allowed * 'r) Solver.mode -> Const.t
+  val zap_to_legacy : (Const.t, allowed * 'r) S.mode -> Const.t
 end
 
 module Lattice_Product (L : Lattice) = struct
@@ -3160,23 +3159,23 @@ module Comonadic_with (Areality : Areality) = struct
     end
   end
 
-  let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m = S.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   module Per_axis = struct
     let zap_to_floor ax m =
       let obj = proj_obj ax in
-      with_log (Solver.zap_to_floor obj m)
+      with_log (S.zap_to_floor obj m)
 
     let zap_to_ceil ax m =
       let obj = proj_obj ax in
-      with_log (Solver.zap_to_ceil obj m)
+      with_log (S.zap_to_ceil obj m)
   end
 
   let min_with ax m =
-    Solver.apply ~hint:Skip Obj.obj (Min_with ax) (Solver.disallow_right m)
+    S.apply ~hint:Skip Obj.obj (Min_with ax) (S.disallow_right m)
 
   let max_with ax m =
-    Solver.apply ~hint:Skip Obj.obj (Max_with ax) (Solver.disallow_left m)
+    S.apply ~hint:Skip Obj.obj (Max_with ax) (S.disallow_left m)
 
   let meet_const_with ax c m = meet_const (Const.max_with ax c) m
 
@@ -3296,16 +3295,16 @@ module Monadic = struct
     end
   end
 
-  let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m = S.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   module Per_axis = struct
     let zap_to_floor ax m =
       let obj = proj_obj ax in
-      with_log (Solver.zap_to_ceil obj m)
+      with_log (S.zap_to_ceil obj m)
 
     let zap_to_ceil ax m =
       let obj = proj_obj ax in
-      with_log (Solver.zap_to_floor obj m)
+      with_log (S.zap_to_floor obj m)
   end
 
   (* The monadic fragment is inverted. *)
@@ -3313,7 +3312,7 @@ module Monadic = struct
   let join_const_with ax c m = join_const (Const.min_with ax c) m
 
   let min_with ax m =
-    Solver.apply ~hint:Skip Obj.obj (Max_with ax) (Solver.disallow_left m)
+    S.apply ~hint:Skip Obj.obj (Max_with ax) (S.disallow_left m)
 
   let zap_to_legacy m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
