@@ -173,7 +173,19 @@
   OPCODE(PERFORM) \
   OPCODE(RESUME) \
   OPCODE(RESUMETERM) \
-  OPCODE(REPERFORMTERM)
+  OPCODE(REPERFORMTERM) \
+  OPCODE(MAKE_FAUX_MIXEDBLOCK) \
+  OPCODE(WITH_STACK) \
+  OPCODE(WITH_STACK_BIND) \
+
+// Think carefully before adding a new bytecode instruction. In general,
+// this makes the OxCaml compiler less compatible with the
+// OCaml ecosystem. Projects may need to be patched to build with
+// oxcaml.
+//
+// We added the [MAKE_FAUX_MIXEDBLOCK] instruction without making this
+// consideration and it has turned out OK, but we might want to reverse
+// this decision if we run into difficulty in the future.
 
 #endif /* CAML_INTERNALS */
 

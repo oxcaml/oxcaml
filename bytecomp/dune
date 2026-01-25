@@ -14,10 +14,17 @@
 
 (rule
  (targets opcodes.ml)
- (mode    fallback)
- (deps    (:instr (file ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/instruct.h)))
+ (mode fallback)
+ (deps
+  (:conf ../Makefile.config)
+  (:c opcodes.ml.c)
+  (:tbl
+   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/opcodes.h))
  (action
-  (bash "%{dep:../tools/make_opcodes.exe} -opcodes < %{instr} > %{targets}")))
+  (with-stdout-to
+   %{targets}
+   (bash
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set} %{c}"))))
 
 (rule
  (targets opcodes.mli)

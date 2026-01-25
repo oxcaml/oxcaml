@@ -55,7 +55,7 @@
    simd.c
    blake2.c
    misc.c
-   build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl)
+   build_config.h sync_posix.h caml/domain_state.tbl)
  (action
    (progn
      (run %{dep:gen_primitives.sh} primitives %{deps})
