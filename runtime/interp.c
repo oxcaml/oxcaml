@@ -293,9 +293,11 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
 #endif
 
 #ifdef THREADED_CODE
+#define OPCODE_LABEL(name) &&lbl_ ## name,
   static const void * const jumptable[] = {
-#    include "caml/jumptbl.h"
+    CAML_ZINC_OPCODES(OPCODE_LABEL)
   };
+#undef OPCODE_LABEL
 #endif
 
   if (prog == NULL) {           /* Interpreter is initializing */
