@@ -11,18 +11,8 @@
 #define SIZECLASS_MAX 128
 #define NUM_SIZECLASSES 33
 
-<<<<<<< HEAD
 typedef unsigned char sizeclass_t;
 static_assert(NUM_SIZECLASSES < (1 << (CHAR_BIT * sizeof(sizeclass_t))), "");
-||||||| upstream
-typedef unsigned char sizeclass;
-static_assert(NUM_SIZECLASSES < (1 << (CHAR_BIT * sizeof(sizeclass))), "");
-=======
-#include <assert.h>
-#include <limits.h>
-typedef unsigned char sizeclass;
-static_assert(NUM_SIZECLASSES < (1 << (CHAR_BIT * sizeof(sizeclass))), "");
->>>>>>> ocaml/ocaml#14489
 
 /* The slot sizes (and therefore the largest whsize) for each size class.
    (A gap is left after smaller objects) */
