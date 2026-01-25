@@ -16,6 +16,14 @@
 #ifndef CAML_THREADS_H
 #define CAML_THREADS_H
 
+<<<<<<< HEAD
+||||||| upstream
+#include "caml/config.h"
+
+=======
+#include <caml/misc.h>
+
+>>>>>>> ocaml/ocaml#14489
 #ifdef __cplusplus
 extern "C" {
 #endif

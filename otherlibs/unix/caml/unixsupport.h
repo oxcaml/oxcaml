@@ -16,7 +16,7 @@
 #ifndef CAML_UNIXSUPPORT_H
 #define CAML_UNIXSUPPORT_H
 
-#include <caml/misc.h>
+#include <caml/mlvalues.h>
 
 #ifdef _WIN32 /* Windows */
 #define WIN32_LEAN_AND_MEAN
