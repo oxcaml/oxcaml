@@ -34,6 +34,8 @@ Create a function that runs locate-types on a variable of a given type
   >               # No position info available
   >               .data[1].type
   >             end
+  >           elif .data[0] == "Other" then
+  >             .data[1]
   >           else
   >             .data[0]
   >           end;
@@ -80,8 +82,7 @@ Functions
   $ run "x:a -> ?y:b -> c"
   Arrow
     a (1:5)
-    option
-      b (2:5)
+    b (2:5)
     c (3:5)
 
 Tuples
@@ -112,9 +113,11 @@ Type variables
 
   $ run "_ one_arg"
   one_arg (4:8)
+    '_weak1
 
   $ run "'a one_arg"
   one_arg (4:8)
+    '_a
 
 Objects
 
@@ -184,6 +187,7 @@ Compound types
   two_arg (5:14)
     option
       a (1:5)
+    '_weak1
 
   $ run "a -> b -> #(x:a * b)"
   Arrow
@@ -198,3 +202,17 @@ Compound types
     list
       one_arg (4:8)
         a (1:5)
+
+Type variables
+
+  $ run "('a, 'b) two_arg"
+  two_arg (5:14)
+    '_a
+    '_b
+
+  $ run "'a -> 'b -> 'c -> 'a"
+  Arrow
+    '_a
+    '_b
+    '_c
+    '_a

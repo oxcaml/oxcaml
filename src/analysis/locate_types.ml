@@ -1,35 +1,57 @@
 open Std
 
 module Type_tree = struct
-  type type_ref_payload = { path : Path.t; ty : Types.type_expr }
-  type t = type_ref_payload Query_protocol.Locate_types_result.Tree.t
+  type node_data =
+    | Arrow
+    | Tuple
+    | Unboxed_tuple
+    | Object
+    | Poly_variant
+    | Type_ref of { path : Path.t; ty : Types.type_expr }
+    | Other of Types.type_expr
+
+  type t = { data : node_data; children : t list }
 end
 
 let rec flatten_arrow ret_ty =
   match Types.get_desc ret_ty with
-  | Tarrow (_, ty1, ty2, _) -> ty1 :: flatten_arrow ty2
+  | Tarrow ((label, _, _), ty1, ty2, _) ->
+    let ty1 =
+      match label with
+      | Optional _ ->
+        let rec strip_option ty =
+          match Types.get_desc ty with
+          | Tconstr (path, [ ty ], _) when Path.same path Predef.path_option ->
+            ty
+          | Tpoly (ty, vars) ->
+            Types.newty3 ~level:(Types.get_level ty) ~scope:(Types.get_scope ty)
+              (Tpoly (strip_option ty, vars))
+          | _ -> ty
+        in
+        strip_option ty1
+      | _ -> ty1
+    in
+    ty1 :: flatten_arrow ty2
   | _ -> [ ret_ty ]
 
-let rec create_type_tree ty : Type_tree.t option =
+let rec create_type_tree ty : Type_tree.t =
   match Types.get_desc ty with
-  | Tarrow (_, ty1, ty2, _) ->
-    let tys = ty1 :: flatten_arrow ty2 in
-    let children = List.filter_map tys ~f:create_type_tree in
-    Some { data = Arrow; children }
+  | Tarrow _ ->
+    let tys = flatten_arrow ty in
+    let children = List.map tys ~f:create_type_tree in
+    { data = Arrow; children }
   | Ttuple tys ->
-    let children =
-      List.filter_map tys ~f:(fun (_, ty) -> create_type_tree ty)
-    in
-    Some { data = Tuple; children }
+    let tys = List.map ~f:snd tys in
+    let children = List.map tys ~f:create_type_tree in
+    { data = Tuple; children }
   | Tunboxed_tuple tys ->
-    let children =
-      List.filter_map tys ~f:(fun (_, ty) -> create_type_tree ty)
-    in
-    Some { data = Unboxed_tuple; children }
+    let tys = List.map ~f:snd tys in
+    let children = List.map tys ~f:create_type_tree in
+    { data = Unboxed_tuple; children }
   | Tconstr (path, arg_tys, abbrev_memo) ->
     let ty_without_args = Btype.newgenty (Tconstr (path, [], abbrev_memo)) in
-    let children = List.filter_map arg_tys ~f:create_type_tree in
-    Some { data = Type_ref { path; ty = ty_without_args }; children }
+    let children = List.map arg_tys ~f:create_type_tree in
+    { data = Type_ref { path; ty = ty_without_args }; children }
   | Tlink ty | Tpoly (ty, _) -> create_type_tree ty
   | Tobject (fields_type, _) ->
     let rec extract_field_types (ty : Types.type_expr) =
@@ -38,23 +60,23 @@ let rec create_type_tree ty : Type_tree.t option =
       | _ -> []
     in
     let field_types = List.rev (extract_field_types fields_type) in
-    let children = List.filter_map field_types ~f:create_type_tree in
-    Some { data = Object; children }
+    let children = List.map field_types ~f:create_type_tree in
+    { data = Object; children }
   | Tvariant row_desc ->
     let fields = Types.row_fields row_desc in
     let children =
       List.filter_map fields ~f:(fun (_, row_field) ->
           match Types.row_field_repr row_field with
-          | Rpresent (Some ty) -> create_type_tree ty
+          | Rpresent (Some ty) -> Some (create_type_tree ty)
           | Reither (_, tys, _) ->
             (* If there are multiple types in [tys], they are types that are meant to
                unify with each other (it'd be a type error if not, see
                [Ctype.collapse_conj]). So just using the head of the list seems fine
                (using the entire list results in types being duplicated). *)
-            List.hd_opt tys |> Option.bind ~f:create_type_tree
+            List.hd_opt tys |> Option.map ~f:create_type_tree
           | Rpresent None | Rabsent -> None)
     in
-    Some { data = Poly_variant; children }
+    { data = Poly_variant; children }
   | Tnil
   | Tvar _
   | Tsubst _
@@ -63,4 +85,4 @@ let rec create_type_tree ty : Type_tree.t option =
   | Tfield _
   | Tquote _
   | Tsplice _
-  | Tof_kind _ -> None
+  | Tof_kind _ -> { data = Other ty; children = [] }
