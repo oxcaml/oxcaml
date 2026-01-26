@@ -37,12 +37,14 @@ open! Stdlib
 type (+'a : any mod separable) t = 'a iarray
 (** An alias for the type of immutable arrays. *)
 
-external length : ('a : any mod separable). local_ 'a iarray -> int  = "%array_length"
+external length : ('a : any mod separable). local_ 'a iarray -> int
+  = "%array_length"
 [@@layout_poly]
 (** Return the length (number of elements) of the given immutable array. *)
 
-external get : ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt]) =
-  "%array_safe_get"
+external get :
+  ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+  = "%array_safe_get"
 [@@layout_poly]
 (** [get a n] returns the element number [n] of immutable array [a].
    The first element has number 0.
@@ -52,7 +54,8 @@ external get : ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@
    @raise Invalid_argument
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
-external ( .:() ) : ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+external ( .:() ) :
+  ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
   = "%array_safe_get"
 [@@layout_poly]
 (** A synonym for [get]. *)
@@ -555,6 +558,7 @@ val of_seq_local : local_ 'a Seq.t -> local_ 'a iarray
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_get : ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt]) =
-  "%array_unsafe_get"
+external unsafe_get :
+  ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+  = "%array_unsafe_get"
 [@@layout_poly]
