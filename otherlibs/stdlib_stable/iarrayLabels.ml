@@ -119,14 +119,16 @@ let[@inline always] unsafe_init_local (type a : value_or_null mod separable) l
        function, and why it's not tail-recursive; if it were tail-recursive,
        then we wouldn't have anywhere to put the array elements during the whole
        process. *)
-    let rec go i = exclave_
+    let rec go i = exclave_ begin
       let x = f i in
-      if i = l - 1 then make_mutable_local l x
-      else
-        let res = go (i + 1) in
+      if i = l - 1 then
+        make_mutable_local l x
+      else begin
+        let res = go (i+1) in
         unsafe_set_local res i x;
         res
-    in
+      end
+    end in
     unsafe_of_local_array (go 0)
 
 (* The implementation is copied from [Array] so that [f] can be [local_] *)
