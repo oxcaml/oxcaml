@@ -71,8 +71,13 @@ let log fmt =
 
 let partition_files ~threshold file_sizes =
   log "partition_files: input has %d file(s)" (List.length file_sizes);
-  (* Separate files that must go into Main partition: - Files with probes (to
-     keep probes together) - Startup and cached genfns (by origin) *)
+  (* Separate files that must go into Main partition:
+
+     - Files with probes (to keep probes together)
+
+     - Startup and cached genfns (by origin).
+
+     Normal object files never go into Main. *)
   let main_files, partitionable_files =
     List.partition
       (fun entry -> MOF.File_size.has_probes entry || must_be_in_main entry)
@@ -80,17 +85,10 @@ let partition_files ~threshold file_sizes =
   in
   log "  main_files: %d, partitionable: %d" (List.length main_files)
     (List.length partitionable_files);
-  (* Calculate the size of main_files - this will be added to the first
-     partition, so we need to account for it when partitioning. *)
-  let main_files_size =
-    List.fold_left
-      (fun acc entry -> Int64.add acc (MOF.File_size.size entry))
-      0L main_files
-  in
   (* Partition regular OCaml files into buckets, starting a new bucket when
-     adding the next file would exceed the threshold. The first partition has
-     reduced capacity since main_files will be added to it. The order of files
-     is preserved. *)
+     adding the next file would exceed the threshold. These go into Large_code
+     partitions; Main partition only contains main_files. The order of files is
+     preserved. *)
   let rec loop current_partition current_size partitions = function
     | [] ->
       (* Finish: add current partition if non-empty *)
@@ -112,15 +110,9 @@ let partition_files ~threshold file_sizes =
                   size = entry_size;
                   threshold
                 }));
-      (* For the first partition, account for main_files size *)
-      let effective_threshold =
-        if partitions = []
-        then Int64.sub threshold main_files_size
-        else threshold
-      in
-      (* Check if adding this file would exceed the effective threshold *)
+      (* Check if adding this file would exceed the threshold *)
       let new_size = Int64.add current_size entry_size in
-      if new_size > effective_threshold && current_partition <> []
+      if new_size > threshold && current_partition <> []
       then
         (* Start a new partition *)
         let partitions = List.rev current_partition :: partitions in
@@ -130,12 +122,8 @@ let partition_files ~threshold file_sizes =
         loop (entry :: current_partition) new_size partitions rest
   in
   let file_lists = loop [] 0L [] partitionable_files in
-  (* Add main_files to the first (Main) partition *)
-  let file_lists =
-    match file_lists with
-    | [] -> if main_files = [] then [] else [main_files]
-    | first :: rest -> (main_files @ first) :: rest
-  in
+  (* Prepend main_files as the Main partition *)
+  let file_lists = [main_files] @ file_lists in
   let partitions =
     List.mapi
       (fun i files ->
