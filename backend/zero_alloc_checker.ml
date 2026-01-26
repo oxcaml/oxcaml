@@ -2554,11 +2554,11 @@ end = struct
           let w = create_witnesses t Indirect_tailcall dbg in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
-        | Call (External { returns = None; alloc = false; _ }) ->
+        | Call (External { returns_to = None; alloc = false; _ }) ->
           (* Sound to ignore [next] and [exn] because the call never returns or
              raises. *)
           Value.bot
-        | Call (External { returns = None; alloc = true; func_symbol; _ }) ->
+        | Call (External { returns_to = None; alloc = true; func_symbol; _ }) ->
           (* Sound to ignore [next] because the call never returns. *)
           (* CR gyorsh: we do not currently generate this, but may later. *)
           let w = create_witnesses t (Extcall { callee = func_symbol }) dbg in
@@ -2569,7 +2569,7 @@ end = struct
           (* Sound to ignore [exn] because external call marked as noalloc does
              not raise. *)
           next
-        | Call (External { func_symbol; alloc = true; returns = Some _; _ }) ->
+        | Call (External { func_symbol; alloc = true; returns_to = Some _; _ }) ->
           let w = create_witnesses t (Extcall { callee = func_symbol }) dbg in
           transform_top t ~next ~exn w ("external call to " ^ func_symbol) dbg
         | Call (Probe { name; handler_code_sym; _ }) ->
@@ -2578,7 +2578,7 @@ end = struct
           in
           let w = create_witnesses t (Probe { name; handler_code_sym }) dbg in
           transform_call t ~next ~exn handler_code_sym w ~desc dbg
-        | Call (OCaml { op = Indirect; returns = _ }) ->
+        | Call (OCaml { op = Indirect; returns_to = _ }) ->
           let w = create_witnesses t Indirect_call dbg in
           transform_top t ~next ~exn w "indirect call" dbg
         | Call (OCaml { op = Direct { sym_name = func; sym_global = _ }; _ }) ->
@@ -2652,7 +2652,7 @@ let update_caml_flambda_invalid_cfg cfg_with_layout =
             in
             block.terminator
               <- { block.terminator with
-                   desc = Call (External { ext with returns = None })
+                   desc = Call (External { ext with returns_to = None })
                  };
             block.exn <- None;
             block.can_raise <- false;

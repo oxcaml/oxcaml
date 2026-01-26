@@ -122,8 +122,8 @@ let check_tailrec_position t =
 let check_call _t _label block =
   match[@ocaml.warning "-fragile-match"] block.Cfg.terminator.desc with
   (* CR mshinwell: re-enable once we generate the [External] op | Call (External
-     { alloc = false; returns = Some _; _ }) -> report t "[Call External] with
-     alloc=false and returns=Some must be encoded as \ [Op External]" *)
+     { alloc = false; returns_to = Some _; _ }) -> report t "[Call External] with
+     alloc=false and returns_to=Some must be encoded as \ [Op External]" *)
   | _ -> ()
 
 let check_tailrec t _label block =

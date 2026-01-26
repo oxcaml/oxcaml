@@ -388,7 +388,7 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
           in
           match predecessor_block.terminator.desc with
           | Return | Raise _ | Tailcall_func _
-          | Call (External { returns = None; _ })
+          | Call (External { returns_to = None; _ })
           | Never ->
             assert false
           | Tailcall_self _ -> ()
@@ -396,7 +396,7 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
             add_phi_moves_to_instr_list state ~before:predecessor_block
               ~phi:block substs to_unify predecessor_block.body
           | Switch _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-          | Call (OCaml _ | External { returns = Some _; _ } | Probe _) ->
+          | Call (OCaml _ | External { returns_to = Some _; _ } | Probe _) ->
             let instrs = DLL.make_empty () in
             add_phi_moves_to_instr_list state ~before:predecessor_block
               ~phi:block substs to_unify instrs;

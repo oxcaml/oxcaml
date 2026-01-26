@@ -121,11 +121,11 @@ let successor_labels_normal ti =
     |> Label.Set.add uo
   | Int_test { lt; gt; eq; imm = _; is_signed = _ } ->
     Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
-  | Call (External { returns = None; _ }) -> Label.Set.empty
+  | Call (External { returns_to = None; _ }) -> Label.Set.empty
   | Call
-      ( OCaml { returns = label_after; _ }
-      | External { returns = Some label_after; _ }
-      | Probe { returns = label_after; _ } ) ->
+      ( OCaml { returns_to = label_after; _ }
+      | External { returns_to = Some label_after; _ }
+      | Probe { returns_to = label_after; _ } ) ->
     Label.Set.singleton label_after
 
 let successor_labels ~normal ~exn block =
@@ -175,14 +175,15 @@ let replace_successor_labels t ~normal ~exn block ~f =
         Tailcall_self { destination = f destination }
       | Tailcall_func Indirect | Tailcall_func (Direct _) | Return | Raise _ ->
         block.terminator.desc
-      | Call (OCaml { op; returns }) -> Call (OCaml { op; returns = f returns })
+      | Call (OCaml { op; returns_to }) ->
+        Call (OCaml { op; returns_to = f returns_to })
       | Call
           (External
             { func_symbol;
               ty_res;
               ty_args;
               alloc;
-              returns;
+              returns_to;
               effects;
               stack_ofs;
               _
@@ -193,14 +194,14 @@ let replace_successor_labels t ~normal ~exn block ~f =
                ty_res;
                ty_args;
                alloc;
-               returns = Option.map f returns;
+               returns_to = Option.map f returns_to;
                effects;
                stack_ofs
              })
-      | Call (Probe { name; handler_code_sym; enabled_at_init; returns }) ->
+      | Call (Probe { name; handler_code_sym; enabled_at_init; returns_to }) ->
         Call
           (Probe
-             { name; handler_code_sym; enabled_at_init; returns = f returns })
+             { name; handler_code_sym; enabled_at_init; returns_to = f returns_to })
     in
     block.terminator <- { block.terminator with desc }
 
@@ -413,19 +414,19 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
       (match call with
       | Indirect -> Linear.Ltailcall_ind
       | Direct func -> Linear.Ltailcall_imm { func })
-  | Call (OCaml { op; returns }) ->
+  | Call (OCaml { op; returns_to }) ->
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
       (match op with
       | Indirect -> Linear.Lcall_ind
       | Direct func -> Linear.Lcall_imm { func });
-    Format.fprintf ppf "%sgoto %a" sep Label.format returns
+    Format.fprintf ppf "%sgoto %a" sep Label.format returns_to
   | Call
       (External
         { func_symbol = func;
           ty_res;
           ty_args;
           alloc;
-          returns;
+          returns_to;
           stack_ofs;
           effects = _
         }) ->
@@ -435,11 +436,11 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
     Option.iter
       (fun label_after ->
         Format.fprintf ppf "%sgoto %a" sep Label.format label_after)
-      returns
-  | Call (Probe { name; handler_code_sym; enabled_at_init; returns }) ->
+      returns_to
+  | Call (Probe { name; handler_code_sym; enabled_at_init; returns_to }) ->
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
       (Linear.Lprobe { name; handler_code_sym; enabled_at_init });
-    Format.fprintf ppf "%sgoto %a" sep Label.format returns
+    Format.fprintf ppf "%sgoto %a" sep Label.format returns_to
 
 let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator
 
@@ -475,10 +476,10 @@ let print_instruction ppf i = print_instruction' ppf i
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Call (External { func_symbol; returns = None; _ }) ->
+  | Call (External { func_symbol; returns_to = None; _ }) ->
     not (String.equal func_symbol Cmm.caml_flambda2_invalid)
   | Raise _ | Tailcall_func _ | Call (OCaml _ | Probe _) -> true
-  | Call (External { returns = Some _; alloc; effects; _ }) -> (
+  | Call (External { returns_to = Some _; alloc; effects; _ }) -> (
     if not alloc
     then false
     else

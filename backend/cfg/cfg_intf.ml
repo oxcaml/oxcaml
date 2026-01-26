@@ -40,12 +40,12 @@ module S = struct
     { func_symbol : string;
       alloc : bool;
       (* CR mshinwell: rename [alloc] -> [needs_caml_c_call] *)
-      returns : Label.t option;
-          (** At least one of [alloc] and [returns] must be set.  Otherwise,
+      returns_to : Label.t option;
+          (** At least one of [alloc] and [returns_to] must be set.  Otherwise,
               use [Op]. *)
       (* CR mshinwell: same comment as in cmm.mli (see the [External]
-         constructor) about [effects], [alloc] and [returns]. In addition this
-         should apply to the [OCaml] case below e.g. to know that an OCaml
+         constructor) about [effects], [alloc] and [returns_to]. In addition
+         this should apply to the [OCaml] case below e.g. to know that an OCaml
          function doesn't return. *)
       effects : Cmm.effects;
       ty_res : Cmm.machtype;
@@ -56,7 +56,7 @@ module S = struct
   type call_operation =
     | OCaml of
         { op : func_call_operation;
-          returns : Label.t
+          returns_to : Label.t
               (* CR mshinwell: we should track [Rc_nontail] here: at the moment
                  it is impossible to turn a non-tail call into a tail call in
                  Cfg, because this information has been dropped in
@@ -67,7 +67,7 @@ module S = struct
         { name : string;
           handler_code_sym : string;
           enabled_at_init : bool;
-          returns : Label.t
+          returns_to : Label.t
         }
 
   type bool_test =

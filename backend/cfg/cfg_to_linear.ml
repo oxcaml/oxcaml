@@ -165,7 +165,7 @@ let linearize_terminator cfg_with_layout (func : string) start
         (External
           { func_symbol;
             alloc;
-            returns = None;
+            returns_to = None;
             ty_args;
             ty_res;
             stack_ofs;
@@ -181,18 +181,18 @@ let linearize_terminator cfg_with_layout (func : string) start
                 returns = false;
                 stack_ofs
               }))
-    | Call (OCaml { op; returns = label_after }) ->
+    | Call (OCaml { op; returns_to }) ->
       let op : Linear.call_operation =
         match op with
         | Indirect -> Lcall_ind
         | Direct func_symbol -> Lcall_imm { func = func_symbol }
       in
-      branch_or_fallthrough [L.Lcall_op op] label_after, None
+      branch_or_fallthrough [L.Lcall_op op] returns_to, None
     | Call
         (External
           { func_symbol;
             alloc;
-            returns = Some label_after;
+            returns_to = Some label_after;
             ty_args;
             ty_res;
             stack_ofs;
@@ -209,13 +209,11 @@ let linearize_terminator cfg_with_layout (func : string) start
           }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None
-    | Call
-        (Probe
-          { name; handler_code_sym; enabled_at_init; returns = label_after }) ->
+    | Call (Probe { name; handler_code_sym; enabled_at_init; returns_to }) ->
       let op : Linear.call_operation =
         Lprobe { name; handler_code_sym; enabled_at_init }
       in
-      branch_or_fallthrough [L.Lcall_op op] label_after, None
+      branch_or_fallthrough [L.Lcall_op op] returns_to, None
     | Switch labels -> single (L.Lswitch labels)
     | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
     | Always label -> branch_or_fallthrough [] label, None
@@ -356,9 +354,9 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
       match prev_block.terminator.desc with
       | Switch _ -> true
       | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
-      | Call (External { returns = None; _ }) -> assert false
+      | Call (External { returns_to = None; _ }) -> assert false
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-      | Call (OCaml _ | External { returns = Some _; _ } | Probe _) ->
+      | Call (OCaml _ | External { returns_to = Some _; _ } | Probe _) ->
         false
       | Return | Raise _ | Tailcall_func _ | Tailcall_self _ -> assert false)
 
