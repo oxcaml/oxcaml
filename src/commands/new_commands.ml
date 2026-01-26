@@ -862,7 +862,9 @@ let all_commands =
           match pos with
           | `None -> failwith "-position <pos> is mandatory"
           | #Msource.position as position ->
-            run buffer (Query_protocol.Kind_enclosing { position; index })
+            run buffer
+              (Query_protocol.Kind_enclosing
+                 { position; index; override_verbosity = None })
       end;
     command "type-expression"
       ~doc:

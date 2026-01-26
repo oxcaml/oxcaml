@@ -16,9 +16,9 @@ module Kind_info = struct
     in
     Printtyp.wrap_printing_env ~verbosity env (fun () ->
         let format_jkind =
-          match verbosity with
-          | Smart | Lvl 0 -> Jkind.format
-          | _ -> Jkind.format_expanded
+          match Mconfig.Verbosity.to_int ~for_smart:0 verbosity > 0 with
+          | false -> Jkind.format
+          | true -> Jkind.format_expanded
         in
         Format.asprintf "%a" format_jkind kind)
 end

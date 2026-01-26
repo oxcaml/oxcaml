@@ -223,7 +223,12 @@ type _ t =
       Msource.position * bool * int option
       -> (Location.t * [ `String of string | `Index of int ]) list t
   | Kind_enclosing (* *) :
-      { position : Msource.position; index : int option }
+      { position : Msource.position;
+        index : int option;
+        override_verbosity : Mconfig.Verbosity.t option
+            (** Use a different verbosity for printing kinds than as specified by the
+                Mconfig. *)
+      }
       -> (Location.t * [ `Kind of string | `Index of int ]) list t
   | Type_enclosing (* *) :
       (string * int) option * Msource.position * int option

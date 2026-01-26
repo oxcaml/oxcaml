@@ -78,14 +78,19 @@ let dump (type a) : a t -> json =
           | Some n -> `Int n );
         ("position", mk_position pos)
       ]
-  | Kind_enclosing { position; index } ->
+  | Kind_enclosing { position; index; override_verbosity } ->
     mk "kind-enclosing"
-      [ ( "index",
-          match index with
-          | None -> `String "all"
-          | Some n -> `Int n );
-        ("position", mk_position position)
-      ]
+      ([ ( "index",
+           match index with
+           | None -> `String "all"
+           | Some n -> `Int n );
+         ("position", mk_position position)
+       ]
+      @
+      match override_verbosity with
+      | Some (Lvl n) -> [ ("override-verbosity", `Int n) ]
+      | Some Smart -> [ ("override-verbosity", `String "smart") ]
+      | None -> [])
   | Locate_type pos -> mk "locate-type" [ ("position", mk_position pos) ]
   | Locate_types pos -> mk "locate-types" [ ("position", mk_position pos) ]
   | Enclosing pos -> mk "enclosing" [ ("position", mk_position pos) ]
