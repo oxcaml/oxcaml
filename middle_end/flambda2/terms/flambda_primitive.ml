@@ -1764,8 +1764,8 @@ type binary_int_arith_op =
   | Add
   | Sub
   | Mul
-  | Div
-  | Mod
+  | Div of Scalar.Signedness.t
+  | Mod of Scalar.Signedness.t
   | And
   | Or
   | Xor
@@ -1776,8 +1776,10 @@ let print_binary_int_arith_op ppf o =
   | Add -> fprintf ppf "+"
   | Sub -> fprintf ppf "-"
   | Mul -> fprintf ppf "*"
-  | Div -> fprintf ppf "/"
-  | Mod -> fprintf ppf "mod"
+  | Div Signed -> fprintf ppf "/"
+  | Div Unsigned -> fprintf ppf "/"
+  | Mod Signed -> fprintf ppf "mod"
+  | Mod Unsigned -> fprintf ppf "mod"
   | And -> fprintf ppf "and"
   | Or -> fprintf ppf "or"
   | Xor -> fprintf ppf "xor"
@@ -2042,7 +2044,12 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
     reading_from_a_string_or_bigstring Mutable
   | Phys_equal _ ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
-  | Int_arith (_kind, (Add | Sub | Mul | Div | Mod | And | Or | Xor)) ->
+  | Int_arith
+      ( _kind,
+        ( Add | Sub | Mul
+        | Div (Signed | Unsigned)
+        | Mod (Signed | Unsigned)
+        | And | Or | Xor ) ) ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Int_shift _ ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch

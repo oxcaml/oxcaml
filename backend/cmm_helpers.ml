@@ -1006,6 +1006,8 @@ let untag_int i dbg =
     lsr_const c (n + 1) dbg
   | c -> asr_const c 1 dbg
 
+let unsigned_untag_int i dbg = lsr_const i 1 dbg
+
 let mk_not dbg cmm =
   match cmm with
   | Cop
@@ -1145,7 +1147,7 @@ let divimm_parameters d =
      (if unsigned_compare zl xl < 0 then succ zh else zh), zl
 
    let shl2 (xh, xl) n =
-     assert (0 < n && n < size + size);
+     assert (0 <= n && n < size + size);
      if n < size
      then
        logor (shift_left xh n) (shift_right_logical xl (size - n)),
@@ -1175,6 +1177,66 @@ let divimm_parameters d =
      unsigned_compare2 twoszp md < 0
      && unsigned_compare2 md (add2 twoszp twop1) <= 0
 *)
+
+let udivimm_parameters d =
+  (* Unsigned division and modulus at type nativeint. Algorithm: Hacker's
+     Delight, 2nd ed, Figure 10-2. *)
+  let open Nativeint in
+  let udivmod n d =
+    let q = unsigned_div n d in
+    q, sub n (mul q d)
+  in
+  let nc = sub (-1n) (unsigned_rem (neg d) d) in
+  let rec loop ~p ~a (q1, r1) (q2, r2) =
+    let p = p + 1 in
+    let q1, r1 =
+      let q1', r1' = shift_left q1 1, shift_left r1 1 in
+      if unsigned_compare r1 (sub nc r1) >= 0
+      then succ q1', sub r1' nc
+      else q1', r1'
+    in
+    let a, q2, r2 =
+      let q2', r2' = shift_left q2 1, shift_left r2 1 in
+      if unsigned_compare (succ r2) (sub d r2) >= 0
+      then
+        let a = if unsigned_compare q2 max_int >= 0 then true else a in
+        a, succ q2', sub (succ r2') d
+      else
+        let a = if unsigned_compare q2 min_int >= 0 then true else a in
+        a, q2', succ r2'
+    in
+    let delta = sub (pred d) r2 in
+    if
+      p < 128
+      && (unsigned_compare q1 delta < 0 || (equal q1 delta && equal r1 0n))
+    then loop ~p ~a (q1, r1) (q2, r2)
+    else succ q2, a, p - 64
+  in
+  loop ~p:63 ~a:false (udivmod min_int nc) (udivmod max_int d)
+
+(*= For d not a power of 2, the result [(m, a, p)] of [udivimm_parameters d]
+    satisfies the following inequality:
+
+    2^(wordsize + p) < M * d <= 2^(wordsize + p) + 2^p (i)
+
+    where M = m + a * 2^wordsize, from which it follows that
+
+    floor(n / d) = floor(n * M / 2^(wordsize+p))
+
+    The correctness condition (i) above can be checked by the code below (see
+    the comment below [divimm_parameters] for the helper functions). It was
+    exhaustively tested for values of d from 2 to 10^9, d not a power of 2, in
+    the wordsize = 64 case.
+
+    let validate d m a p =
+      let md = mul2 m d in
+      let md = if a then add2 md (d, 0n) else md in
+      let one2 = 0n, 1n in
+      let twoszp = shl2 one2 (size + p) in
+      let twop = shl2 one2 p in
+      unsigned_compare2 twoszp md < 0
+      && unsigned_compare2 md (add2 twoszp twop) <= 0
+ *)
 
 let raise_symbol dbg symb =
   Cop
@@ -1285,7 +1347,60 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
           add_int q sign_bit dbg)
   | _, _ ->
     make_safe_divmod ?dividend_cannot_be_min_int ~if_divisor_is_negative_one
-      Cdivi c1 c2 ~dbg
+      (Cdivi { signed = true })
+      c1 c2 ~dbg
+
+let unsigned_div_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> c1
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_div n1 n2)
+  | _, Some -1n ->
+    (* unsigned division by unsigned max_int always returns 0 unless the
+       dividend is also max_int, in which case it's 1. *)
+    Cifthenelse
+      ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
+        dbg,
+        Cconst_int (1, dbg),
+        dbg,
+        Cconst_int (0, dbg),
+        dbg )
+  | _, Some divisor ->
+    if is_power_of_2_or_zero divisor
+    then
+      if Nativeint.equal divisor Nativeint.min_int
+      then
+        (* special case for divisor = 1 << 63 since [log2_nativeint] assumes
+           argument is signed *)
+        lsr_const c1 63 dbg
+      else
+        let l = Misc.log2_nativeint divisor in
+        lsr_const c1 l dbg
+    else
+      bind "dividend" c1 (fun n ->
+          (* Algorithm:
+
+             q = smulhu n, M
+
+             if a then
+
+             q = ((n-q)/2 + q) u>> (s-1)
+
+             else
+
+             q u>>= s *)
+          let m, a, s = udivimm_parameters divisor in
+          let q =
+            Cop
+              (Cmulhi { signed = false }, [n; natint_const_untagged dbg m], dbg)
+          in
+          if a
+          then
+            lsr_const
+              (add_int (lsr_const (sub_int n q dbg) 1 dbg) q dbg)
+              (s - 1) dbg
+          else lsr_const q s dbg)
+  | _, _ -> Cop (Cdivi { signed = false }, [c1; c2], dbg)
 
 let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
   let if_divisor_is_positive_or_negative_one ~dividend ~dbg =
@@ -1339,8 +1454,32 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
           sub_int c1 (mul_int (div_int c1 c2 dbg) c2 dbg) dbg)
   | _, _ ->
     make_safe_divmod ?dividend_cannot_be_min_int
-      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one Cmodi
+      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one
+      (Cmodi { signed = true })
       c1 c2 ~dbg
+
+let unsigned_mod_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> Cconst_int (0, dbg)
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_rem n1 n2)
+  | _, Some -1n ->
+    (* similarly, mod unsigned max_int is identity unless the divisor is
+       max_int, in which case it is 0 *)
+    Cifthenelse
+      ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
+        dbg,
+        Cconst_int (0, dbg),
+        dbg,
+        c1,
+        dbg )
+  | _, Some divisor ->
+    if is_power_of_2_or_zero divisor
+    then and_const c1 (Nativeint.pred divisor) dbg
+    else
+      bind "dividend" c1 (fun c1 ->
+          sub_int c1 (mul_int (unsigned_div_int c1 c2 dbg) c2 dbg) dbg)
+  | _, _ -> Cop (Cmodi { signed = false }, [c1; c2], dbg)
 
 (* Bool *)
 
@@ -4136,6 +4275,14 @@ let div_int_caml arg1 arg2 dbg =
        (untag_int arg2 dbg) dbg)
     dbg
 
+let unsigned_div_int_caml arg1 arg2 dbg =
+  tag_int
+    (unsigned_div_int
+       (unsigned_untag_int arg1 dbg)
+       (unsigned_untag_int arg2 dbg)
+       dbg)
+    dbg
+
 let mod_int_caml arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
     (* Since caml integers are tagged, we know that they when they're untagged,
@@ -4145,6 +4292,14 @@ let mod_int_caml arg1 arg2 dbg =
   tag_int
     (mod_int ~dividend_cannot_be_min_int (untag_int arg1 dbg)
        (untag_int arg2 dbg) dbg)
+    dbg
+
+let unsigned_mod_int_caml arg1 arg2 dbg =
+  tag_int
+    (unsigned_mod_int
+       (unsigned_untag_int arg1 dbg)
+       (unsigned_untag_int arg2 dbg)
+       dbg)
     dbg
 
 let and_int_caml arg1 arg2 dbg = and_int arg1 arg2 dbg
@@ -4838,8 +4993,8 @@ let cmm_arith_size (e : Cmm.expression) =
   let rec cmm_arith_size0 (e : Cmm.expression) =
     match e with
     | Cop
-        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor
-          | Clsl | Clsr | Casr ),
+        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
+          | Cxor | Clsl | Clsr | Casr ),
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)

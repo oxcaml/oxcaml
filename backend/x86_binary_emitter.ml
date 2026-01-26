@@ -1003,6 +1003,13 @@ let emit_idiv b dst =
       emit_mod_rm_reg b rexw [ 0xF7 ] rm reg
   | _ -> assert false
 
+let emit_div b dst =
+  let reg = 6 in
+  match dst with
+  | (Reg64 _ | Reg32 _ | Mem _ | Mem64_RIP _) as rm ->
+      emit_mod_rm_reg b rexw [ 0xF7 ] rm reg
+  | _ -> assert false
+
 let emit_shift reg b dst src =
   match (dst, src) with
   | ((Reg64 _ | Reg32 _ | Mem _) as rm), Imm 1L ->
@@ -1358,6 +1365,7 @@ let assemble_instr b loc = function
   | IMUL (src, dst) -> emit_imul b dst src
   | MUL src -> emit_mul b ~src
   | IDIV dst -> emit_idiv b dst
+  | DIV dst -> emit_div b dst
   | J (condition, dst) -> emit_j b !loc condition dst
   | JMP dst -> emit_jmp b !loc dst
   | LEAVE -> emit_leave b

@@ -2026,7 +2026,7 @@ module Tables = struct
 # 2027 "flambda_parser_in.ml"
         ) = 
 # 549 "flambda_parser.mly"
-          ( Div )
+          ( Div Scalar.Signedness.Signed )
 # 2031 "flambda_parser_in.ml"
          in
         {
@@ -2055,7 +2055,7 @@ module Tables = struct
 # 2056 "flambda_parser_in.ml"
         ) = 
 # 550 "flambda_parser.mly"
-            ( Mod )
+            ( Mod Scalar.Signedness.Signed )
 # 2060 "flambda_parser_in.ml"
          in
         {

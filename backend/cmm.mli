@@ -430,8 +430,8 @@ type operation =
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }
-  | Cdivi
-  | Cmodi
+  | Cdivi of { signed : bool }
+  | Cmodi of { signed : bool }
   | Caddi128
   | Csubi128
   | Cmuli64 of { signed : bool }

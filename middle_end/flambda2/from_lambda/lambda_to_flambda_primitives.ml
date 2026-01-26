@@ -1056,7 +1056,7 @@ let multiple_word_array_access_validity_condition array ~machine_width
            compute the non-unarized bound, then compare against that. *)
         Prim
           (Binary
-             ( Int_arith (Naked_nativeint, Div),
+             ( Int_arith (Naked_nativeint, Div Signed),
                nativeint_bound,
                Simple
                  (Simple.const
@@ -2180,10 +2180,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | And -> Binary (Int_arith (width, And), arg1, arg2)
         | Or -> Binary (Int_arith (width, Or), arg1, arg2)
         | Xor -> Binary (Int_arith (width, Xor), arg1, arg2)
-        | Div Unsafe -> Binary (Int_arith (width, Div), arg1, arg2)
-        | Mod Unsafe -> Binary (Int_arith (width, Mod), arg1, arg2)
-        | Div Safe -> check_zero_division ~machine_width width arg1 arg2 Div dbg
-        | Mod Safe -> check_zero_division ~machine_width width arg1 arg2 Mod dbg
+        | Div (Unsafe, signedness) ->
+          Binary (Int_arith (width, Div signedness), arg1, arg2)
+        | Mod (Unsafe, signedness) ->
+          Binary (Int_arith (width, Mod signedness), arg1, arg2)
+        | Div (Safe, signedness) ->
+          check_zero_division ~machine_width width arg1 arg2 (Div signedness)
+            dbg
+        | Mod (Safe, signedness) ->
+          check_zero_division ~machine_width width arg1 arg2 (Mod signedness)
+            dbg
       in
       [to_expr (maybe_wrap (Prim result))]
     | Shift (outer, op, rhs) ->
@@ -2356,7 +2362,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         |> Target_ocaml_int.of_int machine_width
         |> Simple.const_int
       in
-      [Binary (Int_arith (Tagged_immediate, Div), Prim prim, Simple divisor)])
+      [ Binary
+          (Int_arith (Tagged_immediate, Div Signed), Prim prim, Simple divisor)
+      ])
   | Pduparray (kind, mutability), [[arg]] -> (
     let duplicate_array_kind =
       convert_array_kind_to_duplicate_array_kind kind
