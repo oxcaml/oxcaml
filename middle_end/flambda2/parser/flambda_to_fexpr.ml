@@ -474,7 +474,7 @@ and variant_subkind consts non_consts : Fexpr.subkind =
   let non_consts =
     non_consts |> Tag.Scannable.Map.bindings
     |> List.map (fun (tag, (_shape, sk)) ->
-           Tag.Scannable.to_int tag, List.map kind_with_subkind sk)
+        Tag.Scannable.to_int tag, List.map kind_with_subkind sk)
   in
   Variant { consts; non_consts }
 
@@ -734,10 +734,10 @@ let set_of_closures env sc =
       (Set_of_closures.function_decls sc
       |> Function_declarations.funs_in_order
       |> Function_slot.Lmap.map (function
-           | Function_declarations.Deleted _ -> Misc.fatal_error "todo"
-           | Function_declarations.Code_id
-               { code_id; only_full_applications = _ } ->
-             code_id)
+        | Function_declarations.Deleted _ -> Misc.fatal_error "todo"
+        | Function_declarations.Code_id { code_id; only_full_applications = _ }
+          ->
+          code_id)
       |> Function_slot.Lmap.bindings)
   in
   let elts = value_slots env (Set_of_closures.value_slots sc) in
@@ -920,8 +920,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         else Some (Code.inline code)
       in
       let loopify =
-        if Flambda2_terms.Loopify_attribute.equal (Code.loopify code)
-             Default_loopify_and_not_tailrec
+        if
+          Flambda2_terms.Loopify_attribute.equal (Code.loopify code)
+            Default_loopify_and_not_tailrec
         then None
         else Some (Code.loopify code)
       in
@@ -930,19 +931,19 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         Flambda.Function_params_and_body.pattern_match
           (Code.params_and_body code)
           ~f:(fun
-               ~return_continuation
-               ~exn_continuation
-               params
-               ~body
-               ~my_closure
-               ~is_my_closure_used:_
-               ~my_region
-               ~my_ghost_region
-               ~my_depth
-               ~free_names_of_body:_
-               :
-               Fexpr.params_and_body
-             ->
+              ~return_continuation
+              ~exn_continuation
+              params
+              ~body
+              ~my_closure
+              ~is_my_closure_used:_
+              ~my_region
+              ~my_ghost_region
+              ~my_depth
+              ~free_names_of_body:_
+              :
+              Fexpr.params_and_body
+            ->
             let ret_cont, env =
               Env.bind_named_continuation env return_continuation
             in
@@ -1119,20 +1120,19 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
     Env.find_continuation_exn env c
   in
   let args = List.map (simple env) (Apply_expr.args app) in
+  let alloc_mode =
+    alloc_mode_for_applications env (Apply_expr.alloc_mode app)
+  in
   let call_kind : Fexpr.call_kind =
     match Apply_expr.call_kind app with
-    | Function { function_call = Direct code_id; alloc_mode } ->
+    | Function { function_call = Direct code_id } ->
       let code_id = Env.find_code_id_exn env code_id in
       let function_slot = None in
       (* CR mshinwell: remove [function_slot] *)
-      let alloc = alloc_mode_for_applications env alloc_mode in
-      Function (Direct { code_id; function_slot; alloc })
+      Function (Direct { code_id; function_slot })
     | Function
-        { function_call = Indirect_unknown_arity | Indirect_known_arity _;
-          alloc_mode
-        } ->
-      let alloc = alloc_mode_for_applications env alloc_mode in
-      Function (Indirect alloc)
+        { function_call = Indirect_unknown_arity | Indirect_known_arity _ } ->
+      Function Indirect
     | C_call { needs_caml_c_call; _ } -> C_call { alloc = needs_caml_c_call }
     | Method _ -> Misc.fatal_error "TODO: Method call kind"
     | Effect _ -> Misc.fatal_error "TODO: Effect call kind"
@@ -1141,11 +1141,11 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   let return_arity = Apply_expr.return_arity app in
   let arities : Fexpr.function_arities option =
     match Apply_expr.call_kind app with
-    | Function { function_call = Indirect_known_arity _; alloc_mode = _ } ->
+    | Function { function_call = Indirect_known_arity _ } ->
       let params_arity = Some (complex_arity param_arity) in
       let ret_arity = arity return_arity in
       Some { params_arity; ret_arity }
-    | Function { function_call = Direct _; alloc_mode = _ } ->
+    | Function { function_call = Direct _ } ->
       if is_default_arity return_arity
       then None
       else
@@ -1159,8 +1159,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       let params_arity = Some (complex_arity param_arity) in
       let ret_arity = arity return_arity in
       Some { params_arity; ret_arity }
-    | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
-      None
+    | Function { function_call = Indirect_unknown_arity } -> None
     | Method _ | Effect _ -> assert false
   in
   let inlined : Fexpr.inlined_attribute option =
@@ -1181,6 +1180,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       exn_continuation;
       args;
       call_kind;
+      alloc_mode;
       inlined;
       inlining_state;
       arities
@@ -1196,13 +1196,13 @@ and apply_cont env app_cont : Fexpr.apply_cont =
   let trap_action =
     Apply_cont_expr.trap_action app_cont
     |> Option.map (fun (action : Trap_action.t) : Fexpr.trap_action ->
-           match action with
-           | Push { exn_handler } ->
-             let exn_handler = Env.find_continuation_exn env exn_handler in
-             Push { exn_handler }
-           | Pop { exn_handler; raise_kind } ->
-             let exn_handler = Env.find_continuation_exn env exn_handler in
-             Pop { exn_handler; raise_kind })
+        match action with
+        | Push { exn_handler } ->
+          let exn_handler = Env.find_continuation_exn env exn_handler in
+          Push { exn_handler }
+        | Pop { exn_handler; raise_kind } ->
+          let exn_handler = Env.find_continuation_exn env exn_handler in
+          Pop { exn_handler; raise_kind })
   in
   let args = List.map (simple env) (Apply_cont_expr.args app_cont) in
   { cont; trap_action; args }
@@ -1302,17 +1302,17 @@ module Iter = struct
         let params_and_body = Code.params_and_body code in
         Function_params_and_body.pattern_match params_and_body
           ~f:(fun
-               ~return_continuation:_
-               ~exn_continuation:_
-               _
-               ~body
-               ~my_closure:_
-               ~is_my_closure_used:_
-               ~my_region:_
-               ~my_ghost_region:_
-               ~my_depth:_
-               ~free_names_of_body:_
-             -> expr f_c f_s body))
+              ~return_continuation:_
+              ~exn_continuation:_
+              _
+              ~body
+              ~my_closure:_
+              ~is_my_closure_used:_
+              ~my_region:_
+              ~my_ghost_region:_
+              ~my_depth:_
+              ~free_names_of_body:_
+            -> expr f_c f_s body))
       ~deleted_code:(fun () code_id -> f_c ~id:code_id None)
       ~set_of_closures:(fun () ~closure_symbols set_of_closures ->
         f_s ~closure_symbols:(Some closure_symbols) ~is_phantom:false

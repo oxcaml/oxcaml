@@ -526,7 +526,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
            env ld.ld_loc kloc ty;
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
-          ld_modalities = ld.ld_modalities;
+          ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = Jkind.Sort.Const.void;
             (* Updated by [update_label_sorts] *)
           ld_type = ty;
@@ -554,7 +554,7 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
     check_representable ~why:(Constructor_declaration idx)
       env loc kloc ca.ca_type.ctyp_type;
     {
-      Types.ca_modalities = ca.ca_modalities;
+      Types.ca_modalities = ca.ca_modalities.moda_modalities;
       ca_loc = ca.ca_loc;
       ca_type = ca.ca_type.ctyp_type;
       ca_sort = Jkind.Sort.Const.void;
@@ -609,7 +609,7 @@ let make_constructor
         Ctype.with_local_level_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
-            TyVarEnv.make_poly_univars_jkinds
+            TyVarEnv.make_poly_univars_jkinds env
               ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
               (List.map (fun (v, l) -> (v, l, Env.stage env)) svars)
           in
@@ -1872,7 +1872,19 @@ let rec update_decl_jkind env dpath decl =
          mutable voids : bool;
       }
   end in
-
+  (* The compiler does not like matching on records with mutable fields, so we
+     create an immutable copy for the match below. *)
+  let module Imm_element_rep = struct
+    type element_repr_summary =
+      {  values : bool;
+         floats: bool;
+         atomic_floats : bool;
+         atomic_fields : bool;
+         float64s : bool;
+         non_float64_unboxed_fields : bool;
+         voids : bool;
+    }
+  end in
   (* returns updated labels, updated rep, and updated jkind *)
   let update_record_kind loc lbls rep =
     match lbls, rep with
@@ -1925,7 +1937,14 @@ let rec update_decl_jkind env dpath decl =
         reprs lbls;
       let rep =
         (* CR layouts: improve the readability of this match *)
-        match repr_summary with
+        let { values; floats; atomic_floats; float64s;
+               non_float64_unboxed_fields; atomic_fields; voids} = repr_summary
+        in
+        let summary : Imm_element_rep.element_repr_summary =
+          { values; floats; atomic_floats; float64s;
+            non_float64_unboxed_fields; atomic_fields; voids }
+        in
+        match summary with
         (* We store floats flatly in mixed records if all fields are
            float/float64/void. *)
         | { values = false; floats = true; atomic_floats = false;
@@ -3846,28 +3865,30 @@ type transl_value_decl_modal =
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
-  let mode, val_modalities =
+  let mode, val_modalities, val_modal_info =
     match modal with
     | Str_primitive ->
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
+        let modes = Typemode.transl_mode_annots modes in
         let mode =
-          modes
-          |> Typemode.transl_mode_annots
+          modes.mode_modes
           |> Mode.Alloc.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
-        mode, Mode.Modality.id
+        mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
-        let modalities =
+        let raw_modalities =
           match valdecl.pval_modalities with
-          | [] -> sig_modalities
+          | [] -> { moda_modalities = sig_modalities; moda_desc = [] }
           | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
         in
-        let modalities = Mode.Modality.of_const modalities in
-        md_mode, modalities
+        let modalities =
+          Mode.Modality.of_const raw_modalities.moda_modalities
+        in
+        md_mode, modalities, Valmi_sig_value raw_modalities
   in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
@@ -3983,6 +4004,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
      val_id = id;
      val_name = valdecl.pval_name;
      val_desc = cty; val_val = v;
+     val_modal_info;
      val_prim = valdecl.pval_prim;
      val_loc = valdecl.pval_loc;
      val_attributes = valdecl.pval_attributes;

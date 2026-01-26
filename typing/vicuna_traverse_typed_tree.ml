@@ -120,13 +120,14 @@ let classify env ty : classification =
       then Float
       else if Path.same p Predef.path_lazy_t
       then Lazy
-      else if Path.same p Predef.path_string
-              || Path.same p Predef.path_bytes
-              || Path.same p Predef.path_array
-              || Path.same p Predef.path_iarray
-              || Path.same p Predef.path_nativeint
-              || Path.same p Predef.path_int32
-              || Path.same p Predef.path_int64
+      else if
+        Path.same p Predef.path_string
+        || Path.same p Predef.path_bytes
+        || Path.same p Predef.path_array
+        || Path.same p Predef.path_iarray
+        || Path.same p Predef.path_nativeint
+        || Path.same p Predef.path_int32
+        || Path.same p Predef.path_int64
       then Addr
       else
         try
@@ -412,7 +413,7 @@ let rec split_external_type (ct : core_type) :
     (core_type * bool) list * core_type =
   match ct.ctyp_desc with
   | Ttyp_poly (_, ct) -> split_external_type ct
-  | Ttyp_arrow (lab, arg, cont) -> (
+  | Ttyp_arrow (lab, arg, _, cont, _) -> (
     let args, ret = split_external_type cont in
     match lab with
     | Nolabel | Labelled _ -> (arg, false) :: args, ret

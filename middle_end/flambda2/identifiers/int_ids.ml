@@ -319,8 +319,8 @@ module Code_id_data = struct
       Linkage_name.print linkage_name
 
   let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
-    (* As per comment above, just looking at the linkage name suffices (same
-       below), rather than the compilation unit as well. *)
+    (* Linkage names are unique across a whole project, so there's no need to
+       hash the other fields. *)
     Linkage_name.hash linkage_name
 
   let equal

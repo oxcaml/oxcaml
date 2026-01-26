@@ -23,7 +23,7 @@
    -bin-annot
    -safe-string
    -strict-formats))
- (ocamlopt_flags (:include %{project_root}/ocamlopt_flags.sexp))
+ (ocamlopt_flags (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags (:standard -linkall))
  (foreign_stubs (language c) (names runtime_events_consumer)
   (flags ((:include %{project_root}/oc_cflags.sexp)

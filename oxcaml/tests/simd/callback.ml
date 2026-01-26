@@ -16,11 +16,11 @@ external run_callback_stack_args :
 
 external low_of : float32 -> float32x4
   = "caml_vec128_unreachable" "caml_float32x4_low_of_float32"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 external low_to : float32x4 -> float32
   = "caml_vec128_unreachable" "caml_float32x4_low_to_float32"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 let add = Builtins.Float32x4.add
 
@@ -107,7 +107,7 @@ let () =
   | Sys.Break -> callback ()
   | _ -> assert false
 
-let[@loop never] rec stack_overflow () = (stack_overflow () [@nontail])
+let[@loop never] rec stack_overflow () = stack_overflow () [@nontail]
 
 let () =
   try Sys.with_async_exns stack_overflow with

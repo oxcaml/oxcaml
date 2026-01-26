@@ -104,14 +104,14 @@ let add_if_not_exists sources tid args provenance =
 
 (** A rule consists of:
 
-      - A [Cursor.t] to iterates on the entries produced by the right-hand
-        side of the rule (hypotheses);
+    - A [Cursor.t] to iterates on the entries produced by the right-hand side of
+      the rule (hypotheses);
 
-      - A list of [binder]s that are bound to the tables appearing in the
-        left-hand side of the rule (conclusion) and updated throughout rule
-        evaluation;
+    - A list of [binder]s that are bound to the tables appearing in the
+      left-hand side of the rule (conclusion) and updated throughout rule
+      evaluation;
 
-      - An unique identifier for logging/tracing purposes.
+    - An unique identifier for logging/tracing purposes.
 
     The cursor embeds callbacks to update the [binder]s. *)
 type rule =
@@ -396,8 +396,7 @@ let print_stats ppf stats =
 
     {b Note}: there needs not be any relationship between the input database
     represented by the [(previous, diff, current)] triple and the output
-    database [incremental_db].
-*)
+    database [incremental_db]. *)
 let run_rule_incremental ?stats ~previous ~diff ~current incremental_db
     (Rule { binders; cursor; provenance_table_ref; _ } as rule) =
   (match stats with
@@ -460,8 +459,7 @@ let run_rules_incremental ?stats rules ~previous ~diff ~current incremental_db =
     reaching a fixpoint.
 
     Returns an incremental database containing the new state of [current] along
-    with all the new facts added during saturation.
-*)
+    with all the new facts added during saturation. *)
 let saturate_rules_incremental ?stats rules ~previous ~diff ~current =
   let rec saturate_rules_incremental ?stats ~previous ~diff ~current rules
       full_diff =
@@ -482,8 +480,7 @@ let saturate_rules_incremental ?stats rules ~previous ~diff ~current =
   saturate_rules_incremental ?stats rules Table.Map.empty ~previous ~diff
     ~current
 
-(** Run the evaluation functions in [fns] until reaching a fixpoint.
-*)
+(** Run the evaluation functions in [fns] until reaching a fixpoint. *)
 let run_list_incremental fns ~previous ~diff ~current =
   (* Each evaluation of a rule that produced changes is associated with a
      timestamp (the initial used-provided [diff] is at timestamp [0]), and each

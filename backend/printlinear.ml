@@ -50,26 +50,27 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   let test = Operation.format_test ~print_reg in
   let operation = Printoperation.operation ~print_reg in
   (if !Oxcaml_flags.davail
-  then
-    let module RAS = Reg_availability_set in
-    let ras_is_nonempty (set : RAS.t) =
-      match set with
-      | Ok set ->
-        not
-          (Reg_with_debug_info.Set_distinguishing_names_and_locations.is_empty
-             set)
-      | Unreachable -> true
-    in
-    if ras_is_nonempty i.available_before || ras_is_nonempty i.available_across
-    then
-      if RAS.equal i.available_before i.available_across
-      then
-        fprintf ppf "@[<1>AB=AA={%a}@]@," (RAS.print ~print_reg:reg)
-          i.available_before
-      else (
-        fprintf ppf "@[<1>AB={%a}" (RAS.print ~print_reg:reg) i.available_before;
-        fprintf ppf ",AA={%a}" (RAS.print ~print_reg:reg) i.available_across;
-        fprintf ppf "@]@,"));
+   then
+     let module RAS = Reg_availability_set in
+     let ras_is_nonempty (set : RAS.t) =
+       match set with
+       | Ok set ->
+         not
+           (Reg_with_debug_info.Set_distinguishing_names_and_locations.is_empty
+              set)
+       | Unreachable -> true
+     in
+     if ras_is_nonempty i.available_before || ras_is_nonempty i.available_across
+     then
+       if RAS.equal i.available_before i.available_across
+       then
+         fprintf ppf "@[<1>AB=AA={%a}@]@," (RAS.print ~print_reg:reg)
+           i.available_before
+       else (
+         fprintf ppf "@[<1>AB={%a}" (RAS.print ~print_reg:reg)
+           i.available_before;
+         fprintf ppf ",AA={%a}" (RAS.print ~print_reg:reg) i.available_across;
+         fprintf ppf "@]@,"));
   (match i.desc with
   | Lend -> ()
   | Lprologue -> fprintf ppf "prologue"

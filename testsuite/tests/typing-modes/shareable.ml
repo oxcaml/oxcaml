@@ -30,8 +30,8 @@ Line 4, characters 22-25:
 4 |   let _ @ shareable = bar in
                           ^^^
 Error: This value is "nonportable"
-       because it contains a usage (of the value "a" at Line 3, characters 15-16)
-       which is expected to be "uncontended".
+         because it contains a usage (of the value "a" at Line 3, characters 15-16)
+         which is expected to be "uncontended".
        However, the highlighted expression is expected to be "shareable".
 |}]
 
@@ -52,9 +52,10 @@ let foo (f : (unit -> unit) @ shareable) @ portable = fun () -> f ()
 Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ shareable) @ portable = fun () -> f ()
                                                                     ^
-Error: The value "f" is "shareable" but is expected to be "portable"
-       because it is used inside the function at Line 1, characters 54-68
-       which is expected to be "portable".
+Error: The value "f" is "shareable"
+       but is expected to be "portable"
+         because it is used inside the function at Line 1, characters 54-68
+         which is expected to be "portable".
 |}]
 
 let foo (f : (unit -> unit) @ nonportable) @ shareable = fun () -> f ()
@@ -62,9 +63,10 @@ let foo (f : (unit -> unit) @ nonportable) @ shareable = fun () -> f ()
 Line 1, characters 67-68:
 1 | let foo (f : (unit -> unit) @ nonportable) @ shareable = fun () -> f ()
                                                                        ^
-Error: The value "f" is "nonportable" but is expected to be "shareable"
-       because it is used inside the function at Line 1, characters 57-71
-       which is expected to be "shareable".
+Error: The value "f" is "nonportable"
+       but is expected to be "shareable"
+         because it is used inside the function at Line 1, characters 57-71
+         which is expected to be "shareable".
 |}]
 
 let foo (f : (unit -> unit) @ portable) @ shareable = fun () -> f ()
@@ -90,7 +92,7 @@ Line 1, characters 43-46:
 1 | let get : 'a t -> 'a @ portable = fun t -> t.x
                                                ^^^
 Error: This value is "shareable"
-       because it is the field "x" (with some modality) of the record at Line 1, characters 43-44.
+         because it is the field "x" (with some modality) of the record at Line 1, characters 43-44.
        However, the highlighted expression is expected to be "portable".
 |}]
 

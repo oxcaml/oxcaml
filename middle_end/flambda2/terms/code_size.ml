@@ -243,12 +243,12 @@ let divmod_bi_check ~machine_width else_branch_size
     (bi : Flambda_kind.Standard_int.t) =
   (* CR gbury: we should allow check Arch.division_crashed_on_overflow, but
      that's likely a dependency we want to avoid ? *)
-  if Target_system.Machine_width.is_32_bit machine_width
-     ||
-     match bi with
-     | Naked_int8 | Naked_int16 | Naked_int32 -> false
-     | Naked_int64 | Naked_nativeint | Naked_immediate | Tagged_immediate ->
-       true
+  if
+    Target_system.Machine_width.is_32_bit machine_width
+    ||
+    match bi with
+    | Naked_int8 | Naked_int16 | Naked_int32 -> false
+    | Naked_int64 | Naked_nativeint | Naked_immediate | Tagged_immediate -> true
   then 2 + else_branch_size
   else 0
 
@@ -525,10 +525,8 @@ let apply apply =
   match Apply_expr.call_kind apply with
   | Function { function_call = Direct _; _ } -> direct_call_size
   (* CR mshinwell: Check / fix these numbers *)
-  | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
-    indirect_call_size
-  | Function { function_call = Indirect_known_arity _; alloc_mode = _ } ->
-    indirect_call_size
+  | Function { function_call = Indirect_unknown_arity } -> indirect_call_size
+  | Function { function_call = Indirect_known_arity _ } -> indirect_call_size
   | C_call { needs_caml_c_call = true; _ } -> needs_caml_c_call_extcall_size
   | C_call { needs_caml_c_call = false; _ } ->
     does_not_need_caml_c_call_extcall_size

@@ -80,11 +80,11 @@ let symbol ppf { txt = cunit, s; loc = _ } =
   Format.pp_print_char ppf '$';
   cunit
   |> Option.iter (fun { ident; linkage_name } ->
-         symbol_part ppf ident;
-         linkage_name
-         |> Option.iter (fun linkage_name ->
-                Format.fprintf ppf "/%a" symbol_part linkage_name);
-         Format.pp_print_char ppf '.');
+      symbol_part ppf ident;
+      linkage_name
+      |> Option.iter (fun linkage_name ->
+          Format.fprintf ppf "/%a" symbol_part linkage_name);
+      Format.pp_print_char ppf '.');
   symbol_part ppf s
 
 let ident ppf s =
@@ -775,16 +775,15 @@ let named ppf = function
 let static_closure_binding ppf (scb : static_closure_binding) =
   Format.fprintf ppf "%a =@ %a" symbol scb.symbol fun_decl scb.fun_decl
 
-let call_kind ~space ppf ck =
+let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
   match ck with
-  | Function (Indirect alloc) ->
-    alloc_mode_for_applications_opt ppf alloc ~space
-  | Function (Direct { code_id = c; function_slot = cl; alloc }) ->
+  | Function Indirect -> alloc_mode_for_applications_opt ppf alloc_mode ~space
+  | Function (Direct { code_id = c; function_slot = cl }) ->
     pp_spaced ~space ppf "@[direct(%a%a%a)@]" code_id c
       (pp_option ~space:Before (pp_like "@@%a" function_slot))
       cl
       (alloc_mode_for_applications_opt ~space:Before)
-      alloc
+      alloc_mode
   | C_call { alloc } ->
     let noalloc_kwd = if alloc then None else Some "noalloc" in
     pp_spaced ~space ppf "ccall%a"
@@ -891,6 +890,7 @@ let rec expr scope ppf = function
     (* (fun ppf () -> if cases <> [] then Format.pp_print_cut ppf ()) () *)
   | Apply
       { call_kind = kind;
+        alloc_mode;
         inlined;
         inlining_state = is;
         continuation = ret;
@@ -906,7 +906,8 @@ let rec expr scope ppf = function
     in
     Format.fprintf ppf
       "@[<hv 2>apply@[<2>%a%a%a@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ %a@]@]@]"
-      (call_kind ~space:Before) kind
+      (call_kind_and_alloc_mode ~space:Before)
+      (kind, alloc_mode)
       (inlined_attribute_opt ~space:Before)
       inlined pp_inlining_state () func_name_with_optional_arities
       (func, arities)

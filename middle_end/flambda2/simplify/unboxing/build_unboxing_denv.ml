@@ -196,14 +196,14 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       fields_by_tag denv
   | Unbox
       (Number
-        (Naked_immediate, { param = naked_immediate; param_debug_uid; args = _ }))
-    ->
+         ( Naked_immediate,
+           { param = naked_immediate; param_debug_uid; args = _ } )) ->
     let shape = T.tagged_immediate_alias_to ~naked_immediate in
     denv_of_number_decision K.naked_immediate shape param_var param_debug_uid
       naked_immediate denv
   | Unbox
       (Number
-        (Naked_float32, { param = naked_float32; param_debug_uid; args = _ }))
+         (Naked_float32, { param = naked_float32; param_debug_uid; args = _ }))
     ->
     let shape =
       T.boxed_float32_alias_to ~naked_float32 (Alloc_mode.For_types.unknown ())
@@ -248,8 +248,8 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       naked_int64 denv
   | Unbox
       (Number
-        (Naked_nativeint, { param = naked_nativeint; param_debug_uid; args = _ }))
-    ->
+         ( Naked_nativeint,
+           { param = naked_nativeint; param_debug_uid; args = _ } )) ->
     let shape =
       T.boxed_nativeint_alias_to ~naked_nativeint
         (Alloc_mode.For_types.unknown ())
@@ -257,24 +257,24 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
     denv_of_number_decision K.naked_nativeint shape param_var param_debug_uid
       naked_nativeint denv
   | Unbox
-      (Number
-        (Naked_vec128, { param = naked_vec128; param_debug_uid; args = _ })) ->
+      (Number (Naked_vec128, { param = naked_vec128; param_debug_uid; args = _ }))
+    ->
     let shape =
       T.boxed_vec128_alias_to ~naked_vec128 (Alloc_mode.For_types.unknown ())
     in
     denv_of_number_decision K.naked_vec128 shape param_var param_debug_uid
       naked_vec128 denv
   | Unbox
-      (Number
-        (Naked_vec256, { param = naked_vec256; param_debug_uid; args = _ })) ->
+      (Number (Naked_vec256, { param = naked_vec256; param_debug_uid; args = _ }))
+    ->
     let shape =
       T.boxed_vec256_alias_to ~naked_vec256 (Alloc_mode.For_types.unknown ())
     in
     denv_of_number_decision K.naked_vec256 shape param_var param_debug_uid
       naked_vec256 denv
   | Unbox
-      (Number
-        (Naked_vec512, { param = naked_vec512; param_debug_uid; args = _ })) ->
+      (Number (Naked_vec512, { param = naked_vec512; param_debug_uid; args = _ }))
+    ->
     let shape =
       T.boxed_vec512_alias_to ~naked_vec512 (Alloc_mode.For_types.unknown ())
     in

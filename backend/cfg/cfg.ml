@@ -142,8 +142,10 @@ let successor_labels_normal ti =
   | Call
       ( OCaml { returns_to = label_after; _ }
       | External { returns_to = Some label_after; _ }
-      | Probe { returns_to = label_after; _ } ) ->
+      | Probe { returns_to = label_after; _ } )
+  | Invalid { label_after = Some label_after; _ } ->
     Label.Set.singleton label_after
+  | Invalid { label_after = None; _ } -> Label.Set.empty
 
 let successor_labels ~normal ~exn block =
   match normal, exn with
@@ -191,7 +193,7 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Tailcall_self { destination } ->
         Tailcall_self { destination = f destination }
       | Tailcall_func (Indirect _) | Tailcall_func (Direct _) | Return | Raise _
-        ->
+      | Invalid { label_after = None; _ } ->
         block.terminator.desc
       | Call (OCaml { op; returns_to }) ->
         Call (OCaml { op; returns_to = f returns_to })
@@ -225,6 +227,8 @@ let replace_successor_labels t ~normal ~exn block ~f =
                enabled_at_init;
                returns_to = f returns_to
              })
+      | Invalid ({ label_after = Some label_after; _ } as r) ->
+        Invalid { r with label_after = Some (f label_after) }
     in
     block.terminator <- { block.terminator with desc }
 
@@ -431,6 +435,9 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
       (Linear.Lprobe { name; handler_code_sym; enabled_at_init });
     Format.fprintf ppf "%sgoto %a" sep Label.format returns_to
+  | Invalid { message; label_after; _ } ->
+    Format.fprintf ppf "Invalid %S" message;
+    Option.iter (Format.fprintf ppf "%sgoto %a" sep Label.format) label_after
 
 let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator
 
@@ -475,9 +482,11 @@ let can_raise_terminator (i : terminator) =
     else
       (* Even if going via [caml_c_call], if there are no effects, the function
          cannot raise an exception. (Example: [caml_obj_dup].) *)
-      match effects with No_effects -> false | Arbitrary_effects -> true)
+      match effects with
+      | No_effects -> false
+      | Arbitrary_effects -> true)
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Return | Tailcall_self _ ->
+  | Switch _ | Return | Tailcall_self _ | Invalid _ ->
     false
 
 (* CR gyorsh: [is_pure_terminator] is not the same as [can_raise_terminator]
@@ -487,7 +496,8 @@ let can_raise_terminator (i : terminator) =
    taking into account [effects] on extcalls *)
 let is_pure_terminator desc =
   match (desc : terminator) with
-  | Return | Raise _ | Call _ | Tailcall_func _ | Tailcall_self _ -> false
+  | Return | Raise _ | Call _ | Tailcall_func _ | Tailcall_self _ | Invalid _ ->
+    false
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
     (* CR gyorsh: fix for memory operands *)
@@ -497,14 +507,16 @@ let is_never_terminator desc =
   match (desc : terminator) with
   | Never -> true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call _ ->
+  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call _
+  | Invalid _ ->
     false
 
 let is_return_terminator desc =
   match (desc : terminator) with
   | Return -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call _ ->
+  | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call _ | Invalid _
+    ->
     false
 
 let is_pure_basic : basic -> bool = function
@@ -677,20 +689,20 @@ let is_end_region (b : basic) =
 let basic_block_contains_calls block =
   block.is_trap_handler
   || (match block.terminator.desc with
-     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-     | Int_test _ | Switch _ | Return ->
-       false
-     | Raise raise_kind -> (
-       match raise_kind with
-       | Lambda.Raise_notrace -> false
-       | Lambda.Raise_regular | Lambda.Raise_reraise ->
-         (* PR#6239 *)
-         (* caml_stash_backtrace; we #mark_call rather than #mark_c_tailcall to
+    | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+    | Int_test _ | Switch _ | Return ->
+      false
+    | Raise raise_kind -> (
+      match raise_kind with
+      | Lambda.Raise_notrace -> false
+      | Lambda.Raise_regular | Lambda.Raise_reraise ->
+        (* PR#6239 *)
+        (* caml_stash_backtrace; we #mark_call rather than #mark_c_tailcall to
             get a good stack backtrace *)
-         true)
-     | Tailcall_self _ -> false
-     | Tailcall_func _ -> false
-     | Call _ -> true)
+        true)
+    | Tailcall_self _ -> false
+    | Tailcall_func _ -> false
+    | Call _ | Invalid _ -> true)
   || DLL.exists block.body ~f:(fun (instr : basic instruction) ->
          match instr.desc with
          | Op (Alloc _ | Poll | External_without_caml_c_call _) -> true
@@ -755,7 +767,7 @@ let remove_trap_instructions t removed_trap_handlers =
     | Tailcall_self _ -> assert (Int.equal stack_offset 0)
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ ->
+    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
       ());
     update_instruction terminator ~stack_offset
   and update_block label ~stack_offset =

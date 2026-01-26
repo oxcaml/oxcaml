@@ -355,13 +355,16 @@ let report_mode_sub_error got expected ppf e =
   let {left; right} : _ Mode.simple_error =
     Mode.Value.print_error (Location.none, Unknown) e
   in
-  Format.fprintf ppf "%s " (String.capitalize_ascii got);
+  let open Format in
+  let open_box = dprintf "@[<hov 2>" in
+  let reopen_box = dprintf "@]@ %t" open_box in
+  fprintf ppf "%t%s " open_box (String.capitalize_ascii got);
   begin match left ppf with
-  | Mode -> Format.fprintf ppf "@ but %s " expected
-  | Mode_with_hint -> Format.fprintf ppf ".@\nHowever, %s " expected
+  | Mode -> fprintf ppf "%tbut %s " reopen_box expected
+  | Mode_with_hint -> fprintf ppf ".%tHowever, %s " reopen_box expected
   end;
   ignore (right ppf);
-  Format.pp_print_string ppf "."
+  fprintf ppf ".@]"
 
 let report_modality_equate_error first second ppf
   ((equate_step, sub_error) : Modality.equate_error) =

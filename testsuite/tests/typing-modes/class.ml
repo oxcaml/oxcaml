@@ -27,8 +27,9 @@ let foo () =
 Line 5, characters 16-17:
 5 |         val k = s
                     ^
-Error: The value "s" is "local" but is expected to be "global"
-       because it is used in a class (at Lines 4-6, characters 16-7).
+Error: The value "s" is "local"
+       but is expected to be "global"
+         because it is used in a class (at Lines 4-6, characters 16-7).
 |}]
 
 (* class can refer to external unique things, but only as aliased. *)
@@ -44,7 +45,7 @@ Line 5, characters 27-28:
 5 |         val k = unique_use s
                                ^
 Error: This value is "aliased"
-       because it is used in a class (at Lines 4-6, characters 16-7).
+         because it is used in a class (at Lines 4-6, characters 16-7).
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -174,9 +175,8 @@ Line 3, characters 17-20:
 3 |     portable_use foo
                      ^^^
 Error: This value is "nonportable"
-       because it closes over the class "cla" at Line 2, characters 21-24
-       which is "nonportable"
-       because classes are always at the legacy modes.
+         because it closes over the class "cla" at Line 2, characters 21-24
+         which is "nonportable" because classes are always at the legacy modes.
        However, the highlighted expression is expected to be "portable".
 |}]
 

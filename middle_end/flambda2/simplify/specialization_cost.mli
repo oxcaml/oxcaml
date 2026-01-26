@@ -15,10 +15,10 @@
 
 (** {1 Continuation Specialization Cost}
 
-    Continuation specialization is done in simplify on the way down.
-    Consider a term of the form:
+    Continuation specialization is done in simplify on the way down. Consider a
+    term of the form:
 
-{v
+    {v
   let_cont k x =
     let_cont k' y =
       ...
@@ -32,19 +32,17 @@
   switch .. with
   | 0 -> k 0
   | 1 -> k 1
-v}
-    *)
+    v} *)
 
-(** The decision to specialize continuation k
-    is made once Simplify has reached the bottom of the handler of k.
-    This allows to know all of the relevant
-    information before deciding whether to specialize [k]: all uses of [k] have been
-    seen, and we have also seen the code for the handler of [ĸ].
+(** The decision to specialize continuation k is made once Simplify has reached
+    the bottom of the handler of k. This allows to know all of the relevant
+    information before deciding whether to specialize [k]: all uses of [k] have
+    been seen, and we have also seen the code for the handler of [ĸ].
 
-    The type [t] represents an accumulator updated while doing the downwards pass
-    on the handler of [k] to record enough information to estimate the cost of a
-    specialization of [k], and whether there was any reason to **not** specialize
-    [k] regardless of the cost *)
+    The type [t] represents an accumulator updated while doing the downwards
+    pass on the handler of [k] to record enough information to estimate the cost
+    of a specialization of [k], and whether there was any reason to **not**
+    specialize [k] regardless of the cost *)
 
 type reason =
   | At_toplevel
@@ -76,7 +74,8 @@ val cannot_specialize : reason -> t
 val add_prim :
   machine_width:Target_system.Machine_width.t -> Flambda_primitive.t -> t -> t
 
-(** Add a set of closure containing [~num] closures to the cost of specialization. *)
+(** Add a set of closure containing [~num] closures to the cost of
+    specialization. *)
 val add_set_of_closures : Set_of_closures.t -> t -> t
 
 val add_lifted_set_of_closures : Set_of_closures.t -> t -> t

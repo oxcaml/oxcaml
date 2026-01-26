@@ -70,13 +70,12 @@ val emit_frames : emit_frame_actions -> unit
 
 val is_generic_function : string -> bool
 
-(** Is a binary backend available.  If yes, we don't need
-        to generate the textual assembly file (unless the user
-        request it with -S). *)
+(** Is a binary backend available. If yes, we don't need to generate the textual
+    assembly file (unless the user request it with -S). *)
 val binary_backend_available : bool ref
 
-(** Clear global state and compact the heap, so that an external program
-    (such as the assembler or linker) may have more memory available to it.
+(** Clear global state and compact the heap, so that an external program (such
+    as the assembler or linker) may have more memory available to it.
 
     When this frees up around 1.1GB of memory, it takes around 0.6s. We only
     take this time when the job is large enough that we're worried that we'll
@@ -84,10 +83,10 @@ val binary_backend_available : bool ref
     heuristically measure how big the job is by how much heap we're using
     ourselves.
 
-    The [reset] parameter will be called before [Gc.compact] if we go ahead
-    with the compaction. It should clear as much as possible from the global
-    state, since the fewer live words there are after GC, the smaller the new
-    heap can be. *)
+    The [reset] parameter will be called before [Gc.compact] if we go ahead with
+    the compaction. It should clear as much as possible from the global state,
+    since the fewer live words there are after GC, the smaller the new heap can
+    be. *)
 val reduce_heap_size : reset:(unit -> unit) -> unit
 
 type error =

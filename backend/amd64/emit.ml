@@ -92,8 +92,8 @@ module I = struct
     I.simd simd args
 end
 
-(** Turn a Linear label into an assembly label. The section is checked against the
-    section tracked by [D] when emitting label definitions. *)
+(** Turn a Linear label into an assembly label. The section is checked against
+    the section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
     =
   L.create_int section (Label.to_int l)
@@ -196,7 +196,12 @@ let pop r =
 
 (* Symbols *)
 
-let emit_symbol s = S.encode (S.create s)
+(* Convert Cmm.is_global to Asm_symbol.visibility *)
+let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
+  | Cmm.Global -> S.Global
+  | Cmm.Local -> S.Local
+
+let emit_symbol s = S.encode (S.create_global s)
 
 (* Record symbols used and defined - at the end generate extern for those used
    but not defined *)
@@ -223,8 +228,8 @@ let get_imp_symbol s =
 
 let emit_imp_table ~section () =
   let f s imps =
-    D.define_symbol_label ~section (S.create imps);
-    D.symbol (S.create s)
+    D.define_symbol_label ~section (S.create_global imps);
+    D.symbol (S.create_global s)
   in
   D.data ();
   D.comment "relocation table start";
@@ -258,7 +263,9 @@ let emit_jump s = I.jmp (rel_plt s)
 let domain_field f = mem64 QWORD (Domainstate.idx_of_field f * 8) (Scalar R14)
 
 let emit_cmm_symbol (s : Cmm.symbol) =
-  let sym = S.create s.sym_name in
+  let sym =
+    S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
+  in
   match (s.sym_global : Cmm.is_global) with
   | Global -> `Symbol sym
   (* This label is special in that it is not of the form "Lnumber". Instead, we
@@ -298,8 +305,9 @@ let emit_named_text_section ?(suffix = "") func_name =
      [Cfg.codegen_option], and at that point we could add a constructor for
      module-entry-functions too so that we don't have to inspect [func_name]
      like we do now. *)
-  if !Oxcaml_flags.module_entry_functions_section
-     && String.ends_with func_name ~suffix:"__entry"
+  if
+    !Oxcaml_flags.module_entry_functions_section
+    && String.ends_with func_name ~suffix:"__entry"
   then (
     match[@ocaml.warning "-4"] system with
     | S_macosx
@@ -352,16 +360,16 @@ let emit_function_or_basic_block_section_name () =
 
 let emit_Llabel fallthrough lbl section_name =
   (if !Oxcaml_flags.basic_block_sections
-  then
-    match section_name with
-    | Some name ->
-      if not (String.equal name !current_basic_block_section)
-      then (
-        current_basic_block_section := name;
-        D.cfi_endproc ();
-        emit_function_or_basic_block_section_name ();
-        D.cfi_startproc ())
-    | None -> ());
+   then
+     match section_name with
+     | Some name ->
+       if not (String.equal name !current_basic_block_section)
+       then (
+         current_basic_block_section := name;
+         D.cfi_endproc ();
+         emit_function_or_basic_block_section_name ();
+         D.cfi_startproc ())
+     | None -> ());
   if (not fallthrough) && !fastcode_flag
   then D.align ~fill_x86_bin_emitter:Nop ~bytes:4;
   D.define_label lbl
@@ -470,13 +478,13 @@ let addressing addr typ i n =
 
 (* Record live pointers at call points -- see Emitaux *)
 
-type save_simd_regs = Reg_class.save_simd_regs =
-  | Save_xmm
-  | Save_ymm
-  | Save_zmm
+(* A global symbol that maybe calls the GC, suffixed by the class of simd
+   register which should be saved *)
+let global_gc_sym ~simd name =
+  Cmm.global_symbol (name ^ Reg_class.Save_simd_regs.symbol_suffix simd)
 
-let must_save_simd_regs live =
-  let v256, v512 = ref false, ref false in
+let must_save_simd_regs live : Reg_class.Save_simd_regs.t =
+  let v128, v256, v512 = ref false, ref false, ref false in
   Reg.Set.iter
     (fun r ->
       if not (Reg.is_reg r)
@@ -485,7 +493,8 @@ let must_save_simd_regs live =
         match r.typ with
         | Vec256 -> v256 := true
         | Vec512 -> v512 := true
-        | Val | Addr | Int | Float | Vec128 | Float32 | Valx2 -> ())
+        | Float | Vec128 | Float32 | Valx2 -> v128 := true
+        | Val | Addr | Int -> ())
     live;
   if !v512
   then (
@@ -495,7 +504,9 @@ let must_save_simd_regs live =
   then (
     I.require_vec256 ();
     Save_ymm)
-  else Save_xmm
+  else if !v128
+  then Save_xmm
+  else Save_none
 
 (* CR sspies: Consider whether more of [record_frame_label] can be shared with
    the Arm backend. *)
@@ -543,27 +554,23 @@ type gc_call =
     gc_return_lbl : L.t; (* Where to branch after GC *)
     gc_frame : L.t; (* Label of frame descriptor *)
     gc_dbg : Debuginfo.t; (* Location of the original instruction *)
-    gc_save_simd : save_simd_regs (* Whether we need to save SIMD regs. *)
+    gc_save_simd : Reg_class.Save_simd_regs.t
+        (* What SIMD regs, if any, we need to save *)
   }
 
 let call_gc_sites = ref ([] : gc_call list)
 
-let call_gc_local_sym : Cmm.symbol =
-  { sym_name = "caml_call_gc_"; sym_global = Local }
-
-let call_gc_local_sym_avx : Cmm.symbol =
-  { sym_name = "caml_call_gc_avx_"; sym_global = Local }
-
-let call_gc_local_sym_avx512 : Cmm.symbol =
-  { sym_name = "caml_call_gc_avx512_"; sym_global = Local }
+let call_gc_local_sym ~simd : Cmm.symbol =
+  { sym_name =
+      Format.sprintf "caml_call_gc%s_"
+        (Reg_class.Save_simd_regs.symbol_suffix simd);
+    sym_global = Local
+  }
 
 let emit_call_gc gc =
   D.define_label gc.gc_lbl;
   emit_debug_info gc.gc_dbg;
-  (match gc.gc_save_simd with
-  | Save_xmm -> emit_call call_gc_local_sym
-  | Save_ymm -> emit_call call_gc_local_sym_avx
-  | Save_zmm -> emit_call call_gc_local_sym_avx512);
+  emit_call (call_gc_local_sym ~simd:gc.gc_save_simd);
   D.define_label gc.gc_frame;
   I.jmp (emit_asm_label_arg gc.gc_return_lbl)
 
@@ -573,7 +580,7 @@ type local_realloc_call =
   { lr_lbl : L.t;
     lr_return_lbl : L.t;
     lr_dbg : Debuginfo.t;
-    lr_save_simd : save_simd_regs
+    lr_save_simd : Reg_class.Save_simd_regs.t
   }
 
 let local_realloc_sites = ref ([] : local_realloc_call list)
@@ -581,10 +588,7 @@ let local_realloc_sites = ref ([] : local_realloc_call list)
 let emit_local_realloc lr =
   D.define_label lr.lr_lbl;
   emit_debug_info lr.lr_dbg;
-  (match lr.lr_save_simd with
-  | Save_xmm -> emit_call (Cmm.global_symbol "caml_call_local_realloc")
-  | Save_ymm -> emit_call (Cmm.global_symbol "caml_call_local_realloc_avx")
-  | Save_zmm -> emit_call (Cmm.global_symbol "caml_call_local_realloc_avx512"));
+  emit_call (global_gc_sym "caml_call_local_realloc" ~simd:lr.lr_save_simd);
   I.jmp (emit_asm_label_arg lr.lr_return_lbl)
 
 (* Record calls to caml_ml_array_bound_error and caml_ml_array_align_error. In
@@ -643,7 +647,8 @@ type stack_realloc =
   { sc_label : L.t; (* Label of the reallocation code. *)
     sc_return : L.t; (* Label to return to after reallocation. *)
     sc_size_in_bytes : int; (* Size for reallocation. *)
-    sc_save_simd : save_simd_regs (* Whether we need to save SIMD regs. *)
+    sc_save_simd : Reg_class.Save_simd_regs.t
+        (* What SIMD regs, if any, we need to save. *)
   }
 
 let stack_realloc = ref ([] : stack_realloc list)
@@ -660,11 +665,7 @@ let emit_stack_realloc () =
       I.push (int (Config.stack_threshold + (sc_size_in_bytes / 8)));
       D.cfi_adjust_cfa_offset ~bytes:8;
       (* measured in words *)
-      (match sc_save_simd with
-      | Save_xmm -> emit_call (Cmm.global_symbol "caml_call_realloc_stack")
-      | Save_ymm -> emit_call (Cmm.global_symbol "caml_call_realloc_stack_avx")
-      | Save_zmm ->
-        emit_call (Cmm.global_symbol "caml_call_realloc_stack_avx512"));
+      emit_call (global_gc_sym "caml_call_realloc_stack" ~simd:sc_save_simd);
       I.add (int 8) rsp;
       D.cfi_adjust_cfa_offset ~bytes:(-8);
       I.jmp (emit_asm_label_arg sc_return))
@@ -979,7 +980,7 @@ let global_maybe_protected (sym : S.t) =
 (* CR sspies: The naming of these functions is confusing. *)
 let emit_global_label_for_symbol ~section lbl =
   add_def_symbol lbl;
-  let lbl = S.create lbl in
+  let lbl = S.create_global lbl in
   global_maybe_protected lbl;
   D.define_symbol_label ~section lbl
 
@@ -1103,7 +1104,7 @@ let tailrec_entry_point = ref None
 
 let probe_handler_wrapper_name probe_label =
   let w = Printf.sprintf "probe_wrapper_%s" (Label.to_string probe_label) in
-  Cmm_helpers.make_symbol w |> S.create
+  Cmm_helpers.make_symbol w |> S.create_global
 
 let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
   assert !frame_required;
@@ -1138,7 +1139,7 @@ let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
     let rel_size = 4L in
     let rel_offset_from_next = 4L in
     D.reloc_x86_64_plt32 ~offset_from_this:rel_size ~target_symbol:wrap_label
-      ~rel_offset_from_next)
+      ~addend:rel_offset_from_next)
   else
     (* Emit absolute value, no relocation. The immediate operand of cmp is the
        offset of the wrapper from the current instruction's address "." minus
@@ -1184,7 +1185,9 @@ module Address_sanitizer : sig
     | Store_initialize
     | Store_modify
 
-  (** Implements [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping]. *)
+  (** Implements
+      [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping].
+  *)
   val emit_sanitize :
     ?dependencies:X86_ast.arg array ->
     instr:instruction ->
@@ -1278,8 +1281,12 @@ end = struct
     let index = (chunk_size lsl 1) + access in
     (* We take extra care to structure our code such that these are statically
        allocated as manifest constants in a flat array. *)
-    match simd_regs with
-    | Save_xmm -> (
+    match (simd_regs : Reg_class.Save_simd_regs.t) with
+    | Save_none | Save_xmm -> (
+      (* We combine the Save_none and Save_xmm cases here because the only
+         reason we have different asan report functions is due to conditional
+         GCC compilation for backend support, and all supported backends have
+         SSE2 (which is not the case for avx/avx512) *)
       match index with
       | 0 -> Sym "caml_asan_report_load1_noabort"
       | 1 -> Sym "caml_asan_report_store1_noabort"
@@ -1732,8 +1739,9 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
 (* Only used for instructions that have an implicit memory operand. Explicit
    load/store operations are sanitized automatically by [emit_simd_instr]. *)
 let emit_implicit_simd_sanitize (op : Simd.operation) instr =
-  if Config.with_address_sanitizer && !Arch.is_asan_enabled
-     && Simd.is_memory_operation op
+  if
+    Config.with_address_sanitizer && !Arch.is_asan_enabled
+    && Simd.is_memory_operation op
   then
     let simd = Simd.Pseudo_instr.instr op.instr in
     match[@warning "-4"] simd.id with
@@ -1957,8 +1965,9 @@ let emit_instr ~first ~fallthrough i =
       emit_jump func)
   | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
     add_used_symbol func;
-    if stack_ofs > 0
-       && (Config.runtime5 || not (Cmm.equal_stack_align stack_align Align_16))
+    if
+      stack_ofs > 0
+      && (Config.runtime5 || not (Cmm.equal_stack_align stack_align Align_16))
     then (
       I.mov rsp r13;
       I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
@@ -2098,22 +2107,13 @@ let emit_instr ~first ~fallthrough i =
            }
            :: !call_gc_sites)
     else (
-      (match n, gc_save_simd with
-      | 16, Save_xmm -> emit_call (Cmm.global_symbol "caml_alloc1")
-      | 16, Save_ymm -> emit_call (Cmm.global_symbol "caml_alloc1_avx")
-      | 16, Save_zmm -> emit_call (Cmm.global_symbol "caml_alloc1_avx512")
-      | 24, Save_xmm -> emit_call (Cmm.global_symbol "caml_alloc2")
-      | 24, Save_ymm -> emit_call (Cmm.global_symbol "caml_alloc2_avx")
-      | 24, Save_zmm -> emit_call (Cmm.global_symbol "caml_alloc2_avx512")
-      | 32, Save_xmm -> emit_call (Cmm.global_symbol "caml_alloc3")
-      | 32, Save_ymm -> emit_call (Cmm.global_symbol "caml_alloc3_avx")
-      | 32, Save_zmm -> emit_call (Cmm.global_symbol "caml_alloc3_avx512")
-      | _, (Save_xmm | Save_ymm | Save_zmm) -> (
+      (match n with
+      | 16 -> emit_call (global_gc_sym "caml_alloc1" ~simd:gc_save_simd)
+      | 24 -> emit_call (global_gc_sym "caml_alloc2" ~simd:gc_save_simd)
+      | 32 -> emit_call (global_gc_sym "caml_alloc3" ~simd:gc_save_simd)
+      | _ ->
         I.sub (int n) r15;
-        match gc_save_simd with
-        | Save_xmm -> emit_call (Cmm.global_symbol "caml_allocN")
-        | Save_ymm -> emit_call (Cmm.global_symbol "caml_allocN_avx")
-        | Save_zmm -> emit_call (Cmm.global_symbol "caml_allocN_avx512")));
+        emit_call (global_gc_sym "caml_allocN" ~simd:gc_save_simd));
       let label = record_frame_label i.live (Dbg_alloc dbginfo) in
       D.define_label label;
       I.lea (mem64 NONE 8 (Scalar R15)) (res i 0))
@@ -2214,19 +2214,19 @@ let emit_instr ~first ~fallthrough i =
     I.neg r0
   | Lop (Floatop (Float64, Inegf)) ->
     sse_or_avx_dst xorpd vxorpd_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_negf_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_negf_mask))
       (res i 0)
   | Lop (Floatop (Float64, Iabsf)) ->
     sse_or_avx_dst andpd vandpd_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_absf_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_absf_mask))
       (res i 0)
   | Lop (Floatop (Float32, Inegf)) ->
     sse_or_avx_dst xorps vxorps_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_negf32_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_negf32_mask))
       (res i 0)
   | Lop (Floatop (Float32, Iabsf)) ->
     sse_or_avx_dst andps vandps_X_X_Xm128
-      (mem64_rip VEC128 (emit_symbol "caml_absf32_mask"))
+      (mem64_rip VEC128 (S.encode S.Predef.caml_absf32_mask))
       (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
     instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
@@ -2455,7 +2455,10 @@ let emit_instr ~first ~fallthrough i =
   | Lentertrap ->
     if fp
     then
-      let delta = frame_size () - 16 (* retaddr + rbp *) in
+      let delta =
+        frame_size () - 16
+        (* retaddr + rbp *)
+      in
       I.lea (mem64 NONE delta (Scalar RSP)) rbp
   | Ladjust_stack_offset { delta_bytes } ->
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
@@ -2563,10 +2566,11 @@ let fundecl fundecl =
   emit_function_or_basic_block_section_name ();
   D.align ~fill_x86_bin_emitter:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
-  let fundecl_sym = S.create fundecl.fun_name in
-  if is_macosx system
-     && (not !Clflags.output_c_object)
-     && is_generic_function fundecl.fun_name
+  let fundecl_sym = S.create_global fundecl.fun_name in
+  if
+    is_macosx system
+    && (not !Clflags.output_c_object)
+    && is_generic_function fundecl.fun_name
   then (* PR#4690 *)
     D.private_extern fundecl_sym
   else global_maybe_protected fundecl_sym;
@@ -2585,9 +2589,10 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
-  if Config.runtime5
-     && (not Config.no_stack_checks)
-     && String.equal !Clflags.runtime_variant "d"
+  if
+    Config.runtime5
+    && (not Config.no_stack_checks)
+    && String.equal !Clflags.runtime_variant "d"
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   List.iter emit_call_gc !call_gc_sites;
@@ -2595,9 +2600,9 @@ let fundecl fundecl =
   emit_call_safety_errors ();
   emit_stack_realloc ();
   (if !frame_required
-  then
-    let n = frame_size () - 8 - if fp then 8 else 0 in
-    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
+   then
+     let n = frame_size () - 8 - if fp then 8 else 0 in
+     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
   (match fun_end_label with
   | Some l -> D.define_label (label_to_asm_label ~section:Text l)
   | None -> ());
@@ -2610,7 +2615,9 @@ let fundecl fundecl =
 (* CR sspies: Share the [emit_item] code with the Arm backend in emitaux. *)
 let emit_item : Cmm.data_item -> unit = function
   | Cdefine_symbol s -> (
-    let sym = S.create s.sym_name in
+    let sym =
+      S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
+    in
     match s.sym_global with
     | Local -> D.define_label (L.create_string_unchecked Data (S.encode sym))
     | Global ->
@@ -2698,19 +2705,24 @@ let begin_assembly unix =
   if is_win64 system
   then (
     D.extrn S.Predef.caml_call_gc;
+    D.extrn S.Predef.caml_call_gc_sse;
     D.extrn S.Predef.caml_call_gc_avx;
     D.extrn S.Predef.caml_call_gc_avx512;
     D.extrn S.Predef.caml_c_call;
     D.extrn S.Predef.caml_allocN;
+    D.extrn S.Predef.caml_allocN_sse;
     D.extrn S.Predef.caml_allocN_avx;
     D.extrn S.Predef.caml_allocN_avx512;
     D.extrn S.Predef.caml_alloc1;
+    D.extrn S.Predef.caml_alloc1_sse;
     D.extrn S.Predef.caml_alloc1_avx;
     D.extrn S.Predef.caml_alloc1_avx512;
     D.extrn S.Predef.caml_alloc2;
+    D.extrn S.Predef.caml_alloc2_sse;
     D.extrn S.Predef.caml_alloc2_avx;
     D.extrn S.Predef.caml_alloc2_avx512;
     D.extrn S.Predef.caml_alloc3;
+    D.extrn S.Predef.caml_alloc3_sse;
     D.extrn S.Predef.caml_alloc3_avx;
     D.extrn S.Predef.caml_alloc3_avx512;
     D.extrn S.Predef.caml_ml_array_bound_error;
@@ -2743,24 +2755,15 @@ let begin_assembly unix =
   emit_global_label_for_symbol ~section:Text code_begin;
   if is_macosx system then I.nop ();
   (* PR#4690 *)
-  (match emit_cmm_symbol call_gc_local_sym with
-  | `Symbol sym -> D.define_symbol_label ~section:Text sym
-  | `Label lbl -> D.define_label lbl);
-  D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc"));
-  D.cfi_endproc ();
-  (match emit_cmm_symbol call_gc_local_sym_avx with
-  | `Symbol sym -> D.define_symbol_label ~section:Text sym
-  | `Label lbl -> D.define_label lbl);
-  D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc_avx"));
-  D.cfi_endproc ();
-  (match emit_cmm_symbol call_gc_local_sym_avx512 with
-  | `Symbol sym -> D.define_symbol_label ~section:Text sym
-  | `Label lbl -> D.define_label lbl);
-  D.cfi_startproc ();
-  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc_avx512"));
-  D.cfi_endproc ();
+  Reg_class.Save_simd_regs.all
+  |> List.iter (fun simd ->
+      (match emit_cmm_symbol (call_gc_local_sym ~simd) with
+      | `Symbol sym -> D.define_symbol_label ~section:Text sym
+      | `Label lbl -> D.define_label lbl);
+      D.cfi_startproc ();
+      let call_gc = global_gc_sym "caml_call_gc" ~simd in
+      I.jmp (rel_plt call_gc);
+      D.cfi_endproc ());
   ()
 
 let make_stack_loc ~offset n (r : Reg.t) =
@@ -2885,7 +2888,10 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   in
   let live_offset = size_of_regs live in
   (* Compute the size of stack slots for spilling all arguments of the probe. *)
-  let aux_offset = 8 (* for saving r15 *) in
+  let aux_offset =
+    8
+    (* for saving r15 *)
+  in
   let tmp_offset = size_of_regs p.probe_insn.arg in
   let loc_args, loc_offset = Proc.loc_arguments (Reg.typv p.probe_insn.arg) in
   (*= Ensure the stack is aligned.
@@ -2899,9 +2905,10 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if Config.runtime5
-     && (not Config.no_stack_checks)
-     && n >= Stack_check.stack_threshold_size
+  if
+    Config.runtime5
+    && (not Config.no_stack_checks)
+    && n >= Stack_check.stack_threshold_size
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
       ~save_simd:(must_save_simd_regs p.probe_insn.live);
@@ -2979,8 +2986,9 @@ let emit_trap_notes () =
     emit_labels traps.push_traps;
     emit_labels traps.pop_traps
   in
-  if is_system_supported && !Arch.trap_notes
-     && not (L.Set.is_empty traps.enter_traps)
+  if
+    is_system_supported && !Arch.trap_notes
+    && not (L.Set.is_empty traps.enter_traps)
   then (
     D.switch_to_section Note_ocaml_eh;
     Emitaux.emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l
@@ -3070,7 +3078,7 @@ let end_assembly () =
           D.define_label lbl);
       efa_string = (fun s -> D.string (s ^ "\000"))
     };
-  let frametable_sym = S.create (Cmm_helpers.make_symbol "frametable") in
+  let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
   D.data ();
   Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol;
@@ -3082,7 +3090,8 @@ let end_assembly () =
     D.comment "External functions";
     String.Set.iter
       (fun s ->
-        if not (String.Set.mem s !symbols_defined) then D.extrn (S.create s))
+        if not (String.Set.mem s !symbols_defined)
+        then D.extrn (S.create_global s))
       !symbols_used;
     symbols_used := String.Set.empty;
     symbols_defined := String.Set.empty);

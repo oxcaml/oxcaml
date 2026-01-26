@@ -381,29 +381,12 @@ let create_let_symbols uacc lifted_constant ~body =
         | None ->
           let prim : P.t =
             let symbol = Simple.symbol (Symbol_projection.symbol proj) in
-            let kind = Symbol_projection.kind proj in
+            let result_kind = Symbol_projection.kind proj in
             match Symbol_projection.projection proj with
-            | Block_load { index } ->
-              let block_access_kind : P.Block_access_kind.t =
-                match Flambda_kind.With_subkind.kind kind with
-                | Value ->
-                  let field_kind : P.Block_access_field_kind.t =
-                    if Flambda_kind.With_subkind.equal kind
-                         Flambda_kind.With_subkind.tagged_immediate
-                    then Immediate
-                    else Any_value
-                  in
-                  Values { tag = Unknown; size = Unknown; field_kind }
-                | Naked_number Naked_float -> Naked_floats { size = Unknown }
-                | Naked_number
-                    ( Naked_float32 | Naked_immediate | Naked_nativeint
-                    | Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec128
-                    | Naked_vec256 | Naked_vec512 | Naked_int64 )
-                | Region | Rec_info ->
-                  Misc.fatal_errorf
-                    "Unexpected kind %a for symbol projection: %a"
-                    Flambda_kind.With_subkind.print kind Symbol_projection.print
-                    proj
+            | Block_load { index; block_shape } ->
+              let block_access_kind =
+                P.Block_access_kind.from_block_shape block_shape ~index
+                  ~result_kind
               in
               Unary
                 ( Block_load

@@ -406,7 +406,7 @@ let name_expression ~loc ~attrs sort exp =
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
-      val_modalities = Mode.Modality.id;
+      val_modalities = Mode.Modality.(Const.id |> of_const);
       val_uid = Uid.internal_not_actually_unique; }
   in
   let sg = [Sig_value(id, vd, Exported)] in
@@ -538,7 +538,12 @@ let execute_phrase print_outcome ppf phr =
               in
               Ophr_exception (exn, outv)
         in
-        !print_out_phrase ppf out_phr;
+        begin match out_phr with
+        | Ophr_signature [] -> ()
+        | _ ->
+            Location.separate_new_message ppf;
+            !print_out_phrase ppf out_phr
+        end;
         begin match out_phr with
         | Ophr_eval (_, _) | Ophr_signature _ -> true
         | Ophr_exception _ -> false

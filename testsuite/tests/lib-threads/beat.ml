@@ -5,29 +5,60 @@
    hassysthreads;
    { bytecode; }
    { native; }
- }{
-   macos;
-   reason = "off-by-one error on MacOS+Clang (#408)";
-   skip;
  }
 *)
 
-(* Test Thread.delay and its scheduling *)
+(* Test Thread.delay and its scheduling.  We test both (a) when threads become runnable
+   independently, and (b) when they are in some resonance. We also test when they do and
+   don't exactly fit the test duration. *)
 
 open Printf
 
-let tick (delay, count) =
-  while true do
+let counter (r, delay, count) =
+  for _ = 0 to count-1 do
     Thread.delay delay;
-    incr count
+    incr r
   done
 
+(* All the durations here are multiples of a notional "tick". The thread periods are 9
+   ticks and either 6 or 7 ticks. The test duration is 126 or 128 ticks (126 ticks is an
+   exact number of each of the periods). 6 tick and 9 tick periods are considered
+   "resonant" as they will coincide every 18 ticks.
+*)
+
+let tick = 0.05 (* Reduce this to make the test run faster *)
+
+let ticks resonant slack =
+  let n1 = if resonant then 6 else 7 and n2 = 9 in
+  let sleep = 9*7*2 + (if slack then 2 else 0) in
+  let p1 = Float.of_int n1 *. tick and p2 = Float.of_int n2 *. tick in
+  let r1 = ref 0 and r2 = ref 0 in
+  ignore (Thread.create counter (r1, p1, sleep/n1 + 2));
+  ignore (Thread.create counter (r2, p2, sleep/n2 + 2));
+  Thread.delay (Float.of_int sleep *. tick);
+  (!r1, !r2, sleep/n1, sleep/n2)
+
+let check resonant slack =
+  let n1,n2,e1,e2 = ticks resonant slack in
+  let d1 = e1-n1 and d2=e2-n2 in
+  let allowed = if slack then 0 else 1 in
+  (* We might want to revise "allowed" to 2 under some circumstances. Specifically, in CI
+     an earlier version of this test saw two missed ticks (with the combination of
+     runtime4, bytecode, and O3).
+
+     TODO: Consider revising "allowed" under MacOS, as this test has previously been
+     disabled under MacOS for off-by-one failures. *)
+  printf "%sresonant, with %sslack:\n"
+    (if resonant then "" else "not ")
+    (if slack then "" else "no ");
+  if d1 >= 0 && d2 >=0 && d1 <= allowed && d2 <= allowed then printf "  passed.\n" else
+    (if d1 < 0 then printf "  too many short periods: %d > %d\n" n1 e1;
+     if d2 < 0 then printf "  too many long periods: %d > %d\n" n2 e2;
+     if d1 > allowed then printf "  too few short periods: %d < %d\n" n1 (e1-allowed);
+     if d2 > allowed then printf "  too few long periods: %d < %d\n" n2 (e2-allowed))
+
 let _ =
-  let c1 = ref 0 and c2 = ref 0 in
-  ignore (Thread.create tick (0.333333333, c1));
-  ignore (Thread.create tick (0.5, c2));
-  Thread.delay 3.0;
-  let n1 = !c1 and n2 = !c2 in
-  if n1 >= 8 && n1 <= 10 && n2 >= 5 && n2 <= 7
-  then printf "passed\n"
-  else printf "FAILED (n1 = %d, n2 = %d)\n" n1 n2
+  check true true;
+  check true false;
+  check false true;
+  check false false

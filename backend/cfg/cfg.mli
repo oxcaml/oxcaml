@@ -112,8 +112,8 @@ type t =
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
     next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
     fun_ret_type : Cmm.machtype;
-        (** Function return type. As in [fun_args], this value is not used when starting
-            from Linear. *)
+        (** Function return type. As in [fun_args], this value is not used when
+            starting from Linear. *)
     mutable allowed_to_be_irreducible : bool;
         (* Whether rewrites are allowed to make the CFG irreducible (if the CFG
            is irreducible, the information about loops cannot be trusted). *)
@@ -258,7 +258,8 @@ val make_instruction_from_copy :
 
 val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 
-(** "Contains calls" in the traditional sense as used in upstream [Selectgen]. *)
+(** "Contains calls" in the traditional sense as used in upstream [Selectgen].
+*)
 val basic_block_contains_calls : basic_block -> bool
 
 (* [max_instr_id cfg] returns the maximum instruction identifier in [cfg]. *)

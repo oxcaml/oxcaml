@@ -95,9 +95,9 @@ let project_tuple ~machine_width ~dbg ~size ~field tuple =
   in
   Named.create_prim prim dbg
 
-let split_direct_over_application apply
-    ~(apply_alloc_mode : Alloc_mode.For_applications.t) ~callee's_code_id
+let split_direct_over_application apply ~callee's_code_id
     ~callee's_code_metadata =
+  let apply_alloc_mode = Apply.alloc_mode apply in
   let callee's_params_arity =
     Code_metadata.params_arity callee's_code_metadata
   in
@@ -162,9 +162,9 @@ let split_direct_over_application apply
       (Apply.exn_continuation apply)
       ~args:remaining_args ~args_arity:remaining_arity
       ~return_arity:(Apply.return_arity apply)
-      ~call_kind:
-        (Call_kind.indirect_function_call_unknown_arity outer_apply_alloc_mode)
-      (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+      ~call_kind:Call_kind.indirect_function_call_unknown_arity
+      ~alloc_mode:outer_apply_alloc_mode (Apply.dbg apply)
+      ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
       ~relative_history:(Apply.relative_history apply)
@@ -285,9 +285,9 @@ let split_direct_over_application apply
       (Apply.exn_continuation apply)
       ~args:first_args ~args_arity:callee's_params_arity
       ~return_arity:(Code_metadata.result_arity callee's_code_metadata)
-      ~call_kind:
-        (Call_kind.direct_function_call callee's_code_id inner_apply_alloc_mode)
-      (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+      ~call_kind:(Call_kind.direct_function_call callee's_code_id)
+      ~alloc_mode:inner_apply_alloc_mode (Apply.dbg apply)
+      ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
       ~relative_history:(Apply.relative_history apply)
@@ -364,8 +364,9 @@ let clear_demoted_trap_action uacc apply_cont : AC.t =
   match AC.trap_action apply_cont with
   | None -> apply_cont
   | Some (Push { exn_handler } | Pop { exn_handler; _ }) ->
-    if UE.mem_continuation (UA.uenv uacc) exn_handler
-       && not (UA.is_demoted_exn_handler uacc exn_handler)
+    if
+      UE.mem_continuation (UA.uenv uacc) exn_handler
+      && not (UA.is_demoted_exn_handler uacc exn_handler)
     then apply_cont
     else AC.clear_trap_action apply_cont
 

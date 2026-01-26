@@ -406,22 +406,22 @@ module Acc = struct
       | exception Not_found ->
         let approx = Flambda_cmx.load_symbol_approx loader symbol in
         (if Flambda_features.check_invariants ()
-        then
-          match approx with
-          | Value_symbol sym ->
-            Misc.fatal_errorf
-              "Closure_conversion: approximation loader returned a Symbol \
-               approximation (%a) for symbol %a"
-              Symbol.print sym Symbol.print symbol
-          | Unknown kind ->
-            if not (Flambda_kind.equal kind Flambda_kind.value)
-            then
-              Misc.fatal_errorf
-                "Closure_conversion: approximation loader returned an \
-                 approximation of kind %a for symbol %a"
-                Flambda_kind.print kind Symbol.print symbol
-          | Value_const _ | Closure_approximation _ | Block_approximation _ ->
-            ());
+         then
+           match approx with
+           | Value_symbol sym ->
+             Misc.fatal_errorf
+               "Closure_conversion: approximation loader returned a Symbol \
+                approximation (%a) for symbol %a"
+               Symbol.print sym Symbol.print symbol
+           | Unknown kind ->
+             if not (Flambda_kind.equal kind Flambda_kind.value)
+             then
+               Misc.fatal_errorf
+                 "Closure_conversion: approximation loader returned an \
+                  approximation of kind %a for symbol %a"
+                 Flambda_kind.print kind Symbol.print symbol
+           | Value_const _ | Closure_approximation _ | Block_approximation _ ->
+             ());
         let rec filter_inlinable approx =
           match (approx : Env.value_approximation) with
           | Unknown _ | Value_symbol _ | Value_const _ -> approx
@@ -462,8 +462,8 @@ module Acc = struct
       symbol_approximations = Symbol.Map.empty;
       approximation_for_external_symbol =
         (if Flambda_features.classic_mode ()
-        then approximation_loader cmx_loader
-        else fun _symbol -> Value_approximation.Unknown Flambda_kind.value);
+         then approximation_loader cmx_loader
+         else fun _symbol -> Value_approximation.Unknown Flambda_kind.value);
       code_in_reverse_order = [];
       code_map = Code_id.Map.empty;
       free_names = Name_occurrences.empty;
@@ -586,8 +586,9 @@ module Acc = struct
       match t.closure_infos with
       | [] -> t
       | closure_info :: closure_infos ->
-        if closure_info.is_purely_tailrec
-           && Name_occurrences.mem_var free_names closure_info.my_closure
+        if
+          closure_info.is_purely_tailrec
+          && Name_occurrences.mem_var free_names closure_info.my_closure
         then
           { t with
             closure_infos =
@@ -603,8 +604,9 @@ module Acc = struct
       | true, closure_infos -> closure_infos
       | false, [] -> []
       | false, closure_info :: closure_infos ->
-        if closure_info.is_purely_tailrec
-           && Name.equal (Name.var closure_info.my_closure) name
+        if
+          closure_info.is_purely_tailrec
+          && Name.equal (Name.var closure_info.my_closure) name
         then { closure_info with is_purely_tailrec = false } :: closure_infos
         else t.closure_infos
     in
@@ -746,8 +748,9 @@ module Acc = struct
       match closure_infos with
       | [] -> []
       | closure_info2 :: closure_infos2 ->
-        if closure_info2.is_purely_tailrec
-           && Name_occurrences.mem_var t.free_names closure_info2.my_closure
+        if
+          closure_info2.is_purely_tailrec
+          && Name_occurrences.mem_var t.free_names closure_info2.my_closure
         then { closure_info2 with is_purely_tailrec = false } :: closure_infos2
         else closure_infos
     in
@@ -989,8 +992,8 @@ module Expr_with_acc = struct
       | None -> false
       | Some { return_continuation; exn_continuation; _ } -> (
         (match Apply_expr.continuation apply with
-        | Never_returns -> true
-        | Return cont -> Continuation.equal cont return_continuation)
+          | Never_returns -> true
+          | Return cont -> Continuation.equal cont return_continuation)
         && Exn_continuation.equal
              (Apply_expr.exn_continuation apply)
              exn_continuation

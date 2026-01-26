@@ -22,7 +22,8 @@
     Primitives that accept float, int32, int64 or nativeint values always take
     (or return) the unboxed versions.
 
-    No primitive raises an exception. (Bounds checking is handled separately.) *)
+    No primitive raises an exception. (Bounds checking is handled separately.)
+*)
 
 module Lazy_block_tag : sig
   type t = Lambda.lazy_block_tag =
@@ -53,7 +54,8 @@ module Array_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
     | Gc_ignorable_values
-        (** An array consisting of [value]-kind elements that the GC may ignore. *)
+        (** An array consisting of [value]-kind elements that the GC may ignore.
+        *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -72,8 +74,8 @@ module Array_kind : sig
     | Naked_vec512s
     | Unboxed_product of t list
         (** Accesses to arrays of unboxed products are unarized on the way into
-            Flambda 2.  The float array optimization never applies for these
-            arrays.  Vectors are not yet supported inside these arrays. *)
+            Flambda 2. The float array optimization never applies for these
+            arrays. Vectors are not yet supported inside these arrays. *)
 
   val print : Format.formatter -> t -> unit
 
@@ -106,7 +108,8 @@ module Array_load_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
     | Gc_ignorable_values
-        (** An array consisting of [value]-kind elements that the GC may ignore. *)
+        (** An array consisting of [value]-kind elements that the GC may ignore.
+        *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -136,10 +139,10 @@ module Array_set_kind : sig
         (** An array of [value]-kind elements that the GC may ignore. *)
     | Values of Init_or_assign.t
         (** An array consisting of elements of kind [value]. With the float
-        array optimisation enabled, such elements must never be [float]s. *)
+            array optimisation enabled, such elements must never be [float]s. *)
     | Naked_floats
         (** An array consisting of naked floats, represented using
-        [Double_array_tag]. *)
+            [Double_array_tag]. *)
     | Naked_float32s
     | Naked_ints
     | Naked_int8s
@@ -164,10 +167,9 @@ module Duplicate_block_kind : sig
         }
     | Naked_floats of { length : Target_ocaml_int.t }
     | Mixed
-        (** We could store tag/length (or other relevant fields) on [Mixed],
-            but we don't because the fields of [t] are currently only used for
-            printing.
-        *)
+        (** We could store tag/length (or other relevant fields) on [Mixed], but
+            we don't because the fields of [t] are currently only used for
+            printing. *)
 
   val print : Format.formatter -> t -> unit
 
@@ -240,6 +242,12 @@ module Block_access_kind : sig
   val element_subkind_for_load : t -> Flambda_kind.With_subkind.t
 
   val to_block_shape : t -> Flambda_kind.Block_shape.t
+
+  val from_block_shape :
+    Flambda_kind.Block_shape.t ->
+    index:Target_ocaml_int.t ->
+    result_kind:Flambda_kind.With_subkind.t ->
+    t
 end
 
 (* CR-someday mshinwell: We should have unboxed arrays of int32, int64 and
@@ -274,9 +282,9 @@ module Bigarray_kind : sig
     | Float32
     | Float32_t
         (** [Float32_t] is used for bigarrays that contain (unboxed) float32
-            values and are read and written to using the [float32] type.  This
-            is in contrast to [Float32] bigarrays, where the accesses are done
-            at type [float]. *)
+            values and are read and written to using the [float32] type. This is
+            in contrast to [Float32] bigarrays, where the accesses are done at
+            type [float]. *)
     | Float64
     | Sint8
     | Uint8
@@ -365,11 +373,11 @@ type nullary_primitive =
   | Tls_get  (** Obtain the thread-local state block. *)
   | Poll
       (** Poll for runtime actions. May run pending actions such as signal
-          handlers, finalizers, memprof callbacks, etc, as well as GCs and
-          GC slices, so should not be moved or optimised away. *)
+          handlers, finalizers, memprof callbacks, etc, as well as GCs and GC
+          slices, so should not be moved or optimised away. *)
   | Cpu_relax
-      (** Arch-specific pause. If poll insertion is disabled, also acts
-          as a polling point. *)
+      (** Arch-specific pause. If poll insertion is disabled, also acts as a
+          polling point. *)
 
 (** Untagged binary integer arithmetic operations.
 
@@ -414,9 +422,9 @@ type unary_primitive =
   | Is_null
   | Get_tag
   | Array_length of Array_kind_for_length.t
-      (** The unarized length of an array.  So for an example an array of
-          kind [Unboxed_product [tagged_immediate; tagged_immediate]] always
-          has a length that is a multiple of two. *)
+      (** The unarized length of an array. So for an example an array of kind
+          [Unboxed_product [tagged_immediate; tagged_immediate]] always has a
+          length that is a multiple of two. *)
   | Bigarray_length of { dimension : int }
       (** This primitive is restricted by type-checking to bigarrays that have
           at least the correct number of dimensions. More specifically, they
@@ -471,20 +479,19 @@ type unary_primitive =
   | Is_flat_float_array
       (** Only valid when the float array optimisation is enabled. *)
   | End_region of { ghost : bool }
-      (** Ending delimiter of local allocation region, accepting a region name. *)
+      (** Ending delimiter of local allocation region, accepting a region name.
+      *)
   | End_try_region of { ghost : bool }
       (** Corresponding delimiter for [Begin_try_region]. *)
   | Obj_dup  (** Corresponds to [Obj.dup]; see the documentation in obj.mli. *)
   | Get_header
       (** Get the header of a block. This primitive is invalid if provided with
           an immediate value. It should also not be used to read tags above
-          [No_scan_tag].
-          Note: The GC color bits in the header are not reliable except for
-          checking if the value is locally allocated
-          Invariant: never read the tag of a possibly-lazy value from
-          ocamlopt-generated code. Tag reads that are allowed to be lazy tags
-          (by the type system) should always go through caml_obj_tag, which is
-          opaque to the compiler. *)
+          [No_scan_tag]. Note: The GC color bits in the header are not reliable
+          except for checking if the value is locally allocated Invariant: never
+          read the tag of a possibly-lazy value from ocamlopt-generated code.
+          Tag reads that are allowed to be lazy tags (by the type system) should
+          always go through caml_obj_tag, which is opaque to the compiler. *)
   | Peek of Flambda_kind.Standard_int_or_float.t
   | Make_lazy of Lazy_block_tag.t
 
@@ -529,9 +536,9 @@ type binary_primitive =
   | Array_load of Array_kind.t * Array_load_kind.t * Mutability.t
       (** Unarized or SIMD array load.
 
-          The array kind preserves unboxed product information but the load
-          kind and index all correspond to the unarized representation.
-          See also [Array_length], above. *)
+          The array kind preserves unboxed product information but the load kind
+          and index all correspond to the unarized representation. See also
+          [Array_length], above. *)
   | String_or_bigstring_load of string_like_value * string_accessor_width
   | Bigarray_load of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
   | Phys_equal of equality_comparison
@@ -569,8 +576,8 @@ end
 (** Primitives taking exactly three arguments. *)
 type ternary_primitive =
   | Array_set of Array_kind.t * Array_set_kind.t
-      (** Unarized array update, for mutable arrays.  See [Array_load] above
-          for more details on the unarization. *)
+      (** Unarized array update, for mutable arrays. See [Array_load] above for
+          more details on the unarization. *)
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
   | Atomic_field_int_arith of int_atomic_op
@@ -588,8 +595,7 @@ type ternary_primitive =
           - If it is [Into_block_or_off_heap], then the base can also be NULL,
             in which case the byte_offset must be a pointer that does not point
             into the OCaml heap (as the payload will be written via a raw
-            store).
-      *)
+            store). *)
 
 (** Primitives taking exactly four arguments. *)
 type quaternary_primitive =
@@ -598,10 +604,10 @@ type quaternary_primitive =
       { atomic_kind : Block_access_field_kind.t;
             (** The kind of values which the atomic can hold. *)
         args_kind : Block_access_field_kind.t
-            (** The kind of values which the compare-exchange operation is to
-                be used with on this particular occasion.  Note that this might
-                be [Immediate] even though the atomic is marked as [Any_value],
-                for example. *)
+            (** The kind of values which the compare-exchange operation is to be
+                used with on this particular occasion. Note that this might be
+                [Immediate] even though the atomic is marked as [Any_value], for
+                example. *)
       }
 
 (** Primitives taking zero or more arguments. *)

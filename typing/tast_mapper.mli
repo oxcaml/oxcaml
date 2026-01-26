@@ -41,6 +41,8 @@ type mapper =
     jkind_annotation:
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
     location: mapper -> Location.t -> Location.t;
+    modalities: mapper -> modalities -> modalities;
+    modes: 'a. mapper -> 'a modes -> 'a modes;
     module_binding: mapper -> module_binding -> module_binding;
     module_coercion: mapper -> module_coercion -> module_coercion;
     module_declaration: mapper -> module_declaration -> module_declaration;

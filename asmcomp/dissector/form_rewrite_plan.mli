@@ -29,9 +29,9 @@
 
 (** Form a rewrite plan for ELF section rewriting.
 
-    This module analyzes the input ELF file and builds a plan describing
-    all the modifications needed: new sections, relocated symbols, and
-    file layout. The plan can then be executed by [Rewrite_sections]. *)
+    This module analyzes the input ELF file and builds a plan describing all the
+    modifications needed: new sections, relocated symbols, and file layout. The
+    plan can then be executed by [Rewrite_sections]. *)
 
 (** Information about an original symbol from the ELF symbol table. *)
 module Symbol_entry : sig
@@ -125,8 +125,8 @@ val symbol_to_index : t -> int Misc.Stdlib.String.Tbl.t
 (** Returns the total number of symbols in the output symbol table. *)
 val total_symbols : t -> int
 
-(** Returns the list of rewritten .rela.text* sections, each with their
-    original file offset and rewritten entries. *)
+(** Returns the list of rewritten .rela.text* sections, each with their original
+    file offset and rewritten entries. *)
 val rewritten_rela_sections : t -> Rewritten_rela_section.t list
 
 (** Returns the string table for symbol names. *)
@@ -135,9 +135,9 @@ val strtab : t -> Compiler_owee.Owee_elf_string_table.t
 (** Returns the section header string table. *)
 val shstrtab : t -> Compiler_owee.Owee_elf_string_table.t
 
-(** Returns a map from original section names to (offset, renamed_name) pairs
-    in shstrtab. For Large_code partitions, the stored values point to the
-    renamed name (e.g., .caml.p1.text instead of .text). *)
+(** Returns a map from original section names to (offset, renamed_name) pairs in
+    shstrtab. For Large_code partitions, the stored values point to the renamed
+    name (e.g., .caml.p1.text instead of .text). *)
 val section_name_offsets : t -> (int * string) Misc.Stdlib.String.Tbl.t
 
 (** Returns the offset of the IGOT section name in shstrtab. *)
@@ -185,9 +185,8 @@ val symtab_idx : t -> int
 (** Returns the index of the SYMTAB_SHNDX section in the input file. *)
 val symtab_shndx_idx : t -> int option
 
-(** Returns the index of a newly created SYMTAB_SHNDX section, if one needs
-    to be created because the input lacks one but new indices >=
-    SHN_LORESERVE. *)
+(** Returns the index of a newly created SYMTAB_SHNDX section, if one needs to
+    be created because the input lacks one but new indices >= SHN_LORESERVE. *)
 val new_symtab_shndx_idx : t -> int option
 
 (** Returns the name offset in shstrtab for a new SYMTAB_SHNDX section. *)
@@ -197,15 +196,15 @@ val symtab_shndx_name_offset : t -> int option
 val layout : t -> Layout.t
 
 (** [compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
-      ~partition_kind ~igot_and_iplt ~relocations] analyzes the ELF structure
-    and builds a rewrite plan.
+     ~partition_kind ~igot_and_iplt ~relocations] analyzes the ELF structure and
+    builds a rewrite plan.
 
     [rela_text_sections] is a list of (section, body) pairs for all .rela.text*
     sections in the input file. This handles both traditional single .rela.text
     sections and function sections (.rela.text.foo, .rela.text.bar, etc.).
 
-    For [Large_code] partitions, section names are renamed with a prefix
-    (e.g., .text -> .caml.p1.text). *)
+    For [Large_code] partitions, section names are renamed with a prefix (e.g.,
+    .text -> .caml.p1.text). *)
 val compute :
   header:Compiler_owee.Owee_elf.header ->
   sections:Compiler_owee.Owee_elf.section array ->

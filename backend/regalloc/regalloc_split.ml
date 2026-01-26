@@ -423,7 +423,8 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
             add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
               ~phi:block substs to_unify predecessor_block.body
           | Switch _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-          | Call (OCaml _ | External { returns_to = Some _; _ } | Probe _) ->
+          | Call (OCaml _ | External { returns_to = Some _; _ } | Probe _)
+          | Invalid _ ->
             let instrs = DLL.make_empty () in
             add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
               ~phi:block substs to_unify instrs;
@@ -444,14 +445,15 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
                 let inserted_label = inserted_block.start in
                 if not (Label.Set.mem inserted_label block.predecessors)
                 then fatal "inserted block is not a predecessor";
-                if not
-                     (Label.Set.mem inserted_label
-                        (Cfg.successor_labels ~normal:true ~exn:false
-                           inserted_block))
+                if
+                  not
+                    (Label.Set.mem inserted_label
+                       (Cfg.successor_labels ~normal:true ~exn:false
+                          inserted_block))
                 then fatal "inserted block not a normal successor";
-                if Label.Set.mem inserted_label
-                     (Cfg.successor_labels ~normal:false ~exn:true
-                        inserted_block)
+                if
+                  Label.Set.mem inserted_label
+                    (Cfg.successor_labels ~normal:false ~exn:true inserted_block)
                 then fatal "inserted block an exceptional successor"
               | [] -> fatal "no block was inserted"
               | _ :: _ :: _ -> fatal "several blocks were inserted");

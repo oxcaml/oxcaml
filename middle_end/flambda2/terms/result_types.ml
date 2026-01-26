@@ -85,9 +85,10 @@ module Bound = struct
     let fresh_params = Bound_parameters.to_list fresh_params in
     let results = Bound_parameters.to_list results in
     let fresh_results = Bound_parameters.to_list fresh_results in
-    if List.compare_lengths params fresh_params <> 0
-       || List.compare_lengths results fresh_results <> 0
-       || List.compare_lengths other_vars fresh_other_vars <> 0
+    if
+      List.compare_lengths params fresh_params <> 0
+      || List.compare_lengths results fresh_results <> 0
+      || List.compare_lengths other_vars fresh_other_vars <> 0
     then Misc.fatal_error "Mismatching params/results/other-vars list lengths";
     let renaming =
       List.fold_left2

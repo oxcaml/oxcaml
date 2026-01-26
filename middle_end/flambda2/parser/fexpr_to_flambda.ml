@@ -301,9 +301,9 @@ let rec subkind :
     let non_consts =
       non_consts
       |> List.map (fun (tag, sk) ->
-             ( tag_scannable tag,
-               ( Flambda_kind.Block_shape.Scannable Value_only,
-                 List.map value_kind_with_subkind sk ) ))
+          ( tag_scannable tag,
+            ( Flambda_kind.Block_shape.Scannable Value_only,
+              List.map value_kind_with_subkind sk ) ))
       |> Tag.Scannable.Map.of_list
     in
     Variant { consts; non_consts }
@@ -608,24 +608,24 @@ let apply_cont env ({ cont; args; trap_action } : Fexpr.apply_cont) =
   let trap_action : Trap_action.t option =
     trap_action
     |> Option.map (fun (ta : Fexpr.trap_action) : Trap_action.t ->
-           match ta with
-           | Push { exn_handler } ->
-             let exn_handler, _ = find_cont env exn_handler in
-             Push { exn_handler }
-           | Pop { exn_handler; raise_kind } ->
-             let exn_handler, _ = find_cont env exn_handler in
-             Pop { exn_handler; raise_kind })
+        match ta with
+        | Push { exn_handler } ->
+          let exn_handler, _ = find_cont env exn_handler in
+          Push { exn_handler }
+        | Pop { exn_handler; raise_kind } ->
+          let exn_handler, _ = find_cont env exn_handler in
+          Pop { exn_handler; raise_kind })
   in
   let c, arity = find_cont env cont in
   (if List.length args <> arity
-  then
-    let cont_str =
-      match cont with
-      | Special Done -> "done"
-      | Special Error -> "error"
-      | Named { txt = cont_id; _ } -> cont_id
-    in
-    Misc.fatal_errorf "wrong continuation arity %s" cont_str);
+   then
+     let cont_str =
+       match cont with
+       | Special Done -> "done"
+       | Special Error -> "error"
+       | Named { txt = cont_id; _ } -> cont_id
+     in
+     Misc.fatal_errorf "wrong continuation arity %s" cont_str);
   let args = List.map (simple env) args in
   Flambda.Apply_cont.create c ~args ~dbg:Debuginfo.none ?trap_action
 
@@ -1050,6 +1050,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
   | Apply
       { func;
         call_kind;
+        alloc_mode;
         inlined;
         inlining_state;
         continuation;
@@ -1058,9 +1059,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
         arities
       } ->
     let continuation = find_result_cont env continuation in
+    let alloc_mode = alloc_mode_for_applications env alloc_mode in
     let call_kind, args_arity, return_arity =
       match call_kind with
-      | Function (Direct { code_id; function_slot = _; alloc }) ->
+      | Function (Direct { code_id; function_slot = _ }) ->
         let code_id = find_code_id env code_id in
         let params_arity =
           (* CR mshinwell: This needs fixing to cope with the fact that the
@@ -1074,15 +1076,13 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
             Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
           | Some { ret_arity; _ } -> arity ret_arity
         in
-        let alloc = alloc_mode_for_applications env alloc in
-        Call_kind.direct_function_call code_id alloc, params_arity, return_arity
-      | Function (Indirect alloc) -> (
-        let alloc = alloc_mode_for_applications env alloc in
+        Call_kind.direct_function_call code_id, params_arity, return_arity
+      | Function Indirect -> (
         match arities with
         | Some { params_arity = Some params_arity; ret_arity } ->
           let params_arity = arity params_arity in
           let return_arity = arity ret_arity in
-          ( Call_kind.indirect_function_call_known_arity ~code_ids:Unknown alloc,
+          ( Call_kind.indirect_function_call_known_arity ~code_ids:Unknown,
             params_arity,
             return_arity )
         | None | Some { params_arity = None; ret_arity = _ } ->
@@ -1097,7 +1097,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
                arities have moved onto [Apply_expr] *)
             Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
           in
-          ( Call_kind.indirect_function_call_unknown_arity alloc,
+          ( Call_kind.indirect_function_call_unknown_arity,
             params_arity,
             return_arity ))
       | C_call { alloc = needs_caml_c_call } -> (
@@ -1106,8 +1106,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
           let params_arity = arity params_arity in
           let return_arity = arity ret_arity in
           ( Call_kind.c_call ~needs_caml_c_call ~is_c_builtin:false
-              ~effects:Arbitrary_effects ~coeffects:Has_coeffects
-              Alloc_mode.For_applications.heap,
+              ~effects:Arbitrary_effects ~coeffects:Has_coeffects,
             params_arity,
             return_arity )
         | None | Some { params_arity = None; ret_arity = _ } ->
@@ -1136,7 +1135,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
         ~callee:(Some (simple env func))
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
-        ~args_arity ~return_arity ~call_kind Debuginfo.none ~inlined
+        ~args_arity ~return_arity ~call_kind ~alloc_mode Debuginfo.none ~inlined
         ~inlining_state ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
     in

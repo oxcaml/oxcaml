@@ -79,9 +79,10 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
           UA.create ~flow_result ~compute_slot_offsets:true uenv dacc
         in
         let uacc =
-          if Flow.Analysis.did_perform_mutable_unboxing flow_result
-             || Flow.Analysis.added_useful_alias_in_loop (DA.typing_env dacc)
-                  data_flow flow_result
+          if
+            Flow.Analysis.did_perform_mutable_unboxing flow_result
+            || Flow.Analysis.added_useful_alias_in_loop (DA.typing_env dacc)
+                 data_flow flow_result
           then UA.set_resimplify uacc
           else uacc
         in
@@ -93,8 +94,9 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
      [Simplify_set_of_closures]. *)
   NO.fold_continuations_including_in_trap_actions (UA.name_occurrences uacc)
     ~init:() ~f:(fun () cont ->
-      if (not (Continuation.equal cont return_continuation))
-         && not (Continuation.equal cont exn_continuation)
+      if
+        (not (Continuation.equal cont return_continuation))
+        && not (Continuation.equal cont exn_continuation)
       then
         Misc.fatal_errorf
           "Continuation %a should not be free in toplevel expression after \

@@ -50,19 +50,19 @@ let label_set_of_layout : layout -> Label.Set.t =
 
 let set_layout t layout =
   (if debug
-  then
-    let cur_layout = label_set_of_layout t.layout in
-    let new_layout = label_set_of_layout layout in
-    let hd_is_entry =
-      match DLL.hd layout with
-      | None -> false
-      | Some label -> Label.equal label t.cfg.entry_label
-    in
-    if not (hd_is_entry && Label.Set.equal cur_layout new_layout)
-    then
-      Misc.fatal_error
-        "Cfg set_layout: new layout is not a permutation of the current \
-         layout, or first label is not entry");
+   then
+     let cur_layout = label_set_of_layout t.layout in
+     let new_layout = label_set_of_layout layout in
+     let hd_is_entry =
+       match DLL.hd layout with
+       | None -> false
+       | Some label -> Label.equal label t.cfg.entry_label
+     in
+     if not (hd_is_entry && Label.Set.equal cur_layout new_layout)
+     then
+       Misc.fatal_error
+         "Cfg set_layout: new layout is not a permutation of the current \
+          layout, or first label is not entry");
   t.layout <- layout
 
 let assign_blocks_to_section t labels name =
@@ -245,8 +245,8 @@ let print_dot ?(show_instr = true) ?(show_exn = true)
             (Format.dprintf ".L%a:I%d:S%d%s%s%s" Label.format label show_index
                (DLL.length block.body)
                (if block.stack_offset > 0
-               then ":T" ^ string_of_int block.stack_offset
-               else "")
+                then ":T" ^ string_of_int block.stack_offset
+                else "")
                (if block.is_trap_handler then ":eh" else "")
                (annotate_block label))));
     if show_instr
@@ -280,7 +280,7 @@ let print_dot ?(show_instr = true) ?(show_exn = true)
         (print_row
            (empty_cell ~col_span:(col_count - col_span)
            ++ print_cell ~col_span ~align:Left (fun ppf ->
-                  annotate_block_end ppf block)))
+               annotate_block_end ppf block)))
           ppf);
     Format.fprintf ppf "@]@,</table>@]\n>]\n";
     let print_arrow ?style ?label ppf from to_ =
@@ -416,8 +416,7 @@ let iter_instructions :
       DLL.iter ~f:instruction block.body;
       terminator block.terminator)
 
-let fold_instructions :
-    type a.
+let fold_instructions : type a.
     t ->
     instruction:(a -> Cfg.basic Cfg.instruction -> a) ->
     terminator:(a -> Cfg.terminator Cfg.instruction -> a) ->

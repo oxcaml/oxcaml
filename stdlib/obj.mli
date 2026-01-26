@@ -78,10 +78,9 @@ val double_field : t -> int -> float  (* @since 3.11.2 *)
 val set_double_field : t -> int -> float -> unit
   (* @since 3.11.2 *)
 
-external raw_field : t -> int -> raw_data = "caml_obj_raw_field"
+val raw_field : t -> int -> raw_data
   (* @since 4.12 *)
-external set_raw_field : t -> int -> raw_data -> unit
-                                          = "caml_obj_set_raw_field"
+val set_raw_field : t -> int -> raw_data -> unit
   (* @since 4.12 *)
 
 external new_block : int -> int -> t = "caml_obj_block"

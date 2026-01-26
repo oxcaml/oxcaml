@@ -102,7 +102,8 @@ let extract_constant args name ~max =
       | Cifthenelse (_, _, _, _, _, _)
       | Cswitch (_, _, _, _)
       | Ccatch (_, _, _)
-      | Cexit (_, _, _) ))
+      | Cexit (_, _, _)
+      | Cinvalid _ ))
     :: _ ->
     bad_immediate "Did not get integer immediate for %s" name
 
@@ -1460,8 +1461,9 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     let consts = List.map extract_intop_imm_int cfg_ops in
     match create_const_vec consts, vectorize_intop intop with
     | Some [const_instruction], Some [intop_instruction] ->
-      if Array.length const_instruction.results = 1
-         && Array.length intop_instruction.arguments = 2
+      if
+        Array.length const_instruction.results = 1
+        && Array.length intop_instruction.arguments = 2
       then (
         assert (arg_count = 1 && res_count = 1);
         const_instruction.results.(0)
@@ -1693,10 +1695,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         let arguments = append_result results address_args in
         simd_load_sse_or_avx ~mode:addressing_mode sse avx arguments
         |> Option.map (fun (operation, arguments) ->
-               [ { Vectorize_utils.Vectorized_instruction.operation;
-                   arguments;
-                   results
-                 } ])
+            [ { Vectorize_utils.Vectorized_instruction.operation;
+                arguments;
+                results
+              } ])
       else
         (* Emit a load followed by an arithmetic operation, effectively
            reverting the decision from Arch.selection. It will probably not be

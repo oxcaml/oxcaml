@@ -12,25 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Execute a list of phrases from a .ml file and compare the result to the
-   expected output, written inside [%%expect ...] nodes. At the end, create
-   a .corrected file containing the corrected expectations. The test is
-   successful if there is no differences between the two files.
-
-   An [%%expect] node always contains both the expected outcome with and
-   without -principal. When the two differ the expectation is written as
-   follows:
-
-   {[
-     [%%expect {|
-     output without -principal
-     |}, Principal{|
-     output with -principal
-     |}]
-   ]}
-*)
-
-[@@@ocaml.warning "-40"]
+[@@@ocaml.warning "-69"]
 
 open StdLabels
 
@@ -53,6 +35,7 @@ type chunk =
   ; expectation : expectation
   }
 
+
 type correction =
   { corrected_expectations : expectation list
   ; trailing_output        : string
@@ -60,7 +43,7 @@ type correction =
 
 let match_expect_extension (ext : Parsetree.extension) =
   match ext with
-  | ({Asttypes.txt="expect"|"ocaml.expect"; loc = extid_loc}, payload) ->
+  | ({Asttypes.txt = "expect" | "ocaml.expect"; loc = extid_loc}, payload) ->
     let invalid_payload () =
       Location.raise_errorf ~loc:extid_loc "invalid [%%%%expect payload]"
     in
@@ -162,11 +145,11 @@ let capture_everything buf ppf ~f =
   collect_formatters buf [Format.std_formatter; Format.err_formatter]
                      ~f:(fun () -> Compiler_messages.capture ppf ~f)
 
-let exec_phrase ppf phrase =
+let exec_phrase ppf phrase ~execute_phrase =
   Location.reset ();
   if !Clflags.dump_parsetree then Printast. top_phrase ppf phrase;
   if !Clflags.dump_source    then Pprintast.top_phrase ppf phrase;
-  Toploop.execute_phrase true ppf phrase
+  execute_phrase true ppf phrase
 
 let parse_contents ~fname contents =
   let lexbuf = Lexing.from_string contents in
@@ -215,7 +198,7 @@ function
   | (Ptop_dir _  | Ptop_def []) :: l -> min_line_number l
   | Ptop_def (st :: _) :: _ -> Some st.pstr_loc.loc_start.pos_lnum
 
-let eval_expect_file _fname ~file_contents =
+let eval_expect_file _fname ~file_contents ~execute_phrase =
   Warnings.reset_fatal ();
   let chunks, trailing_code =
     parse_contents ~fname:"" file_contents |> split_chunks
@@ -236,7 +219,8 @@ let eval_expect_file _fname ~file_contents =
         acc &&
         let snap = Btype.snapshot () in
         try
-          Sys.with_async_exns (fun () -> exec_phrase ppf phrase)
+          Sys.with_async_exns
+            (fun () -> exec_phrase ppf phrase ~execute_phrase)
         with exn ->
           let bt = Printexc.get_raw_backtrace () in
           begin try Location.report_exception ppf exn
@@ -261,7 +245,9 @@ let eval_expect_file _fname ~file_contents =
   let corrected_expectations =
     capture_everything buf ppf ~f:(fun () ->
       List.fold_left chunks ~init:[] ~f:(fun acc chunk ->
-        let output = exec_phrases chunk.phrases in
+        let output =
+          exec_phrases chunk.phrases
+        in
         match eval_expectation chunk.expectation ~output with
         | None -> acc
         | Some correction -> correction :: acc)
@@ -271,7 +257,8 @@ let eval_expect_file _fname ~file_contents =
     match trailing_code with
     | None -> ""
     | Some phrases ->
-      capture_everything buf ppf ~f:(fun () -> exec_phrases phrases)
+      capture_everything buf ppf
+        ~f:(fun () -> exec_phrases phrases)
   in
   { corrected_expectations; trailing_output }
 
@@ -303,7 +290,7 @@ let write_corrected ~file ~file_contents correction =
   output_corrected oc ~file_contents correction;
   close_out oc
 
-let process_expect_file fname =
+let process_expect_file fname ~execute_phrase =
   let corrected_fname = fname ^ ".corrected" in
   let file_contents =
     let ic = open_in_bin fname in
@@ -311,7 +298,7 @@ let process_expect_file fname =
     | s           -> close_in ic; Misc.normalise_eol s
     | exception e -> close_in ic; raise e
   in
-  let correction = eval_expect_file fname ~file_contents in
+  let correction = eval_expect_file fname ~file_contents ~execute_phrase in
   write_corrected ~file:corrected_fname ~file_contents correction
 
 let repo_root = ref None
@@ -319,9 +306,19 @@ let keep_original_error_size = ref false
 let preload_objects = ref []
 let main_file = ref None
 
-let read_anonymous_arg fname =
-  if Filename.check_suffix fname ".cmo"
-          || Filename.check_suffix fname ".cma"
+module type Toplevel = sig
+  val override_sys_argv : string array -> unit
+  val initialize_toplevel_env : unit -> unit
+  val load_file : Format.formatter -> string -> bool
+  val execute_phrase :
+    bool -> Format.formatter -> Parsetree.toplevel_phrase -> bool
+end
+
+let is_object_file ~object_extensions fname =
+  List.exists ~f:(fun ext -> Filename.check_suffix fname ext) object_extensions
+
+let read_anonymous_arg ~object_extensions fname =
+  if is_object_file ~object_extensions fname
   then preload_objects := fname :: !preload_objects
   else
   match !main_file with
@@ -330,10 +327,10 @@ let read_anonymous_arg fname =
     Printf.eprintf "expect_test: multiple input source files\n";
     exit 2
 
-let main fname =
+let main (module Toplevel : Toplevel) fname =
   if not !keep_original_error_size then
     Clflags.error_size := 0;
-  Toploop.override_sys_argv
+  Toplevel.override_sys_argv
     (Array.sub Sys.argv ~pos:!Arg.current
        ~len:(Array.length Sys.argv - !Arg.current));
   (* Ignore OCAMLRUNPARAM=b to be reproducible *)
@@ -350,42 +347,39 @@ let main fname =
         Compenv.last_include_dirs := [Filename.concat dir "stdlib"]
   end;
   Compmisc.init_path ~auto_include:Load_path.no_auto_include ();
-  Toploop.initialize_toplevel_env ();
+  Toplevel.initialize_toplevel_env ();
   let objects = List.rev (!preload_objects) in
   List.iter objects ~f:(fun obj_fname ->
-    match Topeval.load_file false Format.err_formatter obj_fname with
+    match Toplevel.load_file Format.err_formatter obj_fname with
     | true -> ()
     | false ->
       Printf.eprintf "expect_test: failed to load object %s\n" obj_fname;
       exit 2);
   (* We are in interactive mode and should record directive error on stdout *)
   Sys.interactive := true;
-  process_expect_file fname;
+  process_expect_file fname ~execute_phrase:Toplevel.execute_phrase;
   exit 0
 
-module Options = Main_args.Make_bytetop_options (struct
-  include Main_args.Default.Topmain
-  let _stdin () = (* disabled *) ()
-  let _args = Arg.read_arg
-  let _args0 = Arg.read_arg0
-  let anonymous s = read_anonymous_arg s
-end);;
-
-let args =
-  Arg.align
-    ( [ "-repo-root", Arg.String (fun s -> repo_root := Some s),
-        "<dir> root of the OCaml repository. This causes the tool to use \
-         the stdlib from the current source tree rather than the installed one."
-      ; "-keep-original-error-size", Arg.Set keep_original_error_size,
-        " truncate long error messages as the compiler would"
-      ] @ Options.list
-    )
-
-let usage = "Usage: expect_test <options> [script-file [arguments]]\n\
-             options are:"
-
-let () =
-(* Early disabling of colors in any output *)
+let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
+  let args =
+    Arg.align
+      ( [ "-repo-root", Arg.String (fun s -> repo_root := Some s),
+          "<dir> root of the OCaml repository. This causes the tool to use \
+           the stdlib from the current source tree rather than the installed \
+           one."
+        ; "-keep-original-error-size", Arg.Set keep_original_error_size,
+          " truncate long error messages as the compiler would"
+        ] @ extra_args
+      )
+  in
+  let usage = "Usage: expect_test <options> [script-file [arguments]]\n\
+               options are:"
+  in
+  (* Some tricky typing tests cause stack overflows in the compiler.
+     Bounding the compiler's stack size makes that happen faster. *)
+  Gc.set {(Gc.get ()) with stack_limit = 1_000_000};
+  extra_init ();
+  (* Early disabling of colors in any output *)
   let () =
     Clflags.color := Some Misc.Color.Never;
     Misc.Style.(setup @@ Some Never)
@@ -393,7 +387,7 @@ let () =
   try
     Arg.parse args read_anonymous_arg usage;
     match !main_file with
-    | Some fname -> main fname
+    | Some fname -> main toplevel fname
     | None ->
       Printf.eprintf "expect: no input file\n";
       exit 2

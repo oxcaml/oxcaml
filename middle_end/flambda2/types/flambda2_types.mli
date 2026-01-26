@@ -1055,9 +1055,9 @@ module Rewriter : sig
     val block_slot :
       ?tag:Tag.t -> t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t
 
-    (** [array_slot t ofs env ty] returns the abstraction of an array field
-        at offset [ofs] of an array with abstraction [t]. [ty] is the type of
-        the field. *)
+    (** [array_slot t ofs env ty] returns the abstraction of an array field at
+        offset [ofs] of an array with abstraction [t]. [ty] is the type of the
+        field. *)
     val array_slot : t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t
 
     type set_of_closures

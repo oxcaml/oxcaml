@@ -241,6 +241,17 @@ val jkind : Parsetree.attributes -> jkind_attribute Location.loc option
     ignored. **)
 val error_message_attr : Parsetree.attributes -> string option
 
+(** If the argument is an "implicit_kind" attribute, marks it as used,
+    and returns a list of variable name and jkind annotation pairs.
+    Returns an empty list otherwise.
+
+    Expected syntax:
+    [@@@implicit_kind: ('var : jkind)]
+    [@@@implicit_kind: ('var1 : jkind1) * ('var2 : jkind2) ...]
+*)
+val get_implicit_jkind_attr :
+  Parsetree.attribute -> (string * Parsetree.jkind_annotation) list
+
 (** [get_int_payload] is a helper for working with attribute payloads.
     Given a payload that consist of a structure containing exactly
     {[

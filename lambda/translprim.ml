@@ -589,8 +589,10 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
-    | "%makeblock" -> Primitive ((Pmakeblock(0, Immutable, None, mode)), 1)
-    | "%makemutable" -> Primitive ((Pmakeblock(0, Mutable, None, mode)), 1)
+    | "%makeblock" ->
+       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+    | "%makemutable" ->
+       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -1045,14 +1047,17 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%atomic_lxor_field" -> Atomic(Lxor, Field, Immediate)
     | "%atomic_lxor_loc" -> Atomic(Lxor, Loc, Immediate)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
-    | "%runstack" ->
-      if runtime5 then Primitive (Prunstack, 3) else Unsupported Prunstack
+    | "%with_stack" ->
+      if runtime5 then Primitive (Pwith_stack, 5) else Unsupported Pwith_stack
+    | "%with_stack_bind" ->
+      if runtime5 then Primitive (Pwith_stack_bind, 7)
+      else Unsupported Pwith_stack_bind
     | "%reperform" ->
       if runtime5 then Primitive (Preperform, 3) else Unsupported Preperform
     | "%perform" ->
       if runtime5 then Primitive (Pperform, 1) else Unsupported Pperform
     | "%resume" ->
-      if runtime5 then Primitive (Presume, 4) else Unsupported Presume
+      if runtime5 then Primitive (Presume, 3) else Unsupported Presume
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%poll" -> Primitive (Ppoll, 1)
@@ -1665,7 +1670,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       | Pbigarray_unknown, Pbigarray_unknown_layout -> None
       | _, _ -> Some (Primitive (Pbigarrayset(unsafe, n, k, l), arity))
     end
-  | Primitive (Pmakeblock(tag, mut, None, mode), arity), fields -> begin
+  | Primitive (Pmakeblock(tag, mut, All_value, mode), arity), fields ->
+    begin
       let shape =
         List.map (fun typ ->
           Lambda.must_be_value (Typeopt.layout env (to_location loc)
@@ -1674,7 +1680,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       in
       let useful = List.exists (fun knd -> knd <> Lambda.generic_value) shape in
       if useful then
-        Some (Primitive (Pmakeblock(tag, mut, Some shape, mode),arity))
+        Some (Primitive (Pmakeblock(tag, mut,
+                           Lambda.block_shape_of_value_kinds (Some shape),
+                           mode), arity))
       else None
     end
   | Comparison(comp, Compare_generic), p1 :: _ ->
@@ -2083,7 +2091,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, None, alloc_heap), [lam; arg], loc)
+      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+            [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
       Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
   | Send_self (pos, layout), [obj; meth] ->
@@ -2131,7 +2140,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (
         Praise Raise_regular,
         [Lprim (
-          Pmakeblock (0, Immutable, None, alloc_heap),
+          Pmakeblock (0, Immutable, All_value, alloc_heap),
           [exn; Lconst (Const_immstring msg)],
           loc)],
         loc)
@@ -2336,7 +2345,7 @@ let lambda_primitive_needs_event_after = function
   | Punboxed_nativeint_array_set_vec _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
-  | Prunstack | Pperform | Preperform | Presume
+  | Pwith_stack | Pwith_stack_bind | Pperform | Preperform | Presume
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)
@@ -2347,7 +2356,7 @@ let lambda_primitive_needs_event_after = function
   | Parray_to_iarray | Parray_of_iarray
   | Pignore
   | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
-  | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
+  | Pmakeufloatblock _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _

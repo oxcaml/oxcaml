@@ -58,26 +58,28 @@ module Memory_access : sig
 
   val first_memory_arg_index : t -> int
 
-  (** Base address of memory access [t] is guaranteed to be aligned to
-      at least [alignment_in_bytes t]. *)
+  (** Base address of memory access [t] is guaranteed to be aligned to at least
+      [alignment_in_bytes t]. *)
   val alignment_in_bytes : t -> int
 end
 
 module Vectorized_instruction : sig
-  (** Registers used in vectorized instructions of one scalar instruction
-     group. *)
+  (** Registers used in vectorized instructions of one scalar instruction group.
+  *)
   type register =
     | New_Vec128 of int
-        (** The n-th new temporary register used in the vectorized instructions *)
+        (** The n-th new temporary register used in the vectorized instructions
+        *)
     | Argument of int
         (** Vector version of the n-th argument's register of the scalar
-       instruction *)
+            instruction *)
     | Result of int
-        (** Vector version of the n-th result's register of the scalar instruction *)
+        (** Vector version of the n-th result's register of the scalar
+            instruction *)
     | Original of int
-        (** Keep the original instruction in the n-th argument/result (depending on whether
-          it is used in the argument or result of the vectorized instructions) of the
-          scalar instruction*)
+        (** Keep the original instruction in the n-th argument/result (depending
+            on whether it is used in the argument or result of the vectorized
+            instructions) of the scalar instruction*)
 
   type t =
     { operation : Operation.t;
@@ -90,9 +92,10 @@ module Vectorized_instruction : sig
   val make_default : arg_count:int -> res_count:int -> Operation.t -> t
 end
 
-(** Given two registers of non-vector types, return true iff there exist a vector type
-    that can contain both of them. Currently distinguishes between [Val] and other
-    types. Mixing [Val] with non-Val in a vector is not yet supported. *)
+(** Given two registers of non-vector types, return true iff there exist a
+    vector type that can contain both of them. Currently distinguishes between
+    [Val] and other types. Mixing [Val] with non-Val in a vector is not yet
+    supported. *)
 val vectorizable_machtypes : Reg.t -> Reg.t -> bool
 
 val vectorize_machtypes : Reg.t list -> Cmm.machtype_component

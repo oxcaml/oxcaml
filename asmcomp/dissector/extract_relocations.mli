@@ -29,9 +29,9 @@
 
 (** Extract relocations from partially-linked object files.
 
-    This module reads ELF object files and extracts relocations that need
-    to be converted to use an intermediate PLT or GOT when linking with
-    the dissector code model. *)
+    This module reads ELF object files and extracts relocations that need to be
+    converted to use an intermediate PLT or GOT when linking with the dissector
+    code model. *)
 
 (** Information about a single relocation that needs conversion. *)
 module Relocation_entry : sig
@@ -50,19 +50,19 @@ type t
 (** Returns relocations with type R_X86_64_PLT32 that need PLT entries. *)
 val convert_to_plt : t -> Relocation_entry.t list
 
-(** Returns relocations with type R_X86_64_REX_GOTPCRELX that need GOT
-    entries. *)
+(** Returns relocations with type R_X86_64_REX_GOTPCRELX that need GOT entries.
+*)
 val convert_to_got : t -> Relocation_entry.t list
 
 (** [extract unix ~filename] reads the ELF object file at [filename] and
-    extracts relocations from the .rela.text section that need to be
-    converted for the medium code model.
+    extracts relocations from the .rela.text section that need to be converted
+    for the medium code model.
 
     Returns the lists of PLT32 and REX_GOTPCRELX relocations found. *)
 val extract : (module Compiler_owee.Unix_intf.S) -> filename:string -> t
 
-(** [extract_from_linked_partitions unix linked_partitions] extracts
-    relocations from all the partially-linked object files.
+(** [extract_from_linked_partitions unix linked_partitions] extracts relocations
+    from all the partially-linked object files.
 
     Returns combined relocation information from all partitions. *)
 val extract_from_linked_partitions :

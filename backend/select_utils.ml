@@ -54,8 +54,8 @@ type environment =
       (Reg.t array * Backend_var.Provenance.t option * Asttypes.mutable_flag)
       V.Map.t;
     static_exceptions : static_handler Static_label.Map.t;
-        (** Which registers must be populated when jumping to the given
-        handler. *)
+        (** Which registers must be populated when jumping to the given handler.
+        *)
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t
   }
@@ -363,7 +363,7 @@ module Effect_and_coeffect : sig
 
   val arbitrary : t
 
-  val effect : t -> Effect.t
+  val effect_ : t -> Effect.t
 
   val coeffect : t -> Coeffect.t
 
@@ -385,7 +385,7 @@ end = struct
 
   let arbitrary = Effect.Arbitrary, Coeffect.Arbitrary
 
-  let effect (e, _ce) = e
+  let effect_ (e, _ce) = e
 
   let coeffect (_e, ce) = ce
 
@@ -512,7 +512,7 @@ module Stack_offset_and_exn = struct
         InstructionId.format term.id
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call _ ->
+    | Tailcall_func _ | Invalid _ | Call _ ->
       stack_offset, traps
 
   let rec process_basic :

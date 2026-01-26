@@ -50,17 +50,16 @@ val report_error : Format.formatter -> error -> unit
 (** Result of running the dissector. After the dissector runs, OCaml object
     files (ml_objfiles, startup_obj) are baked into the partition files.
     Passthrough files (ccobjs, runtime_libs) bypass partial linking and are
-    passed directly to the final linker.
-    Use {!Build_linker_args.build} to convert this result into linker
-    arguments. *)
+    passed directly to the final linker. Use {!Build_linker_args.build} to
+    convert this result into linker arguments. *)
 module Result : sig
   type t
 
   (** Returns the partially-linked partition object files. *)
   val linked_partitions : t -> Partition.Linked.t list
 
-  (** Returns the passthrough files that should be passed directly to the
-      final linker without partial linking. These are C stub files and runtime
+  (** Returns the passthrough files that should be passed directly to the final
+      linker without partial linking. These are C stub files and runtime
       libraries that may have sections like .gcc_except_table that don't work
       well with ld -r. *)
   val passthrough_files : t -> string list

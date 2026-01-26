@@ -33,8 +33,9 @@ module Float32x4 = struct
         in
         (* When both are NaN, AMD returns the first argument and Intel returns
            the second argument. Hence we do not test this case. *)
-        if f0 |> Int32.float_of_bits |> Float.is_nan
-           && f1 |> Int32.float_of_bits |> Float.is_nan
+        if
+          f0 |> Int32.float_of_bits |> Float.is_nan
+          && f1 |> Int32.float_of_bits |> Float.is_nan
         then ()
         else eq_float32x4 ~result ~expect)
 
@@ -102,20 +103,20 @@ module Int64x2 = struct
 
   external int64x2_of_int64s : int64 -> int64 -> int64x2
     = "caml_vec128_unreachable" "vec128_of_int64s"
-    [@@noalloc] [@@unboxed]
+  [@@noalloc] [@@unboxed]
 
   external int64x2_low_int64 : int64x2 -> int64
     = "caml_vec128_unreachable" "vec128_low_int64"
-    [@@noalloc] [@@unboxed]
+  [@@noalloc] [@@unboxed]
 
   external int64x2_high_int64 : int64x2 -> int64
     = "caml_vec128_unreachable" "vec128_high_int64"
-    [@@noalloc] [@@unboxed]
+  [@@noalloc] [@@unboxed]
 
   external clmul :
     (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "caml_vec128_unreachable" "caml_clmul_int64x2"
-    [@@noalloc] [@@builtin]
+  [@@noalloc] [@@builtin]
 
   let eq lv hv l h =
     if l <> lv then Printf.printf "%016Lx <> %016Lx\n" lv l;

@@ -216,14 +216,14 @@ stdenv.mkDerivation {
     [
       pkgs.autoconf
       menhir
-      ocaml_4_14_2
+      ocaml_5_4_0
       dune
       pkgs.pkg-config
       pkgs.rsync
       pkgs.which
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
-      pkgs.ocaml-ng.ocamlPackages_4_14.ocamlformat # required for make fmt
+      ocamlformat # required for make fmt
       pkgs.removeReferencesTo
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS

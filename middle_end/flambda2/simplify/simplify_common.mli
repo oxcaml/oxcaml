@@ -21,11 +21,11 @@ open! Flambda
 (** There are two (nested, higher-order) levels of continuations here:
 
     - one of them, the "term-level continuation" expresses the traversal order
-    (enabling values to be held in the closures corresponding to meta-level
-    continuations until they are needed later);
+      (enabling values to be held in the closures corresponding to meta-level
+      continuations until they are needed later);
 
     - the other, the "compiler-level continuation" ensures that the simplifier
-    is tail recursive.
+      is tail recursive.
 
     In the future the first continuation might be removed by
     defunctionalisation. *)
@@ -48,19 +48,20 @@ type ('a, 'b) down_to_up = Downwards_acc.t -> rebuild:'a rebuild -> 'b
 (** The environments and accumulators for simplification are as follows:
 
     - [Downwards_env], which operates like a normal typing environment following
-    the scope of terms. It is discarded when the end of a given subexpression (a
-    "terminator" expression, such as an [Apply]) is reached, upon which point
-    the current [down_to_up] is called;
+      the scope of terms. It is discarded when the end of a given subexpression
+      (a "terminator" expression, such as an [Apply]) is reached, upon which
+      point the current [down_to_up] is called;
 
     - [Downwards_acc], which contains [Downwards_env] in addition to extra
-    information (not scope-based) that is accumulated across all subexpressions;
+      information (not scope-based) that is accumulated across all
+      subexpressions;
 
     - [Upwards_env], which operates like a normal environment for the upwards
-    pass, mainly used to record the handler expressions of continuations. It is
-    discarded when the end of a given subexpression is reached.
+      pass, mainly used to record the handler expressions of continuations. It
+      is discarded when the end of a given subexpression is reached.
 
     - [Upwards_acc], which contains [Upwards_env] in addition to extra
-    information that is accumulated across all subexpressions.
+      information that is accumulated across all subexpressions.
 
     Upon changing from the downwards to the upwards pass, some information is
     propagated from the [Downwards_acc] to the [Upwards_acc]. (In fact the
@@ -120,7 +121,6 @@ val project_tuple :
     application of the leftover arguments. *)
 val split_direct_over_application :
   Apply_expr.t ->
-  apply_alloc_mode:Alloc_mode.For_applications.t ->
   callee's_code_id:Code_id.t ->
   callee's_code_metadata:Code_metadata.t ->
   Expr.t

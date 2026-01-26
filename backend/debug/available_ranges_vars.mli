@@ -19,13 +19,12 @@
     location on the stack.)
 
     Available subranges associated with non-phantom variables are computed by
-    this pass based on the information from the dataflow analysis in
-    [Regs]. (The linearized code is updated so that it contains the
-    necessary labels for delimiting such ranges.)
+    this pass based on the information from the dataflow analysis in [Regs].
+    (The linearized code is updated so that it contains the necessary labels for
+    delimiting such ranges.)
 
     An "available range" is then a set of available subranges that do not
-    overlap in code space, again for a single variable and function.
-*)
+    overlap in code space, again for a single variable and function. *)
 
 module Key : Compute_ranges_intf.S_key with type t = Reg_with_debug_info.t
 

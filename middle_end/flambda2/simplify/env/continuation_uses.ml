@@ -66,8 +66,9 @@ let union t1 t2 =
        Continuation uses t1:@ %a@ and@ t2:@ %a"
       Continuation.print t1.continuation Continuation.print t2.continuation
       print t1 print t2;
-  if Flambda_features.kind_checks ()
-     && not (Flambda_arity.equal_ignoring_subkinds t1.arity t2.arity)
+  if
+    Flambda_features.kind_checks ()
+    && not (Flambda_arity.equal_ignoring_subkinds t1.arity t2.arity)
   then
     Misc.fatal_errorf
       "Arity of continuation uses (%a) doesn't match arity of continuation \
@@ -122,13 +123,14 @@ let get_arg_types_by_use_id t =
 let get_arg_types_by_use_id_for_invariant_params arity l =
   List.fold_left
     (fun arg_maps t ->
-      if not
-           (Misc.Stdlib.List.is_prefix ~equal:Flambda_kind.equal
-              (Flambda_arity.unarized_components arity
-              |> List.map Flambda_kind.With_subkind.kind)
-              ~of_:
-                (Flambda_arity.unarized_components t.arity
-                |> List.map Flambda_kind.With_subkind.kind))
+      if
+        not
+          (Misc.Stdlib.List.is_prefix ~equal:Flambda_kind.equal
+             (Flambda_arity.unarized_components arity
+             |> List.map Flambda_kind.With_subkind.kind)
+             ~of_:
+               (Flambda_arity.unarized_components t.arity
+               |> List.map Flambda_kind.With_subkind.kind))
       then
         Misc.fatal_errorf
           "Arity of invariant params@ (%a) is not a prefix of the arity of the \

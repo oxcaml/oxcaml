@@ -40,7 +40,7 @@ let is_nontail_call : Cfg.terminator -> bool =
   | Call (External { returns_to = None; _ } | OCaml _) -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call (External { returns_to = Some _; _ } | Probe _) ->
+  | Call (External { returns_to = Some _; _ } | Probe _) | Invalid _ ->
     false
 
 (* Returns the stack check info, and the max of seen instruction ids. *)
@@ -204,15 +204,16 @@ let cfg (cfg_with_layout : Cfg_with_layout.t) =
   | true ->
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     (if not Config.no_stack_checks
-    then
-      let { max_frame_size; blocks_needing_stack_checks } =
-        build_cfg_info cfg
-      in
-      if not (Label.Set.is_empty blocks_needing_stack_checks)
-      then
-        if Label.Tbl.length cfg.blocks
+     then
+       let { max_frame_size; blocks_needing_stack_checks } =
+         build_cfg_info cfg
+       in
+       if not (Label.Set.is_empty blocks_needing_stack_checks)
+       then
+         if
+           Label.Tbl.length cfg.blocks
            < !Oxcaml_flags.cfg_stack_checks_threshold
-        then
-          insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
-        else insert_instruction cfg cfg.entry_label ~max_frame_size);
+         then
+           insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
+         else insert_instruction cfg cfg.entry_label ~max_frame_size);
     cfg_with_layout

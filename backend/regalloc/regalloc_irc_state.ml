@@ -389,9 +389,10 @@ let[@inline] add_edge state u v =
     | Stack (Local _ | Incoming _ | Outgoing _ | Domainstate _) -> false
   in
   let pair = RegisterStamp.pair u.Reg.stamp v.Reg.stamp in
-  if (not (Reg.same u v))
-     && is_interesting_reg u && is_interesting_reg v && same_reg_class u v
-     && not (RegisterStamp.PairSet.mem state.adj_set pair)
+  if
+    (not (Reg.same u v))
+    && is_interesting_reg u && is_interesting_reg v && same_reg_class u v
+    && not (RegisterStamp.PairSet.mem state.adj_set pair)
   then (
     RegisterStamp.PairSet.add state.adj_set pair;
     let add_adj_list x y =
@@ -723,8 +724,8 @@ let[@inline] invariant state =
               (Reg.Set.inter adj_list work_lists_or_precolored);
             fatal
               "invariant expected degree for %a to be %d but got %d\n\
-              \ (#adj_list=%d, #work_lists_or_precolored=%d)" Printreg.reg u
-              cardinal degree
+              \ (#adj_list=%d, #work_lists_or_precolored=%d)"
+              Printreg.reg u cardinal degree
               (Reg.Set.cardinal adj_list)
               (Reg.Set.cardinal work_lists_or_precolored)))
       work_lists)

@@ -26,8 +26,8 @@ module type Lattice = sig
 
   val le : t -> t -> bool
 
-  (** [equal a b] is equivalent to [le a b && le b a], but defined separately for
-      performance reasons *)
+  (** [equal a b] is equivalent to [le a b && le b a], but defined separately
+      for performance reasons *)
   val equal : t -> t -> bool
 
   val join : t -> t -> t
@@ -65,9 +65,9 @@ type equate_step =
 (* CR-soon zqian: remove [simple_error] such that all mode errors are printed
    with hints. *)
 
-(** Simple mode error specific to axis whose carrier type is ['a]. [left] is the lower
-bound of actual mode and [right] is the upper bound of expected mode. [left <= right] is
-false, which is why the submode failed. *)
+(** Simple mode error specific to axis whose carrier type is ['a]. [left] is the
+    lower bound of actual mode and [right] is the upper bound of expected mode.
+    [left <= right] is false, which is why the submode failed. *)
 type 'a simple_error =
   { left : 'a;
     right : 'a
@@ -85,11 +85,11 @@ module type Common = sig
   type error
 
   (** Takes a submode [error] accompanied by a [pinpoint] of the original
-  submode, returns an explaining printer for each side. Each printer prints
-  either a mode constant name, or "[mode] because ...". The function assumes
-  [pinpoint] is already printed, which allows simplifying its own printing. The
-  caller is responsible for printing [pinpoint] and placing the result of this
-  function in a suitable linguistic context. *)
+      submode, returns an explaining printer for each side. Each printer prints
+      either a mode constant name, or "[mode] because ...". The function assumes
+      [pinpoint] is already printed, which allows simplifying its own printing.
+      The caller is responsible for printing [pinpoint] and placing the result
+      of this function in a suitable linguistic context. *)
   val print_error : Mode_hint.pinpoint -> error -> print_error
 
   type equate_error = equate_step * error
@@ -140,12 +140,12 @@ module type Common = sig
      [pinpoint] argument passed to submode. *)
 
   (** Takes the actual and expected mode of something, check that the actual
-    mode is less than the expected mode. In case of error, the error is returned
-    and no mutation is done.
+      mode is less than the expected mode. In case of error, the error is
+      returned and no mutation is done.
 
-    The two modes should be hinted sufficently that the submode is self-evident.
-    In particular, the two modes should be about the "same thing". See the notes
-    [How to submode] for details. *)
+      The two modes should be hinted sufficently that the submode is
+      self-evident. In particular, the two modes should be about the "same
+      thing". See the notes [How to submode] for details. *)
   val submode :
     ?pp:Mode_hint.pinpoint ->
     (allowed * 'r) t ->
@@ -154,18 +154,18 @@ module type Common = sig
   (* CR-soon zqian: make [pp] mandatory *)
 
   (** Similar to [submode], but instead of returning an error, raise
-    user-friendly errors directly, with [pinpoint] describing the thing
-    whose actual and expected modes are being checked.
+      user-friendly errors directly, with [pinpoint] describing the thing whose
+      actual and expected modes are being checked.
 
-    If you need more than [pinpoint] as the context in the error message,
-    consider [submode]. *)
+      If you need more than [pinpoint] as the context in the error message,
+      consider [submode]. *)
   val submode_err :
     Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate : lr -> lr -> (unit, equate_error) result
 
   (** Similiar to [submode], but crashes the compiler if errors. Use this
-    function if the submode is guaranteed to succeed. *)
+      function if the submode is guaranteed to succeed. *)
   val submode_exn :
     ?pp:Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
@@ -200,11 +200,11 @@ module type Common_axis = sig
 end
 
 module type Axis = sig
-  (** An axis with carrier type ['a]  *)
+  (** An axis with carrier type ['a] *)
   type 'a t
 
   (** Compare two axes in implication order. If A implies B, then A is before B.
-      *)
+  *)
   val compare : 'a t -> 'b t -> int
 
   type packed = P : 'a t -> packed
@@ -253,7 +253,7 @@ module type S = sig
      into [disallow_*]. *)
 
   (** Remove hints from all variables that have been created. See the comments
-  on [erase_hint] in [Solver_intf] for details. *)
+      on [erase_hint] in [Solver_intf] for details. *)
   val erase_hints : unit -> unit
 
   module Hint = Mode_hint
@@ -322,8 +322,8 @@ module type S = sig
 
     module Guts : sig
       (** This module exposes some functions that allow callers to inspect modes
-      directly, which could be useful for error printing and dev tools (such as
-      merlin). Any usage of this in type checking should be pondered. *)
+          directly, which could be useful for error printing and dev tools (such
+          as merlin). Any usage of this in type checking should be pondered. *)
 
       (** Returns [Some c] if the given mode has been constrained to constant
           [c]. see notes on [get_floor] in [solver_intf.mli] for cautions. *)
@@ -511,9 +511,9 @@ module type S = sig
 
   module Axis : sig
     (** ('p, 'r) t represents a projection from a product of type ['p] to an
-    element of type ['r].
+        element of type ['r].
 
-    NB: must listed in the order of axis implication. See [typemode.ml]. *)
+        NB: must listed in the order of axis implication. See [typemode.ml]. *)
     type ('p, 'r) t =
       | Areality : ('a comonadic_with, 'a) t
       | Forkable : ('areality comonadic_with, Forkable.Const.t) t
@@ -573,8 +573,8 @@ module type S = sig
     end
 
     module Axis : sig
-      (** Represents a mode axis in this product whose constant is ['a], and whose
-      allowance is ['d1] given the product's allowance ['d0]. *)
+      (** Represents a mode axis in this product whose constant is ['a], and
+          whose allowance is ['d1] given the product's allowance ['d0]. *)
       type 'a t =
         | Monadic : 'a Monadic.Axis.t -> 'a t
         | Comonadic : 'a Comonadic.Axis.t -> 'a t
@@ -646,8 +646,8 @@ module type S = sig
 
       val merge : (Monadic.Const.t, Comonadic.Const.t) monadic_comonadic -> t
 
-      (** [diff a b] returns [None] for axes where [a] and [b] match, and [Some
-      a0] for axes where [a] is [a0] and [b] isn't. *)
+      (** [diff a b] returns [None] for axes where [a] and [b] match, and
+          [Some a0] for axes where [a] is [a0] and [b] isn't. *)
       val diff : t -> t -> Option.t
 
       (** Similar to [Alloc.close_over] but for constants *)
@@ -662,6 +662,9 @@ module type S = sig
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
+
+    (** Existentially holds a mode together with its axis. *)
+    type atom = Atom : 'a Axis.t * 'a -> atom
 
     type error =
       | Monadic of Monadic.error
@@ -737,12 +740,13 @@ module type S = sig
       (('l * allowed) Monadic.t, (allowed * 'r) Comonadic.t) monadic_comonadic ->
       l
 
-    (** Returns the lower bound needed for [B -> C] in relation to [A -> B -> C] *)
+    (** Returns the lower bound needed for [B -> C] in relation to [A -> B -> C]
+    *)
     val partial_apply : (allowed * 'r) t -> l
   end
 
-  (** The most general mode. Used in most type checking,
-      including in value bindings in [Env] *)
+  (** The most general mode. Used in most type checking, including in value
+      bindings in [Env] *)
   module Value : Mode with module Areality := Regionality
 
   (** The mode on arrow types. Compared to [Value], it contains the [Locality]
@@ -794,8 +798,8 @@ module type S = sig
       module Atom : sig
         type 'a t =
           | Meet_with of 'a
-              (** [Meet_with c] takes [x] and returns [meet c x]. [c] can be [max]
-          in which case it's the identity modality. *)
+              (** [Meet_with c] takes [x] and returns [meet c x]. [c] can be
+                  [max] in which case it's the identity modality. *)
         [@@unboxed]
       end
     end
@@ -804,8 +808,8 @@ module type S = sig
       module Atom : sig
         type 'a t =
           | Join_with of 'a
-              (** [Join_with c] takes [x] and returns [join c x]. [c] can be [min]
-          in which case it's the identity modality. *)
+              (** [Join_with c] takes [x] and returns [join c x]. [c] can be
+                  [min] in which case it's the identity modality. *)
         [@@unboxed]
       end
     end
@@ -830,6 +834,8 @@ module type S = sig
 
       (** Test if the given modality is a constant modality. *)
       val is_constant : 'a Axis.t -> 'a -> bool
+
+      val print : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
     type error = Error : 'a Axis.t * 'a simple_error -> error
@@ -850,8 +856,8 @@ module type S = sig
        [zap_to_id], [zap_to_floor], etc.. *)
 
     module Const : sig
-      (** A modality that acts on [Value] axes. Conceptually it is a record where
-        individual fields can be [set] or [proj]. *)
+      (** A modality that acts on [Value] axes. Conceptually it is a record
+          where individual fields can be [set] or [proj]. *)
       type t
 
       (** The identity modality. *)
@@ -880,11 +886,11 @@ module type S = sig
       val proj : 'a Axis.t -> t -> 'a
 
       (** [diff t0 t1] returns a list of atoms in [t1] that are different than
-        [t0]. *)
+          [t0]. *)
       val diff : t -> t -> atom list
 
-      (** [equate t0 t1] checks that [t0 = t1].
-            Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
+      (** [equate t0 t1] checks that [t0 = t1]. Definition: [t0 = t1] iff
+          [t0 <= t1] and [t1 <= t0]. *)
       val equate : t -> t -> (unit, equate_error) Result.t
 
       (** Printing for debugging. *)
@@ -892,44 +898,54 @@ module type S = sig
     end
 
     (** A modality that acts on [Value] modes. Conceptually it is a record where
-      individual fields can be [set] or [proj]. *)
+        individual fields can be [set] or [proj]. *)
     type t
 
-    (** The identity modality. *)
-    val id : t
+    (* CR-someday zqian: [undefined] is only used for [val_modalities] and
+       [md_modalities]. Consider moving the logic there. *)
 
     (** The undefined modality. *)
     val undefined : t
+
+    (** Check if the given modality is [undefined]. *)
+    val is_undefined : t -> bool
 
     (* CR zqian: note that currently, [apply] and [sub] and [zap] are NOT
        coherent for comonadic axes. That is, we do NOT have
        [apply t m = Const.apply (zap t) m]. This is probably fine. *)
 
-    (** Apply a modality on a left mode. The calller should ensure that [apply
-      t m] is only called for [m >= md_mode] for inferred modalities. *)
-    val apply : t -> (allowed * 'r) Value.t -> Value.l
+    (** Apply a modality on a left mode. The calller should ensure that
+        [apply t m] is only called for [m >= md_mode] for inferred modalities.
+    *)
+    val apply :
+      ?hint:
+        ( (allowed * 'r) neg Hint.morph,
+          (allowed * 'r) pos Hint.morph )
+        monadic_comonadic ->
+      t ->
+      (allowed * 'r) Value.t ->
+      Value.l
 
-    (** [sub t0 t1] checks that [t0 <= t1].
-          Definition: [t0 <= t1] iff [forall a. t0(a) <= t1(a)].
+    (** [sub t0 t1] checks that [t0 <= t1]. Definition: [t0 <= t1] iff
+        [forall a. t0(a) <= t1(a)].
 
-          In case of failure, [Error (ax, {left; right})] is returned, where
-          [ax] is the axis on which the modalities disagree. [left] is the
-          projection of [t0] on [ax], and [right] is the projection of [t1] on
-          [ax]. *)
+        In case of failure, [Error (ax, {left; right})] is returned, where [ax]
+        is the axis on which the modalities disagree. [left] is the projection
+        of [t0] on [ax], and [right] is the projection of [t1] on [ax]. *)
     val sub : t -> t -> (unit, error) Result.t
 
-    (** [equate t0 t1] checks that [t0 = t1].
-          Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
+    (** [equate t0 t1] checks that [t0 = t1]. Definition: [t0 = t1] iff
+        [t0 <= t1] and [t1 <= t0]. *)
     val equate : t -> t -> (unit, equate_error) Result.t
 
     (** Printing for debugging. *)
     val print : Format.formatter -> t -> unit
 
-    (** Given [md_mode] the mode of a module, and [mode] the mode of a value
-      to be put in that module, return the inferred modality to be put on the
-      value description in the inferred module type.
+    (** Given [md_mode] the mode of a module, and [mode] the mode of a value to
+        be put in that module, return the inferred modality to be put on the
+        value description in the inferred module type.
 
-      The caller should ensure that for comonadic axes, [md_mode >= mode]. *)
+        The caller should ensure that for comonadic axes, [md_mode >= mode]. *)
     val infer : md_mode:Value.lr -> mode:Value.lr -> t
 
     (* The following zapping functions possibly mutate a potentially inferred
@@ -965,35 +981,36 @@ module type S = sig
   end
 
   (** Some modes on an axis might be indistinguishable for values of some type,
-    in which case the actual mode of values can be strenghthened (or
-    equivalently the expected mode loosened) accordingly to make more programs
-    mode-check. The capabilities/permissions to perform such adjustments are
-    called mode crossing and depicted in this module.
+      in which case the actual mode of values can be strenghthened (or
+      equivalently the expected mode loosened) accordingly to make more programs
+      mode-check. The capabilities/permissions to perform such adjustments are
+      called mode crossing and depicted in this module.
 
-    We define an ordering on the crossings: [t0 <= t1] iff [t0] allows more
-    adjustments than [t1]. By this ordering, the currently representable
-    crossings form a lattice:
-    - The bottom crossing allows any adjustments on this axis, which trivializes
-      the axis.
-    - The top crossing allows no adjustments on this axis, which is the safe
-      default.
-    - Joining two crossings gives a crossing that's less permissive than both.
-    - Meeting two crossings gives a crossing that's more permissive than both.
-    *)
+      We define an ordering on the crossings: [t0 <= t1] iff [t0] allows more
+      adjustments than [t1]. By this ordering, the currently representable
+      crossings form a lattice:
+      - The bottom crossing allows any adjustments on this axis, which
+        trivializes the axis.
+      - The top crossing allows no adjustments on this axis, which is the safe
+        default.
+      - Joining two crossings gives a crossing that's less permissive than both.
+      - Meeting two crossings gives a crossing that's more permissive than both.
+  *)
   module Crossing : sig
     module Monadic : sig
       module Atom : sig
         (** The mode crossing capability on a monadic axis whose carrier type is
-      ['a]. Currently it has only one constructor and is thus unboxed. *)
+            ['a]. Currently it has only one constructor and is thus unboxed. *)
         type 'a t =
           | Modality of 'a Modality.Monadic.Atom.t
               (** The mode crossing caused by a modality atom on an axis whose
-      carrier type is ['a]. For a concrete example, consider:
-      {[
-      type 'x r = { x : 'x @@ portable } [@@unboxed]
-      ]}
-      The type ['x r] can cross the portability axis. This is represented as
-      [Modality (Meet_with Portable) : Portability.Const.t t]. *)
+                  carrier type is ['a]. For a concrete example, consider:
+                  {[
+                    type 'x r = { x : 'x @@ portable } [@@unboxed]
+                  ]}
+                  The type ['x r] can cross the portability axis. This is
+                  represented as
+                  [Modality (Meet_with Portable) : Portability.Const.t t]. *)
         [@@unboxed]
       end
 
@@ -1002,8 +1019,8 @@ module type S = sig
 
       include Lattice with type t := t
 
-      (** Create a mode crossing on the monadic fragment from the collection of mode
-      crossings on each monadic axes. *)
+      (** Create a mode crossing on the monadic fragment from the collection of
+          mode crossings on each monadic axes. *)
       val create :
         uniqueness:Uniqueness.Const.t Atom.t ->
         contention:Contention.Const.t Atom.t ->
@@ -1014,8 +1031,9 @@ module type S = sig
 
     module Comonadic : sig
       module Atom : sig
-        (** The mode crossing capability on a comonadic axis whose carrier type is
-      ['a]. Currently it has only one constructor and is thus unboxed. *)
+        (** The mode crossing capability on a comonadic axis whose carrier type
+            is ['a]. Currently it has only one constructor and is thus unboxed.
+        *)
         type 'a t =
           | Modality of 'a Modality.Comonadic.Atom.t
               (** See comment on the similar constructor in [Monadic.Atom.t] *)
@@ -1028,7 +1046,7 @@ module type S = sig
       include Lattice with type t := t
 
       (** Create a mode crossing on the comonadic fragment from the collection
-      of mode crossings on each comonadic axes. *)
+          of mode crossings on each comonadic axes. *)
       val create :
         regionality:Regionality.Const.t Atom.t ->
         linearity:Linearity.Const.t Atom.t ->
@@ -1038,7 +1056,8 @@ module type S = sig
         statefulness:Statefulness.Const.t Atom.t ->
         t
 
-      (** Create the mode crossing for a type whose values are always constructed at the given mode. *)
+      (** Create the mode crossing for a type whose values are always
+          constructed at the given mode. *)
       val always_constructed_at : Value.Comonadic.Const.t -> t
     end
 
@@ -1064,9 +1083,9 @@ module type S = sig
       Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
 
     (** Convenience for creating a mode crossing capability on all axes, using a
-    boolean for each axis where [true] means full crossing and [false] means no
-    crossing. Alternatively, call [Monadic.create] and [Comonadic.create] and
-    pack the results into a record of type [t]. *)
+        boolean for each axis where [true] means full crossing and [false] means
+        no crossing. Alternatively, call [Monadic.create] and [Comonadic.create]
+        and pack the results into a record of type [t]. *)
     val create :
       regionality:bool ->
       linearity:bool ->
@@ -1089,11 +1108,12 @@ module type S = sig
     include Lattice with type t := t
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
-    [m] where [T] has mode crossing [t]. *)
+        [m] where [T] has mode crossing [t]. *)
     val modality : Modality.Const.t -> t -> t
 
-    (** Takes a mode crossing [t], returns the modality needed to make [max] into [t].
-      More precisely, [to_modality] is the inverse of [modality _ max]. *)
+    (** Takes a mode crossing [t], returns the modality needed to make [max]
+        into [t]. More precisely, [to_modality] is the inverse of
+        [modality _ max]. *)
     val to_modality : t -> Modality.Const.t
 
     (** Apply mode crossing on a left mode, making it stronger. *)

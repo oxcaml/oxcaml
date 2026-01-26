@@ -1,5 +1,5 @@
 (* TEST
- flags = "-dlambda -dno-unique-ids";
+ flags = "-dlambda -dno-unique-ids -extension-universe upstream_compatible";
  expect;
 *)
 

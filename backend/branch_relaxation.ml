@@ -31,13 +31,13 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Llabel { label = lbl; _ } ->
         Hashtbl.add map lbl pc;
         fill_map pc instr.next
-      | ( Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
-        | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
-        | Lcondbranch (_, _)
-        | Lcondbranch3 (_, _, _)
-        | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-        | Lstackcheck _ ) as op ->
-        fill_map (pc + T.instr_size op) instr.next
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
+      | Lcondbranch (_, _)
+      | Lcondbranch3 (_, _, _)
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
+        fill_map (pc + T.instr_size instr) instr.next
     in
     fill_map 0 code
 
@@ -113,15 +113,15 @@ module Make (T : Branch_relaxation_intf.S) = struct
           instr_overflows ~code_size ~max_out_of_line_code_offset instr map pc
         in
         if not overflows
-        then fixup did_fix (pc + T.instr_size instr.desc) instr.next
+        then fixup did_fix (pc + T.instr_size instr) instr.next
         else
           match instr.desc with
           | Lop Poll ->
             instr.desc <- T.relax_poll ();
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr) instr.next
           | Lop (Alloc { bytes = num_bytes; dbginfo; _ }) ->
             instr.desc <- T.relax_allocation ~num_bytes ~dbginfo;
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr) instr.next
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label () in
             let llabel = Llabel { label = lbl2; section_name = None } in
@@ -135,7 +135,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
             in
             instr.desc <- Lcondbranch (Operation.invert_test test, lbl2);
             instr.next <- cont;
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr) instr.next
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
             let cont =
               expand_optbranch lbl0 0 instr.arg
@@ -178,8 +178,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
         max_int T.Cond_branch.all
     in
     let code_size, map = label_map code in
-    if code_size >= min_of_max_branch_offsets
-       && fixup_branches ~code_size ~max_out_of_line_code_offset map code
+    if
+      code_size >= min_of_max_branch_offsets
+      && fixup_branches ~code_size ~max_out_of_line_code_offset map code
     then relax code ~max_out_of_line_code_offset
     else ()
 end

@@ -1,5 +1,5 @@
 external select : bool -> int -> int -> int = "" "caml_csel_value"
-  [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
+[@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
 
 let[@local never] [@inline never] csel cond ifso ifnot = select cond ifso ifnot
 

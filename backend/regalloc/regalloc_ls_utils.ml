@@ -113,8 +113,9 @@ module Range = struct
    fun left right ->
     let left_value = DLL.Cursor.value left in
     let right_value = DLL.Cursor.value right in
-    if left_value.end_ >= right_value.begin_
-       && right_value.end_ >= left_value.begin_
+    if
+      left_value.end_ >= right_value.begin_
+      && right_value.end_ >= left_value.begin_
     then true
     else if left_value.end_ < right_value.end_
     then

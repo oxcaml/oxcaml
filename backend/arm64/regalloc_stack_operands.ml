@@ -25,10 +25,10 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         May_still_have_spilled_registers))
   | Op
       (Specific
-        ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
-        | Imulsubf | Inegmulsubf | Isqrtf | Ifar_alloc _
-        | Ishiftarith (_, _)
-        | Ibswap _ | Isignext _ | Isimd _ ))
+         ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
+         | Imulsubf | Inegmulsubf | Isqrtf | Ifar_alloc _
+         | Ishiftarith (_, _)
+         | Ibswap _ | Isignext _ | Isimd _ ))
   | Op
       ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
       | Dls_get | Tls_get | Poll | Const_int _ | Const_float32 _ | Const_float _
@@ -54,6 +54,7 @@ let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
   | Call (Probe _) -> may_use_stack_operands_everywhere map term
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
+  | Invalid _
   | Call (OCaml _ | External _) ->
     (* no rewrite *)
     May_still_have_spilled_registers

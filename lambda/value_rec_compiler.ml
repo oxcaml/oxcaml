@@ -246,14 +246,16 @@ let compute_static_size lam =
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
         end
-    | Pmakeblock _ | Pmakelazyblock _ ->
+    | Pmakeblock (_, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
+        (match Lambda.mixed_block_of_block_shape shape with
+         | None -> Block (Regular_block (List.length args))
+         | Some arr -> Block (Mixed_record arr))
+    | Pmakelazyblock _ ->
         Block (Regular_block (List.length args))
-    | Pmakemixedblock (_, _, shape, _) ->
-        Block (Mixed_record (shape))
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
@@ -292,7 +294,8 @@ let compute_static_size lam =
     | Pfield_computed _
     | Pfloatfield _
     | Pmixedfield _
-    | Prunstack
+    | Pwith_stack
+    | Pwith_stack_bind
     | Pperform
     | Presume
     | Preperform
@@ -517,7 +520,8 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
-               Lprim (Pmakeblock (0, lifted_block_mut, None, Lambda.alloc_heap),
+               Lprim (Pmakeblock
+                        (0, lifted_block_mut, All_value, Lambda.alloc_heap),
                       [Lvar v], no_loc))
   | Lfunction lfun ->
     let free_vars = Lambda.free_variables lfun.body in
@@ -543,7 +547,7 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = new_fun; free_vars_block_size } in
     let block =
-      Lprim (Pmakeblock (0, lifted_block_mut, None, Lambda.alloc_heap),
+      Lprim (Pmakeblock (0, lifted_block_mut, All_value, Lambda.alloc_heap),
              List.rev block_fields_rev,
              no_loc)
     in

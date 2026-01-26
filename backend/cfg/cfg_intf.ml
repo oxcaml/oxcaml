@@ -78,8 +78,8 @@ module S = struct
 
   (** [int_test] represents all possible outcomes of a comparison between two
       integers. When [imm] field is [None], compare variables x and y, specified
-      by the arguments of the enclosing [instruction]. When [imm] field is [Some
-      n], compare variable x and immediate [n]. This corresponds to
+      by the arguments of the enclosing [instruction]. When [imm] field is
+      [Some n], compare variable x and immediate [n]. This corresponds to
       [Mach.Iinttest] and [Mach.Iinttest_imm] in the compiler. *)
   type int_test =
     { lt : Label.t;  (** if x < y (resp. x < n) goto [lt] label *)
@@ -156,6 +156,12 @@ module S = struct
     | Tailcall_func of func_call_operation
     (* CR mshinwell: [Invalid] from flambda2 should have its own terminator, to
        avoid the hack in [can_raise_terminator] *)
+    | Invalid of
+        { message : string;
+          stack_ofs : int;
+          stack_align : Cmm.stack_align;
+          label_after : Label.t Option.t
+        }
     (* CR mshinwell: move [Tailcall_*] into [call_operation] *)
     | Call of call_operation
 

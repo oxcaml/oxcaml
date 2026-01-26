@@ -488,8 +488,8 @@ Line 4, characters 22-23:
 4 |   in ignore x; unique x
                           ^
 Error: This value is "aliased"
-       because it contains (via constructor "::") the expression at Line 3, characters 5-28
-       which is "aliased".
+         because it contains (via constructor "::") the expression at Line 3, characters 5-28
+         which is "aliased".
        However, the highlighted expression is expected to be "unique".
 |}]
 

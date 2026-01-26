@@ -73,8 +73,9 @@ module Make (T : OrderedTypeWithDummy) : S with type e = T.t = struct
 
   let add t e =
     let idx = index t.array t.length e in
-    if idx >= Array.length t.array
-       || T.compare e (Array.unsafe_get t.array idx) <> 0
+    if
+      idx >= Array.length t.array
+      || T.compare e (Array.unsafe_get t.array idx) <> 0
     then (
       if t.length = Array.length t.array
       then (
@@ -107,8 +108,9 @@ module Make (T : OrderedTypeWithDummy) : S with type e = T.t = struct
 
   let remove t e =
     let idx = index t.array t.length e in
-    if idx < Array.length t.array
-       && T.compare e (Array.unsafe_get t.array idx) = 0
+    if
+      idx < Array.length t.array
+      && T.compare e (Array.unsafe_get t.array idx) = 0
     then (
       let len = t.length - idx - 1 in
       if len > 0

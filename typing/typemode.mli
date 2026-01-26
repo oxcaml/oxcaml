@@ -1,39 +1,55 @@
 module Jkind = Btype.Jkind0
 
-(** Interpret mode syntax as mode annotation, where axes can be left unspecified *)
-val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t
+(* CR-soon liam923: The [modes] and [modalities] types should be defined in
+   [Typedtree], but can't be due to a dependency cycle. *)
 
-val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.modes
+type 'a modes =
+  { mode_modes : 'a;
+    mode_desc : Mode.Alloc.atom Location.loc list
+  }
+
+type modalities =
+  { moda_modalities : Mode.Modality.Const.t;
+    moda_desc : Mode.Modality.atom Location.loc list
+  }
+
+(** Interpret mode syntax as mode annotation, where axes can be left unspecified
+*)
+val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t modes
+
+val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_alloc_mode :
-  Parsetree.modes -> Mode.Alloc.Const.Option.t * Mode.Alloc.Const.t
-(* CR-soon zqian: The first return value should be typedtree.modes. Fix the
-   dependency cycle that blocks this. *)
+val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t modes
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
     attributes on the field and insert mutable-implied modalities accordingly.
-    *)
+*)
 val transl_modalities :
   maturity:Language_extension.maturity ->
   Types.mutability ->
   Parsetree.modalities ->
-  Mode.Modality.Const.t
+  modalities
+
+val least_modalities_implying :
+  Types.mutability -> Mode.Modality.Const.t -> Mode.Modality.atom list
+
+val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
+
+(** Get the default modalities implied by the mutability of a field. *)
+val mutable_modalities : Types.mutability -> Mode.Modality.Const.t
 
 val let_mutable_modalities : Mode.Modality.Const.t
 
 (** The (default) modalities for an atomic mutable field *)
 val atomic_mutable_modalities : Mode.Modality.Const.t
 
-val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
+val untransl_modality :
+  Mode.Modality.atom Location.loc -> Parsetree.modality Location.loc
 
-(** Un-interpret modalities back to parsetree. Takes the mutability and
-    attributes on the field and remove mutable-implied modalities accordingly.
-    *)
-val untransl_modalities :
-  Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
+val untransl_modalities : modalities -> Parsetree.modalities
 
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t

@@ -1425,53 +1425,67 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Optional l -> Optional l
   | Position l -> Position l
 
-let tree_of_modality (t: Parsetree.modality loc) =
-  let Modality s = t.txt in s
-
+(** Un-interpret modalities back to outcome tree. Takes the mutability and
+    attributes on the field and removes mutable-implied modalities
+    accordingly. *)
 let tree_of_modalities mut t =
-  let t = Typemode.untransl_modalities mut t in
-  List.map tree_of_modality t
-
-let tree_of_mode (t: Parsetree.mode loc) =
-  let Mode s = t.txt in s
+  t
+  |> Typemode.least_modalities_implying mut
+  |> Typemode.sort_dedup_modalities
+  |> List.map (fun (Atom (ax, m) : Modality.atom) ->
+      Format.asprintf "%a" (Modality.Per_axis.print ax) m)
 
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
-  let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
+  (* Step 1: Compute the modes to print *)
+  let diff =
 
-  (* [forkable] has implied defaults depending on [areality]: *)
-  let forkable =
-    match modes.areality, modes.forkable with
-    | Local, Unforkable | Global, Forkable -> None
-    | _, _ -> Some modes.forkable
+    (* [forkable] has implied defaults depending on [areality]: *)
+    let forkable =
+      match modes.areality, modes.forkable with
+      | Local, Unforkable | Global, Forkable -> None
+      | _, _ -> Some modes.forkable
+    in
+
+    (* [yielding] has implied defaults depending on [areality]: *)
+    let yielding =
+      match modes.areality, modes.yielding with
+      | Local, Yielding | Global, Unyielding -> None
+      | _, _ -> Some modes.yielding
+    in
+
+    (* [contention] has implied defaults based on [visibility]: *)
+    let contention =
+      match modes.visibility, modes.contention with
+      | Immutable, Contended | Read, Shared | Read_write, Uncontended -> None
+      | _, _ -> Some modes.contention
+    in
+
+    (* [portability] has implied defaults based on [statefulness]: *)
+    let portability =
+      match modes.statefulness, modes.portability with
+      | Stateless, Portable
+      | Observing, Shareable
+      | Stateful, Nonportable -> None
+      | _, _ -> Some modes.portability
+    in
+
+    let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
+    { diff with forkable; yielding; contention; portability }
   in
-
-  (* [yielding] has implied defaults depending on [areality]: *)
-  let yielding =
-    match modes.areality, modes.yielding with
-    | Local, Yielding | Global, Unyielding -> None
-    | _, _ -> Some modes.yielding
+  (* Step 2: Print the modes *)
+  let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
+  let modes =
+    [ print_to_string_opt Mode.Locality.Const.print diff.areality
+    ; print_to_string_opt Mode.Uniqueness.Const.print diff.uniqueness
+    ; print_to_string_opt Mode.Linearity.Const.print diff.linearity
+    ; print_to_string_opt Mode.Portability.Const.print diff.portability
+    ; print_to_string_opt Mode.Contention.Const.print diff.contention
+    ; print_to_string_opt Mode.Forkable.Const.print diff.forkable
+    ; print_to_string_opt Mode.Yielding.Const.print diff.yielding
+    ; print_to_string_opt Mode.Statefulness.Const.print diff.statefulness
+    ; print_to_string_opt Mode.Visibility.Const.print diff.visibility ]
   in
-
-  (* [contention] has implied defaults based on [visibility]: *)
-  let contention =
-    match modes.visibility, modes.contention with
-    | Immutable, Contended | Read, Shared | Read_write, Uncontended -> None
-    | _, _ -> Some modes.contention
-  in
-
-  (* [portability] has implied defaults based on [statefulness]: *)
-  let portability =
-    match modes.statefulness, modes.portability with
-    | Stateless, Portable
-    | Observing, Shareable
-    | Stateful, Nonportable -> None
-    | _, _ -> Some modes.portability
-  in
-
-  let diff = {diff with forkable; yielding; contention; portability} in
-  (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
-  let l = Typemode.untransl_mode_annots diff in
-  List.map tree_of_mode l
+  List.filter_map (fun x -> x) modes
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
@@ -1769,9 +1783,7 @@ let typexp mode ppf ty =
 let modality ?(id = fun _ppf -> ()) ax ppf modality =
   if Mode.Modality.Per_axis.is_id ax modality then id ppf
   else
-    Atom (ax, modality)
-    |> Typemode.untransl_modality
-    |> tree_of_modality
+    Format.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
     |> !Oprint.out_modality ppf
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
@@ -2777,7 +2789,12 @@ and tree_of_modtype_declaration ?abbrev id decl =
   Osig_modtype (Ident.name id, mty)
 
 and tree_of_module ?abbrev id md rs = wrap_mutation (fun () ->
-  let moda = Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities in
+  let moda =
+    if Mode.Modality.is_undefined md.md_modalities then
+      Mode.Modality.Const.id
+    else
+      Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities
+  in
     Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
     tree_of_modalities Immutable moda,
     tree_of_rec rs)

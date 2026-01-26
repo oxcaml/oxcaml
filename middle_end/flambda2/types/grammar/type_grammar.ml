@@ -451,22 +451,19 @@ and free_names_head_of_kind_rec_info head =
 and free_names_head_of_kind_region () = Name_occurrences.empty
 
 and free_names_row_like :
-      'row_tag 'lattice 'shape 'maps_to 'known.
-      free_names_lattice:('lattice -> Name_occurrences.t) ->
-      free_names_maps_to:
-        (follow_value_slots:bool -> 'maps_to -> Name_occurrences.t) ->
-      follow_value_slots:bool ->
-      known:'known ->
-      other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
-      fold_known:
-        (('row_tag ->
-         ('lattice, 'shape, 'maps_to) row_like_case ->
-         'acc ->
-         'acc) ->
-        'known ->
-        'acc ->
-        'acc) ->
-      Name_occurrences.t =
+    'row_tag 'lattice 'shape 'maps_to 'known.
+    free_names_lattice:('lattice -> Name_occurrences.t) ->
+    free_names_maps_to:
+      (follow_value_slots:bool -> 'maps_to -> Name_occurrences.t) ->
+    follow_value_slots:bool ->
+    known:'known ->
+    other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
+    fold_known:
+      (('row_tag -> ('lattice, 'shape, 'maps_to) row_like_case -> 'acc -> 'acc) ->
+      'known ->
+      'acc ->
+      'acc) ->
+    Name_occurrences.t =
  fun ~free_names_lattice ~free_names_maps_to ~follow_value_slots ~known ~other
      ~fold_known ->
   let[@inline always] free_names_index { domain; shape = _ } =
@@ -747,8 +744,9 @@ and apply_renaming_head_of_kind_value_non_null head renaming =
       apply_renaming_row_like_for_blocks blocks renaming
     in
     let extensions' = apply_renaming_variant_extensions extensions renaming in
-    if is_int == is_int' && get_tag == get_tag' && immediates == immediates'
-       && blocks == blocks' && extensions == extensions'
+    if
+      is_int == is_int' && get_tag == get_tag' && immediates == immediates'
+      && blocks == blocks' && extensions == extensions'
     then head
     else
       Variant
@@ -866,18 +864,18 @@ and apply_renaming_head_of_kind_rec_info head renaming =
 and apply_renaming_head_of_kind_region () _renaming = ()
 
 and apply_renaming_row_like :
-      'lattice 'shape 'maps_to 'known.
-      apply_renaming_lattice:('lattice -> Renaming.t -> 'lattice) ->
-      apply_renaming_maps_to:('maps_to -> Renaming.t -> 'maps_to) ->
-      known:'known ->
-      other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
-      map_known:
-        ((('lattice, 'shape, 'maps_to) row_like_case ->
-         ('lattice, 'shape, 'maps_to) row_like_case) ->
-        'known ->
-        'known) ->
-      Renaming.t ->
-      ('known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t) option =
+    'lattice 'shape 'maps_to 'known.
+    apply_renaming_lattice:('lattice -> Renaming.t -> 'lattice) ->
+    apply_renaming_maps_to:('maps_to -> Renaming.t -> 'maps_to) ->
+    known:'known ->
+    other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
+    map_known:
+      ((('lattice, 'shape, 'maps_to) row_like_case ->
+       ('lattice, 'shape, 'maps_to) row_like_case) ->
+      'known ->
+      'known) ->
+    Renaming.t ->
+    ('known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t) option =
  fun ~apply_renaming_lattice ~apply_renaming_maps_to ~known ~other ~map_known
      renaming ->
   let rename_index { domain; shape } =
@@ -1240,23 +1238,20 @@ and print_head_of_kind_rec_info ppf head = Rec_info_expr.print ppf head
 and print_head_of_kind_region ppf () = Format.pp_print_string ppf "Region"
 
 and print_row_like :
-      'lattice 'shape 'maps_to 'known.
-      print_index:
-        (Format.formatter -> ('lattice, 'shape) row_like_index -> unit) ->
-      print_maps_to:(Format.formatter -> 'maps_to -> unit) ->
-      print_known_map:
-        ((Format.formatter ->
-         ('lattice, 'shape, 'maps_to) row_like_case ->
-         unit) ->
-        Format.formatter ->
-        'known ->
-        unit) ->
-      is_empty_map_known:('known -> bool) ->
-      known:'known ->
-      other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
-      Alloc_mode.For_types.t ->
+    'lattice 'shape 'maps_to 'known.
+    print_index:(Format.formatter -> ('lattice, 'shape) row_like_index -> unit) ->
+    print_maps_to:(Format.formatter -> 'maps_to -> unit) ->
+    print_known_map:
+      ((Format.formatter -> ('lattice, 'shape, 'maps_to) row_like_case -> unit) ->
       Format.formatter ->
-      unit =
+      'known ->
+      unit) ->
+    is_empty_map_known:('known -> bool) ->
+    known:'known ->
+    other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
+    Alloc_mode.For_types.t ->
+    Format.formatter ->
+    unit =
  fun ~print_index ~print_maps_to ~print_known_map ~is_empty_map_known ~known
      ~other alloc_mode ppf ->
   if row_like_is_bottom ~known ~other ~is_empty_map_known
@@ -1502,19 +1497,16 @@ and ids_for_export_head_of_kind_rec_info head =
 and ids_for_export_head_of_kind_region () = Ids_for_export.empty
 
 and ids_for_export_row_like :
-      'row_tag 'lattice 'shape 'maps_to 'known.
-      ids_for_export_maps_to:('maps_to -> Ids_for_export.t) ->
-      known:'known ->
-      other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
-      fold_known:
-        (('row_tag ->
-         ('lattice, 'shape, 'maps_to) row_like_case ->
-         'acc ->
-         'acc) ->
-        'known ->
-        'acc ->
-        'acc) ->
-      Ids_for_export.t =
+    'row_tag 'lattice 'shape 'maps_to 'known.
+    ids_for_export_maps_to:('maps_to -> Ids_for_export.t) ->
+    known:'known ->
+    other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
+    fold_known:
+      (('row_tag -> ('lattice, 'shape, 'maps_to) row_like_case -> 'acc -> 'acc) ->
+      'known ->
+      'acc ->
+      'acc) ->
+    Ids_for_export.t =
  fun ~ids_for_export_maps_to ~known ~other ~fold_known ->
   let from_known =
     fold_known
@@ -1812,21 +1804,21 @@ and apply_coercion_head_of_kind_rec_info head coercion : _ Or_bottom.t =
 and apply_coercion_head_of_kind_region () _coercion : _ Or_bottom.t = Ok ()
 
 and apply_coercion_row_like :
-      'lattice 'shape 'maps_to 'row_tag 'known.
-      apply_coercion_maps_to:
-        ('row_tag option -> 'maps_to -> Coercion.t -> 'maps_to Or_bottom.t) ->
-      known:'known ->
-      other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
-      is_empty_map_known:('known -> bool) ->
-      filter_map_known:
-        (('row_tag ->
-         ('lattice, 'shape, 'maps_to) row_like_case ->
-         ('lattice, 'shape, 'maps_to) row_like_case option) ->
-        'known ->
-        'known) ->
-      Coercion.t ->
-      ('known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t)
-      Or_bottom.t =
+    'lattice 'shape 'maps_to 'row_tag 'known.
+    apply_coercion_maps_to:
+      ('row_tag option -> 'maps_to -> Coercion.t -> 'maps_to Or_bottom.t) ->
+    known:'known ->
+    other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
+    is_empty_map_known:('known -> bool) ->
+    filter_map_known:
+      (('row_tag ->
+       ('lattice, 'shape, 'maps_to) row_like_case ->
+       ('lattice, 'shape, 'maps_to) row_like_case option) ->
+      'known ->
+      'known) ->
+    Coercion.t ->
+    ('known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t)
+    Or_bottom.t =
  fun ~apply_coercion_maps_to ~known ~other ~is_empty_map_known ~filter_map_known
      coercion ->
   let known =
@@ -1951,8 +1943,8 @@ and apply_coercion_to_closure_types_in_set
   in
   if !found_bottom
   then Bottom
-  else if function_slot_components_by_index
-          == function_slot_components_by_index'
+  else if
+    function_slot_components_by_index == function_slot_components_by_index'
   then Ok product
   else
     Ok
@@ -2185,8 +2177,9 @@ and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value_non_null
       remove_unused_value_slots_and_shortcut_aliases_variant_extensions
         extensions ~used_value_slots ~canonicalise
     in
-    if is_int == is_int' && get_tag == get_tag' && immediates == immediates'
-       && blocks == blocks' && extensions == extensions'
+    if
+      is_int == is_int' && get_tag == get_tag' && immediates == immediates'
+      && blocks == blocks' && extensions == extensions'
     then head
     else
       Variant
@@ -2372,27 +2365,27 @@ and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_region ()
   ()
 
 and remove_unused_value_slots_and_shortcut_aliases_row_like :
-      'lattice 'shape 'maps_to 'known.
-      remove_unused_value_slots_and_shortcut_aliases_lattice:
-        ('lattice ->
-        used_value_slots:Value_slot.Set.t ->
-        canonicalise:(Simple.t -> Simple.t) ->
-        'lattice) ->
-      remove_unused_value_slots_and_shortcut_aliases_maps_to:
-        ('maps_to ->
-        used_value_slots:Value_slot.Set.t ->
-        canonicalise:(Simple.t -> Simple.t) ->
-        'maps_to) ->
-      known:'known ->
-      other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
-      map_known:
-        ((('lattice, 'shape, 'maps_to) row_like_case ->
-         ('lattice, 'shape, 'maps_to) row_like_case) ->
-        'known ->
-        'known) ->
+    'lattice 'shape 'maps_to 'known.
+    remove_unused_value_slots_and_shortcut_aliases_lattice:
+      ('lattice ->
       used_value_slots:Value_slot.Set.t ->
       canonicalise:(Simple.t -> Simple.t) ->
-      ('known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t) option =
+      'lattice) ->
+    remove_unused_value_slots_and_shortcut_aliases_maps_to:
+      ('maps_to ->
+      used_value_slots:Value_slot.Set.t ->
+      canonicalise:(Simple.t -> Simple.t) ->
+      'maps_to) ->
+    known:'known ->
+    other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
+    map_known:
+      ((('lattice, 'shape, 'maps_to) row_like_case ->
+       ('lattice, 'shape, 'maps_to) row_like_case) ->
+      'known ->
+      'known) ->
+    used_value_slots:Value_slot.Set.t ->
+    canonicalise:(Simple.t -> Simple.t) ->
+    ('known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t) option =
  fun ~remove_unused_value_slots_and_shortcut_aliases_lattice
      ~remove_unused_value_slots_and_shortcut_aliases_maps_to ~known ~other
      ~map_known ~used_value_slots ~canonicalise ->
@@ -2449,8 +2442,8 @@ and remove_unused_value_slots_and_shortcut_aliases_row_like_for_blocks
   in
   match
     remove_unused_value_slots_and_shortcut_aliases_row_like
-      ~remove_unused_value_slots_and_shortcut_aliases_lattice:
-        (fun block_size ~used_value_slots:_ ~canonicalise:_ -> block_size)
+      ~remove_unused_value_slots_and_shortcut_aliases_lattice:(fun
+          block_size ~used_value_slots:_ ~canonicalise:_ -> block_size)
       ~remove_unused_value_slots_and_shortcut_aliases_maps_to:
         remove_unused_value_slots_and_shortcut_aliases_int_indexed_product
       ~known:known_tags ~other:other_tags ~map_known ~used_value_slots
@@ -2464,8 +2457,8 @@ and remove_unused_value_slots_and_shortcut_aliases_row_like_for_closures
     ~used_value_slots ~canonicalise =
   match
     remove_unused_value_slots_and_shortcut_aliases_row_like
-      ~remove_unused_value_slots_and_shortcut_aliases_lattice:
-        (fun index ~used_value_slots ~canonicalise:_ ->
+      ~remove_unused_value_slots_and_shortcut_aliases_lattice:(fun
+          index ~used_value_slots ~canonicalise:_ ->
         Set_of_closures_contents.remove_unused_value_slots index
           ~used_value_slots)
       ~remove_unused_value_slots_and_shortcut_aliases_maps_to:
@@ -2511,10 +2504,11 @@ and remove_unused_value_slots_and_shortcut_aliases_value_slot_indexed_product
     (* CR-someday mshinwell: some loss of sharing here, potentially *)
     Value_slot.Map.filter_map
       (fun value_slot ty ->
-        if (not
-              (Value_slot.in_compilation_unit value_slot
-                 (Compilation_unit.get_current_exn ())))
-           || Value_slot.Set.mem value_slot used_value_slots
+        if
+          (not
+             (Value_slot.in_compilation_unit value_slot
+                (Compilation_unit.get_current_exn ())))
+          || Value_slot.Set.mem value_slot used_value_slots
         then
           Some
             (remove_unused_value_slots_and_shortcut_aliases ty ~used_value_slots
@@ -2930,8 +2924,9 @@ and project_head_of_kind_value_non_null ~to_project ~expand head =
     let extensions' =
       project_variant_extensions ~to_project ~expand extensions
     in
-    if is_int == is_int' && get_tag == get_tag' && immediates == immediates'
-       && blocks == blocks' && extensions == extensions'
+    if
+      is_int == is_int' && get_tag == get_tag' && immediates == immediates'
+      && blocks == blocks' && extensions == extensions'
     then head
     else
       Variant
@@ -3131,9 +3126,10 @@ and project_closures_entry ~to_project ~expand
   let value_slot_types' =
     project_value_slot_indexed_product ~to_project ~expand value_slot_types
   in
-  if function_types == function_types'
-     && closure_types == closure_types'
-     && value_slot_types == value_slot_types'
+  if
+    function_types == function_types'
+    && closure_types == closure_types'
+    && value_slot_types == value_slot_types'
   then closures_entry
   else
     { function_types = function_types';
@@ -4401,31 +4397,31 @@ let rec must_be_singleton t ~machine_width : RWC.t option =
     | Ok (No_alias { is_null = Maybe_null _; _ })
     | Ok
         (No_alias
-          { is_null = Not_null;
-            non_null =
-              ( Unknown | Bottom
-              | Ok
-                  ( Mutable_block _ | Boxed_float _ | Boxed_float32 _
-                  | Boxed_int32 _ | Boxed_int64 _ | Boxed_vec128 _
-                  | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_nativeint _
-                  | String _ | Closures _ | Array _ ) )
-          }) ->
+           { is_null = Not_null;
+             non_null =
+               ( Unknown | Bottom
+               | Ok
+                   ( Mutable_block _ | Boxed_float _ | Boxed_float32 _
+                   | Boxed_int32 _ | Boxed_int64 _ | Boxed_vec128 _
+                   | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_nativeint _
+                   | String _ | Closures _ | Array _ ) )
+           }) ->
       None
     | Ok (Equals simple) -> Simple.must_be_const simple
     | Ok
         (No_alias
-          { is_null = Not_null;
-            non_null =
-              Ok
-                (Variant
-                  { is_int = _;
-                    get_tag = _;
-                    immediates;
-                    blocks;
-                    extensions = _;
-                    is_unique = _
-                  })
-          }) -> (
+           { is_null = Not_null;
+             non_null =
+               Ok
+                 (Variant
+                    { is_int = _;
+                      get_tag = _;
+                      immediates;
+                      blocks;
+                      extensions = _;
+                      is_unique = _
+                    })
+           }) -> (
       match blocks with
       | Unknown -> None
       | Known blocks -> (

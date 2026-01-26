@@ -4,7 +4,8 @@ open! Int_replace_polymorphic_compare
 let are_equal_regs (reg1 : Reg.t) (reg2 : Reg.t) =
   Reg.same_loc_fatal_on_unknown
     ~fatal_message:
-      "peephole optimization should be run after register allocation" reg1 reg2
+      "peephole optimization should be run after register allocation"
+    reg1 reg2
 
 (* CR-soon gtulba-lecu: Delete this when implementing auto-generated rules. *)
 let go_back_const = 1
