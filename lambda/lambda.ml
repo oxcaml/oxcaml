@@ -257,8 +257,13 @@ type primitive =
       mode : locality_mode; boxed : bool }
   | Pbigstring_load_64 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
-  | Pbigstring_load_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
-      index_kind : array_index_kind; mode : locality_mode; boxed : bool }
+  | Pbigstring_load_vec of {
+      size : boxed_vector;
+      safety : (len:int * align:int) option;
+      index_kind : array_index_kind;
+      mode : locality_mode;
+      aligned : bool;
+      boxed : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_set_32 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
@@ -266,8 +271,12 @@ type primitive =
       boxed : bool }
   | Pbigstring_set_64 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
-  | Pbigstring_set_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
-      index_kind : array_index_kind; boxed : bool }
+  | Pbigstring_set_vec of {
+      size : boxed_vector;
+      safety : (len:int * align:int) option;
+      index_kind : array_index_kind;
+      aligned : bool;
+      boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
@@ -2199,12 +2208,12 @@ let primitive_can_raise prim =
   | Pbigstring_load_32 { unsafe = false; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_f32 { unsafe = false; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_64 { unsafe = false; index_kind = _; mode = _; boxed = _ }
-  | Pbigstring_load_vec { unsafe = false; _ }
+  | Pbigstring_load_vec { safety = Some _; _ }
   | Pbigstring_set_16 { unsafe = false; index_kind = _ }
   | Pbigstring_set_32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbigstring_set_f32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbigstring_set_64 { unsafe = false; index_kind = _; boxed = _ }
-  | Pbigstring_set_vec { unsafe = false; _ }
+  | Pbigstring_set_vec { safety = Some _; _ }
   | Pfloatarray_load_vec { unsafe = false; _ }
   | Pfloat_array_load_vec { unsafe = false; _ }
   | Pint_array_load_vec { unsafe = false; _ }
@@ -2280,12 +2289,12 @@ let primitive_can_raise prim =
   | Pbigstring_load_32 { unsafe = true; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_f32 { unsafe = true; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_64 { unsafe = true; index_kind = _; mode = _; boxed = _ }
-  | Pbigstring_load_vec { unsafe = true; _ }
+  | Pbigstring_load_vec { safety = None; _ }
   | Pbigstring_set_16 { unsafe = true; _ }
   | Pbigstring_set_32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbigstring_set_f32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbigstring_set_64 { unsafe = true; index_kind = _; boxed = _ }
-  | Pbigstring_set_vec { unsafe = true; _ }
+  | Pbigstring_set_vec { safety = None; _ }
   | Pfloatarray_load_vec { unsafe = true; _ }
   | Pfloat_array_load_vec { unsafe = true; _ }
   | Pint_array_load_vec { unsafe = true; _ }

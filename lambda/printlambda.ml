@@ -697,9 +697,9 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbigstring_load_vec { size; unsafe; aligned; mode; boxed; index_kind } ->
+  | Pbigstring_load_vec { size; safety; aligned; mode; boxed; index_kind } ->
      fprintf ppf "bigarray.array1.%s%sget%s%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
+       (if Option.is_none safety then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
        (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
@@ -719,9 +719,9 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbigstring_set_vec { size; unsafe; aligned; boxed; index_kind } ->
+  | Pbigstring_set_vec { size; safety; aligned; boxed; index_kind } ->
      fprintf ppf "bigarray.array1.%s%sset%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
+       (if Option.is_none safety then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
        (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
