@@ -1596,7 +1596,9 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
     D.record_after_evaluation reduction_diagnostics
       (Type_shape.Evaluated_shape.shape evaluated_shape);
     let complex_shape =
-      Complex_shape.type_shape_to_complex_shape evaluated_shape type_layout
+      Complex_shape.type_shape_to_complex_shape
+        ~cache:(DS.complex_shape_cache state)
+        evaluated_shape type_layout
     in
     let complex_shape_flattened =
       Complex_shape.flatten_complex_shape complex_shape

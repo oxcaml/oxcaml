@@ -90,6 +90,14 @@ val runtime_shape : t -> RS.t option
     to simulate the effect of unarization on function arguments. *)
 val flatten_complex_shape : t -> RS.t RS.Or_void.t list
 
+(** Cache for memoizing [type_shape_to_complex_shape] results. *)
+module Shape_cache : sig
+  type t
+
+  val create : int -> t
+end
+
 (** Convert an evaluated type shape and layout to a complex shape for DWARF type
     generation. *)
-val type_shape_to_complex_shape : Type_shape.Evaluated_shape.t -> Layout.t -> t
+val type_shape_to_complex_shape :
+  cache:Shape_cache.t -> Type_shape.Evaluated_shape.t -> Layout.t -> t

@@ -341,14 +341,8 @@ and flatten_product_layout_exn (cs : t) =
   | Unboxed_product { components; kind = Unboxed_tuple } ->
     List.map (fun arg -> None, arg) components
 
-module Shape_cache : sig
-  val find_in_cache :
-    Shape.t -> Layout.t -> rec_env:'a S.DeBruijn_env.t -> t option
-
-  val add_to_cache :
-    Shape.t -> Layout.t -> t -> rec_env:'a S.DeBruijn_env.t -> unit
-end = struct
-  type t =
+module Shape_cache = struct
+  type key =
     { type_shape : Shape.t;
       type_layout : Layout.t
     }
@@ -356,7 +350,7 @@ end = struct
   (* CR sspies: This caching will need performance improvements along with the
      other caches in the future. *)
   module Cache = Hashtbl.Make (struct
-    type nonrec t = t
+    type t = key
 
     let equal ({ type_shape = x1; type_layout = y1 } : t)
         ({ type_shape = x2; type_layout = y2 } : t) =
@@ -367,14 +361,16 @@ end = struct
     (* CR sspies: Add a hash function to Layout.t *)
   end)
 
-  let cache = Cache.create 100
+  type nonrec t = t Cache.t
 
-  let find_in_cache type_shape type_layout ~rec_env =
+  let create initial_size = Cache.create initial_size
+
+  let find_in_cache cache type_shape type_layout ~rec_env =
     if S.DeBruijn_env.is_empty rec_env
     then Cache.find_opt cache { type_shape; type_layout }
     else None
 
-  let add_to_cache type_shape type_layout value ~rec_env =
+  let add_to_cache cache type_shape type_layout value ~rec_env =
     (* [rec_env] being empty means that the shape is closed. *)
     if S.DeBruijn_env.is_empty rec_env
     then Cache.add cache { type_shape; type_layout } value
@@ -397,7 +393,7 @@ let rec layout_to_unknown_shape (ly : Layout.t) : t =
     | Other runtime_layout -> runtime (RS.unknown runtime_layout)
     | Void -> void)
 
-let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
+let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     (type_layout : Layout.t option) : t =
   let unknown_shape_exn =
     match type_layout with
@@ -415,7 +411,8 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
   | Tuple args, (None | Some (Base Value)) -> (
     let args =
       List.map
-        (fun sh -> type_shape_to_complex_shape ~rec_env sh (Layout.Base Value))
+        (fun sh ->
+          type_shape_to_complex_shape ~cache ~rec_env sh (Layout.Base Value))
         (* CR sspies: In the future, we cannot assume that these are always
            values. This means we may need to use
            [type_shape_to_complex_shape_exn] and catch the exception on the
@@ -431,9 +428,10 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
   | Tuple _, Some type_layout ->
     err_or_unknown_exn (fun f ->
         f "tuple must have value layout, but got: %a" Layout.format type_layout)
-  | At_layout (shape, ly), None -> type_shape_to_complex_shape ~rec_env shape ly
+  | At_layout (shape, ly), None ->
+    type_shape_to_complex_shape ~cache ~rec_env shape ly
   | At_layout (shape, ly1), Some ly2 when Layout.equal ly1 ly2 ->
-    type_shape_to_complex_shape ~rec_env shape ly1
+    type_shape_to_complex_shape ~cache ~rec_env shape ly1
   | At_layout (shape, layout), Some type_layout ->
     err_or_unknown_exn (fun f ->
         f
@@ -442,7 +440,9 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
           Layout.format type_layout Layout.format layout Shape.print shape)
   | Predef (pre, args), _ -> (
     try
-      let predef_shape = predef_to_complex_shape_exn ~rec_env pre ~args in
+      let predef_shape =
+        predef_to_complex_shape_exn ~cache ~rec_env pre ~args
+      in
       runtime (RS.predef predef_shape)
     with Layout_missing -> (
       let layout = Shape.Predef.to_base_layout pre in
@@ -457,7 +457,7 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
     (* CR sspies: We should guess the layout from the recursive body [sh]
        instead of just using the current layout. *)
     let rec_env = Shape.DeBruijn_env.push rec_env type_layout in
-    type_shape_to_complex_shape_exn ~rec_env sh type_layout
+    type_shape_to_complex_shape_exn ~cache ~rec_env sh type_layout
     |> force_runtime_shape_exn |> RS.mu |> runtime
   | Rec_var i, layout -> (
     match Shape.DeBruijn_env.get_opt rec_env ~de_bruijn_index:i, layout with
@@ -490,7 +490,7 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
       layout_to_unknown_shape ly
     | (Some None | None), None -> raise Layout_missing)
   | Alias sh, type_layout ->
-    type_shape_to_complex_shape_exn ~rec_env sh type_layout
+    type_shape_to_complex_shape_exn ~cache ~rec_env sh type_layout
   | Arrow, (None | Some (Base Value)) -> runtime RS.func
   | Arrow, Some type_layout ->
     err_or_unknown_exn (fun f ->
@@ -499,11 +499,12 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
   | Unboxed_tuple shapes, None ->
     unboxed_tuple
       (List.map
-         (fun sh -> type_shape_to_complex_shape_exn ~rec_env sh None)
+         (fun sh -> type_shape_to_complex_shape_exn ~cache ~rec_env sh None)
          shapes)
   | Unboxed_tuple fields, Some (Product lys)
     when Int.equal (List.length lys) (List.length fields) ->
-    unboxed_tuple (List.map2 (type_shape_to_complex_shape ~rec_env) fields lys)
+    unboxed_tuple
+      (List.map2 (type_shape_to_complex_shape ~cache ~rec_env) fields lys)
   | Unboxed_tuple _, Some (Base b) ->
     err_or_unknown_exn (fun f ->
         f "unboxed tuple must have product layout, but got: %a" Layout.format
@@ -532,7 +533,8 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
                        S.field_uid = _;
                        S.field_value = arg, layout
                      } ->
-                  field_name, type_shape_to_complex_shape ~rec_env arg layout)
+                  ( field_name,
+                    type_shape_to_complex_shape ~cache ~rec_env arg layout ))
                 args
             in
             let constr_args =
@@ -565,8 +567,8 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
               List.map
                 (fun arg ->
                   ( None,
-                    type_shape_to_complex_shape ~rec_env arg (Layout.Base Value)
-                  ))
+                    type_shape_to_complex_shape ~cache ~rec_env arg
+                      (Layout.Base Value) ))
                 pv_constr_args
             in
             (* Currently, all arguments here are values, but sooner or later
@@ -595,7 +597,8 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
       (List.map
          (fun (field_name, _, field_value, field_layout) ->
            ( field_name,
-             type_shape_to_complex_shape ~rec_env field_value field_layout ))
+             type_shape_to_complex_shape ~cache ~rec_env field_value
+               field_layout ))
          fields)
   | Record { fields; kind = Record_unboxed_product }, Some (Product lys)
     when List.equal Layout.equal (List.map (fun (_, _, _, ly) -> ly) fields) lys
@@ -604,7 +607,8 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
       (List.map
          (fun (field_name, _, field_value, field_layout) ->
            ( field_name,
-             type_shape_to_complex_shape ~rec_env field_value field_layout ))
+             type_shape_to_complex_shape ~cache ~rec_env field_value
+               field_layout ))
          fields)
   | ( Record { fields; kind = Record_unboxed_product },
       Some ((Base _ | Product _) as ly) ) ->
@@ -622,7 +626,8 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
         List.map
           (fun (field_name, _, field_type, field_layout) ->
             let shape =
-              type_shape_to_complex_shape ~rec_env field_type field_layout
+              type_shape_to_complex_shape ~cache ~rec_env field_type
+                field_layout
             in
             Some field_name, shape)
           fields
@@ -648,7 +653,9 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
       ly2 )
     when Option.value ~default:true (Option.map (Layout.equal field_layout) ly2)
     -> (
-    let shape = type_shape_to_complex_shape ~rec_env field_type field_layout in
+    let shape =
+      type_shape_to_complex_shape ~cache ~rec_env field_type field_layout
+    in
     match lay_out_sequentially shape with
     | [shape] ->
       runtime
@@ -689,7 +696,9 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
       ly2 )
     when Option.value ~default:true (Option.map (Layout.equal arg_layout) ly2)
     -> (
-    let shape = type_shape_to_complex_shape ~rec_env arg_shape arg_layout in
+    let shape =
+      type_shape_to_complex_shape ~cache ~rec_env arg_shape arg_layout
+    in
     match lay_out_sequentially shape with
     | [shape] ->
       runtime
@@ -716,11 +725,13 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
       _ ) ->
     unknown_shape_exn ()
 
-and predef_to_complex_shape_exn ~rec_env (predef : S.Predef.t) ~args : RS.predef
-    =
+and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
+    RS.predef =
   match predef, args with
   | Array, [elem_shape] -> (
-    let elem_shape = type_shape_to_complex_shape_exn ~rec_env elem_shape None in
+    let elem_shape =
+      type_shape_to_complex_shape_exn ~cache ~rec_env elem_shape None
+    in
     let children = lay_out_sequentially elem_shape in
     match children with
     | [] -> err_exn (fun f -> f "array cannot contain only void elements")
@@ -740,7 +751,7 @@ and predef_to_complex_shape_exn ~rec_env (predef : S.Predef.t) ~args : RS.predef
   | Int64, [] -> Int64
   | Lazy_t, [elem_shape] ->
     let elem_shape =
-      type_shape_to_complex_shape_exn ~rec_env elem_shape
+      type_shape_to_complex_shape_exn ~cache ~rec_env elem_shape
         (Some (Layout.Base Value))
     in
     let elem_shape =
@@ -786,18 +797,20 @@ and predef_to_complex_shape_exn ~rec_env (predef : S.Predef.t) ~args : RS.predef
              S.print)
           args)
 
-and type_shape_to_complex_shape ~rec_env type_shape type_layout : t =
-  match Shape_cache.find_in_cache type_shape type_layout ~rec_env with
+and type_shape_to_complex_shape ~cache ~rec_env type_shape type_layout : t =
+  match Shape_cache.find_in_cache cache type_shape type_layout ~rec_env with
   | Some shape -> shape
   | None ->
     let shape =
-      try type_shape_to_complex_shape_exn ~rec_env type_shape (Some type_layout)
+      try
+        type_shape_to_complex_shape_exn ~cache ~rec_env type_shape
+          (Some type_layout)
       with Layout_missing -> layout_to_unknown_shape type_layout
     in
-    Shape_cache.add_to_cache type_shape type_layout shape ~rec_env;
+    Shape_cache.add_to_cache cache type_shape type_layout shape ~rec_env;
     shape
 
-let type_shape_to_complex_shape evaluated_shape type_layout =
+let type_shape_to_complex_shape ~cache evaluated_shape type_layout =
   let type_shape = Type_shape.Evaluated_shape.shape evaluated_shape in
-  type_shape_to_complex_shape ~rec_env:Shape.DeBruijn_env.empty type_shape
-    type_layout
+  type_shape_to_complex_shape ~cache ~rec_env:Shape.DeBruijn_env.empty
+    type_shape type_layout

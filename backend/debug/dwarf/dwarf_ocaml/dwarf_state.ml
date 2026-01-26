@@ -48,7 +48,8 @@ type t =
     function_abstract_instances : (Proto_die.t * Asm_symbol.t) Asm_symbol.Tbl.t;
     get_file_num : string -> int;
     sourcefile : string;
-    diagnostics : Diagnostics.t
+    diagnostics : Diagnostics.t;
+    complex_shape_cache : Complex_shape.Shape_cache.t
   }
 
 let create ~compilation_unit_header_label ~compilation_unit_proto_die
@@ -66,7 +67,8 @@ let create ~compilation_unit_header_label ~compilation_unit_proto_die
     function_abstract_instances = Asm_symbol.Tbl.create 42;
     get_file_num;
     sourcefile;
-    diagnostics = { variables = [] }
+    diagnostics = { variables = [] };
+    complex_shape_cache = Complex_shape.Shape_cache.create 100
   }
 
 let compilation_unit_header_label t = t.compilation_unit_header_label
@@ -94,6 +96,8 @@ let get_file_num t filename = t.get_file_num filename
 let sourcefile t = t.sourcefile
 
 let diagnostics t = t.diagnostics
+
+let complex_shape_cache t = t.complex_shape_cache
 
 let add_variable_reduction_diagnostic t diagnostic =
   t.diagnostics.variables <- diagnostic :: t.diagnostics.variables
