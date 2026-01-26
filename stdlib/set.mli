@@ -14,6 +14,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ portable
+
 open! Stdlib
 
 (* NOTE: If this file is set.mli, do not edit it directly! Instead,

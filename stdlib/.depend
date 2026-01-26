@@ -47,6 +47,11 @@ stdlib__Atomic.cmo : atomic.ml \
 stdlib__Atomic.cmx : atomic.ml \
     stdlib__Atomic.cmi
 stdlib__Atomic.cmi : atomic.mli
+stdlib__Backoff.cmo : backoff.ml \
+    stdlib__Backoff.cmi
+stdlib__Backoff.cmx : backoff.ml \
+    stdlib__Backoff.cmi
+stdlib__Backoff.cmi : backoff.mli
 stdlib__Bigarray.cmo : bigarray.ml \
     stdlib__Sys.cmi \
     stdlib.cmi \
@@ -142,6 +147,13 @@ camlinternalComprehension.cmx : \
     stdlib.cmx \
     camlinternalComprehension.cmi
 camlinternalComprehension.cmi :
+camlinternalQuote.cmo : \
+    stdlib.cmi \
+    camlinternalQuote.cmi
+camlinternalQuote.cmx : \
+    stdlib.cmx \
+    camlinternalQuote.cmi
+camlinternalQuote.cmi :
 camlinternalFormat.cmo : \
     stdlib__Sys.cmi \
     stdlib__String.cmi \

@@ -73,10 +73,13 @@ let parameter_list_from_arrows typ =
     | Types.Tconstr _
     | Types.Tobject _
     | Types.Tfield _
+    | Types.Tquote _
+    | Types.Tsplice _
     | Types.Tnil
     | Types.Tunivar _
     | Types.Tpackage _
-    | Types.Tvariant _ ->
+    | Types.Tvariant _
+    | Types.Tof_kind _ ->
         []
     | Types.Tsubst _ ->
         assert false

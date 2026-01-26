@@ -495,7 +495,7 @@ module Analyser =
       let record comments
           { Typedtree.ld_id; ld_mutable; ld_type; ld_loc; ld_attributes } =
         get_field env comments @@
-        {Types.ld_id; ld_mutable; ld_modalities = Mode.Modality.Value.Const.id;
+        {Types.ld_id; ld_mutable; ld_modalities = Mode.Modality.Const.id;
          ld_sort=Jkind.Sort.Const.void (* ignored *);
          ld_type=ld_type.Typedtree.ctyp_type;
          ld_loc; ld_attributes; ld_uid=Types.Uid.internal_not_actually_unique} in
@@ -1650,10 +1650,11 @@ module Analyser =
            let loc_end = Loc.end_ loc in
            let mp_type_code = get_string_of_file loc_start loc_end in
            match sig_module_type with
-             Types.Mty_functor (param, body_module_type) ->
+             Types.Mty_functor (param, body_module_type, _) ->
                let mp_name, mp_kind =
                  match param2, param with
-                   Parsetree.Named (_, pmty, _), Types.Named (Some ident, mty) ->
+                   Parsetree.Named (_, pmty, _),
+                   Types.Named (Some ident, mty, _) ->
                      Name.from_ident ident,
                      analyse_module_type_kind env current_module_name pmty mty
                  | _ -> "*", Module_type_struct []
@@ -1664,7 +1665,7 @@ module Analyser =
                    mp_type =
                      (match param with
                       | Types.Unit -> None
-                      | Types.Named (_, mty) ->
+                      | Types.Named (_, mty, _) ->
                         Some (Odoc_env.subst_module_type env mty));
                    mp_type_code = mp_type_code ;
                    mp_kind = mp_kind ;
@@ -1743,7 +1744,7 @@ module Analyser =
       | Parsetree.Pmty_functor (param2,module_type2, _) (* of string * module_type * module_type *) ->
           (
            match sig_module_type with
-             Types.Mty_functor (param, body_module_type) ->
+             Types.Mty_functor (param, body_module_type, _) ->
                let loc = match param2 with Parsetree.Unit -> Location.none
                      | Parsetree.Named (_, pmty, _) -> pmty.Parsetree.pmty_loc in
                let loc_start = Loc.start loc in
@@ -1751,7 +1752,8 @@ module Analyser =
                let mp_type_code = get_string_of_file loc_start loc_end in
                let mp_name, mp_kind =
                  match param2, param with
-                   Parsetree.Named (_, pmty, _), Types.Named (Some ident, mty) ->
+                   Parsetree.Named (_, pmty, _),
+                   Types.Named (Some ident, mty, _) ->
                      Name.from_ident ident,
                      analyse_module_type_kind env current_module_name pmty mty
                  | _ -> "*", Module_type_struct []
@@ -1762,7 +1764,8 @@ module Analyser =
                    mp_type =
                      (match param with
                       | Types.Unit -> None
-                      | Types.Named(_, mty) -> Some (Odoc_env.subst_module_type env mty));
+                      | Types.Named(_, mty, _) ->
+                          Some (Odoc_env.subst_module_type env mty));
                    mp_type_code = mp_type_code ;
                    mp_kind = mp_kind ;
                  }

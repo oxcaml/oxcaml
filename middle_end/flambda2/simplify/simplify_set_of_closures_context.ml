@@ -28,7 +28,7 @@ type t =
 
 let function_decl_type ?new_code_id ~rec_info old_code_id =
   let code_id = Option.value new_code_id ~default:old_code_id in
-  Or_unknown_or_bottom.Ok (T.Function_type.create code_id ~rec_info)
+  Or_unknown.Known (T.Function_type.create code_id ~rec_info)
 
 let create_for_stub dacc ~all_code ~simplify_function_body =
   let dacc_inside_functions =
@@ -41,7 +41,7 @@ let create_for_stub dacc ~all_code ~simplify_function_body =
         Code_id.Map.fold
           (fun code_id code denv -> DE.define_code denv ~code_id ~code)
           all_code
-          (DE.enter_set_of_closures (DE.disable_inlining denv)))
+          (DE.enter_set_of_closures denv ~in_stub:true))
   in
   { dacc_prior_to_sets = dacc;
     simplify_function_body;
@@ -113,8 +113,8 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
                  (old_code_id :
                    Function_declarations.code_id_in_function_declaration) ->
               match old_code_id with
-              | Deleted _ -> Or_unknown_or_bottom.Unknown
-              | Code_id old_code_id ->
+              | Deleted _ -> Or_unknown.Unknown
+              | Code_id { code_id = old_code_id; only_full_applications = _ } ->
                 let code_or_metadata = DE.find_code_exn denv old_code_id in
                 let new_code_id =
                   (* The types of the functions involved should reference the
@@ -217,7 +217,7 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
              old_to_new_code_ids ->
           match old_code_id with
           | Deleted _ -> old_to_new_code_ids
-          | Code_id old_code_id ->
+          | Code_id { code_id = old_code_id; only_full_applications = _ } ->
             let code =
               try DE.find_code_exn denv old_code_id
               with Not_found ->
@@ -254,7 +254,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     ~closure_bound_names_all_sets ~value_slot_types_all_sets =
   let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
-    denv |> DE.enter_set_of_closures
+    DE.enter_set_of_closures denv ~in_stub:false
     (* Even if we are not rebuilding terms we should always rebuild them for
        local functions. The type of a function is dependent on its term and not
        knowing it prohibits us from inlining it. *)

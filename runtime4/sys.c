@@ -715,6 +715,24 @@ CAMLprim value caml_sys_const_runtime5(value unit)
   return Val_false;
 }
 
+CAMLprim value caml_sys_const_arch_amd64(value unit)
+{
+#if defined(__x86_64__)
+  return Val_true;
+#else
+  return Val_false;
+#endif
+}
+
+CAMLprim value caml_sys_const_arch_arm64(value unit)
+{
+#if defined(__aarch64__)
+  return Val_true;
+#else
+  return Val_false;
+#endif
+}
+
 CAMLprim value caml_sys_get_config(value unit)
 {
   CAMLparam0 ();   /* unit is unused */

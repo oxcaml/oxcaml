@@ -31,9 +31,13 @@ let unbox_variants = true
 let unbox_closures = true
 
 let make_optimistic_const_ctor () : U.const_ctors_decision =
-  let is_int = Extra_param_and_args.create ~name:"is_int" in
+  let is_int =
+    Extra_param_and_args.create ~name:"is_int" ~debug_uid:Flambda_debug_uid.none
+      K.naked_immediate
+  in
   let unboxed_const_ctor =
     Extra_param_and_args.create ~name:"unboxed_const_ctor"
+      ~debug_uid:Flambda_debug_uid.none K.naked_immediate
   in
   let ctor = U.Unbox (Number (Naked_immediate, unboxed_const_ctor)) in
   At_least_one { is_int; ctor }
@@ -42,7 +46,11 @@ let make_optimistic_number_decision tenv param_type
     (decider : Unboxers.number_decider) : U.decision option =
   match decider.prove_is_a_boxed_number tenv param_type with
   | Proved () ->
-    let naked_number = Extra_param_and_args.create ~name:decider.param_name in
+    let naked_number =
+      Extra_param_and_args.create ~name:decider.param_name
+        ~debug_uid:Flambda_debug_uid.none
+        (K.naked_number decider.kind)
+    in
     Some (Unbox (Number (decider.kind, naked_number)))
   | Unknown -> None
 
@@ -56,7 +64,9 @@ let deciders =
     Unboxers.Int32.decider;
     Unboxers.Int64.decider;
     Unboxers.Nativeint.decider;
-    Unboxers.Vec128.decider ]
+    Unboxers.Vec128.decider;
+    Unboxers.Vec256.decider;
+    Unboxers.Vec512.decider ]
 
 let rec make_optimistic_decision ~depth ~recursive tenv ~param_type : U.decision
     =
@@ -97,10 +107,13 @@ let rec make_optimistic_decision ~depth ~recursive tenv ~param_type : U.decision
           match T.prove_variant_like tenv param_type with
           | Proved { const_ctors; non_const_ctors_with_sizes }
             when unbox_variants && not recursive -> (
-            let tag = Extra_param_and_args.create ~name:"tag" in
+            let tag =
+              Extra_param_and_args.create ~name:"tag"
+                ~debug_uid:Flambda_debug_uid.none K.naked_immediate
+            in
             let const_ctors : U.const_ctors_decision =
               match const_ctors with
-              | Known set when Targetint_31_63.Set.is_empty set -> Zero
+              | Known set when Target_ocaml_int.Set.is_empty set -> Zero
               | Unknown | Known _ -> make_optimistic_const_ctor ()
             in
             let fields_by_tag =
@@ -150,8 +163,10 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
     Format.asprintf "%s%a_%d" field_base_name (pp_tag add_tag_to_name) tag n
   in
   let field_vars =
-    List.init (Targetint_31_63.to_int size) (fun i ->
-        Extra_param_and_args.create ~name:(field_name i))
+    List.init (Target_ocaml_int.to_int size) (fun i ->
+        Extra_param_and_args.create ~name:(field_name i)
+          ~debug_uid:Flambda_debug_uid.none
+          (K.Block_shape.element_kind shape i))
   in
   let type_of_var index (epa : Extra_param_and_args.t) =
     T.alias_type_of
@@ -161,7 +176,8 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
   let field_types = List.mapi type_of_var field_vars in
   let tenv =
     Misc.Stdlib.List.fold_lefti
-      (fun index acc { Extra_param_and_args.param = var; args = _ } ->
+      (fun index acc
+           { Extra_param_and_args.param = var; param_debug_uid = _; args = _ } ->
         let name = Bound_name.create (Name.var var) Name_mode.normal in
         TE.add_definition acc name (K.Block_shape.element_kind shape index))
       tenv field_vars
@@ -169,6 +185,7 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
   let shape =
     T.immutable_block ~is_unique:false tag ~shape ~fields:field_types
       (Alloc_mode.For_types.unknown ())
+      ~machine_width:(TE.machine_width tenv)
   in
   match T.meet tenv param_type shape with
   | Bottom -> None
@@ -195,7 +212,10 @@ and make_optimistic_vars_within_closure ~depth ~recursive tenv closures_entry =
   Value_slot.Map.mapi
     (fun value_slot var_type : U.field_decision ->
       let epa =
-        Extra_param_and_args.create ~name:(Value_slot.to_string value_slot)
+        Extra_param_and_args.create
+          ~name:(Value_slot.to_string value_slot)
+          ~debug_uid:Flambda_debug_uid.none
+          (Value_slot.kind value_slot)
       in
       let decision =
         make_optimistic_decision ~depth:(depth + 1) ~recursive tenv

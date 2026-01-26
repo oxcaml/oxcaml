@@ -28,11 +28,12 @@ include Contains_ids.S with type t := t
 val create :
   condition_dbg:Debuginfo.t ->
   scrutinee:Simple.t ->
-  arms:Apply_cont_expr.t Targetint_31_63.Map.t ->
+  arms:Apply_cont_expr.t Target_ocaml_int.Map.t ->
   t
 
 (** Create a [Switch] corresponding to a traditional if-then-else. *)
 val if_then_else :
+  machine_width:Target_system.Machine_width.t ->
   condition_dbg:Debuginfo.t ->
   scrutinee:Simple.t ->
   if_true:Apply_cont_expr.t ->
@@ -47,10 +48,10 @@ val condition_dbg : t -> Debuginfo.t
 
 (** Call the given function [f] on each (discriminant, action) pair in the
     switch. *)
-val iter : t -> f:(Targetint_31_63.t -> Apply_cont_expr.t -> unit) -> unit
+val iter : t -> f:(Target_ocaml_int.t -> Apply_cont_expr.t -> unit) -> unit
 
 (** What the switch will do for each possible value of the discriminant. *)
-val arms : t -> Apply_cont_expr.t Targetint_31_63.Map.t
+val arms : t -> Apply_cont_expr.t Target_ocaml_int.Map.t
 
 (** How many cases the switch has. (Note that this is not the number of
     destinations reached by the switch, which may be a smaller number.) *)

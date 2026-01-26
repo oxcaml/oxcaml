@@ -1,0 +1,30 @@
+; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
+; we need to compile it as an additional target, but only for the first
+; stage build.
+;
+; These rules cannot be in the root "dune" file, as this causes dune to
+; report a circular dependency.
+
+(rule
+ (targets camlinternalquote_if_missing_from_stdlib)
+ (enabled_if
+  (= %{context_name} "default"))
+ ; Use runtime detection to also support the case where the system compiler
+ ; *does* have camlinternalQuote in its stdlib (e.g. the system compiler is
+ ; oxcaml).
+ (action
+  (with-stdout-to %{targets}
+   (bash "
+     if ocaml -e 'open CamlinternalQuote' 2>/dev/null
+     then echo '()'
+     else echo 'camlinternalQuote'
+     fi
+   "))))
+
+(rule
+ (targets camlinternalquote_if_missing_from_stdlib)
+ (enabled_if
+  (not
+   (= %{context_name} "default")))
+ (action
+  (write-file %{targets} "()")))

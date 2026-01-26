@@ -33,4 +33,25 @@ Hint: Single backslashes \ are reserved for escape sequences
 To get a backslash character, escape it with a second backslash: \\.
 
 val invalid : string = "\\o99"
+Line 2, characters 14-17:
+2 | let invalid = #'' ;;
+                  ^^^
+Error: Illegal empty character literal ''
+  Hint: Did you mean ' ' or a type variable 'a?
+Line 1, characters 14-21:
+1 | let invalid = #'\400' ;;
+                  ^^^^^^^
+Error: Illegal backslash escape in string or character (#'\400'): 400 is outside the range of legal characters (0-255).
+Line 1, characters 14-18:
+1 | let invalid = #'\xAAA' ;;
+                  ^^^^
+Error: Illegal backslash escape in string or character (\x)
+Line 1, characters 14-18:
+1 | let invalid = #'\xA' ;;
+                  ^^^^
+Error: Illegal backslash escape in string or character (\x)
+Line 1, characters 14-18:
+1 | let invalid = #'\b1010' ;;
+                  ^^^^
+Error: Illegal backslash escape in string or character (\b)
 

@@ -14,10 +14,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val simplify_switch :
-  simplify_let:
-    (simplify_expr:Flambda.Expr.t Simplify_common.expr_simplifier ->
-    simplify_function_body:Simplify_common.simplify_function_body ->
-    Flambda.Let.t Simplify_common.expr_simplifier) ->
-  simplify_function_body:Simplify_common.simplify_function_body ->
-  Flambda.Switch.t Simplify_common.expr_simplifier
+val simplify_switch : Flambda.Switch.t Simplify_common.expr_simplifier

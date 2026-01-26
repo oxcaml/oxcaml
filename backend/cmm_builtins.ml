@@ -54,9 +54,13 @@ let if_operation_supported op ~f =
   match Proc.operation_supported op with true -> Some (f ()) | false -> None
 
 let if_operation_supported_bi bi op ~f =
-  if Primitive.equal_unboxed_integer bi Primitive.Unboxed_int64 && size_int = 4
+  if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int64
+     && size_int = 4
   then None
   else if_operation_supported op ~f
+
+let if_expr_supported expr =
+  match Proc.expression_supported expr with true -> Some expr | false -> None
 
 let int_of_value arg dbg = Cop (Creinterpret_cast Int_of_value, [arg], dbg)
 
@@ -74,6 +78,8 @@ let shift32 make_op arg count dbg =
     | Cconst_float32 _
     | Cconst_float (_, _)
     | Cconst_vec128 (_, _)
+    | Cconst_vec256 (_, _)
+    | Cconst_vec512 (_, _)
     | Cconst_symbol (_, _)
     | Cvar _
     | Clet (_, _, _)
@@ -101,14 +107,15 @@ let clz ~arg_is_non_zero bi arg dbg =
   let op = Cclz { arg_is_non_zero } in
   if_operation_supported_bi bi op ~f:(fun () ->
       let res = Cop (op, [make_unsigned_int bi arg dbg], dbg) in
-      if Primitive.equal_unboxed_integer bi Primitive.Unboxed_int32
+      if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
          && size_int = 8
       then Cop (Caddi, [res; Cconst_int (-32, dbg)], dbg)
       else res)
 
 let ctz ~arg_is_non_zero bi arg dbg =
   let arg = make_unsigned_int bi arg dbg in
-  if Primitive.equal_unboxed_integer bi Primitive.Unboxed_int32 && size_int = 8
+  if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
+     && size_int = 8
   then
     (* regardless of the value of the argument [arg_is_non_zero], always set the
        corresponding field to [true], because we make it non-zero below by
@@ -227,6 +234,7 @@ let bigstring_atomic_sub size (arg1, arg2, arg3) dbg =
 
 let rec const_args_gen ~extract ~type_name n args name =
   match n, args with
+  | -1, _ -> bad_immediate "Too many arguments for %s" name
   | 0, [] -> []
   | _, [] ->
     bad_immediate "Missing %d constant %s argument(s) for %s" n type_name name
@@ -268,20 +276,18 @@ let const_int64_args =
     ~type_name:"int64"
 
 let int64_of_int8 i =
-  (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-  if i < 0 || i > 0xff
-  then bad_immediate "Int8 constant not in range [0x0,0xff]: 0x%016x" i;
-  Int64.of_int i
+  if i < -0x80 || i > 0x7f
+  then bad_immediate "Int8 constant not in range [0x0,0xff]: 0x%x" i;
+  Int64.of_int i |> Int64.logand 0xffL
 
 let int64_of_int16 i =
-  (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-  if i < 0 || i > 0xffff
-  then bad_immediate "Int16 constant not in range [0x0,0xffff]: 0x%016x" i;
-  Int64.of_int i
+  if i < -0x8000 || i > 0x7fff
+  then bad_immediate "Int16 constant not in range [0x0,0xffff]: 0x%x" i;
+  Int64.of_int i |> Int64.logand 0xffffL
 
 let int64_of_int32 i =
   if i < Int32.to_int Int32.min_int || i > Int32.to_int Int32.max_int
-  then bad_immediate "Int32 constant not in range [0x0,0xffffffff]: 0x%016x" i;
+  then bad_immediate "Int32 constant not in range [0x0,0xffffffff]: 0x%x" i;
   Int64.of_int i |> Int64.logand 0xffffffffL
 
 let int64_of_float32 f =
@@ -305,11 +311,35 @@ let pack_int8s i0 i1 i2 i3 i4 i5 i6 i7 =
          (logor (shift_left i3 24) (shift_left i2 16))
          (logor (shift_left i1 8) i0)))
 
-let transl_vec128_builtin name args dbg _typ_res =
+let transl_vec_builtin name args dbg _typ_res =
   match name with
   (* Vector casts (no-ops) *)
   | "caml_vec128_cast" ->
-    let op = Creinterpret_cast V128_of_v128 in
+    let op = Creinterpret_cast (V128_of_vec Vec128) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec256_cast" ->
+    let op = Creinterpret_cast (V256_of_vec Vec256) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_cast" ->
+    let op = Creinterpret_cast (V512_of_vec Vec512) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec256_low_of_vec128" ->
+    let op = Creinterpret_cast (V256_of_vec Vec128) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec256_low_to_vec128" ->
+    let op = Creinterpret_cast (V128_of_vec Vec256) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_low_of_vec128" ->
+    let op = Creinterpret_cast (V512_of_vec Vec128) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_low_to_vec128" ->
+    let op = Creinterpret_cast (V128_of_vec Vec512) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_low_of_vec256" ->
+    let op = Creinterpret_cast (V512_of_vec Vec256) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_low_to_vec256" ->
+    let op = Creinterpret_cast (V256_of_vec Vec512) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   (* Scalar casts. These leave the top bits of the vector unspecified. *)
   | "caml_float64x2_low_of_float" ->
@@ -336,103 +366,464 @@ let transl_vec128_builtin name args dbg _typ_res =
   | "caml_int32x4_low_to_int32" ->
     let op = Cstatic_cast (Scalar_of_v128 Int32x4) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int16x8_low_of_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+  | "caml_int16x8_low_of_int16" ->
     let op = Cstatic_cast (V128_of_scalar Int16x8) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int16x8_low_to_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+  | "caml_int16x8_low_to_int16" ->
     let op = Cstatic_cast (Scalar_of_v128 Int16x8) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int8x16_low_of_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+  | "caml_int8x16_low_of_int8" ->
     let op = Cstatic_cast (V128_of_scalar Int8x16) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int8x16_low_to_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+  | "caml_int8x16_low_to_int8" ->
     let op = Cstatic_cast (Scalar_of_v128 Int8x16) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  (* Constants *)
+  | "caml_float64x4_low_of_float" ->
+    let op = Cstatic_cast (V256_of_scalar Float64x4) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_float64x4_low_to_float" ->
+    let op = Cstatic_cast (Scalar_of_v256 Float64x4) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_float32x8_low_of_float32" ->
+    let op = Cstatic_cast (V256_of_scalar Float32x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_float32x8_low_to_float32" ->
+    let op = Cstatic_cast (Scalar_of_v256 Float32x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int64x4_low_of_int64" ->
+    let op = Cstatic_cast (V256_of_scalar Int64x4) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int64x4_low_to_int64" ->
+    let op = Cstatic_cast (Scalar_of_v256 Int64x4) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int32x8_low_of_int32" ->
+    let op = Cstatic_cast (V256_of_scalar Int32x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int32x8_low_to_int32" ->
+    let op = Cstatic_cast (Scalar_of_v256 Int32x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int16x16_low_of_int16" ->
+    let op = Cstatic_cast (V256_of_scalar Int16x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int16x16_low_to_int16" ->
+    let op = Cstatic_cast (Scalar_of_v256 Int16x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int8x32_low_of_int8" ->
+    let op = Cstatic_cast (V256_of_scalar Int8x32) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int8x32_low_to_int8" ->
+    let op = Cstatic_cast (Scalar_of_v256 Int8x32) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_float64x8_low_of_float" ->
+    let op = Cstatic_cast (V512_of_scalar Float64x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_float64x8_low_to_float" ->
+    let op = Cstatic_cast (Scalar_of_v512 Float64x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_float32x16_low_of_float32" ->
+    let op = Cstatic_cast (V512_of_scalar Float32x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_float32x16_low_to_float32" ->
+    let op = Cstatic_cast (Scalar_of_v512 Float32x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int64x8_low_of_int64" ->
+    let op = Cstatic_cast (V512_of_scalar Int64x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int64x8_low_to_int64" ->
+    let op = Cstatic_cast (Scalar_of_v512 Int64x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int32x16_low_of_int32" ->
+    let op = Cstatic_cast (V512_of_scalar Int32x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int32x16_low_to_int32" ->
+    let op = Cstatic_cast (Scalar_of_v512 Int32x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int16x32_low_of_int16" ->
+    let op = Cstatic_cast (V512_of_scalar Int16x32) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int16x32_low_to_int16" ->
+    let op = Cstatic_cast (Scalar_of_v512 Int16x32) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int8x64_low_of_int8" ->
+    let op = Cstatic_cast (V512_of_scalar Int8x64) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int8x64_low_to_int8" ->
+    let op = Cstatic_cast (Scalar_of_v512 Int8x64) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  (* 128-bit constants *)
   | "caml_float32x4_const1" ->
     let f = const_float32_args 1 args name |> List.hd in
     let i = int64_of_float32 f in
     let i = pack_int32s i i in
-    Some (Cconst_vec128 ({ low = i; high = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_float32x4_const4" ->
-    let i0, i1, i2, i3 =
-      match const_float32_args 4 args name |> List.map int64_of_float32 with
-      | [i0; i1; i2; i3] -> i0, i1, i2, i3
-      | _ -> assert false
+    let vals =
+      const_float32_args 4 args name
+      |> Array.of_list |> Array.map int64_of_float32
     in
-    let low = pack_int32s i0 i1 in
-    let high = pack_int32s i2 i3 in
-    Some (Cconst_vec128 ({ low; high }, dbg))
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_float64x2_const1" ->
     let f = const_float_args 1 args name |> List.hd in
     let i = Int64.bits_of_float f in
-    Some (Cconst_vec128 ({ low = i; high = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_float64x2_const2" ->
-    let low, high =
-      match const_float_args 2 args name |> List.map Int64.bits_of_float with
-      | [f0; f1] -> f0, f1
-      | _ -> assert false
+    let vals =
+      const_float_args 2 args name
+      |> Array.of_list
+      |> Array.map Int64.bits_of_float
     in
-    Some (Cconst_vec128 ({ low; high }, dbg))
+    let word0, word1 = vals.(0), vals.(1) in
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int64x2_const1" ->
     let i = const_int64_args 1 args name |> List.hd in
-    Some (Cconst_vec128 ({ low = i; high = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int64x2_const2" ->
-    let low, high =
-      match const_int64_args 2 args name with
-      | [i0; i1] -> i0, i1
-      | _ -> assert false
-    in
-    Some (Cconst_vec128 ({ low; high }, dbg))
+    let vals = const_int64_args 2 args name |> Array.of_list in
+    let word0, word1 = vals.(0), vals.(1) in
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int32x4_const1" ->
     let i = const_int_args 1 args name |> List.hd |> int64_of_int32 in
     let i = pack_int32s i i in
-    Some (Cconst_vec128 ({ low = i; high = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int32x4_const4" ->
-    let i0, i1, i2, i3 =
-      match const_int_args 4 args name |> List.map int64_of_int32 with
-      | [i0; i1; i2; i3] -> i0, i1, i2, i3
-      | _ -> assert false
+    let vals =
+      const_int_args 4 args name |> Array.of_list |> Array.map int64_of_int32
     in
-    let low = pack_int32s i0 i1 in
-    let high = pack_int32s i2 i3 in
-    Some (Cconst_vec128 ({ low; high }, dbg))
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int16x8_const1" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
     let i = pack_int16s i i i i in
-    Some (Cconst_vec128 ({ low = i; high = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int16x8_const8" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-    let i0, i1, i2, i3, i4, i5, i6, i7 =
-      match const_int_args 8 args name |> List.map int64_of_int16 with
-      | [i0; i1; i2; i3; i4; i5; i6; i7] -> i0, i1, i2, i3, i4, i5, i6, i7
-      | _ -> assert false
+    let vals =
+      const_int_args 8 args name |> Array.of_list |> Array.map int64_of_int16
     in
-    let low = pack_int16s i0 i1 i2 i3 in
-    let high = pack_int16s i4 i5 i6 i7 in
-    Some (Cconst_vec128 ({ low; high }, dbg))
+    let word0 = pack_int16s vals.(0) vals.(1) vals.(2) vals.(3) in
+    let word1 = pack_int16s vals.(4) vals.(5) vals.(6) vals.(7) in
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int8x16_const1" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
     let i = pack_int8s i i i i i i i i in
-    Some (Cconst_vec128 ({ low = i; high = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int8x16_const16" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-    let i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15 =
-      match const_int_args 16 args name |> List.map int64_of_int8 with
-      | [i0; i1; i2; i3; i4; i5; i6; i7; i8; i9; i10; i11; i12; i13; i14; i15]
-        ->
-        i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15
-      | _ -> assert false
+    let vals =
+      const_int_args 16 args name |> Array.of_list |> Array.map int64_of_int8
     in
-    let low = pack_int8s i0 i1 i2 i3 i4 i5 i6 i7 in
-    let high = pack_int8s i8 i9 i10 i11 i12 i13 i14 i15 in
-    Some (Cconst_vec128 ({ low; high }, dbg))
+    let word0 =
+      pack_int8s vals.(0) vals.(1) vals.(2) vals.(3) vals.(4) vals.(5) vals.(6)
+        vals.(7)
+    in
+    let word1 =
+      pack_int8s vals.(8) vals.(9) vals.(10) vals.(11) vals.(12) vals.(13)
+        vals.(14) vals.(15)
+    in
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
+  (* 256-bit constants *)
+  | "caml_float32x8_const1" ->
+    let f = const_float32_args 1 args name |> List.hd in
+    let i = int64_of_float32 f in
+    let i = pack_int32s i i in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_float32x8_const8" ->
+    let vals =
+      const_float32_args 8 args name
+      |> Array.of_list |> Array.map int64_of_float32
+    in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    let word2 = pack_int32s vals.(4) vals.(5) in
+    let word3 = pack_int32s vals.(6) vals.(7) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_float64x4_const1" ->
+    let f = const_float_args 1 args name |> List.hd in
+    let i = Int64.bits_of_float f in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_float64x4_const4" ->
+    let vals =
+      const_float_args 4 args name
+      |> Array.of_list
+      |> Array.map Int64.bits_of_float
+    in
+    let word0, word1, word2, word3 = vals.(0), vals.(1), vals.(2), vals.(3) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_int64x4_const1" ->
+    let i = const_int64_args 1 args name |> List.hd in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_int64x4_const4" ->
+    let vals = const_int64_args 4 args name |> Array.of_list in
+    let word0, word1, word2, word3 = vals.(0), vals.(1), vals.(2), vals.(3) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_int32x8_const1" ->
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int32 in
+    let i = pack_int32s i i in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_int32x8_const8" ->
+    let vals =
+      const_int_args 8 args name |> Array.of_list |> Array.map int64_of_int32
+    in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    let word2 = pack_int32s vals.(4) vals.(5) in
+    let word3 = pack_int32s vals.(6) vals.(7) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_int16x16_const1" ->
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
+    let i = pack_int16s i i i i in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_int16x16_const16" ->
+    let vals =
+      const_int_args 16 args name |> Array.of_list |> Array.map int64_of_int16
+    in
+    let word0 = pack_int16s vals.(0) vals.(1) vals.(2) vals.(3) in
+    let word1 = pack_int16s vals.(4) vals.(5) vals.(6) vals.(7) in
+    let word2 = pack_int16s vals.(8) vals.(9) vals.(10) vals.(11) in
+    let word3 = pack_int16s vals.(12) vals.(13) vals.(14) vals.(15) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_int8x32_const1" ->
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
+    let i = pack_int8s i i i i i i i i in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_int8x32_const32" ->
+    let vals =
+      const_int_args 32 args name |> Array.of_list |> Array.map int64_of_int8
+    in
+    let word0 =
+      pack_int8s vals.(0) vals.(1) vals.(2) vals.(3) vals.(4) vals.(5) vals.(6)
+        vals.(7)
+    in
+    let word1 =
+      pack_int8s vals.(8) vals.(9) vals.(10) vals.(11) vals.(12) vals.(13)
+        vals.(14) vals.(15)
+    in
+    let word2 =
+      pack_int8s vals.(16) vals.(17) vals.(18) vals.(19) vals.(20) vals.(21)
+        vals.(22) vals.(23)
+    in
+    let word3 =
+      pack_int8s vals.(24) vals.(25) vals.(26) vals.(27) vals.(28) vals.(29)
+        vals.(30) vals.(31)
+    in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  (* 512-bit constants *)
+  | "caml_float32x16_const1" ->
+    let f = const_float32_args 1 args name |> List.hd in
+    let i = int64_of_float32 f in
+    let i = pack_int32s i i in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_float32x16_const16" ->
+    let vals =
+      const_float32_args 16 args name
+      |> Array.of_list |> Array.map int64_of_float32
+    in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    let word2 = pack_int32s vals.(4) vals.(5) in
+    let word3 = pack_int32s vals.(6) vals.(7) in
+    let word4 = pack_int32s vals.(8) vals.(9) in
+    let word5 = pack_int32s vals.(10) vals.(11) in
+    let word6 = pack_int32s vals.(12) vals.(13) in
+    let word7 = pack_int32s vals.(14) vals.(15) in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_float64x8_const1" ->
+    let f = const_float_args 1 args name |> List.hd in
+    let i = Int64.bits_of_float f in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_float64x8_const8" ->
+    let vals =
+      const_float_args 8 args name
+      |> Array.of_list
+      |> Array.map Int64.bits_of_float
+    in
+    let word0, word1, word2, word3, word4, word5, word6, word7 =
+      ( vals.(0),
+        vals.(1),
+        vals.(2),
+        vals.(3),
+        vals.(4),
+        vals.(5),
+        vals.(6),
+        vals.(7) )
+    in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_int64x8_const1" ->
+    let i = const_int64_args 1 args name |> List.hd in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_int64x8_const8" ->
+    let vals = const_int64_args 8 args name |> Array.of_list in
+    let word0, word1, word2, word3, word4, word5, word6, word7 =
+      ( vals.(0),
+        vals.(1),
+        vals.(2),
+        vals.(3),
+        vals.(4),
+        vals.(5),
+        vals.(6),
+        vals.(7) )
+    in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_int32x16_const1" ->
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int32 in
+    let i = pack_int32s i i in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_int32x16_const16" ->
+    let vals =
+      const_int_args 16 args name |> Array.of_list |> Array.map int64_of_int32
+    in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    let word2 = pack_int32s vals.(4) vals.(5) in
+    let word3 = pack_int32s vals.(6) vals.(7) in
+    let word4 = pack_int32s vals.(8) vals.(9) in
+    let word5 = pack_int32s vals.(10) vals.(11) in
+    let word6 = pack_int32s vals.(12) vals.(13) in
+    let word7 = pack_int32s vals.(14) vals.(15) in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_int16x32_const1" ->
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
+    let i = pack_int16s i i i i in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_int16x32_const32" ->
+    let vals =
+      const_int_args 32 args name |> Array.of_list |> Array.map int64_of_int16
+    in
+    let word0 = pack_int16s vals.(0) vals.(1) vals.(2) vals.(3) in
+    let word1 = pack_int16s vals.(4) vals.(5) vals.(6) vals.(7) in
+    let word2 = pack_int16s vals.(8) vals.(9) vals.(10) vals.(11) in
+    let word3 = pack_int16s vals.(12) vals.(13) vals.(14) vals.(15) in
+    let word4 = pack_int16s vals.(16) vals.(17) vals.(18) vals.(19) in
+    let word5 = pack_int16s vals.(20) vals.(21) vals.(22) vals.(23) in
+    let word6 = pack_int16s vals.(24) vals.(25) vals.(26) vals.(27) in
+    let word7 = pack_int16s vals.(28) vals.(29) vals.(30) vals.(31) in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_int8x64_const1" ->
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
+    let i = pack_int8s i i i i i i i i in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_int8x64_const64" ->
+    let vals =
+      const_int_args 64 args name |> Array.of_list |> Array.map int64_of_int8
+    in
+    let word0 =
+      pack_int8s vals.(0) vals.(1) vals.(2) vals.(3) vals.(4) vals.(5) vals.(6)
+        vals.(7)
+    in
+    let word1 =
+      pack_int8s vals.(8) vals.(9) vals.(10) vals.(11) vals.(12) vals.(13)
+        vals.(14) vals.(15)
+    in
+    let word2 =
+      pack_int8s vals.(16) vals.(17) vals.(18) vals.(19) vals.(20) vals.(21)
+        vals.(22) vals.(23)
+    in
+    let word3 =
+      pack_int8s vals.(24) vals.(25) vals.(26) vals.(27) vals.(28) vals.(29)
+        vals.(30) vals.(31)
+    in
+    let word4 =
+      pack_int8s vals.(32) vals.(33) vals.(34) vals.(35) vals.(36) vals.(37)
+        vals.(38) vals.(39)
+    in
+    let word5 =
+      pack_int8s vals.(40) vals.(41) vals.(42) vals.(43) vals.(44) vals.(45)
+        vals.(46) vals.(47)
+    in
+    let word6 =
+      pack_int8s vals.(48) vals.(49) vals.(50) vals.(51) vals.(52) vals.(53)
+        vals.(54) vals.(55)
+    in
+    let word7 =
+      pack_int8s vals.(56) vals.(57) vals.(58) vals.(59) vals.(60) vals.(61)
+        vals.(62) vals.(63)
+    in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
   | _ -> None
 
 (** [transl_builtin prim args dbg] returns None if the built-in [prim] is not
@@ -447,10 +838,26 @@ let transl_vec128_builtin name args dbg _typ_res =
   tagging before the result is returned to the user. *)
 let transl_builtin name args dbg typ_res =
   match name with
+  | "caml_int128_add" ->
+    let op = Caddi128 in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int128_sub" ->
+    let op = Csubi128 in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int64_mul128" ->
+    let op = Cmuli64 { signed = true } in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_unsigned_int64_mul128" ->
+    let op = Cmuli64 { signed = false } in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int64_bits_of_float_unboxed" ->
     Some (Cop (Creinterpret_cast Int64_of_float, args, dbg))
   | "caml_int64_float_of_bits_unboxed" ->
     Some (Cop (Creinterpret_cast Float_of_int64, args, dbg))
+  | "caml_int64_of_float_unboxed" ->
+    Some (Cop (Cstatic_cast (Int_of_float Float64), args, dbg))
+  | "caml_int64_to_float_unboxed" ->
+    Some (Cop (Cstatic_cast (Float_of_int Float64), args, dbg))
   | "caml_float32_of_bits" ->
     Some (Cop (Creinterpret_cast Float32_of_int32, args, dbg))
   | "caml_float32_to_bits" ->
@@ -546,7 +953,8 @@ let transl_builtin name args dbg typ_res =
   | "caml_int32_unsigned_to_int_trunc_unboxed_to_untagged" ->
     Some (zero_extend ~bits:32 ~dbg (one_arg name args))
   | "caml_csel_value" | "caml_csel_int_untagged" | "caml_csel_int64_unboxed"
-  | "caml_csel_int32_unboxed" | "caml_csel_nativeint_unboxed" ->
+  | "caml_csel_int32_unboxed" | "caml_csel_int16_untagged"
+  | "caml_csel_int8_untagged" | "caml_csel_nativeint_unboxed" ->
     (* Unboxed float variant of csel intrinsic is not currently supported. It
        can be emitted on arm64 using FCSEL, but there appears to be no
        corresponding instruction on amd64 for xmm registers. *)
@@ -564,6 +972,8 @@ let transl_builtin name args dbg typ_res =
         | Cconst_float32 (_, _)
         | Cconst_float (_, _)
         | Cconst_vec128 (_, _)
+        | Cconst_vec256 (_, _)
+        | Cconst_vec512 (_, _)
         | Cconst_symbol (_, _)
         | Cvar _
         | Clet (_, _, _)
@@ -823,7 +1233,8 @@ let transl_builtin name args dbg typ_res =
     bigstring_cas Sixtyfour (four_args name args) dbg
   | "caml_bigstring_compare_and_swap_int32_unboxed" ->
     bigstring_cas Thirtytwo (four_args name args) dbg
-  | _ -> transl_vec128_builtin name args dbg typ_res
+  | "caml_pause_hint" -> Some (Cop (Cpause, args, dbg))
+  | _ -> transl_vec_builtin name args dbg typ_res
 
 let builtin_even_if_not_annotated = function
   | "caml_int64_bits_of_float_unboxed" | "caml_int64_float_of_bits_unboxed" ->

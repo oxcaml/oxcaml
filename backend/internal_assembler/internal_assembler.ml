@@ -28,6 +28,7 @@ open! Int_replace_polymorphic_compare
 module String = Misc.Stdlib.String
 module Section_name = X86_proc.Section_name
 module StringMap = X86_binary_emitter.StringMap
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 let isprefix s1 s2 =
   String.length s1 <= String.length s2
@@ -165,15 +166,17 @@ let make_relocation_section sections ~sym_tbl_idx relocation_table
 
 let assemble_one_section ~name instructions =
   let align =
-    List.fold_left
-      (fun acc i ->
-        match i with X86_ast.Align (data, n) when n > acc -> n | _ -> acc)
-      0 instructions
+    DLL.fold_left instructions
+      ~f:(fun acc i ->
+        match i with
+        | X86_ast.Directive (Align { bytes=n; _ }) when n > acc -> n
+        | _ -> acc)
+      ~init:0
   in
   align,
   X86_binary_emitter.assemble_section X64
     { X86_binary_emitter.sec_name = X86_proc.Section_name.to_string name;
-      sec_instrs = Array.of_list instructions
+      sec_instrs = DLL.to_array instructions
     }
 
 let get_sections ~delayed sections =

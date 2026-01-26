@@ -26,15 +26,30 @@ open Allowance
 (** Asttypes exposes basic definitions shared both by Parsetree and Types. *)
 open Asttypes
 
+(** Whether or not a mutable field is atomic *)
+type atomic =
+  | Nonatomic
+  | Atomic
+
 (** Describes a mutable field/element. *)
 type mutability =
   | Immutable
-  | Mutable of Mode.Alloc.Comonadic.Const.t
-  (** The upper bound of the new field value upon mutation. *)
+  | Mutable of
+      { mode : Mode.Value.Comonadic.lr
+        (** Mode of new field value in mutation. *)
+      ; atomic : atomic
+      }
 
-(** Returns [true] is the [mutable_flag] is mutable. Should be called if not
-    interested in the payload of [Mutable]. *)
+(** Returns [true] is the [mutable_flag] is mutable or atomic. Should be called
+    if not interested in the payload of [Mutable]. *)
 val is_mutable : mutability -> bool
+
+(** Returns [true] is the [mutable_flag] is atomic. Should be called
+    if not interested in the payload of [Mutable]. *)
+val is_atomic : mutability -> bool
+
+(** Given the parameter [m0] on mutable, return the mode of future writes. *)
+val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Type expressions for the core language.
 
@@ -68,77 +83,12 @@ val is_mutable : mutability -> bool
     Note on mutability: TBD.
  *)
 
-(** The mod-bounds of a jkind *)
-module Jkind_mod_bounds : sig
-  module Locality = Mode.Locality.Const
-  module Linearity = Mode.Linearity.Const
-  module Uniqueness = Mode.Uniqueness.Const_op
-  module Portability = Mode.Portability.Const
-  module Contention = Mode.Contention.Const_op
-  module Yielding = Mode.Yielding.Const
-  module Statefulness = Mode.Statefulness.Const
-  module Visibility = Mode.Visibility.Const_op
-  module Externality = Jkind_axis.Externality
-  module Nullability = Jkind_axis.Nullability
-
-  type t
-
-  val create :
-    locality:Locality.t ->
-    linearity:Linearity.t ->
-    uniqueness:Uniqueness.t ->
-    portability:Portability.t ->
-    contention:Contention.t ->
-    yielding:Yielding.t ->
-    statefulness:Statefulness.t ->
-    visibility:Visibility.t ->
-    externality:Externality.t ->
-    nullability:Nullability.t ->
-    t
-
-  val locality : t -> Locality.t
-  val linearity : t -> Linearity.t
-  val uniqueness : t -> Uniqueness.t
-  val portability : t -> Portability.t
-  val contention : t -> Contention.t
-  val yielding : t -> Yielding.t
-  val statefulness : t -> Statefulness.t
-  val visibility : t -> Visibility.t
-  val externality : t -> Externality.t
-  val nullability : t -> Nullability.t
-
-  val set_locality : Locality.t -> t -> t
-  val set_linearity : Linearity.t -> t -> t
-  val set_uniqueness : Uniqueness.t -> t -> t
-  val set_portability : Portability.t -> t -> t
-  val set_contention : Contention.t -> t -> t
-  val set_yielding : Yielding.t -> t -> t
-  val set_statefulness : Statefulness.t -> t -> t
-  val set_visibility : Visibility.t -> t -> t
-  val set_externality : Externality.t -> t -> t
-  val set_nullability : Nullability.t -> t -> t
-
-  (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max] within
-      [bounds] *)
-  val set_max_in_set : t -> Jkind_axis.Axis_set.t -> t
-
-  (** [set_min_in_set bounds axes] sets all the axes in [axes] to their [min] within
-      [bounds] *)
-  val set_min_in_set : t -> Jkind_axis.Axis_set.t -> t
-
-  (** [is_max_within_set bounds axes] returns whether or not all the axes in [axes] are
-      [max] within [bounds] *)
-  val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
-  val is_max : t -> bool
-
-  val debug_print : Format.formatter -> t -> unit
-end
-
-
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
   (** The axes that the with-bound applies to *)
   type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+
+  val join : t -> t -> t
 end
 
 type type_expr
@@ -204,6 +154,12 @@ and type_desc =
   | Tfield of string * field_kind * type_expr * type_expr
   (** [Tfield ("foo", field_public, t, ts)] ==> [<...; foo : t; ts>] *)
 
+  | Tquote of type_expr
+  (** [Tquote t] ==> [<[ t ]>] *)
+
+  | Tsplice of type_expr
+  (** [Tsplice t] ==> [$t] *)
+
   | Tnil
   (** [Tnil] ==> [<...; >] *)
 
@@ -234,6 +190,15 @@ and type_desc =
   | Tpackage of Path.t * (Longident.t * type_expr) list
   (** Type of a first-class module (a.k.a package). *)
 
+  | Tof_kind of jkind_lr
+  (** [Tof_kind jkind] ==> [(type : jkind)]
+
+      The "canonical" type of a particular kind.
+
+      These types are uninhabited, and any appearing in translation will cause an error.
+      They are only used to represent the kinds of existentially-quantified types
+      mentioned in with-bounds. See test typing-jkind-bounds/gadt.ml *)
+
 (** This is used in the Typedtree. It is distinct from
     {{!Asttypes.arg_label}[arg_label]} because Position argument labels are
     discovered through typechecking. *)
@@ -248,11 +213,15 @@ and arrow_desc =
 
 
 
+(** See also documentation for [row_more], which enumerates how these
+    constructors arise. *)
 and fixed_explanation =
   | Univar of type_expr (** The row type was bound to an univar *)
   | Fixed_private (** The row type is private *)
   | Reified of Path.t (** The row was reified *)
   | Rigid (** The row type was made rigid during constraint verification *)
+  | Fixed_existential (** The row type is existential in a with-bound.
+                      See Note [With-bounds for GADTs] in Jkind. *)
 
 (** [abbrev_memo] allows one to keep track of different expansions of a type
     alias. This is done for performance purposes.
@@ -325,6 +294,14 @@ and jkind_history =
 (** The types within the with-bounds of a jkind *)
 and with_bounds_types
 
+(** The mod bounds of a jkind *)
+and mod_bounds =
+  { crossing : Mode.Crossing.t;
+    externality: Jkind_axis.Externality.t;
+    nullability: Jkind_axis.Nullability.t;
+    separability: Jkind_axis.Separability.t;
+  }
+
 and 'd with_bounds =
   | No_with_bounds : ('l * 'r) with_bounds
   | With_bounds
@@ -333,7 +310,7 @@ and 'd with_bounds =
 
 and ('layout, 'd) layout_and_axes =
   { layout : 'layout;
-    mod_bounds : Jkind_mod_bounds.t;
+    mod_bounds : mod_bounds;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
@@ -437,18 +414,36 @@ val get_level: type_expr -> int
 val get_scope: type_expr -> int
 val get_id: type_expr -> int
 
+(** Access to marks. They are stored in the scope field. *)
+type type_mark
+val with_type_mark: (type_mark -> 'a) -> 'a
+        (* run a computation using exclusively an available type mark *)
+
+val not_marked_node: type_mark -> type_expr -> bool
+        (* Return true if a type node is not yet marked *)
+
+val try_mark_node: type_mark -> type_expr -> bool
+        (* Mark a type node if it is not yet marked.
+           Marks will be automatically removed when leaving the
+           scope of [with_type_mark].
+
+           Return false if it was already marked *)
+
 (** Transient [type_expr].
     Should only be used immediately after [Transient_expr.repr] *)
 type transient_expr = private
       { mutable desc: type_desc;
         mutable level: int;
-        mutable scope: int;
+        mutable scope: scope_field;
         id: int }
+and scope_field (* abstract *)
 
 module Transient_expr : sig
   (** Operations on [transient_expr] *)
 
   val create: type_desc -> level: int -> scope: int -> id: int -> transient_expr
+  val get_scope: transient_expr -> int
+  val get_marks: transient_expr -> int
   val set_desc: transient_expr -> type_desc -> unit
   val set_level: transient_expr -> int -> unit
   val set_scope: transient_expr -> int -> unit
@@ -460,6 +455,8 @@ module Transient_expr : sig
   val set_stub_desc: type_expr -> type_desc -> unit
       (** Instantiate a not yet instantiated stub.
           Fail if already instantiated. *)
+
+  val try_mark_node: type_mark -> transient_expr -> bool
 end
 
 val create_expr: type_desc -> level: int -> scope: int -> id: int -> type_expr
@@ -480,6 +477,8 @@ module TransientTypeOps : sig
   val equal : t -> t -> bool
   val hash : t -> int
 end
+
+module TransientTypeHash : Hashtbl.S with type key = transient_expr
 
 (** Comparisons for [type_expr]; cannot be used for functors *)
 
@@ -523,9 +522,57 @@ val create_row:
   name:(Path.t * type_expr list) option -> row_desc
 
 val row_fields: row_desc -> (label * row_field) list
+
+(** [row_more] returns a [type_expr] with one of the following [type_desc]s
+    (also described with the return from [row_fixed], which varies similarly):
+
+    * [Tvar]: This is a row variable; it would occur in e.g. [val f :
+    [> `A | `B] -> int]. When/if we learn more about a polymorphic variant, this
+    variable might get unified with one of the other [type_desc]s listed here,
+    or a [Tvariant] that represents a new set of constructors to add to the row.
+
+    During [constraint] checking (toward the end of checking a type declaration,
+    in [Typedecl.check_constraints_rec]) we [Ctype.rigidify] a type to make it
+    so that its unification variables will not unify. When a [Tvar] row variable
+    is rigidified, its [fixed_explanation] will be [Rigid].
+
+    * [Tunivar]: This is a universally quantified row variable; it would occur
+    in e.g. [type t = { f : 'a. ([> `A | `B ] as 'a) -> int }]. A [Tunivar] has
+    a [fixed_explanation] of [Univar].
+
+    * [Tconstr]: There are two possible ways this can happen:
+
+      1. This is an abstract [#row] type created by a [private] row type, as in
+      [type t = private [> `A | `B]]. In this case, the [fixed_explanation] will
+      be [Fixed_private].
+
+      2. This is a locally abstract type created by [Ctype.reify], which happens
+      when a row variable is free in the type of the scrutinee in a GADT pattern
+      match. The [fixed_explanation] will be [Reified]. Note that any manifest
+      of a reified row variable is actually ignored by [row_repr]; this causes
+      some incompletness in type inference.
+
+    * [Tnil]: Used to denote a static polymorphic variant (with no [>] or [<]).
+
+    * [Tof_kind]: See Wrinkle BW2 in Note [With-bounds for GADTs] in Jkind.
+    Briefly, [Tof_kind] can appear as a [row_more] when computing the kind
+    of a GADT with an existentially-bound row variable. The [fixed_explanation]
+    will be [Fixed_existential].
+
+    ----------------------------------------
+
+    It is an invariant that row variables are never shared between different
+    types. That is, if [row_more row1 == row_more row2], then [row1] and [row2]
+    come from structurally identical [Tvariant]s (but they might not be
+    physically equal). When copying types, two types with the same [row_more]
+    field are replaced by the same copy.
+*)
 val row_more: row_desc -> type_expr
 val row_closed: row_desc -> bool
+
+(** See documentation for [row_more]. *)
 val row_fixed: row_desc -> fixed_explanation option
+
 val row_name: row_desc -> (Path.t * type_expr list) option
 
 val set_row_name: row_desc -> (Path.t * type_expr list) option -> row_desc
@@ -583,7 +630,9 @@ module Vars  : Map.S with type key = string
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg                             (* Regular value *)
+    Val_reg of Jkind_types.Sort.t       (* Regular value *)
+  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+                                        (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
   | Val_self of class_signature * self_meths * Ident.t Vars.t * string
@@ -757,10 +806,18 @@ and mixed_block_element =
   (* A [Float_boxed] is a float that's stored flat but boxed upon projection. *)
   | Float64
   | Float32
+  | Bits8
+  | Bits16
+  | Untagged_immediate
   | Bits32
   | Bits64
   | Vec128
+  | Vec256
+  | Vec512
   | Word
+  | Product of mixed_product_shape
+  (* Invariant: the array has at least two things in it. *)
+  | Void
 
 and mixed_product_shape = mixed_block_element array
 
@@ -768,6 +825,8 @@ and type_origin =
     Definition
   | Rec_check_regularity       (* See Typedecl.transl_type_decl *)
   | Existential of string
+
+and module_representation = Jkind_types.Sort.t array
 
 and record_representation =
   | Record_unboxed
@@ -825,7 +884,7 @@ and label_declaration =
   {
     ld_id: Ident.t;
     ld_mutable: mutability;
-    ld_modalities: Mode.Modality.Value.Const.t;
+    ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -845,7 +904,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Mode.Modality.Value.Const.t;
+    ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
     ca_sort: Jkind_types.Sort.Const.t;
     ca_loc: Location.t;
@@ -858,7 +917,8 @@ and constructor_arguments =
 val tys_of_constr_args : constructor_arguments -> type_expr list
 
 (* Returns the inner type and its modalities, if unboxed. *)
-val find_unboxed_type : type_declaration -> (type_expr * Mode.Modality.Value.Const.t) option
+val find_unboxed_type : type_declaration ->
+  (type_expr * Mode.Modality.Const.t) option
 
 type extension_constructor =
   {
@@ -946,7 +1006,7 @@ module type Wrapped = sig
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities: Mode.Modality.Value.t;      (* Modalities on the value *)
+      val_modalities: Mode.Modality.t;      (* Modalities on the value *)
       val_kind: value_kind;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
@@ -957,14 +1017,14 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type
+  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type
+  | Named of Ident.t option * module_type * Mode.Alloc.lr
 
   and signature = signature_item list wrapped
 
@@ -981,6 +1041,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
+    md_modalities : Mode.Modality.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -993,6 +1054,10 @@ module type Wrapped = sig
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
   }
+
+  (* Returns [None] for items that have no runtime representation (see
+     [Includemod.is_runtime_component]). *)
+  val sort_of_signature_item : signature_item -> Jkind_types.Sort.t option
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t
@@ -1071,11 +1136,10 @@ type 'a gen_label_description =
     lbl_res: type_expr;                 (* Type of the result *)
     lbl_arg: type_expr;                 (* Type of the argument *)
     lbl_mut: mutability;                (* Is this a mutable field? *)
-    lbl_modalities: Mode.Modality.Value.Const.t;
+    lbl_modalities: Mode.Modality.Const.t;
                                         (* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in block *)
-    lbl_num: int;                       (* Position in the type *)
+    lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
     lbl_repres: 'a;  (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
@@ -1105,19 +1169,18 @@ type record_form_packed =
 
 val record_form_to_string : _ record_form -> string
 
-(** The special value we assign to lbl_pos for label descriptions corresponding
-    to void types, because they can't sensibly be projected.
-
-    CR layouts v5: This should be removed once we have unarization, as it
-    will be up to a later stage of the compiler to erase void.
-*)
-val lbl_pos_void : int
+val mixed_block_element_of_const_sort :
+  Jkind_types.Sort.Const.t -> mixed_block_element
 
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
+
+(** Like [bound_value_identifiers], but also return sorts *)
+val bound_value_identifiers_and_sorts :
+  signature -> (Ident.t * Jkind_types.Sort.t) list
 
 val signature_item_id : signature_item -> Ident.t
 

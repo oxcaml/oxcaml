@@ -1,0 +1,24 @@
+Test 1: int field (value type)
+  get: expected 20, got 20
+  set: expected (10, 200), got (10, 200)
+Test 2: float# field (flat type)
+  get: expected 20.5, got 20.5
+  set: expected (10, 200.5), got (10, 200.5)
+Test 3: float32# field (flat type)
+  get: expected 20.5, got 20.5
+  set: expected (10, 200.5), got (10, 200.5)
+Test 4: int32# field (flat type)
+  get: expected 20, got 20
+  set: expected (10, 200), got (10, 200)
+Test 5: int64# field (flat type)
+  get: expected 20, got 20
+  set: expected (10, 200), got (10, 200)
+Test 6: nativeint# field (flat type)
+  get: expected 20, got 20
+  set: expected (10, 200), got (10, 200)
+Test 7: unboxed product of ints (value types)
+  get: expected (20, 30), got (20, 30)
+  set: expected (10, (200, 300)), got (10, (200, 300))
+Test 8: unboxed product of floats (flat types)
+  get: expected (20.5, 30.5), got (20.5, 30.5)
+  set: expected (10, (200.5, 300.5)), got (10, (200.5, 300.5))

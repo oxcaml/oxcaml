@@ -37,16 +37,16 @@ val prove_equals_to_simple_of_kind :
 
 (* CR mshinwell: Should remove "_equals_" from these names *)
 val prove_equals_tagged_immediates :
-  Typing_env.t -> Type_grammar.t -> Targetint_31_63.Set.t proof_of_property
+  Typing_env.t -> Type_grammar.t -> Target_ocaml_int.Set.t proof_of_property
 
 val meet_equals_tagged_immediates :
-  Typing_env.t -> Type_grammar.t -> Targetint_31_63.Set.t meet_shortcut
+  Typing_env.t -> Type_grammar.t -> Target_ocaml_int.Set.t meet_shortcut
 
 val meet_naked_immediates :
-  Typing_env.t -> Type_grammar.t -> Targetint_31_63.Set.t meet_shortcut
+  Typing_env.t -> Type_grammar.t -> Target_ocaml_int.Set.t meet_shortcut
 
 val meet_equals_single_tagged_immediate :
-  Typing_env.t -> Type_grammar.t -> Targetint_31_63.t meet_shortcut
+  Typing_env.t -> Type_grammar.t -> Target_ocaml_int.t meet_shortcut
 
 val meet_naked_float32s :
   Typing_env.t ->
@@ -57,6 +57,12 @@ val meet_naked_floats :
   Typing_env.t ->
   Type_grammar.t ->
   Numeric_types.Float_by_bit_pattern.Set.t meet_shortcut
+
+val meet_naked_int8s :
+  Typing_env.t -> Type_grammar.t -> Numeric_types.Int8.Set.t meet_shortcut
+
+val meet_naked_int16s :
+  Typing_env.t -> Type_grammar.t -> Numeric_types.Int16.Set.t meet_shortcut
 
 val meet_naked_int32s :
   Typing_env.t -> Type_grammar.t -> Numeric_types.Int32.Set.t meet_shortcut
@@ -72,10 +78,20 @@ val meet_naked_vec128s :
   Type_grammar.t ->
   Vector_types.Vec128.Bit_pattern.Set.t meet_shortcut
 
+val meet_naked_vec256s :
+  Typing_env.t ->
+  Type_grammar.t ->
+  Vector_types.Vec256.Bit_pattern.Set.t meet_shortcut
+
+val meet_naked_vec512s :
+  Typing_env.t ->
+  Type_grammar.t ->
+  Vector_types.Vec512.Bit_pattern.Set.t meet_shortcut
+
 type variant_like_proof = private
-  { const_ctors : Targetint_31_63.Set.t Or_unknown.t;
+  { const_ctors : Target_ocaml_int.Set.t Or_unknown.t;
     non_const_ctors_with_sizes :
-      (Targetint_31_63.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
+      (Target_ocaml_int.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
   }
 
 val meet_variant_like :
@@ -91,6 +107,8 @@ type boxed_or_tagged_number = private
 
 val prove_is_a_boxed_or_tagged_number :
   Typing_env.t -> Type_grammar.t -> boxed_or_tagged_number proof_of_property
+
+val prove_nothing : Typing_env.t -> Type_grammar.t -> _ proof_of_property
 
 val prove_is_a_tagged_immediate :
   Typing_env.t -> Type_grammar.t -> unit proof_of_property
@@ -113,15 +131,24 @@ val prove_is_a_boxed_nativeint :
 val prove_is_a_boxed_vec128 :
   Typing_env.t -> Type_grammar.t -> unit proof_of_property
 
+val prove_is_a_boxed_vec256 :
+  Typing_env.t -> Type_grammar.t -> unit proof_of_property
+
+val prove_is_a_boxed_vec512 :
+  Typing_env.t -> Type_grammar.t -> unit proof_of_property
+
 val prove_is_or_is_not_a_boxed_float :
   Typing_env.t -> Type_grammar.t -> bool proof_of_property
 
 val prove_unique_tag_and_size :
   Typing_env.t ->
   Type_grammar.t ->
-  (Tag.t * Flambda_kind.Block_shape.t * Targetint_31_63.t) proof_of_property
+  (Tag.t * Flambda_kind.Block_shape.t * Target_ocaml_int.t) proof_of_property
 
 val prove_is_int : Typing_env.t -> Type_grammar.t -> bool proof_of_property
+
+val prove_is_not_a_pointer :
+  Typing_env.t -> Type_grammar.t -> bool proof_of_property
 
 val meet_is_int_variant_only :
   Typing_env.t -> Type_grammar.t -> bool meet_shortcut
@@ -134,7 +161,7 @@ val meet_is_null : Typing_env.t -> Type_grammar.t -> bool meet_shortcut
 val prove_unique_fully_constructed_immutable_heap_block :
   Typing_env.t ->
   Type_grammar.t ->
-  (Tag.t * Flambda_kind.Block_shape.t * Targetint_31_63.t * Simple.t list)
+  (Tag.t * Flambda_kind.Block_shape.t * Target_ocaml_int.t * Simple.t list)
   proof_of_property
 
 val meet_is_flat_float_array :
@@ -237,12 +264,24 @@ val meet_boxed_vec128_containing_simple :
   Type_grammar.t ->
   Simple.t meet_shortcut
 
+val meet_boxed_vec256_containing_simple :
+  Typing_env.t ->
+  min_name_mode:Name_mode.t ->
+  Type_grammar.t ->
+  Simple.t meet_shortcut
+
+val meet_boxed_vec512_containing_simple :
+  Typing_env.t ->
+  min_name_mode:Name_mode.t ->
+  Type_grammar.t ->
+  Simple.t meet_shortcut
+
 val meet_block_field_simple :
   Typing_env.t ->
   min_name_mode:Name_mode.t ->
   field_kind:Flambda_kind.t ->
   Type_grammar.t ->
-  Targetint_31_63.t ->
+  Target_ocaml_int.t ->
   Simple.t meet_shortcut
 
 val meet_project_value_slot_simple :

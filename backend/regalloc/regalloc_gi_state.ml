@@ -8,18 +8,17 @@ type t =
   { mutable assignments : Hardware_register.location Reg.Map.t;
     mutable introduced_temporaries : Reg.Set.t;
     stack_slots : Regalloc_stack_slots.t;
-    instruction_id : InstructionId.sequence;
+    affinity : Regalloc_affinity.t;
     initial_temporaries : int
   }
 
-let[@inline] make ~initial_temporaries ~stack_slots ~last_used =
+let[@inline] make ~initial_temporaries ~stack_slots ~affinity =
   let assignments = Reg.Map.empty in
-  let instruction_id = InstructionId.make_sequence ~last_used () in
   let introduced_temporaries = Reg.Set.empty in
   { assignments;
     introduced_temporaries;
     stack_slots;
-    instruction_id;
+    affinity;
     initial_temporaries
   }
 
@@ -51,5 +50,4 @@ let[@inline] initial_temporary_count state = state.initial_temporaries
 
 let[@inline] stack_slots state = state.stack_slots
 
-let[@inline] get_and_incr_instruction_id state =
-  InstructionId.get_and_incr state.instruction_id
+let[@inline] affinity state = state.affinity

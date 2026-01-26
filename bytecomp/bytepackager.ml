@@ -103,11 +103,12 @@ type pack_member =
     pm_kind: pack_member_kind }
 
 let read_member_info ~packed_compilation_unit file =
-  let member_artifact = Unit_info.Artifact.from_filename file in
-  let member_name =
-    Unit_info.Artifact.modname member_artifact |> CU.Name.of_string
+  let for_pack_prefix = CU.to_prefix packed_compilation_unit in
+  let member_artifact =
+    Unit_info.Artifact.from_filename ~for_pack_prefix file
   in
-  let packed_name = CU.create_child packed_compilation_unit member_name in
+  let packed_name = Unit_info.Artifact.modname member_artifact in
+  let member_name = CU.name packed_name in
   let kind =
     (* PR#7479: make sure it is either a .cmi or a .cmo *)
     if Unit_info.is_cmi member_artifact then
@@ -217,15 +218,19 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
       members
   in
   let main_module_block_size, lam =
-    Translmod.transl_package components packed_compilation_unit coercion
-      ~style:Set_global_to_block
+    Translmod.transl_package components coercion
   in
   if !Clflags.dump_rawlambda then
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
-  let lam = Simplif.simplify_lambda lam in
+  let lam = Simplif.simplify_lambda_for_bytecode lam in
   if !Clflags.dump_lambda then
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
-  let instrs = Bytegen.compile_implementation packed_compilation_unit lam in
+  let blam =
+    Blambda_of_lambda.blambda_of_lambda
+      ~compilation_unit:(Some packed_compilation_unit) lam in
+  if !Clflags.dump_blambda then
+    Format.fprintf ppf_dump "%a@." Printblambda.blambda blam;
+  let instrs = Bytegen.compile_implementation packed_compilation_unit blam in
   let size, pack_relocs, pack_events, pack_debug_dirs =
     Emitcode.to_packed_file oc instrs in
   let events = List.rev_append pack_events state.events in
@@ -241,13 +246,8 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
 
 let package_object_files ~ppf_dump files target coercion =
   let targetfile = Unit_info.Artifact.filename target in
-  let packed_compilation_unit_name =
-    CU.Name.of_string (Unit_info.Artifact.modname target)
-  in
-  let packed_compilation_unit =
-    let prefix = CU.Prefix.from_clflags () in
-    CU.create prefix packed_compilation_unit_name
-  in
+  let packed_compilation_unit = Unit_info.Artifact.modname target in
+  let packed_compilation_unit_name = CU.name packed_compilation_unit in
   let members =
     map_left_right (read_member_info ~packed_compilation_unit) files
   in
@@ -274,8 +274,7 @@ let package_object_files ~ppf_dump files target coercion =
             List.fold_right CU.Set.add cu_required_compunits required_compunits)
       members CU.Set.empty
   in
-  let oc = open_out_bin targetfile in
-  Fun.protect ~finally:(fun () -> close_out oc) (fun () ->
+  Misc.protect_output_to_file targetfile (fun oc ->
     output_string oc Config.cmo_magic_number;
     let pos_depl = pos_out oc in
     output_binary_int oc 0;
@@ -320,7 +319,8 @@ let package_object_files ~ppf_dump files target coercion =
     in
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)
-      Mb_struct { mb_size = main_module_block_size }
+      Mb_struct
+        { mb_repr = Module_value_only { field_count = main_module_block_size } }
     in
     let compunit =
       { cu_name = packed_compilation_unit;
@@ -350,12 +350,15 @@ let package_files ~ppf_dump initial_env files targetfile =
          try Load_path.find f
          with Not_found -> raise(Error(File_not_found f)))
       files in
-  let target = Unit_info.Artifact.from_filename targetfile in
-  let comp_unit =
-    CU.create (CU.Prefix.from_clflags ())
-      (Unit_info.Artifact.modname target |> CU.Name.of_string)
+  let for_pack_prefix = CU.Prefix.from_clflags () in
+  let target = Unit_info.Artifact.from_filename ~for_pack_prefix targetfile in
+  let comp_unit = Unit_info.Artifact.modname target in
+  let unit_info =
+    (* Do what [asmpackager] does and use the target .cmx as a dummy source
+       file *)
+    Unit_info.of_artifact Impl target ~dummy_source_file:targetfile
   in
-  CU.set_current (Some comp_unit);
+  Env.set_unit_name (Some unit_info);
   Misc.try_finally (fun () ->
       let coercion =
         Typemod.package_units initial_env files (Unit_info.companion_cmi target)

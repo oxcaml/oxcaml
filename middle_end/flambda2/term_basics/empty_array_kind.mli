@@ -17,10 +17,15 @@ type t =
   | Values_or_immediates_or_naked_floats  (** Traditional OCaml arrays. *)
   | Unboxed_products
   | Naked_float32s
+  | Naked_ints
+  | Naked_int8s
+  | Naked_int16s
   | Naked_int32s
   | Naked_int64s
   | Naked_nativeints
   | Naked_vec128s
+  | Naked_vec256s
+  | Naked_vec512s
       (** Arrays of unboxed numbers, with a slightly different runtime
           representation. *)
 

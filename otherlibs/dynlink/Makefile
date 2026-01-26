@@ -67,6 +67,7 @@ COMPILERLIBS_INTFS=\
   parsing/asttypes.mli \
   parsing/parsetree.mli \
   typing/solver_intf.mli \
+  typing/mode_hint.mli \
   typing/mode_intf.mli \
   typing/outcometree.mli \
   typing/value_rec_types.mli \
@@ -81,6 +82,7 @@ COMPILERLIBS_SOURCES=\
   utils/config.ml \
   utils/build_path_prefix_map.ml \
   utils/misc.ml \
+  utils/target_system.ml \
   utils/identifiable.ml \
   utils/numbers.ml \
   utils/arg_helper.ml \
@@ -104,6 +106,8 @@ COMPILERLIBS_SOURCES=\
   utils/lazy_backtrack.ml \
   utils/zero_alloc_utils.ml \
   utils/compression.ml \
+  utils/diffing.ml \
+  utils/diffing_with_keys.ml \
   parsing/location.ml \
   parsing/language_extension.ml \
   parsing/unit_info.ml \
@@ -126,11 +130,11 @@ COMPILERLIBS_SOURCES=\
   typing/path.ml \
   typing/shape.ml \
   typing/jkind_types.ml \
+  typing/scalar.ml \
   typing/primitive.ml \
   typing/zero_alloc.ml \
   typing/types.ml \
   typing/oprint.ml \
-  typing/jkind.ml \
   typing/typedtree.ml \
   typing/btype.ml \
   typing/subst.ml \
@@ -140,11 +144,25 @@ COMPILERLIBS_SOURCES=\
   file_formats/cmi_format.ml \
   typing/persistent_env.ml \
   typing/env.ml \
+  typing/jkind.ml \
+  typing/errortrace.ml \
+  typing/signature_group.ml \
+  typing/ctype.ml \
+  typing/printtyp.ml \
+  typing/includecore.ml \
+  typing/typedecl_properties.ml \
+  typing/typedecl_separability.ml \
+  typing/typedecl_variance.ml \
+  typing/typetexp.ml \
+  typing/typedecl.ml \
+  typing/mtype.ml \
   typing/shape_reduce.ml \
+  typing/type_shape.ml \
   typing/typedtree.ml \
   lambda/debuginfo.ml \
   lambda/lambda.ml \
   lambda/runtimedef.ml \
+  lambda/static_label.ml \
   middle_end/internal_variable_names.ml \
   middle_end/variable.ml \
   middle_end/flambda/base_types/closure_element.ml \

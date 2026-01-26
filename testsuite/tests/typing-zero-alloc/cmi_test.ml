@@ -23,7 +23,7 @@ Error: Signature mismatch:
            val f_unconstrained_variable : int -> int @@ portable
            module M_constrained_variable =
              Cmi_test_lib.M_constrained_variable
-           module M_no_variable = Cmi_test_lib.M_no_variable
+           module M_no_variable = Cmi_test_lib.M_no_variable @@ portable
          end
        is not included in
          sig val f_unconstrained_variable : int -> int [@@zero_alloc] end

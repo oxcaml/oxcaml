@@ -19,28 +19,30 @@
 open Asttypes
 open Types
 open Btype
+module Jkind = Btype.Jkind0
 
 (* Simplified version of Ctype.free_vars *)
 let free_vars ?(param=false) ty =
   let ret = ref TypeSet.empty in
-  let rec loop ty =
-    if try_mark_node ty then
-      match get_desc ty with
-      | Tvar _ ->
-          ret := TypeSet.add ty !ret
-      | Tvariant row ->
+  with_type_mark begin fun mark ->
+    let rec loop ty =
+      if try_mark_node mark ty then
+        match get_desc ty with
+        | Tvar _ ->
+            ret := TypeSet.add ty !ret
+        | Tvariant row ->
           iter_row loop row;
           if not (static_row row) then begin
             match get_desc (row_more row) with
             | Tvar _ when param -> ret := TypeSet.add ty !ret
             | _ -> loop (row_more row)
           end
-      (* XXX: What about Tobject ? *)
-      | _ ->
-          iter_type_expr loop ty
-  in
-  loop ty;
-  unmark_type ty;
+        (* XXX: What about Tobject ? *)
+        | _ ->
+            iter_type_expr loop ty
+    in
+    loop ty
+  end;
   !ret
 
 let newgenconstr path tyl = newgenty (Tconstr (path, tyl, ref Mnil))
@@ -70,10 +72,11 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       in
       let type_params = TypeSet.elements arg_vars_set in
       let arity = List.length type_params in
-      (* CR layouts v2.8: We could call [Jkind.normalize ~mode:Require_best] on this
-         jkind, and plausibly gain some perf wins by building up smaller jkinds that are
-         cheaper to deal with later. But doing so runs into some confusing mutual
-         recursion that's non-trivial to debug. Reinvestigate later *)
+      (* CR layouts v2.8: We could call [Jkind.normalize ~mode:Require_best] on
+         this jkind, and plausibly gain some perf wins by building up smaller
+         jkinds that are cheaper to deal with later. But doing so runs into some
+         confusing mutual recursion that's non-trivial to debug. Reinvestigate
+         later. Internal ticket 5102.  *)
       let jkind = Jkind.for_boxed_record lbls in
       let tdecl =
         {
@@ -98,8 +101,8 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort = Jkind.Sort.Const.value;
-          ca_modalities = Mode.Modality.Value.Const.id;
+          ca_sort = Jkind_types.Sort.Const.value;
+          ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
       ],
@@ -107,10 +110,10 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
 
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
-  let cstr_shapes_and_arg_jkinds =
+  let cstr_shapes_and_arg_jkinds, is_unboxed =
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
-    | Variant_boxed x, _ -> x
+    | Variant_boxed x, _ -> x, false
     | Variant_unboxed, [{ cd_args }] ->
       (* CR layouts: It's tempting just to use [decl.type_jkind] here, instead
          of grabbing the jkind from the argument. However, doing so does not
@@ -124,7 +127,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       begin match cd_args with
       | Cstr_tuple [{ ca_sort = sort }]
       | Cstr_record [{ ld_sort = sort }] ->
-        [| Constructor_uniform_value, [| sort |] |]
+        [| Constructor_uniform_value, [| sort |] |], true
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
@@ -135,16 +138,19 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
       [| Constructor_uniform_value, [| |]
-       ; Constructor_uniform_value, [| Jkind.Sort.Const.value |] |]
+       ; Constructor_uniform_value, [| Jkind_types.Sort.Const.value |] |],
+      false
   in
-  let all_void sorts = Array.for_all Jkind.Sort.Const.(equal void) sorts in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
     Array.map
       (fun (_, sorts) ->
-         let all_void = all_void sorts in
-         if all_void then incr num_consts else incr num_nonconsts;
-         all_void)
+         let all_void = Array.for_all Jkind_types.Sort.Const.all_void sorts in
+         (* constant constructors are constructors of non-[@@unboxed] variants
+            with 0 bits of payload *)
+         let is_const = all_void && not is_unboxed in
+         if is_const then incr num_consts else incr num_nonconsts;
+         is_const)
       cstr_shapes_and_arg_jkinds
   in
   let describe_constructor (src_index, const_tag, nonconst_tag, acc)
@@ -239,9 +245,9 @@ let dummy_label (type rep) (record_form : rep record_form)
   | Unboxed_product -> Record_unboxed_product
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
-    lbl_mut = Immutable; lbl_modalities = Mode.Modality.Value.Const.id;
-    lbl_sort = Jkind.Sort.Const.void;
-    lbl_num = -1; lbl_pos = -1; lbl_all = [||];
+    lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
+    lbl_sort = Jkind_types.Sort.Const.void;
+    lbl_pos = -1; lbl_all = [||];
     lbl_repres = repres;
     lbl_private = Public;
     lbl_loc = Location.none;
@@ -251,10 +257,9 @@ let dummy_label (type rep) (record_form : rep record_form)
 
 let label_descrs record_form ty_res lbls repres priv =
   let all_labels = Array.make (List.length lbls) (dummy_label record_form) in
-  let rec describe_labels num pos = function
+  let rec describe_labels pos = function
       [] -> []
     | l :: rest ->
-        let is_void = Jkind.Sort.Const.(equal void l.ld_sort) in
         let lbl =
           { lbl_name = Ident.name l.ld_id;
             lbl_res = ty_res;
@@ -262,8 +267,7 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_mut = l.ld_mutable;
             lbl_modalities = l.ld_modalities;
             lbl_sort = l.ld_sort;
-            lbl_pos = if is_void then lbl_pos_void else pos;
-            lbl_num = num;
+            lbl_pos = pos;
             lbl_all = all_labels;
             lbl_repres = repres;
             lbl_private = priv;
@@ -271,10 +275,9 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_attributes = l.ld_attributes;
             lbl_uid = l.ld_uid;
           } in
-        all_labels.(num) <- lbl;
-        let pos = if is_void then pos else pos+1 in
-        (l.ld_id, lbl) :: describe_labels (num+1) pos rest in
-  describe_labels 0 0 lbls
+        all_labels.(pos) <- lbl;
+        (l.ld_id, lbl) :: describe_labels (pos+1) rest in
+  describe_labels 0 lbls
 
 exception Constr_not_found
 
@@ -282,16 +285,17 @@ let find_constr ~constant tag cstrs =
   try
     List.find
       (function
-        | ({cstr_tag=Ordinary {runtime_tag=tag'}; cstr_constant},_) ->
+        | (({cstr_tag=Ordinary {runtime_tag=tag'}; cstr_constant},_),_) ->
           tag' = tag && cstr_constant = constant
-        | ({cstr_tag=Null; cstr_constant}, _) -> tag = -1 && cstr_constant = constant
-        | ({cstr_tag=Extension _},_) -> false)
+        | (({cstr_tag=Null; cstr_constant}, _),_) ->
+          tag = -1 && cstr_constant = constant
+        | (({cstr_tag=Extension _},_),_) -> false)
       cstrs
   with
   | Not_found -> raise Constr_not_found
 
 let find_constr_by_tag ~constant tag cstrlist =
-  fst (find_constr ~constant tag cstrlist)
+  fst (fst (find_constr ~constant tag cstrlist))
 
 let constructors_of_type ~current_unit ty_path decl =
   match decl.type_kind with

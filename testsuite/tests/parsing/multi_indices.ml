@@ -15,10 +15,14 @@ let (.%{;..}) = A.get
 [%%expect {|
 
 let (.%{;..}<-) = A.set;;
-val ( .%{;..}<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit = <fun>
+val ( .%{;..}<- ) :
+  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit =
+  <fun>
 
 let (.%{;..}) = A.get;;
-val ( .%{;..} ) : ('a, 'b, 'c) A.t -> int array -> 'a = <fun>
+val ( .%{;..} ) :
+  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a =
+  <fun>
 |}]
 
 let (.![;..]<-) = A.set
@@ -31,14 +35,17 @@ let (.![;..]) a n =
 [%%expect {|
 
 let (.![;..]<-) = A.set;;
-val ( .![;..]<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit = <fun>
+val ( .![;..]<- ) :
+  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit =
+  <fun>
 
 let (.![;..]) a n =
   Format.printf "indices: @[[|%a|]@]@."
     (Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
        Format.pp_print_int) (Array.to_list n);
   A.get a n;;
-val ( .![;..] ) : ('a, 'b, 'c) A.t -> int array -> 'a = <fun>
+val ( .![;..] ) :
+  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a = <fun>
 |}]
 
 let (.?(;..)<-) = A.set
@@ -46,10 +53,14 @@ let (.?(;..)) = A.get
 [%%expect {|
 
 let (.?(;..)<-) = A.set;;
-val ( .?(;..)<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit = <fun>
+val ( .?(;..)<- ) :
+  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit =
+  <fun>
 
 let (.?(;..)) = A.get;;
-val ( .?(;..) ) : ('a, 'b, 'c) A.t -> int array -> 'a = <fun>
+val ( .?(;..) ) :
+  'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a =
+  <fun>
 |}]
 
 let a = A.create Bigarray.float64 Bigarray.c_layout [|3;3;3|]
@@ -137,12 +148,18 @@ module M =
   end;;
 module M :
   sig
-    val ( .%?(;..) ) : ('a, 'b, 'c) A.t -> int array -> 'a
-    val ( .%?(;..)<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit
-    val ( .%![;..] ) : ('a, 'b, 'c) A.t -> int array -> 'a
-    val ( .%![;..]<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit
-    val ( .%%{;..} ) : ('a, 'b, 'c) A.t -> int array -> 'a
-    val ( .%%{;..}<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit
+    val ( .%?(;..) ) :
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a
+    val ( .%?(;..)<- ) :
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit
+    val ( .%![;..] ) :
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a
+    val ( .%![;..]<- ) :
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit
+    val ( .%%{;..} ) :
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t @ shared -> int array -> 'a
+    val ( .%%{;..}<- ) :
+      'a ('b : any) ('c : any). ('a, 'b, 'c) A.t -> int array -> 'a -> unit
   end
 
 ;;a.M.%![1;0;0] <- 7.;;

@@ -18,18 +18,25 @@ external write : ('a : any mod external_). 'a t -> 'a -> unit = "%poke"
   [@@layout_poly]
 |}]
 
-let bad_read p : string = read p
+type v : value_or_null mod external_
+
+(* CR dkalinichenko: this used to test that peek and poke is forbidden
+   for non-immediate values, but currently, [any mod external] rules them out.
+   We will have non-immediate external values once externality is a modal axis. *)
+
+let bad_read p : v = read p
 [%%expect {|
-Line 1, characters 26-32:
-1 | let bad_read p : string = read p
-                              ^^^^^^
-Error: Unsupported layout for the peek primitive
+type v : value_or_null mod external_
+>> Fatal error: Blambda_of_lambda: (peek
+tagged_immediate) is not supported in bytecode
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
-let bad_write p (s : string) = write p s
+let bad_write p (v : v) = write p v
 [%%expect {|
-Line 1, characters 31-40:
-1 | let bad_write p (s : string) = write p s
-                                   ^^^^^^^^^
-Error: Unsupported layout for the poke primitive
+>> Fatal error: Blambda_of_lambda: (poke
+tagged_immediate) is not supported in bytecode
+Uncaught exception: Misc.Fatal_error
+
 |}]

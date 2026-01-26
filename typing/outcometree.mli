@@ -47,6 +47,8 @@ type out_value =
   | Oval_float of float
   | Oval_float32 of Obj.t (* We cannot use the [float32] type in the compiler. *)
   | Oval_int of int
+  | Oval_int8 of int (* We cannot use the [int8] type in the compiler. *)
+  | Oval_int16 of int (* We cannot use the [int16] type in the compiler. *)
   | Oval_int32 of int32
   | Oval_int64 of int64
   | Oval_nativeint of nativeint
@@ -60,17 +62,17 @@ type out_value =
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
-type out_modality_legacy = Ogf_global
+  | Oval_code of CamlinternalQuote.Code.t
 
-type out_modality_new = string
+type out_modality = string
 
-type out_modality =
-  | Ogf_legacy of out_modality_legacy
-  | Ogf_new of out_modality_new
+type out_atomicity =
+  | Atomic
+  | Nonatomic
 
 type out_mutability =
   | Om_immutable
-  | Om_mutable of string option
+  | Om_mutable of string option * out_atomicity
 
 
 
@@ -81,20 +83,13 @@ type arg_label =
   | Optional of string
   | Position of string
 
-type out_mode_legacy =
-  | Omd_local
-
-type out_mode_new = string
-
-type out_mode =
-  | Omd_legacy of out_mode_legacy
-  | Omd_new of out_mode_new
+type out_mode = string
 
 type out_arg_mode = out_mode list
 
 type out_ret_mode =
-  | Orm_not_arrow of out_mode list
-  (** The ret type is not arrow, with modes annotating. *)
+  | Orm_any of out_mode list
+  (** The ret type could be anything, with modes annotating. *)
   | Orm_no_parens
   (** The ret type is arrow, and no need to print parens around the arrow *)
   | Orm_parens of out_mode list
@@ -107,7 +102,7 @@ type out_jkind_const =
   | Ojkind_const_abbreviation of string
   (** The base of [Ojkind_const_mod] is optional to enable printing individual axes *)
   | Ojkind_const_mod of out_jkind_const option * string list
-  | Ojkind_const_with of out_jkind_const * out_type * out_modality_new list
+  | Ojkind_const_with of out_jkind_const * out_type * out_modality list
   | Ojkind_const_kind_of of out_type
   | Ojkind_const_product of out_jkind_const list
 
@@ -130,9 +125,8 @@ and out_type =
   | Otyp_abstract
   | Otyp_open
   | Otyp_alias of {non_gen:bool; aliased:out_type; alias:string}
-  | Otyp_arrow of arg_label * out_arg_mode * out_type * out_ret_mode * out_type
-  (* INVARIANT: the [out_ret_mode] is [Orm_not_arrow] unless the RHS [out_type]
-    is [Otyp_arrow] *)
+  | Otyp_arrow of arg_label * out_arg_mode * out_type * out_type
+  (** INVARIANT: the [out_type] for the return must be [Otyp_ret]. *)
   | Otyp_class of out_ident * out_type list
   | Otyp_constr of out_ident * out_type list
   | Otyp_manifest of out_type * out_type
@@ -148,12 +142,17 @@ and out_type =
   | Otyp_unboxed_tuple of (string option * out_type) list
   | Otyp_var of bool * string
   | Otyp_variant of out_variant * bool * (string list) option
+  | Otyp_quote of out_type
+  | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
   | Otyp_module of out_ident * (string * out_type) list
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
          synthesized directly from the [Typedtree] *)
+  | Otyp_of_kind of out_jkind
+  | Otyp_ret of out_ret_mode * out_type
+  (** INVARIANT: See [out_ret_mode]. *)
 
 and out_constructor = {
   ocstr_name: string;
@@ -176,7 +175,9 @@ and out_class_sig_item =
 
 type out_module_type =
   | Omty_abstract
-  | Omty_functor of (string option * out_module_type) option * out_module_type
+  | Omty_functor of
+      (string option * out_module_type * out_mode list) option *
+        out_module_type * out_mode list
   | Omty_ident of out_ident
   | Omty_signature of out_sig_item list
   | Omty_alias of out_ident
@@ -191,7 +192,8 @@ and out_sig_item =
         out_rec_status
   | Osig_typext of out_extension_constructor * out_ext_status
   | Osig_modtype of string * out_module_type
-  | Osig_module of string * out_module_type * out_rec_status
+  | Osig_module of string * out_module_type * out_modality list
+      * out_rec_status
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of out_val_decl
   | Osig_ellipsis
@@ -224,7 +226,7 @@ and out_type_extension =
 and out_val_decl =
   { oval_name: string;
     oval_type: out_type;
-    oval_modalities : out_modality_new list;
+    oval_modalities : out_modality list;
     (* Modalities on value descriptions are always new, even for [global_] *)
     oval_prims: string list;
     oval_attributes: out_attribute list }

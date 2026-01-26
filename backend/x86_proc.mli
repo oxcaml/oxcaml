@@ -33,6 +33,10 @@ val string_of_reg64 : reg64 -> string
 
 val string_of_regf : regf -> string
 
+val string_of_gpr : arch -> reg64 -> string
+
+val string_of_reg_idx : arch -> reg_idx -> string
+
 val string_of_substring_literal : int -> int -> string -> string
 
 val string_of_string_literal : string -> string
@@ -46,6 +50,8 @@ val string_of_float_condition_imm : arg -> string
 val string_of_symbol : (*prefix*) string -> string -> string
 
 val string_of_rounding : rounding -> string
+
+val imm_of_float_condition : float_condition -> arg
 
 val imm_of_rounding : rounding -> arg
 
@@ -71,7 +77,7 @@ val reset_asm_code : unit -> unit
       the provided syntax emitter) in a file (if provided) and
       compile it with an internal assembler (if registered
       through [register_internal_assembler]). *)
-val generate_code : (X86_ast.asm_line list -> unit) option -> unit
+val generate_code : (X86_ast.asm_program -> unit) option -> unit
 
 (** Generate an object file corresponding to the last call to
     [generate_code].  An internal assembler is used if available (and

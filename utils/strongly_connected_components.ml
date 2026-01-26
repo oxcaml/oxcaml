@@ -160,6 +160,10 @@ module type S = sig
     | Has_loop of Id.t list
     | No_loop of Id.t
 
+  val stable_connected_components_sorted_from_roots_to_leaf
+    : (Id.t * Id.Set.t) list
+    -> component array
+
   val connected_components_sorted_from_roots_to_leaf
      : directed_graph
     -> component array
@@ -187,9 +191,8 @@ module Make (Id : Id) = struct
           set)
       dependencies
 
-  let number graph =
-    let size = Id.Map.cardinal graph in
-    let bindings = Id.Map.bindings graph in
+  let number ?(stable = false) (bindings : (Id.t * Id.Set.t) list) =
+    let size = List.length bindings in
     let a = Array.of_list bindings in
     let forth = Array.map fst a in
     let back =
@@ -202,16 +205,20 @@ module Make (Id : Id) = struct
     let integer_graph =
       Array.init size (fun i ->
         let _, dests = a.(i) in
-        Id.Set.fold (fun dest acc ->
-            let v =
-              try Id.Map.find dest back
-              with Not_found ->
-                Misc.fatal_errorf
-                  "Strongly_connected_components: missing dependency %a"
-                  Id.print dest
-            in
-            v :: acc)
-          dests [])
+        let integer_dests =
+          Id.Set.fold (fun dest acc ->
+              let v =
+                try Id.Map.find dest back
+                with Not_found ->
+                  Misc.fatal_errorf
+                    "Strongly_connected_components: missing dependency %a"
+                    Id.print dest
+              in
+              v :: acc)
+            dests []
+        in
+        if not stable then integer_dests
+        else List.sort Int.compare integer_dests)
     in
     forth, integer_graph
 
@@ -220,8 +227,7 @@ module Make (Id : Id) = struct
     | [] -> false
     | x' :: xs -> if Int.equal x x' then true else int_list_mem x xs
 
-  let component_graph graph =
-    let forth, integer_graph = number graph in
+  let numbered_component_graph (forth, integer_graph) =
     let { Kosaraju. sorted_connected_components;
           component_edges } =
       Kosaraju.component_graph integer_graph
@@ -238,6 +244,15 @@ module Make (Id : Id) = struct
           (Has_loop (List.map (fun node -> forth.(node)) nodes)),
             component_edges.(component))
       sorted_connected_components
+
+  let stable_component_graph graph =
+    numbered_component_graph (number ~stable:true graph)
+
+  let stable_connected_components_sorted_from_roots_to_leaf graph =
+    Array.map fst (stable_component_graph graph)
+
+  let component_graph graph =
+    numbered_component_graph (number ~stable:false (Id.Map.bindings graph))
 
   let connected_components_sorted_from_roots_to_leaf graph =
     Array.map fst (component_graph graph)

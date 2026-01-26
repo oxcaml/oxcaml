@@ -94,16 +94,19 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
             ~print_name:"speculative" ~code_age_relation:Code_age_relation.empty
             ~used_value_slots:Unknown
             ~code_ids_to_never_delete:Code_id.Set.empty
+            ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation:function_return_cont
             ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
+            ~machine_width:(DE.machine_width (DA.denv dacc))
         in
         let uenv =
           (* Note that we don't need to do anything special if the exception
              continuation takes extra arguments, since we are only simplifying
              the body of the function in question, not substituting it into an
              existing context. *)
+          let machine_width = DE.machine_width (DA.denv dacc) in
           UE.add_function_return_or_exn_continuation
-            (UE.create (DA.are_rebuilding_terms dacc))
+            (UE.create (DA.are_rebuilding_terms dacc) ~machine_width)
             (Exn_continuation.exn_handler exn_continuation)
             (Flambda_arity.create_singletons
                [Flambda_kind.With_subkind.any_value])
@@ -134,19 +137,37 @@ let argument_types_useful dacc apply =
         Simple.pattern_match simple
           ~name:(fun name ~coercion:_ ->
             let ty = TE.find typing_env name None in
-            not (T.is_unknown typing_env ty))
+            not (T.is_unknown_maybe_null typing_env ty))
           ~const:(fun _ -> true))
       (Apply.args apply)
+
+let inlining_does_decrease_code_size ~code_or_metadata cost_metrics =
+  let[@ocamlformat "break-infix=fit-or-vertical"] original_code_size =
+    code_or_metadata
+    |> Code_or_metadata.code_metadata
+    |> Code_metadata.cost_metrics
+    |> Cost_metrics.size
+  in
+  let inlined_code_size = Cost_metrics.size cost_metrics in
+  not (Code_size.( <= ) original_code_size inlined_code_size)
 
 let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
     ~return_arity : Call_site_inlining_decision_type.t =
   let denv = DA.denv dacc in
-  let env_prohibits_inlining = not (DE.can_inline denv) in
+  let disable_inlining = DE.disable_inlining denv in
   let decision =
     Code_or_metadata.code_metadata code_or_metadata
     |> Code_metadata.inlining_decision
   in
-  if Function_decl_inlining_decision_type.must_be_inlined decision
+  let in_a_stub, doing_speculative_inlining =
+    match disable_inlining with
+    | Disable_inlining Stub -> true, false
+    | Disable_inlining Speculative_inlining -> false, true
+    | Do_not_disable_inlining -> false, false
+  in
+  if in_a_stub
+  then In_a_stub
+  else if Function_decl_inlining_decision_type.must_be_inlined decision
   then
     Definition_says_inline
       { was_inline_always =
@@ -154,25 +175,60 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
       }
   else if Function_decl_inlining_decision_type.cannot_be_inlined decision
   then Definition_says_not_to_inline
-  else if env_prohibits_inlining
-  then Environment_says_never_inline
-  else if not (argument_types_useful dacc apply)
-  then Argument_types_not_useful
+  else if doing_speculative_inlining
+  then Doing_speculative_inlining
   else
-    let cost_metrics =
-      speculative_inlining ~apply dacc ~simplify_expr ~return_arity
-        ~function_type
-    in
-    let inlining_args =
-      Apply.inlining_arguments apply
-      |> Inlining_arguments.meet (DE.inlining_arguments denv)
-    in
-    let evaluated_to = Cost_metrics.evaluate ~args:inlining_args cost_metrics in
-    let threshold = Inlining_arguments.threshold inlining_args in
-    let is_under_inline_threshold = Float.compare evaluated_to threshold <= 0 in
-    if is_under_inline_threshold
-    then Speculatively_inline { cost_metrics; evaluated_to; threshold }
-    else Speculatively_not_inline { cost_metrics; evaluated_to; threshold }
+    Profile.record_call_with_counters ~accumulate:true "speculative_inlining"
+      ~counter_f:(fun (decision : Call_site_inlining_decision_type.t) ->
+        let counters = Profile.Counters.create () in
+        match decision with
+        | Argument_types_not_useful ->
+          Profile.Counters.incr "argument_types_not_useful" counters
+        | Speculatively_inline { cost_metrics; _ } ->
+          let counters =
+            Profile.Counters.incr "speculatively_inline" counters
+          in
+          if inlining_does_decrease_code_size ~code_or_metadata cost_metrics
+          then counters
+          else Profile.Counters.incr "same_code_size" counters
+        | Speculatively_not_inline _ ->
+          Profile.Counters.incr "speculatively_not_inline" counters
+        | Missing_code | Definition_says_not_to_inline | In_a_stub
+        | Doing_speculative_inlining | Unrolling_depth_exceeded
+        | Max_inlining_depth_exceeded | Recursion_depth_exceeded
+        | Never_inlined_attribute | Attribute_always
+        | Replay_history_says_must_inline | Begin_unrolling _
+        | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
+          ->
+          (* These can't be returned by the speculative inlining cases below. *)
+          if Flambda_features.check_light_invariants ()
+          then
+            Misc.fatal_error
+              "Unexpected call site inlinine decision for speculative inlining";
+          counters)
+      (fun () : Call_site_inlining_decision_type.t ->
+        if not (argument_types_useful dacc apply)
+        then Argument_types_not_useful
+        else
+          let cost_metrics =
+            speculative_inlining ~apply dacc ~simplify_expr ~return_arity
+              ~function_type
+          in
+          let inlining_args =
+            Apply.inlining_arguments apply
+            |> Inlining_arguments.meet (DE.inlining_arguments denv)
+          in
+          let evaluated_to =
+            Cost_metrics.evaluate ~args:inlining_args cost_metrics
+          in
+          let threshold = Inlining_arguments.threshold inlining_args in
+          let is_under_inline_threshold =
+            Float.compare evaluated_to threshold <= 0
+          in
+          if is_under_inline_threshold
+          then Speculatively_inline { cost_metrics; evaluated_to; threshold }
+          else
+            Speculatively_not_inline { cost_metrics; evaluated_to; threshold })
 
 let get_rec_info dacc ~function_type =
   let rec_info = FT.rec_info function_type in
@@ -181,18 +237,30 @@ let get_rec_info dacc ~function_type =
   | Need_meet -> Rec_info_expr.unknown
   | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
 
-let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
+let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
+  let must_inline = DE.must_inline (DA.denv dacc) in
+  let fail_if_must_inline () =
+    if must_inline
+    then
+      Misc.fatal_errorf
+        "Deciding not to inline an [Apply], but the replay_history says we \
+         should inline"
+  in
   let rec_info = get_rec_info dacc ~function_type in
   let inlined = Apply.inlined apply in
   match inlined with
-  | Never_inlined -> Never_inlined_attribute
+  | Never_inlined ->
+    fail_if_must_inline ();
+    Never_inlined_attribute
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
     let code_or_metadata =
       DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
     in
     if not (Code_or_metadata.code_present code_or_metadata)
-    then Missing_code
+    then (
+      fail_if_must_inline ();
+      Missing_code)
     else
       (* The unrolling process is rather subtle, but it boils down to two steps:
 
@@ -212,7 +280,9 @@ let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
         Simplify_rec_info_expr.known_remaining_unrolling_depth dacc rec_info
       in
       match unrolling_depth with
-      | Some 0 -> Unrolling_depth_exceeded
+      | Some 0 ->
+        fail_if_must_inline ();
+        Unrolling_depth_exceeded
       | Some _ -> Continue_unrolling
       | None -> (
         (* lmaurer: This seems semantically dodgy: If we really think of a free
@@ -234,7 +304,9 @@ let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
             (Code_or_metadata.code_metadata code_or_metadata)
         in
         if Inlining_state.is_depth_exceeded apply_inlining_state
-        then Max_inlining_depth_exceeded
+        then (
+          fail_if_must_inline ();
+          Max_inlining_depth_exceeded)
         else
           let policy =
             match inlined with
@@ -259,7 +331,11 @@ let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
             in
             if Simplify_rec_info_expr.depth_may_exceed dacc rec_info
                  max_rec_depth
-            then Recursion_depth_exceeded
+            then (
+              fail_if_must_inline ();
+              Recursion_depth_exceeded)
+            else if must_inline
+            then Replay_history_says_must_inline
             else
               might_inline dacc ~apply ~code_or_metadata ~function_type
                 ~simplify_expr ~return_arity
@@ -270,5 +346,13 @@ let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
                  [Inlining_transforms] for how [unroll_to] is ultimately
                  handled. *)
               Begin_unrolling unroll_to
-            else Unrolling_depth_exceeded
+            else (
+              fail_if_must_inline ();
+              Unrolling_depth_exceeded)
           | `Always -> Attribute_always))
+
+let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
+    Call_site_inlining_decision_type.t =
+  if !Clflags.jsir
+  then Jsir_inlining_disabled
+  else make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity

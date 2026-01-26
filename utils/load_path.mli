@@ -22,7 +22,7 @@
     doesn't change during the execution of the compiler.
 *)
 
-(* CR aodintsov/mshinwell: merge the remaining flambda-backend changes
+(* CR aodintsov/mshinwell: merge the remaining oxcaml changes
    upstream *)
 
 val add_dir : hidden:bool -> string -> unit
@@ -105,6 +105,18 @@ val prepend_dir : Dir.t -> unit
 (** [prepend_dir d] adds [d] to the start of the load path (i.e. at highest
     priority. *)
 
-val get_visible : unit -> Dir.t list
+type dirs_and_files =
+  { dirs : Dir.t list
+  ; basenames : string list
+  }
+
+val get_visible : unit -> dirs_and_files
 (** Same as [get_paths ()], except that it returns a [Dir.t list], and doesn't
     include the -H paths. *)
+
+module For_testing : sig
+  exception Parse_error of string
+
+  val split_and_unescape : buffer:Buffer.t -> string -> string list
+  val set_manifest_files_root : string option -> unit
+end

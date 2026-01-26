@@ -27,7 +27,8 @@
 type t =
   | Missing_code
   | Definition_says_not_to_inline
-  | Environment_says_never_inline
+  | In_a_stub
+  | Doing_speculative_inlining
   | Argument_types_not_useful
   | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded
@@ -39,6 +40,7 @@ type t =
         threshold : float
       }
   | Attribute_always
+  | Replay_history_says_must_inline
   | Begin_unrolling of int
   | Continue_unrolling
   | Definition_says_inline of { was_inline_always : bool }
@@ -47,14 +49,16 @@ type t =
         evaluated_to : float;
         threshold : float
       }
+  | Jsir_inlining_disabled
 
 let [@ocamlformat "disable"] print ppf t =
   match t with
   | Missing_code -> Format.fprintf ppf "Missing_code"
   | Definition_says_not_to_inline ->
     Format.fprintf ppf "Definition_says_not_to_inline"
-  | Environment_says_never_inline ->
-    Format.fprintf ppf "Environment_says_never_inline"
+  | In_a_stub -> Format.fprintf ppf "In_a_stub"
+  | Doing_speculative_inlining ->
+    Format.fprintf ppf "Doing_speculative_inlining"
   | Argument_types_not_useful ->
     Format.fprintf ppf "Argument_types_not_useful"
   | Unrolling_depth_exceeded ->
@@ -67,6 +71,8 @@ let [@ocamlformat "disable"] print ppf t =
     Format.fprintf ppf "Never_inlined_attribute"
   | Attribute_always ->
     Format.fprintf ppf "Attribute_always"
+  | Replay_history_says_must_inline ->
+    Format.fprintf ppf "Replay_history_says_must_inline"
   | Definition_says_inline { was_inline_always } ->
     Format.fprintf ppf
       "@[<hov 1>(Definition_says_inline@ \
@@ -101,6 +107,7 @@ let [@ocamlformat "disable"] print ppf t =
       Cost_metrics.print cost_metrics
       evaluated_to
       threshold
+  | Jsir_inlining_disabled -> Format.fprintf ppf "Jsir_inlining_disabled"
 
 type can_inline =
   | Do_not_inline of { erase_attribute_if_ignored : bool }
@@ -111,9 +118,10 @@ type can_inline =
 
 let can_inline (t : t) : can_inline =
   match t with
-  | Missing_code | Environment_says_never_inline | Max_inlining_depth_exceeded
-  | Recursion_depth_exceeded | Speculatively_not_inline _
-  | Definition_says_not_to_inline | Argument_types_not_useful ->
+  | Missing_code | In_a_stub | Doing_speculative_inlining
+  | Max_inlining_depth_exceeded | Recursion_depth_exceeded
+  | Speculatively_not_inline _ | Definition_says_not_to_inline
+  | Argument_types_not_useful ->
     (* If there's an [@inlined] attribute on this, something's gone wrong *)
     Do_not_inline { erase_attribute_if_ignored = false }
   | Never_inlined_attribute ->
@@ -139,7 +147,12 @@ let can_inline (t : t) : can_inline =
   | Speculatively_inline _ ->
     Inline { unroll_to = None; was_inline_always = false }
   | Attribute_always -> Inline { unroll_to = None; was_inline_always = true }
+  | Replay_history_says_must_inline ->
+    Inline { unroll_to = None; was_inline_always = false }
+  | Jsir_inlining_disabled ->
+    Do_not_inline { erase_attribute_if_ignored = false }
 
+(* CR mshinwell/gbury: tidy up by using Format.pp_print_text *)
 let report_reason fmt t =
   match (t : t) with
   | Missing_code ->
@@ -149,8 +162,12 @@ let report_reason fmt t =
     Format.fprintf fmt
       "this@ function@ was@ deemed@ at@ the@ point@ of@ its@ definition@ to@ \
        never@ be@ inlinable"
-  | Environment_says_never_inline ->
-    Format.fprintf fmt "the@ environment@ says@ never@ to@ inline"
+  | In_a_stub ->
+    Format.fprintf fmt
+      "this@ function@ is@ being@ called@ inside@ of@ a@ stub;@ inlining@ is@ \
+       not@ performed@ inside@ stubs@ (until@ they@ are@ inlined)"
+  | Doing_speculative_inlining ->
+    Format.fprintf fmt "because@ speculative@ inlining@ is@ in@ progress"
   | Argument_types_not_useful ->
     Format.fprintf fmt
       "there@ was@ no@ useful@ information@ about@ the@ arguments"
@@ -164,6 +181,14 @@ let report_reason fmt t =
     Format.fprintf fmt "the@ call@ has@ an@ attribute@ forbidding@ inlining"
   | Attribute_always ->
     Format.fprintf fmt "the@ call@ has@ an@ [@@inline always]@ attribute"
+  | Replay_history_says_must_inline ->
+    (* CR gbury: We could decide not to include in the inlining report inlining
+       decisions that were made during replays (e.g. continuation
+       specialization), or alternatively to store the initial inlining decision
+       so that we can report it each time. *)
+    Format.fprintf fmt
+      "the@ call@ was@ inlined@ during@ the@ first@ pass@ on@ the@ current@ \
+       continuation@ handler"
   | Begin_unrolling n ->
     Format.fprintf fmt "the@ call@ has@ an@ [@@unroll %d]@ attribute" n
   | Continue_unrolling ->
@@ -183,6 +208,9 @@ let report_reason fmt t =
       "the@ function@ was@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
        were=%a,@ which@ was@ evaluated@ to@ %f <= threshold %f"
       Cost_metrics.print cost_metrics evaluated_to threshold
+  | Jsir_inlining_disabled ->
+    Format.fprintf fmt
+      "function@ inlining@ is@ disabled@ for@ Js_of_ocaml@ translation"
 
 let report fmt t =
   Format.fprintf fmt

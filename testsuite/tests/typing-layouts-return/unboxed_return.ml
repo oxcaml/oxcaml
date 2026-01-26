@@ -1,14 +1,13 @@
 (* TEST
+ flags = "-bin-annot-cms";
  modules = "stubs.c";
  reference = "${test_source_directory}/unboxed_return.reference";
  include stdlib_stable;
  flambda2;
  {
-   flags = "-extension layouts_alpha";
    native;
  }
  {
-   flags = "-extension layouts_alpha";
    bytecode;
  }
 *)

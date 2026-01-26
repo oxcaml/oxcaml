@@ -57,6 +57,9 @@ DOMAIN_STATE(intnat, action_pending)
 /* Whether we are due to start the processing of delayable pending
    actions. See runtime/signal.c. Valid values: 0,1. */
 
+DOMAIN_STATE(struct dynamic_thread_s *, dynamic_bindings)
+/* Cache of Dynamic.t bindings. Per-thread, switched on thread switch */
+
 DOMAIN_STATE(struct c_stack_link*, c_stack)
 /* The C stack associated with this domain.
  * Used by this domain to perform external calls. */
@@ -143,8 +146,11 @@ DOMAIN_STATE(int, id)
 
 DOMAIN_STATE(int, unique_id)
 
-DOMAIN_STATE(value, dls_root)
+DOMAIN_STATE(value, dls_state)
 /* Domain-local state */
+
+DOMAIN_STATE(value, tls_state)
+/* Thread-local state */
 
 /* How much external memory is currenty held by the minor heap. */
 DOMAIN_STATE(uintnat, minor_dependent_bsz)

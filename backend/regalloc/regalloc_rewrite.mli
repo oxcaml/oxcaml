@@ -6,8 +6,6 @@ module type State = sig
   type t
 
   val stack_slots : t -> Regalloc_stack_slots.t
-
-  val get_and_incr_instruction_id : t -> InstructionId.t
 end
 
 module type Utils = sig
@@ -49,7 +47,7 @@ val prelude :
   (module Utils) ->
   on_fatal_callback:(unit -> unit) ->
   Cfg_with_infos.t ->
-  cfg_infos * Regalloc_stack_slots.t
+  cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t
 
 (* Runs the last steps common to register allocators, updating the CFG (stack
    slots, live fields, and prologue), running [f], and checking

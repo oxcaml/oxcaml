@@ -16,6 +16,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ portable
+
 open! Stdlib
 
 (** Unboxed 64-bit integers.  This file primarily duplicates

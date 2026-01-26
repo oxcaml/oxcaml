@@ -16,6 +16,8 @@ val flambda2_is_enabled : unit -> bool
 
 val debug_flambda2 : unit -> bool
 
+val debug_reaper : string -> bool
+
 type 'a mode =
   | Normal : [`Normal] mode
   | Classic : [`Classic] mode
@@ -38,7 +40,7 @@ val join_depth : unit -> int
 
 val use_n_way_join : unit -> bool
 
-type join_algorithm = Flambda_backend_flags.join_algorithm =
+type join_algorithm = Oxcaml_flags.join_algorithm =
   | Binary
   | N_way
   | Checked
@@ -46,6 +48,20 @@ type join_algorithm = Flambda_backend_flags.join_algorithm =
 val join_algorithm : unit -> join_algorithm
 
 val enable_reaper : unit -> bool
+
+type reaper_preserve_direct_calls = Oxcaml_flags.reaper_preserve_direct_calls =
+  | Never
+  | Always
+  | Zero_alloc
+  | Auto
+
+val reaper_preserve_direct_calls : unit -> reaper_preserve_direct_calls
+
+val reaper_local_fields : unit -> bool
+
+val reaper_unbox : unit -> bool
+
+val reaper_change_calling_conventions : unit -> bool
 
 val kind_checks : unit -> bool
 
@@ -74,7 +90,7 @@ val check_invariants : unit -> bool
 
 val check_light_invariants : unit -> bool
 
-type dump_target = Flambda_backend_flags.Flambda2.Dump.target =
+type dump_target = Oxcaml_flags.Flambda2.Dump.target =
   | Nowhere
   | Main_dump_stream
   | File of Misc.filepath
@@ -85,7 +101,11 @@ val dump_flambda : unit -> bool
 
 val dump_rawfexpr : unit -> dump_target
 
-val dump_fexpr : unit -> dump_target
+type pass = Oxcaml_flags.Flambda2.Dump.pass =
+  | Last_pass
+  | This_pass of string
+
+val dump_fexpr : pass -> dump_target
 
 val dump_flexpect : unit -> dump_target
 
@@ -102,7 +122,7 @@ val freshen_when_printing : unit -> bool
 module Inlining : sig
   type round_or_default =
     | Round of int
-    | Default of Flambda_backend_flags.opt_level
+    | Default of Oxcaml_flags.opt_level
 
   val depth_scaling_factor : int
 
@@ -143,6 +163,8 @@ module Expert : sig
 
   val inline_effects_in_cmm : unit -> bool
 
+  val cmm_safe_subst : unit -> bool
+
   val max_block_size_for_projections : unit -> int option
 
   val phantom_lets : unit -> bool
@@ -156,6 +178,8 @@ module Expert : sig
   val shorten_symbol_names : unit -> bool
 
   val cont_lifting_budget : unit -> int
+
+  val cont_spec_budget : unit -> int
 end
 
 val stack_allocation_enabled : unit -> bool

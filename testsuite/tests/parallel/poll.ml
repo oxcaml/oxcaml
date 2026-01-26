@@ -1,9 +1,10 @@
 (* TEST
- flags += "-alert -unsafe_parallelism -alert -unsafe_multidomain";
+ flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  poll-insertion;
  include unix;
  hasunix;
  runtime5;
+ multidomain;
  {
    bytecode;
  }{

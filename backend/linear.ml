@@ -29,12 +29,14 @@ type instruction =
     dbg : Debuginfo.t;
     fdo : Fdo_info.t;
     live : Reg.Set.t;
-    available_before : Reg_availability_set.t option;
-    available_across : Reg_availability_set.t option
+    available_before : Reg_availability_set.t;
+    available_across : Reg_availability_set.t
   }
 
 and instruction_desc =
   | Lprologue
+  | Lepilogue_open
+  | Lepilogue_close
   | Lend
   | Lop of Operation.t
   | Lcall_op of call_operation
@@ -51,7 +53,7 @@ and instruction_desc =
   | Lentertrap
   | Ladjust_stack_offset of { delta_bytes : int }
   | Lpushtrap of { lbl_handler : label }
-  | Lpoptrap
+  | Lpoptrap of { lbl_handler : label }
   | Lraise of Lambda.raise_kind
   | Lstackcheck of { max_frame_size_bytes : int }
 
@@ -66,7 +68,8 @@ and call_operation =
         ty_args : Cmm.exttype list;
         alloc : bool;
         returns : bool;
-        stack_ofs : int
+        stack_ofs : int;
+        stack_align : Cmm.stack_align
       }
   | Lprobe of
       { name : string;
@@ -77,10 +80,12 @@ and call_operation =
 let has_fallthrough = function
   | Lreturn | Lbranch _ | Lswitch _ | Lraise _
   | Lcall_op Ltailcall_ind
-  | Lcall_op (Ltailcall_imm _) ->
+  | Lcall_op (Ltailcall_imm _)
+  | Lepilogue_close ->
     false
   | Lcall_op (Lcall_ind | Lcall_imm _ | Lextcall _ | Lprobe _)
-  | Lprologue | Lend | Lreloadretaddr | Lentertrap | Lpoptrap | Lop _ | Llabel _
+  | Lprologue | Lepilogue_open | Lend | Lreloadretaddr | Lentertrap | Lpoptrap _
+  | Lop _ | Llabel _
   | Lcondbranch (_, _)
   | Lcondbranch3 (_, _, _)
   | Ladjust_stack_offset _ | Lpushtrap _ | Lstackcheck _ ->
@@ -112,8 +117,8 @@ let rec end_instr =
     dbg = Debuginfo.none;
     fdo = Fdo_info.none;
     live = Reg.Set.empty;
-    available_before = Some Unreachable;
-    available_across = None
+    available_before = Unreachable;
+    available_across = Unreachable
   }
 
 (* Cons an instruction (live, debug empty) *)
@@ -130,4 +135,4 @@ let instr_cons d a r n ~available_before ~available_across =
     available_across
   }
 
-let traps_to_bytes traps = Proc.trap_size_in_bytes * traps
+let traps_to_bytes traps = Proc.trap_size_in_bytes () * traps

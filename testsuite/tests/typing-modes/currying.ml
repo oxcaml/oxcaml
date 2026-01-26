@@ -1,5 +1,6 @@
 (* TEST
- expect;
+  flags+="-rectypes";
+  expect;
 *)
 
 
@@ -8,21 +9,23 @@
  *)
 let g : local_ 'a -> int -> _ = fun _ _ -> (fun[@curry] (local_ _) (x : int) -> x)
 [%%expect{|
-val g : local_ 'a -> int -> (local_ 'b -> int -> int) = <fun>
+val g : 'a @ local -> int -> ('b @ local -> int -> int) = <fun>
 |}]
 let apply1 x = g x
 [%%expect{|
 Line 1, characters 15-18:
 1 | let apply1 x = g x
                    ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
 let apply2 x = g x x
 [%%expect{|
-val apply2 : int -> local_ 'a -> int -> int = <fun>
+val apply2 : int -> 'a @ local -> int -> int = <fun>
 |}]
 let apply3 x = g x x x
 [%%expect{|
@@ -38,8 +41,10 @@ let apply3_wrapped x = (g x x) x
 Line 1, characters 23-32:
 1 | let apply3_wrapped x = (g x x) x
                            ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -61,7 +66,8 @@ let ill_typed () = g 1 2 3 4 5
 Line 1, characters 19-30:
 1 | let ill_typed () = g 1 2 3 4 5
                        ^^^^^^^^^^^
-Error: The function "g" has type local_ 'a -> int -> (local_ 'b -> int -> int)
+Error: The function "g" has type
+         'a @ local -> int -> ('b @ local -> int -> int)
        It is applied to too many arguments
 Line 1, characters 29-30:
 1 | let ill_typed () = g 1 2 3 4 5
@@ -75,7 +81,7 @@ Line 1, characters 29-30:
 
 let f g = g (local_ (1, 2)) 1 2 3 [@nontail]
 [%%expect{|
-val f : (local_ int * int -> int -> int -> int -> 'a) -> 'a = <fun>
+val f : (int * int @ local -> int -> int -> int -> 'a) -> 'a = <fun>
 |}]
 
 (*
@@ -87,33 +93,42 @@ let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42) 
 Line 1, characters 64-79:
 1 | let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42) ()
                                                                     ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: It is captured by a partial application.
+Error: This value is "local" but is expected to be "global"
+       because it is captured by a partial application
+       which is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
 Line 1, characters 64-79:
 1 | let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
                                                                     ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: It is captured by a partial application.
+Error: This value is "local" but is expected to be "global"
+       because it is captured by a partial application
+       which is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
 Line 1, characters 56-71:
 1 | let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
                                                             ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: It is captured by a partial application.
+Error: This value is "local" but is expected to be "global"
+       because it is captured by a partial application
+       which is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
 Line 1, characters 56-71:
 1 | let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(local_ ref 42)
                                                             ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is an argument in a tail call.
 |}]
 let app42 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   f ~a:(local_ ref 1) 2 ~c:4
@@ -129,8 +144,8 @@ let app42_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> 
   (f ~a:(local_ ref 1)) 2 ~c:4
 [%%expect{|
 val app42_wrapped :
-  (a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) ->
-  b:local_ int ref -> unit = <fun>
+  (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) ->
+  b:int ref @ local -> unit = <fun>
 |}]
 let app43 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   f ~a:(local_ ref 1) 2
@@ -138,44 +153,46 @@ let app43 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
 Line 2, characters 7-21:
 2 |   f ~a:(local_ ref 1) 2
            ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is an argument in a tail call.
 |}]
 let app5 (f : b:local_ int ref -> a:int -> unit) = f ~a:42
 [%%expect{|
-val app5 : (b:local_ int ref -> a:int -> unit) -> b:local_ int ref -> unit =
+val app5 : (b:int ref @ local -> a:int -> unit) -> b:int ref @ local -> unit =
   <fun>
 |}]
 let app6 (f : a:local_ int ref -> b:local_ int ref -> c:int -> unit) = f ~c:42
 [%%expect{|
 val app6 :
-  (a:local_ int ref -> b:local_ int ref -> c:int -> unit) ->
-  a:local_ int ref -> b:local_ int ref -> unit = <fun>
+  (a:int ref @ local -> b:int ref @ local -> c:int -> unit) ->
+  a:int ref @ local -> b:int ref @ local -> unit = <fun>
 |}]
 
 let app1' (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(ref 42) ()
 [%%expect{|
-val app1' : (a:int -> b:local_ int ref -> unit -> unit) -> a:int -> unit =
+val app1' : (a:int -> b:int ref @ local -> unit -> unit) -> a:int -> unit =
   <fun>
 |}]
 let app2' (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(ref 42)
 [%%expect{|
 val app2' :
-  (a:int -> b:local_ int ref -> unit -> unit) ->
-  a:int -> local_ (unit -> unit) = <fun>
+  (a:int -> b:int ref @ local -> unit -> unit) ->
+  a:int -> (unit -> unit) @ local = <fun>
 |}]
 let app3' (f : a:int -> b:local_ int ref -> unit) = f ~b:(ref 42)
 [%%expect{|
-val app3' : (a:int -> b:local_ int ref -> unit) -> a:int -> unit = <fun>
+val app3' : (a:int -> b:int ref @ local -> unit) -> a:int -> unit = <fun>
 |}]
 let app4' (f : b:local_ int ref -> a:int -> unit) = f ~b:(ref 42)
 [%%expect{|
 Line 1, characters 52-65:
 1 | let app4' (f : b:local_ int ref -> a:int -> unit) = f ~b:(ref 42)
                                                         ^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -193,8 +210,8 @@ let app42'_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int ->
   (f ~a:(ref 1)) 2 ~c:4
 [%%expect{|
 val app42'_wrapped :
-  (a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) ->
-  b:local_ int ref -> unit = <fun>
+  (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) ->
+  b:int ref @ local -> unit = <fun>
 |}]
 let app43' (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   f ~a:(ref 1) 2
@@ -210,18 +227,18 @@ let app43'_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int ->
   (f ~a:(ref 1)) 2
 [%%expect{|
 val app43'_wrapped :
-  (a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) ->
-  b:local_ int ref -> c:int -> unit = <fun>
+  (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) ->
+  b:int ref @ local -> c:int -> unit = <fun>
 |}]
 
 let rapp1 (f : a:int -> unit -> local_ int ref) = f ()
 [%%expect{|
-val rapp1 : (a:int -> unit -> local_ int ref) -> a:int -> local_ int ref =
+val rapp1 : (a:int -> unit -> int ref @ local) -> a:int -> int ref @ local =
   <fun>
 |}]
 let rapp2 (f : a:int -> unit -> local_ int ref) = f ~a:1
 [%%expect{|
-val rapp2 : (a:int -> unit -> local_ int ref) -> unit -> local_ int ref =
+val rapp2 : (a:int -> unit -> int ref @ local) -> unit -> int ref @ local =
   <fun>
 |}]
 let rapp3 (f : a:int -> unit -> local_ int ref) = f ~a:1 ()
@@ -229,8 +246,10 @@ let rapp3 (f : a:int -> unit -> local_ int ref) = f ~a:1 ()
 Line 1, characters 50-59:
 1 | let rapp3 (f : a:int -> unit -> local_ int ref) = f ~a:1 ()
                                                       ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let bug1 () =
@@ -244,8 +263,10 @@ let bug1 () =
 Line 7, characters 2-5:
 7 |   res
       ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 let bug2 () =
   let foo : a:local_ string -> (b:local_ string -> (c:int -> unit)) =
@@ -274,13 +295,15 @@ let bug3 () =
 Line 3, characters 63-64:
 3 |     fun ~a -> fun[@curry] ~b -> fun[@curry] ~c -> print_string a
                                                                    ^
-Error: The value "a" is local, so cannot be used inside a function that might escape.
+Error: The value "a" is "local" to the parent region but is expected to be "global"
+       because it is used inside the function at Line 3, characters 14-64
+       which is expected to be "global".
 |}]
 let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()
 
 let () = overapp ~a:1 ~b:2 ~c:3 ~d:4
 [%%expect{|
-val overapp : a:local_ 'a -> b:'b -> (c:'c -> d:'d -> unit) = <fun>
+val overapp : a:'a @ local -> b:'b -> (c:'c -> d:'d -> unit) = <fun>
 Line 3, characters 9-26:
 3 | let () = overapp ~a:1 ~b:2 ~c:3 ~d:4
              ^^^^^^^^^^^^^^^^^
@@ -330,7 +353,7 @@ let bug4 : local_ (string -> foo:string -> unit) -> (string -> unit) =
 Line 2, characters 11-25:
 2 |   fun f -> f ~foo:"hello"
                ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -340,7 +363,7 @@ Error: This value escapes its region.
 let bug4_fixed : local_ (string -> foo:string -> unit) -> local_ (string -> unit) =
   fun f -> exclave_ f ~foo:"hello"
 [%%expect{|
-val bug4_fixed : local_ (string -> foo:string -> unit) -> string -> unit =
+val bug4_fixed : (string -> foo:string -> unit) @ local -> string -> unit =
   <fun>
 |}]
 
@@ -353,8 +376,10 @@ let bug4' () =
 Line 3, characters 25-31:
 3 |   let local_ perm ~foo = f ~foo in
                              ^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
         Adding 1 more argument may make the value non-local
 |}]
@@ -491,3 +516,32 @@ let f (g @ nonportable) x =
 [%%expect{|
 val f : ('a -> 'a -> 'b) -> 'a -> 'b = <fun>
 |}]
+
+type t = (int -> 'f) as 'f
+[%%expect{|
+type t = int -> 'a as 'a
+|}]
+
+type t = (int -> 'f @ local) as 'f
+[%%expect{|
+type t = int -> 'a @ local as 'a
+|}]
+
+(* In the following, [local] on [int] doesn't trigger the mode currying on ['f].
+   The printing reproduces the parsing. *)
+type t = (int @ local -> 'f) as 'f
+[%%expect{|
+type t = int @ local -> 'a as 'a
+|}]
+
+type t = (int @ local -> 'f @ global) as 'f
+[%%expect{|
+type t = int @ local -> 'a as 'a
+|}]
+
+type t = (int @ local -> 'f @ local) as 'f
+[%%expect{|
+type t = int @ local -> 'a @ local as 'a
+|}]
+
+(* CR zqian: add tests for [Tpoly (_, [])] *)

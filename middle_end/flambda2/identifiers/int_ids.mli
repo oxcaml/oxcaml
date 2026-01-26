@@ -25,38 +25,42 @@ module Const : sig
 
   include Container_types.S with type t := t
 
-  val const_true : t
+  val const_true : Target_system.Machine_width.t -> t
 
-  val const_false : t
+  val const_false : Target_system.Machine_width.t -> t
 
-  val untagged_const_true : t
+  val untagged_const_true : Target_system.Machine_width.t -> t
 
-  val untagged_const_false : t
+  val untagged_const_false : Target_system.Machine_width.t -> t
 
-  val untagged_const_zero : t
+  val untagged_const_zero : Target_system.Machine_width.t -> t
 
-  val untagged_const_int : Targetint_31_63.t -> t
+  val untagged_const_int : Target_ocaml_int.t -> t
 
-  val const_zero : t
+  val const_zero : Target_system.Machine_width.t -> t
 
-  val const_one : t
+  val const_one : Target_system.Machine_width.t -> t
 
-  val const_unit : t
+  val const_unit : Target_system.Machine_width.t -> t
 
-  val const_int : Targetint_31_63.t -> t
+  val const_int : Target_ocaml_int.t -> t
 
   val const_null : t
 
   (** [naked_immediate] is similar to [naked_nativeint], but represents integers
       of width [n - 1] bits, where [n] is the native machine width. (By
       contrast, [naked_nativeint] represents integers of width [n] bits.) *)
-  val naked_immediate : Targetint_31_63.t -> t
+  val naked_immediate : Target_ocaml_int.t -> t
 
-  val tagged_immediate : Targetint_31_63.t -> t
+  val tagged_immediate : Target_ocaml_int.t -> t
 
   val naked_float32 : Numeric_types.Float32_by_bit_pattern.t -> t
 
   val naked_float : Numeric_types.Float_by_bit_pattern.t -> t
+
+  val naked_int8 : Numeric_types.Int8.t -> t
+
+  val naked_int16 : Numeric_types.Int16.t -> t
 
   val naked_int32 : Int32.t -> t
 
@@ -66,16 +70,24 @@ module Const : sig
 
   val naked_vec128 : Vector_types.Vec128.Bit_pattern.t -> t
 
+  val naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
+
+  val naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
+
   module Descr : sig
     type t = private
-      | Naked_immediate of Targetint_31_63.t
-      | Tagged_immediate of Targetint_31_63.t
+      | Naked_immediate of Target_ocaml_int.t
+      | Tagged_immediate of Target_ocaml_int.t
       | Naked_float32 of Numeric_types.Float32_by_bit_pattern.t
       | Naked_float of Numeric_types.Float_by_bit_pattern.t
+      | Naked_int8 of Numeric_types.Int8.t
+      | Naked_int16 of Numeric_types.Int16.t
       | Naked_int32 of Int32.t
       | Naked_int64 of Int64.t
       | Naked_nativeint of Targetint_32_64.t
       | Naked_vec128 of Vector_types.Vec128.Bit_pattern.t
+      | Naked_vec256 of Vector_types.Vec256.Bit_pattern.t
+      | Naked_vec512 of Vector_types.Vec512.Bit_pattern.t
       | Null
 
     include Container_types.S with type t := t
@@ -93,15 +105,19 @@ module Variable : sig
 
   type exported
 
-  include Container_types.S with type t := t
+  include Container_types.S_plus_iterator with type t := t
 
-  val create : ?user_visible:unit -> string -> t
+  module Lmap : Lmap.S with type key := t
+
+  val create : ?user_visible:unit -> string -> Flambda_kind.t -> t
 
   val compilation_unit : t -> Compilation_unit.t
 
   val name : t -> string
 
   val name_stamp : t -> int
+
+  val kind : t -> Flambda_kind.t
 
   val user_visible : t -> bool
 
@@ -115,7 +131,7 @@ module Symbol : sig
 
   type exported
 
-  include Container_types.S with type t := t
+  include Container_types.S_plus_iterator with type t := t
 
   (* CR lmaurer: This treats the [Linkage_name.t] as a string to be prefixed
      rather than the actual linkage name. That's not really consistent with the
@@ -127,6 +143,8 @@ module Symbol : sig
   val unsafe_create : Compilation_unit.t -> Linkage_name.t -> t
 
   val compilation_unit : t -> Compilation_unit.t
+
+  val for_compilation_unit : Compilation_unit.t -> t
 
   val linkage_name : t -> Linkage_name.t
 
@@ -145,6 +163,10 @@ module Name : sig
   include Container_types.S_plus_iterator with type t := t
 
   val var : Variable.t -> t
+
+  val var_set : Variable.Set.t -> Set.t
+
+  val var_map : 'a Variable.Map.t -> 'a Map.t
 
   val symbol : Symbol.t -> t
 
@@ -211,7 +233,7 @@ module Code_id : sig
 
   val initialise : unit -> unit
 
-  val create : name:string -> Compilation_unit.t -> t
+  val create : name:string -> debug:Debuginfo.t -> Compilation_unit.t -> t
 
   val get_compilation_unit : t -> Compilation_unit.t
 

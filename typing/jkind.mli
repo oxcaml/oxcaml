@@ -13,6 +13,7 @@
 (**************************************************************************)
 
 open Allowance
+module Jkind0 := Btype.Jkind0
 
 (* This module is named Jkind, with a 'j', to distinguish jkinds
    as used here from type kinds (which might be abstract or record or variant,
@@ -59,7 +60,7 @@ end
 type sort = Sort.t
 
 module Sub_failure_reason : sig
-  type t =
+  type t = Jkind0.Violation.Sub_failure_reason.t =
     | Axis_disagreement of Jkind_axis.Axis.packed
     | Layout_disagreement
     | Constrain_ran_out_of_fuel
@@ -101,9 +102,7 @@ module Layout : sig
     val to_string : t -> string
   end
 
-  val of_const : Const.t -> Sort.t t
-
-  val sub : Sort.t t -> Sort.t t -> Sub_result.t
+  val sub : level:int -> Sort.t t -> Sort.t t -> Sub_result.t
 
   module Debug_printers : sig
     val t :
@@ -112,9 +111,7 @@ module Layout : sig
 end
 
 module Mod_bounds : sig
-  type t = Types.Jkind_mod_bounds.t
-
-  val to_mode_crossing : t -> Mode.Crossing.t
+  val debug_print : Format.formatter -> Types.mod_bounds -> unit
 end
 
 module With_bounds : sig
@@ -175,10 +172,20 @@ module History : sig
 end
 
 (******************************)
+(* context *)
+
+(** Context for jkind operations. *)
+type jkind_context =
+  { jkind_of_type : Types.type_expr -> Types.jkind_l option;
+    is_abstract : Path.t -> bool
+        (* Check if a type path refers to an abstract type *)
+  }
+
+(******************************)
 (* errors *)
 
 module Violation : sig
-  type violation =
+  type violation = Jkind0.Violation.violation =
     (* [Not_a_subjkind] allows l-jkinds on the right so that it can be used
        in [sub_jkind_l]. There is no downside to this, as the printing
        machinery works over l-jkinds. *)
@@ -189,15 +196,11 @@ module Violation : sig
         -> violation
     | No_intersection : 'd Types.jkind * ('l * allowed) Types.jkind -> violation
 
-  type t
+  type t = Jkind0.Violation.t
 
   (** Set [?missing_cmi] to mark [t] as having arisen from a missing cmi *)
 
-  val of_ :
-    jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
-    ?missing_cmi:Path.t ->
-    violation ->
-    t
+  val of_ : context:jkind_context -> ?missing_cmi:Path.t -> violation -> t
 
   (** Is this error from a missing cmi? *)
   val is_missing_cmi : t -> bool
@@ -214,16 +217,25 @@ module Violation : sig
   (** Prints a violation and the thing that had an unexpected jkind
       ([offender], which you supply an arbitrary printer for). *)
   val report_with_offender :
-    offender:(Format.formatter -> unit) -> Format.formatter -> t -> unit
+    offender:(Format.formatter -> unit) ->
+    level:int ->
+    Format.formatter ->
+    t ->
+    unit
 
   (** Like [report_with_offender], but additionally prints that the issue is
       that a representable jkind was expected. *)
   val report_with_offender_sort :
-    offender:(Format.formatter -> unit) -> Format.formatter -> t -> unit
+    offender:(Format.formatter -> unit) ->
+    level:int ->
+    Format.formatter ->
+    t ->
+    unit
 
   (** Simpler version of [report_with_offender] for when the thing that had an
       unexpected jkind is available as a string. *)
-  val report_with_name : name:string -> Format.formatter -> t -> unit
+  val report_with_name :
+    name:string -> level:int -> Format.formatter -> t -> unit
 end
 
 (******************************)
@@ -235,102 +247,9 @@ module Const : sig
       The "constant" refers to the fact that there are no sort variables here.
       The existence of [with]-types means, though, that we still need the
       allowance machinery here. *)
-  type 'd t constraint 'd = 'l * 'r
-
-  include Allowance.Allow_disallow with type (_, _, 'd) sided = 'd t
+  type 'd t = 'd Jkind0.Const.t constraint 'd = 'l * 'r
 
   val to_out_jkind_const : 'd t -> Outcometree.out_jkind_const
-
-  (** This returns [true] iff both types have no with-bounds and they are equal.
-      Normally, we want an equality check to happen only on values that are
-      allowed on both the left and the right. But a type with no with-bounds is
-      allowed on the left and the right, so we test for that condition first
-      before doing the proper equality check. *)
-  val no_with_bounds_and_equal : 'd1 t -> 'd2 t -> bool
-
-  (* CR layouts: Remove this once we have a better story for printing with jkind
-     abbreviations. *)
-  module Builtin : sig
-    type nonrec t =
-      { jkind : (allowed * allowed) t;
-        name : string
-      }
-
-    (** This jkind is the top of the jkind lattice. All types have jkind [any].
-    But we cannot compile run-time manipulations of values of types with jkind
-    [any]. *)
-    val any : t
-
-    (** [any], except for null pointers. *)
-    val any_non_null : t
-
-    (** Value of types of this jkind are not retained at all at runtime *)
-    val void : t
-
-    (** This is the jkind of normal ocaml values or null pointers *)
-    val value_or_null : t
-
-    (** This is the jkind of normal ocaml values *)
-    val value : t
-
-    (** Immutable values that don't contain functions. *)
-    val immutable_data : t
-
-    (** Atomically mutable values that don't contain functions. *)
-    val sync_data : t
-
-    (** Mutable values that don't contain functions. *)
-    val mutable_data : t
-
-    (** Values of types of this jkind are immediate on 64-bit platforms; on other
-    platforms, we know nothing other than that it's a value. *)
-    val immediate64 : t
-
-    (** We know for sure that values of types of this jkind are always immediate *)
-    val immediate : t
-
-    (** Values of types of this jkind are either immediate or null pointers *)
-    val immediate_or_null : t
-
-    (** The jkind of unboxed 64-bit floats with no mode crossing. *)
-    val float64 : t
-
-    (** The jkind of unboxed 64-bit floats with mode crossing. *)
-    val kind_of_unboxed_float : t
-
-    (** The jkind of unboxed 32-bit floats with no mode crossing. *)
-    val float32 : t
-
-    (** The jkind of unboxed 32-bit floats with mode crossing. *)
-    val kind_of_unboxed_float32 : t
-
-    (** The jkind of unboxed 32-bit native-sized integers with no mode crossing. *)
-    val word : t
-
-    (** The jkind of unboxed 32-bit native-sized integers with mode crossing. *)
-    val kind_of_unboxed_nativeint : t
-
-    (** The jkind of unboxed 32-bit integers with no mode crossing. *)
-    val bits32 : t
-
-    (** The jkind of unboxed 32-bit integers with mode crossing. *)
-    val kind_of_unboxed_int32 : t
-
-    (** The jkind of unboxed 64-bit integers with no mode crossing. *)
-    val bits64 : t
-
-    (** The jkind of unboxed 64-bit integers with mode crossing. *)
-    val kind_of_unboxed_int64 : t
-
-    (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
-    val vec128 : t
-
-    (** The jkind of unboxed 128-bit vectors with mode crossing. *)
-    val kind_of_unboxed_128bit_vectors : t
-
-    (** A list of all Builtin jkinds *)
-    val all : t list
-  end
 end
 
 module Builtin : sig
@@ -377,7 +296,7 @@ module Builtin : sig
       are represented in the with-bounds. *)
   val product :
     why:History.product_creation_reason ->
-    (Types.type_expr * Mode.Modality.Value.Const.t) list ->
+    (Types.type_expr * Mode.Modality.Const.t) list ->
     Sort.t Layout.t list ->
     Types.jkind_l
 
@@ -385,22 +304,12 @@ module Builtin : sig
       mode-cross (and has kind [Not_best] accordingly), even though unboxed products
       generally should. This is useful when creating an initial jkind in Typedecl. *)
   val product_of_sorts :
-    why:History.product_creation_reason -> int -> Types.jkind_l
+    why:History.product_creation_reason -> level:int -> int -> Types.jkind_l
 end
-
-(** Take an existing [t] and add an ability to cross across the nullability axis. *)
-val add_nullability_crossing : 'd Types.jkind -> 'd Types.jkind
 
 (** Forcibly change the mod- and with-bounds of a [t] based on the mod- and with-bounds of [from]. *)
 val unsafely_set_bounds :
   from:'d Types.jkind -> 'd Types.jkind -> 'd Types.jkind
-
-(** Take an existing [jkind_l] and add some with-bounds. *)
-val add_with_bounds :
-  modality:Mode.Modality.Value.Const.t ->
-  type_expr:Types.type_expr ->
-  Types.jkind_l ->
-  Types.jkind_l
 
 (** Does this jkind have with-bounds? *)
 val has_with_bounds : Types.jkind_l -> bool
@@ -418,36 +327,30 @@ val is_best : ('l * disallowed) Types.jkind -> bool
 (** Create a fresh sort variable, packed into a jkind, returning both
     the resulting kind and the sort. *)
 val of_new_sort_var :
-  why:History.concrete_creation_reason -> 'd Types.jkind * sort
+  why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
 
 (** Create a fresh sort variable, packed into a jkind. *)
-val of_new_sort : why:History.concrete_creation_reason -> 'd Types.jkind
+val of_new_sort :
+  why:History.concrete_creation_reason -> level:int -> 'd Types.jkind
 
 (** Same as [of_new_sort_var], but the jkind is lowered to [Non_null]
     to mirror "legacy" OCaml values.
     Defaulting the sort variable produces exactly [value].  *)
 val of_new_legacy_sort_var :
-  why:History.concrete_legacy_creation_reason -> 'd Types.jkind * sort
+  why:History.concrete_legacy_creation_reason ->
+  level:int ->
+  'd Types.jkind * sort
 
 (** Same as [of_new_sort], but the jkind is lowered to [Non_null]
     to mirror "legacy" OCaml values.
     Defaulting the sort variable produces exactly [value].  *)
 val of_new_legacy_sort :
-  why:History.concrete_legacy_creation_reason -> 'd Types.jkind
+  why:History.concrete_legacy_creation_reason -> level:int -> 'd Types.jkind
 
-(** Construct a jkind from a constant jkind, at quality [Not_best] *)
-val of_const :
-  annotation:Parsetree.jkind_annotation option ->
-  why:History.creation_reason ->
-  quality:'d Types.jkind_quality ->
-  'd Const.t ->
-  'd Types.jkind
-
-(** Construct a jkind from a builtin kind, at quality [Best]. *)
-val of_builtin :
-  why:History.creation_reason ->
-  Const.Builtin.t ->
-  ('l * disallowed) Types.jkind
+(** Same as [of_new_sort_var], but the jkind is lowered to [Non_float].
+    Defaulting the sort variable produces exactly the sort [value].  *)
+val of_new_non_float_sort_var :
+  why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
 
 val of_annotation :
   context:('l * allowed) History.annotation_context ->
@@ -495,17 +398,71 @@ val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
 
-(** Choose an appropriate jkind for a boxed variant type. *)
-val for_boxed_variant : Types.constructor_declaration list -> Types.jkind_l
+(** Choose an appropriate jkind for a boxed variant type.
+
+    [decl_params] is the parameters in the head of the type declaration. [type_apply]
+    should be [Ctype.apply] partially applied to an [env].
+
+    [free_vars] is a function that, given a list of [Types.type_expr]s that are used in
+    the boxed variant, returns all type variables that are free within the
+    [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good candidate for
+    implementing this function. *)
+val for_boxed_variant :
+  loc:Location.t ->
+  decl_params:Types.type_expr list ->
+  type_apply:
+    (Types.type_expr list ->
+    Types.type_expr ->
+    Types.type_expr list ->
+    Types.type_expr) ->
+  free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  Types.constructor_declaration list ->
+  Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
+
+(** Choose an appropriate jkind for a row type. *)
+val for_boxed_row : Types.row_desc -> Types.jkind_l
 
 (** The jkind of an arrow type. *)
 val for_arrow : Types.jkind_l
 
 (** The jkind of an object type.  *)
 val for_object : Types.jkind_l
+
+(** The jkind for values that are not floats. *)
+val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
+
+(** The jkind for [or_null] type arguments. *)
+val for_or_null_argument : Ident.t -> 'd Types.jkind
+
+(** The jkind for an abbreviation declaration. This implements the design
+    in rule FIND_ABBREV in kind-inference.md, where we consider a definition
+
+    {[
+      type ... = rhs
+    ]}
+
+    to have the kind [<<layout of rhs>> mod everything with rhs]. This is
+    important to allow code like this to type-check:
+
+    {[
+      module M : sig
+        type 'a t : value mod portable with 'a
+      end = struct
+        type 'a t = 'a
+      end
+    ]}
+*)
+val for_abbreviation :
+  type_jkind_purely:(Types.type_expr -> Types.jkind_l) ->
+  modality:Mode.Modality.Const.t ->
+  Types.type_expr ->
+  Types.jkind_l
+
+(** The jkind for array elements, creating a new sort variable. *)
+val for_array_element_sort : level:int -> Types.jkind_lr * sort
 
 (******************************)
 (* elimination and defaulting *)
@@ -527,10 +484,6 @@ val get : 'd Types.jkind -> 'd Desc.t
 (** [get_layout_defaulting_to_value] extracts a constant layout, defaulting
     any sort variable to [value]. *)
 val get_layout_defaulting_to_value : 'd Types.jkind -> Layout.Const.t
-
-(** [get_const] returns a [Const.t] if the layout has no sort variables,
-    returning [None] otherwise *)
-val get_const : 'd Types.jkind -> 'd Const.t option
 
 (** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
 val default_to_value : 'd Types.jkind -> unit
@@ -557,16 +510,12 @@ val extract_layout : 'd Types.jkind -> Sort.t Layout.t
 
 (** Gets the mode crossing for types of this jkind. *)
 val get_mode_crossing :
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
-  'd Types.jkind ->
-  Mode.Crossing.t
+  context:jkind_context -> 'd Types.jkind -> Mode.Crossing.t
 
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
 val get_externality_upper_bound :
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
-  'd Types.jkind ->
-  Jkind_axis.Externality.t
+  context:jkind_context -> 'd Types.jkind -> Jkind_axis.Externality.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the externality axis *)
@@ -575,14 +524,17 @@ val set_externality_upper_bound :
 
 (** Gets the nullability from a jkind. *)
 val get_nullability :
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
-  'd Types.jkind ->
-  Jkind_axis.Nullability.t
+  context:jkind_context -> Types.jkind_l -> Jkind_axis.Nullability.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
-    mode for the externality axis *)
+    mode for the nullability axis *)
 val set_nullability_upper_bound :
   Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
+
+(** Computes a jkind that is the same as the input but with an updated maximum
+    mode for the separability axis *)
+val set_separability_upper_bound :
+  Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
 
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
@@ -592,13 +544,25 @@ val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
     modified by the modality, by setting the mod-bounds appropriately
     and propagating the modality into any with-bounds. *)
 val apply_modality_l :
-  Mode.Modality.Value.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
+  Mode.Modality.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
 (** Change a jkind to be appropriate for an expectation of a type under
     a modality. This means that the jkind's axes affected by the modality
     will all be top. The with-bounds are left unchanged. *)
 val apply_modality_r :
-  Mode.Modality.Value.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
+  Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
+
+(** Change a jkind to be appropriate for ['a or_null] based on passed ['a].
+    Adjusts nullability to be [Maybe_null], and separability to be
+    [Maybe_separable] if it is already [Separable]. If the jkind is already
+    [Maybe_null], fails. *)
+val apply_or_null_l : Types.jkind_l -> (Types.jkind_l, unit) result
+
+(** Change a jkind to be appropriate for an expectation of a type passed to
+    the [or_null] constructor. Adjusts nullability to be [Non_null], and
+    separability to be [Non_float] if it is demanded to be [Separable].
+    If the jkind is already [Non_null], fails. *)
+val apply_or_null_r : Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Extract out component jkinds from the product. Because there are no product
     jkinds, this is a bit of a lie: instead, this decomposes the layout but just
@@ -624,22 +588,17 @@ type normalize_mode =
           with-bounds. *)
 
 val normalize :
-  mode:normalize_mode ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
-  Types.jkind_l ->
-  Types.jkind_l
+  mode:normalize_mode -> context:jkind_context -> Types.jkind_l -> Types.jkind_l
 
 (*********************************)
 (* pretty printing *)
 
 (** Call these before trying to print. *)
-val set_outcometree_of_type : (Types.type_expr -> Outcometree.out_type) -> unit
+val set_outcometrees_of_types :
+  (Types.type_expr list -> Outcometree.out_type list) -> unit
 
-val set_outcometree_of_modalities_new :
-  (Types.mutability ->
-  Parsetree.attributes ->
-  Mode.Modality.Value.Const.t ->
-  Outcometree.out_mode_new list) ->
+val set_outcometree_of_modalities :
+  (Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list) ->
   unit
 
 (** Provides the [Printtyp.path] formatter back up the dependency chain to
@@ -655,6 +614,10 @@ val set_print_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 
 val format : Format.formatter -> 'd Types.jkind -> unit
+
+(** Similar to [format], but the kind is expanded as much as possible rather
+    than written in terms of a kind abbreviation. This is used by Merlin. *)
+val format_expanded : Format.formatter -> 'd Types.jkind -> unit
 
 (** Format the history of this jkind: what interactions it has had and why
     it is the jkind that it is. Might be a no-op: see [display_histories]
@@ -684,7 +647,7 @@ val equal : Types.jkind_lr -> Types.jkind_lr -> bool
     sort variables. Works over any mix of l- and r-jkinds, because the only
     way not to have an intersection is by looking at the layout: all axes
     have a bottom element. *)
-val has_intersection : 'd1 Types.jkind -> 'd2 Types.jkind -> bool
+val has_intersection : level:int -> 'd1 Types.jkind -> 'd2 Types.jkind -> bool
 
 (** Finds the intersection of two jkinds, constraining sort variables to
     create one if needed, or returns a [Violation.t] if an intersection does
@@ -695,8 +658,9 @@ val has_intersection : 'd1 Types.jkind -> 'd2 Types.jkind -> bool
     intersection of the two, not something that modifies the second jkind. *)
 val intersection_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   reason:History.interact_reason ->
+  level:int ->
   ('l1 * allowed) Types.jkind ->
   ('l2 * allowed) Types.jkind ->
   (('l1 * allowed) Types.jkind, Violation.t) Result.t
@@ -705,7 +669,8 @@ val intersection_or_error :
     either [t1] or [t2] to make their layouts equal.*)
 val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
+  level:int ->
   Types.jkind_l ->
   Types.jkind_r ->
   bool
@@ -722,7 +687,8 @@ type sub_or_intersect =
     see comments there for more info. *)
 val sub_or_intersect :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
+  level:int ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
   sub_or_intersect
@@ -731,7 +697,8 @@ val sub_or_intersect :
     [Violation.t] upon failure. *)
 val sub_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
+  level:int ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
   (unit, Violation.t) result
@@ -742,7 +709,8 @@ val sub_or_error :
 *)
 val sub_jkind_l :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
+  level:int ->
   ?allow_any_crossing:bool ->
   Types.jkind_l ->
   Types.jkind_l ->
@@ -751,7 +719,7 @@ val sub_jkind_l :
 (** "round up" a [jkind_l] to a [jkind_r] such that the input is less than the
     output. *)
 val round_up :
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind
 
@@ -761,11 +729,13 @@ val map_type_expr :
   (allowed * 'r) Types.jkind ->
   (allowed * 'r) Types.jkind
 
-(** Checks to see whether a jkind is {iobviously} the maximum jkind. Never does any
-    mutation, preferring a quick check over a thorough one, and doesn't expand any
-    with-bounds. Might return [false] even when the input is actually the maximum
-    jkind. *)
-val is_obviously_max : ('l * allowed) Types.jkind -> bool
+(** Checks to see whether a right-jkind is the maximum jkind. Never does any
+    mutation. *)
+val is_max : ('l * allowed) Types.jkind -> bool
+
+(** Checks to see whether a right-jkind's mod-bounds are the maximum
+    mod-bounds. Never does any mutation. *)
+val mod_bounds_are_max : ('l * allowed) Types.jkind -> bool
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)
 val has_layout_any : ('l * allowed) Types.jkind -> bool
@@ -785,3 +755,15 @@ module Debug_printers : sig
     val t : Format.formatter -> 'd Const.t -> unit
   end
 end
+
+(* These aliases are here to make sure various modules don't depend on [jkind] -
+   they would create a cycle causing the build system to error otherwise.  They
+   will be removed in the PR that adds abstract kinds, and until then they
+   ensure that the dependency structure needed for that PR isn't broken. *)
+type temp_cycle_check_subst = Subst.t
+
+type temp_cycle_check_env = Env.t
+
+module type temp_cycle_check_datarepr = module type of Datarepr
+
+module type temp_cycle_check_predef = module type of Predef

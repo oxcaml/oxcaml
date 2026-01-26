@@ -30,6 +30,12 @@ type expr_primitive =
       * simple_or_prim
       * simple_or_prim
       * simple_or_prim
+  | Quaternary of
+      Flambda_primitive.quaternary_primitive
+      * simple_or_prim
+      * simple_or_prim
+      * simple_or_prim
+      * simple_or_prim
   | Variadic of Flambda_primitive.variadic_primitive * simple_or_prim list
   | Checked of
       { validity_conditions : expr_primitive list;
@@ -51,6 +57,13 @@ type expr_primitive =
 and simple_or_prim =
   | Simple of Simple.t
   | Prim of expr_primitive
+
+val simple_untagged_int :
+  machine_width:Target_system.Machine_width.t -> int -> simple_or_prim
+
+val simple_i64 : Int64.t -> simple_or_prim
+
+val simple_i64_expr : Int64.t -> expr_primitive
 
 val maybe_create_unboxed_product : expr_primitive list -> expr_primitive
 
@@ -74,3 +87,7 @@ val bind_recs :
   Debuginfo.t ->
   (Acc.t -> Flambda.Named.t list -> Expr_with_acc.t) ->
   Expr_with_acc.t
+
+val mixed_block_access_field_kind :
+  'a Mixed_block_shape.Singleton_mixed_block_element.t ->
+  Flambda_primitive.Mixed_block_access_field_kind.t

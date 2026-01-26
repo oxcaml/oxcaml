@@ -257,7 +257,8 @@ let subst_func_decl env
     Function_declarations.code_id_in_function_declaration =
   match code_id with
   | Deleted _ -> code_id
-  | Code_id code_id -> Code_id (subst_code_id env code_id)
+  | Code_id { code_id; only_full_applications } ->
+    Code_id { code_id = subst_code_id env code_id; only_full_applications }
 
 let subst_func_decls env decls =
   Function_declarations.funs_in_order decls
@@ -419,7 +420,7 @@ and subst_let_cont env (let_cont_expr : Let_cont_expr.t) =
       ~f:(fun ~invariant_params ~body handlers ->
         let body = subst_expr env body in
         let handlers =
-          Continuation.Map.map_sharing (subst_cont_handler env)
+          Continuation.Lmap.map_sharing (subst_cont_handler env)
             (handlers |> Continuation_handlers.to_map)
         in
         Let_cont_expr.create_recursive handlers ~invariant_params ~body)
@@ -459,7 +460,7 @@ and subst_apply_cont env apply_cont =
 and subst_switch env switch =
   let scrutinee = subst_simple env (Switch_expr.scrutinee switch) in
   let arms =
-    Targetint_31_63.Map.map_sharing (subst_apply_cont env)
+    Target_ocaml_int.Map.map_sharing (subst_apply_cont env)
       (Switch_expr.arms switch)
   in
   Expr.create_switch
@@ -555,6 +556,12 @@ let code_ids env code_id1 code_id2 : Code_id.t Comparison.t =
   then Equivalent
   else Different { approximant = code_id1 }
 
+let code_ids_set env code_ids1 code_ids2 : Code_id.Set.t Comparison.t =
+  let code_ids1 = Code_id.Set.map (subst_code_id env) code_ids1 in
+  if Code_id.Set.equal code_ids1 code_ids2
+  then Equivalent
+  else Different { approximant = code_ids1 }
+
 let function_slots env function_slot1 function_slot2 :
     Function_slot.t Comparison.t =
   match Env.find_function_slot env function_slot1 with
@@ -625,6 +632,21 @@ let simple_exprs env simple1 simple2 : Simple.t Comparison.t =
           if Reg_width_const.equal const1 const2
           then Equivalent
           else Different { approximant = simple1 }))
+
+let simples_with_debuginfo env simple_with_dbg1 simple_with_dbg2 :
+    Simple.With_debuginfo.t Comparison.t =
+  let simple1 = Simple.With_debuginfo.simple simple_with_dbg1 in
+  let simple2 = Simple.With_debuginfo.simple simple_with_dbg2 in
+  let dbg1 = Simple.With_debuginfo.dbg simple_with_dbg1 in
+  let dbg2 = Simple.With_debuginfo.dbg simple_with_dbg2 in
+  Comparison.map
+    ~f:(fun (simple, dbg) -> Simple.With_debuginfo.create simple dbg)
+    (pairs ~f1:simple_exprs
+       ~f2:
+         (Comparator.of_predicate (fun dbg1 dbg2 ->
+              Debuginfo.compare dbg1 dbg2 = 0))
+       ~subst2:(fun _ dbg -> dbg)
+       env (simple1, dbg1) (simple2, dbg2))
 
 let print_list f ppf l =
   let pp_sep ppf () = Format.fprintf ppf ";@;<1 2>" in
@@ -724,8 +746,13 @@ let function_decls env
   | ( Deleted { function_slot_size = size1; dbg = _ },
       Deleted { function_slot_size = size2; dbg = _ } ) ->
     if Int.equal size1 size2 then Equivalent else Different { approximant = () }
-  | Code_id code_id1, Code_id code_id2 ->
+  | ( Code_id
+        { code_id = code_id1; only_full_applications = only_full_applications1 },
+      Code_id
+        { code_id = code_id2; only_full_applications = only_full_applications2 }
+    ) ->
     if code_ids env code_id1 code_id2 |> Comparison.is_equivalent
+       && Bool.equal only_full_applications1 only_full_applications2
     then Equivalent
     else Different { approximant = () }
   | Deleted _, Code_id _ | Code_id _, Deleted _ ->
@@ -775,7 +802,7 @@ let sets_of_closures env set1 set2 : Set_of_closures.t Comparison.t =
   let ok = ref true in
   let () =
     let compare (kind1, value1, _var1) (kind2, value2, _var2) =
-      let c = Flambda_kind.With_subkind.compare kind1 kind2 in
+      let c = Flambda_kind.compare kind1 kind2 in
       if c = 0 then Simple.compare value1 value2 else c
     in
     iter2_merged (value_slots_by_value set1) (value_slots_by_value set2)
@@ -800,7 +827,7 @@ let sets_of_closures env set1 set2 : Set_of_closures.t Comparison.t =
            ->
              match code_id with
              | Deleted _ -> Right function_slot
-             | Code_id code_id0 ->
+             | Code_id { code_id = code_id0; _ } ->
                Left (subst_code_id env code_id0, (function_slot, code_id)))
     in
     ( Code_id.Map.of_list function_slot_map,
@@ -913,7 +940,7 @@ let bound_static env bound_static1 bound_static2 : Bound_static.t Comparison.t =
 
 let fields env (field1 : Simple.With_debuginfo.t)
     (field2 : Simple.With_debuginfo.t) : Simple.With_debuginfo.t Comparison.t =
-  Comparator.of_predicate Simple.With_debuginfo.equal env field1 field2
+  simples_with_debuginfo env field1 field2
 
 let blocks env block1 block2 =
   triples
@@ -946,10 +973,23 @@ let call_kinds env (call_kind1 : Call_kind.t) (call_kind2 : Call_kind.t) :
         if code_ids env code_id1 code_id2 |> Comparison.is_equivalent
         then Equivalent
         else Different { approximant = call_kind1 })
-  | ( Function { function_call = Indirect_known_arity; alloc_mode = alloc_mode1 },
+  | ( Function
+        { function_call = Indirect_known_arity code_ids1;
+          alloc_mode = alloc_mode1
+        },
       Function
-        { function_call = Indirect_known_arity; alloc_mode = alloc_mode2 } ) ->
-    compare_alloc_modes_then alloc_mode1 alloc_mode2 ~f:(fun () -> Equivalent)
+        { function_call = Indirect_known_arity code_ids2;
+          alloc_mode = alloc_mode2
+        } ) ->
+    compare_alloc_modes_then alloc_mode1 alloc_mode2 ~f:(fun () ->
+        match code_ids1, code_ids2 with
+        | Unknown, Unknown -> Equivalent
+        | Known code_ids1, Known code_ids2 ->
+          if code_ids_set env code_ids1 code_ids2 |> Comparison.is_equivalent
+          then Equivalent
+          else Different { approximant = call_kind1 }
+        | Unknown, Known _ | Known _, Unknown ->
+          Different { approximant = call_kind1 })
   | ( Function
         { function_call = Indirect_unknown_arity; alloc_mode = alloc_mode1 },
       Function
@@ -1079,14 +1119,14 @@ let switch_exprs env switch1 switch2 : Expr.t Comparison.t =
     lists
       ~f:
         (pairs
-           ~f1:(Comparator.of_predicate Targetint_31_63.equal)
+           ~f1:(Comparator.of_predicate Target_ocaml_int.equal)
            ~f2:apply_cont_exprs ~subst2:subst_apply_cont)
       ~subst:(fun env (target_imm, apply_cont) ->
         target_imm, subst_apply_cont env apply_cont)
       ~subst_snd:true env
-      (Targetint_31_63.Map.bindings arms1)
-      (Targetint_31_63.Map.bindings arms2)
-    |> Comparison.map ~f:Targetint_31_63.Map.of_list
+      (Target_ocaml_int.Map.bindings arms1)
+      (Target_ocaml_int.Map.bindings arms2)
+    |> Comparison.map ~f:Target_ocaml_int.Map.of_list
   in
   pairs ~f1:compare_arms ~f2:simple_exprs ~subst2:subst_simple env
     (Switch.arms switch1, Switch.scrutinee switch1)
@@ -1283,7 +1323,7 @@ and let_cont_exprs env (let_cont1 : Let_cont.t) (let_cont2 : Let_cont.t) :
                  ~free_names_of_body:Unknown))
   | Recursive handlers1, Recursive handlers2 ->
     let compare_handler_maps env map1 map2 :
-        Continuation_handler.t Continuation.Map.t Comparison.t =
+        Continuation_handler.t Continuation.Lmap.t Comparison.t =
       lists
         ~f:(fun env (cont, handler1) (_cont, handler2) ->
           cont_handlers env handler1 handler2
@@ -1292,15 +1332,15 @@ and let_cont_exprs env (let_cont1 : Let_cont.t) (let_cont2 : Let_cont.t) :
           |> Comparison.map ~f:(fun handler1' -> cont, handler1'))
         ~subst:(fun env (cont, handler) -> cont, subst_cont_handler env handler)
         ~subst_snd:false env
-        (map1 |> Continuation.Map.bindings)
-        (map2 |> Continuation.Map.bindings)
-      |> Comparison.map ~f:Continuation.Map.of_list
+        (map1 |> Continuation.Lmap.bindings)
+        (map2 |> Continuation.Lmap.bindings)
+      |> Comparison.map ~f:Continuation.Lmap.of_list
     in
     Recursive_let_cont_handlers.pattern_match_pair handlers1 handlers2
       ~f:(fun ~invariant_params ~body1 ~body2 cont_handlers1 cont_handlers2 ->
         pairs ~f1:exprs ~f2:compare_handler_maps
           ~subst2:(fun env map ->
-            Continuation.Map.map_sharing (subst_cont_handler env) map)
+            Continuation.Lmap.map_sharing (subst_cont_handler env) map)
           env
           (body1, cont_handlers1 |> Continuation_handlers.to_map)
           (body2, cont_handlers2 |> Continuation_handlers.to_map)
@@ -1337,8 +1377,12 @@ and cont_handlers env handler1 handler2 =
 let flambda_units u1 u2 =
   let ret_cont = Continuation.create ~sort:Toplevel_return () in
   let exn_cont = Continuation.create () in
-  let toplevel_my_region = Variable.create "toplevel_my_region" in
-  let toplevel_my_ghost_region = Variable.create "toplevel_my_ghost_region" in
+  let toplevel_my_region =
+    Variable.create "toplevel_my_region" Flambda_kind.region
+  in
+  let toplevel_my_ghost_region =
+    Variable.create "toplevel_my_ghost_region" Flambda_kind.region
+  in
   let mk_renaming u =
     let renaming = Renaming.empty in
     let renaming =

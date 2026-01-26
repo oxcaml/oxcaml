@@ -17,6 +17,8 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
+(* CR sspies: Consider using [Asm_label.t] for this label to avoid duplication
+   in the assembly backends. *)
 type label = Cmm.label
 
 type instruction =
@@ -27,12 +29,25 @@ type instruction =
     dbg : Debuginfo.t;
     fdo : Fdo_info.t;
     live : Reg.Set.t;
-    available_before : Reg_availability_set.t option;
-    available_across : Reg_availability_set.t option
+    available_before : Reg_availability_set.t;
+    available_across : Reg_availability_set.t
   }
 
 and instruction_desc =
   | Lprologue
+    (* [Lepilogue_open] and [Lepilogue_close] shrink the stack on exiting a
+       function. They are split so that the terminator can be emitted between
+       them, to maintain the correct debug information.
+
+       [Lepilogue_open] reverts the stack pointer and adjusts the CFA offset in
+       preparation for the function ending, and [Lepilogue_close] adjusts the
+       CFA offset back in case the function continues.
+
+       The two instructions should be paired together, with the terminator
+       between them. Any additional instructions between them that affect the
+       stack pointer and/or CFA will likely cause incorrect results. *)
+  | Lepilogue_open
+  | Lepilogue_close
   | Lend
   | Lop of Operation.t
   | Lcall_op of call_operation
@@ -49,7 +64,7 @@ and instruction_desc =
   | Lentertrap
   | Ladjust_stack_offset of { delta_bytes : int }
   | Lpushtrap of { lbl_handler : label }
-  | Lpoptrap
+  | Lpoptrap of { lbl_handler : label }
   | Lraise of Lambda.raise_kind
   | Lstackcheck of { max_frame_size_bytes : int }
 
@@ -64,7 +79,8 @@ and call_operation =
         ty_args : Cmm.exttype list;
         alloc : bool;
         returns : bool;
-        stack_ofs : int
+        stack_ofs : int;
+        stack_align : Cmm.stack_align
       }
   | Lprobe of
       { name : string;
@@ -81,8 +97,8 @@ val instr_cons :
   Reg.t array ->
   Reg.t array ->
   instruction ->
-  available_before:Reg_availability_set.t option ->
-  available_across:Reg_availability_set.t option ->
+  available_before:Reg_availability_set.t ->
+  available_across:Reg_availability_set.t ->
   instruction
 
 type fundecl =

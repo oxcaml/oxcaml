@@ -61,8 +61,7 @@ let init_parameters () =
   let param_names = !Clflags.parameters in
   List.iter
     (fun param_name ->
-        (* We don't (yet!) support parameterised parameters *)
-        let param = Global_module.Name.create_no_args param_name in
+        let param = Global_module.Parameter_name.of_string param_name in
         Env.register_parameter param
     )
     param_names
@@ -110,11 +109,17 @@ let read_clflags_from_env () =
   set_from_env Clflags.error_style Clflags.error_style_reader;
   ()
 
+let directory_exists dir =
+  Sys.file_exists dir && Sys.is_directory dir
+
 let rec make_directory dir =
-  if Sys.file_exists dir then () else
+  if directory_exists dir then () else
     begin
       make_directory (Filename.dirname dir);
-      Sys.mkdir dir 0o777
+      (try
+        Sys.mkdir dir 0o777
+      with (Sys_error _) as se ->
+        if not (directory_exists dir) then raise se)
     end
 
 let with_ppf_file ~file_prefix ~file_extension f =
@@ -144,3 +149,15 @@ let with_ppf_dump ?stdout ~file_prefix f =
       if Option.is_some stdout then Format.std_formatter else Format.err_formatter in
     Misc.try_finally (fun () -> f formatter)
   | true -> with_ppf_file ~file_prefix ~file_extension:".dump" f
+
+let get_profile_file_prefix ~expected_suffix ~default_name =
+  match !Clflags.profile_output_name with
+  | None -> default_name
+  | Some filename ->
+    if Filename.check_suffix filename expected_suffix then
+      Filename.chop_suffix filename expected_suffix
+    else
+      Compenv.fatal
+        (Printf.sprintf
+          "Profile output filename must have %s extension, got: %s"
+          expected_suffix filename)

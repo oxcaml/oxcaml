@@ -502,16 +502,16 @@ module Make_Okasaki :
     sig
       type 'a t = (Ord.t, 'a) tree
       val fold : ('a -> 'b -> 'c -> 'c) -> 'c -> ('a, 'b) tree -> 'c
-      val balance_left : ('a, 'b) tree -> ('a, 'b) tree
-      val balance_right : ('a, 'b) tree -> ('a, 'b) tree
+      val balance_left : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
+      val balance_right : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
       val ins : Ord.t -> 'a -> (Ord.t, 'a) tree -> (Ord.t, 'a) tree
-      val set_black : ('a, 'b) tree -> ('a, 'b) tree
+      val set_black : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
       val insert : Ord.t -> 'a -> (Ord.t, 'a) tree -> (Ord.t, 'a) tree
     end
 Line 110, characters 16-52:
 110 |     | Node _ -> overwrite_ t with Node { color = c }
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1107, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
 
 |}]

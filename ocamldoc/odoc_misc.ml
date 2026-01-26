@@ -504,9 +504,12 @@ let remove_option typ =
     | Tunboxed_tuple _
     | Tobject _
     | Tfield _
+    | Tquote _
+    | Tsplice _
     | Tnil
     | Tvariant _
-    | Tpackage _ -> t
+    | Tpackage _
+    | Tof_kind _ -> t
     | Tlink t2 -> trim (get_desc t2)
     | Tsubst _ -> assert false
   in

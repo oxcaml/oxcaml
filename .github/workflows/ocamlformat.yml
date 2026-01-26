@@ -1,48 +1,46 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
 name: ocamlformat
 on:
   push:
     branches:
       - main
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
-  build:
+  check:
+    name: check (${{ matrix.system }})
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
-        os: [ubuntu-latest]
-        ocaml-compiler:
-          - "4.14.0"
-
+        include:
+          - system: x86_64-linux
+            os: warp-ubuntu-latest-x64-32x
     steps:
-    - name: Checkout the Flambda backend repo
-      uses: actions/checkout@master
-      with:
-        path: 'flambda_backend'
+      - name: Checkout the OxCaml repo
+        uses: actions/checkout@master
 
-    - name: Setup OCaml ${{ matrix.ocaml-compiler }}
-      uses: ocaml/setup-ocaml@v3
-      with:
-        ocaml-compiler: ${{ matrix.ocaml-compiler }}
+      - name: Checkout the parent branch
+        run: git fetch origin HEAD --deepen 1
 
-    - name: Install a recent version of re
-      run: opam install 're>=1.10.0'
+      - name: Pretend we're running in a container (makes setup-ocaml go faster)
+        run: sudo touch /.dockerenv
+        # makes setup-ocaml skip apt-get, which is slow on first invocation
 
-    - name: Install ocamlformat 0.24.1
-      run: opam pin -y ocamlformat 0.24.1
+      - name: Set up Opam
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: oxcaml-ci-deps.5.2.0
+          opam-repositories: |
+            local: file://${{ github.workspace }}/tools/ci/local-opam
+            default: https://github.com/ocaml/opam-repository.git
+          opam-disable-sandboxing: true
+          opam-pin: false
 
-    - name: autoconf
-      working-directory: flambda_backend
-      run: autoconf
+      - name: 'Check for the "skip 80ch" PR tag'
+        if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
+        run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
-    - name: configure
-      working-directory: flambda_backend
-      run: |
-        ./configure \
-          --prefix=$GITHUB_WORKSPACE/_install \
-          --enable-middle-end=flambda2 \
-          --with-dune=/bin/false
-
-    - name: Check formatting of Flambda 2 and Cfg code
-      working-directory: flambda_backend
-      run: opam exec -- make check-fmt
+      - name: Check OCaml Formatting
+        run: opam exec -- bash tools/ci/actions/check-fmt.sh

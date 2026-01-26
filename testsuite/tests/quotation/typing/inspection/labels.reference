@@ -1,0 +1,44 @@
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : A.rcd) : A.rcd)
+
+Stdlib.ignore ((fun x -> x) (fun r -> (r : A.rcd).A.foo) : A.rcd -> int)
+
+Stdlib.ignore
+  ((fun x -> x) (fun r -> (r : A.rcd).A.bar <- "xyz") : A.rcd -> unit)
+
+Stdlib.ignore
+  ((fun x -> x) (function | ({A.foo=foo; _} : A.rcd) -> foo) : A.rcd -> int)
+
+Stdlib.ignore ((fun x -> x) (A.Foo : A.vrt) : A.vrt)
+
+Stdlib.ignore
+  ((fun x -> x) (function | (A.Foo : A.vrt) -> 0 | (A.Bar : A.vrt) -> 1) :
+  A.vrt -> int)
+
+Stdlib.ignore
+  ((fun x -> x) { A.box = (#{ A.foo = 0; A.bar = 0; } : A.urcd); } : (
+  A.urcd) A.box_imm_imm)
+
+Stdlib.ignore
+  ((fun x -> x) (fun r -> let _ = ((r : A.urcd).#A.foo) in ()) : A.urcd ->
+  unit)
+
+Stdlib.ignore
+  ((fun x -> x) (function | (#{A.foo = foo; _} : A.urcd) -> foo) : A.urcd ->
+  int)
+
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : _ A.rcd1) : _ A.rcd1)
+
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _) A.rcd2) : (
+  _, _) A.rcd2)
+
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _) A.rcd2) : (
+  _, _) A.rcd2)
+
+Stdlib.ignore
+  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _, _) A.rcd3) :
+  (_, _, _) A.rcd3)
+

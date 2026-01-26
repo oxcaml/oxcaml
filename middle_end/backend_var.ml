@@ -35,9 +35,15 @@ module Provenance = struct
     module_path : Path.t;
     location : Debuginfo.t;
     original_ident : Ident.t;
+    debug_uid : Flambda2_identifiers.Flambda_debug_uid.t
   }
 
-  let print ppf { module_path; location; original_ident; } =
+  let print_debug_uid ppf duid =
+    if !Clflags.dump_debug_uids then
+      Format.fprintf ppf "%@{%a}"
+        Flambda2_identifiers.Flambda_debug_uid.print duid
+
+  let print ppf { module_path; location; original_ident; debug_uid } =
     let printf fmt = Format.fprintf ppf fmt in
     printf "@[<hov 1>(";
     printf "@[<hov 1>(module_path@ %a)@]@ "
@@ -45,21 +51,54 @@ module Provenance = struct
     if !Clflags.locations then
       printf "@[<hov 1>(location@ %a)@]@ "
         Debuginfo.print_compact location;
-    printf "@[<hov 1>(original_ident@ %a)@]"
-      Ident.print original_ident;
+    printf "@[<hov 1>(original_ident@ %a%a)@]"
+      Ident.print original_ident
+      print_debug_uid debug_uid;
     printf ")@]"
 
-  let create ~module_path ~location ~original_ident =
+  let create ~module_path ~location ~original_ident ~debug_uid =
     { module_path;
       location;
       original_ident;
+      debug_uid
     }
 
   let module_path t = t.module_path
   let location t = t.location
   let original_ident t = t.original_ident
+  let debug_uid t = t.debug_uid
 
-  let equal t1 t2 = Stdlib.compare t1 t2 = 0
+  let compare t1 t2 =
+    let { module_path = module_path1;
+          location = location1;
+          original_ident = original_ident1;
+          debug_uid = debug_uid1
+        } =
+      t1
+    in
+    let { module_path = module_path2;
+          location = location2;
+          original_ident = original_ident2;
+          debug_uid = debug_uid2
+        } =
+      t2
+    in
+    let c = Path.compare module_path1 module_path2 in
+    if c <> 0
+    then c
+    else
+      let c = Debuginfo.compare location1 location2 in
+      if c <> 0
+      then c
+      else
+        let c = Ident.compare original_ident1 original_ident2 in
+        if c <> 0
+        then c
+        else
+          Flambda2_identifiers.Flambda_debug_uid.compare debug_uid1
+            debug_uid2
+
+  let equal t1 t2 = compare t1 t2 = 0
 end
 
 module With_provenance = struct

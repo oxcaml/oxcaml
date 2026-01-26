@@ -9,7 +9,7 @@ type t_imm   : immediate
 type t_imm64 : immediate64
 type t_float64 : float64
 type t_void  : void
-type t_any_non_null : any_non_null;;
+type t_any_mod_separable : any mod separable;;
 type t_value_or_null : value_or_null;;
 
 type void_variant = VV of t_void
@@ -23,7 +23,7 @@ type t_imm : immediate
 type t_imm64 : immediate64
 type t_float64 : float64
 type t_void : void
-type t_any_non_null : any_non_null
+type t_any_mod_separable : any mod separable
 type t_value_or_null : value_or_null
 type void_variant = VV of t_void
 type void_record = { vr_void : t_void; vr_int : int; }
@@ -196,30 +196,17 @@ module F2 (X : sig val x : t_void end) = struct
   let f () = X.x
 end;;
 [%%expect{|
-Line 1, characters 27-33:
-1 | module F2 (X : sig val x : t_void end) = struct
-                               ^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of type t_void must be a sublayout of value
-         because it's the type of something stored in a module structure.
+module F2 :
+  functor (X : sig val x : t_void end) -> sig val f : unit -> t_void end
 |}];;
-(* CR layouts v5: the test above should be made to work *)
 
 module F2 (X : sig val f : void_record -> unit end) = struct
   let g z = X.f { vr_void = z; vr_int = 42 }
 end;;
 [%%expect{|
-Line 2, characters 16-44:
-2 |   let g z = X.f { vr_void = z; vr_int = 42 }
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Non-value detected in [value_kind].
-       Please report this error to the Jane Street compilers team.
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
-         because it has to be value for the V1 safety check.
+module F2 :
+  functor (X : sig val f : void_record -> unit end) ->
+    sig val g : t_void -> unit end
 |}];;
 
 (**************************************)
@@ -363,7 +350,7 @@ type ('a : void) void5 = Void5  of 'a
 let id5 : 'a void5 -> 'a void5 = function
   | Void5 x -> Void5 x
 
-(* CR layouts v2.8: At the moment, the code in the comment below does not work.
+(* CR layouts: At the moment, the code in the comment below does not work.
    Because we demand that constructor arguments have layout (Sort 'l), the type
    [any5] actually only works on values.
 
@@ -380,15 +367,7 @@ let id5 : 'a void5 -> 'a void5 = function
 
 [%%expect{|
 type ('a : void) void5 = Void5 of 'a
-Lines 3-4, characters 33-22:
-3 | .................................function
-4 |   | Void5 x -> Void5 x
-Error: Non-value detected in [value_kind].
-       Please report this error to the Jane Street compilers team.
-       The layout of 'a is void
-         because of the definition of void5 at line 1, characters 0-37.
-       But the layout of 'a must be a sublayout of value
-         because it has to be value for the V1 safety check.
+val id5 : ('a : void). 'a void5 -> 'a void5 = <fun>
 |}];;
 
 (* disallowed attempts to use f5 and Void5 on non-voids *)
@@ -422,11 +401,7 @@ let g (x : 'a void5) =
   match x with
   | Void5 x -> x;;
 [%%expect{|
-Lines 2-3, characters 2-16:
-2 | ..match x with
-3 |   | Void5 x -> x..
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       'a. Please report this error to the Jane Street compilers team.
+val g : ('a : void). 'a void5 -> 'a = <fun>
 |}]
 
 (****************************************)
@@ -847,11 +822,11 @@ module M11_3 = struct
   let foo o (A x) = o # usevoid x
 end;;
 [%%expect{|
-Line 4, characters 32-33:
-4 |   let foo o (A x) = o # usevoid x
-                                    ^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       'a. Please report this error to the Jane Street compilers team.
+module M11_3 :
+  sig
+    type ('a : void) t = A of 'a
+    val foo : ('a : void) 'b. < usevoid : 'a -> 'b; .. > -> 'a t -> 'b
+  end
 |}];;
 
 module M11_4 = struct
@@ -1170,7 +1145,7 @@ let x13 (VV v) = [| v |];;
 Line 1, characters 17-24:
 1 | let x13 (VV v) = [| v |];;
                      ^^^^^^^
-Error: Layout void is not supported yet.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}];;
 
 let x13 v =
@@ -1178,16 +1153,10 @@ let x13 v =
   | [| v |] -> VV v
   | _ -> assert false
 [%%expect{|
-Lines 2-4, characters 2-21:
-2 | ..match v with
-3 |   | [| v |] -> VV v
-4 |   | _ -> assert false
-Error: Non-value detected in [value_kind].
-       Please report this error to the Jane Street compilers team.
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
-         because it has to be value for the V1 safety check.
+Line 2, characters 8-9:
+2 |   match v with
+            ^
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}];;
 
 (****************************************************************************)
@@ -1269,11 +1238,7 @@ let f19 () =
   let _y = (x :> t_void) in
   ();;
 [%%expect{|
-Line 3, characters 6-8:
-3 |   let _y = (x :> t_void) in
-          ^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val f19 : unit -> unit = <fun>
 |}];;
 
 (********************************************)
@@ -1286,11 +1251,7 @@ let f20 () =
   in
   ();;
 [%%expect{|
-Line 3, characters 6-8:
-3 |   let _y =
-          ^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val f20 : unit -> unit = <fun>
 |}];;
 
 (**********************************)
@@ -1306,11 +1267,7 @@ let f21 () =
   ();;
 [%%expect{|
 module type M21 = sig end
-Line 7, characters 4-5:
-7 |     x
-        ^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val f21 : unit -> unit = <fun>
 |}];;
 
 (***************************************************************)
@@ -1325,15 +1282,7 @@ let f () =
 [%%expect{|
 type t_void : void
 type ('a : void) r = { x : int; y : 'a; }
-Lines 6-7, characters 2-20:
-6 | ..let rec g { x = x ; y = y } : _ r = g { x; y } in
-7 |   g (failwith "foo")..
-Error: Non-value detected in [value_kind].
-       Please report this error to the Jane Street compilers team.
-       The layout of 'a is void
-         because of the definition of r at line 3, characters 0-40.
-       But the layout of 'a must be a sublayout of value
-         because it has to be value for the V1 safety check.
+val f : ('a : void). unit -> 'a r = <fun>
 |}];;
 
 (********************************************************************)
@@ -1379,12 +1328,7 @@ let f (x : 'a. 'a t2_void) = x
 
 [%%expect{|
 type 'a t2_void : void
-Line 3, characters 29-30:
-3 | let f (x : 'a. 'a t2_void) = x
-                                 ^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       'a t2_void.
-       Please report this error to the Jane Street compilers team.
+val f : ('a. 'a t2_void) -> 'b t2_void = <fun>
 |}]
 
 (**************************************************)
@@ -1412,11 +1356,7 @@ Error: This expression has type "t_void" but an expression was expected of type
 let g f (x : t_void) : t_void = f x
 
 [%%expect{|
-Line 1, characters 32-35:
-1 | let g f (x : t_void) : t_void = f x
-                                    ^^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val g : (t_void -> t_void) -> t_void -> t_void = <fun>
 |}]
 
 (******************************************)
@@ -1425,11 +1365,7 @@ Error: Non-value layout void detected in [Typeopt.layout] as sort for type
 let rec f : _ -> _ = fun (x : t_void) -> x
 
 [%%expect{|
-Line 1, characters 41-42:
-1 | let rec f : _ -> _ = fun (x : t_void) -> x
-                                             ^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val f : t_void -> t_void = <fun>
 |}]
 
 (**********************************************)
@@ -1447,11 +1383,8 @@ and q () =
   ()
 
 [%%expect{|
-Line 1, characters 17-29:
-1 | let rec ( let* ) (x : t_void) f = ()
-                     ^^^^^^^^^^^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val ( let* ) : t_void -> ('a -> unit) -> unit = <fun>
+val q : unit -> unit = <fun>
 |}]
 
 let ( let* ) (x : t_float64) f = ()
@@ -1473,11 +1406,8 @@ and q () =
   ()
 
 [%%expect{|
-Line 4, characters 7-8:
-4 |   let* x = assert false in
-           ^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val ( let* ) : 'a -> (t_void -> unit) -> unit = <fun>
+val q : unit -> unit = <fun>
 |}]
 
 let ( let* ) x (f : t_float64 -> _) = ()
@@ -1499,11 +1429,8 @@ and q () =
   assert false
 
 [%%expect{|
-Line 5, characters 2-14:
-5 |   assert false
-      ^^^^^^^^^^^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val ( let* ) : 'a -> ('b -> t_void) -> unit = <fun>
+val q : unit -> unit = <fun>
 |}]
 
 let ( let* ) x (f : _ -> t_float64) = ()
@@ -1525,11 +1452,8 @@ and q () =
   ()
 
 [%%expect{|
-Line 1, characters 32-44:
-1 | let rec ( let* ) x f : t_void = assert false
-                                    ^^^^^^^^^^^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val ( let* ) : int -> ('a -> unit) -> t_void = <fun>
+val q : unit -> t_void = <fun>
 |}]
 
 let ( let* ) x f : t_float64 = assert false
@@ -1553,11 +1477,9 @@ and q () =
     ()
 
 [%%expect{|
-Line 2, characters 16-29:
-2 | and ( and* ) x1 (x2 : t_void) = ()
-                    ^^^^^^^^^^^^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val ( let* ) : unit -> ('a * 'b -> unit) -> unit = <fun>
+val ( and* ) : int -> t_void -> unit = <fun>
+val q : unit -> unit = <fun>
 |}]
 
 let ( let* ) x f = ()
@@ -1584,11 +1506,9 @@ and q () =
     ()
 
 [%%expect{|
-Line 2, characters 13-26:
-2 | and ( and* ) (x1 : t_void) x2 = ()
-                 ^^^^^^^^^^^^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val ( let* ) : unit -> ('a * 'b -> unit) -> unit = <fun>
+val ( and* ) : t_void -> int -> unit = <fun>
+val q : unit -> unit = <fun>
 |}]
 
 let ( let* ) x f = ()
@@ -1615,11 +1535,9 @@ and q () =
     ()
 
 [%%expect{|
-Line 1, characters 17-18:
-1 | let rec ( let* ) x f = ()
-                     ^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val ( let* ) : t_void -> ('a * 'b -> unit) -> unit = <fun>
+val ( and* ) : int -> int -> t_void = <fun>
+val q : unit -> unit = <fun>
 |}]
 
 let ( let* ) (x : (_ : float64))  f = ()
@@ -1787,11 +1705,11 @@ external foo33 : t_any = "foo33";;
 Line 1, characters 17-22:
 1 | external foo33 : t_any = "foo33";;
                      ^^^^^
-Error: This type signature for "foo33" is not a value type.
+Error: The type of a module-level value must have a representable layout.
        The layout of type t_any is any
          because of the definition of t_any at line 1, characters 0-18.
-       But the layout of type t_any must be a sublayout of value
-         because it's the type of something stored in a module structure.
+       But the layout of type t_any must be representable
+         because it's the type of something stored in a module.
 |}]
 
 
@@ -1812,7 +1730,7 @@ Line 2, characters 19-31:
 2 | let f35 : 'a t35 = fun () -> ()
                        ^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable
+       The kind of 'a -> 'b is value mod aliased immutable non_float
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of immediate
          because of the definition of t35 at line 1, characters 0-30.

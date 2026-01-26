@@ -57,8 +57,9 @@ let try_cse dacc dbg ~original_prim ~min_name_mode ~result_var : cse_result =
             ~operation:(Removed_operations.prim original_prim)
             Cost_metrics.zero
         in
+        let machine_width = DE.machine_width (DA.denv dacc) in
         let simplified_named =
-          Simplified_named.create named
+          Simplified_named.create ~machine_width named
           |> Simplified_named.update_cost_metrics cost_metrics
         in
         Simplify_primitive_result.create_simplified simplified_named
@@ -73,7 +74,7 @@ let try_cse dacc dbg ~original_prim ~min_name_mode ~result_var : cse_result =
           let bound_to = Simple.var result_var' in
           let dacc =
             DA.map_denv dacc ~f:(fun denv ->
-                DE.add_cse denv eligible_prim ~bound_to)
+                DE.add_cse denv eligible_prim ~bound_to ~name_mode:min_name_mode)
           in
           DA.merge_debuginfo_rewrite dacc ~bound_to dbg
       in
@@ -155,6 +156,34 @@ let simplify_primitive dacc (prim : P.t) dbg ~result_var =
         Simplify_ternary_primitive.simplify_ternary_primitive dacc original_prim
           ternary_prim ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~arg3 ~arg3_ty dbg
           ~result_var)
+  | Quaternary (quaternary_prim, orig_arg1, orig_arg2, orig_arg3, orig_arg4)
+    -> (
+    let arg1_ty, arg1 = S.simplify_simple dacc orig_arg1 ~min_name_mode in
+    let arg2_ty, arg2 = S.simplify_simple dacc orig_arg2 ~min_name_mode in
+    let arg3_ty, arg3 = S.simplify_simple dacc orig_arg3 ~min_name_mode in
+    let arg4_ty, arg4 = S.simplify_simple dacc orig_arg4 ~min_name_mode in
+    let arg1_kind, arg2_kind, arg3_kind, arg4_kind =
+      P.args_kind_of_quaternary_primitive quaternary_prim
+    in
+    if arg_kind_mismatch prim
+         [ arg1_ty, arg1_kind;
+           arg2_ty, arg2_kind;
+           arg3_ty, arg3_kind;
+           arg4_ty, arg4_kind ]
+    then SPR.create_invalid dacc
+    else
+      let original_prim : P.t =
+        if orig_arg1 == arg1 && orig_arg2 == arg2 && orig_arg3 == arg3
+           && orig_arg4 == arg4
+        then prim
+        else Quaternary (quaternary_prim, arg1, arg2, arg3, arg4)
+      in
+      match try_cse dacc dbg ~original_prim ~min_name_mode ~result_var with
+      | Applied result -> result
+      | Not_applied dacc ->
+        Simplify_quaternary_primitive.simplify_quaternary_primitive dacc
+          original_prim quaternary_prim ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~arg3
+          ~arg3_ty ~arg4 ~arg4_ty dbg ~result_var)
   | Variadic (variadic_prim, orig_args) -> (
     let args_with_tys =
       ListLabels.fold_right orig_args ~init:[] ~f:(fun arg args_rev ->

@@ -254,7 +254,7 @@ let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
 let newvar ?name jkind =
   newty2 ~level:!current_level (Tvar { name; jkind })
 let new_rep_var ?name ~why () =
-  let jkind, sort = Jkind.of_new_sort_var ~why in
+  let jkind, sort = Jkind.of_new_sort_var ~why ~level:!current_level in
   newvar ?name jkind, sort
 let newvar2 ?name level jkind = newty2 ~level (Tvar { name; jkind })
 let new_global_var ?name jkind =
@@ -269,6 +269,22 @@ let newconstr path tyl = newty (Tconstr (path, tyl, ref Mnil))
 let newmono ty = newty (Tpoly(ty, []))
 
 let none = newty (Ttuple [])                (* Clearly ill-formed type *)
+
+(**** Control variable stage in inference *)
+
+let rec update_variable_stage stage_offset ty name jkind =
+  if stage_offset = 0 then ()
+  else if stage_offset < 0 then begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tquote v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset + 1) v name jkind
+  end else begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset - 1) v name jkind
+  end
 
 (**** information for [Typecore.unify_pat_*] ****)
 
@@ -601,9 +617,9 @@ exception Non_closed of type_expr * variable_kind
 
    It is marked [@inline] so that calls to [add_one] are not indirect.
  *)
-let[@inline] free_vars ~zero ~add_one ?env tys =
+let[@inline] free_vars ~zero ~add_one ?env mark tys =
   let rec fv ~kind acc ty =
-    if not (try_mark_node ty) then acc
+    if not (try_mark_node mark ty) then acc
     else match get_desc ty, env with
       | Tvar { jkind; _ }, _ ->
           add_one ty (Some jkind) kind acc
@@ -634,9 +650,7 @@ let[@inline] free_vars ~zero ~add_one ?env tys =
 
 let free_variables ?env ty =
   let add_one ty _jkind _kind acc = ty :: acc in
-  let tl = free_vars ~zero:[] ~add_one ?env [ty] in
-  unmark_type ty;
-  tl
+  with_type_mark (fun mark -> free_vars ~zero:[] ~add_one ?env mark [ty])
 
 let free_non_row_variables_of_list tyl =
   let add_one ty _jkind kind acc =
@@ -644,9 +658,16 @@ let free_non_row_variables_of_list tyl =
     | Type_variable -> ty :: acc
     | Row_variable -> acc
   in
-  let tl = free_vars ~zero:[] ~add_one tyl in
-  List.iter unmark_type tyl;
-  tl
+  with_type_mark (fun mark -> free_vars ~zero:[] ~add_one mark tyl)
+
+let free_variable_set_of_list env tys =
+  let add_one ty jkind _kind acc =
+    match jkind with
+    | None -> (* not a Tvar *) acc
+    | Some _jkind -> TypeSet.add ty acc
+  in
+  with_type_mark (fun mark ->
+    free_vars ~zero:TypeSet.empty ~add_one ~env mark tys)
 
 let exists_free_variable f ty =
   let exception Exists in
@@ -656,40 +677,32 @@ let exists_free_variable f ty =
     | Some _ -> ()
     | None -> assert false (* this only happens passing ~env to [free_vars] *)
   in
-  let result =
-    try free_vars ~zero:() ~add_one [ty]; false
-    with Exists -> true
-  in
-  unmark_type ty;
-  result
+  with_type_mark (fun mark ->
+    try free_vars ~zero:() ~add_one mark [ty]; false
+    with Exists -> true)
 
-let closed_type ?env ty =
+let closed_type ?env mark ty =
   let add_one ty _jkind kind _acc = raise (Non_closed (ty, kind)) in
-  free_vars ~zero:() ~add_one ?env [ty]
+  free_vars ~zero:() ~add_one ?env mark [ty]
 
 let closed_type_expr ?env ty =
-  let closed =
-    try closed_type ?env ty; true
-    with Non_closed _ -> false
-  in
-  unmark_type ty;
-  closed
+  with_type_mark (fun mark ->
+    try closed_type ?env mark ty; true
+    with Non_closed _ -> false)
 
-let close_type ty =
+let close_type mark ty =
   remove_mode_and_jkind_variables ty;
-  closed_type ty
+  closed_type mark ty
 
 let closed_parameterized_type params ty =
-  List.iter mark_type params;
-  let ok =
-    try close_type ty; true with Non_closed _ -> false in
-  List.iter unmark_type params;
-  unmark_type ty;
-  ok
+  with_type_mark begin fun mark ->
+    List.iter (mark_type mark) params;
+    try close_type mark ty; true with Non_closed _ -> false
+  end
 
 let closed_type_decl decl =
-  try
-    List.iter mark_type decl.type_params;
+  with_type_mark begin fun mark -> try
+    List.iter (mark_type mark) decl.type_params;
     List.iter remove_mode_and_jkind_variables decl.type_params;
     begin match decl.type_kind with
       Type_abstract _ ->
@@ -709,28 +722,27 @@ let closed_type_decl decl =
                     remove_mode_and_jkind_variables l.ld_type) l
                 end;
                 remove_mode_and_jkind_variables res_ty
-            | None -> List.iter close_type (tys_of_constr_args cd_args)
+            | None -> List.iter (close_type mark) (tys_of_constr_args cd_args)
           )
           v
     | Type_record(r, _rep, _) ->
-        List.iter (fun l -> close_type l.ld_type) r
+        List.iter (fun l -> close_type mark l.ld_type) r
     | Type_record_unboxed_product(r, _rep, _) ->
-        List.iter (fun l -> close_type l.ld_type) r
+        List.iter (fun l -> close_type mark l.ld_type) r
     | Type_open -> ()
     end;
     begin match decl.type_manifest with
       None    -> ()
-    | Some ty -> close_type ty
+    | Some ty -> close_type mark ty
     end;
-    unmark_type_decl decl;
     None
   with Non_closed (ty, _) ->
-    unmark_type_decl decl;
     Some ty
+  end
 
 let closed_extension_constructor ext =
-  try
-    List.iter mark_type ext.ext_type_params;
+  with_type_mark begin fun mark -> try
+    List.iter (mark_type mark) ext.ext_type_params;
     begin match ext.ext_ret_type with
     | Some res_ty ->
         (* gadts cannot have free type variables, but they might
@@ -739,13 +751,12 @@ let closed_extension_constructor ext =
         iter_type_expr_cstr_args remove_mode_and_jkind_variables ext.ext_args;
         remove_mode_and_jkind_variables res_ty
     | None ->
-        iter_type_expr_cstr_args close_type ext.ext_args
+        iter_type_expr_cstr_args (close_type mark) ext.ext_args
     end;
-    unmark_extension_constructor ext;
     None
   with Non_closed (ty, _) ->
-    unmark_extension_constructor ext;
     Some ty
+  end
 
 type closed_class_failure = {
   free_variable: type_expr * variable_kind;
@@ -755,13 +766,14 @@ type closed_class_failure = {
 exception CCFailure of closed_class_failure
 
 let closed_class params sign =
-  List.iter mark_type params;
-  ignore (try_mark_node sign.csig_self_row);
+  with_type_mark begin fun mark ->
+  List.iter (mark_type mark) params;
+  ignore (try_mark_node mark sign.csig_self_row);
   try
     Meths.iter
       (fun lab (priv, _, ty) ->
         if priv = Mpublic then begin
-          try close_type ty with Non_closed (ty0, variable_kind) ->
+          try close_type mark ty with Non_closed (ty0, variable_kind) ->
             raise (CCFailure {
               free_variable = (ty0, variable_kind);
               meth = lab;
@@ -769,14 +781,10 @@ let closed_class params sign =
             })
         end)
       sign.csig_meths;
-    List.iter unmark_type params;
-    unmark_class_signature sign;
     None
   with CCFailure reason ->
-    List.iter unmark_type params;
-    unmark_class_signature sign;
     Some reason
-
+  end
 
                             (**********************)
                             (*  Type duplication  *)
@@ -796,6 +804,12 @@ let duplicate_class_type ty =
                          (*  Type level manipulation  *)
                          (*****************************)
 
+let rec lower_all ty =
+  if get_level ty > !current_level then begin
+    set_level ty !current_level;
+    iter_type_expr lower_all ty
+  end
+
 (*
    It would be a bit more efficient to remove abbreviation expansions
    rather than generalizing them: these expansions will usually not be
@@ -803,22 +817,30 @@ let duplicate_class_type ty =
    [expand_abbrev] (via [subst]) requires these expansions to be
    preserved. Does it worth duplicating this code ?
 *)
-let rec generalize ty =
+let rec generalize stage_offset ty =
   let level = get_level ty in
   if (level > !current_level) && (level <> generic_level) then begin
     set_level ty generic_level;
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
-      Tconstr (_, _, abbrev) ->
-        iter_abbrev generalize !abbrev
-    | _ -> ()
+    | Tvar name -> update_variable_stage stage_offset ty name.name name.jkind
+    | Tvariant row ->
+        if stage_offset <> 0 && is_Tvar (row_more row) then
+          lower_all ty
+        else
+          iter_type_expr (generalize stage_offset) ty
+    | Tquote ty' -> generalize (stage_offset + 1) ty'
+    | Tsplice ty' -> generalize (stage_offset - 1) ty'
+    | Tconstr (_, _, abbrev) ->
+        iter_abbrev (generalize stage_offset) !abbrev;
+        iter_type_expr (generalize stage_offset) ty
+    | _ -> iter_type_expr (generalize stage_offset) ty
     end;
-    iter_type_expr generalize ty
   end
 
 let generalize ty =
   simple_abbrevs := Mnil;
-  generalize ty
+  generalize 0 ty
 
 (* Generalize the structure and lower the variables *)
 
@@ -894,35 +916,35 @@ let rec normalize_package_path env p =
           normalize_package_path env (Path.Pdot (p1', s))
       | _ -> p
 
-let rec check_scope_escape env level ty =
+let rec check_scope_escape mark env level ty =
   let orig_level = get_level ty in
-  if try_logged_mark_node ty then begin
+  if try_mark_node mark ty then begin
     if level < get_scope ty then
       raise_scope_escape_exn ty;
     begin match get_desc ty with
     | Tconstr (p, _, _) when level < Path.scope p ->
         begin match !forward_try_expand_safe env ty with
         | ty' ->
-            check_scope_escape env level ty'
+            check_scope_escape mark env level ty'
         | exception Cannot_expand ->
             raise_escape_exn (Constructor p)
         end
     | Tpackage (p, fl) when level < Path.scope p ->
         let p' = normalize_package_path env p in
         if Path.same p p' then raise_escape_exn (Module_type p);
-        check_scope_escape env level
+        check_scope_escape mark env level
           (newty2 ~level:orig_level (Tpackage (p', fl)))
     | _ ->
-        iter_type_expr (check_scope_escape env level) ty
+        iter_type_expr (check_scope_escape mark env level) ty
     end;
   end
 
 let check_scope_escape env level ty =
-  let snap = snapshot () in
-  try check_scope_escape env level ty; backtrack snap
+  with_type_mark begin fun mark -> try
+    check_scope_escape mark env level ty
   with Escape e ->
-    backtrack snap;
     raise (Escape { e with context = Some ty })
+  end
 
 let rec update_scope scope ty =
   if get_scope ty < scope then begin
@@ -1139,7 +1161,8 @@ let limited_generalize ty0 ty =
   List.iter (generalize_parents ~is_root:true) !roots;
   TypeHash.iter
     (fun ty _ ->
-       if get_level ty <> generic_level then set_level ty !current_level)
+       if get_level ty <> generic_level then
+         set_level ty !current_level)
     graph
 
 let limited_generalize_class_type rv cty =
@@ -1186,15 +1209,14 @@ let compute_univars ty =
 
 
 let fully_generic ty =
-  let rec aux ty =
-    if not_marked_node ty then
-      if get_level ty = generic_level then
-        (flip_mark_node ty; iter_type_expr aux ty)
-      else raise Exit
-  in
-  let res = try aux ty; true with Exit -> false in
-  unmark_type ty;
-  res
+  with_type_mark begin fun mark ->
+    let rec aux ty =
+      if try_mark_node mark ty then
+        if get_level ty = generic_level then iter_type_expr aux ty
+        else raise Exit
+    in
+    try aux ty; true with Exit -> false
+  end
 
 
                               (*******************)
@@ -1297,7 +1319,7 @@ let rec copy ?partial ?keep_names copy_scope ty =
                   Tsubst (ty, None) -> ty
                   (* TODO: is this case possible?
                      possibly an interaction with (copy more) below? *)
-                | Tconstr _ | Tnil ->
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
                     copy more
                 | Tvar _ | Tunivar _ ->
                     if keep then more else newty mored
@@ -1607,7 +1629,7 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
             if keep then
               (add_delayed_copy t ty;
                Tvar { name = None;
-                      jkind = Jkind.Builtin.value ~why:Polymorphic_variant })
+                      jkind = Jkind.for_non_float ~why:Polymorphic_variant })
             else
             let more' = copy_rec ~may_share:false more in
             let fixed' = fixed && (is_Tvar more || is_Tunivar more) in
@@ -1629,13 +1651,16 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
   List.iter (fun force -> force ()) !delayed_copies;
   ty
 
-let instance_poly' copy_scope ~keep_names ~fixed univars sch =
+let instance_poly' copy_scope ~keep_names ~fixed ~copy_var univars sch =
   (* In order to compute univars below, [sch] should not contain [Tsubst] *)
-  let copy_var ty =
-    match get_desc ty with
-      Tunivar { name; jkind } ->
-        if keep_names then newty (Tvar { name; jkind }) else newvar jkind
-    | _ -> assert false
+  let copy_var =
+    Option.value copy_var
+      ~default:
+        (fun ty ->
+          match get_desc ty with
+            Tunivar { name; jkind } ->
+              if keep_names then newty (Tvar { name; jkind }) else newvar jkind
+          | _ -> assert false)
   in
   let vars = List.map copy_var univars in
   let visited = TypeHash.create 17 in
@@ -1643,9 +1668,59 @@ let instance_poly' copy_scope ~keep_names ~fixed univars sch =
   let ty = copy_sep ~copy_scope ~fixed ~visited sch in
   vars, ty
 
-let instance_poly ?(keep_names=false) ~fixed univars sch =
+let instance_poly_fixed ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
-    instance_poly' copy_scope ~keep_names ~fixed univars sch
+    instance_poly' copy_scope ~keep_names ~fixed:true ~copy_var:None univars sch
+  )
+
+let instance_poly ?(keep_names=false) univars sch =
+  For_copy.with_scope (fun copy_scope ->
+    snd (instance_poly' copy_scope ~keep_names ~fixed:false ~copy_var:None
+          univars sch)
+  )
+
+(** The body of a [Tpoly] will likely have references to the [Tunivar]s bound in
+    it. When asking for the jkind of a [Tpoly], we don't want to let those
+    vars escape the scope. To resolve this, we substitute all occurrences of
+    them with a [Tof_kind]. *)
+let instance_poly_for_jkind univars sch =
+  (* Note [Tunivar best-ness]
+     ~~~~~~~~~~~~~~~~~~~~~~~~
+     [Tof_kind]s are always treated as having "best" quality. We've exhaustively
+     looked through all the ways in which [Tpoly] is used in the compiler, and
+     as of the time of writing this comment, it can only occur as the type of:
+      - a let binding / value description
+      - a function parameter
+      - a record field
+      - a method of a class/object
+      In all these cases, it is true that we can never learn more about the
+      type of the univars it binds, so it's sound to give them "best".
+
+      But it's also plausible that in the future we will decide to assign
+      mod-bounds to the jkind of a [Tunivar] (internal ticket 5746). Since we do
+      not do this but still mark "best", this change could cause some programs
+      to stop type-checking. But we think the probability of people writing such
+      programs is low, so it should be easy to cross that bridge if/when we come
+      to it. *)
+  (* Replace a univar in [sch] with a [Tof_jkind]s. *)
+  let copy_var ty =
+    match get_desc ty with
+    | Tunivar { name = _; jkind } ->
+      (* CR layouts v2.8: We can likely do better here. We suspect that it is
+         sound to use the bottom jkind here rather than the jkind bound on the
+         univar. However, the utility of this is not clear, as most univars
+         occur within arrow types (or an abstract type that is really an arrow),
+         whose jkind is (at the moment) independent of the types in the
+         arrow. Internal ticket 5746. *)
+      newgenty (Tof_kind jkind)
+    | _ -> Misc.fatal_error "Ctype.instance_poly_for_jkind: expected Tunivar"
+  in
+  For_copy.with_scope (fun copy_scope ->
+    let _, ty =
+      instance_poly' copy_scope ~keep_names:false ~fixed:false
+        ~copy_var:(Some copy_var) univars sch
+    in
+    ty
   )
 
 let instance_label ~fixed lbl =
@@ -1653,7 +1728,8 @@ let instance_label ~fixed lbl =
     let vars, ty_arg =
       match get_desc lbl.lbl_arg with
         Tpoly (ty, tl) ->
-          instance_poly' copy_scope ~keep_names:false ~fixed tl ty
+          instance_poly' copy_scope ~keep_names:false ~copy_var:None ~fixed
+            tl ty
       | _ ->
           [], copy copy_scope lbl.lbl_arg
     in
@@ -1671,59 +1747,61 @@ let prim_mode' mvars = function
     Locality.allow_right Locality.local, None
   | Primitive.Prim_poly, _ ->
     match mvars with
-    | Some (mvar_l, mvar_y) -> mvar_l, Some mvar_y
+    | Some (mvar_l, (mvar_f, mvar_y)) -> mvar_l, Some (mvar_f, mvar_y)
     | None -> assert false
 
 (* Exported version. *)
 let prim_mode mvar prim =
-  let mvars = Option.map (fun mvar_l -> mvar_l, Yielding.newvar ()) mvar in
-  fst (prim_mode' mvars prim)
+  let mvar = Option.map
+    (fun mvar_l -> mvar_l, (Forkable.newvar (), Yielding.newvar ())) mvar
+  in
+  fst (prim_mode' mvar prim)
 
 (** Returns a new mode variable whose locality is the given locality and
     whose yieldingness is the given yieldingness, while all other axes are
     from the given [m]. This function is too specific to be put in [mode.ml] *)
-let with_locality_and_yielding (locality, yielding) m =
+let with_locality_and_forkable_yielding (locality, fy) m =
+  let forkable = Option.map fst fy in
+  let yielding = Option.map snd fy in
   let m' = Alloc.newvar () in
-  Locality.equate_exn (Alloc.proj (Comonadic Areality) m') locality;
-  let yielding =
-    Option.value ~default:(Alloc.proj (Comonadic Yielding) m) yielding
+  Locality.equate_exn (Alloc.proj_comonadic Areality m') locality;
+  let forkable =
+    Option.value ~default:(Alloc.proj_comonadic Forkable m) forkable
   in
-  Yielding.equate_exn (Alloc.proj (Comonadic Yielding) m') yielding;
-  Alloc.submode_exn m' (Alloc.join_const
-    { Alloc.Const.min with
-      areality = Locality.Const.max;
-      yielding = Yielding.Const.max} m);
-  Alloc.submode_exn (Alloc.meet_const
-    { Alloc.Const.max with
+  let yielding =
+    Option.value ~default:(Alloc.proj_comonadic Yielding m) yielding
+  in
+  Forkable.equate_exn (Alloc.proj_comonadic Forkable m') forkable;
+  Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
+  let c =
+    { Alloc.Comonadic.Const.max with
       areality = Locality.Const.min;
-      yielding = Yielding.Const.min} m) m';
+      forkable = Forkable.Const.min;
+      yielding = Yielding.Const.min}
+  in
+  Alloc.submode_exn (Alloc.meet_const c m') m;
+  Alloc.submode_exn (Alloc.meet_const c m) m';
   m'
 
+(* When user writes an (uncurried) arrow type [A -> B -> C], the corresponding
+implementation is typically [fun a b -> ...], in which case [fun b -> ...] will
+close over [a] and partially apply the original function. Therefore, we let the
+comonadic axes of [B -> C] reflect that.
+On the other hand, the monadic axes of [fun b -> ...] won't be constrained by
+this (but maybe constrained by other things); therefore, we take it to be legacy
+for compatibility. *)
 let curry_mode alloc arg : Alloc.Const.t =
   let acc =
-    Alloc.Const.join
+    Alloc.Comonadic.Const.join
       (Alloc.Const.close_over arg)
       (Alloc.Const.partial_apply alloc)
   in
-  (* For A -> B -> C, we always interpret (B -> C) to be of aliased. This is the
-    legacy mode which helps with legacy compatibility. Arrow types cross
-    uniqueness so we are not losing too much expressvity here. One
-    counter-example is:
-
-    let g : (A -> B -> C) = ...
-    let f (g : A -> unique_ (B -> C)) = ...
-
-    And [f g] would not work, as mode crossing doesn't work deeply into arrows.
-    Our answer to this issue is that, the author of f shouldn't ask B -> C to be
-    unique_. Instead, they should leave it as default which is aliased, and mode
-    crossing it to unique at the location where B -> C is a real value (instead
-    of the return of a function). *)
-  {acc with uniqueness=Uniqueness.Const.Aliased}
+  Alloc.Const.merge {comonadic = acc; monadic = Alloc.Monadic.Const.legacy}
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
   | l :: locals, Tarrow ((lbl,marg,mret),arg,ret,commu) ->
-     let marg = with_locality_and_yielding
+     let marg = with_locality_and_forkable_yielding
       (prim_mode' (Some (mvar_l, mvar_y)) l) marg
      in
      let macc =
@@ -1735,7 +1813,7 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
      in
      let mret =
        match locals with
-       | [] -> with_locality_and_yielding (loc, yld) mret
+       | [] -> with_locality_and_forkable_yielding (loc, yld) mret
        | _ :: _ ->
           let mret', _ = Alloc.newvar_above macc in (* curried arrow *)
           mret'
@@ -1769,43 +1847,40 @@ let instance_prim_layout (desc : Primitive.description) ty =
   if not desc.prim_is_layout_poly
   then ty, None
   else
-  let new_sort_and_jkind = ref None in
-  let get_jkind () =
-    (* CR layouts v2.8: This should replace only the layout component of the
-       jkind. It's possible that we might want a primitive that accepts a
-       mode-crossing, layout-polymorphic parameter. *)
-    match !new_sort_and_jkind with
-    | Some (_, jkind) ->
-      jkind
+  let new_sort = ref None in
+  let get_jkind jkind =
+    let sort = match !new_sort with
+    | Some sort -> sort
     | None ->
-      let jkind, sort =
-        Jkind.of_new_sort_var ~why:Layout_poly_in_external
-      in
-      new_sort_and_jkind := Some (sort, jkind);
-      jkind
+      let sort = Jkind.Sort.new_var ~level:!current_level in
+      new_sort := Some sort;
+      sort
+    in
+    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort sort) in
+    Jkind.History.update_reason
+      jkind (Concrete_creation Layout_poly_in_external)
   in
   For_copy.with_scope (fun copy_scope ->
-    let rec inner ty =
+    let rec inner mark ty =
       let level = get_level ty in
       (* only change type vars on generic_level to avoid modifying ones captured
          from an outer scope *)
-      if level = generic_level && try_mark_node ty then begin
+      if level = generic_level && try_mark_node mark ty then begin
         begin match get_desc ty with
         | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
           For_copy.redirect_desc copy_scope ty
-            (Tvar {r with jkind = get_jkind ()})
+            (Tvar {r with jkind = get_jkind jkind})
         | Tunivar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
           For_copy.redirect_desc copy_scope ty
-            (Tunivar {r with jkind = get_jkind ()})
+            (Tunivar {r with jkind = get_jkind jkind})
         | _ -> ()
         end;
-        iter_type_expr inner ty
+        iter_type_expr (inner mark) ty
       end
     in
-    inner ty;
-    unmark_type ty;
-    match !new_sort_and_jkind with
-    | Some (sort, _) ->
+    with_type_mark (fun mark -> inner mark ty);
+    match !new_sort with
+    | Some sort ->
       (* We don't want to lower the type vars from generic_level due to usages
          in [includecore.ml]. This means an extra [instance] call is needed in
          [type_ident], but we only hit it if it's layout polymorphic. *)
@@ -1818,11 +1893,13 @@ let instance_prim_mode (desc : Primitive.description) ty =
   if is_poly desc.prim_native_repr_res ||
        List.exists is_poly desc.prim_native_repr_args then
     let mode_l = Locality.newvar () in
-    let mode_y = Yielding.newvar () in
-    let finalret = prim_mode' (Some (mode_l, mode_y)) desc.prim_native_repr_res in
+    let mode_fy = Forkable.newvar (), Yielding.newvar () in
+    let finalret =
+      prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res
+    in
     instance_prim_locals desc.prim_native_repr_args
-      mode_l mode_y (Alloc.disallow_right Alloc.legacy) finalret ty,
-    Some mode_l, Some mode_y
+      mode_l mode_fy (Alloc.disallow_right Alloc.legacy) finalret ty,
+    Some mode_l, Some mode_fy
   else
     ty, None, None
 
@@ -1872,7 +1949,8 @@ let jkind_subst env level params args jkind =
      In the vastly common case, the params are a list of distinct Tvars. In that
      scenario, we can likely build a copy_scope that will just perform the
      substitution during the copy, avoiding copying the params and then unifying
-     them. Though we should measure, this should be a nice little speedup. *)
+     them. Though we should measure, this should be a nice little speedup.
+     Internal ticket 5105. *)
   if List.length params <> List.length args then raise Cannot_subst;
   let old_level = !current_level in
   current_level := level;
@@ -1884,7 +1962,8 @@ let jkind_subst env level params args jkind =
     (* CR layouts v2.8: It's plausibly worth immediately calling [Jkind.normalize
        ~mode:Require_best] on this jkind, so that if we do multiple things with it down
        the road we don't have to normalize each time. But doing so in a way that avoids
-       looping (when normalize calls [jkind_subst] itself) is nontrivial. *)
+       looping (when normalize calls [jkind_subst] itself) is nontrivial.
+       Internal ticket 5106. *)
     jkind'
   with Unify _ ->
     current_level := old_level;
@@ -2036,12 +2115,37 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
+(* Cancel out all pairs of $ and <[_]>, or <[_]> and $.
+   This ensures type unification works correctly. *)
+let rec quote_splice_cancel ty =
+  (* CR metaprogramming aivaskovic: try to remove type_desc mutation here *)
+  match get_desc ty with
+  | Tquote t -> begin
+      match get_desc t with
+      | Tsplice t' -> t'
+      | Tquote _ -> set_type_desc ty (Tquote (quote_splice_cancel t)); ty
+      | _ -> raise Cannot_expand
+    end
+  | Tsplice t -> begin
+      match get_desc t with
+      | Tquote t' -> t'
+      | Tsplice _ -> set_type_desc t (Tsplice (quote_splice_cancel t)); ty
+      | _ -> raise Cannot_expand
+    end
+  | _ -> raise Cannot_expand
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
-let try_expand_once env ty =
+let rec try_expand_once env ty =
+  let expand_and_cancel t =
+    match try_expand_once env t with
+    | _ | exception Cannot_expand -> quote_splice_cancel ty
+  in
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
+  | Tsplice t -> expand_and_cancel t
+  | Tquote t -> expand_and_cancel t
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2102,8 +2206,10 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Tquote ty -> extract_concrete_typedecl env ty
+  | Tsplice ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-  | Tvariant _ | Tpackage _ -> Has_no_typedecl
+  | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
   | Tlink _ | Tsubst _ -> assert false
 
@@ -2124,9 +2230,11 @@ let safe_abbrev_opt env ty =
     Btype.backtrack snap;
     false
 
-let try_expand_once_opt env ty =
+let rec try_expand_once_opt env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev_opt env ty
+  | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -2143,17 +2251,18 @@ let is_principal ty =
 
 type unwrapped_type_expr =
   { ty : type_expr
-  ; is_open : bool
-  ; modality : Mode.Modality.Value.Const.t }
+  ; modality : Mode.Modality.Const.t }
 
 let mk_unwrapped_type_expr ty =
-  { ty; is_open = false; modality = Mode.Modality.Value.Const.id }
+  { ty; modality = Mode.Modality.Const.id }
 
 type unbox_result =
   (* unboxing process made a step: either an unboxing or removal of a [Tpoly] *)
   | Stepped of unwrapped_type_expr
   (* unboxing process unboxed a product. Invariant: length >= 2 *)
   | Stepped_record_unboxed_product of unwrapped_type_expr list
+  (* unboxing process unboxed an [or_null] type *)
+  | Stepped_or_null of unwrapped_type_expr
   (* no step to make; we're all done here *)
   | Final_result
   (* definition not in environment: missing cmi *)
@@ -2165,10 +2274,15 @@ let unbox_once env ty =
     begin match Env.find_type p env with
     | exception Not_found -> Missing p
     | decl ->
-      let apply ty2 = apply env decl.type_params ty2 args in
+      let apply ty2 ~extra_substs =
+        let extra_params, extra_args = List.split extra_substs in
+        (* put extras first as they're often empty. *)
+        apply env (extra_params @ decl.type_params) ty2 (extra_args @ args)
+      in
       begin match find_unboxed_type decl with
       | Some (ty2, modality) ->
-        let ty2 = match get_desc ty2 with Tpoly (t, _) -> t | _ -> ty2 in
+        (* We need to ensure that existential variables do not escape their
+           scope. To do so, we substitute them with [Tof_kind]s. *)
         let existentials =
           match Env.find_type_descrs p env with
           | Type_variant ([{ cstr_existentials }], _, _) -> cstr_existentials
@@ -2176,11 +2290,21 @@ let unbox_once env ty =
             Misc.fatal_error "Ctype.unbox_once: not just one constructor"
           | Type_abstract _ | Type_record _
           | Type_record_unboxed_product _ | Type_open -> []
-          | exception Not_found -> (* but we found it earlier! *) assert false
+          | exception Not_found ->
+            (* but we found it earlier! *)
+            Misc.fatal_error "Ctype.unbox_once: expected to find [p] in [env]"
         in
-        Stepped { ty = apply ty2;
-                  is_open = not (Misc.Stdlib.List.is_empty existentials);
-                  modality }
+        let extra_substs =
+          List.map
+            (fun ty ->
+              match get_desc ty with
+              | Tvar { name = _; jkind } -> ty, newgenty (Tof_kind jkind)
+              | _ ->
+                Misc.fatal_error
+                  "Ctype.unbox_once: existential is not a variable")
+            existentials
+        in
+        Stepped { ty = apply ty2 ~extra_substs; modality }
       | None -> begin match decl.type_kind with
         | Type_record_unboxed_product ([_], Record_unboxed_product, _) ->
           (* [find_unboxed_type] would have returned [Some] *)
@@ -2188,27 +2312,37 @@ let unbox_once env ty =
         | Type_record_unboxed_product
             ((_::_::_ as lbls), Record_unboxed_product, _) ->
           Stepped_record_unboxed_product
-            (List.map (fun ld -> { ty = apply ld.ld_type;
-                                   is_open = false;
+            (List.map (fun ld -> { ty = apply ld.ld_type ~extra_substs:[];
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
+        | Type_variant ([_; cd2], Variant_with_null, _) ->
+          begin match cd2.cd_args with
+          | Cstr_tuple [arg] ->
+            (* [arg.ca_modalities] is currently always empty, but won't be
+               when we let users define custom or-null-like types. *)
+            Stepped_or_null { ty = apply arg.ca_type ~extra_substs:[];
+                              modality = arg.ca_modalities }
+          | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
+          end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
           Final_result
         end
       end
     end
-  | Tpoly (ty, bound_vars) ->
-    Stepped { ty;
-              is_open = not (Misc.Stdlib.List.is_empty bound_vars);
-              modality = Mode.Modality.Value.Const.id }
+  | Tpoly (ty, univars) ->
+    Stepped
+      { ty = instance_poly_for_jkind univars ty
+      ; modality = Mode.Modality.Const.id
+      }
   | _ -> Final_result
 
 let contained_without_boxing env ty =
   match get_desc ty with
   | Tconstr _ ->
     begin match unbox_once env ty with
-    | Stepped { ty; is_open = _; modality = _ } -> [ty]
+    | Stepped { ty; modality = _ } -> [ty]
+    | Stepped_or_null { ty; modality = _ } -> [ty]
     | Stepped_record_unboxed_product tys ->
       List.map (fun { ty; _ } -> ty) tys
     | Final_result | Missing _ -> []
@@ -2217,141 +2351,142 @@ let contained_without_boxing env ty =
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
-  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ -> []
+  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
+  | Tquote _ | Tsplice _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
    we eventually bottom out at a missing cmi file, or otherwise. *)
-let rec get_unboxed_type_representation
-          ~is_open ~modality env ty_prev ty fuel =
-  if fuel < 0 then Error { ty; is_open; modality }
+let rec get_unboxed_type_representation ~modality env ty_prev ty fuel =
+  if fuel < 0 then Error { ty; modality }
   else
     (* We use expand_head_opt version of expand_head to get access
        to the manifest type of private abbreviations. *)
     let ty = expand_head_opt env ty in
     match unbox_once env ty with
-    | Stepped { ty = ty2; is_open = is_open2; modality = modality2 } ->
-      let is_open = is_open || is_open2 in
-      let modality =
-        Mode.Modality.Value.Const.concat modality ~then_:modality2
-      in
-      get_unboxed_type_representation
-        ~is_open ~modality env ty ty2 (fuel - 1)
-    | Stepped_record_unboxed_product _ | Final_result ->
-      Ok { ty; is_open; modality }
-    | Missing _ -> Ok { ty = ty_prev; is_open; modality }
+    | Stepped { ty = ty2; modality = modality2 } ->
+      let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
+      get_unboxed_type_representation ~modality env ty ty2 (fuel - 1)
+    | Stepped_or_null _ | Stepped_record_unboxed_product _ | Final_result ->
+      Ok { ty; modality }
+    | Missing _ -> Ok { ty = ty_prev; modality }
 
 let get_unboxed_type_representation env ty =
   (* Do not give too much fuel: PR#7424 *)
-  get_unboxed_type_representation
-    ~is_open:false ~modality:Mode.Modality.Value.Const.id env ty ty 100
+  get_unboxed_type_representation ~modality:Mode.Modality.Const.id env ty ty 100
 
 let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
   | Ok ty | Error ty -> ty
 
-let tvariant_not_immediate row =
-  (* if all labels are devoid of arguments, not a pointer *)
-  (* CR layouts v5: Polymorphic variants with all void args can probably
-     be immediate, but we don't allow them to have void args right now. *)
-  not (row_closed row)
-  || List.exists
-    (fun (_,field) -> match row_field_repr field with
-      | Rpresent (Some _) | Reither (false, _, _) -> true
-      | _ -> false)
-    (row_fields row)
 
 (* forward declarations *)
 let type_equal' = ref (fun _ _ _ -> Misc.fatal_error "type_equal")
 let type_jkind_purely_if_principal' =
   ref (fun _ _ -> Misc.fatal_error "type_jkind_purely_if_principal")
 
+(* Helper functions for creating jkind contexts *)
+let mk_is_abstract env p =
+  let decl =
+    try Env.find_type p env
+    with Not_found ->
+      Misc.fatal_errorf "mk_is_abstract: type %a not found in environment"
+        Path.print p
+  in
+  match decl.type_kind with
+  | Type_abstract _ ->
+    (* Check if it's truly abstract (no manifest) or just an abbreviation *)
+    begin match decl.type_manifest with
+    | None -> true  (* Truly abstract - no manifest *)
+    | Some _ -> false  (* Type abbreviation - has manifest *)
+    end
+  | Type_variant _ | Type_record _ | Type_open | Type_record_unboxed_product _
+  -> false
+
+let mk_jkind_context env jkind_of_type =
+  { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
+
 (* We parameterize [estimate_type_jkind] by a function
    [expand_component] because some callers want expansion of types and others
-   don't. *)
-let rec estimate_type_jkind ~expand_component env ty =
+   don't.
+
+   [ignore_mod_bounds] is for an optimization in [constrain_type_jkind]. When
+   [true], [constrain_type_jkind] only cares about the layout of the jkind and
+   not its mod-bounds, so we don't perform a substitution into the
+   with-bounds. *)
+let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
-     let is_open, tys_modalities =
-       List.fold_left_map
-         (fun is_open1 (_lbl, ty) ->
-            let { ty; is_open = is_open2; modality } = expand_component ty in
-            (is_open1 || is_open2), (ty, modality))
-         false ltys
+     let tys_modalities =
+       List.map
+         (fun (_lbl, ty) ->
+            let { ty; modality } = expand_component ty in
+            (ty, modality))
+         ltys
      in
      (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
-        just to throw most of it away will go away once we get [layout_of]. *)
+        just to throw most of it away will go away once we get [layout_of].
+        Internal ticket 2912. *)
      let layouts =
        List.map (fun (ty, _modality (* ignore; we just care about layout *)) ->
-         estimate_type_jkind ~expand_component env ty |>
+         estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty |>
          Jkind.extract_layout)
          tys_modalities
      in
-     Jkind.Builtin.product
-       ~why:Unboxed_tuple tys_modalities layouts |>
-     close_open_jkind ~expand_component ~is_open env
+     Jkind.Builtin.product ~why:Unboxed_tuple tys_modalities layouts
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind = type_decl.type_jkind in
       (* Checking [has_with_bounds] here is needed for correctness, because
          intersection types sometimes do not unify with themselves. Removing
          this check causes typing-misc/pr7937.ml to fail. *)
-      if Jkind.has_with_bounds jkind && List.compare_length_with args 0 <> 0
+      if not ignore_mod_bounds
+         && Jkind.has_with_bounds jkind
+         && List.compare_length_with args 0 <> 0
       then
         let level = get_level ty in
         (* CR layouts v2.8: We could possibly skip this substitution if we're
            called from [constrain_type_jkind]; the jkind returned without
-           substing is just weaker than the one we would get by substing. *)
+           substing is just weaker than the one we would get by substing.
+           Internal ticket 5107. *)
         jkind_subst env level type_decl.type_params args jkind
       else
         jkind
     with
     (* CR layouts v2.8: It will be confusing when a [Cannot_subst] leads to
-       a [Missing_cmi]. *)
+       a [Missing_cmi]. Internal ticket 5109. *)
     | Cannot_subst | Not_found -> Jkind.Builtin.any ~why:(Missing_cmi p)
     end
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
+  | Tquote _ -> Jkind.Builtin.value ~why:Tquote
+  | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
-     if tvariant_not_immediate row
-     then Jkind.Builtin.value ~why:Polymorphic_variant
-     else Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
+     Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
-  | Tpoly (ty, _) ->
-    let jkind_of_type = !type_jkind_purely_if_principal' env in
-    estimate_type_jkind ~expand_component env ty |>
+  | Tpoly (ty, univars) ->
     (* The jkind of [ty] might mention the variables bound in this [Tpoly]
        node, and so just returning it here would be wrong. Instead, we need
-       to eliminate these variables. For now, we just [round_up] to eliminate
-       _all_ with-bounds. We can imagine doing better, just rounding up those
-       variables bound in this [Tpoly]. *)
-    (* CR layouts v2.8: Consider doing better -- but only once we can write
-       down a test case that cares. *)
-    Jkind.round_up ~jkind_of_type |>
-    Jkind.disallow_right
-  | Tpackage _ -> Jkind.Builtin.value ~why:First_class_module
-
-and close_open_jkind ~expand_component ~is_open env jkind =
-  if is_open (* if the type has free variables, we can't let these leak into
-                with-bounds *)
-    (* CR layouts v2.8: Do better, by tracking the actual free variables and
-       rounding only those variables up. *)
-  then
-    let jkind_of_type ty =
-      Some (estimate_type_jkind ~expand_component env ty)
-    in
-    Jkind.round_up ~jkind_of_type jkind |> Jkind.disallow_right
-  else jkind
+       to eliminate these variables. We do this by replacing them with
+       [Tof_kind]s. *)
+    instance_poly_for_jkind univars ty
+    |> estimate_type_jkind ~expand_component ~ignore_mod_bounds env
+  | Tof_kind jkind ->
+    (* A [Tof_kind] is substitued for existential [Tvar]s or [Tunivar]s bound in
+       a [Tpoly] that would escape their scope. In both cases, we can never
+       learn more about about the type of the [Tvar] or [Tunivar] (see note
+       [Tunivar best-ness]), so it is safe to mark is as best. *)
+    Jkind.mark_best jkind
+  | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 
 let estimate_type_jkind_unwrapped
-      ~expand_component env { ty; is_open; modality } =
-  estimate_type_jkind ~expand_component env ty |>
-  close_open_jkind ~expand_component ~is_open env |>
+      ~expand_component env { ty; modality } =
+  estimate_type_jkind ~expand_component ~ignore_mod_bounds:false env ty |>
   Jkind.apply_modality_l modality
 
 
@@ -2361,7 +2496,7 @@ let type_jkind env ty =
     ~expand_component:(get_unboxed_type_approximation env) env
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
-   gdoc titled "Let's kill type_jkind_purely". *)
+   gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)
 let type_jkind_purely env ty =
   if !Clflags.principal || Env.has_local_constraints env then
     (* We snapshot to keep this pure; see the test in [typing-local/crossing.ml]
@@ -2374,7 +2509,8 @@ let type_jkind_purely env ty =
     type_jkind env ty
 
 (* CR layouts v2.8: It's possible we can remove this function if we change
-   [jkind_subst] to not substitute non-principal things. Investigate. *)
+   [jkind_subst] to not substitute non-principal things. Investigate.
+   Internal ticket 5111. *)
 let type_jkind_purely_if_principal env ty =
   match is_principal ty with
   | true -> Some (type_jkind_purely env ty)
@@ -2384,6 +2520,14 @@ let () = type_jkind_purely_if_principal' := type_jkind_purely_if_principal
 let estimate_type_jkind =
   estimate_type_jkind ~expand_component:mk_unwrapped_type_expr
 
+(* After type_jkind_purely_if_principal is defined, we can use it directly *)
+let mk_jkind_context_check_principal env =
+  mk_jkind_context env (type_jkind_purely_if_principal env)
+
+(* For cases where we always want Some (type_jkind_purely env ty) *)
+let mk_jkind_context_always_principal env =
+  mk_jkind_context env (fun ty -> Some (type_jkind_purely env ty))
+
 (**** checking jkind relationships ****)
 
 (* The ~fixed argument controls what effects this may have on `ty`.  If false,
@@ -2391,7 +2535,7 @@ let estimate_type_jkind =
    possible.  If true, we won't (but will still instantiate sort variables). *)
 let constrain_type_jkind ~fixed env ty jkind =
   let type_equal = !type_equal' env in
-  let jkind_of_type = type_jkind_purely_if_principal env in
+  let context = mk_jkind_context_check_principal env in
   (* The [expanded] argument says whether we've already tried [expand_head_opt].
 
      The "fuel" argument is used because we're duplicating the loop of
@@ -2409,21 +2553,17 @@ let constrain_type_jkind ~fixed env ty jkind =
      like this that can occur, though, and may need a more principled solution
      later).
 
-     As this unboxes types, it might unbox an existential type. We thus keep
-     track of whether [ty] [is_open]. EDIT: This is actually pointless and
-     could be removed: #3684.
-
      As this unboxed types, it might also encounter modalities. These modalities
      are accommodated by changing [jkind], the expected jkind of the type.
      Trying to apply the modality to the jkind extracted from [ty] would be
      wrong, as it would incorrectly change the jkind on a [Tvar] to mode-cross
      more than necessary.  *)
-  let rec loop ~fuel ~expanded ty ~is_open ty's_jkind jkind =
+  let rec loop ~fuel ~expanded ty ty's_jkind jkind =
     (* Just succeed if we're comparing against [any] *)
-    if Jkind.is_obviously_max jkind then Ok () else
+    if Jkind.is_max jkind then Ok () else
     if fuel < 0 then
       Error (
-        Jkind.Violation.of_ ~jkind_of_type (
+        Jkind.Violation.of_ ~context (
           Not_a_subjkind (ty's_jkind, jkind, [Constrain_ran_out_of_fuel])))
     else
     match get_desc ty with
@@ -2452,20 +2592,28 @@ let constrain_type_jkind ~fixed env ty jkind =
           it first.
         *)
        let jkind_inter =
-         Jkind.intersection_or_error ~type_equal ~jkind_of_type
-           ~reason:Tyvar_refinement_intersection ty's_jkind jkind
+         Jkind.intersection_or_error ~type_equal ~context
+           ~reason:Tyvar_refinement_intersection ~level:!current_level
+           ty's_jkind jkind
        in
        Result.map (set_var_jkind ty) jkind_inter
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
-    | Tpoly (t, bound_vars) ->
-      let is_open = is_open || not (Misc.Stdlib.List.is_empty bound_vars) in
-      loop ~fuel ~expanded:false t ~is_open ty's_jkind jkind
+    | Tpoly (t, _) ->
+      (* [t] probably contains variables that will escapes their scope here. But
+         comparing these variables in jkinds is fine, and they can't escape from
+         this function (except harmlessly in error messages), so we don't do
+         anything special to handle them.
+
+         But if we ever choose to substitute min mod-bounds for [Tunivar]s, we
+         must do so here. Internal ticket 5746. *)
+      loop ~fuel ~expanded:false t ty's_jkind jkind
 
     | _ ->
        match
-         Jkind.sub_or_intersect ~type_equal ~jkind_of_type ty's_jkind jkind
+         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level
+           ty's_jkind jkind
        with
        | Sub -> Ok ()
        | Disjoint sub_failure_reasons ->
@@ -2477,7 +2625,7 @@ let constrain_type_jkind ~fixed env ty jkind =
              arbitrary amounts of expansion and looking through [@@unboxed]
              types. So we don't, settling for the slightly worse error
              message. *)
-          Error (Jkind.Violation.of_ ~jkind_of_type
+          Error (Jkind.Violation.of_ ~context
             (Not_a_subjkind (ty's_jkind, jkind, Nonempty_list.to_list sub_failure_reasons)))
        | Has_intersection sub_failure_reasons ->
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
@@ -2486,16 +2634,16 @@ let constrain_type_jkind ~fixed env ty jkind =
              let recur ty's_jkinds jkinds =
                let results =
                  Misc.Stdlib.List.map3
-                   (fun { ty; is_open = _; modality } ty's_jkind jkind ->
+                   (fun { ty; modality } ty's_jkind jkind ->
                       let jkind =
                         Jkind.apply_modality_r modality jkind
                       in
-                      loop ~fuel ~expanded:false ~is_open ty ty's_jkind jkind)
+                      loop ~fuel ~expanded:false ty ty's_jkind jkind)
                    tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
                then Ok ()
-               else Error (Jkind.Violation.of_ ~jkind_of_type
+               else Error (Jkind.Violation.of_ ~context
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              in
              begin match Jkind.decompose_product ty's_jkind,
@@ -2505,7 +2653,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                        && List.length jkinds = num_components ->
                recur ty's_jkinds jkinds
              | Some ty's_jkinds, None
-                  when Jkind.has_layout_any jkind ->
+                  when Jkind.has_layout_any jkind
+                    && List.length ty's_jkinds = num_components ->
                (* Even though [jkind] has layout any, it still might have
                   mode-crossing restrictions, so we recur, just duplicating
                   the jkind. *)
@@ -2514,32 +2663,59 @@ let constrain_type_jkind ~fixed env ty jkind =
                (* Products don't line up. This is only possible if [ty] was
                   given a jkind annotation of the wrong product arity.
                *)
-               Error (Jkind.Violation.of_ ~jkind_of_type
+               Error (Jkind.Violation.of_ ~context
                   (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              end
+          in
+          let or_null ~fuel ty modality =
+            let error () =
+              Error (Jkind.Violation.of_ ~context
+                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+            in
+            let jkind = Jkind.apply_modality_r modality jkind in
+            match
+              Jkind.apply_or_null_r jkind
+            with
+            | Ok jkind ->
+              (match
+                estimate_jkind_and_loop ~fuel ~expanded:false ty jkind
+              with
+              | Ok () -> Ok ()
+              | Error _ ->
+                (* CR or_null:
+                   Since [constrain_type_jkind] reports errors for the original
+                   type on the left, return the original error.
+                   We could do something smarter here, updating the [loop]-ed
+                   error to have correct jkinds. *)
+                error ())
+            | Error () ->
+              (* CR or_null:
+                 [_ or_null] fails against a non-null jkind.
+                 We could still estimate the kind on the left better. *)
+              error ()
           in
           match get_desc ty with
           | Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
-               loop ~fuel ~expanded:true ty ~is_open
-                 (estimate_type_jkind env ty) jkind
+               estimate_jkind_and_loop ~fuel ~expanded:true ty jkind
              else
                begin match unbox_once env ty with
                | Missing path -> Error (Jkind.Violation.of_
-                                          ~jkind_of_type ~missing_cmi:path
+                                          ~context ~missing_cmi:path
                                           (Not_a_subjkind (ty's_jkind, jkind,
                                                            sub_failure_reasons)))
                | Final_result ->
                  Error
-                   (Jkind.Violation.of_ ~jkind_of_type
+                   (Jkind.Violation.of_ ~context
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
-               | Stepped { ty; is_open = is_open2; modality } ->
-                 let is_open = is_open || is_open2 in
+               | Stepped { ty; modality } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
-                 loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
-                   (estimate_type_jkind env ty) jkind
+                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false ty
+                    jkind
+               | Stepped_or_null { ty; modality } ->
+                 or_null ~fuel:(fuel - 1) ty modality
                | Stepped_record_unboxed_product tys_modalities ->
                  product ~fuel:(fuel - 1) tys_modalities
                end
@@ -2551,14 +2727,26 @@ let constrain_type_jkind ~fixed env ty jkind =
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
           | _ ->
-            Error (Jkind.Violation.of_ ~jkind_of_type
+            Error (Jkind.Violation.of_ ~context
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+  and estimate_jkind_and_loop ~fuel ~expanded ty jkind : _ result =
+    (* If [jkind]'s bound's are all max, then we immediately know that the
+       mod-bounds already agree. But in such a case, we may still need to
+       constrain layouts. So we still continue, but we avoid performing any
+       substitutions into the with-bounds while in [estimate_type_jkind]. These
+       substitutions can be expensive if there are many with-bounds, and this
+       case gets hit a lot (the v1 safety check always hits this case). *)
+    let ignore_mod_bounds = Jkind.mod_bounds_are_max jkind in
+    let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
+    loop ~fuel ~expanded ty ty's_jkind jkind
   in
-  loop ~fuel:100 ~expanded:false ty ~is_open:false
-    (estimate_type_jkind env ty) (Jkind.disallow_left jkind)
+  estimate_jkind_and_loop ~fuel:100 ~expanded:false ty
+    (Jkind.disallow_left jkind)
+
+let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
 
 let type_sort ~why ~fixed env ty =
-  let jkind, sort = Jkind.of_new_sort_var ~why in
+  let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
   match constrain_type_jkind ~fixed env ty jkind with
   | Ok _ -> Ok sort
   | Error _ as e -> e
@@ -2580,9 +2768,21 @@ let check_type_externality env ty ext =
   | Ok () -> true
   | Error _ -> false
 
+let is_always_gc_ignorable env ty =
+  check_type_externality
+    env ty (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
+
 let check_type_nullability env ty null =
   let upper_bound =
     Jkind.set_nullability_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) null
+  in
+  match check_type_jkind env ty upper_bound with
+  | Ok () -> true
+  | Error _ -> false
+
+let check_type_separability env ty sep =
+  let upper_bound =
+    Jkind.set_separability_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) sep
   in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
@@ -2598,11 +2798,6 @@ let constrain_type_jkind_exn env texn ty jkind =
   | Ok _ -> ()
   | Error err -> raise_for texn (Bad_jkind (ty,err))
 
-let type_legacy_sort ~why env ty =
-  let jkind, sort = Jkind.of_new_legacy_sort_var ~why in
-  match constrain_type_jkind env ty jkind with
-  | Ok _ -> Ok sort
-  | Error _ as e -> e
 
 (* Note: Because [estimate_type_jkind] actually returns an upper bound, this
    function computes an inaccurate intersection in some cases.
@@ -2622,15 +2817,15 @@ let rec intersect_type_jkind ~reason env ty1 jkind2 =
        to avoid this call as in [constrain_type_jkind] *)
     let type_equal = !type_equal' env in
     let jkind1 = type_jkind env ty1 in
-    let jkind_of_type = type_jkind_purely_if_principal env in
-    let jkind1 = Jkind.round_up ~jkind_of_type jkind1 in
-    let jkind2 = Jkind.round_up ~jkind_of_type jkind2 in
+    let context = mk_jkind_context_check_principal env in
+    let jkind1 = Jkind.round_up ~context jkind1 in
+    let jkind2 = Jkind.round_up ~context jkind2 in
     (* This is strange, in that we're rounding up and then computing an
        intersection. So we might find an intersection where there isn't really
        one. See the comment above this function arguing why this is OK here. *)
     (* CR layouts v2.8: Think about doing better, but it's probably not worth
-       it. *)
-    Jkind.intersection_or_error ~type_equal ~jkind_of_type ~reason jkind1 jkind2
+       it. Internal ticket 5112. *)
+    Jkind.intersection_or_error ~type_equal ~context ~reason jkind1 jkind2
 
 (* See comment on [jkind_unification_mode] *)
 let unification_jkind_check uenv ty jkind =
@@ -2649,8 +2844,8 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       (* Just check externality and layout, because that's what actually matters
          for upstream code. We check both for a known value and something that
          might turn out later to be value. This is the conservative choice. *)
-      let jkind_of_type = type_jkind_purely_if_principal env in
-      let ext = Jkind.get_externality_upper_bound ~jkind_of_type jkind in
+      let context = mk_jkind_context_check_principal env in
+      let ext = Jkind.get_externality_upper_bound ~context jkind in
       Jkind_axis.Externality.le ext External64 &&
       match Jkind.get_layout jkind with
       | Some (Base Value) | None -> true
@@ -2674,9 +2869,9 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       Jkind.History.(update_reason jkind (Generalized (name, loc)))
     else jkind
   in
-  let rec inner ty =
+  let rec inner mark ty =
     let level = get_level ty in
-    if try_mark_node ty then begin
+    if try_mark_node mark ty then begin
       begin match get_desc ty with
       | Tvar ({ jkind; _ } as r) ->
         let new_jkind = immediacy_check jkind in
@@ -2688,11 +2883,10 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
         set_type_desc ty (Tunivar {r with jkind = new_jkind})
       | _ -> ()
       end;
-      iter_type_expr inner ty
+      iter_type_expr (inner mark) ty
     end
   in
-  inner ty;
-  unmark_type ty
+  with_type_mark (fun mark -> inner mark ty)
 
 let is_principal ty =
   not !Clflags.principal || get_level ty = generic_level
@@ -2758,30 +2952,34 @@ let is_contractive env p =
 
 exception Occur
 
-let rec occur_rec env allow_recursive visited ty0 ty =
-  if eq_type ty ty0 then raise Occur;
-  match get_desc ty with
-    Tconstr(p, _tl, _abbrev) ->
-      if allow_recursive && is_contractive env p then () else
-      begin try
-        if TypeSet.mem ty visited then raise Occur;
-        let visited = TypeSet.add ty visited in
-        iter_type_expr (occur_rec env allow_recursive visited ty0) ty
-      with Occur -> try
-        let ty' = try_expand_head try_expand_safe env ty in
-        (* This call used to be inlined, but there seems no reason for it.
-           Message was referring to change in rev. 1.58 of the CVS repo. *)
-        occur_rec env allow_recursive visited ty0 ty'
-      with Cannot_expand ->
-        raise Occur
-      end
-  | Tobject _ | Tvariant _ ->
-      ()
-  | _ ->
-      if allow_recursive ||  TypeSet.mem ty visited then () else begin
-        let visited = TypeSet.add ty visited in
-        iter_type_expr (occur_rec env allow_recursive visited ty0) ty
-      end
+let rec occur_rec env visited allow_recursive parents ty0 ty =
+  if not_marked_node visited ty then begin
+    if eq_type ty ty0 then raise Occur;
+    begin match get_desc ty with
+      Tconstr(p, _tl, _abbrev) ->
+        if allow_recursive && is_contractive env p then () else
+        begin try
+          if TypeSet.mem ty parents then raise Occur;
+          let parents = TypeSet.add ty parents in
+          iter_type_expr (occur_rec env visited allow_recursive parents ty0) ty
+        with Occur -> try
+          let ty' = try_expand_head try_expand_safe env ty in
+          (* This call used to be inlined, but there seems no reason for it.
+            Message was referring to change in rev. 1.58 of the CVS repo. *)
+          occur_rec env visited allow_recursive parents ty0 ty'
+        with Cannot_expand ->
+          raise Occur
+        end
+    | Tobject _ | Tvariant _ ->
+        ()
+    | _ ->
+        if allow_recursive ||  TypeSet.mem ty parents then () else begin
+          let parents = TypeSet.add ty parents in
+          iter_type_expr (occur_rec env visited allow_recursive parents ty0) ty
+        end
+    end;
+    ignore (try_mark_node visited ty)
+  end
 
 let type_changed = ref false (* trace possible changes to the studied type *)
 
@@ -2795,7 +2993,8 @@ let occur uenv ty0 ty =
     while
       type_changed := false;
       if not (eq_type ty0 ty) then
-        occur_rec env allow_recursive TypeSet.empty ty0 ty;
+        with_type_mark (fun mark ->
+          occur_rec env mark allow_recursive TypeSet.empty ty0 ty);
       !type_changed
     do () (* prerr_endline "changed" *) done;
     merge type_changed old
@@ -2903,10 +3102,11 @@ let unify_univar_for tr_exn t1 t2 jkind1 jkind2 univar_pairs =
 (* If [inj_only=true], only check injective positions *)
 let occur_univar ?(inj_only=false) env ty =
   let visited = ref TypeMap.empty in
+  with_type_mark begin fun mark ->
   let rec occur_rec bound ty =
-    if not_marked_node ty then
+    if not_marked_node mark ty then
       if TypeSet.is_empty bound then
-        (flip_mark_node ty; occur_desc bound ty)
+        (ignore (try_mark_node mark ty); occur_desc bound ty)
       else try
         let bound' = TypeMap.find ty !visited in
         if not (TypeSet.subset bound' bound) then begin
@@ -2945,10 +3145,8 @@ let occur_univar ?(inj_only=false) env ty =
           end
       | _ -> iter_type_expr (occur_rec bound) ty
   in
-  Misc.try_finally (fun () ->
-      occur_rec TypeSet.empty ty
-    )
-    ~always:(fun () -> unmark_type ty)
+  occur_rec TypeSet.empty ty
+  end
 
 let has_free_univars env ty =
   try occur_univar ~inj_only:false env ty; false with Escape _ -> true
@@ -2979,10 +3177,9 @@ let get_univar_family univar_pairs univars =
 (* Whether a family of univars escapes from a type *)
 let univars_escape env univar_pairs vl ty =
   let family = get_univar_family univar_pairs vl in
-  let visited = ref TypeSet.empty in
+  with_type_mark begin fun mark ->
   let rec occur t =
-    if TypeSet.mem t !visited then () else begin
-      visited := TypeSet.add t !visited;
+    if try_mark_node mark t then begin
       match get_desc t with
         Tpoly (t, tl) ->
           if List.exists (fun t -> TypeSet.mem t family) tl then ()
@@ -3004,6 +3201,7 @@ let univars_escape env univar_pairs vl ty =
     end
   in
   occur ty
+  end
 
 (* Wrapper checking that no variable escapes and updating univar_pairs *)
 let enter_poly env univar_pairs t1 tl1 t2 tl2 f =
@@ -3113,30 +3311,28 @@ let unexpanded_diff ~got ~expected =
 
 (**** Unification ****)
 
-let rec deep_occur_rec t0 ty =
-  if get_level ty >= get_level t0 && try_mark_node ty then begin
+let rec deep_occur_rec mark t0 ty =
+  if get_level ty >= get_level t0 && try_mark_node mark ty then begin
     if eq_type ty t0 then raise Occur;
-    iter_type_expr (deep_occur_rec t0) ty
+    iter_type_expr (deep_occur_rec mark t0) ty
   end
 
 (* Return whether [t0] occurs in any type in [tyl]. Objects are also traversed. *)
 let deep_occur_list t0 tyl =
-  try
-    List.iter (deep_occur_rec t0) tyl;
-    List.iter unmark_type tyl;
-    false
-  with Occur ->
-    List.iter unmark_type tyl;
-    true
+  with_type_mark (fun mark ->
+    try
+      List.iter (deep_occur_rec mark t0) tyl;
+      false
+    with Occur ->
+      true)
 
 let deep_occur t0 ty =
-  try
-    deep_occur_rec t0 ty;
-    unmark_type ty;
-    false
-  with Occur ->
-    unmark_type ty;
-    true
+  with_type_mark (fun mark ->
+    try
+      deep_occur_rec mark t0 ty;
+      false
+    with Occur ->
+      true)
 
 
 (* a local constraint can be added only if the rhs
@@ -3264,8 +3460,8 @@ let equivalent_with_nolabels l1 l2 =
 (* the [tk] means we're comparing a type against a jkind; axes do
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
-let has_jkind_intersection_tk env ty jkind =
-  Jkind.has_intersection (type_jkind env ty) jkind
+let has_jkind_intersection_tk ~level env ty jkind =
+  Jkind.has_intersection ~level (type_jkind env ty) jkind
 
 (* [mcomp] tests if two types are "compatible" -- i.e., if they could ever
    unify.  (This is distinct from [eqtype], which checks if two types *are*
@@ -3282,7 +3478,8 @@ let has_jkind_intersection_tk env ty jkind =
 
 let rec mcomp type_pairs env t1 t2 =
   let check_jkinds ty jkind =
-    if not (has_jkind_intersection_tk env ty (Jkind.disallow_right jkind))
+    if not (has_jkind_intersection_tk ~level:!current_level env ty
+              (Jkind.disallow_right jkind))
     then raise Incompatible
   in
   if eq_type t1 t2 then () else
@@ -3317,8 +3514,9 @@ let rec mcomp type_pairs env t1 t2 =
             begin try
               let decl = Env.find_type p env in
               if non_aliasable p decl || is_datatype decl ||
-                 not (has_jkind_intersection_tk env other decl.type_jkind) then
-                raise Incompatible
+                 not (has_jkind_intersection_tk ~level:!current_level env other
+                        decl.type_jkind)
+              then raise Incompatible
             with Not_found -> ()
             end
         (*
@@ -3344,6 +3542,18 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
             (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
+        | (Tquote t1, Tquote t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tsplice t1, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tsplice t1, _, _, _) ->
+            mcomp type_pairs env t1 t2'
+        | (_, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1' t2
+        | (Tquote t1, _, _, _) ->
+            mcomp type_pairs env t1 t2'
+        | (_, Tquote t2, _, _) ->
+            mcomp type_pairs env t1' t2
         | (_, _, _, _) ->
             raise Incompatible
       end
@@ -3435,7 +3645,8 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
     let check_jkinds () =
-      if not (Jkind.has_intersection decl.type_jkind decl'.type_jkind)
+      if not (Jkind.has_intersection ~level:!current_level decl.type_jkind
+                decl'.type_jkind)
       then raise Incompatible
     in
     if compatible_paths p1 p2 then begin
@@ -3539,14 +3750,16 @@ let mcomp_for tr_exn env t1 t2 =
 
 let find_lowest_level ty =
   let lowest = ref generic_level in
-  let rec find ty =
-    if not_marked_node ty then begin
-      let level = get_level ty in
-      if level < !lowest then lowest := level;
-      flip_mark_node ty;
-      iter_type_expr find ty
-    end
-  in find ty; unmark_type ty; !lowest
+  with_type_mark begin fun mark ->
+    let rec find ty =
+      if try_mark_node mark ty then begin
+        let level = get_level ty in
+        if level < !lowest then lowest := level;
+        iter_type_expr find ty
+      end
+    in find ty
+  end;
+  !lowest
 
 let jkind_of_abstract_type_declaration env p =
   try
@@ -3565,7 +3778,9 @@ let add_jkind_equation ~reason uenv destination jkind1 =
      abstract, we can improve type checking by assigning destination that
      jkind. *)
   let env = get_env uenv in
-  match intersect_type_jkind ~reason env destination jkind1 with
+  match
+    intersect_type_jkind ~reason ~level:!current_level env destination jkind1
+  with
   | Error err -> raise_for Unify (Bad_jkind (destination,err))
   | Ok jkind -> begin
       match get_desc destination with
@@ -3574,7 +3789,8 @@ let add_jkind_equation ~reason uenv destination jkind1 =
         begin
           try
             let decl = Env.find_type p env in
-            (* CR layouts v2.8: We might be able to do better here. *)
+            (* CR layouts v2.8: We might be able to do better here. Internal
+               ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind when
                    not (Jkind.equal jkind decl_jkind) ->
@@ -3698,6 +3914,14 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
+(* Checks if a type is a type variable under some quotes or splices *)
+let rec is_flexible ty =
+  match get_desc ty with
+  | Tvar _ -> true
+  | Tquote ty' -> is_flexible ty'
+  | Tsplice ty' -> is_flexible ty'
+  | _ -> false
+
 (* raise Not_found rather than Unify if the module types are incompatible *)
 let unify_package env unify_list lv1 p1 fl1 lv2 p2 fl2 =
   let ntl2 = complete_type_list env fl1 lv2 (Mty_ident p2) fl2
@@ -3813,9 +4037,17 @@ let rec unify uenv t1 t2 =
   try
     type_changed := true;
     begin match (get_desc t1, get_desc t2) with
-      (Tvar _, Tconstr _) when deep_occur t1 t2 ->
+      (Tconstr _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tconstr _, Tvar _) when deep_occur t2 t1 ->
+    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
+        unify2 uenv t1 t2
+    | (Tquote _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
+    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
+        unify2 uenv t1 t2
+    | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
+    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
@@ -4064,6 +4296,33 @@ and unify3 uenv t1 t1' t2 t2' =
           raise_for Unify (Obj (Abstract_row Second))
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
+      | (Tquote t1, Tquote t2)
+      | (Tsplice t1, Tsplice t2) ->
+          unify uenv t1 t2
+      | (Tsplice s1, _) when is_flexible s1 ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
+          in
+          unify uenv s1 t
+      | (Tquote s1, _) when is_flexible s1 ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
+          in
+          unify uenv s1 t
+      | (_, Tsplice s2) when is_flexible s2 ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
+          in
+          unify uenv s2 t
+      | (_, Tquote s2) when is_flexible s2 ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
+          in
+          unify uenv s2 t
       | (_, _) -> raise_unexplained_for Unify
       end;
       (* XXX Commentaires + changer "create_recursion"
@@ -4942,16 +5201,17 @@ let generalize_class_signature_spine env sign =
    variables from the subject are not lowered.
 *)
 let moregen_occur env level ty =
-  let rec occur ty =
-    let lv = get_level ty in
-    if lv <= level then () else
-    if is_Tvar ty && lv >= generic_level - 1 then raise Occur else
-    if try_mark_node ty then iter_type_expr occur ty
-  in
-  begin try
-    occur ty; unmark_type ty
-  with Occur ->
-    unmark_type ty; raise_unexplained_for Moregen
+  with_type_mark begin fun mark ->
+    let rec occur ty =
+      let lv = get_level ty in
+      if lv <= level then () else
+      if is_Tvar ty && lv >= generic_level - 1 then raise Occur else
+      if try_mark_node mark ty then iter_type_expr occur ty
+    in
+    try
+      occur ty
+    with Occur ->
+      raise_unexplained_for Moregen
   end;
   (* also check for free univars *)
   occur_univar_for Moregen env ty;
@@ -4999,19 +5259,63 @@ let relevant_pairs pairs v =
   | Contravariant -> pairs.contravariant_pairs
   | Bivariant -> pairs.bivariant_pairs
 
+let zap_modalities_to_floor_if_modes_enabled_at level =
+  if Language_extension.(is_at_least Mode level)
+    then Mode.Modality.zap_to_floor
+    else Mode.Modality.zap_to_id
+
+
+(** The mode crossing of the memory block of a structure. *)
+let mode_crossing_structure_memaddr =
+  Mode.Crossing.create
+    ~uniqueness:false
+    ~contention:true
+    ~visibility:true
+    ~regionality:false
+    ~linearity:true
+    ~portability:true
+    ~forkable:true
+    ~yielding:true
+    ~statefulness:true
+    ~staticity:false
+
+(** The mode crossing of a functor. *)
+let mode_crossing_functor =
+  Mode.Crossing.create
+    ~uniqueness:true
+    ~contention:true
+    ~visibility:true
+    ~regionality:false
+    ~linearity:false
+    ~portability:false
+    ~forkable:false
+    ~yielding:false
+    ~statefulness:false
+    ~staticity:false
+
+(** The mode crossing of any module. *)
+let mode_crossing_module = Mode.Crossing.max
+
+let zap_modalities_to_floor_if_at_least level =
+  if Language_extension.(is_at_least Mode level)
+    then Mode.Modality.zap_to_floor
+    else Mode.Modality.zap_to_id
+
 let crossing_of_jkind env jkind =
-  let jkind_of_type = type_jkind_purely_if_principal env in
-  Jkind.get_mode_crossing ~jkind_of_type jkind
+  let context = mk_jkind_context_check_principal env in
+  Jkind.get_mode_crossing ~context jkind
 
 let crossing_of_ty env ?modalities ty =
-  if not (is_principal ty)
-  then Crossing.top
-  else
-    let jkind = type_jkind_purely env ty in
-    let crossing = crossing_of_jkind env jkind in
-    match modalities with
-    | None -> crossing
-    | Some m -> Crossing.modality m crossing
+  let crossing =
+    if not (is_principal ty)
+      then Crossing.max
+    else
+      let jkind = type_jkind_purely env ty in
+      crossing_of_jkind env jkind
+  in
+  match modalities with
+  | None -> crossing
+  | Some m -> Crossing.modality m crossing
 
 let cross_left env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
@@ -5036,7 +5340,9 @@ let submode_with_cross env ~is_ret ty l r =
       (* the locality axis of the return mode cannot cross modes, because a
          local-returning function might allocate in the caller's region, and
          this info must be preserved. *)
-      Alloc.meet [r'; Alloc.max_with (Comonadic Areality) (Alloc.proj (Comonadic Areality) r)]
+      Alloc.meet
+        [r';
+         Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality r)]
     else
       r'
   in
@@ -5148,6 +5454,16 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 (moregen inst_nongen variance type_pairs env)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
+          | (Tquote t1, Tquote t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tsplice t1, Tsplice t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tquote t1, _) ->
+              let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tsplice t1, _) ->
+              let t2 = newty2 ~level:(get_level t2) (Tquote t2) in
+              moregen inst_nongen variance type_pairs env t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -5398,8 +5714,8 @@ module Rigidify = struct
    and check validity after unification *)
 (* Simpler, no? *)
 
-let rec rigidify_rec vars ty =
-  if try_mark_node ty then
+let rec rigidify_rec mark vars ty =
+  if try_mark_node mark ty then
     begin match get_desc ty with
     | Tvar { name; jkind } ->
         vars := TypeMap.add ty (name, jkind) !vars
@@ -5412,12 +5728,12 @@ let rec rigidify_rec vars ty =
               ~name ~closed
           in link_type more (newty2 ~level:(get_level ty) (Tvariant row'))
         end;
-        iter_row (rigidify_rec vars) row;
+        iter_row (rigidify_rec mark vars) row;
         (* only consider the row variable if the variant is not static *)
         if not (static_row row) then
-          rigidify_rec vars (row_more row)
+          rigidify_rec mark vars (row_more row)
     | _ ->
-        iter_type_expr (rigidify_rec vars) ty
+        iter_type_expr (rigidify_rec mark vars) ty
     end
 
 type var = { name : string option
@@ -5431,8 +5747,7 @@ type t = var list
    later. *)
 let rigidify_list tys =
   let vars = ref TypeMap.empty in
-  List.iter (rigidify_rec vars) tys;
-  List.iter unmark_type tys;
+  with_type_mark (fun mark -> List.iter (rigidify_rec mark vars) tys);
   List.map (fun (trans_expr, (name, original_jkind)) ->
              { ty = Transient_expr.type_expr trans_expr; name; original_jkind })
     (TypeMap.bindings !vars)
@@ -5545,6 +5860,9 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
         eqtype_subst type_pairs subst t1 k1 t2 k2 ~do_jkind_check
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
+    | (Tof_kind k1, Tof_kind k2) ->
+      if not (Jkind.equal k1 k2)
+      then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in
         let t2' = expand_head_rigid env t2 in
@@ -5600,6 +5918,10 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Equality t1' t2' k1 k2 !univar_pairs
+          | (Tquote t1, Tquote t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
         end
@@ -6303,6 +6625,14 @@ let rec build_subtype env (visited : transient_expr list)
       let c = max_change c1 c2 in
       if c > Unchanged then (newty (Tfield(s, field_public, t1', t2')), c)
       else (t, Unchanged)
+  | Tquote t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tquote t1'), c)
+      else (t, Unchanged)
+  | Tsplice t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tsplice t1'), c)
+      else (t, Unchanged)
   | Tnil ->
       if posi then
         let v = newvar (Jkind.Builtin.value ~why:Tnil) in
@@ -6317,8 +6647,7 @@ let rec build_subtype env (visited : transient_expr list)
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tpoly(t1', tl)), c)
       else (t, Unchanged)
-  | Tunivar _ | Tpackage _ ->
-      (t, Unchanged)
+  | Tunivar _ | Tpackage _ | Tof_kind _ -> (t, Unchanged)
 
 and build_subtype_tuple env visited loops posi level t labeled_tlist
       constructor =
@@ -6461,7 +6790,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tpoly (u1, []), Tpoly (u2, [])) ->
         subtype_rec env trace u1 u2 cstrs
     | (Tpoly (u1, tl1), Tpoly (u2, [])) ->
-        let _, u1' = instance_poly ~fixed:false tl1 u1 in
+        let u1' = instance_poly tl1 u1 in
         subtype_rec env trace u1' u2 cstrs
     | (Tpoly (u1, tl1), Tpoly (u2,tl2)) ->
         begin try
@@ -6495,6 +6824,10 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Not_found ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
+    | (Tquote t1, Tquote t2) ->
+         subtype_rec env trace t1 t2 cstrs
+    | (Tsplice t1, Tsplice t2) ->
+         subtype_rec env trace t1 t2 cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end
@@ -6777,9 +7110,8 @@ let nongen_vars_in_class_declaration cty =
 
 (* Normalize a type before printing, saving... *)
 (* Cannot use mark_type because deep_occur uses it too *)
-let rec normalize_type_rec visited ty =
-  if not (TypeSet.mem ty !visited) then begin
-    visited := TypeSet.add ty !visited;
+let rec normalize_type_rec mark ty =
+  if try_mark_node mark ty then begin
     let tm = row_of_type ty in
     begin if not (is_Tconstr ty) && is_constr_row ~allow_ident:false tm then
       match get_desc tm with (* PR#7348 *)
@@ -6838,11 +7170,11 @@ let rec normalize_type_rec visited ty =
         set_type_desc fi (get_desc fi')
     | _ -> ()
     end;
-    iter_type_expr (normalize_type_rec visited) ty;
+    iter_type_expr (normalize_type_rec mark) ty;
   end
 
 let normalize_type ty =
-  normalize_type_rec (ref TypeSet.empty) ty
+  with_type_mark (fun mark -> normalize_type_rec mark ty)
 
 
                               (*************************)
@@ -6869,7 +7201,8 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
   in
   match get_desc ty with
     Tvar _ | Tunivar _ -> ty
-    (* CR layouts v2.8: This needs to traverse the jkind. *)
+    (* CR layouts v2.8: This needs to traverse the jkind. Internal
+       ticket 5113. *)
   | _ -> try TypeHash.find nondep_hash ty
   with Not_found ->
     let ty' = newgenstub ~scope:(get_scope ty)
@@ -6975,10 +7308,11 @@ let rec nondep_type_decl env mid is_covariant decl =
               None, decl.type_private
     and jkind =
       try Jkind.map_type_expr (nondep_type_rec env mid) decl.type_jkind
-      (* CR layouts v2.8: This should be done with a proper nondep_jkind. *)
+      (* CR layouts v2.8: This should be done with a proper nondep_jkind.
+         Internal ticket 5113. *)
       with Nondep_cannot_erase _ when is_covariant ->
-        let jkind_of_type = type_jkind_purely_if_principal env in
-        Jkind.round_up ~jkind_of_type decl.type_jkind |>
+        let context = mk_jkind_context_check_principal env in
+        Jkind.round_up ~context decl.type_jkind |>
         Jkind.disallow_right
     in
     clear_hash ();
@@ -7173,31 +7507,87 @@ let print_global_state fmt global_state =
    The problem is that Env depends on Jkind, and so the type of [type_equal]
    can't be written in Jkind. It's possible that, after jkind.ml is broken up,
    this problem goes away, because the dependency from Env to Jkind is pretty
-   minimal. *)
+   minimal. Internal ticket 3339. *)
 let type_equal env ty1 ty2 = is_equal env false [ty1] [ty2]
 let () = type_equal' := type_equal
 
 let check_decl_jkind env decl jkind =
   (* CR layouts v2.8: This could use an algorithm like [constrain_type_jkind]
      to expand only as much as needed, but the l/l subtype algorithm is tricky,
-     and so we leave this optimization for later. *)
+     and so we leave this optimization for later. Internal ticket 5114. *)
   let type_equal = type_equal env in
-  let jkind_of_type ty = Some (type_jkind_purely env ty) in
-  match Jkind.sub_jkind_l ~type_equal ~jkind_of_type decl.type_jkind jkind with
+  let type_jkind_purely = type_jkind_purely env in
+  let context = mk_jkind_context_always_principal env in
+  (* CR layouts v2.8: When we have [layout_of], this logic should move to the
+     place where [type_jkind] is set. But for now, it has to be here, because we
+     want this in module inclusion but not other places (because substitutions
+     won't improve the layout). Internal ticket 2912. *)
+  (* CR layouts v2.8: This improvement ignores types with both [@@unboxed]
+     and [@@unsafe_allow_any_mode_crossing], because the stdlib didn't build
+     otherwise. But we really shouldn't allow mixing those two features, and
+     so instead of trying to get to the bottom of it, I'm just punting.
+     Internal ticket 4349. *)
+  let decl_jkind = match decl.type_kind, decl.type_manifest with
+    | Type_abstract _, Some inner_ty ->
+      (* CR layouts v3.3: Ad-hoc solution, this time due to the magic
+         interaction of [or_null] with separability. Special-cases [or_null]
+         and other [Variant_with_null] types.
+
+         Normally, this would be handled in [constrain_type_jkind]. *)
+      begin match unbox_once env inner_ty with
+      | Stepped_or_null { ty; modality } ->
+          begin match
+            Jkind.apply_modality_l modality (type_jkind_purely ty)
+            |> Jkind.apply_or_null_l with
+          | Ok decl_jkind -> decl_jkind
+          | Error () ->
+            Misc.fatal_error "Ctype.check_decl_jkind: \
+              the constructor argument inside a Variant_with_null \
+              is already maybe-null."
+          end
+      | Final_result | Stepped _ | Stepped_record_unboxed_product _
+      | Missing _ ->
+        Jkind.for_abbreviation ~type_jkind_purely
+        ~modality:Mode.Modality.Const.id inner_ty
+      end
+    (* These next cases are more properly rule TK_UNBOXED from kind-inference.md
+       (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but
+       they should be fine here. This will all get fixed up later with the
+       above CRs. *)
+    | Type_record ([{ ld_type = inner_ty; ld_modalities = modality }],
+                   Record_unboxed, None), _
+    | Type_record_unboxed_product ([{ ld_type = inner_ty;
+                                      ld_modalities = modality }], _, None), _
+    | Type_variant (
+        [{ cd_args =
+             (Cstr_tuple [{ ca_type = inner_ty;
+                            ca_modalities = modality }] |
+              Cstr_record [{ ld_type = inner_ty;
+                             ld_modalities = modality }]) }],
+        Variant_unboxed, None), _ ->
+      Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
+    | _ -> decl.type_jkind
+  in
+  match
+    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level
+      decl_jkind jkind
+  with
   | Ok () -> Ok ()
   | Error _ as err ->
     match decl.type_manifest with
     | None -> err
     | Some ty ->
-      (* CR layouts v2.8: Should this use [type_jkind_purely_if_principal]? I
-         think not. *)
       let ty_jkind = type_jkind env ty in
-      match Jkind.sub_jkind_l ~type_equal ~jkind_of_type ty_jkind jkind with
+      match
+        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level ty_jkind
+          jkind
+      with
       | Ok () -> Ok ()
       | Error _ as err -> err
 
 let constrain_decl_jkind env decl jkind =
-  (* CR layouts v2.8: This will need to be deeply reimplemented. *)
+  (* CR layouts v2.8: This will need to be deeply reimplemented. Internal
+     ticket 5115. *)
   match Jkind.try_allow_r jkind with
   (* This case is sad, because it can't refine type variables. Hence
      the need for reimplementation. Hopefully no one hits this for
@@ -7205,12 +7595,104 @@ let constrain_decl_jkind env decl jkind =
   | None -> check_decl_jkind env decl jkind
   | Some jkind ->
     let type_equal = type_equal env in
-    let jkind_of_type ty = Some (type_jkind_purely env ty) in
+    let context = mk_jkind_context_always_principal env in
     match
-      Jkind.sub_or_error ~type_equal ~jkind_of_type decl.type_jkind jkind
+      Jkind.sub_or_error ~type_equal ~context ~level:!current_level
+        decl.type_jkind jkind
     with
     | Ok () as ok -> ok
     | Error _ as err ->
         match decl.type_manifest with
         | None -> err
         | Some ty -> constrain_type_jkind env ty jkind
+
+let exn_constructor_crossing env lid ~args locks =
+  let vmode =
+    Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Constructor
+      None ((Mode.Value.(disallow_right min)), locks)
+  in
+  (* Exceptions cross contention and visibility on the monadic side, and
+     portability and statefulness on the comonadic side, so we project those
+     axes. *)
+  let monadic_mode = vmode.monadic in
+  let monadic =
+    [ monadic_mode
+      |> Mode.Value.Monadic.proj Contention
+      |> Mode.Value.Monadic.min_with Contention;
+      monadic_mode
+      |> Mode.Value.Monadic.proj Visibility
+      |> Mode.Value.Monadic.min_with Visibility
+    ]
+    |> Mode.Value.Monadic.join
+  in
+  let comonadic_source =
+    Mode.Value.monadic_to_comonadic_max monadic_mode
+  in
+  let comonadic =
+    [ comonadic_source
+      |> Mode.Value.Comonadic.proj Portability
+      |> Mode.Value.Comonadic.max_with Portability;
+      comonadic_source
+      |> Mode.Value.Comonadic.proj Statefulness
+      |> Mode.Value.Comonadic.max_with Statefulness
+    ]
+    |> Mode.Value.Comonadic.meet
+  in
+  let mode_crossing =
+    List.map (
+      fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
+        crossing_of_ty env ~modalities:ca_modalities ca_type
+    ) args
+    |> List.fold_left Mode.Crossing.join Mode.Crossing.min
+  in
+  let min_bound =
+    { monadic;
+      comonadic = Mode.Value.Comonadic.(disallow_right min) }
+  in
+  let max_bound =
+    { comonadic;
+      monadic = Mode.Value.Monadic.(disallow_left max)}
+  in
+  (mode_crossing, min_bound, max_bound)
+
+let check_constructor_crossing ~default_mode ~for_extensible_variant
+    env lid tag ~res ~args held_locks =
+  match tag with
+  | Ordinary _ | Null -> Ok default_mode
+  | Extension _ ->
+      match get_desc (expand_head env res) with
+      | Tconstr (p, _, _) when Path.same Predef.path_exn p ->
+          (* Currently, only [exn] is treated specially. *)
+          let (mode_crossing, min_bound, max_bound) =
+            exn_constructor_crossing env lid ~args held_locks
+          in
+          for_extensible_variant mode_crossing min_bound max_bound
+      | _ -> Ok default_mode
+
+let check_constructor_crossing_creation
+    env lid tag ~res ~args held_locks =
+  check_constructor_crossing
+    ~default_mode:Mode.Value.(disallow_left max)
+    ~for_extensible_variant:(fun mode_crossing min_bound max_bound ->
+      (* Creating a constructor under a lock is safe if the arguments
+         submode on the comonadic axis and cross the monadic axis. *)
+      Result.bind
+        (Mode.Value.submode
+          (Mode.Crossing.apply_left mode_crossing min_bound)
+          Mode.Value.(disallow_left min))
+        (fun () -> Ok max_bound))
+    env lid tag ~res ~args held_locks
+
+let check_constructor_crossing_destruction
+    env lid tag ~res ~args held_locks =
+  check_constructor_crossing
+    ~default_mode:Mode.Value.(disallow_right min)
+    ~for_extensible_variant:(fun mode_crossing min_bound max_bound ->
+      (* Destroying a constructor under a lock is safe if the arguments
+         submode on the monadic axis and cross the comonadic axis. *)
+      Result.bind
+        (Mode.Value.submode
+          Mode.Value.(disallow_right max)
+          (Mode.Crossing.apply_right mode_crossing max_bound))
+        (fun () -> Ok min_bound))
+    env lid tag ~res ~args held_locks

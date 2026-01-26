@@ -40,6 +40,8 @@
 #ifndef strtof_l
 #define strtof_l _strtof_l
 #endif
+#elif defined(__OpenBSD__)
+#define strtof_l(b, e, l) strtof(b, e)
 #endif
 
 extern locale_t caml_locale;
@@ -185,7 +187,7 @@ value compiler_float32_to_float_boxed(value i)
 }
 
 /* The following functions are nearly identical to those in runtime/float32.c,
-   but we cannot reuse them because the flambda-backend compiler must be
+   but we cannot reuse them because the OxCaml compiler must be
    compiled using the upstream runtime. Additionally, we cannot reuse the
    64-bit float parsing functions because they have different rounding
    behavior. */

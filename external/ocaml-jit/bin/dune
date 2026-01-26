@@ -1,0 +1,26 @@
+(executable
+ (name jittop)
+ (public_name jittop)
+ (package jit)
+ (modes native)
+ (modules jittop)
+ (libraries clitop jit compiler-libs-opttoplevel)
+ (link_flags :standard -linkall))
+
+(executable
+ (name nattop)
+ (public_name nattop)
+ (package jit)
+ (modes native)
+ (modules nattop)
+ (libraries clitop compiler-libs-opttoplevel)
+ (link_flags :standard -linkall))
+
+(executable
+ (name bytetop)
+ (public_name bytetop)
+ (package jit)
+ (modes byte)
+ (modules bytetop)
+ (libraries clitop compiler-libs.toplevel)
+ (link_flags :standard -linkall))

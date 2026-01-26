@@ -28,15 +28,19 @@ extern "C" {
 #include "mlvalues.h"
 #include "domain_state.h"
 
+#ifdef MULTIDOMAIN
 #ifdef ARCH_SIXTYFOUR
 #define Max_domains_def 128
 #else
 #define Max_domains_def 16
 #endif
-
 /* Upper limit for the number of domains. Chosen to be arbitrarily large. Used
  * for sanity checking [max_domains] value in OCAMLRUNPARAM. */
 #define Max_domains_max 4096
+#else
+#define Max_domains_def 1
+#define Max_domains_max 1
+#endif
 
 /* is the minor heap full or an external interrupt has been triggered */
 Caml_inline int caml_check_gc_interrupt(caml_domain_state * dom_st)
@@ -69,6 +73,7 @@ void caml_handle_incoming_interrupts(void);
 
 CAMLextern void caml_interrupt_self(void);
 void caml_interrupt_all_signal_safe(void);
+void caml_external_interrupt_all_signal_safe(uintnat flags);
 void caml_reset_young_limit(caml_domain_state *);
 void caml_update_young_limit_after_c_call(caml_domain_state *);
 
@@ -83,10 +88,12 @@ CAMLextern void caml_release_domain_lock(void);
 
 /* These hooks are not modified after other domains are spawned. */
 CAMLextern void (*caml_atfork_hook)(void);
-CAMLextern void (*caml_domain_spawn_hook)(void);
 CAMLextern void (*caml_domain_initialize_hook)(void);
+CAMLextern void (*caml_domain_lock_hook)(void);
+CAMLextern void (*caml_domain_unlock_hook)(void);
 CAMLextern void (*caml_domain_stop_hook)(void);
 CAMLextern void (*caml_domain_external_interrupt_hook)(void);
+CAMLextern void (*caml_domain_send_interrupt_hook)(caml_domain_state*);
 
 CAMLextern void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz);
 CAMLextern void caml_init_domain_self(int);

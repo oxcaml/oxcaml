@@ -245,6 +245,14 @@ let frame_pointers = make
      "frame-pointers available"
      "frame-pointers not available")
 
+let no_frame_pointers = make
+  ~name:"no-frame_pointers"
+  ~description:"Pass if frame pointers are available"
+  ~does_something:false
+  (Actions_helpers.predicate (not Ocamltest_config.frame_pointers)
+     "frame-pointers not available"
+     "frame-pointers available")
+
 let probes = make
   ~name:"probes"
   ~description:"Pass if probes are available"
@@ -276,6 +284,14 @@ let no_tsan = make
   (Actions_helpers.predicate (not Ocamltest_config.tsan)
      "tsan not available"
      "tsan available")
+
+let no_address_sanitizer = make
+  ~name:"no-address-sanitizer"
+  ~description:"Pass if address sanitizer is not supported"
+  ~does_something:false
+  (Actions_helpers.predicate (not Ocamltest_config.address_sanitizer)
+     "address-sanitizer not available"
+     "address-sanitizer available")
 
 let has_symlink = make
   ~name:"has_symlink"
@@ -420,10 +436,12 @@ let init () =
     arch_power;
     function_sections;
     frame_pointers;
+    no_frame_pointers;
     naked_pointers;
     file_exists;
     copy;
     probes;
     tsan;
     no_tsan;
+    no_address_sanitizer;
   ]

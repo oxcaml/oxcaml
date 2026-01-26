@@ -430,7 +430,7 @@ let reg_show_prim name to_sig doc =
 let () =
   reg_show_prim "show_val"
     (fun env loc id lid ->
-       let _path, desc, _, _= Env.lookup_value ~loc lid env in
+       let _path, desc, _ = Env.lookup_value ~loc lid env in
        [ Sig_value (id, desc, Exported) ]
     )
     "Print the signature of the corresponding value."
@@ -450,10 +450,11 @@ let is_nonrec_type id td =
           nonrecursive_use:= true
     | _ -> ()
   in
-  let it =  Btype.{type_iterators with it_path } in
   let () =
-    it.it_type_declaration it td;
-    Btype.unmark_iterators.it_type_declaration Btype.unmark_iterators td
+    with_type_mark begin fun mark ->
+      let it = Btype.{(type_iterators mark) with it_path} in
+      it.it_type_declaration it td
+    end
   in
   match !recursive_use, !nonrecursive_use with
   | false, true -> Trec_not
@@ -489,7 +490,7 @@ let () =
    * that are not also exception types. *)
   reg_show_prim "show_constructor"
     (fun env loc id lid ->
-       let desc = Env.lookup_constructor ~loc Env.Positive lid env in
+       let desc, _ = Env.lookup_constructor ~loc Env.Positive lid env in
        if is_exception_constructor env desc.cstr_res then
          raise Not_found;
        let path = Btype.cstr_type_path desc in
@@ -525,7 +526,7 @@ let () =
 let () =
   reg_show_prim "show_exception"
     (fun env loc id lid ->
-       let desc = Env.lookup_constructor ~loc Env.Positive lid env in
+       let desc, _ = Env.lookup_constructor ~loc Env.Positive lid env in
        if not (is_exception_constructor env desc.cstr_res) then
          raise Not_found;
        let ret_type =
@@ -556,13 +557,12 @@ let is_rec_module id md =
     | Path.Pident id' -> if (Ident.same id id') then raise Exit
     | _ -> ()
   in
-  let it =  Btype.{type_iterators with it_path } in
-  let rs = match it.it_module_declaration it md with
+  with_type_mark begin fun mark ->
+    let it =  Btype.{(type_iterators mark) with it_path} in
+    match it.it_module_declaration it md with
     | () -> Trec_not
     | exception Exit -> Trec_first
-  in
-  Btype.unmark_iterators.it_module_declaration Btype.unmark_iterators md;
-  rs
+  end
 
 let secretly_the_same_path env path1 path2 =
   let norm path = Printtyp.rewrite_double_underscore_paths env path in

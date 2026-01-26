@@ -33,8 +33,8 @@ Error: Signature mismatch:
          type ('a, 'b) t : immutable_data with 'a @@ portable
        The kind of the first is immutable_data with 'a
          because of the definition of t at line 4, characters 2-42.
-       But the kind of the first must be a subkind of immutable_data
-         with 'a @@ portable
+       But the kind of the first must be a subkind of
+           immutable_data with 'a @@ portable
          because of the definition of t at line 2, characters 2-54.
 
        The first mode-crosses less than the second along:
@@ -124,8 +124,7 @@ end = struct
   type 'a t : immediate with 'a @@ aliased many contended global portable
 end
 [%%expect {|
-module M :
-  sig type 'a t : value mod global aliased many contended portable end
+module M : sig type 'a t : value mod global many portable contended end
 |}]
 
 module M : sig
@@ -147,13 +146,18 @@ module type T = S with type ('a, 'b) t = ('a, 'b) t
 [%%expect {|
 type ('a, 'b) t : value mod portable with 'b
 module type S = sig type ('a, 'b) t : value mod portable end
-Line 7, characters 23-51:
+Line 7, characters 16-51:
 7 | module type T = S with type ('a, 'b) t = ('a, 'b) t
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "('a, 'b) t" is value mod portable with 'b
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type ('a, 'b) t = ('a, 'b) t
+       is not included in
+         type ('a, 'b) t : value mod portable
+       The kind of the first is value mod portable with 'b
          because of the definition of t at line 1, characters 0-77.
-       But the kind of type "('a, 'b) t" must be a subkind of
-         value mod portable
+       But the kind of the first must be a subkind of value mod portable
          because of the definition of t at line 4, characters 2-38.
 |}]
 
@@ -196,8 +200,8 @@ Error: Signature mismatch:
          type 'a t : immutable_data with 'a @@ portable
        The kind of the first is immutable_data with 'a
          because of the definition of t at line 4, characters 2-56.
-       But the kind of the first must be a subkind of immutable_data
-         with 'a @@ portable
+       But the kind of the first must be a subkind of
+           immutable_data with 'a @@ portable
          because of the definition of t at line 2, characters 2-48.
 
        The first mode-crosses less than the second along:
@@ -225,8 +229,8 @@ Error: Signature mismatch:
          type 'a t : immutable_data with 'a @@ portable
        The kind of the first is immutable_data with 'a
          because of the definition of t at line 4, characters 2-56.
-       But the kind of the first must be a subkind of immutable_data
-         with 'a @@ portable
+       But the kind of the first must be a subkind of
+           immutable_data with 'a @@ portable
          because of the definition of t at line 2, characters 2-48.
 
        The first mode-crosses less than the second along:
@@ -276,8 +280,8 @@ Error: Signature mismatch:
          type 'a t : immutable_data with 'a @@ portable contended
        The kind of the first is immutable_data with 'a
          because of the definition of t at line 4, characters 2-69.
-       But the kind of the first must be a subkind of immutable_data
-         with 'a @@ portable contended
+       But the kind of the first must be a subkind of
+           immutable_data with 'a @@ portable contended
          because of the definition of t at line 2, characters 2-58.
 
        The first mode-crosses less than the second along:
@@ -324,36 +328,24 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            type ('a, 'b) t
-             : immutable_data
-             with 'a @@ contended
-
-             with 'b @@ portable
+             : immutable_data with 'a @@ contended with 'b @@ portable
          end
        is not included in
          sig
            type ('a, 'b) t
-             : immutable_data
-             with 'a @@ portable
-
-             with 'b @@ contended
+             : immutable_data with 'a @@ portable with 'b @@ contended
          end
        Type declarations do not match:
          type ('a, 'b) t
-           : immutable_data
-           with 'a @@ contended
-
-           with 'b @@ portable
+           : immutable_data with 'a @@ contended with 'b @@ portable
        is not included in
          type ('a, 'b) t
-           : immutable_data
-           with 'a @@ portable
-
-           with 'b @@ contended
-       The kind of the first is immutable_data with 'a @@ contended
-         with 'b @@ portable
+           : immutable_data with 'a @@ portable with 'b @@ contended
+       The kind of the first is
+           immutable_data with 'a @@ contended with 'b @@ portable
          because of the definition of t at line 4, characters 2-75.
-       But the kind of the first must be a subkind of immutable_data
-         with 'a @@ portable with 'b @@ contended
+       But the kind of the first must be a subkind of
+           immutable_data with 'a @@ portable with 'b @@ contended
          because of the definition of t at line 2, characters 2-75.
 
        The first mode-crosses less than the second along:
@@ -367,6 +359,21 @@ end = struct
   type 'a t : immutable_data with 'a @@ portable contended portable
 end
 [%%expect {|
+Line 4, characters 40-48:
+4 |   type 'a t : immutable_data with 'a @@ portable contended portable
+                                            ^^^^^^^^
+Warning 213: This portability is overriden by portable later.
+
+Line 4, characters 40-48:
+4 |   type 'a t : immutable_data with 'a @@ portable contended portable
+                                            ^^^^^^^^
+Warning 213: This portability is overriden by portable later.
+
+Line 4, characters 40-48:
+4 |   type 'a t : immutable_data with 'a @@ portable contended portable
+                                            ^^^^^^^^
+Warning 213: This portability is overriden by portable later.
+
 module M : sig type 'a t : immutable_data with 'a @@ portable end
 |}]
 
@@ -381,4 +388,94 @@ module type T = S with type t = t
 type t : immutable_data
 module type S = sig type t : immutable_data end
 module type T = sig type t = t end
+|}]
+
+(* Test case for bug where type abbreviations incorrectly satisfy modal kinds.
+   Before the fix, this was incorrectly accepted even though refs cannot be mod contended. *)
+module type X = sig
+  type t : value mod contended with t
+end
+
+module Xm : X = struct
+  type t = int ref
+end
+[%%expect {|
+module type X = sig type t : value mod contended with t end
+module Xm : X
+|}]
+
+type q : value mod contended = Xm.t
+[%%expect {|
+Line 1, characters 0-35:
+1 | type q : value mod contended = Xm.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "Xm.t" is value mod contended with Xm.t
+         because of the definition of t at line 2, characters 2-37.
+       But the kind of type "Xm.t" must be a subkind of value mod contended
+         because of the definition of q at line 1, characters 0-35.
+|}]
+
+
+module type X = sig
+  type t : value mod contended portable with t
+
+  val create : int -> t
+  val set : t -> int -> unit
+  val get : t -> int
+end
+[%%expect {|
+module type X =
+  sig
+    type t : value mod portable contended with t
+    val create : int -> t
+    val set : t -> int -> unit
+    val get : t -> int
+  end
+|}]
+
+module Xm : X = struct
+  type t = int ref
+
+  let create n = ref n
+  let set r n = r := n
+  let get r = !r
+end
+[%%expect {|
+module Xm : X
+|}]
+
+
+let fork (f : (unit -> unit) @ portable) = failwith "not implemented";;
+[%%expect {|
+val fork : (unit -> unit) @ portable -> 'a = <fun>
+|}]
+
+(* Data race previously allowed by the compiler! *)
+let r = Xm.create 0;;
+fork (fun () -> Xm.set r 1);;
+Xm.get r;;
+[%%expect {|
+val r : Xm.t = <abstr>
+Line 2, characters 23-24:
+2 | fork (fun () -> Xm.set r 1);;
+                           ^
+Error: The value "r" is "nonportable" but is expected to be "portable"
+       because it is used inside the function at Line 2, characters 5-27
+       which is expected to be "portable".
+|}]
+
+
+(* Also data race, but this was already a type error: r' is contended *)
+let r' = ref 0;;
+fork (fun () -> r' := 1);;
+!r'
+[%%expect {|
+val r' : int ref = {contents = 0}
+Line 2, characters 16-18:
+2 | fork (fun () -> r' := 1);;
+                    ^^
+Error: This value is "contended"
+       because it is used inside the function at Line 2, characters 5-24
+       which is expected to be "portable".
+       However, the highlighted expression is expected to be "uncontended".
 |}]

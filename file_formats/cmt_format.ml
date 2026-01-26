@@ -45,11 +45,11 @@ and binary_part =
   | Partial_signature_item of signature_item
   | Partial_module_type of module_type
 
+type dependency_kind =  Definition_to_declaration | Declaration_to_declaration
 type cmt_infos = {
   cmt_modname : Compilation_unit.t;
   cmt_annots : binary_annots;
-  cmt_value_dependencies :
-    (Types.value_description * Types.value_description) list;
+  cmt_declaration_dependencies : (dependency_kind * Uid.t * Uid.t) list;
   cmt_comments : (string * Location.t) list;
   cmt_args : string array;
   cmt_sourcefile : string option;
@@ -91,7 +91,7 @@ let iter_on_declaration f decl =
   | Value vd -> f vd.val_val.val_uid decl;
   | Value_binding vb ->
       let bound_idents = let_bound_idents_full [vb] in
-      List.iter (fun (_, _, _, uid) -> f uid decl) bound_idents
+      List.iter (fun (_, _, _, _, uid) -> f uid decl) bound_idents
   | Type td ->
       if not (Btype.is_row_name (Ident.name td.typ_id)) then
         f td.typ_type.type_uid (Type td)
@@ -200,6 +200,16 @@ let iter_on_occurrences
       add_label ~namespace pat_env lid label_descr)
     fields
   in
+  let iter_block_access exp_env = function
+    | Baccess_field (lid, label_desc) ->
+      add_label ~namespace:Label exp_env lid label_desc
+    | Baccess_array _ -> ()
+    | Baccess_block _ -> ()
+  in
+  let iter_unboxed_access exp_env = function
+    | Uaccess_unboxed_field (lid, label_desc) ->
+      add_label ~namespace:Unboxed_label exp_env lid label_desc
+  in
   let with_constraint ~env (_path, _lid, with_constraint) =
     match with_constraint with
     | Twith_module (path', lid') | Twith_modsubst (path', lid') ->
@@ -219,6 +229,11 @@ let iter_on_occurrences
           add_label ~namespace:Label exp_env lid label_desc
       | Texp_unboxed_field (_, _, lid, label_desc, _) ->
           add_label ~namespace:Unboxed_label exp_env lid label_desc
+      | Texp_idx (ba, uas) ->
+          iter_block_access exp_env ba;
+          List.iter (iter_unboxed_access exp_env) uas
+      | Texp_atomic_loc (_, _, lid, label_desc, _) ->
+          add_label ~namespace:Label exp_env lid label_desc
       | Texp_new (path, lid, _, _) ->
           f ~namespace:Class exp_env path lid
       | Texp_record { fields; _ } ->
@@ -238,16 +253,20 @@ let iter_on_occurrences
             modifs
       | Texp_extension_constructor (lid, path) ->
           f ~namespace:Extension_constructor exp_env path lid
-      | Texp_constant _ | Texp_let _ | Texp_function _ | Texp_apply _
-      | Texp_match _ | Texp_try _ | Texp_tuple _ | Texp_unboxed_tuple _
-      | Texp_variant _ | Texp_array _
+      | Texp_constant _ | Texp_let _ | Texp_letmutable _ | Texp_function _
+      | Texp_apply _ | Texp_match _ | Texp_try _ | Texp_tuple _
+      | Texp_unboxed_tuple _ | Texp_variant _ | Texp_array _
       | Texp_ifthenelse _ | Texp_sequence _ | Texp_while _ | Texp_for _
       | Texp_send _
       | Texp_letmodule _ | Texp_letexception _ | Texp_assert _ | Texp_lazy _
       | Texp_object _ | Texp_pack _ | Texp_letop _ | Texp_unreachable
       | Texp_list_comprehension _ | Texp_array_comprehension _ | Texp_probe _
       | Texp_probe_is_enabled _ | Texp_exclave _
-      | Texp_open _ | Texp_src_pos | Texp_overwrite _ | Texp_hole _ -> ());
+      (* CR-someday let_mutable: maybe iterate on mutvar? *)
+      | Texp_mutvar _ | Texp_setmutvar _
+      | Texp_open _ | Texp_src_pos | Texp_overwrite _
+      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _
+      | Texp_eval _ -> ());
       default_iterator.expr sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are
@@ -267,6 +286,7 @@ let iter_on_occurrences
           f ~namespace:Module ctyp_env path lid
       | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
       | Ttyp_unboxed_tuple _
+      | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
       | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos -> ());
       default_iterator.typ sub ct);
 
@@ -290,7 +310,7 @@ let iter_on_occurrences
             f ~namespace:Module pat_env path lid
         | Tpat_type (path, lid) ->
             f ~namespace:Type pat_env path lid
-        | Tpat_constraint _ | Tpat_unpack -> ())
+        | Tpat_constraint _ | Tpat_unpack | Tpat_inspected_type _ -> ())
         pat_extra;
       default_iterator.pat sub pat);
 
@@ -452,19 +472,19 @@ let read_cmi filename =
     | Some cmi, _ -> cmi
 
 let saved_types = ref []
-let value_deps = ref []
+let uids_deps : (dependency_kind * Uid.t * Uid.t) list ref = ref []
 
 let clear () =
   saved_types := [];
-  value_deps := []
+  uids_deps := []
 
 let add_saved_type b = saved_types := b :: !saved_types
 let get_saved_types () = !saved_types
 let set_saved_types l = saved_types := l
 
-let record_value_dependency vd1 vd2 =
-  if vd1.Types.val_loc <> vd2.Types.val_loc then
-    value_deps := (vd1, vd2) :: !value_deps
+let record_declaration_dependency (rk, uid1, uid2) =
+  if not (Uid.equal uid1 uid2) then
+    uids_deps := (rk, uid1, uid2) :: !uids_deps
 
 let save_cmt target cu binary_annots initial_env cmi shape =
   if !Clflags.binary_annotations && not !Clflags.print_types then begin
@@ -476,7 +496,12 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            | None -> None
            | Some cmi -> Some (output_cmi temp_file_name oc cmi)
          in
-         let sourcefile = Unit_info.Artifact.source_file target in
+         (* We use the raw_source_file because the original_source_file may not
+            exist (or may have changed), so computing the digest may fail or
+            produce inconsistent results. Merlin expects the cms_sourcefile to
+            be the file we computed the digest of, which is why we use the
+            raw_source_file for that as well. *)
+         let sourcefile = Unit_info.Artifact.raw_source_file target in
          let cmt_ident_occurrences =
           if !Clflags.store_occurrences then
             index_occurrences binary_annots
@@ -499,7 +524,7 @@ let save_cmt target cu binary_annots initial_env cmi shape =
          let cmt = {
            cmt_modname = cu;
            cmt_annots;
-           cmt_value_dependencies = !value_deps;
+           cmt_declaration_dependencies = !uids_deps;
            cmt_comments = Lexer.comments ();
            cmt_args = Sys.argv;
            cmt_sourcefile = sourcefile;
@@ -518,3 +543,5 @@ let save_cmt target cu binary_annots initial_env cmi shape =
          output_cmt oc cmt)
   end;
   clear ()
+
+let get_declaration_dependencies () = !uids_deps

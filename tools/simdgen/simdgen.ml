@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Parses [amd64.csv] and outputs [X86_simd_defs.instr] definitions.
+(* Parses [amd64.csv] and outputs [Amd64_simd_defs.instr] definitions.
 
    [amd64.csv] was retrieved from https://github.com/GregoryComer/x86-csv
    (commit c638bbbaa17f0c81abaa7e84a968335c985542fa) and manually modified.
@@ -72,15 +72,19 @@ let parse in_ =
   csv []
 
 let rec parse_args mnemonic acc encs args imm res =
-  let set_imm () =
-    if !imm then failwith mnemonic;
-    imm := true;
-    None
+  let set_imm i =
+    if !imm <> Imm_none then failwith mnemonic;
+    imm := i
+  in
+  let set_res_fst () =
+    if not (!res = Res_none) then raise Unsupported;
+    res := First_arg
   in
   let set_res loc enc =
-    (* MULX has two results *)
-    if not (!res = First_arg) then raise Unsupported;
-    res := Res { loc; enc }
+    match !res with
+    | First_arg -> raise Unsupported
+    | Res_none -> res := Res [| { loc; enc } |]
+    | Res rr -> res := Res (Array.append rr [| { loc; enc } |])
   in
   match args, encs with
   | [], _ -> List.rev acc
@@ -89,10 +93,13 @@ let rec parse_args mnemonic acc encs args imm res =
     let loc : loc option =
       match String.trim arg with
       | "<RAX>" -> Some (Pin RAX)
+      | "<RDI>" -> Some (Pin RDI)
       | "<RCX>" -> Some (Pin RCX)
       | "<RDX>" -> Some (Pin RDX)
       | "<XMM0>" -> Some (Pin XMM0)
-      | "imm8" -> set_imm ()
+      | "imm8" ->
+        set_imm Imm_spec;
+        None
       | "r8/m8" | "r/m8" -> Some (Temp [| R8; M8 |])
       | "r16/m16" | "r/m16" -> Some (Temp [| R16; M16 |])
       | "r32/m32" | "r/m32" -> Some (Temp [| R32; M32 |])
@@ -112,6 +119,7 @@ let rec parse_args mnemonic acc encs args imm res =
       | "m32" -> Some (Temp [| M32 |])
       | "m64" -> Some (Temp [| M64 |])
       | "m128" -> Some (Temp [| M128 |])
+      | "m256" -> Some (Temp [| M256 |])
       | "mm" | "mm0" | "mm1" | "mm2" | "mm3" -> Some (Temp [| MM |])
       | "mm0/m8" | "mm1/m8" | "mm2/m8" | "mm3/m8" -> Some (Temp [| MM; M8 |])
       | "mm0/m16" | "mm1/m16" | "mm2/m16" | "mm3/m16" ->
@@ -132,12 +140,14 @@ let rec parse_args mnemonic acc encs args imm res =
         Some (Temp [| XMM; M64 |])
       | "xmm0/m128" | "xmm1/m128" | "xmm2/m128" | "xmm3/m128" ->
         Some (Temp [| XMM; M128 |])
-      (* Load/store operations are not handled *)
-      | "mem" | "vm32x" | "vm64x" | "vm32y" | "vm64y" -> raise Unsupported
-      (* CR-soon mslater: AVX / AVX2 *)
-      | "ymm" | "ymm0" | "ymm1" | "ymm2" | "ymm3" | "ymm4" | "ymm0/m256"
-      | "ymm1/m256" | "ymm2/m256" | "ymm3/m256" | "m256" ->
-        raise Unsupported
+      | "vm32x" -> Some (Temp [| VM32X |])
+      | "vm64x" -> Some (Temp [| VM64X |])
+      | "vm32y" -> Some (Temp [| VM32Y |])
+      | "vm64y" -> Some (Temp [| VM64Y |])
+      | "ymm" | "ymm0" | "ymm1" | "ymm2" | "ymm3" | "ymm4" ->
+        Some (Temp [| YMM |])
+      | "ymm0/m256" | "ymm1/m256" | "ymm2/m256" | "ymm3/m256" ->
+        Some (Temp [| YMM; M256 |])
       | arg -> fail mnemonic arg
     in
     let enc, rw = first_word enc in
@@ -145,17 +155,25 @@ let rec parse_args mnemonic acc encs args imm res =
       match String.trim enc with
       | "ModRM:reg" -> RM_r
       | "ModRM:r/m" -> RM_rm
+      | "BaseReg" (* Vector address, always r/m *) -> RM_rm
       | "VEX.vvvv" -> Vex_v
-      | "NA" | "<XMM0>" | "<RAX>" | "<RCX>" | "<RDX>" | "implicit" -> Implicit
-      | enc when String.starts_with (String.lowercase_ascii enc) ~prefix:"imm"
-        ->
+      | "NA" | "<XMM0>" | "<RAX>" | "<RDI>" | "<RCX>" | "<RDX>" | "implicit" ->
         Implicit
+      | "Imm8" | "imm8" | "imm8[3:0]" | "imm8[7:4]" ->
+        if Option.is_some loc
+        then (
+          set_imm Imm_reg;
+          Immediate)
+        else Implicit
       | enc -> fail mnemonic enc
     in
     match loc with
     | None -> parse_args mnemonic acc encs args imm res
     | Some loc -> (
       match String.trim rw with
+      | "(r, w)" ->
+        set_res_fst ();
+        parse_args mnemonic ({ loc; enc } :: acc) encs args imm res
       | "(w)" ->
         set_res loc enc;
         parse_args mnemonic acc encs args imm res
@@ -163,8 +181,8 @@ let rec parse_args mnemonic acc encs args imm res =
   | _ -> failwith mnemonic
 
 let parse_args mnemonic enc args =
-  let imm = ref false in
-  let res = ref First_arg in
+  let imm = ref Imm_none in
+  let res = ref Res_none in
   let args = parse_args mnemonic [] enc args imm res in
   Array.of_list args, !imm, !res
 
@@ -229,7 +247,9 @@ let parse_enc mnemonic enc =
     let prefix =
       let comps = String.split_on_char '.' prefix |> List.tl in
       let comps =
-        match comps with ("NDS" | "NDD") :: comps -> comps | _ -> comps
+        match comps with
+        | ("NDS" | "NDD" | "DDS") :: comps -> comps
+        | _ -> comps
       in
       let vex_l, comps =
         match comps with
@@ -271,16 +291,23 @@ let mangle_loc (loc : loc) =
     | R32 | M32 -> Some 32
     | R64 | M64 -> Some 64
     | M128 -> Some 128
-    | MM | XMM -> None
+    | M256 -> Some 256
+    | MM | XMM | YMM | VM32X | VM32Y | VM64X | VM64Y -> None
   in
   let short : temp -> string = function
     | R8 | R16 | R32 | R64 -> "r"
-    | M8 | M16 | M32 | M64 | M128 -> "m"
+    | M8 | M16 | M32 | M64 | M128 | M256 -> "m"
     | MM -> "M"
     | XMM -> "X"
+    | YMM -> "Y"
+    | VM32X -> "M32X"
+    | VM32Y -> "M32Y"
+    | VM64X -> "M64X"
+    | VM64Y -> "M64Y"
   in
   match loc with
   | Pin RAX -> "rax"
+  | Pin RDI -> "rdi"
   | Pin RCX -> "rcx"
   | Pin RDX -> "rdx"
   | Pin XMM0 -> "xmm0"
@@ -303,13 +330,31 @@ let binding instr =
     in
     let res =
       match instr.res with
-      | First_arg -> ""
-      | Res { loc; _ } -> mangle_loc loc ^ "_"
+      | Res_none | First_arg -> ""
+      | Res rr ->
+        Array.fold_left (fun acc { loc; _ } -> acc ^ mangle_loc loc ^ "_") "" rr
     in
     instr.mnemonic ^ "_" ^ res ^ args
   else instr.mnemonic
 
-let print_one instr =
+let print_one bind instr =
+  let print_ext : ext -> string = function
+    | SSE -> "SSE"
+    | SSE2 -> "SSE2"
+    | SSE3 -> "SSE3"
+    | SSSE3 -> "SSSE3"
+    | SSE4_1 -> "SSE4_1"
+    | SSE4_2 -> "SSE4_2"
+    | POPCNT -> "POPCNT"
+    | LZCNT -> "LZCNT"
+    | PCLMULQDQ -> "PCLMULQDQ"
+    | BMI -> "BMI"
+    | BMI2 -> "BMI2"
+    | AVX -> "AVX"
+    | AVX2 -> "AVX2"
+    | F16C -> "F16C"
+    | FMA -> "FMA"
+  in
   let print_temp : temp -> string = function
     | R8 -> "R8"
     | R16 -> "R16"
@@ -320,11 +365,18 @@ let print_one instr =
     | M32 -> "M32"
     | M64 -> "M64"
     | M128 -> "M128"
+    | M256 -> "M256"
     | MM -> "MM"
     | XMM -> "XMM"
+    | YMM -> "YMM"
+    | VM32X -> "VM32X"
+    | VM32Y -> "VM32Y"
+    | VM64X -> "VM64X"
+    | VM64Y -> "VM64Y"
   in
   let print_loc : loc -> string = function
     | Pin RAX -> "Pin RAX"
+    | Pin RDI -> "Pin RDI"
     | Pin RCX -> "Pin RCX"
     | Pin RDX -> "Pin RDX"
     | Pin XMM0 -> "Pin XMM0"
@@ -339,11 +391,25 @@ let print_one instr =
     | RM_rm -> "RM_rm"
     | Vex_v -> "Vex_v"
     | Implicit -> "Implicit"
+    | Immediate -> "Immediate"
+  in
+  let print_imm = function
+    | Imm_none -> "Imm_none"
+    | Imm_reg -> "Imm_reg"
+    | Imm_spec -> "Imm_spec"
+  in
+  let print_args args =
+    Array.map
+      (fun (arg : arg) ->
+        sprintf "{ loc = %s; enc = %s }" (print_loc arg.loc)
+          (print_arg_enc arg.enc))
+      args
+    |> Array.to_list |> String.concat ";"
   in
   let print_res : res -> string = function
+    | Res_none -> "Res_none"
     | First_arg -> "First_arg"
-    | Res { loc; enc } ->
-      sprintf "Res { loc = %s; enc = %s }" (print_loc loc) (print_arg_enc enc)
+    | Res rr -> sprintf "Res [|%s|]" (print_args rr)
   in
   let print_legacy_prefix : legacy_prefix -> string = function
     | Prx_none -> "Prx_none"
@@ -386,51 +452,57 @@ let print_one instr =
     sprintf "{ prefix = %s; rm_reg = %s; opcode = %d }" (print_prefix p)
       (print_rm_reg r) opcode
   in
-  let binding = binding instr in
-  let constructor = String.capitalize_ascii binding in
-  let args =
-    Array.map
-      (fun (arg : arg) ->
-        sprintf "{ loc = %s; enc = %s }" (print_loc arg.loc)
-          (print_arg_enc arg.enc))
-      instr.args
-    |> Array.to_list |> String.concat ";"
+  let constructor = String.capitalize_ascii bind in
+  let ext =
+    Array.map print_ext instr.ext |> Array.to_list |> String.concat ";"
   in
+  let args = print_args instr.args in
   let res = print_res instr.res in
+  let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
   printf
     {|
 let %s = {
     id = %s
+  ; ext = [|%s|]
   ; args = [|%s|]
   ; res = %s
-  ; imm = %b
+  ; imm = %s
   ; mnemonic = "%s"
   ; enc = %s
 }|}
-    binding constructor args res instr.imm instr.mnemonic enc
+    bind constructor ext args res imm instr.mnemonic enc
 
 let print_all () =
+  let module Map = Map.Make (String) in
+  let all =
+    Hashtbl.to_seq_keys all_instructions
+    |> Seq.map (fun instr -> binding instr, instr)
+    |> Map.of_seq
+  in
   print_endline "type id = ";
-  let constructors = Hashtbl.create 1024 in
-  Hashtbl.iter
-    (fun instr () ->
-      let ctr = String.capitalize_ascii (binding instr) in
-      match Hashtbl.find_opt constructors ctr with
-      | Some () -> ()
-      | None ->
-        Hashtbl.add constructors ctr ();
-        printf "  | %s\n" ctr)
-    all_instructions;
+  Map.iter (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind)) all;
   print_endline "\ntype nonrec instr = id instr";
-  Hashtbl.iter (fun instr () -> print_one instr) all_instructions
+  Map.iter (fun bind instr -> print_one bind instr) all
 
-let relevant_ext = function
-  (* CR-soon mslater: AVX / AVX2 *)
-  | "SSE" | "SSE2" | "SSE3" | "SSSE3" | "SSE4_1" | "SSE4_2" | "PCLMULQDQ"
-  | "BMI2" ->
-    true
-  | _ -> false
+let parse_ext = function
+  | "SSE" -> Some [| SSE |]
+  | "SSE2" -> Some [| SSE2 |]
+  | "SSE3" -> Some [| SSE3 |]
+  | "SSSE3" -> Some [| SSSE3 |]
+  | "SSE4_1" -> Some [| SSE4_1 |]
+  | "SSE4_2" -> Some [| SSE4_2 |]
+  | "POPCNT" -> Some [| POPCNT |]
+  | "LZCNT" -> Some [| LZCNT |]
+  | "PCLMULQDQ" -> Some [| PCLMULQDQ |]
+  | "PCLMULQDQ AVX" -> Some [| PCLMULQDQ; AVX |]
+  | "BMI1" -> Some [| BMI |]
+  | "BMI2" -> Some [| BMI2 |]
+  | "AVX" -> Some [| AVX |]
+  | "AVX2" -> Some [| AVX2 |]
+  | "F16C" -> Some [| F16C |]
+  | "FMA" -> Some [| FMA |]
+  | _ -> None
 
 let amd64 () =
   let csv = In_channel.with_open_text "amd64/amd64.csv" parse in
@@ -439,16 +511,16 @@ let amd64 () =
     |> List.filter_map (function
          | mnemonic :: enc :: ext :: encs -> (
            try
-             match relevant_ext ext with
-             | true ->
+             match parse_ext ext with
+             | Some ext ->
                let mnemonic, args = first_word mnemonic in
                let mnemonic = String.lowercase_ascii mnemonic in
                let args, imm, res =
                  String.split_on_char ',' args |> parse_args mnemonic encs
                in
                let enc = parse_enc mnemonic enc in
-               Some { id = Dummy; args; res; imm; mnemonic; enc }
-             | false -> None
+               Some { id = Dummy; ext; args; res; imm; mnemonic; enc }
+             | None -> None
            with Unsupported -> None)
          | _ -> None)
   in

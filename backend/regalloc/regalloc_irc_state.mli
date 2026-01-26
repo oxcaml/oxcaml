@@ -8,7 +8,7 @@ type t
 val make :
   initial:Reg.t list ->
   stack_slots:Regalloc_stack_slots.t ->
-  last_used:InstructionId.t ->
+  affinity:Regalloc_affinity.t ->
   unit ->
   t
 
@@ -22,9 +22,7 @@ val reset :
   new_block_temporaries:Reg.t list ->
   unit
 
-val work_list : t -> Reg.t -> WorkList.t
-
-val work_list_opt : t -> Reg.t -> WorkList.t option
+val reg_work_list : t -> Reg.t -> RegWorkList.t
 
 val color : t -> Reg.t -> Color.t option
 
@@ -142,7 +140,7 @@ val add_alias : t -> Reg.t -> Reg.t -> unit
 
 val stack_slots : t -> Regalloc_stack_slots.t
 
-val get_and_incr_instruction_id : t -> InstructionId.t
+val affinity : t -> Regalloc_affinity.t
 
 val add_inst_temporaries_list : t -> Reg.t list -> unit
 
@@ -153,6 +151,11 @@ val mem_inst_temporaries : t -> Reg.t -> bool
 val mem_all_introduced_temporaries : t -> Reg.t -> bool
 
 val diff_all_introduced_temporaries : t -> Reg.Set.t -> Reg.Set.t
+
+val set_instr_work_list :
+  t -> instruction_id:InstructionId.t -> work_list:InstrWorkList.t -> unit
+
+val get_instr_work_list : t -> instruction_id:InstructionId.t -> InstrWorkList.t
 
 val update_register_locations : t -> unit
 

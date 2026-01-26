@@ -3,7 +3,8 @@
 (library
  (name flambda2_terms)
  (wrapped true)
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (flags
   (:standard
    -open
@@ -27,10 +28,14 @@
    -open
    Flambda2_ui))
  (ocamlopt_flags
-  (:standard -O3 -open Int_replace_polymorphic_compare))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3
+   -open
+   Int_replace_polymorphic_compare))
  (libraries
   ocamlcommon
-  flambda_backend_utils
+  oxcaml_utils
   flambda2_algorithms
   flambda2_bound_identifiers
   flambda2_identifiers

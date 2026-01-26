@@ -42,15 +42,15 @@ type error =
       compilation_unit : CU.t;
       filename : Misc.filepath;
     }
-  | Missing_argument of { param : Global_module.Name.t }
+  | Missing_argument of { param : Global_module.Parameter_name.t }
   | No_such_parameter of {
       base_unit : CU.t;
-      available_params : Global_module.Name.t list;
-      param : Global_module.Name.t;
+      available_params : Global_module.Parameter_name.t list;
+      param : Global_module.Parameter_name.t;
       arg : Global_module.Name.t;
     }
   | Repeated_parameter of {
-      param : Global_module.Name.t;
+      param : Global_module.Parameter_name.t;
       arg1 : CU.t;
       arg2 : CU.t;
     }
@@ -78,20 +78,23 @@ let instantiate
                { compilation_unit = unit_info.ui_unit;
                  filename = cm_path;
                  base_unit = base_unit_info.ui_unit; })
-    | Some { arg_param; arg_block_idx } ->
-      arg_param, (unit_info.ui_unit, arg_block_idx)
+    | Some { arg_param; arg_block_idx; main_repr } ->
+      arg_param, (unit_info.ui_unit, arg_block_idx, main_repr)
   in
   let arg_infos = List.map arg_info_of_cm_path args in
   let arg_pairs : CU.argument list =
     List.map
-      (fun (param, (value, _)) : CU.argument ->
-         { param = CU.of_global_name param; value })
+      (fun (param, (value, _, _)) : CU.argument ->
+         { param = CU.Name.of_parameter_name param; value })
       arg_infos
   in
-  let arg_map : (CU.t * int) Global_module.Name.Map.t =
-    match Global_module.Name.Map.of_list_checked arg_infos with
+  let arg_map :
+      (CU.t * int * Lambda.module_representation)
+      Global_module.Parameter_name.Map.t
+    =
+    match Global_module.Parameter_name.Map.of_list_checked arg_infos with
     | Ok map -> map
-    | Error (Duplicate { key; value1 = (arg1, _); value2 = (arg2, _) }) ->
+    | Error (Duplicate { key; value1 = (arg1, _, _); value2 = (arg2, _, _) }) ->
       error (Repeated_parameter { param = key; arg1; arg2 })
   in
   let compilation_unit = CU.create_instance base_compilation_unit arg_pairs in
@@ -138,34 +141,33 @@ let instantiate
   let arg_subst : Global_module.subst =
     global.visible_args
     |> List.map (fun ({ param; value } : Global_module.argument) -> param, value)
-    |> Global_module.Name.Map.of_list
+    |> Global_module.Parameter_name.Map.of_list
   in
-  let runtime_params, main_module_block_size =
+  let runtime_params, main_module_block_repr =
     match base_unit_info.ui_format with
     | Mb_struct _ ->
       (* Should have raised [Not_parameterised] above *)
       Misc.fatal_errorf "No runtime parameters for %a"
         CU.print base_compilation_unit
-    | Mb_instantiating_functor { mb_runtime_params; mb_returned_size } ->
-      mb_runtime_params, mb_returned_size
+    | Mb_instantiating_functor { mb_runtime_params; mb_returned_repr } ->
+      mb_runtime_params, mb_returned_repr
   in
   let runtime_args =
     runtime_params
     |> List.map (fun runtime_param : Translmod.runtime_arg ->
          match (runtime_param : Lambda.runtime_param) with
            | Rp_argument_block global ->
-             let global_name = Global_module.to_name global in
              begin
                match
-                 Global_module.Name.Map.find_opt global_name arg_map
+                 Global_module.find_in_parameter_map global arg_map
                with
-               | Some (ra_unit, ra_field_idx) ->
-                 Argument_block { ra_unit; ra_field_idx }
+               | Some (ra_unit, ra_field_idx, ra_main_repr) ->
+                 Argument_block { ra_unit; ra_field_idx; ra_main_repr }
                | None ->
                  (* This should have been caught by
                     [Env.global_of_instance_compilation_unit] earlier *)
                  Misc.fatal_errorf "Can't find value for %a"
-                   Global_module.Name.print global_name
+                   Global_module.print global
              end
            | Rp_main_module_block global ->
              (* Substitute away any references to parameters in [global] *)
@@ -181,7 +183,7 @@ let instantiate
   let arg_descr = base_unit_info.ui_arg_descr in
   compile
     ~source_file:src ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_size ~arg_descr;
+    ~main_module_block_repr ~arg_descr;
   ()
 
 (* Error report *)
@@ -192,7 +194,7 @@ module Style = Misc.Style
 let pp_parameters ppf params =
   fprintf ppf "@[<hov>%a@]"
     (pp_print_list ~pp_sep:pp_print_space
-       (Style.as_inline_code Global_module.Name.print))
+       (Style.as_inline_code Global_module.Parameter_name.print))
     params
 
 let report_error ppf = function
@@ -231,7 +233,7 @@ let report_error ppf = function
       (Style.as_inline_code Location.print_filename) filename
   | Missing_argument { param } ->
     fprintf ppf "No argument given for parameter %a"
-      (Style.as_inline_code Global_module.Name.print) param
+      (Style.as_inline_code Global_module.Parameter_name.print) param
   | No_such_parameter { base_unit; available_params; param; arg } ->
     fprintf ppf
       "@[<hov>Module %a@ is an argument for parameter %a,@ \
@@ -239,10 +241,11 @@ let report_error ppf = function
        @[<hov>@{<hint>Hint@}: @[<hov>%a@ was compiled with %a.@]@]@.\
        @[<hov>@{<hint>Hint@}: @[<hov>Parameters of %a:@ %a@]@]"
       (Style.as_inline_code Global_module.Name.print) arg
-      (Style.as_inline_code Global_module.Name.print) param
+      (Style.as_inline_code Global_module.Parameter_name.print) param
       (Style.as_inline_code CU.print) base_unit
       (Style.as_inline_code Global_module.Name.print) arg
-      (Style.as_clflag "-as-argument-for" Global_module.Name.print) param
+      (Style.as_clflag "-as-argument-for" Global_module.Parameter_name.print)
+        param
       (Style.as_inline_code CU.print) base_unit
       pp_parameters available_params
   | Repeated_parameter { param; arg1; arg2 } ->
@@ -254,10 +257,11 @@ let report_error ppf = function
          with %a.@]@]"
       (Style.as_inline_code CU.print) arg1
       (Style.as_inline_code CU.print) arg2
-      (Style.as_inline_code Global_module.Name.print) param
+      (Style.as_inline_code Global_module.Parameter_name.print) param
       (Style.as_inline_code CU.print) arg1
       (Style.as_inline_code CU.print) arg2
-      (Style.as_clflag "-as-argument-for" Global_module.Name.print) param
+      (Style.as_clflag "-as-argument-for" Global_module.Parameter_name.print)
+        param
 let () =
   Location.register_error_of_exn
     (function

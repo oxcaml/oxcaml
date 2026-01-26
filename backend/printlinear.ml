@@ -49,38 +49,32 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   let regsetaddr = Printreg.regsetaddr' ~print_reg in
   let test = Operation.format_test ~print_reg in
   let operation = Printoperation.operation ~print_reg in
-  (if !Flambda_backend_flags.davail
+  (if !Oxcaml_flags.davail
   then
     let module RAS = Reg_availability_set in
     let ras_is_nonempty (set : RAS.t) =
       match set with
-      | Ok set -> not (Reg_with_debug_info.Set.is_empty set)
+      | Ok set ->
+        not
+          (Reg_with_debug_info.Set_distinguishing_names_and_locations.is_empty
+             set)
       | Unreachable -> true
     in
-    if (match i.available_before with
-       | None -> false
-       | Some available_before -> ras_is_nonempty available_before)
-       ||
-       match i.available_across with
-       | None -> false
-       | Some available_across -> ras_is_nonempty available_across
+    if ras_is_nonempty i.available_before || ras_is_nonempty i.available_across
     then
-      if Option.equal RAS.equal i.available_before i.available_across
+      if RAS.equal i.available_before i.available_across
       then
-        fprintf ppf "@[<1>AB=AA={%a}@]@,"
-          (Misc.Stdlib.Option.print (RAS.print ~print_reg:reg))
+        fprintf ppf "@[<1>AB=AA={%a}@]@," (RAS.print ~print_reg:reg)
           i.available_before
       else (
-        fprintf ppf "@[<1>AB={%a}"
-          (Misc.Stdlib.Option.print (RAS.print ~print_reg:reg))
-          i.available_before;
-        fprintf ppf ",AA={%a}"
-          (Misc.Stdlib.Option.print (RAS.print ~print_reg:reg))
-          i.available_across;
+        fprintf ppf "@[<1>AB={%a}" (RAS.print ~print_reg:reg) i.available_before;
+        fprintf ppf ",AA={%a}" (RAS.print ~print_reg:reg) i.available_across;
         fprintf ppf "@]@,"));
   (match i.desc with
   | Lend -> ()
   | Lprologue -> fprintf ppf "prologue"
+  | Lepilogue_open -> fprintf ppf "epilogue_open"
+  | Lepilogue_close -> fprintf ppf "epilogue_close"
   | Lop op ->
     (match[@warning "-4"] op with
     | Alloc _ | Poll -> fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live
@@ -119,7 +113,7 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   | Ladjust_stack_offset { delta_bytes } ->
     fprintf ppf "adjust pseudo stack offset by %d bytes" delta_bytes
   | Lpushtrap { lbl_handler } -> fprintf ppf "push trap %a" label lbl_handler
-  | Lpoptrap -> fprintf ppf "pop trap"
+  | Lpoptrap { lbl_handler } -> fprintf ppf "pop trap %a" label lbl_handler
   | Lraise k -> fprintf ppf "%s %a" (Lambda.raise_kind k) reg i.arg.(0)
   | Lstackcheck { max_frame_size_bytes } ->
     fprintf ppf "stack check (%d bytes)" max_frame_size_bytes);

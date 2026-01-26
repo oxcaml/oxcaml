@@ -17,7 +17,69 @@
 
 open Cmm
 
+(** Tags for unboxed or untagged arrays using mixed block headers with 
+    scannable_prefix = 0 *)
+module Unboxed_or_untagged_array_tags : sig
+  val untagged_int_array_tag : int
+
+  val unboxed_int64_array_tag : int
+
+  val unboxed_nativeint_array_tag : int
+
+  val untagged_int8_array_zero_tag : int
+
+  val untagged_int8_array_one_tag : int
+
+  val untagged_int8_array_two_tag : int
+
+  val untagged_int8_array_three_tag : int
+
+  val untagged_int8_array_four_tag : int
+
+  val untagged_int8_array_five_tag : int
+
+  val untagged_int8_array_six_tag : int
+
+  val untagged_int8_array_seven_tag : int
+
+  val untagged_int16_array_zero_tag : int
+
+  val untagged_int16_array_one_tag : int
+
+  val untagged_int16_array_two_tag : int
+
+  val untagged_int16_array_three_tag : int
+
+  val unboxed_int32_array_zero_tag : int
+
+  val unboxed_int32_array_one_tag : int
+
+  val unboxed_float32_array_zero_tag : int
+
+  val unboxed_float32_array_one_tag : int
+
+  val unboxed_vec128_array_tag : int
+
+  val unboxed_vec256_array_tag : int
+
+  val unboxed_vec512_array_tag : int
+
+  (* Given the length of an int8 array, return its tag *)
+  val untagged_int8_array_tag : int -> int
+
+  (* Given the length of an int16 array, return its tag *)
+  val untagged_int16_array_tag : int -> int
+
+  (* Given the length of an int32 array, return its tag *)
+  val unboxed_int32_array_tag : int -> int
+
+  (* Given the length of an float32 array, return its tag *)
+  val unboxed_float32_array_tag : int -> int
+end
+
 val arch_bits : int
+
+val log2_size_addr : int
 
 type arity =
   { function_kind : Lambda.function_kind;
@@ -90,6 +152,11 @@ val or_int : expression -> expression -> Debuginfo.t -> expression
 
 val xor_int : expression -> expression -> Debuginfo.t -> expression
 
+(** Similar to [add_int] but produces a result with machtype [Addr] iff
+  [ptr_out_of_heap] is [false]. *)
+val add_int_ptr :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
 (** Integer tagging. [tag_int x = (x lsl 1) + 1] *)
 val tag_int : expression -> Debuginfo.t -> expression
 
@@ -124,6 +191,9 @@ val mk_compare_floats : Debuginfo.t -> expression -> expression -> expression
 val mk_compare_ints_untagged :
   Debuginfo.t -> expression -> expression -> expression
 
+val mk_unsigned_compare_ints_untagged :
+  Debuginfo.t -> expression -> expression -> expression
+
 val mk_compare_floats_untagged :
   Debuginfo.t -> expression -> expression -> expression
 
@@ -151,6 +221,14 @@ val unbox_float : Debuginfo.t -> expression -> expression
 val box_vec128 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
 
 val unbox_vec128 : Debuginfo.t -> expression -> expression
+
+val box_vec256 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_vec256 : Debuginfo.t -> expression -> expression
+
+val box_vec512 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_vec512 : Debuginfo.t -> expression -> expression
 
 (** Make the given expression return a unit value *)
 val return_unit : Debuginfo.t -> expression -> expression
@@ -197,6 +275,12 @@ val get_field_computed :
   index:expression ->
   Debuginfo.t ->
   expression
+
+(** [field_address_computed ptr ofs dbg] returns an expression for the address
+    at offset [ofs] (in machine words) of the block pointed to by [ptr].
+    The resulting expression is a derived pointer of type [Addr]. *)
+val field_address_computed :
+  expression -> expression -> Debuginfo.t -> expression
 
 (** Load a block's header *)
 val get_header : expression -> Debuginfo.t -> expression
@@ -271,6 +355,8 @@ module Extended_machtype_component : sig
     | Any_int
     | Float
     | Vec128
+    | Vec256
+    | Vec512
     | Float32
 end
 
@@ -290,6 +376,10 @@ module Extended_machtype : sig
   val typ_void : t
 
   val typ_vec128 : t
+
+  val typ_vec256 : t
+
+  val typ_vec512 : t
 
   (** Conversion from a normal Cmm machtype. *)
   val of_machtype : machtype -> t
@@ -365,6 +455,8 @@ val machtype_identifier : machtype -> string
 val curry_function_sym :
   Lambda.function_kind -> machtype list -> machtype -> Cmm.symbol
 
+val fail_if_called_indirectly_sym : Cmm.symbol
+
 (** Bigarrays *)
 
 (** Returns the size (in number of bytes) of a single element contained in a
@@ -405,37 +497,120 @@ val unbox_int :
 
 (** Used to prepare 32-bit integers on 64-bit platforms for a lsr operation *)
 val make_unsigned_int :
-  Primitive.unboxed_integer -> expression -> Debuginfo.t -> expression
+  Primitive.unboxed_or_untagged_integer ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
-val unaligned_load_16 : expression -> expression -> Debuginfo.t -> expression
+val unaligned_load_16 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 
 val unaligned_set_16 :
-  expression -> expression -> expression -> Debuginfo.t -> expression
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
-val unaligned_load_32 : expression -> expression -> Debuginfo.t -> expression
+val unaligned_load_32 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 
 val unaligned_set_32 :
-  expression -> expression -> expression -> Debuginfo.t -> expression
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
-val unaligned_load_f32 : expression -> expression -> Debuginfo.t -> expression
+val unaligned_load_f32 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 
 val unaligned_set_f32 :
-  expression -> expression -> expression -> Debuginfo.t -> expression
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
-val unaligned_load_64 : expression -> expression -> Debuginfo.t -> expression
+val unaligned_load_64 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 
 val unaligned_set_64 :
-  expression -> expression -> expression -> Debuginfo.t -> expression
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
-val unaligned_load_128 : expression -> expression -> Debuginfo.t -> expression
+val unaligned_load_128 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 
 val unaligned_set_128 :
-  expression -> expression -> expression -> Debuginfo.t -> expression
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
-val aligned_load_128 : expression -> expression -> Debuginfo.t -> expression
+val aligned_load_128 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 
 val aligned_set_128 :
-  expression -> expression -> expression -> Debuginfo.t -> expression
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_256 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_256 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val aligned_load_256 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val aligned_set_256 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_512 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_512 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val aligned_load_512 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val aligned_set_512 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
 (** Primitives *)
 
@@ -455,10 +630,7 @@ val negint : unary_primitive
 val addr_array_length : unary_primitive
 
 (** Byte swap primitive Operates on Cmm integers (unboxed values) *)
-val bbswap : Primitive.unboxed_integer -> unary_primitive
-
-(** 16-bit byte swap primitive Operates on Cmm integers (untagged integers) *)
-val bswap16 : unary_primitive
+val bbswap : bswap_bitwidth -> unary_primitive
 
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 
@@ -579,10 +751,16 @@ val emit_nativeint_constant :
 val emit_vec128_constant :
   symbol -> Cmm.vec128_bits -> data_item list -> data_item list
 
+val emit_vec256_constant :
+  symbol -> Cmm.vec256_bits -> data_item list -> data_item list
+
+val emit_vec512_constant :
+  symbol -> Cmm.vec512_bits -> data_item list -> data_item list
+
 val emit_float_array_constant :
   symbol -> float list -> data_item list -> data_item list
 
-(** {1} Helper functions and values used by Flambda 2. *)
+(** {1 Helper functions and values used by Flambda 2.} *)
 
 (* CR mshinwell: [dbg] should not be optional. *)
 
@@ -615,6 +793,12 @@ val int64 : dbg:Debuginfo.t -> int64 -> expression
 
 (** Create a constant vec128 expression from two int64s. *)
 val vec128 : dbg:Debuginfo.t -> Cmm.vec128_bits -> expression
+
+(** Create a constant vec256 expression from four int64s. *)
+val vec256 : dbg:Debuginfo.t -> Cmm.vec256_bits -> expression
+
+(** Create a constant vec512 expression from eight int64s. *)
+val vec512 : dbg:Debuginfo.t -> Cmm.vec512_bits -> expression
 
 (** Create a constant int expression from a nativeint. *)
 val nativeint : dbg:Debuginfo.t -> Nativeint.t -> expression
@@ -654,9 +838,6 @@ val trywith :
 
 (** {2 Static jumps} *)
 
-(** Opaque type for static handlers. *)
-type static_handler
-
 (** [handler id vars body is_cold] creates a static handler for exit number [id],
     binding variables [vars] in [body]. *)
 val handler :
@@ -665,7 +846,7 @@ val handler :
   (Backend_var.With_provenance.t * Cmm.machtype) list ->
   Cmm.expression ->
   bool ->
-  static_handler
+  Cmm.static_handler
 
 (** [cexit id args] creates the cmm expression for static to a static handler
     with exit number [id], with arguments [args]. *)
@@ -682,7 +863,7 @@ val trap_return : Cmm.expression -> Cmm.trap_action list -> Cmm.expression
 (** Enclose a body with some static handlers. *)
 val create_ccatch :
   rec_flag:bool ->
-  handlers:static_handler list ->
+  handlers:Cmm.static_handler list ->
   body:Cmm.expression ->
   Cmm.expression
 
@@ -827,6 +1008,11 @@ val store :
   new_value:expression ->
   expression
 
+val caml_modify : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val caml_modify_local :
+  dbg:Debuginfo.t -> expression -> expression -> expression -> expression
+
 (** [direct_call ty f_code args] creates a direct call to the function code
     [f_code] with arguments [args], with a return value of type [ty].
 
@@ -835,7 +1021,7 @@ val direct_call :
   dbg:Debuginfo.t ->
   machtype ->
   Lambda.region_close ->
-  expression ->
+  symbol ->
   expression list ->
   expression
 
@@ -856,8 +1042,8 @@ val indirect_full_call :
   dbg:Debuginfo.t ->
   Extended_machtype.t ->
   Lambda.region_close ->
-  Cmx_format.alloc_mode ->
   expression ->
+  callees:symbol list option ->
   Extended_machtype.t list ->
   expression list ->
   expression
@@ -904,6 +1090,12 @@ val cfloat : float -> data_item
 (** Static 128-bit vector. *)
 val cvec128 : Cmm.vec128_bits -> data_item
 
+(** Static 256-bit vector. *)
+val cvec256 : Cmm.vec256_bits -> data_item
+
+(** Static 512-bit vector. *)
+val cvec512 : Cmm.vec512_bits -> data_item
+
 (** Static symbol. *)
 val symbol_address : symbol -> data_item
 
@@ -923,6 +1115,7 @@ val fundecl :
   codegen_option list ->
   Debuginfo.t ->
   Lambda.poll_attribute ->
+  machtype ->
   fundecl
 
 (** Create a cmm phrase for a function declaration. *)
@@ -965,43 +1158,57 @@ val send_function :
 val apply_function :
   Cmm.machtype list * Cmm.machtype * Cmx_format.alloc_mode -> Cmm.phrase
 
+val fail_if_called_indirectly_function : unit -> Cmm.phrase list
+
 (* Atomics *)
 
-val atomic_load :
-  dbg:Debuginfo.t -> Lambda.immediate_or_pointer -> expression -> expression
-
-val atomic_exchange :
+val atomic_load_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   expression ->
+  field:expression ->
+  expression
+
+val atomic_exchange_field :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  expression ->
+  field:expression ->
   new_value:expression ->
   expression
 
-val atomic_fetch_and_add :
-  dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_fetch_and_add_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_add : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_add_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_sub : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_sub_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_land : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_land_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_lor : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_lor_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_lxor : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_lxor_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_compare_and_set :
+val atomic_compare_and_set_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   expression ->
+  field:expression ->
   old_value:expression ->
   new_value:expression ->
   expression
 
-val atomic_compare_exchange :
+val atomic_compare_exchange_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   expression ->
+  field:expression ->
   old_value:expression ->
   new_value:expression ->
   expression
@@ -1040,6 +1247,21 @@ val reperform :
 val allocate_unboxed_float32_array :
   elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
 
+(** Allocate a block to hold an untagged int array for the given number of
+    elements. *)
+val allocate_untagged_int_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an untagged int8 array for the given number of
+    elements. *)
+val allocate_untagged_int8_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an untagged int16 array for the given number of
+    elements. *)
+val allocate_untagged_int16_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
 (** Allocate a block to hold an unboxed int32 array for the given number of
     elements. *)
 val allocate_unboxed_int32_array :
@@ -1060,18 +1282,40 @@ val allocate_unboxed_nativeint_array :
 val allocate_unboxed_vec128_array :
   elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
 
+(** Allocate a block to hold an unboxed vec256 array for the given number of
+    elements. *)
+val allocate_unboxed_vec256_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed vec512 array for the given number of
+    elements. *)
+val allocate_unboxed_vec512_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
 (** Compute the length of an unboxed float32 array. *)
 val unboxed_float32_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an untagged int8 array. *)
+val untagged_int8_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an untagged int16 array. *)
+val untagged_int16_array_length : expression -> Debuginfo.t -> expression
 
 (** Compute the length of an unboxed int32 array. *)
 val unboxed_int32_array_length : expression -> Debuginfo.t -> expression
 
-(** Compute the length of an unboxed int64 or unboxed nativeint array. *)
-val unboxed_int64_or_nativeint_array_length :
+(** Compute the length of an untagged int or unboxed int64 or unboxed nativeint array. *)
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_length :
   expression -> Debuginfo.t -> expression
 
 (** Compute the length of an unboxed vec128 array. *)
 val unboxed_vec128_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed vec256 array. *)
+val unboxed_vec256_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed vec512 array. *)
+val unboxed_vec512_array_length : expression -> Debuginfo.t -> expression
 
 (** Read from an unboxed float32 array (without bounds check). *)
 val unboxed_float32_array_ref :
@@ -1107,9 +1351,41 @@ val unboxed_mutable_float32_unboxed_product_array_set :
   Debuginfo.t ->
   expression
 
+(** Read from an untagged int8 array (without bounds check). *)
+val untagged_int8_array_ref :
+  expression -> expression -> Debuginfo.t -> expression
+
+(** Read from an untagged int16 array (without bounds check). *)
+val untagged_int16_array_ref :
+  expression -> expression -> Debuginfo.t -> expression
+
 (** Read from an unboxed int32 array (without bounds check). *)
 val unboxed_int32_array_ref :
   expression -> expression -> Debuginfo.t -> expression
+
+(** Read an untagged int8 from (the least significant bits of) a 64-bit field
+    in an array represented as a mixed block (with tag zero), as used for
+    unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The returned value is always sign extended, but it is not assumed that
+    the 64-bit field in the array contains a sign-extended representation.
+*)
+val untagged_mutable_int8_unboxed_product_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Read an untagged int16 from (the least significant bits of) a 64-bit field
+    in an array represented as a mixed block (with tag zero), as used for
+    unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The returned value is always sign extended, but it is not assumed that
+    the 64-bit field in the array contains a sign-extended representation.
+*)
+val untagged_mutable_int16_unboxed_product_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
 
 (** Read an unboxed int32 from (the least significant bits of) a 64-bit field
     in an array represented as a mixed block (with tag zero), as used for
@@ -1122,6 +1398,36 @@ val unboxed_int32_array_ref :
 *)
 val unboxed_mutable_int32_unboxed_product_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Write an untagged int8 into a 64-bit field in an array represented as
+    a mixed block (with tag zero), as used for unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The write is done as a 64-bit write of a sign-extended version of the
+    supplied [new_value].
+*)
+val untagged_mutable_int8_unboxed_product_array_set :
+  expression ->
+  array_index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Write an untagged int16 into a 64-bit field in an array represented as
+    a mixed block (with tag zero), as used for unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The write is done as a 64-bit write of a sign-extended version of the
+    supplied [new_value].
+*)
+val untagged_mutable_int16_unboxed_product_array_set :
+  expression ->
+  array_index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
 
 (** Write an unboxed int32 into a 64-bit field in an array represented as
     a mixed block (with tag zero), as used for unboxed product arrays.
@@ -1138,24 +1444,35 @@ val unboxed_mutable_int32_unboxed_product_array_set :
   Debuginfo.t ->
   expression
 
-(** Read from an unboxed int64 or unboxed nativeint array (without bounds
-    check).
-
-    The [has_custom_ops] parameter should be set to [true] unless the array
-    in question is an unboxed product array: these are represented as mixed
-    blocks, not custom blocks.
+(** Read from an untagged int, unboxed int64, or unboxed nativeint array
+    (without bounds check).
 
     The zero-indexed element number is specified as a tagged immediate.
+
+    A better name would be `naked_int_or_int64_or_nativeint_array_ref`, but this
+    name was chosen for consistency.
 *)
-val unboxed_int64_or_nativeint_array_ref :
-  has_custom_ops:bool ->
-  expression ->
-  array_index:expression ->
-  Debuginfo.t ->
-  expression
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
 
 (** Update an unboxed float32 array (without bounds check). *)
 val unboxed_float32_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an untagged int8 array (without bounds check). *)
+val untagged_int8_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an untagged int16 array (without bounds check). *)
+val untagged_int16_array_set :
   expression ->
   index:expression ->
   new_value:expression ->
@@ -1170,15 +1487,10 @@ val unboxed_int32_array_set :
   Debuginfo.t ->
   expression
 
-(** Update an unboxed int64 or unboxed nativeint array (without bounds
+(** Update an unboxed int64 or unboxed nativeint or untagged int array (without bounds
     check).
-
-    The [has_custom_ops] parameter should be set to [true] unless the array
-    in question is an unboxed product array: these are represented as mixed
-    blocks, not custom blocks.
 *)
-val unboxed_int64_or_nativeint_array_set :
-  has_custom_ops:bool ->
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_set :
   expression ->
   index:expression ->
   new_value:expression ->
@@ -1212,6 +1524,10 @@ val set_field_unboxed :
   expression
 
 val dls_get : dbg:Debuginfo.t -> expression
+
+val tls_get : dbg:Debuginfo.t -> expression
+
+val cpu_relax : dbg:Debuginfo.t -> expression
 
 val poll : dbg:Debuginfo.t -> expression
 

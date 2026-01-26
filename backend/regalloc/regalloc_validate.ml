@@ -14,7 +14,7 @@
 (* CR-soon xclerc for xclerc: try to enable warning 4. *)
 
 open! Int_replace_polymorphic_compare
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 include Cfg_intf.S
 
 module Location : sig
@@ -235,12 +235,12 @@ end = struct
     }
 
   let to_dummy_reg (t : t) : Reg.t =
-    { name = t.for_print.name;
-      typ = t.for_print.typ;
-      stamp = t.for_print.stamp;
-      preassigned = t.for_print.preassigned;
-      loc = Reg_id.to_loc_lossy t.reg_id
-    }
+    let name = t.for_print.name in
+    let typ = t.for_print.typ in
+    let stamp = t.for_print.stamp in
+    let preassigned = t.for_print.preassigned in
+    let loc = Reg_id.to_loc_lossy t.reg_id in
+    Reg.For_printing.create ~name ~typ ~stamp ~preassigned ~loc
 
   let typ (t : t) = t.for_print.typ
 
@@ -297,11 +297,11 @@ module Description : sig
       instructions within or between basic blocks.
 
       The validator checks that the register allocator does not remove
-      instructions except Prologue (whenever it's allowed to do so), and does
-      not add any new instructions except Spill and Reload. The unique IDs of
-      instructions are sufficient to determine this, and the description does
-      not need to record the block an instruction belongs to. It is possible to
-      reconstruct some information about the CFG structure from the description.
+      instructions, and does not add any new instructions except Spill and
+      Reload. The unique IDs of instructions are sufficient to determine this,
+      and the description does not need to record the block an instruction
+      belongs to. It is possible to reconstruct some information about the CFG
+      structure from the description.
       For example, successors of a block can be reconstructed from the labels
       that appear in terminator's [desc]. It also checks that all [fun_args]
       were preassigned before allocation and that they haven't changed after. *)
@@ -439,7 +439,7 @@ end = struct
     t
 
   let create cfg =
-    match !Flambda_backend_flags.regalloc_validate with
+    match !Oxcaml_flags.regalloc_validate with
     | false -> None
     | true -> Some (do_create cfg)
 
@@ -568,7 +568,8 @@ end = struct
     | ( Int_test { lt = lt1; eq = eq1; gt = gt1; is_signed = sign1; imm = imm1 },
         Int_test { lt = lt2; eq = eq2; gt = gt2; is_signed = sign2; imm = imm2 }
       )
-      when Bool.equal sign1 sign2 && Option.equal Int.equal imm1 imm2 ->
+      when Scalar.Signedness.equal sign1 sign2
+           && Option.equal Int.equal imm1 imm2 ->
       compare_label lt1 lt2;
       compare_label eq1 eq2;
       compare_label gt1 gt2
@@ -697,18 +698,8 @@ end = struct
         ignore (first_instruction_id : InstructionId.t))
       (Cfg_with_layout.cfg cfg).Cfg.blocks;
     Hashtbl.iter
-      (fun id { instr; _ } ->
-        let can_be_removed =
-          match instr.Instruction.desc with
-          | Prologue ->
-            let ({ fun_contains_calls; fun_num_stack_slots; _ } : Cfg.t) =
-              Cfg_with_layout.cfg cfg
-            in
-            not
-              (Proc.prologue_required ~fun_contains_calls ~fun_num_stack_slots)
-          | _ -> false
-        in
-        if (not (Hashtbl.mem seen_ids id)) && not can_be_removed
+      (fun id _ ->
+        if not (Hashtbl.mem seen_ids id)
         then
           Regalloc_utils.fatal
             "Instruction no. %a was deleted by register allocator"
@@ -1437,10 +1428,11 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
   | Error error ->
     Error { source = At_instruction error; res_instr; res_block; desc; cfg }
 
-let run desc cfg =
+let run desc cfg_with_infos =
+  let cfg = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   match desc with
-  | None -> cfg
+  | None -> cfg_with_infos
   | Some desc -> (
     match test desc cfg with
-    | Ok cfg -> cfg
+    | Ok _ -> cfg_with_infos
     | Error error -> Regalloc_utils.fatal "%a%!" Error.dump error)

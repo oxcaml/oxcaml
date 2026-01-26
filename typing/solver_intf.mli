@@ -29,17 +29,20 @@ module type Lattices = sig
   (** Lattice identifers, indexed by ['a] the carrier type of that lattice *)
   type 'a obj
 
-  val min : 'a obj -> 'a
+  (** An element in a lattice whose carrier type is ['a]. *)
+  type 'a elt
 
-  val max : 'a obj -> 'a
+  val min : 'a obj -> 'a elt
 
-  val le : 'a obj -> 'a -> 'a -> bool
+  val max : 'a obj -> 'a elt
 
-  val join : 'a obj -> 'a -> 'a -> 'a
+  val le : 'a obj -> 'a elt -> 'a elt -> bool
 
-  val meet : 'a obj -> 'a -> 'a -> 'a
+  val join : 'a obj -> 'a elt -> 'a elt -> 'a elt
 
-  val print : 'a obj -> Format.formatter -> 'a -> unit
+  val meet : 'a obj -> 'a elt -> 'a elt -> 'a elt
+
+  val print : 'a obj -> Format.formatter -> 'a elt -> unit
 
   val eq_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
 
@@ -50,7 +53,7 @@ end
    category. Among those monotone functions some will have left and right
    adjoints. *)
 module type Lattices_mono = sig
-  include Lattices
+  include Lattices with type 'a elt := 'a
 
   (** Morphism from object of base type ['a] to object of base type ['b] with
       allowance ['d]. See Note [Allowance] in allowance.mli.
@@ -61,7 +64,7 @@ module type Lattices_mono = sig
       - [disallowed], meaning the morphism cannot be on the left because
         it does not have right adjoint.
       Similar for ['r]. *)
-  type ('a, 'b, 'd) morph
+  type ('a, 'b, 'd) morph constraint 'd = 'l * 'r
 
   (* Due to the implementation in [solver.ml], a mode doesn't have sufficient
      information to infer the object it lives in,  whether at compile-time or
@@ -160,51 +163,70 @@ module type Lattices_mono = sig
   val print_morph : 'b obj -> Format.formatter -> ('a, 'b, 'd) morph -> unit
 end
 
-(** Arrange the permissions appropriately for a positive lattice, by
-    doing nothing. *)
-type 'a pos = 'b * 'c constraint 'a = 'b * 'c
+type 'd branch =
+  | Join : ('l * disallowed) branch
+  | Meet : (disallowed * 'r) branch
+  constraint 'd = _ * _
+[@@ocaml.warning "-62"]
 
-(** Arrange the permissions appropriately for a negative lattice, by
-    swapping left and right. *)
-type 'a neg = 'c * 'b constraint 'a = 'b * 'c
-
-module type Solver_polarized = sig
+module type Solver_mono = sig
   (* These first few types will be replaced with types from
      the Lattices_mono *)
 
   (** The morphism type from the [Lattices_mono] we're working with. See
       comments on [Lattices_mono.morph]. *)
-  type ('a, 'b, 'd) morph
+  type ('a, 'b, 'd) morph constraint 'd = 'l * 'r
 
   (** The object type from the [Lattices_mono] we're working with *)
   type 'a obj
 
-  type 'a error
+  type pinpoint
 
-  (** For a negative lattice, we reverse the direction of adjoints. We thus use
-      [neg] for [polarized] for negative lattices, which reverses ['l * 'r] to
-      ['r * 'l]. (Use [pos] for positive lattices.) *)
-  type 'd polarized constraint 'd = 'l * 'r
+  type 'd hint_morph constraint 'd = 'l * 'r
 
+  type 'd hint_const constraint 'd = 'l * 'r
+
+  (* Backtracking facilities used by [types.ml] *)
+
+  (** Represents a sequence of state mutations caused by mode operations. All
+  mutating operations in this module take a [log:changes ref option] and
+  append to it all changes made, regardless of success or failure. It is
+  [option] only for performance reasons; the caller should never provide
+  [log:None]. The caller is responsible for taking care of the appended log:
+  they can either revert the changes using [undo_changes], or commit the
+  changes to the global log in [types.ml]. *)
   type changes
+
+  (** An empty sequence of changes. *)
+  val empty_changes : changes
+
+  (** Undo the sequence of changes recorded. *)
+  val undo_changes : changes -> unit
 
   (** A mode with carrier type ['a] and allowance ['d]. See
   Note [Allowance] in allowance.mli.*)
   type ('a, 'd) mode constraint 'd = 'l * 'r
 
-  (** The mode type for the opposite polarity. *)
-  type ('a, 'd) mode_op constraint 'd = 'l * 'r
-
   include Allow_disallow with type ('a, _, 'd) sided = ('a, 'd) mode
 
-  (** Returns the mode representing the given constant. *)
-  val of_const : 'a obj -> 'a -> ('a, 'l * 'r) mode
+  (** Returns the mode representing the given constant, explained by the optional hint. *)
+  val of_const :
+    'a obj -> ?hint:('l * 'r) hint_const -> 'a -> ('a, 'l * 'r) mode
+
+  (* CR-soon zqian: [to_const_exn] should return hints as well. *)
+
+  (** Given a mode whose lower and upper bounds are equal, returns that bound. Raises
+  exception if the condition does not hold. *)
+  val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
 
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
 
   (** The maximum mode in the lattice *)
   val max : 'a obj -> ('a, 'l * 'r) mode
+
+  (* CR-someday zqian: [zap_*] should take optional hint, pointing to the location in
+     the source code where zapping happens *)
 
   (** Pushes the mode variable to the lowest constant possible.
       Expensive.
@@ -219,13 +241,42 @@ module type Solver_polarized = sig
   (** Create a new mode variable of the full range. *)
   val newvar : 'a obj -> ('a, 'l * 'r) mode
 
-  (** Try to constrain the first mode below the second mode. *)
+  (** Remove hints from all vars that have been created. This doesn't affect
+  hints that were applied on top of vars. For example:
+
+  let m = newvar () in
+  submode m (apply ~hint:hint0 g n);
+  let m' = apply ~hint:hint1 f m in
+  erase_hints ()
+
+  The last line erases the hints on [m] (caused by [n]), but [m'] has an immutable hint
+  on top of [m], which is not affected. *)
+  val erase_hints : unit -> unit
+
+  (** Raw hint returned by failed [submode a b]. To consume it, see [populate_hint]. *)
+  type ('a, 'd) hint_raw constraint 'd = 'l * 'r
+
+  (** Raw error returned by failed [submode a b]. [left] will be the lowest mode [a] can be,
+      and [right] will be the highest mode [b] can be. And [left <= right] will be false,
+      which is why the submode failed. [left_hint] explains why [left] is high, and
+      [right_hint] explains why [right] is low. To consume them, see [populate_hint] or
+      [populate_error]. *)
+  type 'a error_raw =
+    { left : 'a;
+      left_hint : ('a, left_only) hint_raw;
+      right : 'a;
+      right_hint : ('a, right_only) hint_raw
+    }
+
+  (** Try to constrain the first mode below the second mode. [pinpoint]
+  describes the thing that has both modes. *)
   val submode :
+    pinpoint ->
     'a obj ->
     ('a, allowed * 'r) mode ->
     ('a, 'l * allowed) mode ->
     log:changes ref option ->
-    (unit, 'a error) result
+    (unit, 'a error_raw) result
 
   (** Creates a new mode variable above the given mode and returns [true]. In
         the speical case where the given mode is top, returns the constant top
@@ -269,34 +320,123 @@ module type Solver_polarized = sig
   val print :
     ?verbose:bool -> 'a obj -> Format.formatter -> ('a, 'l * 'r) mode -> unit
 
-  (** Apply a monotone morphism whose source and target modes are of the
-      polarity of this enclosing module. That is, [Positive.apply_monotone]
-      takes a positive mode to a positive mode. *)
-  val via_monotone :
+  (** Apply a monotone morphism explained by an optional hint *)
+  val apply :
     'b obj ->
-    ('a, 'b, ('l * 'r) polarized) morph ->
+    ?hint:('l * 'r) hint_morph ->
+    ('a, 'b, 'l * 'r) morph ->
     ('a, 'l * 'r) mode ->
     ('b, 'l * 'r) mode
 
-  (** Apply an antitone morphism whose target mode is the mode defined in
-      this module and whose source mode is the dual mode. That is,
-      [Positive.apply_antitone] takes a negative mode to a positive one. *)
-  val via_antitone :
-    'b obj ->
-    ('a, 'b, ('l * 'r) polarized) morph ->
-    ('a, 'r * 'l) mode_op ->
-    ('b, 'l * 'r) mode
+  (** [('a, 'd) hint] explains a bound of type ['a] and allowance ['d], but doesn't contain the bound itself. *)
+  type ('a, 'd) hint =
+    | Apply :
+        'd hint_morph * ('b, 'a, 'd) morph * ('b, 'd) ahint
+        -> ('a, 'd) hint
+        (** [Apply morph_hint morph x_hint] says the current bound is derived by applying
+            morphism [morph] (explained by [morph_hint]) to another bound explained by
+            [x_hint] *)
+    | Const : 'd hint_const -> ('a, 'd) hint
+        (** [Const const_hint] says the current bound is explained by [const_hint] *)
+    | Branch : 'd branch * ('a, 'd) ahint * ('a, 'd) ahint -> ('a, 'd) hint
+        (** [branch b hint0 hint1] says the current bound is jointly explained by [hint0] and [hint1]. *)
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
+
+  (** [('a, 'd) ahint] is a bound of type ['a] explained by a [('a, 'd) hint]. *)
+  and ('a, 'd) ahint = 'a * ('a, 'd) hint constraint 'd = _ * _
+
+  (** Mode error that's suitable for consumption. *)
+  type 'a error =
+    { left : ('a, left_only) ahint;
+      right : ('a, right_only) ahint
+    }
+
+  (** Takes a bound with a [hint_raw] given by [submode], and returns a [ahint]
+      that's suitable for consumption. *)
+  val populate_hint :
+    'a obj -> 'a -> ('a, 'l * 'r) hint_raw -> ('a, 'l * 'r) ahint
+
+  (** Takes a [error_raw] returned by [submode], and returns an [error] hint that's
+      suitable for consumption. *)
+  val populate_error : 'a obj -> 'a error_raw -> 'a error
+
+  module Unhint : sig
+    (** Unhinted mode is similar to [('a, 'd) mode], but its several outermost morphism
+      applications are unhinted. *)
+    type ('a, 'd) t constraint 'd = 'l * 'r
+
+    (** Treat a regular mode as an unhinted mode, by taking the identity morphism as the
+        outermost unhinted morphism. *)
+    val unhint : ('a, 'l * 'r) mode -> ('a, 'l * 'r) t
+
+    (** Takes an unhinted mode, annotate the outermost unhinted morphisms (as a whole)
+    with the given hint, which gives a regular mode. *)
+    val hint :
+      'a obj ->
+      ?hint:('l * 'r) hint_morph ->
+      ('a, 'l * 'r) t ->
+      ('a, 'l * 'r) mode
+
+    (** Apply another unhinted morphism to an unhinted mode. *)
+    val apply :
+      'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
+  end
+end
+
+(** Hint module to be provided by the user of the solver. *)
+module type Hint = sig
+  module Pinpoint : sig
+    (** Descriptions of things that have modes. *)
+    type t
+
+    (** Something that have modes but not described. *)
+    val unknown : t
+  end
+
+  module Morph : sig
+    (** Hints that explain morphisms. The allowance ['d] describes if the morphism can be on
+      the LHS or RHS of [submode]. *)
+    type 'd t constraint 'd = 'l * 'r
+
+    (** The hint for the identity morphism *)
+    val id : 'd t
+
+    (** Given a hint for a mode morphism with its destination pinpoint, return a
+    hint for the left adjoint of the morphism with the opposite pinpoint. *)
+    val left_adjoint :
+      Pinpoint.t -> (_ * allowed) t -> Pinpoint.t * (allowed * disallowed) t
+
+    (** Given a hint for a mode morphism with its destination pinpoint, return a
+    hint for the right adjoint of the morphism with the opposite pinpoint. *)
+    val right_adjoint :
+      Pinpoint.t -> (allowed * _) t -> Pinpoint.t * (disallowed * allowed) t
+
+    (** The hint for unexplained morphs *)
+    val unknown : 'd t
+
+    include Allow_disallow with type (_, _, 'd) sided = 'd t
+  end
+
+  module Const : sig
+    (** Hints that explain constants. The allowance describes if the constant can be on the
+      LHS or RHS of [submode]. *)
+    type 'd t constraint 'd = 'l * 'r
+
+    (** The hint for unexplained constants *)
+    val unknown : ('l * 'r) t
+
+    (** The hint to explain using [max] on the RHS of [submode]. *)
+    val max : (disallowed * 'r) t
+
+    (** The hint to explain using [min] on the LHS of [submode]. *)
+    val min : ('l * disallowed) t
+
+    include Allow_disallow with type (_, _, 'd) sided = 'd t
+  end
 end
 
 module type S = sig
-  (** Error returned by failed [submode a b]. [left] will be the lowest mode [a]
-   can be, and [right] will be the highest mode [b] can be. And [left <= right]
-   will be false, which is why the submode failed. *)
-  type 'a error =
-    { left : 'a;
-      right : 'a
-    }
-
   (** Takes a slow but type-correct [Equal] module and returns the
       magic version, which is faster.
       NOTE: for this to be sound, the function in the original module must be
@@ -304,70 +444,12 @@ module type S = sig
   module Magic_equal (X : Equal) :
     Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t
 
-  (** Solver that supports polarized lattices; needed because some morphisms
-      are antitone  *)
-  module Solvers_polarized (C : Lattices_mono) : sig
-    (* Backtracking facilities used by [types.ml] *)
-
-    (** Represents a sequence of state mutations caused by mode operations. All
-      mutating operations in this module take a [log:changes ref option] and
-      append to it all changes made, regardless of success or failure. It is
-      [option] only for performance reasons; the caller should never provide
-      [log:None]. The caller is responsible for taking care of the appended log:
-      they can either revert the changes using [undo_changes], or commit the
-      changes to the global log in [types.ml]. *)
-    type changes
-
-    (** An empty sequence of changes. *)
-    val empty_changes : changes
-
-    (** Undo the sequence of changes recorded. *)
-    val undo_changes : changes -> unit
-
-    (* Construct a new category based on the original category [C]. Objects are
-       two copies of the objects in [C] of opposite polarity. The positive copy
-       is identical to the original lattice. The negative copy has its lattice
-       structure reversed. Morphism are four copies of the morphisms in [C], from
-       two copies of objects to two copies of objects. *)
-
-    module type Solver_polarized =
-      Solver_polarized
-        with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
-         and type 'a obj := 'a C.obj
-         and type 'a error := 'a error
-         and type changes := changes
-
-    module rec Positive :
-      (Solver_polarized
-        with type 'd polarized = 'd pos
-         and type ('a, 'd) mode_op = ('a, 'd) Negative.mode)
-
-    and Negative :
-      (Solver_polarized
-        with type 'd polarized = 'd neg
-         and type ('a, 'd) mode_op = ('a, 'd) Positive.mode)
-
-    (* The following definitions show how this solver works over a category by
-       defining objects and morphisms. These definitions are not used in
-       practice. They are put into a module to make it easy to spot if we end up
-       using these in the future. *)
-    module Category : sig
-      type 'a obj = 'a C.obj
-
-      type ('a, 'b, 'd) morph = ('a, 'b, 'd) C.morph
-
-      type ('a, 'd) mode =
-        | Positive of ('a, 'd pos) Positive.mode
-        | Negative of ('a, 'd neg) Negative.mode
-
-      val apply_into_positive :
-        'b obj -> ('a, 'b, 'd) morph -> ('a, 'd) mode -> ('b, 'd) Positive.mode
-
-      val apply_into_negative :
-        'b obj ->
-        ('a, 'b, 'l * 'r) morph ->
-        ('a, 'l * 'r) mode ->
-        ('b, 'r * 'l) Negative.mode
-    end
-  end
+  (** Solver that supports lattices with monotone morphisms between them. *)
+  module Solver_mono (Hint : Hint) (C : Lattices_mono) :
+    Solver_mono
+      with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
+       and type 'a obj := 'a C.obj
+       and type pinpoint := Hint.Pinpoint.t
+       and type 'd hint_morph := 'd Hint.Morph.t
+       and type 'd hint_const := 'd Hint.Const.t
 end

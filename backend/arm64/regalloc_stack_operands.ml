@@ -30,19 +30,24 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         | Ishiftarith (_, _)
         | Ibswap _ | Isignext _ | Isimd _ ))
   | Op
-      ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-      | Poll | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Stackoffset _ | Load _
+      ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
+      | Dls_get | Tls_get | Poll | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _
       | Store (_, _, _)
-      | Intop _
+      | Intop _ | Int128op _
       | Intop_imm (_, _)
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
       | Name_for_debugger _ | Alloc _ | External_without_caml_c_call _ )
-  | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _ ->
+  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
+    ->
     (* no rewrite *)
     May_still_have_spilled_registers
+  | Op (Specific (Illvm_intrinsic _)) ->
+    (* should not happen *)
+    fatal "unexpected instruction"
 
 let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
   match term.desc with

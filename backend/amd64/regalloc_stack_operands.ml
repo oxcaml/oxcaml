@@ -155,21 +155,27 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   match instr.desc with
   | Op (Floatop (_, (Iaddf | Isubf | Imulf | Idivf))) ->
     may_use_stack_operand_for_second_argument map instr ~num_args:2
-      ~res_is_fst:true
+      ~res_is_fst:(not (Proc.has_three_operand_float_ops ()))
   | Op (Specific Ipackf32) -> May_still_have_spilled_registers
   | Op (Specific (Isimd op)) -> (
     let simd =
       match op.instr with
       | Instruction instr -> instr
       | Sequence
-          { id = Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _;
+          { id =
+              ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
+              | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X
+              | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y );
             instr
           } ->
         instr
     in
     match Array.length simd.args, simd.res with
+    | _, Res_none ->
+      (* Res_none implies one argument is already an address. *)
+      May_still_have_spilled_registers
     | 1, First_arg -> May_still_have_spilled_registers
-    | 1, Res { loc = res_loc; _ } ->
+    | 1, Res [| { loc = res_loc; _ } |] ->
       let arg_mem = Simd.loc_allows_mem simd.args.(0).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
       assert (not (arg_mem && res_mem));
@@ -184,7 +190,9 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         may_use_stack_operand_for_second_argument map instr ~num_args
           ~res_is_fst:true
       else May_still_have_spilled_registers
-    | num_args, Res { loc = res_loc; _ } ->
+    | num_args, Res rr ->
+      (* We don't attempt to allow spilling additional result regs. *)
+      let res_loc = rr.(0).loc in
       let arg_mem = Simd.loc_allows_mem simd.args.(1).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
       assert (not (arg_mem && res_mem));
@@ -195,32 +203,35 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       else if res_mem
       then may_use_stack_operand_for_result map instr ~num_args
       else May_still_have_spilled_registers)
-  | Op
-      (Specific
-        (Isimd_mem
-          ( ( SSE2 Add_f64
-            | SSE2 Sub_f64
-            | SSE2 Mul_f64
-            | SSE2 Div_f64
-            | SSE Add_f32
-            | SSE Sub_f32
-            | SSE Mul_f32
-            | SSE Div_f32 ),
-            _ ))) ->
+  | Op (Specific (Isimd_mem ((Load _ | Store _), _))) ->
     May_still_have_spilled_registers
-  | Op (Reinterpret_cast (Float_of_float32 | Float32_of_float | V128_of_v128))
+  | Op
+      (Reinterpret_cast
+        ( Float_of_float32 | Float32_of_float | V128_of_vec _ | V256_of_vec _
+        | V512_of_vec _ ))
   | Op (Static_cast (V128_of_scalar Float64x2 | Scalar_of_v128 Float64x2))
-  | Op (Static_cast (V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4)) ->
+  | Op (Static_cast (V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4))
+  | Op (Static_cast (V256_of_scalar Float64x4 | Scalar_of_v256 Float64x4))
+  | Op (Static_cast (V256_of_scalar Float32x8 | Scalar_of_v256 Float32x8))
+  | Op (Static_cast (V512_of_scalar Float64x8 | Scalar_of_v512 Float64x8))
+  | Op (Static_cast (V512_of_scalar Float32x16 | Scalar_of_v512 Float32x16)) ->
     unary_operation_argument_or_result_on_stack map instr
+  | Op (Static_cast (V128_of_scalar Float16x8 | Scalar_of_v128 Float16x8))
+  | Op (Static_cast (V256_of_scalar Float16x16 | Scalar_of_v256 Float16x16))
+  | Op (Static_cast (V512_of_scalar Float16x32 | Scalar_of_v512 Float16x32)) ->
+    Misc.fatal_error "float16 scalar type not supported"
   | Op (Reinterpret_cast (Float_of_int64 | Float32_of_int32))
-  | Op (Static_cast (V128_of_scalar (Int64x2 | Int32x4 | Int16x8 | Int8x16))) ->
+  | Op (Static_cast (V128_of_scalar (Int64x2 | Int32x4 | Int16x8 | Int8x16)))
+  | Op (Static_cast (V256_of_scalar (Int64x4 | Int32x8 | Int16x16 | Int8x32)))
+  | Op (Static_cast (V512_of_scalar (Int64x8 | Int32x16 | Int16x32 | Int8x64)))
+    ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
   | Op (Reinterpret_cast (Int64_of_float | Int32_of_float32))
-  | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4))) ->
+  | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4 | Int16x8 | Int8x16)))
+  | Op (Static_cast (Scalar_of_v256 (Int64x4 | Int32x8 | Int16x16 | Int8x32)))
+  | Op (Static_cast (Scalar_of_v512 (Int64x8 | Int32x16 | Int16x32 | Int8x64)))
+    ->
     may_use_stack_operand_for_result map instr ~num_args:1
-  | Op (Static_cast (Scalar_of_v128 (Int16x8 | Int8x16))) ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16/int8 *)
-    May_still_have_spilled_registers
   | Op
       (Static_cast
         ( Float_of_int (Float32 | Float64)
@@ -252,6 +263,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Csel _) (* CR gyorsh: optimize *)
   | Op (Specific (Ilfence | Isfence | Imfence))
   | Op (Intop (Imulh _ | Imul | Idiv | Imod))
+  | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Intop_imm ((Imulh _ | Imul | Idiv | Imod), _))
   | Op (Specific (Irdtsc | Irdpmc))
   | Op (Intop (Ipopcnt | Iclz _ | Ictz _))
@@ -259,9 +271,10 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op
       ( Move | Spill | Reload
       | Floatop (_, (Inegf | Iabsf | Icompf _))
-      | Const_float _ | Const_float32 _ | Const_vec128 _ | Stackoffset _
-      | Load _ | Store _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque
-      | Begin_region | End_region | Dls_get | Poll | Alloc _ )
+      | Const_float _ | Const_float32 _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Name_for_debugger _
+      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Dls_get
+      | Tls_get | Poll | Pause | Alloc _ )
   | Op (Reinterpret_cast (Int_of_value | Value_of_int))
   | Op
       (Specific
@@ -269,12 +282,14 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         | Istore_int (_, _, _)
         | Ioffset_loc (_, _)
         | Ifloatarithmem (_, _, _)
-        | Ipause | Icldemote _ | Iprefetch _ | Ibswap _ ))
+        | Icldemote _ | Iprefetch _ | Ibswap _ ))
   | Op (External_without_caml_c_call _)
-  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue ->
+  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue ->
     (* no rewrite *)
     May_still_have_spilled_registers
-  | Op (Intop_imm ((Ipopcnt | Iclz _ | Ictz _), _)) | Stack_check _ ->
+  | Op (Intop_imm ((Ipopcnt | Iclz _ | Ictz _), _))
+  | Stack_check _
+  | Op (Specific (Illvm_intrinsic _)) ->
     (* should not happen *)
     fatal "unexpected instruction"
 

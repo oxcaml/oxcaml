@@ -17,6 +17,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ portable
+
 open! Stdlib
 
 (* CR layouts v4: This file is based on [float.mli], which itself is generated

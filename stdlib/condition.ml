@@ -17,6 +17,8 @@ open! Stdlib
 
 type t : value mod portable contended
 external create: unit -> t @@ portable = "caml_ml_condition_new"
-external wait: t -> Mutex.t -> unit @@ portable = "caml_ml_condition_wait"
-external signal: t -> unit @@ portable = "caml_ml_condition_signal"
-external broadcast: t -> unit @@ portable = "caml_ml_condition_broadcast"
+external wait:
+  t @ local -> Mutex.t @ local -> unit @@ portable = "caml_ml_condition_wait"
+external signal: t @ local -> unit @@ portable = "caml_ml_condition_signal"
+external broadcast:
+  t @ local -> unit @@ portable = "caml_ml_condition_broadcast"

@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare
 module List = ListLabels
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 type cell = Cfg.basic Cfg.instruction DLL.cell
 
@@ -34,12 +34,14 @@ let rec find_next_allocation : cell option -> allocation option =
     | Op (Alloc { bytes; dbginfo; mode }) -> Some { bytes; dbginfo; mode; cell }
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
-        | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _ | Store _
-        | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
-        | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Specific _ | Name_for_debugger _ | Dls_get
-        | Poll | External_without_caml_c_call _ )
-    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+        | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+        | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Poll | Pause | External_without_caml_c_call _ )
+    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+    | Stack_check _ ->
       find_next_allocation (DLL.next cell))
 
 (* [find_compatible_allocations cell ~curr_mode ~curr_size] returns the
@@ -80,20 +82,23 @@ let find_compatible_allocations :
         | Local -> return ()
         | Heap -> loop allocations (DLL.next cell) ~curr_mode ~curr_size)
       | Op Poll -> return ()
-      | Reloadretaddr | Poptrap _ | Prologue | Pushtrap _ | Stack_check _ ->
+      | Reloadretaddr | Poptrap _ | Prologue | Epilogue | Pushtrap _
+      | Stack_check _ ->
         (* CR-soon xclerc for xclerc: is it too conservative? (note: only the
            `Pushtrap` case may be too conservative) *)
         { allocations = List.rev allocations; next_cell = Some cell }
       | Op
           ( Move | Spill | Reload | Floatop _ | Reinterpret_cast _ | Opaque
-          | Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
-          | Const_symbol _ | Stackoffset _ | Load _
+          | Pause | Const_int _ | Const_float _ | Const_float32 _
+          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_symbol _
+          | Stackoffset _ | Load _
           | Store (_, _, _)
           | Csel _ | Specific _ | Name_for_debugger _ | Probe_is_enabled _
-          | Static_cast _ | Dls_get
+          | Static_cast _ | Dls_get | Tls_get
           | Intop
               ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
               | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ )
+          | Int128op (Iadd128 | Isub128 | Imul64 _)
           | Intop_imm
               ( ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
                 | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ ),
@@ -177,9 +182,7 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let instr_id =
-    InstructionId.make_sequence ~last_used:(Cfg.max_instr_id cfg) ()
-  in
+  let instr_id = cfg.next_instruction_id in
   Cfg.iter_blocks cfg ~f:(fun _label block ->
       combine ~instr_id (DLL.hd_cell block.body));
   cfg_with_layout

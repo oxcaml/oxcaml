@@ -13,7 +13,72 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Uniqueness analysis, ran after type-checking *)
+(*
+  OCaml has the contraction rule baked in its type checking, which makes the
+  uniqueness/linearity modes inferred by the type system too permissive. This
+  file implements uniqueness analysis, which runs after type checking. It
+  inspects the lexical structure of a program, identifies implicit usages of
+  the contraction rule, and accordingly checks the modes inferred by the type
+  system.
+
+  To that end, we assign a usage to every node in the expression tree. Starting
+  from the bottom, the leaves are the usages representing "use sites" (such as
+  [Pexp_ident]), which are unconstrained at first. Those usages are then
+  composed together by [par], [seq], etc., reflecting the lexical
+  structure of the program. Certain composition of certain usages (such as
+  [seq Unique Unique]) is illegal and leads to Error. Composition of
+  unconstrained usages constrains the usages. For example, [seq u1 u2] will
+  constrain both [u1] and [u2] to be strictly weaker than [Unique].
+
+  In particular, if the usage being constrained represents a "use site", we
+  eagerly apply the constraint on the modes inferred by the type system. For
+  example, [unique_use] in [Texp_ident] is the mode expected by the consumer of
+  the identifier. Type errors are raised if the uniqueness analysis contradicts
+  what is expected in the [unique_use].
+
+  For example:
+  [
+  let x = .. in
+  use_as_unique x;
+  use_as_unique x
+  ]
+
+  The type system would infer both [Pexp_ident x] use sites to be Unique,
+  but uniqueness analysis would infer both to be strictly weaker than Unique.
+  The submode fails and type error is raised (see [mark_multi_use]).
+
+  On top of the naive contraction rule, we adopt the following tweaks:
+
+  - It's useful to express usages in a finer manner than [Unique] vs.
+  [Aliased]. For example, the following example should be allowed:
+
+  let y =
+    match x with
+    | Foo -> true
+    | _ -> false
+  in
+  unique_use x
+
+  The first usage of [x] is confined to the pattern match (not keeping any
+  reference to [x]), and should not forbid a later unique usage of [x]. To
+  that end, we say [x] is used as [Borrowed] by the pattern match. The list of
+  usages can be found in [Module Usage].
+
+  - A naive approach would treat each [Pexp_ident x] as a usage of [x]. This,
+  while being sound, is too strict. For example, the program [unique_use r.x;
+  unique_use r.y] would be rejected as [Pexp_ident r] is used twice. Instead,
+  we should treat this as using [r.x] and [r.y], which is allowed. This is
+  implemented in [module UsageTree].
+
+  - Similarly, it's useful to track aliases instead of treating them as
+  usages. For example, [let x = y in unique_use y] should be allowed, while
+  [let x = y in unique_use y; unique_use x] should be forbidden. This is
+  implemented in [check_uniqueness_exp_as_value].
+
+  The above discussion is about tracking the usages of a single value. To
+  track the usages of multiple values, we lift [module UsageTree] to
+  [module UsageForest].
+*)
 
 open Asttypes
 open Types
@@ -329,6 +394,11 @@ module Usage : sig
     | Aliased of Aliased.t  (** A aliased usage *)
     | Maybe_unique of Maybe_unique.t
         (** A usage that could be either unique or aliased. *)
+    | Antiquote of t
+        (** A usage within an antiquote. Behaves as the underlying
+            usage but is protected from the "lifting" operations
+            that make implicitly borrowed usages into aliased
+            usages. *)
 
   val aliased : Occurrence.t -> Aliased.reason -> t
 
@@ -361,6 +431,10 @@ module Usage : sig
   (** Non-deterministic choice *)
   val choose : t -> t -> t
 
+  val quote : t -> t
+
+  val antiquote : t -> t
+
   (** Parallel composition *)
   val par : t -> t -> t
 
@@ -378,33 +452,6 @@ end = struct
 
      And we have Unused (top) > Borrowed > Aliased > Unique > Error (bot). Lower
      usage is stronger.
-
-     A program can use a value multiple times. We take a hierarchical view of the
-     usages. At the bottom are the usages caused by "use sites" (such as
-     [Pexp_ident]). Those usages are then composed together by [par], [seq],
-     etc., reflecting the lexical structure. Certain composition of certain
-     usages (such as [seq Unique Unique]) is illegal and leads to Error.
-
-     The uniqueness analysis is to infer the strongest usage that can be granted
-     to each use site. To do that, each use site will be granted a usage that is
-     unconstrained, which gets constrained during composition with other usages.
-     For example, [seq u1 u2] will constrain both [u1] and [u2] to be weaker than
-     Unique.
-
-     For each use site, the lexically-inferred usage is eagerly compared against
-     the typing-inferred usage (e.g., [unique_use] in [Pexp_ident]). Type errors
-     are raised if that fails.
-
-     For example:
-     [
-     let x = .. in
-     use_as_unique x;
-     use_as_unique x
-     ]
-
-     type checking would infer both [Pexp_ident x] use sites to be Unique, but
-     uniqueness analysis would infer both to be strictly weaker than Unique.
-     Type error is raised.
 
      It is sound for the analysis to infer a use site to have a weaker usage,
      which might result in false mode errors. It is useful for the analysis to
@@ -454,22 +501,24 @@ end = struct
     | Maybe_aliased of Maybe_aliased.t
     | Aliased of Aliased.t
     | Maybe_unique of Maybe_unique.t
+    | Antiquote of t
 
   let aliased occ reason = Aliased (Aliased.singleton occ reason)
 
   let maybe_unique unique_use occ =
     Maybe_unique (Maybe_unique.singleton unique_use occ)
 
-  let extract_occurrence = function
+  let rec extract_occurrence = function
     | Unused -> None
     | Borrowed occ -> Some occ
     | Maybe_aliased t -> Some (Maybe_aliased.extract_occurrence t)
     | Aliased t -> Some (Aliased.extract_occurrence t)
     | Maybe_unique t -> Some (Maybe_unique.extract_occurrence t)
+    | Antiquote t -> extract_occurrence t
 
   let empty = Unused
 
-  let choose m0 m1 =
+  let rec choose m0 m1 =
     match m0, m1 with
     | Unused, m | m, Unused -> m
     | Borrowed _, t | t, Borrowed _ -> t
@@ -481,6 +530,9 @@ end = struct
       t
     | Aliased _, t | t, Aliased _ -> t
     | Maybe_unique l0, Maybe_unique l1 -> Maybe_unique (Maybe_unique.meet l0 l1)
+    | Antiquote t1, Antiquote t2 -> Antiquote (choose t1 t2)
+    | Antiquote t1, t2 -> choose t1 t2
+    | t1, Antiquote t2 -> choose t1 t2
 
   type first_or_second =
     | First
@@ -501,7 +553,7 @@ end = struct
     | Error cannot_force ->
       raise (Error { cannot_force; there; first_or_second; access_order })
 
-  let par m0 m1 =
+  let rec par m0 m1 =
     match m0, m1 with
     | Unused, m | m, Unused -> m
     | Borrowed occ, Borrowed _ -> Borrowed occ
@@ -534,8 +586,11 @@ end = struct
       force_aliased_multiuse t0 m1 First Par;
       force_aliased_multiuse t1 m0 Second Par;
       aliased (Maybe_unique.extract_occurrence t0) Aliased.Forced
+    | Antiquote t1, Antiquote t2 -> Antiquote (par t1 t2)
+    | Antiquote t1, t2 -> par t1 t2
+    | t1, Antiquote t2 -> par t1 t2
 
-  let seq m0 m1 =
+  let rec seq m0 m1 =
     match m0, m1 with
     | Unused, m | m, Unused -> m
     | Borrowed _, t -> t
@@ -604,8 +659,21 @@ end = struct
       force_aliased_multiuse l0 m1 First Seq;
       force_aliased_multiuse l1 m0 Second Seq;
       aliased (Maybe_unique.extract_occurrence l0) Aliased.Forced
+    | Antiquote t1, Antiquote t2 -> Antiquote (seq t1 t2)
+    | Antiquote t1, t2 -> seq t1 t2
+    | t1, Antiquote t2 -> seq t1 t2
 
-  let print ppf =
+  let quote = function
+    | Maybe_aliased a ->
+      let occ = Maybe_aliased.extract_occurrence a in
+      let access = Maybe_aliased.extract_access a in
+      aliased occ (Aliased.Lifted access)
+    | Antiquote t -> t
+    | t -> t
+
+  let antiquote t = Antiquote t
+
+  let rec print ppf =
     let open Format in
     function
     | Unused -> fprintf ppf "Unused"
@@ -613,6 +681,7 @@ end = struct
     | Maybe_aliased ma -> fprintf ppf "Maybe_aliased(%a)" Maybe_aliased.print ma
     | Aliased a -> fprintf ppf "Aliased(%a)" Aliased.print a
     | Maybe_unique mu -> fprintf ppf "Maybe_unique(%a)" Maybe_unique.print mu
+    | Antiquote t -> fprintf ppf "Antiquote(%a)" print t
 end
 
 module Tag : sig
@@ -1331,6 +1400,10 @@ module Usage_forest : sig
   (** The forest with only one usage, given by the path and the usage *)
   val singleton : Usage.t -> Learned_tags.t -> Overwrites.t -> Path.t -> t
 
+  val quote : t -> t
+
+  val antiquote : t -> t
+
   (** Run a function through a forest. The function must be monotone *)
   val map :
     (Usage.t -> Usage.t) ->
@@ -1434,6 +1507,10 @@ end = struct
     Root_id.Map.mapi (fun _root tree ->
         Usage_tree.mapi (fun _projs usage -> fu usage) fl fo tree)
 
+  let quote t = map Usage.quote (fun x -> x) (fun x -> x) t
+
+  let antiquote t = map Usage.antiquote (fun x -> x) (fun x -> x) t
+
   let check_no_remaining_overwritten_as t =
     Root_id.Map.iter
       (fun _ t -> Usage_tree.check_no_remaining_overwritten_as t)
@@ -1478,22 +1555,22 @@ module Paths : sig
 
   (** [modal_child gf proj t] is [child prof t] when [gf] is [Unrestricted]
       and is [untracked] otherwise. *)
-  val modal_child : Modality.Value.Const.t -> Projection.t -> t -> t
+  val modal_child : Modality.Const.t -> Projection.t -> t -> t
 
   (** [tuple_field i t] is [child (Projection.Tuple_field i) t]. *)
   val tuple_field : int -> t -> t
 
   (** [record_field gf s t] is
       [modal_child gf (Projection.Record_field s) t]. *)
-  val record_field : Modality.Value.Const.t -> string -> t -> t
+  val record_field : Modality.Const.t -> string -> t -> t
 
   (** [record_unboxed_product_field gf s t] is
       [modal_child gf (Projection.Record_unboxed_product_field s) t]. *)
-  val record_unboxed_product_field : Modality.Value.Const.t -> string -> t -> t
+  val record_unboxed_product_field : Modality.Const.t -> string -> t -> t
 
   (** [construct_field gf s i t] is
       [modal_child gf (Projection.Construct_field(s, i)) t]. *)
-  val construct_field : Modality.Value.Const.t -> string -> int -> t -> t
+  val construct_field : Modality.Const.t -> string -> int -> t -> t
 
   (** [variant_field s t] is [child (Projection.Variant_field s) t]. *)
   val variant_field : string -> t -> t
@@ -1532,20 +1609,14 @@ end = struct
 
   let child proj t = List.map (UF.Path.child proj) t
 
-  let modal_child gf proj t =
+  let modal_child modalities proj t =
     (* CR zqian: Instead of just ignoring such children, we should add modality
        to [Projection.t] and add corresponding logic in [UsageTree]. *)
-    let gf = Modality.Value.Const.to_list gf in
-    let l =
-      List.filter
-        (function
-         | Atom (Monadic Uniqueness, Join_with Aliased) -> true
-         | Atom (Comonadic Linearity, Meet_with Many) -> true
-         | _ -> false
-          : Modality.t -> _)
-        gf
-    in
-    if List.length l = 2 then untracked else child proj t
+    let uni = Modality.Const.proj (Monadic Uniqueness) modalities in
+    let lin = Modality.Const.proj (Comonadic Linearity) modalities in
+    match uni, lin with
+    | Join_with Aliased, Meet_with Many -> untracked
+    | _ -> child proj t
 
   let tuple_field i t = child (Projection.Tuple_field i) t
 
@@ -1560,7 +1631,7 @@ end = struct
   let variant_field s t = child (Projection.Variant_field s) t
 
   let array_index mut i t =
-    let modality = Typemode.transl_modalities ~maturity:Stable mut [] [] in
+    let modality = Typemode.transl_modalities ~maturity:Stable mut [] in
     modal_child modality (Projection.Array_index i) t
 
   let memory_address t = child Projection.Memory_address t
@@ -1620,12 +1691,11 @@ module Value : sig
       are the paths of [t] and [o] is [t]'s occurrence. This is used for the
       implicit record field values for kept fields in a [{ foo with ... }]
       expression. *)
-  val implicit_record_field :
-    Modality.Value.Const.t -> string -> t -> unique_use -> t
+  val implicit_record_field : Modality.Const.t -> string -> t -> unique_use -> t
 
   (** Analogous to [implicit_record_field], but for unboxed records *)
   val implicit_record_unboxed_product_field :
-    Modality.Value.Const.t -> string -> t -> unique_use -> t
+    Modality.Const.t -> string -> t -> unique_use -> t
 
   (** Mark the value as aliased_or_unique   *)
   val mark_maybe_unique : t -> UF.t
@@ -1931,8 +2001,8 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext1, uf1 = pattern_match_single pat1 paths in
       Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
     | Tpat_any -> Ienv.Extension.empty, UF.unused
-    | Tpat_var (id, _, _, _) -> Ienv.Extension.singleton id paths, UF.unused
-    | Tpat_alias (pat', id, _, _, _, _) ->
+    | Tpat_var (id, _, _, _, _) -> Ienv.Extension.singleton id paths, UF.unused
+    | Tpat_alias (pat', id, _, _, _, _, _) ->
       let ext0 = Ienv.Extension.singleton id paths in
       let ext1, uf = pattern_match_single pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf
@@ -2144,6 +2214,12 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
       check_uniqueness_exp ~overwrite:None (Ienv.extend ienv ext) body
     in
     UF.seq uf_vbs uf_body
+  | Texp_letmutable (vb, body) ->
+    let ext, uf_vbs = check_uniqueness_value_bindings ienv [vb] in
+    let uf_body =
+      check_uniqueness_exp ~overwrite:None (Ienv.extend ienv ext) body
+    in
+    UF.seq uf_vbs uf_body
   | Texp_function { params; body; _ } ->
     let ienv, uf_params =
       List.fold_left_map
@@ -2289,13 +2365,53 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     let value, uf = check_uniqueness_exp_as_value ienv exp in
     UF.seq uf (Value.mark_maybe_unique value)
   | Texp_setfield (rcd, _, _, _, arg) ->
+    (* Ideally, we should treat this as creating a new alias of [arg], and
+       further usages of the field should be directed at the alias, instead of
+       the old value. However, this would require some big changes to the
+       analysis.
+
+       Instead, we take a conservative approach, treating mutability as opaque.
+       First of all, [type r = { mutable x : 'a }] is viewed as [type r = { x :
+       'b }] where ['b] is some opaque type (think ['a ref]) with some opaque
+       operations [val read: 'b -> 'a] and [val write: 'a -> 'b -> unit]
+
+       Then, field mutation [r.x <- x0] is viewed as [write x0 r.x]. This leads
+       to marking [x0] as fully used, and [r.mem_addr] borrowed, and [r.x] used
+       by [write]. Field projection [r.x] is viewed as [read r.x], which leads
+       to marking [r.mem_addr] borrowed, and [r.x] used by [read].
+
+       Now, note that currently [mutable] implies [many aliased], which means
+       ['b] should cross linearity and uniqueness. Therefore, the above usages
+       on [r.x] can be skipped. *)
     let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
     let uf_arg = check_uniqueness_exp ~overwrite:None ienv arg in
     let uf_write = Value.mark_implicit_borrow_memory_address Write value in
     let uf_tag = Value.invalidate_tag value in
     UF.pars [uf_rcd; uf_arg; uf_write; uf_tag]
+  | Texp_atomic_loc (rcd, _, _, _, _) ->
+    let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
+    let uf = Value.mark_consumed_memory_address value in
+    UF.seq uf_rcd uf
   | Texp_array (_, _, es, _) ->
     UF.pars (List.map (fun e -> check_uniqueness_exp ~overwrite:None ienv e) es)
+  | Texp_idx (ba, _uas) ->
+    let block_access = function
+      | Baccess_field _ -> UF.unused
+      | Baccess_array
+          { mut = _;
+            index_kind = _;
+            index;
+            base_ty = _;
+            elt_ty = _;
+            elt_sort = _
+          } ->
+        check_uniqueness_exp ~overwrite:None ienv index
+      | Baccess_block (_, idx) -> check_uniqueness_exp ~overwrite:None ienv idx
+    in
+    (* All unboxed accesses are unused, but we include the below match in case
+       we add new unboxed access types *)
+    let _unboxed_access = function Uaccess_unboxed_field _ -> UF.unused in
+    block_access ba
   | Texp_ifthenelse (if_, then_, else_opt) ->
     (* if' is only borrowed, not used; but probably doesn't matter because of
        mode crossing *)
@@ -2331,7 +2447,9 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   | Texp_send (e, _, _) -> check_uniqueness_exp ~overwrite:None ienv e
   | Texp_new _ -> UF.unused
   | Texp_instvar _ -> UF.unused
+  | Texp_mutvar _ -> UF.unused
   | Texp_setinstvar (_, _, _, e) -> check_uniqueness_exp ~overwrite:None ienv e
+  | Texp_setmutvar (_, _, e) -> check_uniqueness_exp ~overwrite:None ienv e
   | Texp_override (_, ls) ->
     UF.pars
       (List.map
@@ -2406,6 +2524,17 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
       Paths.mark
         (Usage.maybe_unique use occ)
         Learned_tags.empty Overwrites.empty p)
+  (* CR metaprogramming aivaskovic:
+     it might be reasonable to treat `Texp_quotation e` as `e` *)
+  | Texp_quotation e ->
+    let uf = check_uniqueness_exp ~overwrite:None ienv e in
+    UF.quote uf
+  | Texp_antiquotation e ->
+    let uf = check_uniqueness_exp ~overwrite:None ienv e in
+    UF.antiquote uf
+  | Texp_eval _ ->
+    (* CR metaprogramming mshinwell: Make sure this is correct *)
+    UF.unused
 
 (**
 Corresponds to the first mode.

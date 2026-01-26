@@ -54,14 +54,6 @@ Caml_inline void cpu_relax(void) {
 }
 
 
-/* Atomic read-modify-write instructions, with full fences */
-
-Caml_inline uintnat atomic_fetch_add_verify_ge0(atomic_uintnat* p, uintnat v) {
-  uintnat result = atomic_fetch_add(p,v);
-  CAMLassert ((intnat)result > 0);
-  return result;
-}
-
 /* If we're using glibc, use a custom condition variable implementation to
    avoid this bug: https://sourceware.org/bugzilla/show_bug.cgi?id=25847
 
@@ -308,7 +300,7 @@ typedef uintnat barrier_status;
    the last arrival. */
 Caml_inline barrier_status caml_plat_barrier_arrive(caml_plat_barrier* barrier)
 {
-  return 1 + atomic_fetch_add(&barrier->arrived, 1);
+  return caml_atomic_counter_incr(&barrier->arrived);
 }
 
 /* -- Single-sense --
@@ -445,6 +437,11 @@ void* caml_mem_map(uintnat size, uintnat flags, const char* name);
 void* caml_mem_commit(void* mem, uintnat size, const char* name);
 void caml_mem_decommit(void* mem, uintnat size, const char* name);
 void caml_mem_unmap(void* mem, uintnat size);
+void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
+#ifdef __GNUC__
+  __attribute__ ((format (printf, 3, 4)))
+#endif
+;
 
 
 CAMLnoret void caml_plat_fatal_error(const char * action, int err);

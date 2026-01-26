@@ -414,15 +414,21 @@ module GenHashTable = struct
       else if x * 2 > Sys.max_array_length then x
       else power_2_above (x * 2) n
 
-    module DLS = Domain.Safe.DLS
-
-    let prng_key = DLS.new_key Random.State.make_self_init
+    module Rng : sig
+      val bits : unit -> int
+    end = struct
+      (* This is safe since [bits] is a C call that cannot be preempted, 
+         we do not yield, and we do not borrow the state. *)
+      let key = Domain.Safe.DLS.new_key Random.State.make_self_init
+      let[@inline] bits () = 
+        Random.State.bits (Obj.magic_uncontended (Domain.Safe.DLS.get key))
+    end
 
     let create ?(random = (Hashtbl.is_randomized ())) initial_size =
       let s = power_2_above 16 initial_size in
       let seed =
         if random
-        then DLS.access (fun access -> Random.State.bits (DLS.get access prng_key))
+        then Rng.bits ()
         else 0
       in
       { initial_size = s; size = 0; seed = seed; data = Array.make s Empty }

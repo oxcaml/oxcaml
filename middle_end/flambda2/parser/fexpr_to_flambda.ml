@@ -89,7 +89,7 @@ let init_env () =
   let error_continuation =
     Exn_continuation.create ~exn_handler ~extra_args:[]
   in
-  let toplevel_region = Variable.create "toplevel" in
+  let toplevel_region = Variable.create "toplevel" Flambda_kind.region in
   { done_continuation;
     error_continuation;
     continuations = CM.empty;
@@ -128,15 +128,20 @@ let fresh_exn_cont env { Fexpr.txt = name; loc = _ } =
       exn_continuations = CM.add name e env.exn_continuations
     } )
 
-let fresh_var env { Fexpr.txt = name; loc = _ } =
-  let v = Variable.create name ~user_visible:() in
-  v, { env with variables = VM.add name v env.variables }
+let fresh_var env { Fexpr.txt = name; loc = _ } k =
+  let v = Variable.create name ~user_visible:() k in
+  let v_duid = Flambda_debug_uid.none in
+  (* CR sspies: In the future, try to improve the debug UID propagation here. *)
+  v, v_duid, { env with variables = VM.add name v env.variables }
 
 let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
   match DM.find_opt env.code_ids name with
   | Some code_id -> code_id
   | None ->
-    let c = Code_id.create ~name (Compilation_unit.get_current_exn ()) in
+    let c =
+      Code_id.create ~name ~debug:Debuginfo.none
+        (Compilation_unit.get_current_exn ())
+    in
     DM.add env.code_ids name c;
     c
 
@@ -144,7 +149,7 @@ let fresh_function_slot env { Fexpr.txt = name; loc = _ } =
   let c =
     Function_slot.create
       (Compilation_unit.get_current_exn ())
-      ~name Flambda_kind.With_subkind.any_value
+      ~name ~is_always_immediate:false Flambda_kind.value
   in
   UT.add env.function_slots name c;
   c
@@ -155,7 +160,11 @@ let fresh_or_existing_function_slot env ({ Fexpr.txt = name; loc = _ } as id) =
   | Some function_slot -> function_slot
 
 let fresh_value_slot env { Fexpr.txt = name; loc = _ } kind =
-  let c = Value_slot.create (Compilation_unit.get_current_exn ()) ~name kind in
+  let c =
+    Value_slot.create
+      (Compilation_unit.get_current_exn ())
+      ~name ~is_always_immediate:false kind
+  in
   WT.add env.vars_within_closures name c;
   c
 
@@ -238,19 +247,35 @@ let find_region env (r : Fexpr.region) =
 
 let find_code_id env code_id = fresh_or_existing_code_id env code_id
 
-let targetint (i : Fexpr.targetint) : Targetint_32_64.t =
-  Targetint_32_64.of_int64 i
+(* CR mshinwell: This should not be hardcoded - machine_width should flow
+   through properly *)
+let machine_width = Target_system.Machine_width.Sixty_four
 
-let targetint_31_63 (i : Fexpr.targetint) : Targetint_31_63.t =
-  Targetint_31_63.of_int64 i
+let targetint (i : Fexpr.targetint) : Targetint_32_64.t =
+  Targetint_32_64.of_int64 machine_width i
+
+let targetint_31_63 (i : Fexpr.targetint) : Target_ocaml_int.t =
+  (* CR mshinwell: machine_width should be passed through properly here *)
+  Target_ocaml_int.of_int64 machine_width i
 
 let vec128 bits : Vector_types.Vec128.Bit_pattern.t =
   Vector_types.Vec128.Bit_pattern.of_bits bits
 
+let vec256 bits : Vector_types.Vec256.Bit_pattern.t =
+  Vector_types.Vec256.Bit_pattern.of_bits bits
+
+let vec512 bits : Vector_types.Vec512.Bit_pattern.t =
+  Vector_types.Vec512.Bit_pattern.of_bits bits
+
 let tag_scannable (tag : Fexpr.tag_scannable) : Tag.Scannable.t =
   Tag.Scannable.create_exn tag
 
-let immediate i = i |> Targetint_32_64.of_string |> Targetint_31_63.of_targetint
+let immediate i =
+  (* CR mshinwell: This should not be hardcoded - machine_width should flow
+     through properly *)
+  i
+  |> Targetint_32_64.of_string machine_width
+  |> Target_ocaml_int.of_targetint machine_width
 
 let float32 f = f |> Numeric_types.Float32_by_bit_pattern.create
 
@@ -266,10 +291,12 @@ let rec subkind :
   | Boxed_int64 -> Boxed_int64
   | Boxed_nativeint -> Boxed_nativeint
   | Boxed_vec128 -> Boxed_vec128
+  | Boxed_vec256 -> Boxed_vec256
+  | Boxed_vec512 -> Boxed_vec512
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } ->
     let consts =
-      consts |> List.map targetint_31_63 |> Targetint_31_63.Set.of_list
+      consts |> List.map targetint_31_63 |> Target_ocaml_int.Set.of_list
     in
     let non_consts =
       non_consts
@@ -313,6 +340,8 @@ let const (c : Fexpr.const) : Reg_width_const.t =
   | Naked_int64 i -> Reg_width_const.naked_int64 i
   | Naked_nativeint i -> Reg_width_const.naked_nativeint (i |> targetint)
   | Naked_vec128 bits -> Reg_width_const.naked_vec128 (bits |> vec128)
+  | Naked_vec256 bits -> Reg_width_const.naked_vec256 (bits |> vec256)
+  | Naked_vec512 bits -> Reg_width_const.naked_vec512 (bits |> vec512)
 
 let rec rec_info env (ri : Fexpr.rec_info) : Rec_info_expr.t =
   let module US = Rec_info_expr.Unrolling_state in
@@ -352,9 +381,10 @@ let field_of_block env (v : Fexpr.field_of_block) =
     match v with
     | Symbol s -> Simple.symbol (get_symbol env s)
     | Tagged_immediate i ->
-      let i = Targetint_32_64.of_string i in
+      let i = Targetint_32_64.of_string machine_width i in
       Simple.const
-        (Reg_width_const.tagged_immediate (Targetint_31_63.of_targetint i))
+        (Reg_width_const.tagged_immediate
+           (Target_ocaml_int.of_targetint machine_width i))
     | Dynamically_computed var ->
       let var = find_var env var in
       Simple.var var
@@ -398,7 +428,10 @@ let block_access_kind (ak : Fexpr.block_access_kind) :
   let size s : _ Or_unknown.t =
     match s with
     | None -> Unknown
-    | Some s -> Known (s |> Targetint_31_63.of_int64)
+    | Some s ->
+      (* CR mshinwell: Should get machine_width from fexpr context when
+         available *)
+      Known (s |> Target_ocaml_int.of_int64 machine_width)
   in
   match ak with
   | Values { field_kind; tag; size = s } ->
@@ -436,7 +469,7 @@ let unop env (unop : Fexpr.unop) : Flambda_primitive.unary_primitive =
     Opaque_identity { middle_end_only = false; kind = Flambda_kind.value }
   | Project_value_slot { project_from; value_slot } ->
     (* CR mshinwell: support non-value kinds *)
-    let kind = Flambda_kind.With_subkind.any_value in
+    let kind = Flambda_kind.value in
     let value_slot = fresh_or_existing_value_slot env value_slot kind in
     let project_from = fresh_or_existing_function_slot env project_from in
     Project_value_slot { project_from; value_slot }
@@ -474,24 +507,26 @@ let array_kind : 'a -> Fexpr.array_kind -> Flambda_primitive.Array_kind.t =
  fun _env -> function
   | Immediates -> Immediates
   | Naked_floats -> Naked_floats
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Values -> Values
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Unboxed_product _ ->
+  | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
+  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | Naked_vec512s | Unboxed_product _ ->
     Misc.fatal_error
-      "fexpr support for unboxed float32/int32/64/nativeint/vec128/unboxed \
-       product arrays not yet implemented"
+      "fexpr support for arrays of unboxed elements not yet implemented"
 
 let array_set_kind :
     'a -> Fexpr.array_set_kind -> Flambda_primitive.Array_set_kind.t =
  fun env -> function
   | Immediates -> Immediates
-  | Naked_floats -> Naked_floats
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Values ia -> Values (init_or_assign env ia)
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s ->
+  | Naked_floats -> Naked_floats
+  | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
+  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | Naked_vec512s ->
     Misc.fatal_error
-      "fexpr support for unboxed float32/int32/64/nativeint/vec128 arrays not \
-       yet implemented"
+      "fexpr support for arrays of unboxed elements not yet implemented"
 
 let ternop env (ternop : Fexpr.ternop) : Flambda_primitive.ternary_primitive =
   match ternop with
@@ -555,15 +590,14 @@ let set_of_closures env fun_decls value_slots alloc =
     |> Function_slot.Lmap.of_list
     |> Function_slot.Lmap.map
          (fun code_id : Function_declarations.code_id_in_function_declaration ->
-           Code_id code_id)
+           Code_id { code_id; only_full_applications = false })
     |> Function_declarations.create
   in
   let value_slots = Option.value value_slots ~default:[] in
   let value_slots : Simple.t Value_slot.Map.t =
     let convert ({ var; value } : Fexpr.one_value_slot) =
       (* CR mshinwell: support non-value kinds *)
-      ( fresh_or_existing_value_slot env var Flambda_kind.With_subkind.any_value,
-        simple env value )
+      fresh_or_existing_value_slot env var Flambda_kind.value, simple env value
     in
     List.map convert value_slots |> Value_slot.Map.of_list
   in
@@ -623,8 +657,8 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     in
     let bound_vars, env =
       let convert_binding env (var, _) : Bound_var.t * env =
-        let var, env = fresh_var env var in
-        let var = Bound_var.create var Name_mode.normal in
+        let var, var_duid, env = fresh_var env var Flambda_kind.value in
+        let var = Bound_var.create var var_duid Name_mode.normal in
         var, env
       in
       map_accum_left convert_binding env vars_and_closure_bindings
@@ -649,9 +683,9 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     Misc.fatal_errorf "'with' clause only allowed when defining closures"
   | Let { bindings = [{ var; defining_expr = d }]; body; value_slots = None } ->
     let named = defining_expr env d in
-    let id, env = fresh_var env var in
+    let id, id_duid, env = fresh_var env var (Flambda.Named.kind named) in
     let body = expr env body in
-    let var = Bound_var.create id Name_mode.normal in
+    let var = Bound_var.create id id_duid Name_mode.normal in
     let bound = Bound_pattern.singleton var in
     Flambda.Let.create bound named ~body ~free_names_of_body:Unknown
     |> Flambda.Expr.create_let
@@ -664,49 +698,63 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
       match sort with Exn -> true | Normal | Define_root_symbol -> false
     in
     let sort = continuation_sort sort in
+    let arity =
+      match recursive with
+      | Nonrecursive -> List.length params
+      | Recursive invariant_params ->
+        List.length invariant_params + List.length params
+    in
     let name, body_env =
       if is_exn_handler
       then
         let e, env = fresh_exn_cont env name in
         Exn_continuation.exn_handler e, env
-      else fresh_cont env name ~sort ~arity:(List.length params)
+      else fresh_cont env name ~sort ~arity
     in
     let body = expr body_env body in
-    let env =
-      match recursive with Nonrecursive -> env | Recursive -> body_env
+    let create_params env params =
+      let env, parameters =
+        List.fold_right
+          (fun ({ param; kind } : Fexpr.kinded_parameter) (env, args) ->
+            let kind = value_kind_with_subkind_opt kind in
+            let var, var_duid, env =
+              fresh_var env param (Flambda_kind.With_subkind.kind kind)
+            in
+            let param = Bound_parameter.create var kind var_duid in
+            env, param :: args)
+          params (env, [])
+      in
+      env, Bound_parameters.create parameters
     in
-    let handler_env, params =
-      List.fold_right
-        (fun ({ param; kind } : Fexpr.kinded_parameter) (env, args) ->
-          let var, env = fresh_var env param in
-          let param =
-            Bound_parameter.create var (value_kind_with_subkind_opt kind)
-          in
-          env, param :: args)
-        params (env, [])
+    let env, invariant_params =
+      match recursive with
+      | Nonrecursive -> env, Bound_parameters.empty
+      | Recursive invariant_params -> create_params body_env invariant_params
     in
+    let handler_env, params = create_params env params in
     let handler = expr handler_env handler in
     let handler =
-      Flambda.Continuation_handler.create
-        (Bound_parameters.create params)
-        ~handler ~free_names_of_handler:Unknown ~is_exn_handler ~is_cold:false
+      Flambda.Continuation_handler.create params ~handler
+        ~free_names_of_handler:Unknown ~is_exn_handler ~is_cold:false
     in
     match recursive with
     | Nonrecursive ->
       Flambda.Let_cont.create_non_recursive name handler ~body
         ~free_names_of_body:Unknown
-    | Recursive ->
-      let handlers = Continuation.Map.singleton name handler in
-      Flambda.Let_cont.create_recursive ~invariant_params:Bound_parameters.empty
-        handlers ~body)
+    | Recursive _ ->
+      let handlers = Continuation.Lmap.singleton name handler in
+      Flambda.Let_cont.create_recursive ~invariant_params handlers ~body)
   | Let_cont _ -> failwith "TODO andwhere"
   | Apply_cont ac -> Flambda.Expr.create_apply_cont (apply_cont env ac)
   | Switch { scrutinee; cases } ->
     let arms =
       List.map
-        (fun (case, apply) -> Targetint_31_63.of_int case, apply_cont env apply)
+        (fun (case, apply) ->
+          (* CR mshinwell: Should get machine_width from fexpr context when
+             available *)
+          Target_ocaml_int.of_int machine_width case, apply_cont env apply)
         cases
-      |> Targetint_31_63.Map.of_list
+      |> Target_ocaml_int.Map.of_list
     in
     Flambda.Expr.create_switch
       (Flambda.Switch.create ~condition_dbg:Debuginfo.none
@@ -817,6 +865,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
           static_const (SC.boxed_nativeint (or_variable targetint env i))
         | Boxed_vec128 i ->
           static_const (SC.boxed_vec128 (or_variable vec128 env i))
+        | Boxed_vec256 i ->
+          static_const (SC.boxed_vec256 (or_variable vec256 env i))
+        | Boxed_vec512 i ->
+          static_const (SC.boxed_vec512 (or_variable vec512 env i))
         | Immutable_float_block elements ->
           static_const
             (SC.immutable_float_block
@@ -892,17 +944,27 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
           let params, env =
             map_accum_left
               (fun env ({ param; kind } : Fexpr.kinded_parameter) ->
-                let var, env = fresh_var env param in
-                let param =
-                  Bound_parameter.create var (value_kind_with_subkind_opt kind)
+                let kind = value_kind_with_subkind_opt kind in
+                let var, var_duid, env =
+                  fresh_var env param (Flambda_kind.With_subkind.kind kind)
                 in
+                let param = Bound_parameter.create var kind var_duid in
                 param, env)
               env params
           in
-          let my_closure, env = fresh_var env closure_var in
-          let my_region, env = fresh_var env region_var in
-          let my_ghost_region, env = fresh_var env ghost_region_var in
-          let my_depth, env = fresh_var env depth_var in
+          let my_closure, _my_closure_duid, env =
+            fresh_var env closure_var Flambda_kind.value
+          in
+          let my_region, _my_region_duid, env =
+            fresh_var env region_var Flambda_kind.region
+          in
+          let my_ghost_region, _my_ghost_region, env =
+            fresh_var env ghost_region_var Flambda_kind.region
+          in
+          let my_depth, _my_depth, env =
+            fresh_var env depth_var Flambda_kind.rec_info
+          in
+          (* CR sspies: In the future, consider propagating these debug UIDs. *)
           let return_continuation, env =
             fresh_cont env ret_cont ~sort:Return
               ~arity:(Flambda_arity.cardinal_unarized result_arity)
@@ -965,8 +1027,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
             ~is_a_functor:false ~is_opaque:false ~recursive
             ~cost_metrics (* CR poechsel: grab inlining arguments from fexpr. *)
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
-            ~poll_attribute:Default ~dbg:Debuginfo.none ~is_tupled
-            ~is_my_closure_used ~inlining_decision:Never_inline_attribute
+            ~poll_attribute:Default ~regalloc_attribute:Default_regalloc
+            ~regalloc_param_attribute:Default_regalloc_params ~cold:false
+            ~dbg:Debuginfo.none ~is_tupled ~is_my_closure_used
+            ~inlining_decision:Never_inline_attribute
             ~absolute_history:
               (Inlining_history.Absolute.empty
                  (Compilation_unit.get_current_exn ()))
@@ -1018,7 +1082,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
         | Some { params_arity = Some params_arity; ret_arity } ->
           let params_arity = arity params_arity in
           let return_arity = arity ret_arity in
-          ( Call_kind.indirect_function_call_known_arity alloc,
+          ( Call_kind.indirect_function_call_known_arity ~code_ids:Unknown alloc,
             params_arity,
             return_arity )
         | None | Some { params_arity = None; ret_arity = _ } ->
@@ -1125,5 +1189,6 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : Flambda_unit.t =
   let body = expr env fexpr.body in
   Flambda_unit.create ~return_continuation ~exn_continuation
     ~toplevel_my_region:toplevel_region
-    ~toplevel_my_ghost_region:(Variable.create "my_ghost_region")
+    ~toplevel_my_ghost_region:
+      (Variable.create "my_ghost_region" Flambda_kind.region)
     ~body ~module_symbol ~used_value_slots:Unknown

@@ -21,11 +21,12 @@
 
 (** {1:modname_from_strings Module name convention and computation} *)
 
-(* CR mshinwell: Consider changing [modname] to be [Compilation_unit.t] *)
-
+type intf_or_impl = Intf | Impl
 type modname = string
 type filename = string
 type file_prefix = string
+
+(* CR lmaurer: These overlap with functionality in [Compilation_unit] **)
 
 (** [modulize s] capitalizes the first letter of [s]. *)
 val modulize: string -> modname
@@ -52,36 +53,73 @@ type t
     - the module name associated to the unit
     - the filename prefix (dirname + basename with all extensions stripped)
       for compilation artifacts
-    - the input source file
+    - the original input source file
+    - the raw input source file
     For instance, when calling [ocamlopt dir/x.mli -o target/y.cmi],
     - the input source file is [dir/x.mli]
     - the module name is [Y]
     - the prefix is [target/y]
+
+    When calling, for example, [ocamlopt foo.ml._.preprocess] (where
+    foo.ml._.preprocess is a serialized, ppx-expanded AST of foo.ml), the "raw"
+    source file is foo.ml._.preprocess, while foo.ml is the "original" source
+    file.
 *)
 
-(** [source_file u] is the source file of [u]. *)
-val source_file: t -> filename
+(** [original_source_file u] is the original source file of [u]. When calling,
+    for example, [ocamlopt foo.ml._.preprocess] (where foo.ml._.preprocess is a
+    serialized, ppx-expanded AST of foo.ml), foo.ml is the "original" source
+    file. *)
+val original_source_file: t -> filename
+
+(** [raw_source_file u] is the raw source file of [u]. When calling, for
+    example, [ocamlopt foo.ml._.preprocess] (where foo.ml._.preprocess is a
+    serialized, ppx-expanded AST of foo.ml), foo.ml._.preprocess is the "raw"
+    source file.) *)
+val raw_source_file: t -> filename
 
 (** [prefix u] is the filename prefix of the unit. *)
 val prefix: t -> file_prefix
 
 (** [modname u] or [artifact_modname a] is the module name of the unit
     or compilation artifact.*)
-val modname: t -> modname
+val modname: t -> Compilation_unit.t
+
+(** [kind u] is the kind (interface or implementation) of the unit. *)
+val kind: t -> intf_or_impl
 
 (** [check_unit_name u] prints a warning if the derived module name [modname u]
     should not be used as a module name as specified
     by {!is_unit_name}[ ~strict:true]. *)
 val check_unit_name : t -> unit
 
-(** [make ~check ~source_file prefix] associates both the
+(** [make ~check ~source_file ~for_pack_prefix kind prefix] associates both the
     [source_file] and the module name {!modname_from_source}[ target_prefix] to
     the prefix filesystem path [prefix].
 
    If [check_modname=true], this function emits a warning if the derived module
    name is not valid according to {!check_unit_name}.
 *)
-val make: ?check_modname:bool -> source_file:filename -> file_prefix -> t
+val make:
+    ?check_modname:bool -> source_file:filename ->
+    for_pack_prefix:Compilation_unit.Prefix.t ->
+    intf_or_impl -> file_prefix -> t
+
+(** [make_with_known_compilation_unit ~source_file ~for_pack_prefix kind prefix
+    compilation_unit] associates both the [source_file] and the module name
+    [compilation_unit] to the prefix filesystem path [prefix]. It is assumed
+    that checks were performed by [Compilation_unit].
+*)
+val make_with_known_compilation_unit:
+  source_file:filename -> intf_or_impl -> file_prefix -> Compilation_unit.t -> t
+
+(** [make_dummy ~input_name compilation_unit] is used in places where there's no
+    actual source file but we do need to specify a [Compilation_unit.t]. The
+    [input_name] is a string like "startup", suitable as the value for
+    [Location.input_name] as well. *)
+val make_dummy: input_name:string -> Compilation_unit.t -> t
+
+val set_original_source_file_name : t -> filename -> t
 
 (** {1:artifact_function Build artifacts }*)
 module Artifact: sig
@@ -92,8 +130,17 @@ module Artifact: sig
     - the input source file if it exists
 *)
 
-   (** [source_file a] is the source file of [a] if it exists. *)
-   val source_file: t -> filename option
+   (** [original_source_file a] is the original source file of [a] if it exists.
+       See [Unit_info.original_source_file] for a description of the distinction
+       of "original" vs "raw" source file
+    *)
+   val original_source_file: t -> filename option
+
+   (** [raw_source_file a] is the raw source file of [a] if it exists. See
+       [Unit_info.raw_source_file] for a description of the distinction of
+       "original" vs "raw" source file
+    *)
+   val raw_source_file: t -> filename option
 
   (** [prefix a] is the filename prefix of the compilation artifact. *)
    val prefix: t ->  file_prefix
@@ -102,11 +149,12 @@ module Artifact: sig
    val filename: t -> filename
 
    (** [modname a] is the module name of the compilation artifact.*)
-   val modname: t -> modname
+   val modname: t -> Compilation_unit.t
 
-   (** [from_filename filename] reconstructs the module name
-       [modname_from_source filename] associated to the artifact [filename]. *)
-   val from_filename: filename -> t
+   (** [from_filename ~for_pack_prefix filename] reconstructs the module name
+       [modname_from_source filename] associated to the artifact [filename],
+       assuming the pack prefix is [for_pack_prefix]. *)
+   val from_filename: for_pack_prefix:Compilation_unit.Prefix.t -> filename -> t
 
 end
 
@@ -122,7 +170,13 @@ val cmt: t -> Artifact.t
 val cmti: t -> Artifact.t
 val cms: t -> Artifact.t
 val cmsi: t -> Artifact.t
+val cmj: t -> Artifact.t
+val cmjo: t -> Artifact.t
+val cmja : t -> Artifact.t
+val cmjx : t -> Artifact.t
 val annot: t -> Artifact.t
+
+val artifact : t -> extension:string -> Artifact.t
 
 (** The functions below change the type of an artifact by updating the
     extension of its filename.
@@ -162,3 +216,8 @@ val is_cmi: Artifact.t -> bool
     name [modname u].
     @raise Not_found if no such cmi exists *)
 val find_normalized_cmi: t -> Artifact.t
+
+(** [of_artifact ~dummy_source_file kind a] builds a [Unit_info.t] from a
+    [Unit_info.Artifact.t], using [dummy_source_file] as the filename if the
+    artifact doesn't have one attached. *)
+val of_artifact : dummy_source_file:filename -> intf_or_impl -> Artifact.t -> t

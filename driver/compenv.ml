@@ -137,6 +137,16 @@ let int_option_setter ppf name option s =
     Printf.ksprintf (print_error ppf)
       "non-integer parameter %s for %S" s name
 
+let int_option_with_none ppf name option s =
+  if String.equal s "none"
+  then option := None
+  else
+    try
+      option := Some (int_of_string s)
+    with _ ->
+      Printf.ksprintf (print_error ppf)
+        "non-integer parameter %s for %S (expected integer or 'none')" s name
+
 (*
 let float_setter ppf name option s =
   try
@@ -163,6 +173,13 @@ let check_int ppf name s =
       Printf.ksprintf (print_error ppf)
         "bad value %s for %s" s name;
       None
+
+let check_relative_path ~on_error name s =
+  if Filename.is_relative s then Some s
+  else begin
+    on_error (Printf.sprintf "%s path must be relative, got: %s" name s);
+    None
+  end
 
 let decode_compiler_pass ppf v ~name ~filter =
   let module P = Clflags.Compiler_pass in
@@ -217,6 +234,13 @@ let parse_warnings error v =
 let read_one_param ppf position name v =
   let set name options s =  setter ppf (fun b -> b) name options s in
   let clear name options s = setter ppf (fun b -> not b) name options s in
+  let save_ir ~filter ~setter =
+    if !native_code then begin
+      match decode_compiler_pass ppf v ~name ~filter with
+      | None -> ()
+      | Some pass -> setter pass true
+    end
+  in
   let compat name s =
     let error_if_unset = function
       | true -> true
@@ -249,6 +273,7 @@ let read_one_param ppf position name v =
   | "no-auto-include-otherlibs" -> set "nostdlib" [ no_auto_include_otherlibs ] v
   | "nocwd" -> set "nocwd" [ no_cwd ] v
   | "linkall" -> set "linkall" [ link_everything ] v
+  | "llvm-backend" -> set "llvm-backend" [ Clflags.llvm_backend ] v
   | "nolabels" -> set "nolabels" [ classic ] v
   | "principal" -> set "principal"  [ principal ] v
   | "rectypes" -> set "rectypes" [ recursive_types ] v
@@ -266,6 +291,8 @@ let read_one_param ppf position name v =
   | "keep-docs" -> set "keep-docs" [ Clflags.keep_docs ] v
   | "keep-locs" -> set "keep-locs" [ Clflags.keep_locs ] v
   | "probes" -> set "probes" [ Clflags.probes ] v
+  | "probes_optimized" ->
+    set "probes-optimized" [ Clflags.emit_optimized_probes ] v
 
   | "compact" -> clear "compact" [ optimize_for_speed ] v
   | "no-app-funct" -> clear "no-app-funct" [ applicative_functors ] v
@@ -351,6 +378,32 @@ let read_one_param ppf position name v =
     Int_arg_helper.parse v
       "Bad syntax in OCAMLPARAM for 'inline-max-depth'"
       inline_max_depth
+  | "gdwarf-config-shape-reduce-depth" ->
+    int_option_with_none ppf "gdwarf-config-shape-reduce-depth"
+      gdwarf_config_shape_reduce_depth v
+  | "gdwarf-config-shape-eval-depth" ->
+    int_option_with_none ppf "gdwarf-config-shape-eval-depth"
+      gdwarf_config_shape_eval_depth v
+  | "gdwarf-config-max-cms-files-per-unit" ->
+    int_option_with_none ppf "gdwarf-config-max-cms-files-per-unit"
+      gdwarf_config_max_cms_files_per_unit v
+  | "gdwarf-config-max-cms-files-per-variable" ->
+    int_option_with_none ppf "gdwarf-config-max-cms-files-per-variable"
+      gdwarf_config_max_cms_files_per_variable v
+  | "gdwarf-config-max-type-to-shape-depth" ->
+    int_option_with_none ppf "gdwarf-config-max-type-to-shape-depth"
+      gdwarf_config_max_type_to_shape_depth v
+  | "gdwarf-config-max-shape-reduce-steps-per-variable" ->
+    int_option_with_none ppf
+      "gdwarf-config-max-shape-reduce-steps-per-variable"
+      gdwarf_config_max_shape_reduce_steps_per_variable v
+  | "gdwarf-config-max-evaluation-steps-per-variable" ->
+    int_option_with_none ppf
+      "gdwarf-config-max-evaluation-steps-per-variable"
+      gdwarf_config_max_evaluation_steps_per_variable v
+  | "gdwarf-config-shape-reduce-fuel" ->
+    int_option_with_none ppf "gdwarf-config-shape-reduce-fuel"
+      gdwarf_config_shape_reduce_fuel v
   | "Oclassic" -> if check_bool ppf "Oclassic" v then Clflags.set_oclassic ()
   | "O2" -> if check_bool ppf "O2" v then Clflags.set_o2 ()
   | "O3" -> if check_bool ppf "O3" v then Clflags.set_o3 ()
@@ -476,15 +529,19 @@ let read_one_param ppf position name v =
     set_compiler_pass ppf v ~name Clflags.stop_after ~filter:(fun _ -> true)
 
   | "save-ir-after" ->
-    if !native_code then begin
-      let filter = Clflags.Compiler_pass.can_save_ir_after in
-      match decode_compiler_pass ppf v ~name ~filter with
-      | None -> ()
-      | Some pass -> set_save_ir_after pass true
-    end
+    save_ir
+      ~filter:Clflags.Compiler_pass.can_save_ir_after
+      ~setter:set_save_ir_after
+  | "save-ir-before" ->
+    save_ir
+      ~filter:Clflags.Compiler_pass.can_save_ir_before
+      ~setter:set_save_ir_before
   | "dump-into-file" -> Clflags.dump_into_file := true
   | "dump-into-csv" -> Clflags.dump_into_csv := true
   | "dump-dir" -> Clflags.dump_dir := Some v
+  | "profile-output" ->
+    (check_relative_path ~on_error:(print_error ppf) "profile-output" v)
+    |> Option.iter (fun path -> Clflags.profile_output_name := Some path)
 
   | "extension" -> Language_extension.enable_of_string_exn v
   | "disable-all-extensions" ->

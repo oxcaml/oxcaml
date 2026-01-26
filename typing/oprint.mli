@@ -21,6 +21,7 @@ val out_value : (formatter -> out_value -> unit) ref
 val out_label : (formatter -> string * out_mutability * out_type
   * out_modality list -> unit) ref
 val out_modality : (formatter -> out_modality -> unit) ref
+val out_modes : (formatter -> out_mode list -> unit) ref
 val out_jkind_const : (formatter -> out_jkind_const -> unit) ref
 val out_jkind : (formatter -> out_jkind -> unit) ref
 val out_type : (formatter -> out_type -> unit) ref
@@ -32,10 +33,6 @@ val out_class_type : (formatter -> out_class_type -> unit) ref
 val out_module_type : (formatter -> out_module_type -> unit) ref
 val out_sig_item : (formatter -> out_sig_item -> unit) ref
 val out_signature : (formatter -> out_sig_item list -> unit) ref
-val out_functor_parameters :
-  (formatter ->
-   (string option * Outcometree.out_module_type) option list -> unit)
-    ref
 val out_type_extension : (formatter -> out_type_extension -> unit) ref
 val out_phrase : (formatter -> out_phrase -> unit) ref
 

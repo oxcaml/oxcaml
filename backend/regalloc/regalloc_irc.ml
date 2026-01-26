@@ -128,7 +128,7 @@ let simplify : State.t -> unit =
 
 let ok : State.t -> Reg.t -> Reg.t -> bool =
  fun state t r ->
-  WorkList.equal (State.work_list state t) WorkList.Precolored
+  RegWorkList.equal (State.reg_work_list state t) RegWorkList.Precolored
   || State.degree state t < k t
   || State.mem_adj_set state t r
 
@@ -191,6 +191,8 @@ let coalesce : State.t -> unit =
   then (
     log "coalesce";
     indent ());
+  (* CR-someday xclerc for xclerc: can we use affinity when we choose a move to
+     coalesce? *)
   let m = State.choose_and_remove_work_list_moves state in
   let x = m.res.(0) in
   let y = m.arg.(0) in
@@ -328,18 +330,31 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
       let reg_first_avail = Reg_class.first_available_register reg_class in
       let ok_colors = Array.make reg_num_avail true in
       let counter = ref reg_num_avail in
-      let rec mark_adjacent_colors_and_get_first_available (adj : Reg.t list) :
-          int =
+      (* returns the index of the first available physical register in the
+         `ok_colors` array *)
+      let get_first_available () : int =
+        let first_avail = ref 0 in
+        while
+          !first_avail < reg_num_avail
+          && not (Array.unsafe_get ok_colors !first_avail)
+        do
+          incr first_avail
+        done;
+        !first_avail
+      in
+      (* returns the index of the first available physical register in the
+         passed affinity list *)
+      let rec get_available = function
+        | [] -> get_first_available ()
+        | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
+          let idx = phys_reg - reg_first_avail in
+          if idx >= 0 && idx < reg_num_avail && Array.unsafe_get ok_colors idx
+          then idx
+          else get_available tl
+      in
+      let rec mark_adjacent_colors_and_get_available (adj : Reg.t list) : int =
         match adj with
-        | [] ->
-          let first_avail = ref 0 in
-          while
-            !first_avail < reg_num_avail
-            && not (Array.unsafe_get ok_colors !first_avail)
-          do
-            incr first_avail
-          done;
-          !first_avail
+        | [] -> get_available (Regalloc_affinity.get (State.affinity state) n)
         | hd :: tl ->
           let alias = State.find_alias state hd in
           if State.is_precolored_or_colored state alias
@@ -353,13 +368,13 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
                 Array.unsafe_set ok_colors (color - reg_first_avail) false;
                 decr counter;
                 if !counter > 0
-                then mark_adjacent_colors_and_get_first_available tl
+                then mark_adjacent_colors_and_get_available tl
                 else reg_num_avail)
-              else mark_adjacent_colors_and_get_first_available tl)
-          else mark_adjacent_colors_and_get_first_available tl
+              else mark_adjacent_colors_and_get_available tl)
+          else mark_adjacent_colors_and_get_available tl
       in
       let first_avail =
-        mark_adjacent_colors_and_get_first_available (State.adj_list state n)
+        mark_adjacent_colors_and_get_available (State.adj_list state n)
       in
       if first_avail = reg_num_avail
       then (
@@ -413,8 +428,13 @@ let rewrite :
    seems to be fine with 4 *)
 let max_rounds = 50
 
+module For_testing = struct
+  let rounds = ref (-1)
+end
+
 let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
  fun ~round state cfg_with_infos ->
+  For_testing.rounds := round;
   if round > max_rounds
   then
     fatal "register allocation was not succesful after %d rounds (%s)"
@@ -509,7 +529,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let cfg_infos, stack_slots =
+  let cfg_infos, stack_slots, affinity =
     Regalloc_rewrite.prelude
       (module Utils)
       ~on_fatal_callback:(fun () -> save_cfg "irc" cfg_with_layout)
@@ -522,7 +542,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   let state =
     State.make
       ~initial:(Reg.Set.elements all_temporaries)
-      ~stack_slots ~last_used:cfg_infos.max_instruction_id ()
+      ~stack_slots ~affinity ()
   in
   let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
   (match Reg.Set.elements spilling_because_unused with

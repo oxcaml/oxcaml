@@ -2,6 +2,16 @@ assume_info.ml
 assume_info.mli
 mixed_block_shape.ml
 mixed_block_shape.mli
+mixed_product_bytes.ml
+mixed_product_bytes.mli
+printslambda.ml
+printslambda.mli
+slambda.ml
+slambda.mli
+slambda0.ml
+slambda0.mli
+slambdaeval.ml
+slambdaeval.mli
 transl_array_comprehension.ml
 transl_array_comprehension.mli
 transl_comprehension_utils.ml
@@ -10,3 +20,5 @@ transl_list_comprehension.ml
 transl_list_comprehension.mli
 translmode.ml
 translmode.mli
+translquote.ml
+translquote.mli

@@ -21,7 +21,7 @@ module Name : sig
   val to_string : t -> string
 end
 
-(* Every temp and physical register has a unique stamp, but physical registers
+(*= Every temp and physical register has a unique stamp, but physical registers
    aliased at different types share stamps.
 
    Comparisons and containers for [t] consider both [t.stamp] and [t.typ], so
@@ -32,25 +32,27 @@ end
    that it remembers adjacency between machine registers aliased at multiple types.
 *)
 
-type t =
-  { name: Name.t;                (* Name *)
-    stamp: int;                  (* Unique stamp *)
-    typ: Cmm.machtype_component; (* Type of contents *)
-    preassigned: bool;           (* Pinned to a hardware register or stack slot *)
-    mutable loc: location; }     (* Actual location, immutable if preassigned *)
+type t = private
+  { name : Name.t; (* Name *)
+    stamp : int; (* Unique stamp *)
+    typ : Cmm.machtype_component; (* Type of contents *)
+    preassigned : bool; (* Pinned to a hardware register or stack slot *)
+    mutable loc : location
+  }
+(* Actual location, immutable if preassigned *)
 
 and location =
-    Unknown
+  | Unknown
   | Reg of int
   | Stack of stack_location
 
 and stack_location =
-    Local of int
+  | Local of int
   | Incoming of int
   | Outgoing of int
   | Domainstate of int
 
-(* The [stack_location] describes the location of pseudo-registers
+(*= The [stack_location] describes the location of pseudo-registers
    that reside in memory.
  - [Local] is a local variable or spilled register residing in the stack frame
    of the current function
@@ -74,42 +76,112 @@ and stack_location =
 
 val equal_location : location -> location -> bool
 
-val dummy: t
+val dummy : t
 
-val create: Cmm.machtype_component -> t
-val create_with_typ: t -> t
-val create_with_typ_and_name: ?prefix_if_var:string -> t -> t
-val create_at_location: Cmm.machtype_component -> location -> t
+(* CR-someday gyorsh: [dummy_for_regalloc] is currently only used is for
+   ArraySet, which could arguably be rewritten using DynArray (the latest
+   upstream version, not the one we currently have in this repository), which is
+   based on its own non-domain-specific notion of a dummy... *)
+val dummy_for_regalloc : t
 
-val createv: Cmm.machtype -> t array
-val createv_with_id: id:Ident.t -> Cmm.machtype -> t array
-val createv_with_typs: t array -> t array
-val createv_with_typs_and_id: id:Ident.t -> t array -> t array
+val create : Cmm.machtype_component -> t
 
-val typv: t array -> Cmm.machtype
+val create_with_typ : t -> t
+
+val create_with_typ_and_name : ?prefix_if_var:string -> t -> t
+
+val create_at_location : Cmm.machtype_component -> location -> t
+
+(* [create_alias t typ] given a physical register [t], creates a [Reg.t] with
+   the same stamp and location as [t], but with type [typ]. This is not related
+   to IRC's notion of alias. *)
+val create_alias : t -> typ:Cmm.machtype_component -> t
+
+val createv : Cmm.machtype -> t array
+
+val createv_with_id : id:Ident.t -> Cmm.machtype -> t array
+
+val createv_with_typs : t array -> t array
+
+val createv_with_typs_and_id : id:Ident.t -> t array -> t array
+
+val typv : t array -> Cmm.machtype
 
 (* Check [t]'s location *)
 val is_reg : t -> bool
-val is_stack :  t -> bool
+
+val is_stack : t -> bool
+
 val is_unknown : t -> bool
+
 val is_preassigned : t -> bool
 
-module Set: Set.S with type elt = t
-module Map: Map.S with type key = t
-module Tbl: Hashtbl.S with type key = t
+val is_domainstate : t -> bool
 
-val add_set_array: Set.t -> t array -> Set.t
-val diff_set_array: Set.t -> t array -> Set.t
-val inter_set_array: Set.t -> t array -> Set.t
-val disjoint_set_array: Set.t -> t array -> bool
-val set_of_array: t array -> Set.t
+val set_loc : t -> location -> unit
+
+module Set : Set.S with type elt = t
+
+module Map : Map.S with type key = t
+
+module Tbl : Hashtbl.S with type key = t
+
+val add_set_array : Set.t -> t array -> Set.t
+
+val diff_set_array : Set.t -> t array -> Set.t
+
+val inter_set_array : Set.t -> t array -> Set.t
+
+val disjoint_set_array : Set.t -> t array -> bool
+
+val set_of_array : t array -> Set.t
+
 val set_has_collisions : Set.t -> bool
 
-val all_relocatable_regs: unit -> t list
-val clear_relocatable_regs: unit -> unit
-val reinit_relocatable_regs: unit -> unit
+val all_relocatable_regs : unit -> t list
+
+val clear_relocatable_regs : unit -> unit
+
+val reinit_relocatable_regs : unit -> unit
 
 val same : t -> t -> bool
+
 val compare : t -> t -> int
+
 val same_loc : t -> t -> bool
+
 val same_loc_fatal_on_unknown : fatal_message:string -> t -> t -> bool
+
+val compare_loc : t -> t -> int
+
+val compare_loc_fatal_on_unknown : fatal_message:string -> t -> t -> int
+
+val is_of_type_addr : t -> bool
+
+module UsingLocEquality : sig
+  module Set : Stdlib.Set.S with type elt = t
+
+  module Map : Stdlib.Map.S with type key = t
+
+  module Tbl : Hashtbl.S with type key = t
+end
+
+module For_testing : sig
+  val get_stamp : unit -> int
+
+  val set_state : stamp:int -> relocatable_regs:t list -> unit
+
+  val with_loc : t -> location -> t
+end
+
+module For_printing : sig
+  (** The result of [create] will not be aded to the internal lists of registers,
+      and therefore should not be kept around after printing. *)
+  val create :
+    name:Name.t ->
+    typ:Cmm.machtype_component ->
+    stamp:int ->
+    preassigned:bool ->
+    loc:location ->
+    t
+end

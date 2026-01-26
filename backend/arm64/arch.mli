@@ -19,7 +19,7 @@
 
 val macosx : bool
 val is_asan_enabled : bool ref
-
+val feat_cssc : bool ref
 (* Machine-specific command-line options *)
 
 val command_line_options : (string * Arg.spec * string) list
@@ -58,6 +58,7 @@ type specific_operation =
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
+  | Illvm_intrinsic of string
 
 and arith_operation =
     Ishiftadd
@@ -77,6 +78,10 @@ val size_float : int
 
 val size_vec128 : int
 
+val size_vec256 : int
+
+val size_vec512 : int
+
 val allow_unaligned_access : bool
 
 (* Behavior of division *)
@@ -93,11 +98,15 @@ val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
 
+val addressing_displacement_for_llvmize : addressing_mode -> int
+
 (* Printing operations and addressing modes *)
 
 val print_addressing :
   (Format.formatter -> 'a -> unit) -> addressing_mode ->
   Format.formatter -> 'a array -> unit
+
+val specific_operation_name : specific_operation -> string
 
 val print_specific_operation :
   (Format.formatter -> 'a -> unit) -> specific_operation ->

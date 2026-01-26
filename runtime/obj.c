@@ -36,7 +36,7 @@ static int obj_tag (value arg)
 {
   header_t hd;
 
-  if (arg == Val_null) {
+  if (Is_null(arg)) {
     return 1010;   /* null_tag */
   } else if (Is_long (arg)) {
     return 1000;   /* int_tag */
@@ -92,7 +92,7 @@ CAMLprim value caml_obj_block(value tag, value size)
   sz = Long_val(size);
   tg = Long_val(tag);
 
-  /* When [tg < No_scan_tag], [caml_alloc] returns an object whose fields are
+  /* When [Scannable_tag(tg)], [caml_alloc] returns an object whose fields are
    * initialised to [Val_unit]. Otherwise, the fields are uninitialised. We aim
    * to avoid inconsistent states in other cases, on a best-effort basis --
    * by default there is no initialization. */
@@ -188,7 +188,7 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
     CAMLreturn (Atom(tag_for_alloc));
   }
 
-  if (tag_for_alloc >= No_scan_tag) {
+  if (!Scannable_tag(tag_for_alloc)) {
     res = caml_alloc(sz, tag_for_alloc);
     memcpy(Bp_val(res), Bp_val(arg), sz * sizeof(value));
   } else if (sz <= Max_young_wosize) {
@@ -259,9 +259,9 @@ CAMLprim value caml_obj_add_offset (value v, value offset)
 CAMLprim value caml_obj_compare_and_swap (value v, value f,
                                           value oldv, value newv)
 {
-  int res = caml_atomic_cas_field(v, Int_val(f), oldv, newv);
+  value res = caml_atomic_cas_field(v, f, oldv, newv);
   caml_check_urgent_gc(Val_unit);
-  return Val_int(res);
+  return res;
 }
 
 CAMLprim value caml_obj_is_shared (value obj)
@@ -410,5 +410,5 @@ CAMLprim value caml_succ_scannable_prefix_len (value v) {
 
 CAMLprim value caml_is_null(value v)
 {
-  return v == Val_null ? Val_true : Val_false;
+  return Is_null(v) ? Val_true : Val_false;
 }

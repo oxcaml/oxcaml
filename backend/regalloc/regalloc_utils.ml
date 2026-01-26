@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare
 module Array = ArrayLabels
 module List = ListLabels
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module Substitution = Regalloc_substitution
 
 let fatal_callback = ref (fun () -> ())
@@ -14,9 +14,14 @@ let fatal fmt =
   !fatal_callback ();
   Misc.fatal_errorf fmt
 
+let function_specific_params : string list ref = ref []
+
+let set_function_specific_params l = function_specific_params := l
+
 let find_param_value param_name =
-  !Flambda_backend_flags.regalloc_params
-  |> List.rev
+  (* Concatenate function-specific params with global params *)
+  let all_params = !function_specific_params @ !Oxcaml_flags.regalloc_params in
+  all_params
   |> List.find_map ~f:(fun param ->
          match String.split_on_char ':' param with
          | [] -> None
@@ -57,6 +62,8 @@ let invariants : bool Lazy.t =
 let validator_debug = bool_of_param "VALIDATOR_DEBUG"
 
 let block_temporaries = bool_of_param "BLOCK_TEMPORARIES"
+
+let affinity = bool_of_param "AFFINITY"
 
 let verbose : bool Lazy.t = bool_of_param "VERBOSE"
 
@@ -111,10 +118,8 @@ module Instruction = struct
       live = Reg.Set.empty;
       stack_offset = -1;
       id = InstructionId.none;
-      irc_work_list = Unknown_list;
-      ls_order = -1;
-      available_before = None;
-      available_across = None
+      available_before = Reg_availability_set.Unreachable;
+      available_across = Reg_availability_set.Unreachable
     }
 
   let compare (left : t) (right : t) : int =
@@ -137,41 +142,32 @@ let first_instruction_id (block : Cfg.basic_block) : InstructionId.t =
 
 type cfg_infos =
   { arg : Reg.Set.t;
-    res : Reg.Set.t;
-    max_instruction_id : InstructionId.t
+    res : Reg.Set.t
   }
 
 let collect_cfg_infos : Cfg_with_layout.t -> cfg_infos =
  fun cfg_with_layout ->
   let arg = ref Reg.Set.empty in
   let res = ref Reg.Set.empty in
-  let max_id = ref InstructionId.none in
   let add_registers (set : Reg.Set.t ref) (regs : Reg.t array) : unit =
     ArrayLabels.iter regs ~f:(fun reg ->
         match reg.Reg.loc with
         | Unknown -> set := Reg.Set.add reg !set
         | Reg _ | Stack _ -> ())
   in
-  let update_max_id (instr : _ Cfg.instruction) : unit =
-    max_id := InstructionId.max !max_id instr.id
-  in
   Cfg_with_layout.iter_instructions
     cfg_with_layout (* CR xclerc for xclerc: use fold *)
     ~instruction:(fun instr ->
-      (instr : Instruction.t).irc_work_list <- Cfg.Unknown_list;
       add_registers arg instr.arg;
       add_registers res instr.res;
       instr.arg <- Array.copy instr.arg;
-      instr.res <- Array.copy instr.res;
-      update_max_id instr)
+      instr.res <- Array.copy instr.res)
     ~terminator:(fun term ->
-      term.irc_work_list <- Cfg.Unknown_list;
       add_registers arg term.arg;
       add_registers res term.res;
       term.arg <- Array.copy term.arg;
-      term.res <- Array.copy term.res;
-      update_max_id term);
-  { arg = !arg; res = !res; max_instruction_id = !max_id }
+      term.res <- Array.copy term.res);
+  { arg = !arg; res = !res }
 
 let log_instruction_suffix (instr : _ Cfg.instruction) (liveness : liveness) :
     unit =
@@ -258,23 +254,66 @@ module Move = struct
       from:Reg.t ->
       to_:Reg.t ->
       Instruction.t =
-   fun move ~id ~copy:instr ~from ~to_ ->
-    { desc = Op (op_of_move move);
-      arg = [| from |];
-      res = [| to_ |];
-      dbg = instr.dbg;
-      fdo = instr.fdo;
-      live = instr.live;
-      (* note: recomputed anyway *)
-      stack_offset = instr.stack_offset;
-      id;
-      irc_work_list = Unknown_list;
-      ls_order = -1;
-      available_before = instr.available_before;
-      available_across = instr.available_across
-    }
+   fun move ~id ~copy ~from ~to_ ->
+    Cfg.make_instruction_from_copy copy
+      ~desc:(Cfg.Op (op_of_move move))
+      ~arg:[| from |] ~res:[| to_ |] ~id ()
 
   let to_string = function Plain -> "move" | Load -> "load" | Store -> "store"
+end
+
+(* When inserting a spill instruction like `spill-t/4567[s:0] <- t/1234`, we
+   must insert it after any [Name_for_debugger] instructions that name the
+   register being spilled (t/1234 in this example). This ensures that the
+   spilled register (spill-t/4567) will inherit the debug name. We check
+   register locations using [Reg.same_loc] rather than stamps, since the
+   register allocator can reuse the same location for registers with different
+   stamps. *)
+module Insert_skipping_name_for_debugger = struct
+  (* Check if a [Name_for_debugger] instruction names a register at the same
+     location as [reg]. *)
+  let names_reg_at_location (instr : Cfg.basic Cfg.instruction) (reg : Reg.t) :
+      bool =
+    match instr.desc with
+    | Op (Name_for_debugger { regs; _ }) ->
+      Array.exists ~f:(fun named_reg -> Reg.same_loc named_reg reg) regs
+    | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
+    | Stack_check _ | Op _ ->
+      false
+    [@@ocaml.warning "-4"]
+
+  (* Find the insertion point after skipping [Name_for_debugger] instructions
+     that name [reg]. *)
+  let rec find_insertion_point_after (cell : Cfg.basic Cfg.instruction DLL.cell)
+      (reg : Reg.t) : Cfg.basic Cfg.instruction DLL.cell =
+    match DLL.next cell with
+    | None -> cell
+    | Some next_cell ->
+      let next_instr = DLL.value next_cell in
+      if names_reg_at_location next_instr reg
+      then find_insertion_point_after next_cell reg
+      else cell
+
+  (* Insert [instr] after [cell], skipping over any [Name_for_debugger]
+     instructions that name [reg]. *)
+  let insert_after (cell : Cfg.basic Cfg.instruction DLL.cell)
+      (instr : Cfg.basic Cfg.instruction) ~(reg : Reg.t) : unit =
+    let insertion_cell = find_insertion_point_after cell reg in
+    DLL.insert_after insertion_cell instr
+
+  (* Add [instr] at the beginning of [list], but after any [Name_for_debugger]
+     instructions at the start that name [reg]. *)
+  let add_begin (list : Cfg.basic_instruction_list)
+      (instr : Cfg.basic Cfg.instruction) ~(reg : Reg.t) : unit =
+    match DLL.hd_cell list with
+    | None -> DLL.add_begin list instr
+    | Some first_cell ->
+      let first_instr = DLL.value first_cell in
+      if names_reg_at_location first_instr reg
+      then
+        (* Skip forward to find the right insertion point *)
+        insert_after first_cell instr ~reg
+      else DLL.add_begin list instr
 end
 
 let same_reg_class : Reg.t -> Reg.t -> bool =
@@ -308,42 +347,6 @@ let save_cfg : string -> Cfg_with_layout.t -> unit =
     ~annotate_succ:(fun lbl1 lbl2 ->
       Printf.sprintf "%s->%s" (Label.to_string lbl1) (Label.to_string lbl2))
     str
-
-let remove_prologue : Cfg.basic_block -> bool =
- fun block ->
-  let removed = ref false in
-  DLL.filter_left block.body ~f:(fun instr ->
-      match[@ocaml.warning "-4"] instr.Cfg.desc with
-      | Cfg.Prologue ->
-        removed := true;
-        false
-      | _ -> true);
-  !removed
-
-let remove_prologue_if_not_required : Cfg_with_layout.t -> unit =
- fun cfg_with_layout ->
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let prologue_required =
-    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-      ~fun_num_stack_slots:cfg.fun_num_stack_slots
-  in
-  if not prologue_required
-  then
-    (* note: `Cfgize` has put the prologue in the entry block or its
-       successor. *)
-    let entry_block = Cfg.get_block_exn cfg cfg.entry_label in
-    let removed = remove_prologue entry_block in
-    if not removed
-    then
-      match entry_block.terminator.desc with
-      | Always label ->
-        let block = Cfg.get_block_exn cfg label in
-        let removed = remove_prologue block in
-        assert removed
-      | Never | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-      | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call _
-        ->
-        assert false
 
 let update_live_fields : Cfg_with_layout.t -> liveness -> unit =
  fun cfg_with_layout liveness ->
@@ -424,7 +427,9 @@ module SpillCosts = struct
               | None -> 10
               | Some cost -> int_of_string cost
             in
-            (* CR-soon xclerc for xclerc: consider adding an overflow check. *)
+            (* CR-soon xclerc for xclerc: consider adding an overflow check (See
+               tools/regalloc/regalloc.ml). Or better, share the code between
+               the tool and the allocators. *)
             Misc.power ~base depth
         in
         let cost = base_cost * cost_multiplier in

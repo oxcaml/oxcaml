@@ -70,20 +70,28 @@ module Component_for_creation = struct
     | Singleton : KS.t -> [> ] t
     | Unboxed_product : _ t list -> [`Complex] t
 
-  let rec from_lambda (layout : Lambda.layout) =
+  let rec from_lambda (layout : Lambda.layout) ~machine_width =
     match layout with
-    | Pvalue vk -> Singleton (KS.from_lambda_value_kind vk)
+    | Pvalue vk -> Singleton (KS.from_lambda_value_kind vk ~machine_width)
     | Punboxed_float Unboxed_float64 -> Singleton KS.naked_float
     | Punboxed_float Unboxed_float32 -> Singleton KS.naked_float32
-    | Punboxed_int Unboxed_int32 -> Singleton KS.naked_int32
-    | Punboxed_int Unboxed_int64 -> Singleton KS.naked_int64
-    | Punboxed_int Unboxed_nativeint -> Singleton KS.naked_nativeint
+    | Punboxed_or_untagged_integer Untagged_int8 -> Singleton KS.naked_int8
+    | Punboxed_or_untagged_integer Untagged_int16 -> Singleton KS.naked_int16
+    | Punboxed_or_untagged_integer Unboxed_int32 -> Singleton KS.naked_int32
+    | Punboxed_or_untagged_integer Unboxed_int64 -> Singleton KS.naked_int64
+    | Punboxed_or_untagged_integer Untagged_int -> Singleton KS.naked_immediate
+    | Punboxed_or_untagged_integer Unboxed_nativeint ->
+      Singleton KS.naked_nativeint
     | Punboxed_vector Unboxed_vec128 -> Singleton KS.naked_vec128
-    | Punboxed_product layouts -> Unboxed_product (List.map from_lambda layouts)
+    | Punboxed_vector Unboxed_vec256 -> Singleton KS.naked_vec256
+    | Punboxed_vector Unboxed_vec512 -> Singleton KS.naked_vec512
+    | Punboxed_product layouts ->
+      Unboxed_product (List.map (from_lambda ~machine_width) layouts)
     | Ptop | Pbottom ->
       Misc.fatal_errorf
         "Cannot convert %a to Flambda_arity.Component_for_creation"
         Printlambda.layout layout
+    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
 end
 
 let nullary = []
@@ -132,8 +140,26 @@ let cardinal_unarized t = List.length (unarize t)
 
 let num_params t = List.length t
 
-let from_lambda_list layouts =
-  layouts |> List.map Component_for_creation.from_lambda |> create
+let group_by_parameter t l =
+  let shape = unarize_per_parameter t in
+  let rec unflatten shape l =
+    match shape, l with
+    | [], [] -> []
+    | [], _ :: _ -> Misc.fatal_error "group_by_parameter: too many arguments"
+    | [] :: shape, _ -> [] :: unflatten shape l
+    | (_ :: _) :: _, [] ->
+      Misc.fatal_error "group_by_parameter: too few arguments"
+    | (_ :: rest) :: shape, arg :: args -> (
+      match unflatten (rest :: shape) args with
+      | [] -> assert false
+      | h :: q -> (arg :: h) :: q)
+  in
+  unflatten shape l
+
+let from_lambda_list layouts ~machine_width =
+  layouts
+  |> List.map (Component_for_creation.from_lambda ~machine_width)
+  |> create
 
 let partially_apply t ~num_non_unarized_params_provided =
   if num_non_unarized_params_provided < 0

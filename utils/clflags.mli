@@ -51,17 +51,25 @@ val set_int_arg :
 val set_float_arg :
     int option -> Float_arg_helper.parsed ref -> float -> float option -> unit
 
-module Libloc : sig
-  type t = {
-    path: string;
-    libs: string list;
-    hidden_libs: string list
-  }
-end
-
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
+type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
+type shape_format = Old_merlin | Debugging_shapes
+type gdwarf_fidelity =
+  | Fidelity_low | Fidelity_medium | Fidelity_high
+  | Fidelity_very_high | Fidelity_ultra_high | Fidelity_unlimited
+
+module Dwarf_config_defaults : sig
+  val shape_reduce_depth : int option
+  val shape_eval_depth : int option
+  val max_cms_files_per_unit : int option
+  val max_cms_files_per_variable : int option
+  val max_type_to_shape_depth : int option
+  val max_shape_reduce_steps_per_variable : int option
+  val max_evaluation_steps_per_variable : int option
+  val shape_reduce_fuel : int option
+end
 
 val objfiles : string list ref
 val ccobjs : string list ref
@@ -70,14 +78,29 @@ val cmi_file : string option ref
 val compile_only : bool ref
 val output_name : string option ref
 val include_dirs : string list ref
-val libloc : Libloc.t list ref
 val hidden_include_dirs : string list ref
+val include_manifests : string list ref
+val hidden_include_manifests : string list ref
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref
 val make_archive : bool ref
 val debug : bool ref
 val debug_full : bool ref
+val dwarf_c_toolchain_flag : string ref
+val dwarf_fission : dwarf_fission ref
+val dwarf_pedantic : bool ref
+val gdwarf_config_shape_reduce_depth : int option ref
+val gdwarf_config_shape_eval_depth : int option ref
+val gdwarf_config_max_cms_files_per_unit : int option ref
+val gdwarf_config_max_cms_files_per_variable : int option ref
+val gdwarf_config_max_type_to_shape_depth : int option ref
+val gdwarf_config_max_shape_reduce_steps_per_variable : int option ref
+val gdwarf_config_max_evaluation_steps_per_variable : int option ref
+val gdwarf_config_shape_reduce_fuel : int option ref
+val gdwarf_fidelity : gdwarf_fidelity option ref
+val gdwarf_fidelity_of_string : string -> gdwarf_fidelity option
+val set_gdwarf_fidelity : gdwarf_fidelity -> unit
 val unsafe : bool ref
 val use_linscan : bool ref
 val link_everything : bool ref
@@ -96,10 +119,12 @@ val open_modules : string list ref
 val preprocessor : string option ref
 val all_ppx : string list ref
 val absname : bool ref
+val locs : bool ref
 val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref
 val binary_annotations_cms : bool ref
+val shape_format : shape_format ref
 val store_occurrences : bool ref
 val use_threads : bool ref
 val noassert : bool ref
@@ -138,8 +163,10 @@ val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref
 val dump_shape : bool ref
+val dump_slambda : bool ref
 val dump_rawlambda : bool ref
 val dump_lambda : bool ref
+val dump_blambda : bool ref
 val dump_letreclambda : bool ref
 val dump_rawclambda : bool ref
 val dump_clambda : bool ref
@@ -156,6 +183,7 @@ val dump_linear : bool ref
 val debug_ocaml : bool ref
 val keep_startup_file : bool ref
 val native_code : bool ref
+val jsir : bool ref
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref
@@ -197,6 +225,7 @@ val default_timings_precision : int
 val timings_precision : int ref
 val profile_columns : profile_column list ref
 val profile_granularity : profile_granularity_level ref
+val profile_output_name : string option ref
 val all_profile_granularity_levels : string list
 val set_profile_granularity : string -> unit
 val flambda_invariant_checks : flambda_invariant_checks ref
@@ -211,11 +240,16 @@ val default_inline_max_depth : int
 val inline_max_depth : Int_arg_helper.parsed ref
 val remove_unused_arguments : bool ref
 val dump_flambda_verbose : bool ref
+val dump_jsir : bool ref
 val classic_inlining : bool ref
 val afl_instrument : bool ref
 val afl_inst_ratio : int ref
 val function_sections : bool ref
 val probes : bool ref
+val emit_optimized_probes : bool ref
+val supports_optimized_probes : bool
+
+val llvm_backend : bool ref
 
 val all_passes : string list ref
 val dumped_pass : string -> bool
@@ -241,6 +275,10 @@ val error_style_reader : Misc.Error_style.setting env_reader
 
 val unboxed_types : bool ref
 
+val dump_debug_uids : bool ref         (* -ddebug-uids *)
+
+val dump_debug_uid_tables : bool ref   (* -ddebug-uid-tables *)
+
 val insn_sched : bool ref
 val insn_sched_default : bool
 
@@ -261,7 +299,7 @@ val set_o2 : unit -> unit
 val set_o3 : unit -> unit
 
 module Compiler_ir : sig
-  type t = Linear | Cfg
+  type t = Linear | Cfg | Llvmir
   val all : t list
   val to_string : t -> string
   val extension : t -> string
@@ -271,11 +309,13 @@ end
 module Compiler_pass : sig
   type t = Parsing | Typing | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
+         | Register_allocation | Llvmize
   val of_string : string -> t option
   val to_string : t -> string
   val is_compilation_pass : t -> bool
   val available_pass_names : filter:(t -> bool) -> native:bool -> string list
   val can_save_ir_after : t -> bool
+  val can_save_ir_before : t -> bool
   val compare : t -> t -> int
   val to_output_filename: t -> prefix:string -> string
   val of_input_filename: string -> t option
@@ -283,7 +323,22 @@ end
 val stop_after : Compiler_pass.t option ref
 val should_stop_after : Compiler_pass.t -> bool
 val set_save_ir_after : Compiler_pass.t -> bool -> unit
+val set_save_ir_before : Compiler_pass.t -> bool -> unit
 val should_save_ir_after : Compiler_pass.t -> bool
+val should_save_ir_before : Compiler_pass.t -> bool
+
+module Register_allocator : sig
+  type t =
+    | Cfg
+    | Irc
+    | Ls
+    | Gi
+  val equal : t -> t -> bool
+  val to_string : t -> string
+  val of_string : string -> t option
+  val assoc_list : (string * t) list
+  val format : Format.formatter -> t -> unit
+end
 
 val is_flambda2 : unit -> bool
 
@@ -310,5 +365,14 @@ val zero_alloc_check : Zero_alloc_annotations.Check.t ref
 val zero_alloc_assert : Zero_alloc_annotations.Assert.t ref
 
 val no_auto_include_otherlibs : bool ref
+
+val dissector : bool ref
+val dissector_partition_size_default : float
+val dissector_partition_size : float option ref
+val ddissector : bool ref
+val ddissector_sizes : bool ref
+val ddissector_verbose : bool ref
+val ddissector_partitions : bool ref
+val ddissector_inputs : string option ref
 
 val prepend_directory : string -> string

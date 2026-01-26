@@ -15,7 +15,7 @@
 
 type stats
 
-val create_stats : unit -> stats
+val create_stats : ?with_provenance:bool -> Table.Map.t -> stats
 
 val print_stats : Format.formatter -> stats -> unit
 

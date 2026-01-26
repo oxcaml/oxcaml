@@ -62,7 +62,9 @@ let omega_list = Patterns.omega_list
 let extra_pat =
   make_pat
     (Tpat_var (Ident.create_local "+", mknoloc "+",
-      Uid.internal_not_actually_unique, Mode.Value.disallow_right Mode.Value.max))
+      Uid.internal_not_actually_unique,
+      Jkind.Sort.(of_const Const.for_boxed_variant),
+      Mode.Value.disallow_right Mode.Value.max))
     Ctype.none Env.empty
 
 
@@ -151,10 +153,16 @@ let all_coherent column =
     | Constant c1, Constant c2 -> begin
         match c1, c2 with
         | Const_char _, Const_char _
+        | Const_untagged_char _, Const_untagged_char _
         | Const_int _, Const_int _
+        | Const_int8 _, Const_int8 _
+        | Const_int16 _, Const_int16 _
         | Const_int32 _, Const_int32 _
         | Const_int64 _, Const_int64 _
         | Const_nativeint _, Const_nativeint _
+        | Const_untagged_int _, Const_untagged_int _
+        | Const_untagged_int8 _, Const_untagged_int8 _
+        | Const_untagged_int16 _, Const_untagged_int16 _
         | Const_unboxed_int32 _, Const_unboxed_int32 _
         | Const_unboxed_int64 _, Const_unboxed_int64 _
         | Const_unboxed_nativeint _, Const_unboxed_nativeint _
@@ -164,10 +172,16 @@ let all_coherent column =
         | Const_unboxed_float32 _, Const_unboxed_float32 _
         | Const_string _, Const_string _ -> true
         | ( Const_char _
+          | Const_untagged_char _
           | Const_int _
+          | Const_int8 _
+          | Const_int16 _
           | Const_int32 _
           | Const_int64 _
           | Const_nativeint _
+          | Const_untagged_int _
+          | Const_untagged_int8 _
+          | Const_untagged_int16 _
           | Const_unboxed_int32 _
           | Const_unboxed_int64 _
           | Const_unboxed_nativeint _
@@ -293,6 +307,8 @@ let const_compare x y =
   | Const_string (s1, _, _), Const_string (s2, _, _) ->
       String.compare s1 s2
   | (Const_int _
+    |Const_int8 _
+    |Const_int16 _
     |Const_char _
     |Const_string (_, _, _)
     |Const_float _
@@ -300,6 +316,10 @@ let const_compare x y =
     |Const_int32 _
     |Const_int64 _
     |Const_nativeint _
+    |Const_untagged_char _
+    |Const_untagged_int _
+    |Const_untagged_int8 _
+    |Const_untagged_int16 _
     |Const_unboxed_int32 _
     |Const_unboxed_int64 _
     |Const_unboxed_nativeint _
@@ -312,9 +332,9 @@ let records_args l1 l2 =
   | [],(_,_,p2)::rem2 -> combine (omega::r1) (p2::r2) [] rem2
   | (_,_,p1)::rem1,[] -> combine (p1::r1) (omega::r2) rem1 []
   | (_,lbl1,p1)::rem1, ( _,lbl2,p2)::rem2 ->
-      if lbl1.lbl_num < lbl2.lbl_num then
+      if lbl1.lbl_pos < lbl2.lbl_pos then
         combine (p1::r1) (omega::r2) rem1 l2
-      else if lbl1.lbl_num > lbl2.lbl_num then
+      else if lbl1.lbl_pos > lbl2.lbl_pos then
         combine (omega::r1) (p2::r2) l1 rem2
       else (* same label on both sides *)
         combine (p1::r1) (p2::r2) rem1 rem2 in
@@ -335,8 +355,8 @@ module Compat
   | ((Tpat_any|Tpat_var _),_)
   | (_,(Tpat_any|Tpat_var _)) -> true
 (* Structural induction *)
-  | Tpat_alias (p,_,_,_,_,_),_      -> compat p q
-  | _,Tpat_alias (q,_,_,_,_,_)      -> compat p q
+  | Tpat_alias (p,_,_,_,_,_,_),_      -> compat p q
+  | _,Tpat_alias (q,_,_,_,_,_,_)      -> compat p q
   | Tpat_or (p1,p2,_),_ ->
       (compat p1 q || compat p2 q)
   | _,Tpat_or (q1,q2,_) ->
@@ -466,11 +486,11 @@ let record_unboxed_product_arg ph =
 
 let extract_fields lbls arg =
   let get_field pos arg =
-    match List.find (fun (lbl,_) -> pos = lbl.lbl_num) arg with
+    match List.find (fun (lbl,_) -> pos = lbl.lbl_pos) arg with
     | _, p -> p
     | exception Not_found -> omega
   in
-  List.map (fun lbl -> get_field lbl.lbl_num arg) lbls
+  List.map (fun lbl -> get_field lbl.lbl_pos arg) lbls
 
 (* Build argument list when p2 >= p1, where p1 is a simple pattern *)
 let simple_match_args discr head args =
@@ -535,7 +555,7 @@ let discr_pat q pss =
     | ((head, _), _) :: rows ->
       let append_unique lbls lbls_unique =
         List.fold_right (fun lbl lbls_unique ->
-          if List.exists (fun l -> l.lbl_num = lbl.lbl_num) lbls_unique then
+          if List.exists (fun l -> l.lbl_pos = lbl.lbl_pos) lbls_unique then
             lbls_unique
           else
             lbl :: lbls_unique
@@ -904,8 +924,11 @@ let full_match closing env =  match env with
           (fun (tag,f) ->
             row_field_repr f = Rabsent || List.mem tag fields)
           (row_fields row)
-  | Constant Const_char _ ->
-      List.length env = 256
+  | Constant (Const_char _ | Const_untagged_char _
+            | Const_int8 _ | Const_untagged_int8 _) ->
+      List.length env = 0x1_00
+  | Constant (Const_int16 _ | Const_untagged_int16 _) ->
+      List.length env = 0x1_00_00
   | Constant _
   | Array _ -> false
   | Tuple _
@@ -1041,6 +1064,19 @@ let build_other_constant proj make first next p env =
     else make_pat (make i) p.pat_type p.pat_env
   in try_const first
 
+let build_exhaustable_constant ~to_int ~proj ~make ranges d env =
+  let all = List.map (fun (p, _) -> proj p.pat_desc) env in
+  let rec find_other i imax =
+    if i > imax then None
+    else
+      if List.mem i all then
+        find_other (i+1) imax
+      else
+        Some (make_pat (Tpat_constant (make i)) d.pat_type d.pat_env)
+  in
+  List.find_map (fun (c1, c2) -> find_other (to_int c1) (to_int c2)) ranges
+  |> Option.value ~default:Patterns.omega
+
 (*
   Builds a pattern that is incompatible with all patterns in
   the first column of env
@@ -1059,7 +1095,9 @@ let build_other ext env =
           make_pat
             (Tpat_var (Ident.create_local "*extension*",
                        {txt="*extension*"; loc = d.pat_loc},
-                       Uid.internal_not_actually_unique, Mode.Value.disallow_right Mode.Value.max))
+                       Uid.internal_not_actually_unique,
+                       Jkind.Sort.(of_const Const.for_constructor),
+                       Mode.Value.disallow_right Mode.Value.max))
             Ctype.none Env.empty
       | Construct _ ->
           begin match ext with
@@ -1113,39 +1151,57 @@ let build_other ext env =
                   pat other_pats
             end
       | Constant Const_char _ ->
-          let all_chars =
-            List.map
-              (fun (p,_) -> match p.pat_desc with
-              | Constant (Const_char c) -> c
-              | _ -> assert false)
-              env
-          in
-          let rec find_other i imax =
-            if i > imax then raise Not_found
-            else
-              let ci = Char.chr i in
-              if List.mem ci all_chars then
-                find_other (i+1) imax
-              else
-                make_pat (Tpat_constant (Const_char ci))
-                  d.pat_type d.pat_env
-          in
-          let rec try_chars = function
-            | [] -> Patterns.omega
-            | (c1,c2) :: rest ->
-                try
-                  find_other (Char.code c1) (Char.code c2)
-                with
-                | Not_found -> try_chars rest
-          in
-          try_chars
+          build_exhaustable_constant
+            ~to_int:Char.code
+            ~proj:(function Constant(Const_char c) -> Char.code c
+                          | _ -> assert false)
+            ~make:(fun i -> Const_char (Char.chr i))
             [ 'a', 'z' ; 'A', 'Z' ; '0', '9' ;
-              ' ', '~' ; Char.chr 0 , Char.chr 255]
+              ' ', '~' ; Char.chr 0 , Char.chr 255] d env
+      | Constant Const_untagged_char _ ->
+          build_exhaustable_constant
+            ~to_int:Char.code
+            ~proj:(function Constant(Const_untagged_char c) -> Char.code c
+                          | _ -> assert false)
+            ~make:(fun i -> Const_untagged_char (Char.chr i))
+            [ 'a', 'z' ; 'A', 'Z' ; '0', '9' ;
+              ' ', '~' ; Char.chr 0 , Char.chr 255] d env
       | Constant Const_int _ ->
           build_other_constant
             (function Constant(Const_int i) -> i | _ -> assert false)
             (function i -> Tpat_constant(Const_int i))
             0 succ d env
+      | Constant Const_untagged_int _ ->
+          build_other_constant
+            (function Constant(Const_untagged_int i) -> i | _ -> assert false)
+            (function i -> Tpat_constant(Const_untagged_int i))
+            0 succ d env
+      | Constant Const_int8 _ ->
+          build_exhaustable_constant
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_int8 i) -> i | _ -> assert false)
+            ~make:(fun i -> Const_int8 i)
+            [0, 0x7f; -0x80, -1] d env
+      | Constant Const_untagged_int8 _ ->
+          build_exhaustable_constant
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_untagged_int8 i) -> i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_untagged_int8 i)
+            [0, 0x7f; -0x80, -1] d env
+      | Constant Const_int16 _ ->
+          build_exhaustable_constant
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_int16 i) -> i | _ -> assert false)
+            ~make:(fun i -> Const_int16 i)
+            [0, 0x7f_ff; -0x80_00, -1] d env
+      | Constant Const_untagged_int16 _ ->
+          build_exhaustable_constant
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_untagged_int16 i) -> i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_untagged_int16 i)
+            [0, 0x7f_ff; -0x80_00, -1] d env
       | Constant Const_int32 _ ->
           build_other_constant
             (function Constant(Const_int32 i) -> i | _ -> assert false)
@@ -1216,7 +1272,7 @@ let build_other ext env =
 let rec has_instance p = match p.pat_desc with
   | Tpat_variant (l,_,r) when is_absent l r -> false
   | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_variant (_,None,_) -> true
-  | Tpat_alias (p,_,_,_,_,_) | Tpat_variant (_,Some p,_) -> has_instance p
+  | Tpat_alias (p,_,_,_,_,_,_) | Tpat_variant (_,Some p,_) -> has_instance p
   | Tpat_or (p1,p2,_) -> has_instance p1 || has_instance p2
   | Tpat_construct (_,_,ps, _) | Tpat_array (_, _, ps) ->
       has_instances ps
@@ -1676,7 +1732,7 @@ let is_var_column rs =
 (* Standard or-args for left-to-right matching *)
 let rec or_args p = match p.pat_desc with
 | Tpat_or (p1,p2,_) -> p1,p2
-| Tpat_alias (p,_,_,_,_,_)  -> or_args p
+| Tpat_alias (p,_,_,_,_,_,_)  -> or_args p
 | _                 -> assert false
 
 (* Just remove current column *)
@@ -1856,8 +1912,8 @@ and every_both pss qs q1 q2 =
 let rec le_pat p q =
   match (p.pat_desc, q.pat_desc) with
   | (Tpat_var _|Tpat_any),_ -> true
-  | Tpat_alias(p,_,_,_,_,_), _ -> le_pat p q
-  | _, Tpat_alias(q,_,_,_,_,_) -> le_pat p q
+  | Tpat_alias(p,_,_,_,_,_,_), _ -> le_pat p q
+  | _, Tpat_alias(q,_,_,_,_,_,_) -> le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
   | Tpat_construct(_,c1,ps,_), Tpat_construct(_,c2,qs,_) ->
       Types.equal_tag c1.cstr_tag c2.cstr_tag && le_pats ps qs
@@ -1917,8 +1973,8 @@ let get_mins le ps =
 *)
 
 let rec lub p q = match p.pat_desc,q.pat_desc with
-| Tpat_alias (p,_,_,_,_,_),_      -> lub p q
-| _,Tpat_alias (q,_,_,_,_,_)      -> lub p q
+| Tpat_alias (p,_,_,_,_,_,_),_      -> lub p q
+| _,Tpat_alias (q,_,_,_,_,_,_)      -> lub p q
 | (Tpat_any|Tpat_var _),_ -> q
 | _,(Tpat_any|Tpat_var _) -> p
 | Tpat_or (p1,p2,_),_     -> orlub p1 p2 q
@@ -1972,9 +2028,9 @@ and record_lubs l1 l2 =
   | [],_ -> l2
   | _,[] -> l1
   | (lid1, lbl1,p1)::rem1, (lid2, lbl2,p2)::rem2 ->
-      if lbl1.lbl_num < lbl2.lbl_num then
+      if lbl1.lbl_pos < lbl2.lbl_pos then
         (lid1, lbl1,p1)::lub_rec rem1 l2
-      else if lbl2.lbl_num < lbl1.lbl_num  then
+      else if lbl2.lbl_pos < lbl1.lbl_pos  then
         (lid2, lbl2,p2)::lub_rec l1 rem2
       else
         (lid1, lbl1,lub p1 p2)::lub_rec rem1 rem2 in
@@ -2059,7 +2115,7 @@ let rec initial_only_guarded = function
 let contains_extension pat =
   exists_pattern
     (function
-     | {pat_desc=Tpat_var (_, {txt="*extension*"}, _, _)} -> true
+     | {pat_desc=Tpat_var (_, {txt="*extension*"}, _, _, _)} -> true
      | _ -> false)
     pat
 
@@ -2150,7 +2206,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
     List.fold_left
       (fun r (_, _, p) -> collect_paths_from_pat r p)
       r lps
-| Tpat_variant (_, Some p, _) | Tpat_alias (p,_,_,_,_,_) ->
+| Tpat_variant (_, Some p, _) | Tpat_alias (p,_,_,_,_,_,_) ->
     collect_paths_from_pat r p
 | Tpat_or (p1,p2,_) ->
     collect_paths_from_pat (collect_paths_from_pat r p1) p2
@@ -2238,18 +2294,19 @@ let check_unused pred casel =
                     Used
                 | _ -> r
               in
-              match r with
-              | Unused ->
+              Builtin_attributes.warning_scope q.pat_attributes (fun () ->
+                match r with
+                | Unused ->
                   Location.prerr_warning
                     q.pat_loc Warnings.Redundant_case
-              | Upartial ps ->
+                | Upartial ps ->
                   List.iter
                     (fun p ->
-                      Location.prerr_warning
-                        p.pat_loc Warnings.Redundant_subpat)
+                       Location.prerr_warning
+                         p.pat_loc Warnings.Redundant_subpat)
                     ps
-              | Used -> ()
-            with Empty | Not_found -> assert false
+                | Used -> ())
+          with Empty | Not_found -> assert false
             end ;
 
           if has_guard then
@@ -2279,9 +2336,12 @@ let inactive ~partial pat =
             match c with
             | Const_string _
             | Const_int _ | Const_char _ | Const_float _ | Const_float32 _
-            | Const_unboxed_float _ | Const_unboxed_float32 _ | Const_int32 _
-            | Const_int64 _ | Const_nativeint _ | Const_unboxed_int32 _
-            | Const_unboxed_int64 _ | Const_unboxed_nativeint _
+            | Const_unboxed_float _ | Const_unboxed_float32 _
+            | Const_int8 _ | Const_int16 _ | Const_int32 _ | Const_int64 _
+            | Const_nativeint _ | Const_untagged_char _
+            | Const_untagged_int8 _ | Const_untagged_int16 _
+            | Const_unboxed_int32 _ | Const_unboxed_int64 _
+            | Const_untagged_int _ | Const_unboxed_nativeint _
             -> true
           end
         | Tpat_tuple ps ->
@@ -2290,7 +2350,7 @@ let inactive ~partial pat =
             List.for_all (fun (_,p,_) -> loop p) ps
         | Tpat_construct (_, _, ps, _) | Tpat_array (Immutable, _, ps) ->
             List.for_all (fun p -> loop p) ps
-        | Tpat_alias (p,_,_,_,_,_) | Tpat_variant (_, Some p, _) ->
+        | Tpat_alias (p,_,_,_,_,_,_) | Tpat_variant (_, Some p, _) ->
             loop p
         | Tpat_record (ldps,_) ->
             List.for_all
@@ -2419,9 +2479,9 @@ type amb_row = { row : pattern list ; varsets : Ident.Set.t list; }
 let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
   let rec simpl head_bound_variables varsets p ps k =
     match (Patterns.General.view p).pat_desc with
-    | `Alias (p,x,_,_,_,_) ->
+    | `Alias (p,x,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
-    | `Var (x, _, _, _) ->
+    | `Var (x, _, _, _, _) ->
       simpl (Ident.Set.add x head_bound_variables) varsets Patterns.omega ps k
     | `Or (p1,p2,_) ->
       simpl head_bound_variables varsets p1 ps

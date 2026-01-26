@@ -8,3 +8,8 @@ thread.cmo : \
 thread.cmx : \
     thread.cmi
 thread.cmi :
+multicore.cmo : \
+    multicore.cmi
+multicore.cmx : \
+    multicore.cmi
+multicore.cmi :

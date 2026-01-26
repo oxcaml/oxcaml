@@ -20,15 +20,25 @@ open Datalog_imports
 type vm_action =
   | Unless :
       ('t, 'k, 'v) Trie.is_trie
-      * 't ref
-      * 'k Option_ref.hlist
+      * 't Channel.receiver
+      * 'k Option_receiver.hlist
       * string
       * string list
+      -> vm_action
+  | Unless_eq :
+      'k option Channel.receiver
+      * 'k option Channel.receiver
+      * string
+      * string
+      * 'k Value.repr
+      -> vm_action
+  | Filter :
+      ('k Constant.hlist -> bool) * 'k Option_receiver.hlist * string list
       -> vm_action
 
 type action =
   | Bind_iterator :
-      'a option ref with_name * 'a Trie.Iterator.t with_name
+      'a option Channel.receiver with_name * 'a Trie.Iterator.t with_name
       -> action
   | VM_action : vm_action -> action
 
@@ -39,7 +49,13 @@ let unless id cell args =
     (Unless
        (Table.Id.is_trie id, cell, args.values, Table.Id.name id, args.names))
 
-type binder = Bind_table : ('t, 'k, 'v) Table.Id.t * 't ref -> binder
+let unless_eq repr cell1 cell2 =
+  VM_action (Unless_eq (cell1.value, cell2.value, cell1.name, cell2.name, repr))
+
+let filter f args = VM_action (Filter (f, args.values, args.names))
+
+type binder =
+  | Bind_table : ('t, 'k, 'v) Table.Id.t * 't Channel.sender -> binder
 
 type actions = { mutable rev_actions : action list }
 
@@ -55,6 +71,14 @@ let pp_cursor_action ff = function
          ~pp_sep:(fun ff () -> Format.fprintf ff ", ")
          Format.pp_print_string)
       l_names
+  | Unless_eq (_x1, _x2, x1_name, x2_name, _repr) ->
+    Format.fprintf ff "if %s == %s:@ continue" x1_name x2_name
+  | Filter (_f, _args, args_names) ->
+    Format.fprintf ff "<filter>(%a)"
+      (Format.pp_print_list
+         ~pp_sep:(fun ff () -> Format.fprintf ff ", ")
+         Format.pp_print_string)
+      args_names
 
 module Order : sig
   type t
@@ -79,27 +103,47 @@ end = struct
 end
 
 module Level = struct
+  type cardinality =
+    | All_values
+    | Any_value
+
+  let max_cardinality c1 c2 =
+    match c1, c2 with
+    | All_values, _ | _, All_values -> All_values
+    | Any_value, Any_value -> Any_value
+
   type 'a t =
     { name : string;
       order : Order.t;
       actions : actions;
       mutable iterators : 'a Trie.Iterator.t with_name list;
-      mutable output : 'a option ref with_name option
+      mutable output :
+        ('a option Channel.sender * 'a option Channel.receiver) with_name option;
+      mutable output_cardinality : cardinality
     }
 
   let print ppf { name; order; _ } =
     Format.fprintf ppf "%s (with order %a)" name Order.print order
 
   let create ~order name =
-    { name; order; output = None; iterators = []; actions = create_actions () }
+    { name;
+      order;
+      output = None;
+      output_cardinality = Any_value;
+      iterators = [];
+      actions = create_actions ()
+    }
 
-  let use_output level =
+  let use_output ?(cardinality = All_values) level =
+    level.output_cardinality
+      <- max_cardinality level.output_cardinality cardinality;
     match level.output with
     | None ->
-      let output = { value = ref None; name = level.name } in
+      let channel = Channel.create None in
+      let output = { value = channel; name = level.name } in
       level.output <- Some output;
-      output
-    | Some output -> output
+      { output with value = snd output.value }
+    | Some output -> { output with value = snd output.value }
 
   let actions { actions; _ } = actions
 
@@ -131,7 +175,12 @@ let add_new_level levels name =
   levels.last_order <- order;
   level
 
-module Join_iterator = Leapfrog.Join (Trie.Iterator)
+module Join_iterator = struct
+  module T0 = Leapfrog.Join (Trie.Iterator)
+  include T0
+  include Heterogenous_list.Make (T0)
+end
+
 module VM = Virtual_machine.Make (Join_iterator)
 
 type binders = { mutable rev_binders : binder list }
@@ -163,9 +212,11 @@ let add_iterator context id =
   iterators
 
 let add_naive_binder context id =
-  let handler = ref (Trie.empty (Table.Id.is_trie id)) in
-  add_binder context.naive_binders (Bind_table (id, handler));
-  handler
+  let send_trie, recv_trie =
+    Channel.create (Trie.empty (Table.Id.is_trie id))
+  in
+  add_binder context.naive_binders (Bind_table (id, send_trie));
+  recv_trie
 
 let initial_actions { actions; _ } = actions
 
@@ -226,8 +277,10 @@ let rec open_rev_vars :
         (* If we do not need the output (we usually do), write it to a dummy
            [ref] for simplicity. *)
         match var.output with
-        | Some output -> output
-        | None -> { value = ref None; name = "_" }
+        | Some output -> { output with value = fst output.value }
+        | None ->
+          let send, _recv = Channel.create None in
+          { value = send; name = "_" }
       in
       let iterators = List.map (fun it -> it.value) var.iterators in
       let iterator_names = List.map (fun it -> it.name) var.iterators in
@@ -241,8 +294,9 @@ let rec open_rev_vars :
       | _ :: _ as vars ->
         open_rev_vars vars (VM.open_ iterator cell instruction VM.dispatch)))
 
-(* Optimisation: if we do not use the output from the last variable, we only
-   need the first matching value of that variable.
+(* Optimisation: if the output from the last variable is used with [Any_value]
+   cardinality, we only need the first matching value of that variable and we
+   can skip after the first element.
 
    NB: the variables must be passed in reverse order, i.e. deepest variable
    first. *)
@@ -250,17 +304,20 @@ let rec pop_rev_vars : type s. s Level.hlist -> (vm_action, s) VM.instruction =
   function
   | [] -> VM.advance
   | var :: vars -> (
-    match var.output with None -> VM.up (pop_rev_vars vars) | _ -> VM.advance)
+    match var.output_cardinality with
+    | Any_value -> VM.up (pop_rev_vars vars)
+    | All_values -> VM.advance)
 
 type call =
   | Call :
-      { func : 'a Constant.hlist -> unit;
+      { func : 'c -> 'a Constant.hlist -> unit;
         name : string;
-        args : 'a Option_ref.hlist with_names
+        context : 'c;
+        args : 'a Option_receiver.hlist with_names
       }
       -> call
 
-let create_call func ~name args = Call { func; name; args }
+let create_call func ~name ~context args = Call { func; name; context; args }
 
 let create ?(calls = []) ?output context =
   let { levels; actions; binders; naive_binders } = context in
@@ -271,11 +328,14 @@ let create ?(calls = []) ?output context =
       match output with
       | None -> k
       | Some output ->
-        VM.call (fun args -> !callback args) ~name:"yield" output k
+        VM.call
+          (fun () args -> !callback args)
+          ~name:"yield" ~context:() output k
     in
     (* Make sure to compute calls in the provided order. *)
     List.fold_right
-      (fun (Call { func; name; args }) k -> VM.call func ~name args k)
+      (fun (Call { func; name; context; args }) k ->
+        VM.call func ~name ~context args k)
       calls k
   in
   let instruction : (_, nil) VM.instruction =
@@ -292,25 +352,51 @@ let create ?(calls = []) ?output context =
 
 let bind_table (Bind_table (id, handler)) database =
   let table = Table.Map.get id database in
-  handler := table;
+  Channel.send handler table;
   not (Trie.is_empty (Table.Id.is_trie id) table)
 
 let bind_table_list binders database =
   List.iter (fun binder -> ignore @@ bind_table binder database) binders
 
+let bind_cursor cursor ?(callback = ignore) db =
+  bind_table_list cursor.cursor_binders db;
+  bind_table_list cursor.cursor_naive_binders db;
+  cursor.callback := callback
+
+let unbind_table (Bind_table (id, handler)) =
+  Channel.send handler (Trie.empty (Table.Id.is_trie id))
+
+let unbind_table_list binders = List.iter unbind_table binders
+
+let unbind_cursor cursor =
+  cursor.callback := ignore;
+  unbind_table_list cursor.cursor_naive_binders;
+  unbind_table_list cursor.cursor_binders
+
+let with_bound_cursor ?callback cursor db f =
+  bind_cursor ?callback cursor db;
+  Fun.protect ~finally:(fun () -> unbind_cursor cursor) f
+
 let evaluate = function
   | Unless (is_trie, cell, args, _cell_name, _args_names) ->
     if Option.is_some
-         (Trie.find_opt is_trie (Option_ref.get args) cell.contents)
+         (Trie.find_opt is_trie (Option_receiver.recv args) (Channel.recv cell))
     then Virtual_machine.Skip
     else Virtual_machine.Accept
+  | Unless_eq (cell1, cell2, _cell1_name, _cell2_name, repr) ->
+    if Value.equal_repr repr
+         (Option.get (Channel.recv cell1))
+         (Option.get (Channel.recv cell2))
+    then Virtual_machine.Skip
+    else Virtual_machine.Accept
+  | Filter (f, args, _args_names) ->
+    if f (Option_receiver.recv args)
+    then Virtual_machine.Accept
+    else Virtual_machine.Skip
 
 let naive_iter cursor db f =
-  bind_table_list cursor.cursor_binders db;
-  bind_table_list cursor.cursor_naive_binders db;
-  cursor.callback := f;
-  VM.run (VM.create ~evaluate cursor.instruction);
-  cursor.callback := ignore
+  with_bound_cursor ~callback:f cursor db @@ fun () ->
+  VM.run (VM.create ~evaluate cursor.instruction)
 
 let naive_fold cursor db f acc =
   let acc = ref acc in
@@ -322,8 +408,7 @@ let naive_fold cursor db f acc =
 
    [current] must be equal to [concat ~earlier:previous ~later:diff]. *)
 let[@inline] seminaive_run cursor ~previous ~diff ~current =
-  bind_table_list cursor.cursor_binders current;
-  bind_table_list cursor.cursor_naive_binders current;
+  with_bound_cursor cursor current @@ fun () ->
   let rec loop binders =
     match binders with
     | [] -> ()
@@ -335,8 +420,8 @@ let[@inline] seminaive_run cursor ~previous ~diff ~current =
   loop cursor.cursor_binders
 
 module With_parameters = struct
-  type nonrec ('p, 'v) t =
-    { parameters : 'p Option_ref.hlist;
+  type nonrec ('p, !'v) t =
+    { parameters : 'p Option_sender.hlist;
       cursor : 'v t
     }
 
@@ -348,14 +433,14 @@ module With_parameters = struct
     { cursor = create ?calls ?output context; parameters }
 
   let naive_fold { parameters; cursor } ps db f acc =
-    Option_ref.set parameters ps;
+    Option_sender.send parameters ps;
     naive_fold cursor db f acc
 
   let naive_iter { parameters; cursor } ps db f =
-    Option_ref.set parameters ps;
+    Option_sender.send parameters ps;
     naive_iter cursor db f
 
   let seminaive_run { parameters; cursor } ps ~previous ~diff ~current =
-    Option_ref.set parameters ps;
+    Option_sender.send parameters ps;
     seminaive_run ~previous ~diff ~current cursor
 end

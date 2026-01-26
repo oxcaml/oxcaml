@@ -35,9 +35,7 @@ type trap_stack =
 
 val equal_trap_stack : trap_stack -> trap_stack -> bool
 
-type integer_comparison =
-  | Isigned of Cmm.integer_comparison
-  | Iunsigned of Cmm.integer_comparison
+type integer_comparison = Cmm.integer_comparison
 
 val string_of_integer_comparison : integer_comparison -> string
 
@@ -63,11 +61,20 @@ type integer_operation =
   | Ipopcnt
   | Icomp of integer_comparison
 
+type int128_operation =
+  | Iadd128
+  | Isub128
+  | Imul64 of { signed : bool }
+
 val string_of_integer_operation : integer_operation -> string
+
+val string_of_int128_operation : int128_operation -> string
 
 val is_unary_integer_operation : integer_operation -> bool
 
 val equal_integer_operation : integer_operation -> integer_operation -> bool
+
+val equal_int128_operation : int128_operation -> int128_operation -> bool
 
 type float_comparison = Cmm.float_comparison
 
@@ -129,6 +136,8 @@ type t =
   | Const_float of int64
   | Const_symbol of Cmm.symbol
   | Const_vec128 of Cmm.vec128_bits
+  | Const_vec256 of Cmm.vec256_bits
+  | Const_vec512 of Cmm.vec512_bits
   | Stackoffset of int
   | Load of
       { memory_chunk : Cmm.memory_chunk;
@@ -138,6 +147,7 @@ type t =
       }
   | Store of Cmm.memory_chunk * Arch.addressing_mode * bool
   | Intop of integer_operation
+  | Int128op of int128_operation
   | Intop_imm of integer_operation * int
   | Intop_atomic of
       { op : Cmm.atomic_op;
@@ -148,7 +158,10 @@ type t =
   | Csel of test
   | Reinterpret_cast of Cmm.reinterpret_cast
   | Static_cast of Cmm.static_cast
-  | Probe_is_enabled of { name : string }
+  | Probe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Opaque
   | Begin_region
   | End_region
@@ -157,11 +170,12 @@ type t =
       { ident : Ident.t;
         which_parameter : int option;
         provenance : Backend_var.Provenance.t option;
-        is_assignment : bool;
         regs : Reg.t array
       }
   | Dls_get
+  | Tls_get
   | Poll
+  | Pause
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;

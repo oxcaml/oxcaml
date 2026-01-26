@@ -146,7 +146,8 @@ val f : 'a rep -> int = <fun>
 (***********************************)
 (* Implicit unboxed records basics *)
 
-(* Boxed, including mixed-block, records get implicit unboxed records *)
+(* Boxed records, including non-float mixed-block records, get implicit unboxed
+   records *)
 type r = { i : int ; s : string }
 type u : immediate & value = r#
 [%%expect{|
@@ -159,8 +160,14 @@ type u = r#
 type r = { s : string; f : float#; }
 type u = r#
 |}]
+type r = { f : float#; si : #(string * int64) }
+type u = r#
+[%%expect{|
+type r = { f : float#; si : #(string * int64); }
+type u = r#
+|}]
 
-(* But not float or [@@unboxed] records *)
+(* But not float, mixed float/float#, or [@@unboxed] records *)
 type r = { f : float ; f2 : float }
 type bad = r#
 [%%expect{|
@@ -169,6 +176,17 @@ Line 2, characters 11-13:
 2 | type bad = r#
                ^^
 Error: The type "r" has no unboxed version.
+Hint: Float records don't get unboxed versions.
+|}]
+type r = { f : float ; f2 : float# }
+type bad = r#
+[%%expect{|
+type r = { f : float; f2 : float#; }
+Line 2, characters 11-13:
+2 | type bad = r#
+               ^^
+Error: The type "r" has no unboxed version.
+Hint: Float records don't get unboxed versions.
 |}]
 type r = { i : int } [@@unboxed]
 type bad = r#
@@ -178,6 +196,7 @@ Line 2, characters 11-13:
 2 | type bad = r#
                ^^
 Error: The type "r" has no unboxed version.
+Hint: [@@unboxed] records don't get unboxed versions.
 |}]
 type ('a : float64) t = { i : 'a ; j : 'a }
 type floatu_t : float64 & float64 = float t#
@@ -187,6 +206,7 @@ Line 2, characters 42-44:
 2 | type floatu_t : float64 & float64 = float t#
                                               ^^
 Error: The type "t" has no unboxed version.
+Hint: Float records don't get unboxed versions.
 |}]
 
 (* A type can get an unboxed version from both the manifest and kind *)
@@ -214,10 +234,10 @@ Error: This expression has type "r#" but an expression was expected of type "r2#
 
 (* Mutable fields imply modalities *)
 type r = { i : int ; mutable s : string }
-type u = r# = #{ i : int ; s : string @@ global many aliased unyielding }
+type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
 [%%expect{|
 type r = { i : int; mutable s : string; }
-type u = r# = #{ i : int; s : string @@ global many aliased; }
+type u = r# = #{ i : int; s : string @@ global many dynamic; }
 |}]
 
 (*******************)
@@ -297,7 +317,7 @@ Error: The type constructor "t#" expects 1 argument(s),
 (*******************************************)
 (* Type recursion through unboxed versions *)
 
-type t = int
+type t = string
 and bad = t#
 [%%expect{|
 Line 2, characters 0-12:
@@ -306,7 +326,7 @@ Line 2, characters 0-12:
 Error: The type "t" has no unboxed version.
 |}]
 
-type t = int
+type t = string
 and bad = t# * t#
 [%%expect{|
 Line 2, characters 0-17:
@@ -325,11 +345,11 @@ Error: The type "bad_b" has no unboxed version.
 |}]
 
 type a = b
-and b = int
+and b = string
 type bad = a#
 [%%expect{|
 type a = b
-and b = int
+and b = string
 Line 3, characters 11-13:
 3 | type bad = a#
                ^^
@@ -359,9 +379,9 @@ end = struct
   type t = Bad2.t#
 end
 and Bad2 : sig
-  type t = int
+  type t = string
 end = struct
-  type t = int
+  type t = string
 end
 [%%expect{|
 Line 2, characters 11-18:
@@ -683,12 +703,19 @@ module type Bad = sig
   type t
 end with type t := float#
 [%%expect{|
-Line 3, characters 9-25:
+Lines 1-3, characters 18-25:
+1 | ..................sig
+2 |   type t
 3 | end with type t := float#
-             ^^^^^^^^^^^^^^^^
-Error: The layout of type "float#" is float64
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = float#
+       is not included in
+         type t
+       The layout of the first is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of type "float#" must be a sublayout of value
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-8.
 |}]
 
@@ -717,12 +744,12 @@ Error: In this "with" constraint, the new definition of "t"
 (* Can't substitute an unboxed version for a nonexistent unboxed version *)
 module type Bad = sig
   type t = float#
-end with type t := int#
+end with type t := string#
 [%%expect{|
-Line 3, characters 19-23:
-3 | end with type t := int#
-                       ^^^^
-Error: The type "int" has no unboxed version.
+Line 3, characters 19-26:
+3 | end with type t := string#
+                       ^^^^^^^
+Error: The type "string" has no unboxed version.
 |}]
 
 (* Test subst when a decl's type_unboxed_version over-approximately [None]
@@ -868,12 +895,12 @@ module type S = sig
   module type x
   module M:x
 end
-with module type x = sig type t = int end
+with module type x = sig type t = string end
 module Bad (M : S) = struct
   let id : M.M.t# -> r# = fun x -> x
 end
 [%%expect{|
-module type S = sig module type x = sig type t = int end module M : x end
+module type S = sig module type x = sig type t = string end module M : x end
 Line 7, characters 11-17:
 7 |   let id : M.M.t# -> r# = fun x -> x
                ^^^^^^
@@ -903,12 +930,12 @@ module type S = sig
   module type x
   module M:x
 end
-with module type x := sig type t = int end
+with module type x := sig type t = string end
 module Bad (M : S) = struct
   type u = M.M.t#
 end
 [%%expect{|
-module type S = sig module M : sig type t = int end end
+module type S = sig module M : sig type t = string end end
 Line 7, characters 11-17:
 7 |   type u = M.M.t#
                ^^^^^^
@@ -958,14 +985,14 @@ module F :
 
 (* No unboxed version *)
 module type S = sig type t end
-type m = (module S with type t = int)
+type m = (module S with type t = string)
 module Bad (X : sig val x : m end) = struct
   module M = (val X.x)
   type u = M.t#
 end
 [%%expect{|
 module type S = sig type t end
-type m = (module S with type t = int)
+type m = (module S with type t = string)
 Line 5, characters 11-15:
 5 |   type u = M.t#
                ^^^^
@@ -1245,18 +1272,11 @@ Error: This type cannot be unboxed because
        You should annotate it with "[@@ocaml.boxed]".
 |}]
 
-(* CR layouts 7.2: accept the following program. *)
 type ('a, 'b) t = { a : 'a }
 type ('a, 'b) s = ('a, 'b) t
 type packed = T : (int, 'b) s# -> packed [@@unboxed]
 [%%expect{|
 type ('a, 'b) t = { a : 'a; }
 type ('a, 'b) s = ('a, 'b) t
-Line 3, characters 0-52:
-3 | type packed = T : (int, 'b) s# -> packed [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of the existential variable "'b".
-       You should annotate it with "[@@ocaml.boxed]".
+type packed = T : (int, 'b) s# -> packed [@@unboxed]
 |}]

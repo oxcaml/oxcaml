@@ -6,7 +6,7 @@ open! Int_replace_polymorphic_compare
    use vector operations if possible *)
 (* CR gyorsh: how does the info from [reg_map] flow between blocks? *)
 
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 module State : sig
   type t
@@ -31,7 +31,6 @@ module State : sig
 end = struct
   type t =
     { ppf_dump : Format.formatter;
-      instruction_id : InstructionId.sequence;
       cfg_with_infos : Cfg_with_infos.t Lazy.t;
       cfg_with_layout : Cfg_with_layout.t
     }
@@ -42,15 +41,14 @@ end = struct
 
   let fun_dbg t = (Cfg_with_layout.cfg t.cfg_with_layout).fun_dbg
 
-  let next_available_instruction t = InstructionId.get_and_incr t.instruction_id
+  let next_available_instruction t =
+    InstructionId.get_and_incr
+      (Cfg_with_layout.cfg t.cfg_with_layout).next_instruction_id
 
   let create ppf_dump cl =
     (* CR-someday tip: the function may someday take a cfg_with_infos instead of
        creating a new one *)
-    let cfg = Cfg_with_layout.cfg cl in
     { ppf_dump;
-      instruction_id =
-        InstructionId.make_sequence ~last_used:(Cfg.max_instr_id cfg) ();
       cfg_with_layout = cl;
       cfg_with_infos = lazy (Cfg_with_infos.make cl)
     }
@@ -61,7 +59,7 @@ end = struct
   let extra_debug = true
 
   let dump_if c t =
-    if c && !Flambda_backend_flags.dump_vectorize
+    if c && !Oxcaml_flags.dump_vectorize
     then Format.fprintf t.ppf_dump
     else Format.ifprintf t.ppf_dump
 
@@ -228,7 +226,8 @@ end = struct
       let desc = basic_instruction.desc in
       match desc with
       | Op op -> Some op
-      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ->
         None)
     | Terminator _ -> None
 
@@ -255,7 +254,9 @@ end = struct
     | Const_float32 _, Const_float32 _
     | Const_float _, Const_float _
     | Const_symbol _, Const_symbol _
-    | Const_vec128 _, Const_vec128 _ ->
+    | Const_vec128 _, Const_vec128 _
+    | Const_vec256 _, Const_vec256 _
+    | Const_vec512 _, Const_vec512 _ ->
       true
     | ( Load
           { memory_chunk = memory_chunk1;
@@ -282,6 +283,8 @@ end = struct
       && Bool.equal is_assignment1 is_assignment2
     | Intop intop1, Intop intop2 ->
       Operation.equal_integer_operation intop1 intop2
+    | Int128op intop1, Int128op intop2 ->
+      Operation.equal_int128_operation intop1 intop2
     | Intop_imm (intop1, _), Intop_imm (intop2, _) ->
       Operation.equal_integer_operation intop1 intop2
     | Floatop (width1, floatop1), Floatop (width2, floatop2) ->
@@ -297,10 +300,13 @@ end = struct
     | Const_float _, _
     | Const_symbol _, _
     | Const_vec128 _, _
+    | Const_vec256 _, _
+    | Const_vec512 _, _
     | Stackoffset _, _
     | Load _, _
     | Store _, _
     | Intop _, _
+    | Int128op _, _
     | Intop_imm _, _
     | Intop_atomic _, _
     | Floatop _, _
@@ -309,11 +315,13 @@ end = struct
     | Static_cast _, _
     | Probe_is_enabled _, _
     | Opaque, _
+    | Pause, _
     | Begin_region, _
     | End_region, _
     | Specific _, _
     | Name_for_debugger _, _
     | Dls_get, _
+    | Tls_get, _
     | Poll, _
     | Alloc _, _
     | External_without_caml_c_call _, _ ->
@@ -440,7 +448,9 @@ end
    within a basic block can replace reorder or replace instructions that are not
    consecutive, as long as the transformation preserves dependencies. *)
 
-(**
+(* CR sspies: The comment below is not formatted, because it is not valid odoc.
+   Turn it into a Markdown doc. *)
+(*=
    Construct an overapproximation of transitive dependencies between instructions, and
    use this information to identify instructions that can run in parallel and can be
    reordered.
@@ -798,11 +808,12 @@ end = struct
                         | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _
                           ),
                         _ )
-                  | Opaque | Begin_region | End_region | Dls_get | Poll
-                  | Const_int _ | Const_float32 _ | Const_float _
-                  | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
+                  | Opaque | Begin_region | End_region | Dls_get | Tls_get
+                  | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
+                  | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+                  | Const_vec512 _ | Stackoffset _ | Load _
                   | Store (_, _, _)
-                  | Intop _ | Intop_atomic _
+                  | Intop _ | Int128op _ | Intop_atomic _
                   | Floatop (_, _)
                   | Csel _ | Reinterpret_cast _ | Static_cast _
                   | Probe_is_enabled _ | Specific _ | Name_for_debugger _
@@ -1033,8 +1044,8 @@ end = struct
           | Begin_region | End_region ->
             (* conservative, don't reorder around region begin/end. *)
             create Arbitrary
-          | Name_for_debugger _ | Dls_get | Poll | Opaque | Probe_is_enabled _
-            ->
+          | Name_for_debugger _ | Dls_get | Tls_get | Poll | Opaque | Pause
+          | Probe_is_enabled _ ->
             (* conservative, don't reorder around this instruction. *)
             (* CR-someday gyorsh: Poll insertion pass is after the vectorizer.
                Currently, it inserts instruction at the end of a block, so it
@@ -1052,7 +1063,8 @@ end = struct
               "Unexpected instruction Spill or Reload during vectorize"
           | Move | Reinterpret_cast _ | Static_cast _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-          | Stackoffset _ | Intop _ | Intop_imm _ | Floatop _ | Csel _ | Alloc _
+          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop _
+          | Int128op _ | Intop_imm _ | Floatop _ | Csel _ | Alloc _
           | External_without_caml_c_call _ ->
             None)
 
@@ -2298,9 +2310,10 @@ end = struct
         | Specific s -> Vectorize_specific.is_seed_store s
         | Alloc _ | Load _ | Move | Reinterpret_cast _ | Static_cast _ | Spill
         | Reload | Const_int _ | Const_float32 _ | Const_float _
-        | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Intop _
-        | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
-        | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Stackoffset _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+        | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
+        | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
         | Poll | External_without_caml_c_call _ ->
           None)
 
@@ -3130,7 +3143,7 @@ let count block computation =
     |> Profile.Counters.set "tried_to_vectorize_blocks" 1
     |> Profile.Counters.set "block_size" (Block.size block)
   in
-  if Block.size block > !Flambda_backend_flags.vectorize_max_block_size
+  if Block.size block > !Oxcaml_flags.vectorize_max_block_size
   then counter |> Profile.Counters.set "block_too_big" 1
   else
     match computation with
@@ -3146,13 +3159,13 @@ let maybe_vectorize block =
   let instruction_count = Block.size block in
   let label = Block.start block in
   State.dump state "\nBlock %a:\n" Label.print label;
-  if instruction_count > !Flambda_backend_flags.vectorize_max_block_size
+  if instruction_count > !Oxcaml_flags.vectorize_max_block_size
   then (
     State.dump state
       "Skipping block %a with %d instructions (> %d = \
        max_block_size_to_vectorize).\n"
       Label.print label instruction_count
-      !Flambda_backend_flags.vectorize_max_block_size;
+      !Oxcaml_flags.vectorize_max_block_size;
     None)
   else
     let deps = lazy (Dependencies.from_block block) in

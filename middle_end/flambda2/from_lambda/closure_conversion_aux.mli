@@ -23,7 +23,8 @@ module IR : sig
 
   type exn_continuation =
     { exn_handler : Continuation.t;
-      extra_args : (simple * Flambda_kind.With_subkind.t) list
+      extra_args :
+        (simple * Flambda_debug_uid.t * Flambda_kind.With_subkind.t) list
     }
 
   type trap_action =
@@ -144,7 +145,11 @@ module Env : sig
 
   val add_vars_like :
     t ->
-    (Ident.t * IR.user_visible * Flambda_kind.With_subkind.t) list ->
+    (Ident.t
+    * Flambda_debug_uid.t
+    * IR.user_visible
+    * Flambda_kind.With_subkind.t)
+    list ->
     t * Variable.t list
 
   val find_name : t -> Ident.t -> Name.t
@@ -224,7 +229,10 @@ module Acc : sig
 
   type t
 
-  val create : cmx_loader:Flambda_cmx.loader -> t
+  val create :
+    cmx_loader:Flambda_cmx.loader ->
+    machine_width:Target_system.Machine_width.t ->
+    t
 
   val manufacture_symbol_short_name : t -> t * Linkage_name.t
 
@@ -240,6 +248,8 @@ module Acc : sig
   val code_map : t -> Code.t Code_id.Map.t
 
   val free_names : t -> Name_occurrences.t
+
+  val machine_width : t -> Target_system.Machine_width.t
 
   val seen_a_function : t -> bool
 
@@ -340,6 +350,7 @@ module Function_decls : sig
 
     type param =
       { name : Ident.t;
+        debug_uid : Flambda_debug_uid.t;
         kind : Flambda_kind.With_subkind.t;
         attributes : Lambda.parameter_attribute;
         mode : Lambda.locality_mode
@@ -347,6 +358,7 @@ module Function_decls : sig
 
     val create :
       let_rec_ident:Ident.t option ->
+      let_rec_uid:Flambda_debug_uid.t ->
       function_slot:Function_slot.t ->
       kind:Lambda.function_kind ->
       params:param list ->
@@ -369,6 +381,8 @@ module Function_decls : sig
       t
 
     val let_rec_ident : t -> Ident.t
+
+    val let_rec_debug_uid : t -> Flambda_debug_uid.t
 
     val function_slot : t -> Function_slot.t
 
@@ -397,6 +411,12 @@ module Function_decls : sig
     val specialise : t -> Lambda.specialise_attribute
 
     val poll_attribute : t -> Lambda.poll_attribute
+
+    val regalloc_attribute : t -> Lambda.regalloc_attribute
+
+    val regalloc_param_attribute : t -> Lambda.regalloc_param_attribute
+
+    val cold : t -> bool
 
     val loop : t -> Lambda.loop_attribute
 

@@ -30,6 +30,9 @@ type t =
     inline : Inline_attribute.t;
     zero_alloc_attribute : Zero_alloc_attribute.t;
     poll_attribute : Poll_attribute.t;
+    regalloc_attribute : Regalloc_attribute.t;
+    regalloc_param_attribute : Regalloc_param_attribute.t;
+    cold : bool;
     is_a_functor : bool;
     is_opaque : bool;
     recursive : Recursive.t;
@@ -78,6 +81,12 @@ module Code_metadata_accessors (X : Metadata_view_type) = struct
   let zero_alloc_attribute t = (metadata t).zero_alloc_attribute
 
   let poll_attribute t = (metadata t).poll_attribute
+
+  let regalloc_attribute t = (metadata t).regalloc_attribute
+
+  let regalloc_param_attribute t = (metadata t).regalloc_param_attribute
+
+  let cold t = (metadata t).cold
 
   let is_a_functor t = (metadata t).is_a_functor
 
@@ -141,6 +150,9 @@ type 'a create_type =
   inline:Inline_attribute.t ->
   zero_alloc_attribute:Zero_alloc_attribute.t ->
   poll_attribute:Poll_attribute.t ->
+  regalloc_attribute:Regalloc_attribute.t ->
+  regalloc_param_attribute:Regalloc_param_attribute.t ->
+  cold:bool ->
   is_a_functor:bool ->
   is_opaque:bool ->
   recursive:Recursive.t ->
@@ -158,9 +170,10 @@ type 'a create_type =
 let createk k code_id ~newer_version_of ~params_arity ~param_modes
     ~first_complex_local_param ~result_arity ~result_types ~result_mode ~stub
     ~(inline : Inline_attribute.t) ~zero_alloc_attribute ~poll_attribute
-    ~is_a_functor ~is_opaque ~recursive ~cost_metrics ~inlining_arguments ~dbg
-    ~is_tupled ~is_my_closure_used ~inlining_decision ~absolute_history
-    ~relative_history ~loopify =
+    ~regalloc_attribute ~regalloc_param_attribute ~cold ~is_a_functor ~is_opaque
+    ~recursive ~cost_metrics ~inlining_arguments ~dbg ~is_tupled
+    ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
+    ~loopify =
   (match stub, inline with
   | true, (Available_inline | Never_inline | Default_inline)
   | ( false,
@@ -197,6 +210,9 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
       inline;
       zero_alloc_attribute;
       poll_attribute;
+      regalloc_attribute;
+      regalloc_param_attribute;
+      cold;
       is_a_functor;
       is_opaque;
       recursive;
@@ -221,6 +237,16 @@ let with_cost_metrics cost_metrics t = { t with cost_metrics }
 
 let with_is_my_closure_used is_my_closure_used t = { t with is_my_closure_used }
 
+let with_result_arity result_arity t = { t with result_arity }
+
+let with_params_arity params_arity t = { t with params_arity }
+
+let with_param_modes param_modes t = { t with param_modes }
+
+let with_is_tupled is_tupled t = { t with is_tupled }
+
+let with_result_types result_types t = { t with result_types }
+
 module Option = struct
   include Option
 
@@ -232,7 +258,7 @@ end
 
 let [@ocamlformat "disable"] print_inlining_paths ppf
                                 (relative_history, absolute_history) =
-  if !Flambda_backend_flags.dump_inlining_paths then
+  if !Oxcaml_flags.dump_inlining_paths then
     Format.fprintf ppf
       "@[<hov 1>(relative_history@ %a)@]@ \
        @[<hov 1>(absolute_history@ %a)@]@ "
@@ -241,7 +267,7 @@ let [@ocamlformat "disable"] print_inlining_paths ppf
 
 let [@ocamlformat "disable"] print ppf
        { code_id = _; newer_version_of; stub; inline; zero_alloc_attribute; poll_attribute;
-         is_a_functor; is_opaque; params_arity; param_modes;
+         regalloc_attribute; regalloc_param_attribute; cold; is_a_functor; is_opaque; params_arity; param_modes;
          first_complex_local_param; result_arity;
          result_types; result_mode;
          recursive; cost_metrics; inlining_arguments;
@@ -254,6 +280,9 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>%t(inline@ %a)%t@]@ \
       @[<hov 1>%t(%a)%t@]@ \
       @[<hov 1>%t(poll_attribute@ %a)%t@]@ \
+      @[<hov 1>%t(regalloc_attribute@ %a)%t@]@ \
+      @[<hov 1>%t(regalloc_param_attribute@ %a)%t@]@ \
+      @[<hov 1>%t(cold@ %b)%t@]@ \
       @[<hov 1>%t(is_a_functor@ %b)%t@]@ \
       @[<hov 1>%t(is_opaque@ %b)%t@]@ \
       @[<hov 1>%t(params_arity@ %t%a%t)%t@]@ \
@@ -291,6 +320,17 @@ let [@ocamlformat "disable"] print ppf
     (if Poll_attribute.is_default poll_attribute
      then Flambda_colours.elide else C.none)
     Poll_attribute.print poll_attribute
+    Flambda_colours.pop
+    (if Regalloc_attribute.is_default regalloc_attribute
+     then Flambda_colours.elide else C.none)
+    Regalloc_attribute.print regalloc_attribute
+    Flambda_colours.pop
+    (if Regalloc_param_attribute.is_default regalloc_param_attribute
+     then Flambda_colours.elide else C.none)
+    Regalloc_param_attribute.print regalloc_param_attribute
+    Flambda_colours.pop
+    (if not cold then Flambda_colours.elide else C.none)
+    cold
     Flambda_colours.pop
     (if not is_a_functor then Flambda_colours.elide else C.none)
     is_a_functor
@@ -356,6 +396,7 @@ let [@ocamlformat "disable"] print ppf
 
 let free_names
     { code_id = _;
+      cold = _;
       newer_version_of;
       params_arity = _;
       param_modes = _;
@@ -367,6 +408,8 @@ let free_names
       inline = _;
       zero_alloc_attribute = _;
       poll_attribute = _;
+      regalloc_attribute = _;
+      regalloc_param_attribute = _;
       is_a_functor = _;
       is_opaque = _;
       recursive = _;
@@ -398,6 +441,7 @@ let free_names
 
 let apply_renaming
     ({ code_id;
+       cold = _;
        newer_version_of;
        params_arity = _;
        param_modes = _;
@@ -409,6 +453,8 @@ let apply_renaming
        inline = _;
        zero_alloc_attribute = _;
        poll_attribute = _;
+       regalloc_attribute = _;
+       regalloc_param_attribute = _;
        is_a_functor = _;
        is_opaque = _;
        recursive = _;
@@ -451,6 +497,7 @@ let apply_renaming
 
 let ids_for_export
     { code_id;
+      cold = _;
       newer_version_of;
       params_arity = _;
       param_modes = _;
@@ -462,6 +509,8 @@ let ids_for_export
       inline = _;
       zero_alloc_attribute = _;
       poll_attribute = _;
+      regalloc_attribute = _;
+      regalloc_param_attribute = _;
       is_a_functor = _;
       is_opaque = _;
       recursive = _;
@@ -490,6 +539,7 @@ let ids_for_export
 
 let approx_equal
     { code_id = code_id1;
+      cold = cold1;
       newer_version_of = newer_version_of1;
       params_arity = params_arity1;
       param_modes = param_modes1;
@@ -501,6 +551,8 @@ let approx_equal
       inline = inline1;
       zero_alloc_attribute = zero_alloc_attribute1;
       poll_attribute = poll_attribute1;
+      regalloc_attribute = regalloc_attribute1;
+      regalloc_param_attribute = regalloc_param_attribute1;
       is_a_functor = is_a_functor1;
       is_opaque = is_opaque1;
       recursive = recursive1;
@@ -516,6 +568,7 @@ let approx_equal
     }
     { code_id = code_id2;
       newer_version_of = newer_version_of2;
+      cold = cold2;
       params_arity = params_arity2;
       param_modes = param_modes2;
       first_complex_local_param = first_complex_local_param2;
@@ -526,6 +579,8 @@ let approx_equal
       inline = inline2;
       zero_alloc_attribute = zero_alloc_attribute2;
       poll_attribute = poll_attribute2;
+      regalloc_attribute = regalloc_attribute2;
+      regalloc_param_attribute = regalloc_param_attribute2;
       is_a_functor = is_a_functor2;
       is_opaque = is_opaque2;
       recursive = recursive2;
@@ -550,6 +605,10 @@ let approx_equal
   && Inline_attribute.equal inline1 inline2
   && Zero_alloc_attribute.equal zero_alloc_attribute1 zero_alloc_attribute2
   && Poll_attribute.equal poll_attribute1 poll_attribute2
+  && Regalloc_attribute.equal regalloc_attribute1 regalloc_attribute2
+  && Regalloc_param_attribute.equal regalloc_param_attribute1
+       regalloc_param_attribute2
+  && Bool.equal cold1 cold2
   && Bool.equal is_a_functor1 is_a_functor2
   && Bool.equal is_opaque1 is_opaque2
   && Recursive.equal recursive1 recursive2

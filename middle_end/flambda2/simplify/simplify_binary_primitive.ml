@@ -50,17 +50,28 @@ module type Binary_arith_like_sig = sig
 
   type op
 
-  val unknown : op -> T.t
+  val unknown : machine_width:Target_system.Machine_width.t -> op -> T.t
 
   val these : Result.Set.t -> T.t * Simple.t option
 
-  val op : op -> Lhs.t -> Rhs.t -> Result.t option
+  val op :
+    machine_width:Target_system.Machine_width.t ->
+    op ->
+    Lhs.t ->
+    Rhs.t ->
+    Result.t option
 
   val op_lhs_unknown :
-    op -> rhs:Rhs.t -> Result.t binary_arith_outcome_for_one_side_only
+    machine_width:Target_system.Machine_width.t ->
+    op ->
+    rhs:Rhs.t ->
+    Result.t binary_arith_outcome_for_one_side_only
 
   val op_rhs_unknown :
-    op -> lhs:Lhs.t -> Result.t binary_arith_outcome_for_one_side_only
+    machine_width:Target_system.Machine_width.t ->
+    op ->
+    lhs:Lhs.t ->
+    Result.t binary_arith_outcome_for_one_side_only
 end
 
 module Binary_arith_like (N : Binary_arith_like_sig) : sig
@@ -129,7 +140,10 @@ end = struct
     let proof2 = N.prover_rhs typing_env arg2_ty in
     let kind = N.result_kind in
     let[@inline always] result_unknown () =
-      let dacc = DA.add_variable dacc result_var (N.unknown op) in
+      let machine_width = DE.machine_width denv in
+      let dacc =
+        DA.add_variable dacc result_var (N.unknown ~machine_width op)
+      in
       SPR.create original_term ~try_reify:false dacc
     in
     let[@inline always] result_invalid () =
@@ -161,7 +175,9 @@ end = struct
           else
             match PR.Set.get_singleton possible_results with
             | Some (Simple simple) -> T.alias_type_of kind simple, Some simple
-            | Some (Exactly _) | Some (Prim _) | None -> N.unknown op, None
+            | Some (Exactly _) | Some (Prim _) | None ->
+              let machine_width = DE.machine_width denv in
+              N.unknown ~machine_width op, None
         in
         let dacc = DA.add_variable dacc result_var ty in
         match simple_opt with
@@ -187,6 +203,8 @@ end = struct
                   match N.arg_kind with
                   | Tagged_immediate -> Tagged_immediate
                   | Naked_immediate -> Naked_immediate
+                  | Naked_int8 -> Naked_int8
+                  | Naked_int16 -> Naked_int16
                   | Naked_int32 -> Naked_int32
                   | Naked_int64 -> Naked_int64
                   | Naked_nativeint -> Naked_nativeint
@@ -195,8 +213,14 @@ end = struct
                       "Cannot use [Negation_of_the_other_side] with floats; \
                        use the float version instead"
                 in
+                let machine_width = DE.machine_width denv in
+                let zero =
+                  Simple.const_int_of_kind ~machine_width
+                    (K.Standard_int.to_kind standard_int_kind)
+                    0
+                in
                 let prim : P.t =
-                  Unary (Int_arith (standard_int_kind, Neg), other_side)
+                  Binary (Int_arith (standard_int_kind, Sub), zero, other_side)
                 in
                 Some (PR.Set.add (Prim prim) possible_results)
               | Float_negation_of_the_other_side width ->
@@ -222,7 +246,8 @@ end = struct
         let possible_results =
           N.Pair.Set.fold
             (fun (i1, i2) possible_results ->
-              match N.op op i1 i2 with
+              let machine_width = DE.machine_width denv in
+              match N.op ~machine_width op i1 i2 with
               | None -> possible_results
               | Some result -> PR.Set.add (Exactly result) possible_results)
             all_pairs PR.Set.empty
@@ -230,13 +255,15 @@ end = struct
         check_possible_results ~possible_results
     | Known_result nums1, Need_meet when N.ok_to_evaluate denv ->
       assert (not (N.Lhs.Set.is_empty nums1));
+      let machine_width = DE.machine_width denv in
       only_one_side_known
-        (fun i -> N.op_rhs_unknown op ~lhs:i)
+        (fun i -> N.op_rhs_unknown ~machine_width op ~lhs:i)
         nums1 ~folder:N.Lhs.Set.fold ~other_side:arg2
     | Need_meet, Known_result nums2 when N.ok_to_evaluate denv ->
       assert (not (N.Rhs.Set.is_empty nums2));
+      let machine_width = DE.machine_width denv in
       only_one_side_known
-        (fun i -> N.op_lhs_unknown op ~rhs:i)
+        (fun i -> N.op_lhs_unknown ~machine_width op ~rhs:i)
         nums2 ~folder:N.Rhs.Set.fold ~other_side:arg1
     | (Known_result _ | Need_meet), (Known_result _ | Need_meet) ->
       result_unknown ()
@@ -265,12 +292,14 @@ end = struct
 
   let prover_rhs = I.unboxed_prover
 
-  let unknown _ =
+  let unknown ~machine_width:_ _ =
     match arg_kind with
     | Tagged_immediate -> T.any_tagged_immediate
     | Naked_immediate -> T.any_naked_immediate
     | Naked_float32 -> T.any_naked_float32
     | Naked_float -> T.any_naked_float
+    | Naked_int8 -> T.any_naked_int8
+    | Naked_int16 -> T.any_naked_int16
     | Naked_int32 -> T.any_naked_int32
     | Naked_int64 -> T.any_naked_int64
     | Naked_nativeint -> T.any_naked_nativeint
@@ -290,7 +319,7 @@ end = struct
 
   let cross_product = I.Num.cross_product
 
-  let op (op : P.binary_int_arith_op) n1 n2 =
+  let op ~machine_width:_ (op : P.binary_int_arith_op) n1 n2 =
     let always_some f = Some (f n1 n2) in
     match op with
     | Add -> always_some I.Num.add
@@ -311,43 +340,50 @@ end = struct
 
   module Num = I.Num
 
-  let symmetric_op_one_side_unknown (op : symmetric_op) ~this_side :
-      Num.t binary_arith_outcome_for_one_side_only =
+  let symmetric_op_one_side_unknown ~machine_width (op : symmetric_op)
+      ~this_side : Num.t binary_arith_outcome_for_one_side_only =
     match op with
     | Add ->
-      if Num.equal this_side Num.zero then The_other_side else Cannot_simplify
-    | Mul ->
-      if Num.equal this_side Num.zero
-      then Exactly Num.zero
-      else if Num.equal this_side Num.one
+      if Num.equal this_side (Num.zero machine_width)
       then The_other_side
-      else if Num.equal this_side Num.minus_one
+      else Cannot_simplify
+    | Mul ->
+      if Num.equal this_side (Num.zero machine_width)
+      then Exactly (Num.zero machine_width)
+      else if Num.equal this_side (Num.one machine_width)
+      then The_other_side
+      else if Num.equal this_side (Num.minus_one machine_width)
       then Negation_of_the_other_side
       else Cannot_simplify
     | And ->
-      if Num.equal this_side Num.minus_one
+      if Num.equal this_side (Num.minus_one machine_width)
       then The_other_side
-      else if Num.equal this_side Num.zero
-      then Exactly Num.zero
+      else if Num.equal this_side (Num.zero machine_width)
+      then Exactly (Num.zero machine_width)
       else Cannot_simplify
     | Or ->
-      if Num.equal this_side Num.minus_one
-      then Exactly Num.minus_one
-      else if Num.equal this_side Num.zero
+      if Num.equal this_side (Num.minus_one machine_width)
+      then Exactly (Num.minus_one machine_width)
+      else if Num.equal this_side (Num.zero machine_width)
       then The_other_side
       else Cannot_simplify
     | Xor ->
-      if Num.equal this_side Num.zero then The_other_side else Cannot_simplify
+      if Num.equal this_side (Num.zero machine_width)
+      then The_other_side
+      else Cannot_simplify
 
-  let op_lhs_unknown (op : P.binary_int_arith_op) ~rhs :
+  let op_lhs_unknown ~machine_width (op : P.binary_int_arith_op) ~rhs :
       Num.t binary_arith_outcome_for_one_side_only =
     match op with
-    | Add -> symmetric_op_one_side_unknown Add ~this_side:rhs
-    | Mul -> symmetric_op_one_side_unknown Mul ~this_side:rhs
-    | And -> symmetric_op_one_side_unknown And ~this_side:rhs
-    | Or -> symmetric_op_one_side_unknown Or ~this_side:rhs
-    | Xor -> symmetric_op_one_side_unknown Xor ~this_side:rhs
-    | Sub -> if Num.equal rhs Num.zero then The_other_side else Cannot_simplify
+    | Add -> symmetric_op_one_side_unknown ~machine_width Add ~this_side:rhs
+    | Mul -> symmetric_op_one_side_unknown ~machine_width Mul ~this_side:rhs
+    | And -> symmetric_op_one_side_unknown ~machine_width And ~this_side:rhs
+    | Or -> symmetric_op_one_side_unknown ~machine_width Or ~this_side:rhs
+    | Xor -> symmetric_op_one_side_unknown ~machine_width Xor ~this_side:rhs
+    | Sub ->
+      if Num.equal rhs (Num.zero machine_width)
+      then The_other_side
+      else Cannot_simplify
     | Div ->
       (* Division ("safe" division, strictly speaking, in Lambda terminology) is
          translated to a conditional on the denominator followed by an unsafe
@@ -355,35 +391,35 @@ end = struct
          denominator turns out to be zero here, via the typing or whatever, then
          we're in unreachable code. *)
       (* CR-someday mshinwell: Should we expose unsafe division to the user? *)
-      if Num.equal rhs Num.zero
+      if Num.equal rhs (Num.zero machine_width)
       then Invalid
-      else if Num.equal rhs Num.one
+      else if Num.equal rhs (Num.one machine_width)
       then The_other_side
-      else if Num.equal rhs Num.minus_one
+      else if Num.equal rhs (Num.minus_one machine_width)
       then
         Negation_of_the_other_side
         (* CR mshinwell: Add 0 / x = 0 when x <> 0 *)
       else Cannot_simplify
     | Mod ->
       (* CR mshinwell: We could be more clever for Mod and And *)
-      if Num.equal rhs Num.zero
+      if Num.equal rhs (Num.zero machine_width)
       then Invalid
-      else if Num.equal rhs Num.one
-      then Exactly Num.zero
-      else if Num.equal rhs Num.minus_one
-      then Exactly Num.zero
+      else if Num.equal rhs (Num.one machine_width)
+      then Exactly (Num.zero machine_width)
+      else if Num.equal rhs (Num.minus_one machine_width)
+      then Exactly (Num.zero machine_width)
       else Cannot_simplify
 
-  let op_rhs_unknown (op : P.binary_int_arith_op) ~lhs :
+  let op_rhs_unknown ~machine_width (op : P.binary_int_arith_op) ~lhs :
       Num.t binary_arith_outcome_for_one_side_only =
     match op with
-    | Add -> symmetric_op_one_side_unknown Add ~this_side:lhs
-    | Mul -> symmetric_op_one_side_unknown Mul ~this_side:lhs
-    | And -> symmetric_op_one_side_unknown And ~this_side:lhs
-    | Or -> symmetric_op_one_side_unknown Or ~this_side:lhs
-    | Xor -> symmetric_op_one_side_unknown Xor ~this_side:lhs
+    | Add -> symmetric_op_one_side_unknown ~machine_width Add ~this_side:lhs
+    | Mul -> symmetric_op_one_side_unknown ~machine_width Mul ~this_side:lhs
+    | And -> symmetric_op_one_side_unknown ~machine_width And ~this_side:lhs
+    | Or -> symmetric_op_one_side_unknown ~machine_width Or ~this_side:lhs
+    | Xor -> symmetric_op_one_side_unknown ~machine_width Xor ~this_side:lhs
     | Sub ->
-      if Num.equal lhs Num.zero
+      if Num.equal lhs (Num.zero machine_width)
       then Negation_of_the_other_side
       else Cannot_simplify
     | Div | Mod -> Cannot_simplify
@@ -394,6 +430,8 @@ module Int_ops_for_binary_arith_tagged_immediate =
   Int_ops_for_binary_arith (A.For_tagged_immediates)
 module Int_ops_for_binary_arith_naked_immediate =
   Int_ops_for_binary_arith (A.For_naked_immediates)
+module Int_ops_for_binary_arith_int8 = Int_ops_for_binary_arith (A.For_int8s)
+module Int_ops_for_binary_arith_int16 = Int_ops_for_binary_arith (A.For_int16s)
 module Int_ops_for_binary_arith_int32 = Int_ops_for_binary_arith (A.For_int32s)
 module Int_ops_for_binary_arith_int64 = Int_ops_for_binary_arith (A.For_int64s)
 module Int_ops_for_binary_arith_nativeint =
@@ -402,6 +440,9 @@ module Binary_int_arith_tagged_immediate =
   Binary_arith_like (Int_ops_for_binary_arith_tagged_immediate)
 module Binary_int_arith_naked_immediate =
   Binary_arith_like (Int_ops_for_binary_arith_naked_immediate)
+module Binary_int_arith_int8 = Binary_arith_like (Int_ops_for_binary_arith_int8)
+module Binary_int_arith_int16 =
+  Binary_arith_like (Int_ops_for_binary_arith_int16)
 module Binary_int_arith_int32 =
   Binary_arith_like (Int_ops_for_binary_arith_int32)
 module Binary_int_arith_int64 =
@@ -413,7 +454,7 @@ module Int_ops_for_binary_shift (I : A.Int_number_kind) : sig
   include Binary_arith_like_sig with type op = P.int_shift_op
 end = struct
   module Lhs = I.Num
-  module Rhs = Targetint_31_63
+  module Rhs = Target_ocaml_int
   module Result = I.Num
 
   type op = P.int_shift_op
@@ -428,12 +469,14 @@ end = struct
 
   let prover_rhs = T.meet_naked_immediates
 
-  let unknown _ =
+  let unknown ~machine_width:_ _ =
     match arg_kind with
     | Tagged_immediate -> T.any_tagged_immediate
     | Naked_immediate -> T.any_naked_immediate
     | Naked_float32 -> T.any_naked_float32
     | Naked_float -> T.any_naked_float
+    | Naked_int8 -> T.any_naked_int8
+    | Naked_int16 -> T.any_naked_int16
     | Naked_int32 -> T.any_naked_int32
     | Naked_int64 -> T.any_naked_int64
     | Naked_nativeint -> T.any_naked_nativeint
@@ -466,16 +509,16 @@ end = struct
 
   module Num = I.Num
 
-  let op (op : P.int_shift_op) n1 n2 =
+  let op ~machine_width:_ (op : P.int_shift_op) n1 n2 =
     let always_some f = Some (f n1 n2) in
     match op with
     | Lsl -> always_some Num.shift_left
     | Lsr -> always_some Num.shift_right_logical
     | Asr -> always_some Num.shift_right
 
-  let op_lhs_unknown (op : P.int_shift_op) ~rhs :
+  let op_lhs_unknown ~machine_width (op : P.int_shift_op) ~rhs :
       Num.t binary_arith_outcome_for_one_side_only =
-    let module O = Targetint_31_63 in
+    let module O = Target_ocaml_int in
     let rhs = rhs in
     match op with
     | Lsl | Lsr | Asr ->
@@ -485,9 +528,11 @@ end = struct
          However note that we cannot produce [Invalid] unless the code is type
          unsafe, which it is not here. (Otherwise a GADT match might be reduced
          to only one possible case which it would be wrong to take.) *)
-      if O.equal rhs O.zero then The_other_side else Cannot_simplify
+      if O.equal rhs (O.zero machine_width)
+      then The_other_side
+      else Cannot_simplify
 
-  let op_rhs_unknown (op : P.int_shift_op) ~lhs :
+  let op_rhs_unknown ~machine_width (op : P.int_shift_op) ~lhs :
       Num.t binary_arith_outcome_for_one_side_only =
     (* In these cases we are giving a semantics for some cases where the
        right-hand side may be less than zero or greater than or equal to
@@ -497,12 +542,14 @@ end = struct
        in [op_lhs_unknown], above, where there would be no such benefit.) *)
     match op with
     | Lsl | Lsr ->
-      if Num.equal lhs Num.zero then Exactly Num.zero else Cannot_simplify
+      if Num.equal lhs (Num.zero machine_width)
+      then Exactly (Num.zero machine_width)
+      else Cannot_simplify
     | Asr ->
-      if Num.equal lhs Num.zero
-      then Exactly Num.zero
-      else if Num.equal lhs Num.minus_one
-      then Exactly Num.minus_one
+      if Num.equal lhs (Num.zero machine_width)
+      then Exactly (Num.zero machine_width)
+      else if Num.equal lhs (Num.minus_one machine_width)
+      then Exactly (Num.minus_one machine_width)
       else Cannot_simplify
 end
 [@@inline always]
@@ -511,6 +558,8 @@ module Int_ops_for_binary_shift_tagged_immediate =
   Int_ops_for_binary_shift (A.For_tagged_immediates)
 module Int_ops_for_binary_shift_naked_immediate =
   Int_ops_for_binary_shift (A.For_naked_immediates)
+module Int_ops_for_binary_shift_int8 = Int_ops_for_binary_shift (A.For_int8s)
+module Int_ops_for_binary_shift_int16 = Int_ops_for_binary_shift (A.For_int16s)
 module Int_ops_for_binary_shift_int32 = Int_ops_for_binary_shift (A.For_int32s)
 module Int_ops_for_binary_shift_int64 = Int_ops_for_binary_shift (A.For_int64s)
 module Int_ops_for_binary_shift_nativeint =
@@ -519,6 +568,9 @@ module Binary_int_shift_tagged_immediate =
   Binary_arith_like (Int_ops_for_binary_shift_tagged_immediate)
 module Binary_int_shift_naked_immediate =
   Binary_arith_like (Int_ops_for_binary_shift_naked_immediate)
+module Binary_int_shift_int8 = Binary_arith_like (Int_ops_for_binary_shift_int8)
+module Binary_int_shift_int16 =
+  Binary_arith_like (Int_ops_for_binary_shift_int16)
 module Binary_int_shift_int32 =
   Binary_arith_like (Int_ops_for_binary_shift_int32)
 module Binary_int_shift_int64 =
@@ -533,7 +585,7 @@ module Int_ops_for_binary_comp (I : A.Int_number_kind) : sig
 end = struct
   module Lhs = I.Num
   module Rhs = I.Num
-  module Result = Targetint_31_63
+  module Result = Target_ocaml_int
 
   type op = P.signed_or_unsigned P.comparison_behaviour
 
@@ -547,16 +599,18 @@ end = struct
 
   let prover_rhs = I.unboxed_prover
 
-  let unknown (op : op) =
+  let unknown ~machine_width (op : op) =
     match op with
-    | Yielding_bool _ -> T.these_naked_immediates Targetint_31_63.all_bools
+    | Yielding_bool _ ->
+      T.these_naked_immediates (Target_ocaml_int.all_bools machine_width)
     | Yielding_int_like_compare_functions _signedness ->
-      T.these_naked_immediates Targetint_31_63.zero_one_and_minus_one
+      T.these_naked_immediates
+        (Target_ocaml_int.zero_one_and_minus_one machine_width)
 
   let these s =
     let ty = T.these_naked_immediates s in
     let simple_opt =
-      match Targetint_31_63.Set.get_singleton s with
+      match Target_ocaml_int.Set.get_singleton s with
       | None -> None
       | Some i -> Some (Simple.const (Reg_width_const.naked_immediate i))
     in
@@ -571,10 +625,11 @@ end = struct
 
   module Num = I.Num
 
-  let op (op : P.signed_or_unsigned P.comparison_behaviour) n1 n2 =
+  let op ~machine_width (op : P.signed_or_unsigned P.comparison_behaviour) n1 n2
+      =
     match op with
     | Yielding_bool op -> (
-      let bool b = Targetint_31_63.bool b in
+      let bool b = Target_ocaml_int.bool machine_width b in
       match op with
       | Eq -> Some (bool (Num.compare n1 n2 = 0))
       | Neq -> Some (bool (Num.compare n1 n2 <> 0))
@@ -589,7 +644,7 @@ end = struct
     | Yielding_int_like_compare_functions signed_or_unsigned -> (
       match signed_or_unsigned with
       | Signed ->
-        let int i = Targetint_31_63.of_int i in
+        let int i = Target_ocaml_int.of_int machine_width i in
         let c = Num.compare n1 n2 in
         if c < 0
         then Some (int (-1))
@@ -597,7 +652,7 @@ end = struct
         then Some (int 0)
         else Some (int 1)
       | Unsigned ->
-        let int i = Targetint_31_63.of_int i in
+        let int i = Target_ocaml_int.of_int machine_width i in
         let c = Num.compare_unsigned n1 n2 in
         if c < 0
         then Some (int (-1))
@@ -605,9 +660,9 @@ end = struct
         then Some (int 0)
         else Some (int 1))
 
-  let op_lhs_unknown _op ~rhs:_ = Cannot_simplify
+  let op_lhs_unknown ~machine_width:_ _op ~rhs:_ = Cannot_simplify
 
-  let op_rhs_unknown _op ~lhs:_ = Cannot_simplify
+  let op_rhs_unknown ~machine_width:_ _op ~lhs:_ = Cannot_simplify
 end
 [@@inline always]
 
@@ -615,6 +670,8 @@ module Int_ops_for_binary_comp_tagged_immediate =
   Int_ops_for_binary_comp (A.For_tagged_immediates)
 module Int_ops_for_binary_comp_naked_immediate =
   Int_ops_for_binary_comp (A.For_naked_immediates)
+module Int_ops_for_binary_comp_int8 = Int_ops_for_binary_comp (A.For_int8s)
+module Int_ops_for_binary_comp_int16 = Int_ops_for_binary_comp (A.For_int16s)
 module Int_ops_for_binary_comp_int32 = Int_ops_for_binary_comp (A.For_int32s)
 module Int_ops_for_binary_comp_int64 = Int_ops_for_binary_comp (A.For_int64s)
 module Int_ops_for_binary_comp_nativeint =
@@ -623,6 +680,8 @@ module Binary_int_comp_tagged_immediate =
   Binary_arith_like (Int_ops_for_binary_comp_tagged_immediate)
 module Binary_int_comp_naked_immediate =
   Binary_arith_like (Int_ops_for_binary_comp_naked_immediate)
+module Binary_int_comp_int8 = Binary_arith_like (Int_ops_for_binary_comp_int8)
+module Binary_int_comp_int16 = Binary_arith_like (Int_ops_for_binary_comp_int16)
 module Binary_int_comp_int32 = Binary_arith_like (Int_ops_for_binary_comp_int32)
 module Binary_int_comp_int64 = Binary_arith_like (Int_ops_for_binary_comp_int64)
 module Binary_int_comp_nativeint =
@@ -664,7 +723,7 @@ end = struct
 
   let prover_rhs = FP.prover
 
-  let unknown _ = FP.unknown
+  let unknown ~machine_width:_ _ = FP.unknown
 
   let these s =
     let ty = FP.these s in
@@ -681,7 +740,7 @@ end = struct
 
   let cross_product = F.cross_product
 
-  let op (op : op) n1 n2 =
+  let op ~machine_width:_ (op : op) n1 n2 =
     let always_some f = Some (f n1 n2) in
     match op with
     | Add -> always_some F.IEEE_semantics.add
@@ -717,8 +776,8 @@ end = struct
         [@z3 check_float_binary_opposite `Mul (-1.0) `Right]
       else Cannot_simplify
 
-  let op_lhs_unknown (op : op) ~rhs : F.t binary_arith_outcome_for_one_side_only
-      =
+  let op_lhs_unknown ~machine_width:_ (op : op) ~rhs :
+      F.t binary_arith_outcome_for_one_side_only =
     match op with
     | Add -> symmetric_op_one_side_unknown Add ~this_side:rhs
     | Mul -> symmetric_op_one_side_unknown Mul ~this_side:rhs
@@ -732,8 +791,8 @@ end = struct
         [@z3 check_float_binary_opposite `Div (-1.0) `Right]
       else Cannot_simplify
 
-  let op_rhs_unknown (op : op) ~lhs : F.t binary_arith_outcome_for_one_side_only
-      =
+  let op_rhs_unknown ~machine_width:_ (op : op) ~lhs :
+      F.t binary_arith_outcome_for_one_side_only =
     match op with
     | Add -> symmetric_op_one_side_unknown Add ~this_side:lhs
     | Mul -> symmetric_op_one_side_unknown Mul ~this_side:lhs
@@ -792,7 +851,7 @@ end = struct
   module F = FP.F
   module Lhs = F
   module Rhs = F
-  module Result = Targetint_31_63
+  module Result = Target_ocaml_int
 
   type op = unit P.comparison_behaviour
 
@@ -806,16 +865,18 @@ end = struct
 
   let prover_rhs = FP.prover
 
-  let unknown (op : op) =
+  let unknown ~machine_width (op : op) =
     match op with
-    | Yielding_bool _ -> T.these_naked_immediates Targetint_31_63.all_bools
+    | Yielding_bool _ ->
+      T.these_naked_immediates (Target_ocaml_int.all_bools machine_width)
     | Yielding_int_like_compare_functions () ->
-      T.these_naked_immediates Targetint_31_63.zero_one_and_minus_one
+      T.these_naked_immediates
+        (Target_ocaml_int.zero_one_and_minus_one machine_width)
 
   let these s =
     let ty = T.these_naked_immediates s in
     let simple_opt =
-      match Targetint_31_63.Set.get_singleton s with
+      match Target_ocaml_int.Set.get_singleton s with
       | None -> None
       | Some i -> Some (Simple.const (Reg_width_const.naked_immediate i))
     in
@@ -828,11 +889,11 @@ end = struct
 
   let cross_product = F.cross_product
 
-  let op (op : op) n1 n2 =
+  let op ~machine_width (op : op) n1 n2 =
     match op with
     | Yielding_bool op -> (
       let has_nan = F.is_any_nan n1 || F.is_any_nan n2 in
-      let bool b = Targetint_31_63.bool b in
+      let bool b = Target_ocaml_int.bool machine_width b in
       match op with
       | Eq -> Some (bool (F.IEEE_semantics.equal n1 n2))
       | Neq -> Some (bool (not (F.IEEE_semantics.equal n1 n2)))
@@ -853,7 +914,7 @@ end = struct
         then Some (bool false)
         else Some (bool (F.IEEE_semantics.compare n1 n2 >= 0)))
     | Yielding_int_like_compare_functions () ->
-      let int i = Targetint_31_63.of_int i in
+      let int i = Target_ocaml_int.of_int machine_width i in
       let c = F.IEEE_semantics.compare n1 n2 in
       if c < 0
       then Some (int (-1))
@@ -861,24 +922,27 @@ end = struct
       then Some (int 0)
       else Some (int 1)
 
-  let result_of_comparison_with_nan (op : unit P.comparison) =
+  let result_of_comparison_with_nan ~machine_width (op : unit P.comparison) =
     match op with
-    | Neq -> Exactly Targetint_31_63.bool_true
-    | Eq | Lt () | Gt () | Le () | Ge () -> Exactly Targetint_31_63.bool_false
+    | Neq -> Exactly (Target_ocaml_int.bool_true machine_width)
+    | Eq | Lt () | Gt () | Le () | Ge () ->
+      Exactly (Target_ocaml_int.bool_false machine_width)
 
-  let op_lhs_unknown (op : op) ~rhs : _ binary_arith_outcome_for_one_side_only =
+  let op_lhs_unknown ~machine_width (op : op) ~rhs :
+      _ binary_arith_outcome_for_one_side_only =
     match op with
     | Yielding_bool op ->
       if F.is_any_nan rhs
-      then result_of_comparison_with_nan op
+      then result_of_comparison_with_nan op ~machine_width
       else Cannot_simplify
     | Yielding_int_like_compare_functions () -> Cannot_simplify
 
-  let op_rhs_unknown (op : op) ~lhs : _ binary_arith_outcome_for_one_side_only =
+  let op_rhs_unknown ~machine_width (op : op) ~lhs :
+      _ binary_arith_outcome_for_one_side_only =
     match op with
     | Yielding_bool op ->
       if F.is_any_nan lhs
-      then result_of_comparison_with_nan op
+      then result_of_comparison_with_nan op ~machine_width
       else Cannot_simplify
     | Yielding_int_like_compare_functions () -> Cannot_simplify
 end
@@ -902,6 +966,9 @@ end)
 module Binary_float_comp = Binary_arith_like (Float_ops_for_binary_comp)
 module Binary_float32_comp = Binary_arith_like (Float32_ops_for_binary_comp)
 
+(* Unlike in the language specification, the compiler defines physical equality
+   as referential equality on all values, including immediates and immutable
+   blocks. *)
 let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term _dbg
     ~arg1:_ ~arg1_ty ~arg2:_ ~arg2_ty ~result_var =
   (* This primitive is only used for arguments of kind [Value]. *)
@@ -909,20 +976,21 @@ let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term _dbg
   (* Note: We don't compare the arguments themselves for equality. Instead, we
      know that [simplify_simple] always returns alias types, so we let the
      prover do the matching. *)
+  let machine_width = DE.machine_width (DA.denv dacc) in
   match T.prove_physical_equality typing_env arg1_ty arg2_ty with
   | Proved bool ->
     let result = match op with Eq -> bool | Neq -> not bool in
     let dacc =
       DA.add_variable dacc result_var
-        (T.this_naked_immediate (Targetint_31_63.bool result))
+        (T.this_naked_immediate (Target_ocaml_int.bool machine_width result))
     in
     SPR.create
-      (Named.create_simple (Simple.untagged_const_bool result))
+      (Named.create_simple (Simple.untagged_const_bool machine_width result))
       ~try_reify:false dacc
   | Unknown ->
     let dacc =
       DA.add_variable dacc result_var
-        (T.these_naked_immediates Targetint_31_63.all_bools)
+        (T.these_naked_immediates (Target_ocaml_int.all_bools machine_width))
     in
     SPR.create original_term ~try_reify:false dacc
 
@@ -932,13 +1000,18 @@ let simplify_array_load (array_kind : P.Array_kind.t)
   let result_kind =
     match array_load_kind with
     | Immediates -> (* CR mshinwell: use the subkind *) K.value
-    | Values -> K.value
+    | Gc_ignorable_values | Values -> K.value
     | Naked_floats -> K.naked_float
     | Naked_float32s -> K.naked_float32
+    | Naked_ints -> K.naked_immediate
+    | Naked_int8s -> K.naked_int8
+    | Naked_int16s -> K.naked_int16
     | Naked_int32s -> K.naked_int32
     | Naked_int64s -> K.naked_int64
     | Naked_nativeints -> K.naked_nativeint
     | Naked_vec128s -> K.naked_vec128
+    | Naked_vec256s -> K.naked_vec256
+    | Naked_vec512s -> K.naked_vec512
   in
   let array_kind =
     Simplify_common.specialise_array_kind dacc array_kind ~array_ty
@@ -978,16 +1051,19 @@ let simplify_array_load (array_kind : P.Array_kind.t)
           with
           | Unknown -> contents_unknown ()
           | Proved imms -> (
-            match Targetint_31_63.Set.get_singleton imms with
+            match Target_ocaml_int.Set.get_singleton imms with
             | None -> contents_unknown ()
             | Some imm ->
-              if Targetint_31_63.( < ) imm Targetint_31_63.zero
-                 || Targetint_31_63.( >= ) imm
-                      (Array.length fields |> Targetint_31_63.of_int)
+              let machine_width = DE.machine_width (DA.denv dacc) in
+              if Target_ocaml_int.( < ) imm
+                   (Target_ocaml_int.zero machine_width)
+                 || Target_ocaml_int.( >= ) imm
+                      (Array.length fields
+                      |> Target_ocaml_int.of_int machine_width)
               then SPR.create_invalid dacc
               else
                 return_given_type
-                  fields.(Targetint_31_63.to_int imm)
+                  fields.(Target_ocaml_int.to_int imm)
                   ~try_reify:true))))
 
 let simplify_string_or_bigstring_load _string_like_value _string_accessor_width
@@ -1011,20 +1087,8 @@ let simplify_bigarray_get_alignment _align ~original_prim dacc ~original_term
     (P.result_kind' original_prim)
     ~original_term
 
-let simplify_atomic_set ~original_prim dacc ~original_term _dbg ~arg1:_
+let simplify_atomic_load_field ~original_prim dacc ~original_term _dbg ~arg1:_
     ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
-  SPR.create_unknown dacc ~result_var
-    (P.result_kind' original_prim)
-    ~original_term
-
-let simplify_atomic_exchange ~original_prim dacc ~original_term _dbg ~arg1:_
-    ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
-  SPR.create_unknown dacc ~result_var
-    (P.result_kind' original_prim)
-    ~original_term
-
-let simplify_atomic_int_arith ~original_prim dacc ~original_term _dbg ~op:_
-    ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
     ~original_term
@@ -1036,6 +1100,12 @@ let simplify_block_set _block_access_kind _init_or_assign ~field:_ dacc
 let simplify_poke dacc ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_
     ~result_var =
   SPR.create_unit dacc ~result_var ~original_term
+
+let simplify_read_offset ~original_prim dacc ~original_term _dbg ~arg1:_
+    ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
+  SPR.create_unknown dacc ~result_var
+    (P.result_kind' original_prim)
+    ~original_term
 
 let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
     ~arg1 ~arg1_ty ~arg2 ~arg2_ty dbg ~result_var =
@@ -1049,6 +1119,8 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
       match kind with
       | Tagged_immediate -> Binary_int_arith_tagged_immediate.simplify op
       | Naked_immediate -> Binary_int_arith_naked_immediate.simplify op
+      | Naked_int8 -> Binary_int_arith_int8.simplify op
+      | Naked_int16 -> Binary_int_arith_int16.simplify op
       | Naked_int32 -> Binary_int_arith_int32.simplify op
       | Naked_int64 -> Binary_int_arith_int64.simplify op
       | Naked_nativeint -> Binary_int_arith_nativeint.simplify op)
@@ -1056,6 +1128,8 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
       match kind with
       | Tagged_immediate -> Binary_int_shift_tagged_immediate.simplify op
       | Naked_immediate -> Binary_int_shift_naked_immediate.simplify op
+      | Naked_int8 -> Binary_int_shift_int8.simplify op
+      | Naked_int16 -> Binary_int_shift_int16.simplify op
       | Naked_int32 -> Binary_int_shift_int32.simplify op
       | Naked_int64 -> Binary_int_shift_int64.simplify op
       | Naked_nativeint -> Binary_int_shift_nativeint.simplify op)
@@ -1063,6 +1137,8 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
       match kind with
       | Tagged_immediate -> Binary_int_comp_tagged_immediate.simplify op
       | Naked_immediate -> Binary_int_comp_naked_immediate.simplify op
+      | Naked_int8 -> Binary_int_comp_int8.simplify op
+      | Naked_int16 -> Binary_int_comp_int16.simplify op
       | Naked_int32 -> Binary_int_comp_int32.simplify op
       | Naked_int64 -> Binary_int_comp_int64.simplify op
       | Naked_nativeint -> Binary_int_comp_nativeint.simplify op)
@@ -1083,10 +1159,9 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
         ~original_prim
     | Bigarray_get_alignment align ->
       simplify_bigarray_get_alignment align ~original_prim
-    | Atomic_set _ -> simplify_atomic_set ~original_prim
-    | Atomic_exchange _ -> simplify_atomic_exchange ~original_prim
-    | Atomic_int_arith op -> simplify_atomic_int_arith ~original_prim ~op
+    | Atomic_load_field _ -> simplify_atomic_load_field ~original_prim
     | Poke _ -> simplify_poke
+    | Read_offset _ -> simplify_read_offset ~original_prim
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~result_var
 
@@ -1095,19 +1170,23 @@ let recover_comparison_primitive dacc (prim : P.binary_primitive) ~arg1 ~arg2 =
   | Block_set _ | Array_load _ | Int_arith _ | Int_shift _
   | Int_comp (_, Yielding_int_like_compare_functions _)
   | Float_arith _ | Float_comp _ | Phys_equal _ | String_or_bigstring_load _
-  | Bigarray_load _ | Bigarray_get_alignment _ | Atomic_exchange _
-  | Atomic_set _ | Atomic_int_arith _ | Poke _ ->
+  | Bigarray_load _ | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _
+  | Read_offset _ ->
     None
   | Int_comp (kind, Yielding_bool op) -> (
     match kind with
-    | Naked_immediate | Naked_int32 | Naked_int64 | Naked_nativeint -> None
+    | Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
+    | Naked_nativeint ->
+      None
     | Tagged_immediate -> (
       let try_one_direction left right op =
         Simple.pattern_match right
           ~name:(fun _ ~coercion:_ -> None)
           ~const:(fun const ->
             match[@warning "-fragile-match"] Const.descr const with
-            | Tagged_immediate i when Targetint_31_63.(equal i zero) ->
+            | Tagged_immediate i
+              when Target_ocaml_int.(
+                     equal i (zero (DE.machine_width (DA.denv dacc)))) ->
               Simple.pattern_match' left
                 ~const:(fun _ -> None)
                 ~symbol:(fun _ ~coercion:_ -> None)

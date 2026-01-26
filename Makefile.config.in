@@ -222,6 +222,8 @@ WINDOWS_UNICODE=@windows_unicode@
 AFL_INSTRUMENT=@afl@
 FLAT_FLOAT_ARRAY=@flat_float_array@
 FUNCTION_SECTIONS=@function_sections@
+OXCAML_DWARF_FLAGS_FOR_COMPILER=@oxcaml_dwarf_flags_for_compiler@
+ASSEMBLY_FLAG_FOR_COMPILER=@assembly_flag_for_compiler@
 PROBES=@probes@
 AWK=@AWK@
 STDLIB_MANPAGES=@stdlib_manpages@
@@ -253,7 +255,7 @@ UNIXLIB=unix
 
 RUNTIMEI=$(INSTRUMENTED_RUNTIME)
 
-## Variables used by flambda-backend build
+## Variables used by oxcaml build
 
 install_prefix = @prefix@
 dune = @dune@

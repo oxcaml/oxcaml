@@ -28,13 +28,14 @@ module Let_binding : sig
     { let_kind : Let_kind.t;
       layout : layout;
       id : Ident.t;
+      debug_uid : debug_uid;
       init : lambda; (* initial value *)
       var : lambda (* occurrence of this variable *)
     }
 
   (** Create a fresh local identifier (with name as given by the string
       argument) to bind to an initial value given by the lambda argument. *)
-  val make : Let_kind.t -> layout -> string -> lambda -> t
+  val make : Let_kind.t -> layout -> string -> debug_uid -> lambda -> t
 
   (** Create a Lambda let-binding (with [Llet]) from a first-class let
       binding, providing the body. *)
@@ -61,6 +62,12 @@ module Lambda_utils : sig
 
     val unboxed_float32 : float -> lambda
 
+    val untagged_int : int -> lambda
+
+    val untagged_int8 : int -> lambda
+
+    val untagged_int16 : int -> lambda
+
     val unboxed_int32 : Int32.t -> lambda
 
     val unboxed_int64 : Int64.t -> lambda
@@ -68,7 +75,7 @@ module Lambda_utils : sig
     val unboxed_nativeint : Targetint.t -> lambda
 
     (** Lambda string literals; these require a location, and are constructed as
-        "quoted strings", not {fancy|delimited strings|fancy}. *)
+        "quoted strings", not [{fancy|delimited strings|fancy}]. *)
     val string : loc:Location.t -> string -> lambda
   end
 
@@ -145,6 +152,15 @@ module Lambda_utils : sig
 
     (** Like [make_float_vect] but for unboxed float32 arrays. *)
     val make_unboxed_float32_vect : loc:scoped_location -> lambda -> lambda
+
+    (** Like [make_float_vect] but for untagged int arrays. *)
+    val make_untagged_int_vect : loc:scoped_location -> lambda -> lambda
+
+    (** Like [make_float_vect] but for untagged int8 arrays. *)
+    val make_untagged_int8_vect : loc:scoped_location -> lambda -> lambda
+
+    (** Like [make_float_vect] but for untagged int16 arrays. *)
+    val make_untagged_int16_vect : loc:scoped_location -> lambda -> lambda
 
     (** Like [make_float_vect] but for unboxed int32 arrays. *)
     val make_unboxed_int32_vect : loc:scoped_location -> lambda -> lambda

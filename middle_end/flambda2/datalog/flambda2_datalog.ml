@@ -21,44 +21,7 @@ module Datalog = struct
   module Constant = Constant
 
   module Column = struct
-    type (_, _, _) repr =
-      | Patricia_tree_repr : ('a Patricia_tree.map, int, 'a) repr
-
-    type ('t, 'k, 'v) id =
-      { name : string;
-        print : Format.formatter -> 'k -> unit;
-        repr : ('t, 'k, 'v) repr
-      }
-
-    let print_key { print; _ } = print
-
-    type (_, _, _) hlist =
-      | [] : ('v, nil, 'v) hlist
-      | ( :: ) :
-          ('t, 'k, 's) id * ('s, 'ks, 'v) hlist
-          -> ('t, 'k -> 'ks, 'v) hlist
-
-    let rec print_keys :
-        type t k v.
-        (t, k, v) hlist -> Format.formatter -> k Constant.hlist -> unit =
-     fun columns ppf keys ->
-      match columns, keys with
-      | [], [] -> ()
-      | [column], [key] -> print_key column ppf key
-      | column :: (_ :: _ as columns), key :: keys ->
-        Format.fprintf ppf "%a,@ %a" (print_key column) key (print_keys columns)
-          keys
-
-    (* We could expose the fact that we do not support relations without
-       arguments in the types, but a runtime error here allows us to give a
-       better error message. Plus, we might support constant relations
-       (represented as an option) in the future. *)
-    let rec is_trie : type t k v. (t, k, v) hlist -> (t, k, v) Trie.is_trie =
-      function
-      | [] -> Misc.fatal_error "Cannot create relation with no arguments"
-      | [{ repr = Patricia_tree_repr; _ }] -> Trie.patricia_tree_is_trie
-      | { repr = Patricia_tree_repr; _ } :: (_ :: _ as columns) ->
-        Trie.patricia_tree_of_trie (is_trie columns)
+    include Column
 
     module type S = sig
       type t
@@ -73,24 +36,6 @@ module Datalog = struct
           with module Set = Set
 
       val datalog_column_id : ('a Map.t, t, 'a) id
-    end
-
-    module Make (X : sig
-      val name : string
-
-      val print : Format.formatter -> int -> unit
-    end) =
-    struct
-      type t = int
-
-      let print = X.print
-
-      module Tree = Patricia_tree.Make (X)
-      module Set = Tree.Set
-      module Map = Tree.Map
-
-      let datalog_column_id =
-        { name = X.name; print; repr = Patricia_tree_repr }
     end
 
     module type Columns = sig
@@ -125,17 +70,17 @@ module Datalog = struct
 
   include Datalog
 
-  type ('t, 'k, 'v) table = ('t, 'k, 'v) Table.Id.t
+  type (!'t, !'k, !'v) table = ('t, 'k, 'v) Table.Id.t
 
-  let create_table ~name ~default_value columns =
-    Table.Id.create ~name ~is_trie:(Column.is_trie columns)
-      ~print_keys:(Column.print_keys columns)
-      ~default_value
+  let create_table ?(provenance = true) ~name ~default_value columns =
+    Table.Id.create ~provenance ~name ~columns ~default_value
+
+  let columns table = Table.Id.columns table
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 
-  let create_relation ~name columns =
-    create_table ~name ~default_value:() columns
+  let create_relation ?provenance ~name columns =
+    create_table ?provenance ~name ~default_value:() columns
 
   module Schema = struct
     module type S0 = sig
@@ -245,20 +190,34 @@ module Datalog = struct
 
   let deduce = Schedule.deduce
 
+  type equality =
+    | Equality : (_, 'k, _) Column.id * 'k Term.t * 'k Term.t -> equality
+
+  type filter = Filter : ('k Constant.hlist -> bool) * 'k Term.hlist -> filter
+
   type hypothesis =
     [ `Atom of atom
-    | `Not_atom of atom ]
+    | `Not_atom of atom
+    | `Distinct of equality
+    | `Filter of filter ]
 
   let atom id args = `Atom (Atom (id, args))
 
   let not (`Atom atom) = `Not_atom atom
+
+  let distinct c x y = `Distinct (Equality (c, x, y))
+
+  let filter f args = `Filter (Filter (f, args))
 
   let where predicates f =
     List.fold_left
       (fun f predicate ->
         match predicate with
         | `Atom (Atom (id, args)) -> where_atom id args f
-        | `Not_atom (Atom (id, args)) -> unless_atom id args f)
+        | `Not_atom (Atom (id, args)) -> unless_atom id args f
+        | `Distinct (Equality (repr, t1, t2)) ->
+          unless_eq (Column.value_repr repr) t1 t2 f
+        | `Filter (Filter (p, args)) -> Datalog.filter p args f)
       f predicates
 
   module Cursor = struct
@@ -274,9 +233,8 @@ module Datalog = struct
       where (f variables) @@ yield variables
 
     let create_with_parameters ~parameters variables f =
-      compile variables (fun variables ->
-          with_parameters parameters (fun parameters ->
-              where (f parameters variables) @@ yield variables))
+      compile_with_parameters parameters variables (fun parameters variables ->
+          where (f parameters variables) (yield variables))
 
     let fold_with_parameters cursor parameters database ~init ~f =
       Cursor.With_parameters.naive_fold cursor parameters database f init

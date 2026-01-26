@@ -154,6 +154,26 @@ void caml_set_minor_heap_size (asize_t wsize)
   reset_minor_tables(r);
 }
 
+/* We are about to write `count` ref table entries. We may wish to
+ * avoid them all by doing a minor GC first. Heuristic is that if we
+ * are going to use a significant chunk of the available remembered
+ * set space, without growing the remembered set, then do the GC. */
+
+#define WRITE_PERCENT_TO_TRIGGER_MINOR_GC 10
+
+bool caml_maybe_minor_gc_before_writes(mlsize_t count)
+{
+  struct caml_ref_table *table = &Caml_state->minor_tables->major_ref;
+  size_t space = table->base ? (table->limit - table->ptr) : table->size;
+  if (count > (space * WRITE_PERCENT_TO_TRIGGER_MINOR_GC) / 100) {
+    CAML_EV_COUNTER(EV_C_FORCE_MINOR_MAKE_VECT, 1);
+    caml_minor_collection();
+    return true;
+  }
+  return false;
+}
+
+
 /*****************************************************************************/
 
 struct oldify_state {
@@ -174,15 +194,16 @@ static value alloc_shared(caml_domain_state* d,
   return Val_hp(mem);
 }
 
-/* in progress updates are zeros except for the lowest color bit set to 1
-   that is a header with: wosize == 0 && color == 1 && tag == 0 */
-#define In_progress_update_val ((header_t)0x100)
-#define Is_update_in_progress(hd) ((hd) == In_progress_update_val)
+/* In-progress headers are zeros except for the lowest color bit set
+   to 1. */
+#define In_progress_hd (Make_header(0, 0, 0x100))
+#define Is_update_in_progress(hd) ((hd) == In_progress_hd)
 
-static void spin_on_header(value v) {
+static header_t spin_on_header(value v) {
   SPIN_WAIT {
-    if (atomic_load(Hp_atomic_val(v)) == 0)
-      return;
+    header_t h = atomic_load(Hp_atomic_val(v));
+    if (Is_promoted_hd(h))
+      return h;
   }
 }
 
@@ -192,49 +213,43 @@ Caml_inline header_t get_header_val(value v) {
   if (!Is_update_in_progress(hd))
     return hd;
 
-  spin_on_header(v);
-  return 0;
+  return spin_on_header(v);
 }
-
-header_t caml_get_header_val(value v) {
-  return get_header_val(v);
-}
-
 
 static int try_update_object_header(value v, volatile value *p, value result,
                                     mlsize_t infix_offset) {
   int success = 0;
 
   if( caml_domain_alone() ) {
-    *Hp_val (v) = 0;
+    *Hp_val (v) = Promoted_hd;
     Field(v, 0) = result;
     success = 1;
   } else {
     header_t hd = atomic_load(Hp_atomic_val(v));
-    if( hd == 0 ) {
+    if( Is_promoted_hd(hd) ) {
       /* in this case this has been updated by another domain, throw away result
          and return the one in the object */
       result = Field(v, 0);
     } else if( Is_update_in_progress(hd) ) {
       /* here we've caught a domain in the process of moving a minor heap object
          we need to wait for it to finish */
-      spin_on_header(v);
+      (void)spin_on_header(v);
       /* Also throw away result and use the one from the other domain */
       result = Field(v, 0);
     } else {
       /* Here the header is neither zero nor an in-progress update */
-      header_t desired_hd = In_progress_update_val;
+      header_t desired_hd = In_progress_hd;
       if( atomic_compare_exchange_strong(Hp_atomic_val(v), &hd, desired_hd) ) {
         /* Success. Now we can write the forwarding pointer. */
         atomic_store_relaxed(Op_atomic_val(v), result);
         /* And update header ('release' ensures after update of fwd pointer) */
-        atomic_store_release(Hp_atomic_val(v), 0);
+        atomic_store_release(Hp_atomic_val(v), Promoted_hd);
         /* Let the caller know we were responsible for the update */
         success = 1;
       } else {
         /* Updated by another domain. Spin for that update to complete and
            then throw away the result and use the one from the other domain. */
-        spin_on_header(v);
+        (void)spin_on_header(v);
         result = Field(v, 0);
       }
     }
@@ -269,7 +284,7 @@ static void oldify_one (void* st_v, value v, volatile value *p)
   infix_offset = 0;
   do {
     hd = get_header_val(v);
-    if (hd == 0) {
+    if (Is_promoted_hd(hd)) {
       /* already forwarded, another domain is likely working on this. */
       *p = Field(v, 0) + infix_offset;
       return;
@@ -313,6 +328,23 @@ static void oldify_one (void* st_v, value v, volatile value *p)
     st->live_bytes += Bhsize_hd(hd);
     result = alloc_shared(st->domain, sz, tag, Reserved_hd(hd));
     field0 = Field(v, 0);
+    if (tag == Closure_tag) {
+      /* Copy unscannable prefix, which will include all infix tags,
+       * so that any domain can oldify infix pointers to `v` into
+       * pointers which also have Infix_tag to a working header (so
+       * that, e.g., major GC marking can work while the block is
+       * still on our oldify todo list). Have to do this here, before
+       * we update the object header.
+       */
+      i = Start_env_closinfo(Closinfo_val(v));
+      CAMLassert(i >= 2); /* at least code pointer and closinfo word */
+      CAMLassert(i <= sz);
+      /* Skip fields 0 and 1, used below for field0 and the todo list */
+      for (mlsize_t j = 2; j < i; ++j) {
+        Field(result, j) = Field(v, j);
+      }
+    }
+
     if( try_update_object_header(v, p, result, infix_offset) ) {
       /* Copy the non-scannable suffix of fields.
          There is some trickiness around the 0th field, which
@@ -358,7 +390,7 @@ static void oldify_one (void* st_v, value v, volatile value *p)
       #endif
     }
 
-  } else if (tag >= No_scan_tag) {
+  } else if (!Scannable_tag(tag)) {
     sz = Wosize_hd (hd);
     st->live_bytes += Bhsize_hd(hd);
     result = alloc_shared(st->domain, sz, tag, Reserved_hd(hd));
@@ -386,7 +418,7 @@ static void oldify_one (void* st_v, value v, volatile value *p)
     ft = 0;
 
     if (Is_block (f)) {
-      ft = Tag_val (get_header_val(f) == 0 ? Field(f, 0) : f);
+      ft = Tag_val (Is_promoted_hd(get_header_val(f)) ? Field(f, 0) : f);
     }
 
     if (ft == Forward_tag || ft == Lazy_tag ||
@@ -438,7 +470,7 @@ again:
 
   while (st->todo_list != 0) {
     v = st->todo_list;                   /* Get the head. */
-    CAMLassert (get_header_val(v) == 0); /* It must be forwarded. */
+    CAMLassert (Is_promoted_hd(get_header_val(v))); /* It must be forwarded. */
     new_v = Field(v, 0);                 /* Follow forward pointer. */
     st->todo_list = Field (new_v, 1);    /* Remove from list. */
 
@@ -461,10 +493,9 @@ again:
     i = 1;
 
     if(Tag_val(new_v) == Closure_tag) {
-      mlsize_t non_scannable = Start_env_closinfo(Closinfo_val(v));
-      for (; i < non_scannable; i++) {
-        Field(new_v, i) = Field(v, i);
-      }
+      /* non-scannable prefix already copied in oldify_one */
+      Field(new_v, 1) = Field(v, 1); /* todo-list pointer */
+      i = Start_env_closinfo(Closinfo_val(v));
     }
 
     for (; i < scannable_wosize; i++){
@@ -517,7 +548,7 @@ again:
           re->offset != CAML_EPHE_DATA_OFFSET && /* ephe key (not data)  */
           Is_block(v) &&                         /* a block              */
           young_start <= v && v < young_end &&   /* on *this* minor heap */
-          (hd = Hd_val(v)) != 0 &&               /* not already promoted */
+          !Is_promoted_hd(hd = Hd_val(v)) &&     /* not already promoted */
           Tag_hd(hd) != Infix_tag &&             /* not Infix_tag        */
           atomic_compare_exchange_strong(data, &v, caml_ephe_locked)) {
         /* locked, clean it later */
@@ -726,14 +757,15 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
        r < self_minor_tables->major_ref.ptr; r++) {
     value vnew = **r;
     CAMLassert (!Is_block(vnew)
-            || (get_header_val(vnew) != 0 && !Is_young(vnew)));
+            || (!Is_promoted_hd(get_header_val(vnew)) && !Is_young(vnew)));
   }
 #endif
 
   CAML_EV_BEGIN(EV_MINOR_LOCAL_ROOTS);
   caml_do_local_roots(
     &oldify_one, oldify_scanning_flags, &st,
-    domain->local_roots, domain->current_stack, domain->gc_regs);
+    domain->local_roots, domain->current_stack, domain->gc_regs,
+    domain->dynamic_bindings);
 
   scan_roots_hook = atomic_load(&caml_scan_roots_hook);
   if (scan_roots_hook != NULL)
@@ -756,10 +788,6 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                     "Promoted %"ARCH_INTNAT_PRINTF_FORMAT"u bytes (of zero)\n",
                     st.live_bytes);
   }
-
-  CAML_EV_BEGIN(EV_MINOR_MEMPROF_CLEAN);
-  caml_memprof_after_minor_gc(domain);
-  CAML_EV_END(EV_MINOR_MEMPROF_CLEAN);
 
   domain->young_ptr = domain->young_end;
   /* Trigger a GC poll when half of the minor heap is filled. At that point, a
@@ -832,7 +860,7 @@ static void ephe_clean_minor (caml_domain_state* domain)
       hd = Hd_val(v);
     }
     CAMLassert(Tag_hd(hd) != Infix_tag);
-    if (hd == 0) {
+    if (Is_promoted_hd(hd)) {
       /* promoted */
       v = Field(v, 0) + infix_offset;
     } else {
@@ -856,7 +884,7 @@ static void custom_finalize_minor (caml_domain_state * domain)
        elt < domain->minor_tables->custom.ptr; elt++) {
     value *v = &elt->block;
     if (Is_block(*v) && Is_young(*v)) {
-      if (get_header_val(*v) != 0) { /* value not copied to major heap */
+      if (!Is_promoted_hd(get_header_val(*v))) { /* value not copied to major heap */
         void (*final_fun)(value) = Custom_ops_val(*v)->finalize;
         if (final_fun != NULL) final_fun(*v);
       }
@@ -872,7 +900,7 @@ static void dependent_accounting_minor (caml_domain_state *domain)
     value *v = &elt->block;
     CAMLassert (Is_block (*v));
     if (Is_young(*v)) {
-      if (get_header_val(*v) == 0) { /* value copied to major heap */
+      if (Hd_val(*v) == 0) { /* value copied to major heap */
         /* inlined version of [caml_alloc_dependent_memory] */
         domain->allocated_dependent_bytes += elt->mem;
         domain->stat_promoted_dependent_bytes += elt->mem;
@@ -985,6 +1013,11 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
     ephe_clean_minor(domain);
     CAML_EV_END(EV_MINOR_EPHE_CLEAN);
   }
+
+  CAML_EV_BEGIN(EV_MINOR_MEMPROF_CLEAN);
+  CAML_GC_MESSAGE(MINOR, "Updating memprof.\n");
+  caml_memprof_after_minor_gc(domain);
+  CAML_EV_END(EV_MINOR_MEMPROF_CLEAN);
 
   /* while the minor heap is empty, allow the major GC to mark roots */
   if (mark_requested)

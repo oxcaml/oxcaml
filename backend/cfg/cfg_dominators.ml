@@ -3,8 +3,10 @@
 open! Int_replace_polymorphic_compare
 
 (** The implementation below is based on the following article:
+    {v
     A Simple, Fast Dominance Algorithm
-    Keith D. Cooper, Timothy J. Harvey, and Ken Kennedy *)
+    Keith D. Cooper, Timothy J. Harvey, and Ken Kennedy
+    v} *)
 
 module List = ListLabels
 

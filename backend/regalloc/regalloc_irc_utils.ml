@@ -34,7 +34,7 @@ let log_cfg_with_infos : Cfg_with_infos.t -> unit =
   make_log_cfg_with_infos (Lazy.force log_function) ~instr_prefix ~term_prefix
     cfg_with_infos
 
-module WorkList = struct
+module RegWorkList = struct
   type t =
     | Unknown_list
     | Precolored
@@ -47,23 +47,22 @@ module WorkList = struct
     | Colored
     | Select_stack
 
-  let equal left right =
-    match left, right with
-    | Unknown_list, Unknown_list
-    | Precolored, Precolored
-    | Initial, Initial
-    | Simplify, Simplify
-    | Freeze, Freeze
-    | Spill, Spill
-    | Spilled, Spilled
-    | Coalesced, Coalesced
-    | Colored, Colored
-    | Select_stack, Select_stack ->
-      true
-    | ( ( Unknown_list | Precolored | Initial | Simplify | Freeze | Spill
-        | Spilled | Coalesced | Colored | Select_stack ),
-        _ ) ->
-      false
+  let rank = function
+    | Unknown_list -> 0
+    | Precolored -> 1
+    | Initial -> 2
+    | Simplify -> 3
+    | Freeze -> 4
+    | Spill -> 5
+    | Spilled -> 6
+    | Coalesced -> 7
+    | Colored -> 8
+    | Select_stack -> 9
+
+  let equal
+      (( Unknown_list | Precolored | Initial | Simplify | Freeze | Spill
+       | Spilled | Coalesced | Colored | Select_stack ) as left) right =
+    rank left = rank right
 
   let to_string = function
     | Unknown_list -> "unknown_list"
@@ -76,6 +75,37 @@ module WorkList = struct
     | Coalesced -> "coalesced"
     | Colored -> "colored"
     | Select_stack -> "select_stack"
+end
+
+module InstrWorkList = struct
+  type t =
+    | Unknown_list
+    | Coalesced
+    | Constrained
+    | Frozen
+    | Work_list
+    | Active
+
+  let rank = function
+    | Unknown_list -> 0
+    | Coalesced -> 1
+    | Constrained -> 2
+    | Frozen -> 3
+    | Work_list -> 4
+    | Active -> 5
+
+  let equal
+      ((Unknown_list | Coalesced | Constrained | Frozen | Work_list | Active) as
+      left) right =
+    rank left = rank right
+
+  let to_string = function
+    | Unknown_list -> "unknown_list"
+    | Coalesced -> "coalesced"
+    | Constrained -> "constrained"
+    | Frozen -> "frozen"
+    | Work_list -> "work_list"
+    | Active -> "active"
 end
 
 module Color = struct
@@ -154,10 +184,13 @@ let is_move_basic : Cfg.basic -> bool =
     | Const_float _ -> false
     | Const_symbol _ -> false
     | Const_vec128 _ -> false
+    | Const_vec256 _ -> false
+    | Const_vec512 _ -> false
     | Stackoffset _ -> false
     | Load _ -> false
     | Store _ -> false
     | Intop _ -> false
+    | Int128op _ -> false
     | Intop_imm _ -> false
     | Intop_atomic _ -> false
     | Floatop _ -> false
@@ -169,10 +202,14 @@ let is_move_basic : Cfg.basic -> bool =
     | Specific _ -> false
     | Name_for_debugger _ -> false
     | Dls_get -> false
+    | Tls_get -> false
     | Poll -> false
+    | Pause -> false
     | Alloc _ -> false
     | External_without_caml_c_call _ -> false)
-  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ -> false
+  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
+    ->
+    false
 
 let is_move_instruction : Cfg.basic Cfg.instruction -> bool =
  fun instr -> is_move_basic instr.desc

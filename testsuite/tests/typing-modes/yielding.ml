@@ -8,7 +8,7 @@ let my_effect : (unit -> unit) @ yielding = print_endline "Hello, world!"
 Line 1, characters 4-73:
 1 | let my_effect : (unit -> unit) @ yielding = print_endline "Hello, world!"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
 let storage = ref ""
@@ -18,7 +18,7 @@ let with_effect : ((string -> unit) @ local yielding -> 'a) -> 'a =
 
 [%%expect{|
 val storage : string ref = {contents = ""}
-val with_effect : (local_ (string -> unit) -> 'a) -> 'a = <fun>
+val with_effect : ((string -> unit) @ local -> 'a) -> 'a = <fun>
 |}]
 
 let () = with_effect (fun k -> k "Hello, world!")
@@ -36,7 +36,7 @@ let () = with_effect (fun k -> run_yielding k)
 let _ = !storage
 
 [%%expect{|
-val run_yielding : local_ (string -> unit) -> unit = <fun>
+val run_yielding : (string -> unit) @ local -> unit = <fun>
 - : string = "my string"
 |}]
 
@@ -49,7 +49,7 @@ val run_unyielding : (string -> unit) @ local unyielding -> unit = <fun>
 Line 3, characters 46-47:
 3 | let () = with_effect (fun k -> run_unyielding k)
                                                   ^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
 let run_default : (string -> unit) @ local -> unit = fun f -> f "some string"
@@ -57,7 +57,7 @@ let run_default : (string -> unit) @ local -> unit = fun f -> f "some string"
 let () = with_effect (fun k -> run_default k)
 
 [%%expect{|
-val run_default : local_ (string -> unit) -> unit = <fun>
+val run_default : (string -> unit) @ local -> unit = <fun>
 |}]
 
 (* A closure over a [yielding] value must be [yielding]. *)
@@ -70,7 +70,9 @@ let () = with_effect (fun k ->
 Line 2, characters 45-46:
 2 |   let closure @ local unyielding = fun () -> k () in
                                                  ^
-Error: The value "k" is yielding, so cannot be used inside a function that may not yield.
+Error: The value "k" is "yielding" but is expected to be "unyielding"
+       because it is used inside the function at Line 2, characters 35-49
+       which is expected to be "unyielding".
 |}]
 
 
@@ -86,7 +88,7 @@ let with_global_effect : ((string -> unit) @ yielding -> 'a) -> 'a =
   fun f -> f ((:=) storage)
 
 [%%expect{|
-type 'a t1 = Mk1 of global_ 'a
+type 'a t1 = Mk1 of 'a @@ global
 type 'a t2 = Mk2 of 'a @@ global yielding
 type 'a t3 = Mk3 of 'a @@ unyielding
 type 'a t4 = Mk4 of 'a
@@ -100,7 +102,8 @@ let _ = with_global_effect (fun k -> let _ = Mk1 k in ())
 Line 1, characters 49-50:
 1 | let _ = with_global_effect (fun k -> let _ = Mk1 k in ())
                                                      ^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding"
+       because it is contained (via constructor "Mk1") (with some modality) in the value at Line 1, characters 45-50.
 |}]
 
 (* [global yielding] works: *)
@@ -117,7 +120,8 @@ let _ = with_global_effect (fun k -> let _ = Mk3 k in ())
 Line 1, characters 49-50:
 1 | let _ = with_global_effect (fun k -> let _ = Mk3 k in ())
                                                      ^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding"
+       because it is contained (via constructor "Mk3") (with some modality) in the value at Line 1, characters 45-50.
 |}]
 
 let _ = with_global_effect (fun k -> let _ = Mk4 k in ())
@@ -137,7 +141,7 @@ let _ = ok_yielding (stack_ (Some "local string"))
 let _ = with_global_effect (fun k -> ok_yielding k)
 
 [%%expect{|
-external ok_yielding : local_ 'a -> unit = "%ignore"
+external ok_yielding : 'a @ local -> unit = "%ignore"
 - : unit = ()
 - : unit = ()
 - : unit = ()
@@ -158,7 +162,7 @@ external requires_unyielding : 'a @ local unyielding -> unit = "%ignore"
 Line 7, characters 57-58:
 7 | let _ = with_global_effect (fun k -> requires_unyielding k)
                                                              ^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
 external returns_unyielding : 'a -> 'a @ local unyielding = "%identity"
@@ -182,9 +186,9 @@ let f4 (x @ local unyielding) = exclave_ id x
 [%%expect{|
 external id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
 val f1 : 'a -> 'a = <fun>
-val f2 : local_ 'a -> local_ 'a = <fun>
+val f2 : 'a @ local -> 'a @ local = <fun>
 val f3 : 'a @ yielding -> 'a @ yielding = <fun>
-val f4 : 'a @ local unyielding -> local_ 'a = <fun>
+val f4 : 'a @ local unyielding -> 'a @ local = <fun>
 |}]
 
 (* Test [instance_prim] + mixed mode annots. *)
@@ -203,7 +207,7 @@ let f2 (x @ local) = exclave_ requires_unyielding x
 Line 1, characters 50-51:
 1 | let f2 (x @ local) = exclave_ requires_unyielding x
                                                       ^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
 let f3 (x @ yielding) = requires_unyielding x
@@ -211,12 +215,12 @@ let f3 (x @ yielding) = requires_unyielding x
 Line 1, characters 44-45:
 1 | let f3 (x @ yielding) = requires_unyielding x
                                                 ^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
 let f4 (x @ local unyielding) = exclave_ requires_unyielding x
 [%%expect{|
-val f4 : 'a @ local unyielding -> local_ unit = <fun>
+val f4 : 'a @ local unyielding -> unit @ local = <fun>
 |}]
 
 (* [@local_opt] overrides annotations. *)
@@ -226,7 +230,7 @@ let succeeds (x @ local) = overridden x
 [%%expect{|
 external overridden : ('a [@local_opt]) @ local unyielding -> unit
   = "%ignore"
-val succeeds : local_ 'a -> unit = <fun>
+val succeeds : 'a @ local -> unit = <fun>
 |}]
 
 (* [mod global] implies [mod unyielding] by default. *)

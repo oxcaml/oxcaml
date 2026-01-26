@@ -55,8 +55,8 @@ Error: Signature mismatch:
          type t : value mod portable with a
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod portable
-         with a
+       But the kind of the first must be a subkind of
+           value mod portable with a
          because of the definition of t at line 3, characters 2-36.
 |}]
 
@@ -113,12 +113,19 @@ module F (M : sig type t end) = struct
   module type T = S with type t = t
 end
 [%%expect {|
-Line 6, characters 25-35:
+Line 6, characters 18-35:
 6 |   module type T = S with type t = t
-                             ^^^^^^^^^^
-Error: The kind of type "t" is value
+                      ^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = t
+       is not included in
+         type t : value mod global with M.t
+       The kind of the first is value
          because of the definition of t at line 5, characters 2-8.
-       But the kind of type "t" must be a subkind of value mod global with M.t
+       But the kind of the first must be a subkind of
+           value mod global with M.t
          because of the definition of t at line 3, characters 4-38.
 |}]
 
@@ -148,15 +155,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : value mod portable end
        is not included in
-         sig type t : value mod contended portable with M.t end
+         sig type t : value mod portable contended with M.t end
        Type declarations do not match:
          type t : value mod portable
        is not included in
-         type t : value mod contended portable with M.t
+         type t : value mod portable contended with M.t
        The kind of the first is value mod portable
          because of the definition of t at line 13, characters 2-29.
        But the kind of the first must be a subkind of
-         value mod contended portable with M.t
+           value mod portable contended with M.t
          because of the definition of t at line 11, characters 2-48.
 |}]
 
@@ -188,15 +195,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : value mod portable end
        is not included in
-         sig type t : value mod contended portable with M.u end
+         sig type t : value mod portable contended with M.u end
        Type declarations do not match:
          type t : value mod portable
        is not included in
-         type t : value mod contended portable with M.u
+         type t : value mod portable contended with M.u
        The kind of the first is value mod portable
          because of the definition of t at line 15, characters 2-29.
        But the kind of the first must be a subkind of
-         value mod contended portable with M.u
+           value mod portable contended with M.u
          because of the definition of t at line 13, characters 2-48.
 |}]
 
@@ -207,7 +214,7 @@ end = struct
   type a = [`a of string | `b]
   type t
 end
-(* CR layouts v2.8: this is fine to accept *)
+(* CR layouts v2.8: this is fine to accept. Internal ticket 4294. *)
 [%%expect {|
 Lines 4-7, characters 6-3:
 4 | ......struct
@@ -220,15 +227,16 @@ Error: Signature mismatch:
        is not included in
          sig
            type a = [ `a of string | `b ]
-           type t : value mod global with a
+           type t : value mod forkable unyielding
          end
        Type declarations do not match:
          type t
        is not included in
-         type t : value mod global with a
+         type t : value mod forkable unyielding
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod global with a
+       But the kind of the first must be a subkind of
+           value mod forkable unyielding
          because of the definition of t at line 3, characters 2-34.
 |}]
 
@@ -264,9 +272,46 @@ Error: Signature mismatch:
            constraint 'a = [< `a of string | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
-       But the kind of the first must be a subkind of value mod global
-         with [< `a of string | `b ] u
+       But the kind of the first must be a subkind of
+           value mod global with [< `a of string | `b ] u
          because of the definition of t at line 3, characters 2-40.
+|}]
+
+module M : sig
+  type 'a u = [< `a of (int -> int) | `b] as 'a
+  type 'a t : value mod portable with 'a u
+end = struct
+  type 'a u = [< `a of (int -> int) | `b] as 'a
+  type 'a t constraint 'a = [< `a of (int -> int) | `b]
+end
+[%%expect {|
+Lines 4-7, characters 6-3:
+4 | ......struct
+5 |   type 'a u = [< `a of (int -> int) | `b] as 'a
+6 |   type 'a t constraint 'a = [< `a of (int -> int) | `b]
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type 'a u = 'a constraint 'a = [< `a of int -> int | `b ]
+           type 'a t constraint 'a = [< `a of int -> int | `b ]
+         end
+       is not included in
+         sig
+           type 'a u = 'a constraint 'a = [< `a of int -> int | `b ]
+           type 'a t : value mod portable with [< `a of int -> int | `b ] u
+             constraint 'a = [< `a of int -> int | `b ]
+         end
+       Type declarations do not match:
+         type 'a t constraint 'a = [< `a of int -> int | `b ]
+       is not included in
+         type 'a t : value mod portable with [< `a of int -> int | `b ] u
+           constraint 'a = [< `a of int -> int | `b ]
+       The kind of the first is value
+         because of the definition of t at line 6, characters 2-55.
+       But the kind of the first must be a subkind of
+           value mod portable with [< `a of int -> int | `b ] u
+         because of the definition of t at line 3, characters 2-42.
 |}]
 
 module M : sig
@@ -301,8 +346,8 @@ Error: Signature mismatch:
            constraint 'a = [> `a of string | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
-       But the kind of the first must be a subkind of value mod portable
-         with [> `a of string | `b ] u
+       But the kind of the first must be a subkind of
+           value mod portable with [> `a of string | `b ] u
          because of the definition of t at line 3, characters 2-42.
 |}]
 
@@ -313,7 +358,7 @@ end = struct
   type a = < value : string >
   type t
 end
-(* CR layouts v2.8: this is fine to accept *)
+(* CR layouts v2.8: this is fine to accept. Internal ticket 5125. *)
 [%%expect {|
 Lines 4-7, characters 6-3:
 4 | ......struct
@@ -335,21 +380,17 @@ Error: Signature mismatch:
          because of the definition of t at line 3, characters 2-34.
 |}]
 
-(* CR layouts v2.8: gadts shouldn't be "best" because we intend to give them more refined
-   jkinds in the future. So this program will error in the future. *)
 type gadt = Foo : int -> gadt
 module M : sig
   type t : value mod portable with gadt
 end = struct
-  type t
+  type t : value mod portable
 end
 [%%expect {|
 type gadt = Foo : int -> gadt
-module M : sig type t end
+module M : sig type t : value mod portable end
 |}]
 
-(* CR layouts v2.8: gadts shouldn't be "best". But maybe they should track quality along
-   individual axes, and so this should be accepted anyways? *)
 type gadt = Foo : int -> gadt
 module M : sig
   type t : value mod global with gadt
@@ -358,7 +399,24 @@ end = struct
 end
 [%%expect {|
 type gadt = Foo : int -> gadt
-module M : sig type t end
+Lines 4-6, characters 6-3:
+4 | ......struct
+5 |   type t
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t end
+       is not included in
+         sig type t : value mod forkable unyielding end
+       Type declarations do not match:
+         type t
+       is not included in
+         type t : value mod forkable unyielding
+       The kind of the first is value
+         because of the definition of t at line 5, characters 2-8.
+       But the kind of the first must be a subkind of
+           value mod forkable unyielding
+         because of the definition of t at line 3, characters 2-37.
 |}]
 
 type gadt = Foo : int -> gadt [@@unboxed]
@@ -433,36 +491,29 @@ module M : sig type a = { foo : 'a. 'a ref; } [@@unboxed] type t end
 |}]
 
 module M : sig
+  type a = { foo : ('a : value). 'a }
+  type t : value mod contended with a
+end = struct
+  type a = { foo : ('a : value). 'a }
+  type t
+end
+(* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
+   rejected. Internal ticket 5746. *)
+[%%expect {|
+module M : sig type a = { foo : 'a. 'a; } type t end
+|}]
+
+module M : sig
   type a = { foo : ('a : value). 'a } [@@unboxed]
   type t : value mod contended with a
 end = struct
   type a = { foo : ('a : value). 'a } [@@unboxed]
   type t
 end
-(* CR layouts v2.8: maybe this should be accepted? *)
+(* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
+   rejected. Internal ticket 5746. *)
 [%%expect {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type a = { foo : ('a : value). 'a } [@@unboxed]
-6 |   type t
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type a = { foo : 'a. 'a; } [@@unboxed] type t end
-       is not included in
-         sig
-           type a = { foo : 'a. 'a; } [@@unboxed]
-           type t : value mod contended with a
-         end
-       Type declarations do not match:
-         type t
-       is not included in
-         type t : value mod contended with a
-       The kind of the first is value
-         because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod contended
-         with a
-         because of the definition of t at line 3, characters 2-37.
+module M : sig type a = { foo : 'a. 'a; } [@@unboxed] type t end
 |}]
 
 module type S = sig
@@ -475,7 +526,7 @@ end = struct
   type t
 end
 (* CR layouts v2.8: this should be accepted because module types should be best
-   (once we start giving them proper kinds) *)
+   (once we start giving them proper kinds). Internal ticket 5126 *)
 [%%expect {|
 module type S = sig val nonportable_f : int -> int end
 type s = (module S)
@@ -494,8 +545,8 @@ Error: Signature mismatch:
          type t : value mod portable with s
        The kind of the first is value
          because of the definition of t at line 8, characters 2-8.
-       But the kind of the first must be a subkind of value mod portable
-         with s
+       But the kind of the first must be a subkind of
+           value mod portable with s
          because of the definition of t at line 6, characters 2-36.
 |}]
 

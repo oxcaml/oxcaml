@@ -49,21 +49,24 @@ module Witness : sig
         { bytes : int;
           dbginfo : Cmm.alloc_dbginfo
         }
-    | Indirect_call
-    | Indirect_tailcall
+    | Indirect_call of { callee : string option }
+    | Indirect_tailcall of { callee : string option }
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }
-    | Arch_specific
+    | Arch_specific of Arch.specific_operation
     | Probe of
         { name : string;
           handler_code_sym : string
         }
     | Widen
 
+  type hint
+
   type t =
     { dbg : Debuginfo.t;
-      kind : kind
+      kind : kind;
+      hint : hint
     }
 end
 
@@ -88,7 +91,7 @@ end
       at any time, but the complete information is only available after a call to
       [record_unit_info].  To get all witnesses for all functions, and not only for
       functions annotated with [@zero_alloc], set
-      [Flambda_backend_flags.zero_alloc_checker_details_cutoff]
+      [Oxcaml_flags.zero_alloc_checker_details_cutoff]
       to a negative value before calls to
       [fundecl].  Used by compiler_hooks. *)
 type iter_witnesses = (string -> Witnesses.components -> unit) -> unit

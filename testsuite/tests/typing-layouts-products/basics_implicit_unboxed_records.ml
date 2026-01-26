@@ -44,28 +44,18 @@ Error: This match case could not be refuted.
        Here is an example of a value that would reach it: "#{ _ }"
 |}]
 
-(* We still cannot have top-level products *)
+(* Top-level products *)
 
-let disallowed = #{ i = 1; j = 2 }
+let unboxed_product = #{ i = 1; j = 2 }
 [%%expect{|
-Line 1, characters 4-14:
-1 | let disallowed = #{ i = 1; j = 2 }
-        ^^^^^^^^^^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "disallowed" has layout "value & value".
+val unboxed_product : t# = #{i = 1; j = 2}
 |}]
 
 ;;
 #{ i = 1; j = 2 };;
 [%%expect{|
-Line 1, characters 0-17:
-1 | #{ i = 1; j = 2 };;
-    ^^^^^^^^^^^^^^^^^
-Error: Types of unnamed expressions must have layout value when using
-       the toplevel, but this expression has layout "value & value".
+- : t# = #{i = 1; j = 2}
 |}]
-
-(* However, we can have a top-level unboxed record if its kind is value *)
 
 type m_record = { i1 : int }
 module M = struct
@@ -102,18 +92,14 @@ val s : t# = #{s = "hi"}
 
 (* Accessing inner products *)
 
-(* CR layouts v5: this should work once we allow product record fields *)
 type t = { is: #(int * int) }
 
 let add t =
   let #(x, y) = t.#is in
   x + y
 [%%expect{|
-Line 1, characters 0-29:
-1 | type t = { is: #(int * int) }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "#(int * int)" has layout "value & value".
-       Records may not yet contain types of this layout.
+type t = { is : #(int * int); }
+val add : t# -> int = <fun>
 |}]
 
 (* An unboxed record is not an allocation, but a regular record is *)
@@ -128,7 +114,7 @@ let f_unboxed_record (local_ left) (local_ right) =
 [%%expect{|
 type ('a, 'b) ab = { left : 'a; right : 'b; }
 type ('a, 'b) ab_u = { left : 'a; right : 'b; }
-val f_unboxed_record : local_ 'a -> local_ 'b -> local_ 'a = <fun>
+val f_unboxed_record : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
 let f_boxed_record (local_ left) (local_ right) =
@@ -139,8 +125,16 @@ let f_boxed_record (local_ left) (local_ right) =
 Line 4, characters 2-7:
 4 |   left'
       ^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       because it is the field "left" of the record at Line 3, characters 6-25
+       which is "local"
+       because it is allocated at Line 2, characters 10-25 containing data
+       which is "local" to the parent region
+       because it is a record whose field "left" is the expression at Line 2, characters 12-16
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Mutable fields cannot be read from
@@ -207,9 +201,11 @@ Line 2, characters 0-36:
 2 | and r_bad = { y : float#; z : s t2 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r_bad# is '_representable_layout_1 & '_representable_layout_2
+       The layout of r_bad# is
+           '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed record.
-       But the layout of r_bad# must be a sublayout of value & float64 & value
+       But the layout of r_bad# must be a sublayout of
+           value & float64 & value
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
@@ -340,6 +336,7 @@ Line 5, characters 18-20:
 5 |   type nonrec u = t#
                       ^^
 Error: The type "t" has no unboxed version.
+Hint: It is already an unboxed record.
 |}]
 
 (*************************************)
@@ -554,7 +551,7 @@ val update_t : t# -> unit = <fun>
 
 type ('a : any) t = { x : int; y : 'a }
 [%%expect{|
-type 'a t = { x : int; y : 'a; }
+type ('a : value_or_null) t = { x : int; y : 'a; }
 |}]
 
 (* CR layouts v7.2: once we allow record declarations with unknown kind (right
@@ -598,21 +595,17 @@ type a = B of b
 and b : any = r#
 and r = { i : int ; j : int }
 [%%expect{|
-Line 1, characters 9-15:
-1 | type a = B of b
-             ^^^^^^
-Error: Type "b" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type a = B of b
+and b = r#
+and r = { i : int; j : int; }
 |}]
 type a = B of b_portable
 and b_portable : any mod portable = r#
 and r = { i : int ; j : int }
 [%%expect{|
-Line 1, characters 9-24:
-1 | type a = B of b_portable
-             ^^^^^^^^^^^^^^^
-Error: Type "b_portable" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type a = B of b_portable
+and b_portable = r#
+and r = { i : int; j : int; }
 |}]
 type a = B of b
 and b : any & any & any = r#

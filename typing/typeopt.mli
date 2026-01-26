@@ -27,7 +27,7 @@ val maybe_pointer : Typedtree.expression
 (* Supplying [None] for [elt_sort] should be avoided when possible. It
    will result in a call to [Ctype.type_sort] which can be expensive. *)
 val array_type_kind :
-  elt_sort:(Jkind.Sort.Const.t option)
+  elt_sort:(Jkind.Sort.Const.t option) -> elt_ty:(Types.type_expr option)
   -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
 val array_type_mut : Env.t -> Types.type_expr -> Lambda.mutable_flag
 val array_kind_of_elt :
@@ -78,13 +78,12 @@ val function_arg_layout :
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
 
+val transl_mixed_block_element :
+  Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
+  -> unit Lambda.mixed_block_element
+
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function
                              | `Float_that_cannot_be_shortcut
                              | `Identifier of [`Forward_value | `Other]
                              | `Other]
-
-val layout_union :
-      Lambda.layout -> Lambda.layout -> Lambda.layout
-  (** [layout_union layout1 layout2] is a layout at least as general as
-      [layout1] and [layout2] *)

@@ -28,12 +28,18 @@ module Signature_names : sig
   val simplify: Env.t -> t -> signature -> signature
 end
 
+(* In the following, the optional [expected_mode] is for better error messages
+and not strictly enforced. The caller is reponsible to enforce mode constraint
+by inspecting the returned mode. *)
+(* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
+
 val type_module:
-        Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
+        Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.module_expr ->
+        Typedtree.module_expr * Shape.t
 val type_structure:
-  Env.t -> Parsetree.structure ->
-  Typedtree.structure * Types.signature * Signature_names.t * Shape.t *
-  Env.t
+  Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.structure ->
+  Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *
+  Shape.t * Env.t
 val type_toplevel_phrase:
   Env.t -> Types.signature -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Signature_names.t * Shape.t *
@@ -110,6 +116,17 @@ type functor_dependency_error =
     Functor_applied
   | Functor_included
 
+(** Modules that are required to be legacy mode *)
+type legacy_module =
+  | Compilation_unit
+  | Toplevel
+  | Functor_body
+
+(** Places where modes annotations are not supported *)
+type unsupported_modal_module =
+  | Functor_param
+  | Functor_res
+
 type error =
     Cannot_apply of module_type
   | Not_included of Includemod.explanation
@@ -146,25 +163,25 @@ type error =
   | Badly_formed_signature of string * Typedecl.error
   | Cannot_hide_id of hiding_error
   | Invalid_type_subst_rhs
-  | Unpackable_local_modtype_subst of Path.t
+  | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
-  | Toplevel_nonvalue of string * Jkind.sort
-  | Toplevel_unnamed_nonvalue of Jkind.sort
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
   | Cannot_compile_implementation_as_parameter
   | Cannot_implement_parameter of Compilation_unit.Name.t * Misc.filepath
   | Argument_for_non_parameter of Global_module.Name.t * Misc.filepath
-  | Cannot_find_argument_type of Global_module.Name.t
+  | Cannot_find_argument_type of Global_module.Parameter_name.t
   | Inconsistent_argument_types of {
-      new_arg_type: Global_module.Name.t option;
-      old_arg_type: Global_module.Name.t option;
+      new_arg_type: Global_module.Parameter_name.t option;
+      old_arg_type: Global_module.Parameter_name.t option;
       old_source_file: Misc.filepath;
     }
-  | Duplicate_parameter_name of Global_module.Name.t
+  | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Submode_failed of Mode.Value.error
-  | Modal_module_not_supported
+  | Item_weaker_than_structure of Mode.Value.error
+  | Unsupported_modal_module of unsupported_modal_module
+  | Legacy_module of legacy_module * Mode.Value.error
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

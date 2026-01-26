@@ -32,13 +32,16 @@ open! Stdlib
     {!StdLabels} module.
 *)
 
-type 'a t = 'a array
+type ('a : any mod separable) t = 'a array
 (** An alias for the type of arrays. *)
 
-external length : 'a array -> int = "%array_length"
+external length : ('a : value_or_null mod separable).
+   ('a array[@local_opt]) @ immutable -> int @@ stateless
+  = "%array_length"
 (** Return the length (number of elements) of the given array. *)
 
-external get : 'a array -> int -> 'a = "%array_safe_get"
+external get : ('a : value_or_null mod separable).
+   ('a array[@local_opt]) -> int -> 'a = "%array_safe_get"
 (** [get a n] returns the element number [n] of array [a].
    The first element has number 0.
    The last element has number [length a - 1].
@@ -47,7 +50,8 @@ external get : 'a array -> int -> 'a = "%array_safe_get"
    @raise Invalid_argument
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
-external set : 'a array -> int -> 'a -> unit = "%array_safe_set"
+external set : ('a : value_or_null mod separable).
+   ('a array[@local_opt]) -> int -> 'a -> unit = "%array_safe_set"
 (** [set a n x] modifies array [a] in place, replacing
    element number [n] with [x].
    You can also write [a.(n) <- x] instead of [set a n x].
@@ -55,7 +59,8 @@ external set : 'a array -> int -> 'a -> unit = "%array_safe_set"
    @raise Invalid_argument
    if [n] is outside the range 0 to [length a - 1]. *)
 
-external make : int -> 'a -> 'a array = "caml_make_vect"
+external make : ('a : value_or_null mod separable).
+   int -> 'a -> 'a array = "caml_make_vect"
 (** [make n x] returns a fresh array of length [n],
    initialized with [x].
    All the elements of this new array are initially
@@ -68,12 +73,14 @@ external make : int -> 'a -> 'a array = "caml_make_vect"
    If the value of [x] is a floating-point number, then the maximum
    size is only [Sys.max_array_length / 2].*)
 
-external create_float: int -> float array = "caml_make_float_vect"
+external create_float : ('a : value_or_null mod separable).
+   int -> float array = "caml_make_float_vect"
 (** [create_float n] returns a fresh float array of length [n],
     with uninitialized data.
     @since 4.03 *)
 
-val init : int -> (int -> 'a) -> 'a array
+val init : ('a : value_or_null mod separable).
+   int -> (int -> 'a) -> 'a array
 (** [init n f] returns a fresh array of length [n],
    with element number [i] initialized to the result of [f i].
    In other terms, [init n f] tabulates the results of [f]
@@ -83,7 +90,8 @@ val init : int -> (int -> 'a) -> 'a array
    If the return type of [f] is [float], then the maximum
    size is only [Sys.max_array_length / 2].*)
 
-val make_matrix : int -> int -> 'a -> 'a array array
+val make_matrix : ('a : value_or_null mod separable).
+   int -> int -> 'a -> 'a array array
 (** [make_matrix dimx dimy e] returns a two-dimensional array
    (an array of arrays) with first dimension [dimx] and
    second dimension [dimy]. All the elements of this new matrix
@@ -96,7 +104,8 @@ val make_matrix : int -> int -> 'a -> 'a array array
    If the value of [e] is a floating-point number, then the maximum
    size is only [Sys.max_array_length / 2]. *)
 
-val init_matrix : int -> int -> (int -> int -> 'a) -> 'a array array
+val init_matrix : ('a : value_or_null mod separable).
+   int -> int -> (int -> int -> 'a) -> 'a array array
 (** [init_matrix dimx dimy f] returns a two-dimensional array
    (an array of arrays)
    with first dimension [dimx] and second dimension [dimy],
@@ -111,16 +120,19 @@ val init_matrix : int -> int -> (int -> int -> 'a) -> 'a array array
 
    @since 5.2 *)
 
-val append : 'a array -> 'a array -> 'a array
+val append : ('a : value_or_null mod separable).
+   'a array -> 'a array -> 'a array
 (** [append v1 v2] returns a fresh array containing the
    concatenation of the arrays [v1] and [v2].
    @raise Invalid_argument if
    [length v1 + length v2 > Sys.max_array_length]. *)
 
-val concat : 'a array list -> 'a array
+val concat : ('a : value_or_null mod separable).
+   'a array list -> 'a array
 (** Same as {!append}, but concatenates a list of arrays. *)
 
-val sub : 'a array -> int -> int -> 'a array
+val sub : ('a : value_or_null mod separable).
+   'a array -> int -> int -> 'a array
 (** [sub a pos len] returns a fresh array of length [len],
    containing the elements number [pos] to [pos + len - 1]
    of array [a].
@@ -129,20 +141,21 @@ val sub : 'a array -> int -> int -> 'a array
    designate a valid subarray of [a]; that is, if
    [pos < 0], or [len < 0], or [pos + len > length a]. *)
 
-val copy : 'a array -> 'a array
+val copy : ('a : value_or_null mod separable).
+   'a array -> 'a array
 (** [copy a] returns a copy of [a], that is, a fresh array
    containing the same elements as [a]. *)
 
-val fill : 'a array -> int -> int -> 'a -> unit
+val fill : ('a : value_or_null mod separable).
+   'a array -> int -> int -> 'a -> unit
 (** [fill a pos len x] modifies the array [a] in place,
    storing [x] in elements number [pos] to [pos + len - 1].
 
    @raise Invalid_argument if [pos] and [len] do not
    designate a valid subarray of [a]. *)
 
-val blit :
-  'a array -> int -> 'a array -> int -> int ->
-    unit
+val blit : ('a : value_or_null mod separable).
+   'a array -> int -> 'a array -> int -> int -> unit
 (** [blit src src_pos dst dst_pos len] copies [len] elements
    from array [src], starting at element number [src_pos], to array [dst],
    starting at element number [dst_pos]. It works correctly even if
@@ -153,10 +166,10 @@ val blit :
    designate a valid subarray of [src], or if [dst_pos] and [len] do not
    designate a valid subarray of [dst]. *)
 
-val to_list : 'a array -> 'a list
+val to_list : ('a : value_or_null mod separable). 'a array -> 'a list
 (** [to_list a] returns the list of all the elements of [a]. *)
 
-val of_list : 'a list -> 'a array
+val of_list : ('a : value_or_null mod separable). 'a list -> 'a array
 (** [of_list l] returns a fresh array containing the elements
    of [l].
 
@@ -165,48 +178,56 @@ val of_list : 'a list -> 'a array
 
 (** {1 Iterators} *)
 
-val iter : ('a -> unit) -> 'a array -> unit
+val iter : ('a : value_or_null mod separable).
+   ('a -> unit) -> 'a array -> unit
 (** [iter f a] applies function [f] in turn to all
    the elements of [a].  It is equivalent to
    [f a.(0); f a.(1); ...; f a.(length a - 1); ()]. *)
 
-val iteri : (int -> 'a -> unit) -> 'a array -> unit
+val iteri : ('a : value_or_null mod separable).
+   (int -> 'a -> unit) -> 'a array -> unit
 (** Same as {!iter}, but the
    function is applied to the index of the element as first argument,
    and the element itself as second argument. *)
 
-val map : ('a -> 'b) -> 'a array -> 'b array
+val map : ('a : value_or_null mod separable).
+   ('a -> 'b) -> 'a array -> 'b array
 (** [map f a] applies function [f] to all the elements of [a],
    and builds an array with the results returned by [f]:
    [[| f a.(0); f a.(1); ...; f a.(length a - 1) |]]. *)
 
-val map_inplace : ('a -> 'a) -> 'a array -> unit
+val map_inplace : ('a : value_or_null mod separable).
+   ('a -> 'a) -> 'a array -> unit
 (** [map_inplace f a] applies function [f] to all elements of [a],
     and updates their values in place.
     @since 5.1 *)
 
-val mapi : (int -> 'a -> 'b) -> 'a array -> 'b array
+val mapi : ('a : value_or_null mod separable).
+   (int -> 'a -> 'b) -> 'a array -> 'b array
 (** Same as {!map}, but the
    function is applied to the index of the element as first argument,
    and the element itself as second argument. *)
 
-val mapi_inplace : (int -> 'a -> 'a) -> 'a array -> unit
+val mapi_inplace : ('a : value_or_null mod separable).
+   (int -> 'a -> 'a) -> 'a array -> unit
 (** Same as {!map_inplace}, but the function is applied to the index of the
     element as first argument, and the element itself as second argument.
     @since 5.1 *)
 
-val fold_left : ('acc -> 'a -> 'acc) -> 'acc -> 'a array -> 'acc
+val fold_left : ('a : value_or_null mod separable).
+   ('acc -> 'a -> 'acc) -> 'acc -> 'a array -> 'acc
 (** [fold_left f init a] computes
    [f (... (f (f init a.(0)) a.(1)) ...) a.(n-1)],
    where [n] is the length of the array [a]. *)
 
-val fold_left_map :
-  ('acc -> 'a -> 'acc * 'b) -> 'acc -> 'a array -> 'acc * 'b array
+val fold_left_map : ('a : value_or_null mod separable).
+   ('acc -> 'a -> 'acc * 'b) -> 'acc -> 'a array -> 'acc * 'b array
 (** [fold_left_map] is a combination of {!fold_left} and {!map} that threads an
     accumulator through calls to [f].
     @since 4.13 *)
 
-val fold_right : ('a -> 'acc -> 'acc) -> 'a array -> 'acc -> 'acc
+val fold_right : ('a : value_or_null mod separable).
+   ('a -> 'acc -> 'acc) -> 'a array -> 'acc -> 'acc
 (** [fold_right f a init] computes
    [f a.(0) (f a.(1) ( ... (f a.(n-1) init) ...))],
    where [n] is the length of the array [a]. *)
@@ -214,65 +235,71 @@ val fold_right : ('a -> 'acc -> 'acc) -> 'a array -> 'acc -> 'acc
 
 (** {1 Iterators on two arrays} *)
 
-
-val iter2 : ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
+val iter2 : ('a : value_or_null mod separable).
+   ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
 (** [iter2 f a b] applies function [f] to all the elements of [a]
    and [b].
    @raise Invalid_argument if the arrays are not the same size.
    @since 4.03 (4.05 in ArrayLabels)
    *)
 
-val map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
+val map2 : ('a : value_or_null mod separable).
+   ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
 (** [map2 f a b] applies function [f] to all the elements of [a]
    and [b], and builds an array with the results returned by [f]:
    [[| f a.(0) b.(0); ...; f a.(length a - 1) b.(length b - 1)|]].
    @raise Invalid_argument if the arrays are not the same size.
    @since 4.03 (4.05 in ArrayLabels) *)
 
-
 (** {1 Array scanning} *)
 
-val for_all : ('a -> bool) -> 'a array -> bool
+val for_all : ('a : value_or_null mod separable).
+   ('a -> bool) -> 'a array -> bool
 (** [for_all f [|a1; ...; an|]] checks if all elements
    of the array satisfy the predicate [f]. That is, it returns
    [(f a1) && (f a2) && ... && (f an)].
    @since 4.03 *)
 
-val exists : ('a -> bool) -> 'a array -> bool
+val exists : ('a : value_or_null mod separable).
+   ('a -> bool) -> 'a array -> bool
 (** [exists f [|a1; ...; an|]] checks if at least one element of
     the array satisfies the predicate [f]. That is, it returns
     [(f a1) || (f a2) || ... || (f an)].
     @since 4.03 *)
 
-val for_all2 : ('a -> 'b -> bool) -> 'a array -> 'b array -> bool
+val for_all2 : ('a : value_or_null mod separable).
+   ('a -> 'b -> bool) -> 'a array -> 'b array -> bool
 (** Same as {!for_all}, but for a two-argument predicate.
    @raise Invalid_argument if the two arrays have different lengths.
    @since 4.11 *)
 
-val exists2 : ('a -> 'b -> bool) -> 'a array -> 'b array -> bool
+val exists2 : ('a : value_or_null mod separable).
+   ('a -> 'b -> bool) -> 'a array -> 'b array -> bool
 (** Same as {!exists}, but for a two-argument predicate.
    @raise Invalid_argument if the two arrays have different lengths.
    @since 4.11 *)
 
-val mem : 'a -> 'a array -> bool
+val mem : ('a : value_or_null mod separable). 'a -> 'a array -> bool
 (** [mem a set] is true if and only if [a] is structurally equal
     to an element of [set] (i.e. there is an [x] in [set] such that
     [compare a x = 0]).
     @since 4.03 *)
 
-val memq : 'a -> 'a array -> bool
+val memq : ('a : value_or_null mod separable). 'a -> 'a array -> bool
 (** Same as {!mem}, but uses physical equality
    instead of structural equality to compare array elements.
    @since 4.03 *)
 
-val find_opt : ('a -> bool) -> 'a array -> 'a option
+val find_opt : ('a : value_or_null mod separable).
+   ('a -> bool) -> 'a array -> 'a option
 (** [find_opt f a] returns the first element of the array [a] that satisfies
     the predicate [f], or [None] if there is no value that satisfies [f] in the
     array [a].
 
     @since 4.13 *)
 
-val find_index : ('a -> bool) -> 'a array -> int option
+val find_index : ('a : value_or_null mod separable).
+   ('a -> bool) -> 'a array -> int option
 (** [find_index f a] returns [Some i], where [i] is the index of the first
     element of the array [a] that satisfies [f x], if there is such an
     element.
@@ -281,13 +308,15 @@ val find_index : ('a -> bool) -> 'a array -> int option
 
     @since 5.1 *)
 
-val find_map : ('a -> 'b option) -> 'a array -> 'b option
+val find_map : ('a : value_or_null mod separable).
+   ('a -> 'b option) -> 'a array -> 'b option
 (** [find_map f a] applies [f] to the elements of [a] in order, and returns the
     first result of the form [Some v], or [None] if none exist.
 
     @since 4.13 *)
 
-val find_mapi : (int -> 'a -> 'b option) -> 'a array -> 'b option
+val find_mapi : ('a : value_or_null mod separable).
+   (int -> 'a -> 'b option) -> 'a array -> 'b option
 (** Same as [find_map], but the predicate is applied to the index of
    the element as first argument (counting from 0), and the element
    itself as second argument.
@@ -296,12 +325,14 @@ val find_mapi : (int -> 'a -> 'b option) -> 'a array -> 'b option
 
 (** {1 Arrays of pairs} *)
 
-val split : ('a * 'b) array -> 'a array * 'b array
+val split : ('a : value_or_null mod separable).
+   ('a * 'b) array -> 'a array * 'b array
 (** [split [|(a1,b1); ...; (an,bn)|]] is [([|a1; ...; an|], [|b1; ...; bn|])].
 
     @since 4.13 *)
 
-val combine : 'a array -> 'b array -> ('a * 'b) array
+val combine : ('a : value_or_null mod separable).
+   'a array -> 'b array -> ('a * 'b) array
 (** [combine [|a1; ...; an|] [|b1; ...; bn|]] is [[|(a1,b1); ...; (an,bn)|]].
     Raise [Invalid_argument] if the two arrays have different lengths.
 
@@ -309,7 +340,8 @@ val combine : 'a array -> 'b array -> ('a * 'b) array
 
 (** {1:sorting_and_shuffling Sorting and shuffling} *)
 
-val sort : ('a -> 'a -> int) -> 'a array -> unit
+val sort : ('a : value_or_null mod separable).
+   ('a -> 'a -> int) -> 'a array -> unit
 (** Sort an array in increasing order according to a comparison
    function.  The comparison function must return 0 if its arguments
    compare as equal, a positive integer if the first is greater,
@@ -334,7 +366,8 @@ val sort : ('a -> 'a -> int) -> 'a array -> unit
 -   [cmp a.(i) a.(j)] >= 0 if and only if i >= j
 *)
 
-val stable_sort : ('a -> 'a -> int) -> 'a array -> unit
+val stable_sort : ('a : value_or_null mod separable).
+   ('a -> 'a -> int) -> 'a array -> unit
 (** Same as {!sort}, but the sorting algorithm is stable (i.e.
    elements that compare equal are kept in their original order) and
    not guaranteed to run in constant heap space.
@@ -344,11 +377,12 @@ val stable_sort : ('a -> 'a -> int) -> 'a array -> unit
    than the current implementation of {!sort}.
 *)
 
-val fast_sort : ('a -> 'a -> int) -> 'a array -> unit
+val fast_sort : ('a : value_or_null mod separable).
+   ('a -> 'a -> int) -> 'a array -> unit
 (** Same as {!sort} or {!stable_sort}, whichever is
     faster on typical input. *)
 
-val shuffle :
+val shuffle : ('a : value_or_null mod separable).
   rand: (* thwart tools/sync_stdlib_docs *) (int -> int) -> 'a array -> unit
 (** [shuffle rand a] randomly permutes [a]'s element using [rand] for
     randomness. The distribution of permutations is uniform.
@@ -362,18 +396,18 @@ val shuffle :
 
 (** {1 Arrays and Sequences} *)
 
-val to_seq : 'a array -> 'a Seq.t
+val to_seq : ('a : value_or_null mod separable). 'a array -> 'a Seq.t
 (** Iterate on the array, in increasing order. Modifications of the
     array during iteration will be reflected in the sequence.
     @since 4.07 *)
 
-val to_seqi : 'a array -> (int * 'a) Seq.t
+val to_seqi : ('a : value_or_null mod separable). 'a array -> (int * 'a) Seq.t
 (** Iterate on the array, in increasing order, yielding indices along elements.
     Modifications of the array during iteration will be reflected in the
     sequence.
     @since 4.07 *)
 
-val of_seq : 'a Seq.t -> 'a array
+val of_seq : ('a : value_or_null mod separable). 'a Seq.t -> 'a array
 (** Create an array from the generator
     @since 4.07 *)
 
@@ -455,15 +489,24 @@ let () = Domain.join d1; Domain.join d2
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_get : 'a array -> int -> 'a = "%array_unsafe_get"
-external unsafe_set : 'a array -> int -> 'a -> unit = "%array_unsafe_set"
+external unsafe_get : ('a : value_or_null mod separable).
+                      ('a array[@local_opt]) -> int -> 'a = "%array_unsafe_get"
+external unsafe_set : ('a : value_or_null mod separable).
+                      ('a array[@local_opt]) -> int -> 'a -> unit
+  = "%array_unsafe_set"
 
 module Floatarray : sig
   external create : int -> floatarray = "caml_floatarray_create"
-  external length : floatarray -> int = "%floatarray_length"
-  external get : floatarray -> int -> float = "%floatarray_safe_get"
-  external set : floatarray -> int -> float -> unit = "%floatarray_safe_set"
-  external unsafe_get : floatarray -> int -> float = "%floatarray_unsafe_get"
-  external unsafe_set : floatarray -> int -> float -> unit
-      = "%floatarray_unsafe_set"
+  external length : (floatarray[@local_opt]) @ immutable -> int @@ stateless
+    = "%floatarray_length"
+  external get : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    = "%floatarray_safe_get"
+  external set : (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit
+    = "%floatarray_safe_set"
+  external unsafe_get
+    : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    = "%floatarray_unsafe_get"
+  external unsafe_set
+    : (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit
+    = "%floatarray_unsafe_set"
 end

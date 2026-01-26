@@ -12,7 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type 'a t : immediate_or_null with 'a = 'a or_null [@@or_null_reexport]
+type 'a t : value_or_null mod everything with 'a = 'a or_null
+[@@or_null_reexport]
 
 let null = Null
 let this v = This v

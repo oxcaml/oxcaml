@@ -3,2882 +3,9986 @@
 open Amd64_simd_defs
 
 type id = 
-  | Pmovmskb_r64_X
-  | Addsubps
-  | Psraw_X
-  | Movq_Xm64_X
-  | Sqrtpd
-  | Pmaxub_X_Xm128
-  | Movaps_Xm128_X
-  | Addsd
-  | Rcpps
-  | Maxsd
-  | Subps
-  | Movd_X_r32m32
-  | Divss
-  | Punpckhqdq
-  | Shrx_r32_r32m32_r32
-  | Pextrw_r64_X
-  | Pcmpeqb
-  | Pminud
-  | Movmskpd
-  | Psllq_X_Xm128
-  | Pinsrb
-  | Bzhi_r64_r64m64_r64
-  | Psllq_X
-  | Unpckhps
-  | Mulpd
-  | Phaddsw_M_Mm64
-  | Cvtsi2sd_X_r64m64
-  | Minps
-  | Pavgw_X_Xm128
-  | Movups_Xm128_X
-  | Movss_Xm32_X
-  | Blendps
-  | Cvttsd2si_r64_Xm64
-  | Movntpd
-  | Crc32_r64_r8m8
-  | Pcmpeqd
-  | Pmulhrsw_M_Mm64
-  | Pmuludq_X_Xm128
-  | Addps
-  | Sqrtps
-  | Pcmpgtb
-  | Sqrtsd
-  | Movntdqa
-  | Psubsb
-  | Roundss
-  | Pext_r32_r32_r32m32
-  | Pinsrd
-  | Subpd
-  | Pmulhw
-  | Pminsw_M_Mm64
-  | Paddusw
-  | Cvtsi2ss_X_r32m32
-  | Blendvpd
-  | Movsd_X_m64
-  | Movsd_X_X
-  | Ptest
-  | Pext_r64_r64_r64m64
-  | Rcpss
-  | Movhpd_X_m64
-  | Psignw_X_Xm128
-  | Pmulld
-  | Phaddsw_X_Xm128
-  | Pshufd
-  | Pdep_r32_r32_r32m32
-  | Pmovsxbw
-  | Movupd_Xm128_X
-  | Movntdq
-  | Crc32_r32_r32m32
-  | Crc32_r32_r16m16
-  | Psrldq
-  | Pabsb_M_Mm64
-  | Pcmpeqq
-  | Paddusb
-  | Cvtpd2ps
-  | Psraw_X_Xm128
-  | Shlx_r64_r64m64_r64
-  | Phsubsw_X_Xm128
-  | Psubb
-  | Paddd
-  | Movmskps
-  | Psrld_X
-  | Movdqu_X_Xm128
-  | Subsd
-  | Extractps
-  | Crc32_r32_r8m8
-  | Psubq_X_Xm128
-  | Movapd_Xm128_X
-  | Pmaxsd
-  | Paddw
-  | Cvttss2si_r32_Xm32
-  | Movlhps
-  | Cvtsd2si_r64_Xm64
-  | Pmovsxbq
-  | Pslldq
-  | Pmaddwd
-  | Pmovsxbd
-  | Pmulhuw_X_Xm128
-  | Psrlq_X
-  | Cvtsd2si_r32_Xm64
-  | Roundsd
-  | Por
-  | Punpckhbw
-  | Pmaxud
-  | Psllw_X
-  | Movsldup
-  | Psubd
-  | Movq_X_r64m64
-  | Xorpd
-  | Pmaddubsw_M_Mm64
-  | Pmaxuw
-  | Cvtsi2ss_X_r64m64
-  | Psrad_X
-  | Pextrd
-  | Pcmpestrm
-  | Rsqrtss
-  | Psignd_X_Xm128
-  | Pmullw
-  | Pabsd_X_Xm128
-  | Phaddd_M_Mm64
-  | Cvtps2pd
-  | Andnps
-  | Sqrtss
-  | Phaddw_X_Xm128
   | Addpd
-  | Pmovzxdq
-  | Shufpd
-  | Pinsrw_X_r32m16
-  | Psignw_M_Mm64
-  | Phsubd_X_Xm128
-  | Shlx_r32_r32m32_r32
-  | Punpcklbw
-  | Paddb
-  | Pminsw_X_Xm128
-  | Cvtpd2dq
-  | Psadbw_X_Xm128
-  | Pmovsxdq
-  | Haddpd
-  | Mulss
-  | Cmpsd
-  | Movddup
-  | Cvtsi2sd_X_r32m32
-  | Cvtss2sd
-  | Andpd
-  | Pminuw
-  | Psrad_X_Xm128
-  | Packusdw
-  | Phsubw_X_Xm128
-  | Rorx_r32_r32m32
-  | Pclmulqdq
-  | Pshufb_M_Mm64
-  | Phaddw_M_Mm64
-  | Paddsw
-  | Phminposuw
-  | Pminsb
-  | Rorx_r64_r64m64
-  | Pblendw
-  | Andnpd
-  | Pextrb
-  | Mulsd
-  | Psubusb
-  | Pminsd
-  | Pmaxub_M_Mm64
-  | Psrld_X_Xm128
-  | Movntps
-  | Palignr_M_Mm64
-  | Cvtdq2pd
-  | Pcmpistrm
+  | Addps
+  | Addsd
   | Addss
-  | Comiss
-  | Shufps
-  | Rsqrtps
-  | Movlpd_X_m64
-  | Psrlw_X_Xm128
-  | Minsd
-  | Cvtss2si_r32_Xm32
-  | Pslld_X_Xm128
-  | Movapd_X_Xm128
-  | Hsubps
-  | Andps
-  | Dpps
-  | Pextrw_r64_M
-  | Cvtdq2ps
-  | Pcmpeqw
-  | Psignb_M_Mm64
-  | Psllw_X_Xm128
-  | Punpckhdq
-  | Phsubd_M_Mm64
-  | Movlps_m64_X
-  | Pxor
-  | Maxpd
-  | Pmovsxwq
-  | Phsubsw_M_Mm64
-  | Pmulhuw_M_Mm64
-  | Maskmovdqu
-  | Movlps_X_m64
-  | Pinsrw_M_r32m16
-  | Cvtss2si_r64_Xm32
-  | Hsubpd
-  | Movq_X_Xm64
-  | Movaps_X_Xm128
-  | Punpcklwd
-  | Blendvps
-  | Mpsadbw
-  | Pavgb_X_Xm128
-  | Movdqa_X_Xm128
-  | Pblendvb
-  | Pmovzxwq
-  | Unpcklps
-  | Bzhi_r32_r32m32_r32
-  | Pminub_X_Xm128
-  | Psubsw
-  | Ucomisd
-  | Pmovzxbq
-  | Movlpd_m64_X
-  | Pmovzxwd
-  | Pavgw_M_Mm64
-  | Xorps
-  | Cvttps2dq
-  | Unpckhpd
-  | Paddq
-  | Cmppd
-  | Sarx_r32_r32m32_r32
-  | Movsd_Xm64_X
-  | Pavgb_M_Mm64
-  | Cvttss2si_r64_Xm32
-  | Psubusw
-  | Unpcklpd
-  | Pmuldq
-  | Cmpps
-  | Pcmpgtd
-  | Pand
-  | Pcmpgtq
-  | Pabsd_M_Mm64
-  | Crc32_r64_r64m64
-  | Movupd_X_Xm128
-  | Pslld_X
-  | Pmaxsw_X_Xm128
-  | Palignr_X_Xm128
-  | Psignb_X_Xm128
-  | Pandn
-  | Psubw
-  | Packuswb
-  | Haddps
-  | Movdqa_Xm128_X
-  | Orpd
-  | Paddsb
-  | Packsswb
-  | Movss_X_m32
-  | Movss_X_X
-  | Minpd
-  | Movhlps
-  | Psrlq_X_Xm128
-  | Blendpd
-  | Pextrw_r64m16_X
-  | Cvttpd2dq
-  | Packssdw
-  | Divpd
-  | Pmuludq_M_Mm64
-  | Pabsb_X_Xm128
-  | Pmaxsb
-  | Insertps
-  | Pshuflw
-  | Cvtsd2ss
-  | Pminub_M_Mm64
-  | Pabsw_M_Mm64
-  | Punpcklqdq
-  | Subss
-  | Punpckldq
-  | Ucomiss
-  | Movhpd_m64_X
   | Addsubpd
-  | Pmaxsw_M_Mm64
-  | Minss
-  | Psadbw_M_Mm64
+  | Addsubps
+  | Andn_r32_r32_r32m32
+  | Andn_r64_r64_r64m64
+  | Andnpd
+  | Andnps
+  | Andpd
+  | Andps
+  | Bextr_r32_r32m32_r32
+  | Bextr_r64_r64m64_r64
+  | Blendpd
+  | Blendps
+  | Blendvpd
+  | Blendvps
+  | Blsi_r32_r32m32
+  | Blsi_r64_r64m64
+  | Blsmsk_r32_r32m32
+  | Blsmsk_r64_r64m64
+  | Blsr_r32_r32m32
+  | Blsr_r64_r64m64
+  | Bzhi_r32_r32m32_r32
+  | Bzhi_r64_r64m64_r64
+  | Cmppd
+  | Cmpps
+  | Cmpsd
   | Cmpss
-  | Maxps
-  | Pmovzxbw
-  | Movshdup
-  | Pinsrq
-  | Cvttsd2si_r32_Xm64
-  | Shrx_r64_r64m64_r64
-  | Divps
-  | Pabsw_X_Xm128
-  | Psubq_M_Mm64
-  | Pshufb_X_Xm128
-  | Pmovmskb_r64_M
-  | Movhps_X_m64
-  | Pmulhrsw_X_Xm128
-  | Mulps
-  | Pcmpestri
-  | Maxss
-  | Movhps_m64_X
-  | Psrlw_X
-  | Roundpd
-  | Dppd
-  | Pextrq
-  | Ldmxcsr
-  | Pmovzxbd
-  | Pshufhw
-  | Divsd
-  | Psignd_M_Mm64
   | Comisd
+  | Comiss
+  | Crc32_r32_r16m16
+  | Crc32_r32_r32m32
+  | Crc32_r32_r8m8
+  | Crc32_r64_r64m64
+  | Crc32_r64_r8m8
+  | Cvtdq2pd
+  | Cvtdq2ps
+  | Cvtpd2dq
+  | Cvtpd2ps
   | Cvtps2dq
-  | Orps
+  | Cvtps2pd
+  | Cvtsd2si_r32_Xm64
+  | Cvtsd2si_r64_Xm64
+  | Cvtsd2ss
+  | Cvtsi2sd_X_r32m32
+  | Cvtsi2sd_X_r64m64
+  | Cvtsi2ss_X_r32m32
+  | Cvtsi2ss_X_r64m64
+  | Cvtss2sd
+  | Cvtss2si_r32_Xm32
+  | Cvtss2si_r64_Xm32
+  | Cvttpd2dq
+  | Cvttps2dq
+  | Cvttsd2si_r32_Xm64
+  | Cvttsd2si_r64_Xm64
+  | Cvttss2si_r32_Xm32
+  | Cvttss2si_r64_Xm32
+  | Divpd
+  | Divps
+  | Divsd
+  | Divss
+  | Dppd
+  | Dpps
+  | Extractps
+  | Haddpd
+  | Haddps
+  | Hsubpd
+  | Hsubps
+  | Insertps
+  | Lddqu
+  | Ldmxcsr
+  | Lzcnt_r16_r16m16
+  | Lzcnt_r32_r32m32
+  | Lzcnt_r64_r64m64
+  | Maskmovdqu
+  | Maxpd
+  | Maxps
+  | Maxsd
+  | Maxss
+  | Minpd
+  | Minps
+  | Minsd
+  | Minss
+  | Movapd_X_Xm128
+  | Movapd_Xm128_X
+  | Movapd_m128_X
+  | Movaps_X_Xm128
+  | Movaps_Xm128_X
+  | Movd_X_r32m32
+  | Movd_r32m32_X
+  | Movddup
+  | Movdqa_X_Xm128
+  | Movdqa_Xm128_X
+  | Movdqu_X_Xm128
+  | Movdqu_Xm128_X
+  | Movhlps
+  | Movhpd_X_m64
+  | Movhpd_m64_X
+  | Movhps_X_m64
+  | Movhps_m64_X
+  | Movlhps
+  | Movlpd_X_m64
+  | Movlpd_m64_X
+  | Movlps_X_m64
+  | Movlps_m64_X
+  | Movmskpd
+  | Movmskps
+  | Movntdq
+  | Movntdqa
+  | Movnti_m32_r32
+  | Movnti_m64_r64
+  | Movntpd
+  | Movntps
+  | Movq_X_Xm64
+  | Movq_X_r64m64
+  | Movq_Xm64_X
+  | Movq_r64m64_X
+  | Movsd_X_X
+  | Movsd_X_m64
+  | Movsd_Xm64_X
+  | Movsd_m64_X
+  | Movshdup
+  | Movsldup
+  | Movss_X_X
+  | Movss_X_m32
+  | Movss_Xm32_X
+  | Movss_m32_X
+  | Movupd_X_Xm128
+  | Movupd_Xm128_X
+  | Movupd_m128_X
   | Movups_X_Xm128
-  | Punpckhwd
-  | Pcmpistri
-  | Pmovsxwd
-  | Pmaddubsw_X_Xm128
+  | Movups_Xm128_X
+  | Mpsadbw
+  | Mulpd
+  | Mulps
+  | Mulsd
+  | Mulss
+  | Mulx_r32_r32_r32m32_rdx
+  | Mulx_r64_r64_r64m64_rdx
+  | Orpd
+  | Orps
+  | Pabsb_M_Mm64
+  | Pabsb_X_Xm128
+  | Pabsd_M_Mm64
+  | Pabsd_X_Xm128
+  | Pabsw_M_Mm64
+  | Pabsw_X_Xm128
+  | Packssdw
+  | Packsswb
+  | Packusdw
+  | Packuswb
+  | Paddb
+  | Paddd
+  | Paddq
+  | Paddsb
+  | Paddsw
+  | Paddusb
+  | Paddusw
+  | Paddw
+  | Palignr_M_Mm64
+  | Palignr_X_Xm128
+  | Pand
+  | Pandn
+  | Pavgb_M_Mm64
+  | Pavgb_X_Xm128
+  | Pavgw_M_Mm64
+  | Pavgw_X_Xm128
+  | Pblendvb
+  | Pblendw
+  | Pclmulqdq
+  | Pcmpeqb
+  | Pcmpeqd
+  | Pcmpeqq
+  | Pcmpeqw
+  | Pcmpestri
+  | Pcmpestrm
+  | Pcmpgtb
+  | Pcmpgtd
+  | Pcmpgtq
   | Pcmpgtw
-  | Roundps
-  | Phsubw_M_Mm64
-  | Sarx_r64_r64m64_r64
+  | Pcmpistri
+  | Pcmpistrm
+  | Pdep_r32_r32_r32m32
   | Pdep_r64_r64_r64m64
-  | Stmxcsr
+  | Pext_r32_r32_r32m32
+  | Pext_r64_r64_r64m64
+  | Pextrb
+  | Pextrd
+  | Pextrq
+  | Pextrw_r64_M
+  | Pextrw_r64_X
+  | Pextrw_r64m16_X
+  | Phaddd_M_Mm64
   | Phaddd_X_Xm128
+  | Phaddsw_M_Mm64
+  | Phaddsw_X_Xm128
+  | Phaddw_M_Mm64
+  | Phaddw_X_Xm128
+  | Phminposuw
+  | Phsubd_M_Mm64
+  | Phsubd_X_Xm128
+  | Phsubsw_M_Mm64
+  | Phsubsw_X_Xm128
+  | Phsubw_M_Mm64
+  | Phsubw_X_Xm128
+  | Pinsrb
+  | Pinsrd
+  | Pinsrq
+  | Pinsrw_M_r32m16
+  | Pinsrw_X_r32m16
+  | Pmaddubsw_M_Mm64
+  | Pmaddubsw_X_Xm128
+  | Pmaddwd
+  | Pmaxsb
+  | Pmaxsd
+  | Pmaxsw_M_Mm64
+  | Pmaxsw_X_Xm128
+  | Pmaxub_M_Mm64
+  | Pmaxub_X_Xm128
+  | Pmaxud
+  | Pmaxuw
+  | Pminsb
+  | Pminsd
+  | Pminsw_M_Mm64
+  | Pminsw_X_Xm128
+  | Pminub_M_Mm64
+  | Pminub_X_Xm128
+  | Pminud
+  | Pminuw
+  | Pmovmskb_r64_M
+  | Pmovmskb_r64_X
+  | Pmovsxbd
+  | Pmovsxbq
+  | Pmovsxbw
+  | Pmovsxdq
+  | Pmovsxwd
+  | Pmovsxwq
+  | Pmovzxbd
+  | Pmovzxbq
+  | Pmovzxbw
+  | Pmovzxdq
+  | Pmovzxwd
+  | Pmovzxwq
+  | Pmuldq
+  | Pmulhrsw_M_Mm64
+  | Pmulhrsw_X_Xm128
+  | Pmulhuw_M_Mm64
+  | Pmulhuw_X_Xm128
+  | Pmulhw
+  | Pmulld
+  | Pmullw
+  | Pmuludq_M_Mm64
+  | Pmuludq_X_Xm128
+  | Popcnt_r16_r16m16
+  | Popcnt_r32_r32m32
+  | Popcnt_r64_r64m64
+  | Por
+  | Psadbw_M_Mm64
+  | Psadbw_X_Xm128
+  | Pshufb_M_Mm64
+  | Pshufb_X_Xm128
+  | Pshufd
+  | Pshufhw
+  | Pshuflw
+  | Psignb_M_Mm64
+  | Psignb_X_Xm128
+  | Psignd_M_Mm64
+  | Psignd_X_Xm128
+  | Psignw_M_Mm64
+  | Psignw_X_Xm128
+  | Pslld_X
+  | Pslld_X_Xm128
+  | Pslldq
+  | Psllq_X
+  | Psllq_X_Xm128
+  | Psllw_X
+  | Psllw_X_Xm128
+  | Psrad_X
+  | Psrad_X_Xm128
+  | Psraw_X
+  | Psraw_X_Xm128
+  | Psrld_X
+  | Psrld_X_Xm128
+  | Psrldq
+  | Psrlq_X
+  | Psrlq_X_Xm128
+  | Psrlw_X
+  | Psrlw_X_Xm128
+  | Psubb
+  | Psubd
+  | Psubq_M_Mm64
+  | Psubq_X_Xm128
+  | Psubsb
+  | Psubsw
+  | Psubusb
+  | Psubusw
+  | Psubw
+  | Ptest
+  | Punpckhbw
+  | Punpckhdq
+  | Punpckhqdq
+  | Punpckhwd
+  | Punpcklbw
+  | Punpckldq
+  | Punpcklqdq
+  | Punpcklwd
+  | Pxor
+  | Rcpps
+  | Rcpss
+  | Rorx_r32_r32m32
+  | Rorx_r64_r64m64
+  | Roundpd
+  | Roundps
+  | Roundsd
+  | Roundss
+  | Rsqrtps
+  | Rsqrtss
+  | Sarx_r32_r32m32_r32
+  | Sarx_r64_r64m64_r64
+  | Shlx_r32_r32m32_r32
+  | Shlx_r64_r64m64_r64
+  | Shrx_r32_r32m32_r32
+  | Shrx_r64_r64m64_r64
+  | Shufpd
+  | Shufps
+  | Sqrtpd
+  | Sqrtps
+  | Sqrtsd
+  | Sqrtss
+  | Stmxcsr
+  | Subpd
+  | Subps
+  | Subsd
+  | Subss
+  | Tzcnt_r16_r16m16
+  | Tzcnt_r32_r32m32
+  | Tzcnt_r64_r64m64
+  | Ucomisd
+  | Ucomiss
+  | Unpckhpd
+  | Unpckhps
+  | Unpcklpd
+  | Unpcklps
+  | Vaddpd_X_X_Xm128
+  | Vaddpd_Y_Y_Ym256
+  | Vaddps_X_X_Xm128
+  | Vaddps_Y_Y_Ym256
+  | Vaddsd
+  | Vaddss
+  | Vaddsubpd_X_X_Xm128
+  | Vaddsubpd_Y_Y_Ym256
+  | Vaddsubps_X_X_Xm128
+  | Vaddsubps_Y_Y_Ym256
+  | Vandnpd_X_X_Xm128
+  | Vandnpd_Y_Y_Ym256
+  | Vandnps_X_X_Xm128
+  | Vandnps_Y_Y_Ym256
+  | Vandpd_X_X_Xm128
+  | Vandpd_Y_Y_Ym256
+  | Vandps_X_X_Xm128
+  | Vandps_Y_Y_Ym256
+  | Vblendpd_X_X_Xm128
+  | Vblendpd_Y_Y_Ym256
+  | Vblendps_X_X_Xm128
+  | Vblendps_Y_Y_Ym256
+  | Vblendvpd_X_X_Xm128_X
+  | Vblendvpd_Y_Y_Ym256_Y
+  | Vblendvps_X_X_Xm128_X
+  | Vblendvps_Y_Y_Ym256_Y
+  | Vbroadcastf128
+  | Vbroadcasti128
+  | Vbroadcastsd_Y_X
+  | Vbroadcastsd_Y_m64
+  | Vbroadcastss_X_X
+  | Vbroadcastss_X_m32
+  | Vbroadcastss_Y_X
+  | Vbroadcastss_Y_m32
+  | Vcmppd_X_X_Xm128
+  | Vcmppd_Y_Y_Ym256
+  | Vcmpps_X_X_Xm128
+  | Vcmpps_Y_Y_Ym256
+  | Vcmpsd
+  | Vcmpss
+  | Vcomisd
+  | Vcomiss
+  | Vcvtdq2pd_X_Xm64
+  | Vcvtdq2pd_Y_Xm128
+  | Vcvtdq2ps_X_Xm128
+  | Vcvtdq2ps_Y_Ym256
+  | Vcvtpd2dq_X_Xm128
+  | Vcvtpd2dq_X_Ym256
+  | Vcvtpd2ps_X_Xm128
+  | Vcvtpd2ps_X_Ym256
+  | Vcvtph2ps_X_Xm64
+  | Vcvtph2ps_Y_Xm128
+  | Vcvtps2dq_X_Xm128
+  | Vcvtps2dq_Y_Ym256
+  | Vcvtps2pd_X_Xm64
+  | Vcvtps2pd_Y_Xm128
+  | Vcvtps2ph_Xm128_Y
+  | Vcvtps2ph_Xm64_X
+  | Vcvtsd2si_r32_Xm64
+  | Vcvtsd2si_r64_Xm64
+  | Vcvtsd2ss
+  | Vcvtsi2sd_X_X_r32m32
+  | Vcvtsi2sd_X_X_r64m64
+  | Vcvtsi2ss_X_X_r32m32
+  | Vcvtsi2ss_X_X_r64m64
+  | Vcvtss2sd
+  | Vcvtss2si_r32_Xm32
+  | Vcvtss2si_r64_Xm32
+  | Vcvttpd2dq_X_Xm128
+  | Vcvttpd2dq_X_Ym256
+  | Vcvttps2dq_X_Xm128
+  | Vcvttps2dq_Y_Ym256
+  | Vcvttsd2si_r32_Xm64
+  | Vcvttsd2si_r64_Xm64
+  | Vcvttss2si_r32_Xm32
+  | Vcvttss2si_r64_Xm32
+  | Vdivpd_X_X_Xm128
+  | Vdivpd_Y_Y_Ym256
+  | Vdivps_X_X_Xm128
+  | Vdivps_Y_Y_Ym256
+  | Vdivsd
+  | Vdivss
+  | Vdppd
+  | Vdpps_X_X_Xm128
+  | Vdpps_Y_Y_Ym256
+  | Vextractf128
+  | Vextracti128
+  | Vextractps
+  | Vfmadd132pd_X_X_Xm128
+  | Vfmadd132pd_Y_Y_Ym256
+  | Vfmadd132ps_X_X_Xm128
+  | Vfmadd132ps_Y_Y_Ym256
+  | Vfmadd132sd
+  | Vfmadd132ss
+  | Vfmadd213pd_X_X_Xm128
+  | Vfmadd213pd_Y_Y_Ym256
+  | Vfmadd213ps_X_X_Xm128
+  | Vfmadd213ps_Y_Y_Ym256
+  | Vfmadd213sd
+  | Vfmadd213ss
+  | Vfmadd231pd_X_X_Xm128
+  | Vfmadd231pd_Y_Y_Ym256
+  | Vfmadd231ps_X_X_Xm128
+  | Vfmadd231ps_Y_Y_Ym256
+  | Vfmadd231sd
+  | Vfmadd231ss
+  | Vfmaddsub132pd_X_X_Xm128
+  | Vfmaddsub132pd_Y_Y_Ym256
+  | Vfmaddsub132ps_X_X_Xm128
+  | Vfmaddsub132ps_Y_Y_Ym256
+  | Vfmaddsub213pd_X_X_Xm128
+  | Vfmaddsub213pd_Y_Y_Ym256
+  | Vfmaddsub213ps_X_X_Xm128
+  | Vfmaddsub213ps_Y_Y_Ym256
+  | Vfmaddsub231pd_X_X_Xm128
+  | Vfmaddsub231pd_Y_Y_Ym256
+  | Vfmaddsub231ps_X_X_Xm128
+  | Vfmaddsub231ps_Y_Y_Ym256
+  | Vfmsub132pd_X_X_Xm128
+  | Vfmsub132pd_Y_Y_Ym256
+  | Vfmsub132ps_X_X_Xm128
+  | Vfmsub132ps_Y_Y_Ym256
+  | Vfmsub132sd
+  | Vfmsub132ss
+  | Vfmsub213pd_X_X_Xm128
+  | Vfmsub213pd_Y_Y_Ym256
+  | Vfmsub213ps_X_X_Xm128
+  | Vfmsub213ps_Y_Y_Ym256
+  | Vfmsub213sd
+  | Vfmsub213ss
+  | Vfmsub231pd_X_X_Xm128
+  | Vfmsub231pd_Y_Y_Ym256
+  | Vfmsub231ps_X_X_Xm128
+  | Vfmsub231ps_Y_Y_Ym256
+  | Vfmsub231sd
+  | Vfmsub231ss
+  | Vfmsubadd132pd_X_X_Xm128
+  | Vfmsubadd132pd_Y_Y_Ym256
+  | Vfmsubadd132ps_X_X_Xm128
+  | Vfmsubadd132ps_Y_Y_Ym256
+  | Vfmsubadd213pd_X_X_Xm128
+  | Vfmsubadd213pd_Y_Y_Ym256
+  | Vfmsubadd213ps_X_X_Xm128
+  | Vfmsubadd213ps_Y_Y_Ym256
+  | Vfmsubadd231pd_X_X_Xm128
+  | Vfmsubadd231pd_Y_Y_Ym256
+  | Vfmsubadd231ps_X_X_Xm128
+  | Vfmsubadd231ps_Y_Y_Ym256
+  | Vfnmadd132pd_X_X_Xm128
+  | Vfnmadd132pd_Y_Y_Ym256
+  | Vfnmadd132ps_X_X_Xm128
+  | Vfnmadd132ps_Y_Y_Ym256
+  | Vfnmadd132sd
+  | Vfnmadd132ss
+  | Vfnmadd213pd_X_X_Xm128
+  | Vfnmadd213pd_Y_Y_Ym256
+  | Vfnmadd213ps_X_X_Xm128
+  | Vfnmadd213ps_Y_Y_Ym256
+  | Vfnmadd213sd
+  | Vfnmadd213ss
+  | Vfnmadd231pd_X_X_Xm128
+  | Vfnmadd231pd_Y_Y_Ym256
+  | Vfnmadd231ps_X_X_Xm128
+  | Vfnmadd231ps_Y_Y_Ym256
+  | Vfnmadd231sd
+  | Vfnmadd231ss
+  | Vfnmsub132pd_X_X_Xm128
+  | Vfnmsub132pd_Y_Y_Ym256
+  | Vfnmsub132ps_X_X_Xm128
+  | Vfnmsub132ps_Y_Y_Ym256
+  | Vfnmsub132sd
+  | Vfnmsub132ss
+  | Vfnmsub213pd_X_X_Xm128
+  | Vfnmsub213pd_Y_Y_Ym256
+  | Vfnmsub213ps_X_X_Xm128
+  | Vfnmsub213ps_Y_Y_Ym256
+  | Vfnmsub213sd
+  | Vfnmsub213ss
+  | Vfnmsub231pd_X_X_Xm128
+  | Vfnmsub231pd_Y_Y_Ym256
+  | Vfnmsub231ps_X_X_Xm128
+  | Vfnmsub231ps_Y_Y_Ym256
+  | Vfnmsub231sd
+  | Vfnmsub231ss
+  | Vgatherdpd_X_M32X_X
+  | Vgatherdpd_Y_M32X_Y
+  | Vgatherdps_X_M32X_X
+  | Vgatherdps_Y_M32Y_Y
+  | Vgatherqpd_X_M64X_X
+  | Vgatherqpd_Y_M64Y_Y
+  | Vgatherqps_X_M64X_X
+  | Vgatherqps_X_M64Y_X
+  | Vhaddpd_X_X_Xm128
+  | Vhaddpd_Y_Y_Ym256
+  | Vhaddps_X_X_Xm128
+  | Vhaddps_Y_Y_Ym256
+  | Vhsubpd_X_X_Xm128
+  | Vhsubpd_Y_Y_Ym256
+  | Vhsubps_X_X_Xm128
+  | Vhsubps_Y_Y_Ym256
+  | Vinsertf128
+  | Vinserti128
+  | Vinsertps
+  | Vlddqu_X_m128
+  | Vlddqu_Y_m256
+  | Vldmxcsr
+  | Vmaskmovdqu
+  | Vmaskmovpd_X_X_m128
+  | Vmaskmovpd_Y_Y_m256
+  | Vmaskmovpd_m128_X_X
+  | Vmaskmovpd_m256_Y_Y
+  | Vmaskmovps_X_X_m128
+  | Vmaskmovps_Y_Y_m256
+  | Vmaskmovps_m128_X_X
+  | Vmaskmovps_m256_Y_Y
+  | Vmaxpd_X_X_Xm128
+  | Vmaxpd_Y_Y_Ym256
+  | Vmaxps_X_X_Xm128
+  | Vmaxps_Y_Y_Ym256
+  | Vmaxsd
+  | Vmaxss
+  | Vminpd_X_X_Xm128
+  | Vminpd_Y_Y_Ym256
+  | Vminps_X_X_Xm128
+  | Vminps_Y_Y_Ym256
+  | Vminsd
+  | Vminss
+  | Vmovapd_X_Xm128
+  | Vmovapd_Xm128_X
+  | Vmovapd_Y_Ym256
+  | Vmovapd_Ym256_Y
+  | Vmovapd_m128_X
+  | Vmovapd_m256_Y
+  | Vmovaps_X_Xm128
+  | Vmovaps_Xm128_X
+  | Vmovaps_Y_Ym256
+  | Vmovaps_Ym256_Y
+  | Vmovd_X_r32m32
+  | Vmovd_r32m32_X
+  | Vmovddup_X_Xm64
+  | Vmovddup_Y_Ym256
+  | Vmovdqa_X_Xm128
+  | Vmovdqa_Xm128_X
+  | Vmovdqa_Y_Ym256
+  | Vmovdqa_Ym256_Y
+  | Vmovdqu_X_Xm128
+  | Vmovdqu_Xm128_X
+  | Vmovdqu_Y_Ym256
+  | Vmovdqu_Ym256_Y
+  | Vmovhlps
+  | Vmovhpd_X_X_m64
+  | Vmovhpd_m64_X
+  | Vmovhps_X_X_m64
+  | Vmovhps_m64_X
+  | Vmovlhps
+  | Vmovlpd_X_X_m64
+  | Vmovlpd_m64_X
+  | Vmovlps_X_X_m64
+  | Vmovlps_m64_X
+  | Vmovmskpd_r64_X
+  | Vmovmskpd_r64_Y
+  | Vmovmskps_r64_X
+  | Vmovmskps_r64_Y
+  | Vmovntdq_m128_X
+  | Vmovntdq_m256_Y
+  | Vmovntdqa_X_m128
+  | Vmovntdqa_Y_m256
+  | Vmovntpd_m128_X
+  | Vmovntpd_m256_Y
+  | Vmovntps_m128_X
+  | Vmovntps_m256_Y
+  | Vmovq_X_Xm64
+  | Vmovq_X_r64m64
+  | Vmovq_Xm64_X
+  | Vmovq_r64m64_X
+  | Vmovsd_X_X_X
+  | Vmovsd_X_m64
+  | Vmovsd_m64_X
+  | Vmovshdup_X_Xm128
+  | Vmovshdup_Y_Ym256
+  | Vmovsldup_X_Xm128
+  | Vmovsldup_Y_Ym256
+  | Vmovss_X_X_X
+  | Vmovss_X_m32
+  | Vmovss_m32_X
+  | Vmovupd_X_Xm128
+  | Vmovupd_Xm128_X
+  | Vmovupd_Y_Ym256
+  | Vmovupd_Ym256_Y
+  | Vmovupd_m128_X
+  | Vmovupd_m256_Y
+  | Vmovups_X_Xm128
+  | Vmovups_Xm128_X
+  | Vmovups_Y_Ym256
+  | Vmovups_Ym256_Y
+  | Vmpsadbw_X_X_Xm128
+  | Vmpsadbw_Y_Y_Ym256
+  | Vmulpd_X_X_Xm128
+  | Vmulpd_Y_Y_Ym256
+  | Vmulps_X_X_Xm128
+  | Vmulps_Y_Y_Ym256
+  | Vmulsd
+  | Vmulss
+  | Vorpd_X_X_Xm128
+  | Vorpd_Y_Y_Ym256
+  | Vorps_X_X_Xm128
+  | Vorps_Y_Y_Ym256
+  | Vpabsb_X_Xm128
+  | Vpabsb_Y_Ym256
+  | Vpabsd_X_Xm128
+  | Vpabsd_Y_Ym256
+  | Vpabsw_X_Xm128
+  | Vpabsw_Y_Ym256
+  | Vpackssdw_X_X_Xm128
+  | Vpackssdw_Y_Y_Ym256
+  | Vpacksswb_X_X_Xm128
+  | Vpacksswb_Y_Y_Ym256
+  | Vpackusdw_X_X_Xm128
+  | Vpackusdw_Y_Y_Ym256
+  | Vpackuswb_X_X_Xm128
+  | Vpackuswb_Y_Y_Ym256
+  | Vpaddb_X_X_Xm128
+  | Vpaddb_Y_Y_Ym256
+  | Vpaddd_X_X_Xm128
+  | Vpaddd_Y_Y_Ym256
+  | Vpaddq_X_X_Xm128
+  | Vpaddq_Y_Y_Ym256
+  | Vpaddsb_X_X_Xm128
+  | Vpaddsb_Y_Y_Ym256
+  | Vpaddsw_X_X_Xm128
+  | Vpaddsw_Y_Y_Ym256
+  | Vpaddusb_X_X_Xm128
+  | Vpaddusb_Y_Y_Ym256
+  | Vpaddusw_X_X_Xm128
+  | Vpaddusw_Y_Y_Ym256
+  | Vpaddw_X_X_Xm128
+  | Vpaddw_Y_Y_Ym256
+  | Vpalignr_X_X_Xm128
+  | Vpalignr_Y_Y_Ym256
+  | Vpand_X_X_Xm128
+  | Vpand_Y_Y_Ym256
+  | Vpandn_X_X_Xm128
+  | Vpandn_Y_Y_Ym256
+  | Vpavgb_X_X_Xm128
+  | Vpavgb_Y_Y_Ym256
+  | Vpavgw_X_X_Xm128
+  | Vpavgw_Y_Y_Ym256
+  | Vpblendd_X_X_Xm128
+  | Vpblendd_Y_Y_Ym256
+  | Vpblendvb_X_X_Xm128_X
+  | Vpblendvb_Y_Y_Ym256_Y
+  | Vpblendw_X_X_Xm128
+  | Vpblendw_Y_Y_Ym256
+  | Vpbroadcastb_X_Xm8
+  | Vpbroadcastb_Y_Xm8
+  | Vpbroadcastd_X_Xm32
+  | Vpbroadcastd_Y_Xm32
+  | Vpbroadcastq_X_Xm64
+  | Vpbroadcastq_Y_Xm64
+  | Vpbroadcastw_X_Xm16
+  | Vpbroadcastw_Y_Xm16
+  | Vpclmulqdq
+  | Vpcmpeqb_X_X_Xm128
+  | Vpcmpeqb_Y_Y_Ym256
+  | Vpcmpeqd_X_X_Xm128
+  | Vpcmpeqd_Y_Y_Ym256
+  | Vpcmpeqq_X_X_Xm128
+  | Vpcmpeqq_Y_Y_Ym256
+  | Vpcmpeqw_X_X_Xm128
+  | Vpcmpeqw_Y_Y_Ym256
+  | Vpcmpestri
+  | Vpcmpestrm
+  | Vpcmpgtb_X_X_Xm128
+  | Vpcmpgtb_Y_Y_Ym256
+  | Vpcmpgtd_X_X_Xm128
+  | Vpcmpgtd_Y_Y_Ym256
+  | Vpcmpgtq_X_X_Xm128
+  | Vpcmpgtq_Y_Y_Ym256
+  | Vpcmpgtw_X_X_Xm128
+  | Vpcmpgtw_Y_Y_Ym256
+  | Vpcmpistri
+  | Vpcmpistrm
+  | Vperm2f128
+  | Vperm2i128
+  | Vpermd
+  | Vpermilpd_X_X_Xm128
+  | Vpermilpd_X_Xm128
+  | Vpermilpd_Y_Y_Ym256
+  | Vpermilpd_Y_Ym256
+  | Vpermilps_X_X_Xm128
+  | Vpermilps_X_Xm128
+  | Vpermilps_Y_Y_Ym256
+  | Vpermilps_Y_Ym256
+  | Vpermpd
+  | Vpermps
+  | Vpermq
+  | Vpextrb
+  | Vpextrd
+  | Vpextrq
+  | Vpextrw_r64_X
+  | Vpextrw_r64m16_X
+  | Vpgatherdd_X_M32X_X
+  | Vpgatherdd_Y_M32Y_Y
+  | Vpgatherdq_X_M32X_X
+  | Vpgatherdq_Y_M32X_Y
+  | Vpgatherqd_X_M64X_X
+  | Vpgatherqd_X_M64Y_X
+  | Vpgatherqq_X_M64X_X
+  | Vpgatherqq_Y_M64Y_Y
+  | Vphaddd_X_X_Xm128
+  | Vphaddd_Y_Y_Ym256
+  | Vphaddsw_X_X_Xm128
+  | Vphaddsw_Y_Y_Ym256
+  | Vphaddw_X_X_Xm128
+  | Vphaddw_Y_Y_Ym256
+  | Vphminposuw
+  | Vphsubd_X_X_Xm128
+  | Vphsubd_Y_Y_Ym256
+  | Vphsubsw_X_X_Xm128
+  | Vphsubsw_Y_Y_Ym256
+  | Vphsubw_X_X_Xm128
+  | Vphsubw_Y_Y_Ym256
+  | Vpinsrb
+  | Vpinsrd
+  | Vpinsrq
+  | Vpinsrw
+  | Vpmaddubsw_X_X_Xm128
+  | Vpmaddubsw_Y_Y_Ym256
+  | Vpmaddwd_X_X_Xm128
+  | Vpmaddwd_Y_Y_Ym256
+  | Vpmaskmovd_X_X_m128
+  | Vpmaskmovd_Y_Y_m256
+  | Vpmaskmovd_m128_X_X
+  | Vpmaskmovd_m256_Y_Y
+  | Vpmaskmovq_X_X_m128
+  | Vpmaskmovq_Y_Y_m256
+  | Vpmaskmovq_m128_X_X
+  | Vpmaskmovq_m256_Y_Y
+  | Vpmaxsb_X_X_Xm128
+  | Vpmaxsb_Y_Y_Ym256
+  | Vpmaxsd_X_X_Xm128
+  | Vpmaxsd_Y_Y_Ym256
+  | Vpmaxsw_X_X_Xm128
+  | Vpmaxsw_Y_Y_Ym256
+  | Vpmaxub_X_X_Xm128
+  | Vpmaxub_Y_Y_Ym256
+  | Vpmaxud_X_X_Xm128
+  | Vpmaxud_Y_Y_Ym256
+  | Vpmaxuw_X_X_Xm128
+  | Vpmaxuw_Y_Y_Ym256
+  | Vpminsb_X_X_Xm128
+  | Vpminsb_Y_Y_Ym256
+  | Vpminsd_X_X_Xm128
+  | Vpminsd_Y_Y_Ym256
+  | Vpminsw_X_X_Xm128
+  | Vpminsw_Y_Y_Ym256
+  | Vpminub_X_X_Xm128
+  | Vpminub_Y_Y_Ym256
+  | Vpminud_X_X_Xm128
+  | Vpminud_Y_Y_Ym256
+  | Vpminuw_X_X_Xm128
+  | Vpminuw_Y_Y_Ym256
+  | Vpmovmskb_r64_X
+  | Vpmovmskb_r64_Y
+  | Vpmovsxbd_X_Xm32
+  | Vpmovsxbd_Y_Xm64
+  | Vpmovsxbq_X_Xm16
+  | Vpmovsxbq_Y_Xm32
+  | Vpmovsxbw_X_Xm64
+  | Vpmovsxbw_Y_Xm128
+  | Vpmovsxdq_X_Xm64
+  | Vpmovsxdq_Y_Xm128
+  | Vpmovsxwd_X_Xm64
+  | Vpmovsxwd_Y_Xm128
+  | Vpmovsxwq_X_Xm32
+  | Vpmovsxwq_Y_Xm64
+  | Vpmovzxbd_X_Xm32
+  | Vpmovzxbd_Y_Xm64
+  | Vpmovzxbq_X_Xm16
+  | Vpmovzxbq_Y_Xm32
+  | Vpmovzxbw_X_Xm64
+  | Vpmovzxbw_Y_Xm128
+  | Vpmovzxdq_X_Xm64
+  | Vpmovzxdq_Y_Xm128
+  | Vpmovzxwd_X_Xm64
+  | Vpmovzxwd_Y_Xm128
+  | Vpmovzxwq_X_Xm32
+  | Vpmovzxwq_Y_Xm64
+  | Vpmuldq_X_X_Xm128
+  | Vpmuldq_Y_Y_Ym256
+  | Vpmulhrsw_X_X_Xm128
+  | Vpmulhrsw_Y_Y_Ym256
+  | Vpmulhuw_X_X_Xm128
+  | Vpmulhuw_Y_Y_Ym256
+  | Vpmulhw_X_X_Xm128
+  | Vpmulhw_Y_Y_Ym256
+  | Vpmulld_X_X_Xm128
+  | Vpmulld_Y_Y_Ym256
+  | Vpmullw_X_X_Xm128
+  | Vpmullw_Y_Y_Ym256
+  | Vpmuludq_X_X_Xm128
+  | Vpmuludq_Y_Y_Ym256
+  | Vpor_X_X_Xm128
+  | Vpor_Y_Y_Ym256
+  | Vpsadbw_X_X_Xm128
+  | Vpsadbw_Y_Y_Ym256
+  | Vpshufb_X_X_Xm128
+  | Vpshufb_Y_Y_Ym256
+  | Vpshufd_X_Xm128
+  | Vpshufd_Y_Ym256
+  | Vpshufhw_X_Xm128
+  | Vpshufhw_Y_Ym256
+  | Vpshuflw_X_Xm128
+  | Vpshuflw_Y_Ym256
+  | Vpsignb_X_X_Xm128
+  | Vpsignb_Y_Y_Ym256
+  | Vpsignd_X_X_Xm128
+  | Vpsignd_Y_Y_Ym256
+  | Vpsignw_X_X_Xm128
+  | Vpsignw_Y_Y_Ym256
+  | Vpslld_X_X
+  | Vpslld_X_X_Xm128
+  | Vpslld_Y_Y
+  | Vpslld_Y_Y_Xm128
+  | Vpslldq_X_X
+  | Vpslldq_Y_Y
+  | Vpsllq_X_X
+  | Vpsllq_X_X_Xm128
+  | Vpsllq_Y_Y
+  | Vpsllq_Y_Y_Xm128
+  | Vpsllvd_X_X_Xm128
+  | Vpsllvd_Y_Y_Ym256
+  | Vpsllvq_X_X_Xm128
+  | Vpsllvq_Y_Y_Ym256
+  | Vpsllw_X_X
+  | Vpsllw_X_X_Xm128
+  | Vpsllw_Y_Y
+  | Vpsllw_Y_Y_Xm128
+  | Vpsrad_X_X
+  | Vpsrad_X_X_Xm128
+  | Vpsrad_Y_Y
+  | Vpsrad_Y_Y_Xm128
+  | Vpsravd_X_X_Xm128
+  | Vpsravd_Y_Y_Ym256
+  | Vpsraw_X_X
+  | Vpsraw_X_X_Xm128
+  | Vpsraw_Y_Y
+  | Vpsraw_Y_Y_Xm128
+  | Vpsrld_X_X
+  | Vpsrld_X_X_Xm128
+  | Vpsrld_Y_Y
+  | Vpsrld_Y_Y_Xm128
+  | Vpsrldq_X_X
+  | Vpsrldq_Y_Y
+  | Vpsrlq_X_X
+  | Vpsrlq_X_X_Xm128
+  | Vpsrlq_Y_Y
+  | Vpsrlq_Y_Y_Xm128
+  | Vpsrlvd_X_X_Xm128
+  | Vpsrlvd_Y_Y_Ym256
+  | Vpsrlvq_X_X_Xm128
+  | Vpsrlvq_Y_Y_Ym256
+  | Vpsrlw_X_X
+  | Vpsrlw_X_X_Xm128
+  | Vpsrlw_Y_Y
+  | Vpsrlw_Y_Y_Xm128
+  | Vpsubb_X_X_Xm128
+  | Vpsubb_Y_Y_Ym256
+  | Vpsubd_X_X_Xm128
+  | Vpsubd_Y_Y_Ym256
+  | Vpsubq_X_X_Xm128
+  | Vpsubq_Y_Y_Ym256
+  | Vpsubsb_X_X_Xm128
+  | Vpsubsb_Y_Y_Ym256
+  | Vpsubsw_X_X_Xm128
+  | Vpsubsw_Y_Y_Ym256
+  | Vpsubusb_X_X_Xm128
+  | Vpsubusb_Y_Y_Ym256
+  | Vpsubusw_X_X_Xm128
+  | Vpsubusw_Y_Y_Ym256
+  | Vpsubw_X_X_Xm128
+  | Vpsubw_Y_Y_Ym256
+  | Vptest_r64_X_Xm128
+  | Vptest_r64_Y_Ym256
+  | Vpunpckhbw_X_X_Xm128
+  | Vpunpckhbw_Y_Y_Ym256
+  | Vpunpckhdq_X_X_Xm128
+  | Vpunpckhdq_Y_Y_Ym256
+  | Vpunpckhqdq_X_X_Xm128
+  | Vpunpckhqdq_Y_Y_Ym256
+  | Vpunpckhwd_X_X_Xm128
+  | Vpunpckhwd_Y_Y_Ym256
+  | Vpunpcklbw_X_X_Xm128
+  | Vpunpcklbw_Y_Y_Ym256
+  | Vpunpckldq_X_X_Xm128
+  | Vpunpckldq_Y_Y_Ym256
+  | Vpunpcklqdq_X_X_Xm128
+  | Vpunpcklqdq_Y_Y_Ym256
+  | Vpunpcklwd_X_X_Xm128
+  | Vpunpcklwd_Y_Y_Ym256
+  | Vpxor_X_X_Xm128
+  | Vpxor_Y_Y_Ym256
+  | Vrcpps_X_Xm128
+  | Vrcpps_Y_Ym256
+  | Vrcpss
+  | Vroundpd_X_Xm128
+  | Vroundpd_Y_Ym256
+  | Vroundps_X_Xm128
+  | Vroundps_Y_Ym256
+  | Vroundsd
+  | Vroundss
+  | Vrsqrtps_X_Xm128
+  | Vrsqrtps_Y_Ym256
+  | Vrsqrtss
+  | Vshufpd_X_X_Xm128
+  | Vshufpd_Y_Y_Ym256
+  | Vshufps_X_X_Xm128
+  | Vshufps_Y_Y_Ym256
+  | Vsqrtpd_X_Xm128
+  | Vsqrtpd_Y_Ym256
+  | Vsqrtps_X_Xm128
+  | Vsqrtps_Y_Ym256
+  | Vsqrtsd
+  | Vsqrtss
+  | Vstmxcsr
+  | Vsubpd_X_X_Xm128
+  | Vsubpd_Y_Y_Ym256
+  | Vsubps_X_X_Xm128
+  | Vsubps_Y_Y_Ym256
+  | Vsubsd
+  | Vsubss
+  | Vtestpd_X_Xm128
+  | Vtestpd_Y_Ym256
+  | Vtestps_X_Xm128
+  | Vtestps_Y_Ym256
+  | Vucomisd
+  | Vucomiss
+  | Vunpckhpd_X_X_Xm128
+  | Vunpckhpd_Y_Y_Ym256
+  | Vunpckhps_X_X_Xm128
+  | Vunpckhps_Y_Y_Ym256
+  | Vunpcklpd_X_X_Xm128
+  | Vunpcklpd_Y_Y_Ym256
+  | Vunpcklps_X_X_Xm128
+  | Vunpcklps_Y_Y_Ym256
+  | Vxorpd_X_X_Xm128
+  | Vxorpd_Y_Y_Ym256
+  | Vxorps_X_X_Xm128
+  | Vxorps_Y_Y_Ym256
+  | Vzeroall
+  | Vzeroupper
+  | Xorpd
+  | Xorps
 
 type nonrec instr = id instr
 
-let pmovmskb_r64_X = {
-    id = Pmovmskb_r64_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovmskb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 215 }
-}
-let addsubps = {
-    id = Addsubps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "addsubps"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 208 }
-}
-let psraw_X = {
-    id = Psraw_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "psraw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 4; opcode = 113 }
-}
-let movq_Xm64_X = {
-    id = Movq_Xm64_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|XMM;M64|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 214 }
-}
-let sqrtpd = {
-    id = Sqrtpd
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "sqrtpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
-}
-let pmaxub_X_Xm128 = {
-    id = Pmaxub_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaxub"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 222 }
-}
-let movaps_Xm128_X = {
-    id = Movaps_Xm128_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|XMM;M128|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movaps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
-}
-let addsd = {
-    id = Addsd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "addsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
-}
-let rcpps = {
-    id = Rcpps
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "rcpps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 83 }
-}
-let maxsd = {
-    id = Maxsd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "maxsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
-}
-let subps = {
-    id = Subps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "subps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
-}
-let movd_X_r32m32 = {
-    id = Movd_X_r32m32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 110 }
-}
-let divss = {
-    id = Divss
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "divss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
-}
-let punpckhqdq = {
-    id = Punpckhqdq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "punpckhqdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 109 }
-}
-let shrx_r32_r32m32_r32 = {
-    id = Shrx_r32_r32m32_r32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "shrx"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 247 }
-}
-let pextrw_r64_X = {
-    id = Pextrw_r64_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "pextrw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 197 }
-}
-let pcmpeqb = {
-    id = Pcmpeqb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pcmpeqb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 116 }
-}
-let pminud = {
-    id = Pminud
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pminud"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 59 }
-}
-let movmskpd = {
-    id = Movmskpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movmskpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 80 }
-}
-let psllq_X_Xm128 = {
-    id = Psllq_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psllq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 243 }
-}
-let movd_X_r32m32 = {
-    id = Movd_X_r32m32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
-}
-let pinsrb = {
-    id = Pinsrb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|R32;M8|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pinsrb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 32 }
-}
-let bzhi_r64_r64m64_r64 = {
-    id = Bzhi_r64_r64m64_r64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "bzhi"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 245 }
-}
-let psllq_X = {
-    id = Psllq_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "psllq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 115 }
-}
-let unpckhps = {
-    id = Unpckhps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "unpckhps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 21 }
-}
-let mulpd = {
-    id = Mulpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "mulpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
-}
-let phaddsw_M_Mm64 = {
-    id = Phaddsw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phaddsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 3 }
-}
-let cvtsi2sd_X_r64m64 = {
-    id = Cvtsi2sd_X_r64m64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtsi2sd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
-}
-let minps = {
-    id = Minps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "minps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
-}
-let pavgw_X_Xm128 = {
-    id = Pavgw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pavgw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 227 }
-}
-let movups_Xm128_X = {
-    id = Movups_Xm128_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|XMM;M128|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movups"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
-}
-let movss_Xm32_X = {
-    id = Movss_Xm32_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|XMM;M32|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
-}
-let blendps = {
-    id = Blendps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "blendps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 12 }
-}
-let cvttsd2si_r64_Xm64 = {
-    id = Cvttsd2si_r64_Xm64
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvttsd2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
-}
-let movntpd = {
-    id = Movntpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|M128|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movntpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 43 }
-}
-let crc32_r64_r8m8 = {
-    id = Crc32_r64_r8m8
-  ; args = [|{ loc = Temp [|R64|]; enc = RM_r };{ loc = Temp [|R8;M8|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F38 }; rm_reg = Reg; opcode = 240 }
-}
-let pcmpeqd = {
-    id = Pcmpeqd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pcmpeqd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 118 }
-}
-let pmulhrsw_M_Mm64 = {
-    id = Pmulhrsw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmulhrsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 11 }
-}
-let pmuludq_X_Xm128 = {
-    id = Pmuludq_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmuludq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 244 }
-}
-let addps = {
-    id = Addps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "addps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
-}
-let sqrtps = {
-    id = Sqrtps
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "sqrtps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
-}
-let pcmpgtb = {
-    id = Pcmpgtb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pcmpgtb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 100 }
-}
-let sqrtsd = {
-    id = Sqrtsd
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "sqrtsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
-}
-let movntdqa = {
-    id = Movntdqa
-  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movntdqa"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 42 }
-}
-let psubsb = {
-    id = Psubsb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 232 }
-}
-let roundss = {
-    id = Roundss
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "roundss"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 10 }
-}
-let pext_r32_r32_r32m32 = {
-    id = Pext_r32_r32_r32m32
-  ; args = [|{ loc = Temp [|R32|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pext"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 245 }
-}
-let pinsrd = {
-    id = Pinsrd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pinsrd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 34 }
-}
-let subpd = {
-    id = Subpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "subpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
-}
-let pmulhw = {
-    id = Pmulhw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmulhw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 229 }
-}
-let pminsw_M_Mm64 = {
-    id = Pminsw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pminsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 234 }
-}
-let paddusw = {
-    id = Paddusw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "paddusw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 221 }
-}
-let cvtsi2ss_X_r32m32 = {
-    id = Cvtsi2ss_X_r32m32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtsi2ss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
-}
-let blendvpd = {
-    id = Blendvpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin XMM0; enc = Implicit }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "blendvpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 21 }
-}
-let movsd_X_m64 = {
-    id = Movsd_X_m64
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
-}
-let movsd_X_X = {
-    id = Movsd_X_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
-}
-let ptest = {
-    id = Ptest
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "ptest"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 23 }
-}
-let pext_r64_r64_r64m64 = {
-    id = Pext_r64_r64_r64m64
-  ; args = [|{ loc = Temp [|R64|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pext"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 245 }
-}
-let rcpss = {
-    id = Rcpss
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "rcpss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 83 }
-}
-let movhpd_X_m64 = {
-    id = Movhpd_X_m64
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movhpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
-}
-let psignw_X_Xm128 = {
-    id = Psignw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psignw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 9 }
-}
-let pmulld = {
-    id = Pmulld
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmulld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 64 }
-}
-let phaddsw_X_Xm128 = {
-    id = Phaddsw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phaddsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 3 }
-}
-let pshufd = {
-    id = Pshufd
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "pshufd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
-}
-let pdep_r32_r32_r32m32 = {
-    id = Pdep_r32_r32_r32m32
-  ; args = [|{ loc = Temp [|R32|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pdep"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 245 }
-}
-let pmovsxbw = {
-    id = Pmovsxbw
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovsxbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 32 }
-}
-let movupd_Xm128_X = {
-    id = Movupd_Xm128_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|XMM;M128|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movupd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
-}
-let movntdq = {
-    id = Movntdq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|M128|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movntdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 231 }
-}
-let crc32_r32_r32m32 = {
-    id = Crc32_r32_r32m32
-  ; args = [|{ loc = Temp [|R32|]; enc = RM_r };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
-}
-let crc32_r32_r16m16 = {
-    id = Crc32_r32_r16m16
-  ; args = [|{ loc = Temp [|R32|]; enc = RM_r };{ loc = Temp [|R16;M16|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
-}
-let psrldq = {
-    id = Psrldq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "psrldq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 3; opcode = 115 }
-}
-let pabsb_M_Mm64 = {
-    id = Pabsb_M_Mm64
-  ; args = [|{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|MM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pabsb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 28 }
-}
-let pcmpeqq = {
-    id = Pcmpeqq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pcmpeqq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 41 }
-}
-let paddusb = {
-    id = Paddusb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "paddusb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 220 }
-}
-let cvtpd2ps = {
-    id = Cvtpd2ps
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtpd2ps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
-}
-let psraw_X_Xm128 = {
-    id = Psraw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psraw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 225 }
-}
-let shlx_r64_r64m64_r64 = {
-    id = Shlx_r64_r64m64_r64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "shlx"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 247 }
-}
-let phsubsw_X_Xm128 = {
-    id = Phsubsw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phsubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 7 }
-}
-let psubb = {
-    id = Psubb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 248 }
-}
-let paddd = {
-    id = Paddd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "paddd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 254 }
-}
-let movmskps = {
-    id = Movmskps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movmskps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 80 }
-}
-let psrld_X = {
-    id = Psrld_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "psrld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 114 }
-}
-let movdqu_X_Xm128 = {
-    id = Movdqu_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movdqu"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 111 }
-}
-let subsd = {
-    id = Subsd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "subsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
-}
-let extractps = {
-    id = Extractps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|R64;M32|]; enc = RM_rm }
-  ; imm = true
-  ; mnemonic = "extractps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 23 }
-}
-let crc32_r32_r8m8 = {
-    id = Crc32_r32_r8m8
-  ; args = [|{ loc = Temp [|R32|]; enc = RM_r };{ loc = Temp [|R8;M8|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 240 }
-}
-let psubq_X_Xm128 = {
-    id = Psubq_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 251 }
-}
-let movapd_Xm128_X = {
-    id = Movapd_Xm128_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|XMM;M128|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movapd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
-}
-let pmaxsd = {
-    id = Pmaxsd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaxsd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 61 }
-}
-let paddw = {
-    id = Paddw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "paddw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 253 }
-}
-let cvttss2si_r32_Xm32 = {
-    id = Cvttss2si_r32_Xm32
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvttss2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
-}
-let movlhps = {
-    id = Movlhps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movlhps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
-}
-let cvtsd2si_r64_Xm64 = {
-    id = Cvtsd2si_r64_Xm64
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtsd2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
-}
-let pmovsxbq = {
-    id = Pmovsxbq
-  ; args = [|{ loc = Temp [|XMM;M16|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovsxbq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 34 }
-}
-let pslldq = {
-    id = Pslldq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pslldq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 7; opcode = 115 }
-}
-let pmaddwd = {
-    id = Pmaddwd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaddwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 245 }
-}
-let pmovsxbd = {
-    id = Pmovsxbd
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovsxbd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 33 }
-}
-let pmulhuw_X_Xm128 = {
-    id = Pmulhuw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmulhuw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 228 }
-}
-let psrlq_X = {
-    id = Psrlq_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "psrlq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 115 }
-}
-let cvtsd2si_r32_Xm64 = {
-    id = Cvtsd2si_r32_Xm64
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtsd2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
-}
-let roundsd = {
-    id = Roundsd
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "roundsd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 11 }
-}
-let por = {
-    id = Por
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "por"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 235 }
-}
-let punpckhbw = {
-    id = Punpckhbw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "punpckhbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 104 }
-}
-let pmaxud = {
-    id = Pmaxud
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaxud"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 63 }
-}
-let psllw_X = {
-    id = Psllw_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "psllw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 113 }
-}
-let movsldup = {
-    id = Movsldup
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movsldup"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
-}
-let psubd = {
-    id = Psubd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 250 }
-}
-let movq_X_r64m64 = {
-    id = Movq_X_r64m64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 110 }
-}
-let xorpd = {
-    id = Xorpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "xorpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 87 }
-}
-let pmaddubsw_M_Mm64 = {
-    id = Pmaddubsw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaddubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 4 }
-}
-let pmaxuw = {
-    id = Pmaxuw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaxuw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 62 }
-}
-let cvtsi2ss_X_r64m64 = {
-    id = Cvtsi2ss_X_r64m64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtsi2ss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
-}
-let psrad_X = {
-    id = Psrad_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "psrad"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 4; opcode = 114 }
-}
-let pextrd = {
-    id = Pextrd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|R32;M32|]; enc = RM_rm }
-  ; imm = true
-  ; mnemonic = "pextrd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 22 }
-}
-let pcmpestrm = {
-    id = Pcmpestrm
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin RAX; enc = Implicit };{ loc = Pin RDX; enc = Implicit }|]
-  ; res = Res { loc = Pin XMM0; enc = Implicit }
-  ; imm = true
-  ; mnemonic = "pcmpestrm"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 96 }
-}
-let rsqrtss = {
-    id = Rsqrtss
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "rsqrtss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 82 }
-}
-let psignd_X_Xm128 = {
-    id = Psignd_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psignd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 10 }
-}
-let pmullw = {
-    id = Pmullw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmullw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 213 }
-}
-let pabsd_X_Xm128 = {
-    id = Pabsd_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pabsd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 30 }
-}
-let phaddd_M_Mm64 = {
-    id = Phaddd_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phaddd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 2 }
-}
-let cvtps2pd = {
-    id = Cvtps2pd
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtps2pd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
-}
-let andnps = {
-    id = Andnps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "andnps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 85 }
-}
-let sqrtss = {
-    id = Sqrtss
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "sqrtss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
-}
-let phaddw_X_Xm128 = {
-    id = Phaddw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phaddw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 1 }
-}
 let addpd = {
     id = Addpd
+  ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
+  ; imm = Imm_none
   ; mnemonic = "addpd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
 }
-let pmovzxdq = {
-    id = Pmovzxdq
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovzxdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 53 }
-}
-let shufpd = {
-    id = Shufpd
+let addps = {
+    id = Addps
+  ; ext = [|SSE|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = true
-  ; mnemonic = "shufpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 198 }
+  ; imm = Imm_none
+  ; mnemonic = "addps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
 }
-let pinsrw_X_r32m16 = {
-    id = Pinsrw_X_r32m16
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|R32;M16|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pinsrw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 196 }
-}
-let psignw_M_Mm64 = {
-    id = Psignw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psignw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 9 }
-}
-let phsubd_X_Xm128 = {
-    id = Phsubd_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phsubd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 6 }
-}
-let shlx_r32_r32m32_r32 = {
-    id = Shlx_r32_r32m32_r32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "shlx"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 247 }
-}
-let punpcklbw = {
-    id = Punpcklbw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "punpcklbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 96 }
-}
-let paddb = {
-    id = Paddb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "paddb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 252 }
-}
-let pminsw_X_Xm128 = {
-    id = Pminsw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pminsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 234 }
-}
-let cvtpd2dq = {
-    id = Cvtpd2dq
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtpd2dq"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
-}
-let psadbw_X_Xm128 = {
-    id = Psadbw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psadbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 246 }
-}
-let pmovsxdq = {
-    id = Pmovsxdq
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovsxdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 37 }
-}
-let haddpd = {
-    id = Haddpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "haddpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 124 }
-}
-let mulss = {
-    id = Mulss
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "mulss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
-}
-let cmpsd = {
-    id = Cmpsd
+let addsd = {
+    id = Addsd
+  ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = true
-  ; mnemonic = "cmpsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
-}
-let movddup = {
-    id = Movddup
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movddup"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
-}
-let cvtsi2sd_X_r32m32 = {
-    id = Cvtsi2sd_X_r32m32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtsi2sd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
-}
-let cvtss2sd = {
-    id = Cvtss2sd
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtss2sd"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
-}
-let andpd = {
-    id = Andpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "andpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 84 }
-}
-let pminuw = {
-    id = Pminuw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pminuw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 58 }
-}
-let psrad_X_Xm128 = {
-    id = Psrad_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psrad"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 226 }
-}
-let packusdw = {
-    id = Packusdw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "packusdw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 43 }
-}
-let phsubw_X_Xm128 = {
-    id = Phsubw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phsubw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 5 }
-}
-let rorx_r32_r32m32 = {
-    id = Rorx_r32_r32m32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "rorx"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 240 }
-}
-let pclmulqdq = {
-    id = Pclmulqdq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pclmulqdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 68 }
-}
-let pshufb_M_Mm64 = {
-    id = Pshufb_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pshufb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 0 }
-}
-let phaddw_M_Mm64 = {
-    id = Phaddw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phaddw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 1 }
-}
-let paddsw = {
-    id = Paddsw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "paddsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 237 }
-}
-let phminposuw = {
-    id = Phminposuw
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "phminposuw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 65 }
-}
-let pminsb = {
-    id = Pminsb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pminsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 56 }
-}
-let rorx_r64_r64m64 = {
-    id = Rorx_r64_r64m64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "rorx"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 240 }
-}
-let pblendw = {
-    id = Pblendw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pblendw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 14 }
-}
-let andnpd = {
-    id = Andnpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "andnpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 85 }
-}
-let pextrb = {
-    id = Pextrb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|R64;M8|]; enc = RM_rm }
-  ; imm = true
-  ; mnemonic = "pextrb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 20 }
-}
-let mulsd = {
-    id = Mulsd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "mulsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
-}
-let psubusb = {
-    id = Psubusb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubusb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 216 }
-}
-let pminsd = {
-    id = Pminsd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pminsd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 57 }
-}
-let pmaxub_M_Mm64 = {
-    id = Pmaxub_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaxub"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 222 }
-}
-let psrld_X_Xm128 = {
-    id = Psrld_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psrld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 210 }
-}
-let movntps = {
-    id = Movntps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|M128|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movntps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 43 }
-}
-let palignr_M_Mm64 = {
-    id = Palignr_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "palignr"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 15 }
-}
-let cvtdq2pd = {
-    id = Cvtdq2pd
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtdq2pd"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
-}
-let pcmpistrm = {
-    id = Pcmpistrm
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Pin XMM0; enc = Implicit }
-  ; imm = true
-  ; mnemonic = "pcmpistrm"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 98 }
+  ; imm = Imm_none
+  ; mnemonic = "addsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
 }
 let addss = {
     id = Addss
+  ; ext = [|SSE|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
+  ; imm = Imm_none
   ; mnemonic = "addss"
   ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
 }
-let comiss = {
-    id = Comiss
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "comiss"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 47 }
-}
-let shufps = {
-    id = Shufps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "shufps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 198 }
-}
-let rsqrtps = {
-    id = Rsqrtps
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "rsqrtps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 82 }
-}
-let movlpd_X_m64 = {
-    id = Movlpd_X_m64
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movlpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
-}
-let psrlw_X_Xm128 = {
-    id = Psrlw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psrlw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 209 }
-}
-let minsd = {
-    id = Minsd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "minsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
-}
-let cvtss2si_r32_Xm32 = {
-    id = Cvtss2si_r32_Xm32
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtss2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
-}
-let pslld_X_Xm128 = {
-    id = Pslld_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pslld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 242 }
-}
-let movapd_X_Xm128 = {
-    id = Movapd_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movapd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 40 }
-}
-let hsubps = {
-    id = Hsubps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "hsubps"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 125 }
-}
-let andps = {
-    id = Andps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "andps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 84 }
-}
-let dpps = {
-    id = Dpps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "dpps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 64 }
-}
-let pextrw_r64_M = {
-    id = Pextrw_r64_M
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "pextrw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 197 }
-}
-let cvtdq2ps = {
-    id = Cvtdq2ps
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtdq2ps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 91 }
-}
-let pcmpeqw = {
-    id = Pcmpeqw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pcmpeqw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 117 }
-}
-let psignb_M_Mm64 = {
-    id = Psignb_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psignb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 8 }
-}
-let psllw_X_Xm128 = {
-    id = Psllw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psllw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 241 }
-}
-let punpckhdq = {
-    id = Punpckhdq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "punpckhdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 106 }
-}
-let phsubd_M_Mm64 = {
-    id = Phsubd_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phsubd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 6 }
-}
-let movlps_m64_X = {
-    id = Movlps_m64_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|M64|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movlps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 19 }
-}
-let pxor = {
-    id = Pxor
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pxor"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 239 }
-}
-let maxpd = {
-    id = Maxpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "maxpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
-}
-let pmovsxwq = {
-    id = Pmovsxwq
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovsxwq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 36 }
-}
-let phsubsw_M_Mm64 = {
-    id = Phsubsw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phsubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 7 }
-}
-let pmulhuw_M_Mm64 = {
-    id = Pmulhuw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmulhuw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 228 }
-}
-let maskmovdqu = {
-    id = Maskmovdqu
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "maskmovdqu"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 247 }
-}
-let movlps_X_m64 = {
-    id = Movlps_X_m64
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movlps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
-}
-let pinsrw_M_r32m16 = {
-    id = Pinsrw_M_r32m16
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|R32;M16|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pinsrw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 196 }
-}
-let cvtss2si_r64_Xm32 = {
-    id = Cvtss2si_r64_Xm32
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtss2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
-}
-let hsubpd = {
-    id = Hsubpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "hsubpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 125 }
-}
-let movq_X_Xm64 = {
-    id = Movq_X_Xm64
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
-}
-let movaps_X_Xm128 = {
-    id = Movaps_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movaps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 40 }
-}
-let punpcklwd = {
-    id = Punpcklwd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "punpcklwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 97 }
-}
-let blendvps = {
-    id = Blendvps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin XMM0; enc = Implicit }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "blendvps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 20 }
-}
-let mpsadbw = {
-    id = Mpsadbw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "mpsadbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 66 }
-}
-let pavgb_X_Xm128 = {
-    id = Pavgb_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pavgb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 224 }
-}
-let movdqa_X_Xm128 = {
-    id = Movdqa_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movdqa"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 111 }
-}
-let pblendvb = {
-    id = Pblendvb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin XMM0; enc = Implicit }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pblendvb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 16 }
-}
-let pmovzxwq = {
-    id = Pmovzxwq
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovzxwq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 52 }
-}
-let unpcklps = {
-    id = Unpcklps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "unpcklps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 20 }
-}
-let bzhi_r32_r32m32_r32 = {
-    id = Bzhi_r32_r32m32_r32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "bzhi"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 245 }
-}
-let pminub_X_Xm128 = {
-    id = Pminub_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pminub"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 218 }
-}
-let psubsw = {
-    id = Psubsw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 233 }
-}
-let ucomisd = {
-    id = Ucomisd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "ucomisd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 46 }
-}
-let pmovzxbq = {
-    id = Pmovzxbq
-  ; args = [|{ loc = Temp [|XMM;M16|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovzxbq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 50 }
-}
-let movlpd_m64_X = {
-    id = Movlpd_m64_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|M64|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movlpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 19 }
-}
-let pmovzxwd = {
-    id = Pmovzxwd
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovzxwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 51 }
-}
-let pavgw_M_Mm64 = {
-    id = Pavgw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pavgw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 227 }
-}
-let xorps = {
-    id = Xorps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "xorps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 87 }
-}
-let cvttps2dq = {
-    id = Cvttps2dq
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvttps2dq"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 91 }
-}
-let unpckhpd = {
-    id = Unpckhpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "unpckhpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 21 }
-}
-let paddq = {
-    id = Paddq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "paddq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 212 }
-}
-let cmppd = {
-    id = Cmppd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "cmppd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
-}
-let sarx_r32_r32m32_r32 = {
-    id = Sarx_r32_r32m32_r32
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "sarx"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 247 }
-}
-let movsd_Xm64_X = {
-    id = Movsd_Xm64_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|XMM;M64|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
-}
-let pavgb_M_Mm64 = {
-    id = Pavgb_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pavgb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 224 }
-}
-let cvttss2si_r64_Xm32 = {
-    id = Cvttss2si_r64_Xm32
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvttss2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
-}
-let psubusw = {
-    id = Psubusw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubusw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 217 }
-}
-let unpcklpd = {
-    id = Unpcklpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "unpcklpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 20 }
-}
-let pmuldq = {
-    id = Pmuldq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmuldq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 40 }
-}
-let cmpps = {
-    id = Cmpps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "cmpps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
-}
-let pcmpgtd = {
-    id = Pcmpgtd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pcmpgtd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 102 }
-}
-let pand = {
-    id = Pand
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pand"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 219 }
-}
-let pcmpgtq = {
-    id = Pcmpgtq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pcmpgtq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 55 }
-}
-let pabsd_M_Mm64 = {
-    id = Pabsd_M_Mm64
-  ; args = [|{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|MM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pabsd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 30 }
-}
-let crc32_r64_r64m64 = {
-    id = Crc32_r64_r64m64
-  ; args = [|{ loc = Temp [|R64|]; enc = RM_r };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
-}
-let movupd_X_Xm128 = {
-    id = Movupd_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movupd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
-}
-let pslld_X = {
-    id = Pslld_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pslld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 114 }
-}
-let pmaxsw_X_Xm128 = {
-    id = Pmaxsw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaxsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 238 }
-}
-let palignr_X_Xm128 = {
-    id = Palignr_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "palignr"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 15 }
-}
-let psignb_X_Xm128 = {
-    id = Psignb_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psignb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 8 }
-}
-let pandn = {
-    id = Pandn
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pandn"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 223 }
-}
-let movdqu_X_Xm128 = {
-    id = Movdqu_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movdqu"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 127 }
-}
-let psubw = {
-    id = Psubw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 249 }
-}
-let packuswb = {
-    id = Packuswb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "packuswb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 103 }
-}
-let haddps = {
-    id = Haddps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "haddps"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 124 }
-}
-let movdqa_Xm128_X = {
-    id = Movdqa_Xm128_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|XMM;M128|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movdqa"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 127 }
-}
-let orpd = {
-    id = Orpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "orpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 86 }
-}
-let paddsb = {
-    id = Paddsb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "paddsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 236 }
-}
-let packsswb = {
-    id = Packsswb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "packsswb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 99 }
-}
-let movss_X_m32 = {
-    id = Movss_X_m32
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
-}
-let movss_X_X = {
-    id = Movss_X_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
-}
-let minpd = {
-    id = Minpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "minpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
-}
-let movhlps = {
-    id = Movhlps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movhlps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
-}
-let psrlq_X_Xm128 = {
-    id = Psrlq_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psrlq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 211 }
-}
-let blendpd = {
-    id = Blendpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "blendpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 13 }
-}
-let pextrw_r64m16_X = {
-    id = Pextrw_r64m16_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|R64;M16|]; enc = RM_rm }
-  ; imm = true
-  ; mnemonic = "pextrw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 21 }
-}
-let cvttpd2dq = {
-    id = Cvttpd2dq
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvttpd2dq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
-}
-let packssdw = {
-    id = Packssdw
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "packssdw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 107 }
-}
-let divpd = {
-    id = Divpd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "divpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
-}
-let pmuludq_M_Mm64 = {
-    id = Pmuludq_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmuludq"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 244 }
-}
-let pabsb_X_Xm128 = {
-    id = Pabsb_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pabsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 28 }
-}
-let pmaxsb = {
-    id = Pmaxsb
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaxsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 60 }
-}
-let insertps = {
-    id = Insertps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "insertps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 33 }
-}
-let pshuflw = {
-    id = Pshuflw
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "pshuflw"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
-}
-let cvtsd2ss = {
-    id = Cvtsd2ss
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvtsd2ss"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
-}
-let pminub_M_Mm64 = {
-    id = Pminub_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pminub"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 218 }
-}
-let pabsw_M_Mm64 = {
-    id = Pabsw_M_Mm64
-  ; args = [|{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|MM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pabsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 29 }
-}
-let punpcklqdq = {
-    id = Punpcklqdq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "punpcklqdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 108 }
-}
-let subss = {
-    id = Subss
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "subss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
-}
-let punpckldq = {
-    id = Punpckldq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "punpckldq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 98 }
-}
-let ucomiss = {
-    id = Ucomiss
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "ucomiss"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 46 }
-}
-let movhpd_m64_X = {
-    id = Movhpd_m64_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|M64|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movhpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 23 }
-}
 let addsubpd = {
     id = Addsubpd
+  ; ext = [|SSE3|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
+  ; imm = Imm_none
   ; mnemonic = "addsubpd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 208 }
 }
-let pmaxsw_M_Mm64 = {
-    id = Pmaxsw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+let addsubps = {
+    id = Addsubps
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaxsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 238 }
+  ; imm = Imm_none
+  ; mnemonic = "addsubps"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 208 }
 }
-let minss = {
-    id = Minss
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "minss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+let andn_r32_r32_r32m32 = {
+    id = Andn_r32_r32_r32m32
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R32|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "andn"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 242 }
 }
-let psadbw_M_Mm64 = {
-    id = Psadbw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+let andn_r64_r64_r64m64 = {
+    id = Andn_r64_r64_r64m64
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R64|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "andn"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 242 }
+}
+let andnpd = {
+    id = Andnpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psadbw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 246 }
+  ; imm = Imm_none
+  ; mnemonic = "andnpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 85 }
+}
+let andnps = {
+    id = Andnps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "andnps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 85 }
+}
+let andpd = {
+    id = Andpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "andpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 84 }
+}
+let andps = {
+    id = Andps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "andps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 84 }
+}
+let bextr_r32_r32m32_r32 = {
+    id = Bextr_r32_r32m32_r32
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "bextr"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 247 }
+}
+let bextr_r64_r64m64_r64 = {
+    id = Bextr_r64_r64m64_r64
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "bextr"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 247 }
+}
+let blendpd = {
+    id = Blendpd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "blendpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 13 }
+}
+let blendps = {
+    id = Blendps
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "blendps"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 12 }
+}
+let blendvpd = {
+    id = Blendvpd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin XMM0; enc = Implicit }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "blendvpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 21 }
+}
+let blendvps = {
+    id = Blendvps
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin XMM0; enc = Implicit }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "blendvps"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 20 }
+}
+let blsi_r32_r32m32 = {
+    id = Blsi_r32_r32m32
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; imm = Imm_none
+  ; mnemonic = "blsi"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 3; opcode = 243 }
+}
+let blsi_r64_r64m64 = {
+    id = Blsi_r64_r64m64
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; imm = Imm_none
+  ; mnemonic = "blsi"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 3; opcode = 243 }
+}
+let blsmsk_r32_r32m32 = {
+    id = Blsmsk_r32_r32m32
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; imm = Imm_none
+  ; mnemonic = "blsmsk"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 2; opcode = 243 }
+}
+let blsmsk_r64_r64m64 = {
+    id = Blsmsk_r64_r64m64
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; imm = Imm_none
+  ; mnemonic = "blsmsk"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 2; opcode = 243 }
+}
+let blsr_r32_r32m32 = {
+    id = Blsr_r32_r32m32
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; imm = Imm_none
+  ; mnemonic = "blsr"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 1; opcode = 243 }
+}
+let blsr_r64_r64m64 = {
+    id = Blsr_r64_r64m64
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; imm = Imm_none
+  ; mnemonic = "blsr"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 1; opcode = 243 }
+}
+let bzhi_r32_r32m32_r32 = {
+    id = Bzhi_r32_r32m32_r32
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "bzhi"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 245 }
+}
+let bzhi_r64_r64m64_r64 = {
+    id = Bzhi_r64_r64m64_r64
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "bzhi"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 245 }
+}
+let cmppd = {
+    id = Cmppd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "cmppd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
+}
+let cmpps = {
+    id = Cmpps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "cmpps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
+}
+let cmpsd = {
+    id = Cmpsd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "cmpsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
 }
 let cmpss = {
     id = Cmpss
+  ; ext = [|SSE|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = true
+  ; imm = Imm_spec
   ; mnemonic = "cmpss"
   ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
 }
-let maxps = {
-    id = Maxps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "maxps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
-}
-let pmovzxbw = {
-    id = Pmovzxbw
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovzxbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 48 }
-}
-let movshdup = {
-    id = Movshdup
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movshdup"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
-}
-let movq_X_r64m64 = {
-    id = Movq_X_r64m64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
-}
-let pinsrq = {
-    id = Pinsrq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "pinsrq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A }; rm_reg = Reg; opcode = 34 }
-}
-let cvttsd2si_r32_Xm64 = {
-    id = Cvttsd2si_r32_Xm64
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R32|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "cvttsd2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
-}
-let shrx_r64_r64m64_r64 = {
-    id = Shrx_r64_r64m64_r64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "shrx"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 247 }
-}
-let divps = {
-    id = Divps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "divps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
-}
-let pabsw_X_Xm128 = {
-    id = Pabsw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pabsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 29 }
-}
-let psubq_M_Mm64 = {
-    id = Psubq_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psubq"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 251 }
-}
-let pshufb_X_Xm128 = {
-    id = Pshufb_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pshufb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 0 }
-}
-let pmovmskb_r64_M = {
-    id = Pmovmskb_r64_M
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovmskb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 215 }
-}
-let movhps_X_m64 = {
-    id = Movhps_X_m64
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "movhps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
-}
-let pmulhrsw_X_Xm128 = {
-    id = Pmulhrsw_X_Xm128
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmulhrsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 11 }
-}
-let mulps = {
-    id = Mulps
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "mulps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
-}
-let pcmpestri = {
-    id = Pcmpestri
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin RAX; enc = Implicit };{ loc = Pin RDX; enc = Implicit }|]
-  ; res = Res { loc = Pin RCX; enc = Implicit }
-  ; imm = true
-  ; mnemonic = "pcmpestri"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 97 }
-}
-let maxss = {
-    id = Maxss
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "maxss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
-}
-let crc32_r32_r8m8 = {
-    id = Crc32_r32_r8m8
-  ; args = [|{ loc = Temp [|R32|]; enc = RM_r };{ loc = Temp [|R8;M8|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex; escape = Esc_0F38 }; rm_reg = Reg; opcode = 240 }
-}
-let movhps_m64_X = {
-    id = Movhps_m64_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|M64|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "movhps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 23 }
-}
-let psrlw_X = {
-    id = Psrlw_X
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "psrlw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 113 }
-}
-let roundpd = {
-    id = Roundpd
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "roundpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 9 }
-}
-let dppd = {
-    id = Dppd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = true
-  ; mnemonic = "dppd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 65 }
-}
-let pextrq = {
-    id = Pextrq
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
-  ; res = Res { loc = Temp [|R64;M64|]; enc = RM_rm }
-  ; imm = true
-  ; mnemonic = "pextrq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A }; rm_reg = Reg; opcode = 22 }
-}
-let ldmxcsr = {
-    id = Ldmxcsr
-  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "ldmxcsr"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 174 }
-}
-let pmovzxbd = {
-    id = Pmovzxbd
-  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovzxbd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 49 }
-}
-let pshufhw = {
-    id = Pshufhw
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "pshufhw"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
-}
-let divsd = {
-    id = Divsd
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "divsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
-}
-let psignd_M_Mm64 = {
-    id = Psignd_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "psignd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 10 }
-}
 let comisd = {
     id = Comisd
+  ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
   ; mnemonic = "comisd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 47 }
 }
+let comiss = {
+    id = Comiss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "comiss"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 47 }
+}
+let crc32_r32_r16m16 = {
+    id = Crc32_r32_r16m16
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|R32|]; enc = RM_r };{ loc = Temp [|R16;M16|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "crc32"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
+}
+let crc32_r32_r32m32 = {
+    id = Crc32_r32_r32m32
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|R32|]; enc = RM_r };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "crc32"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
+}
+let crc32_r32_r8m8 = {
+    id = Crc32_r32_r8m8
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|R32|]; enc = RM_r };{ loc = Temp [|R8;M8|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "crc32"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 240 }
+}
+let crc32_r64_r64m64 = {
+    id = Crc32_r64_r64m64
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|R64|]; enc = RM_r };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "crc32"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
+}
+let crc32_r64_r8m8 = {
+    id = Crc32_r64_r8m8
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|R64|]; enc = RM_r };{ loc = Temp [|R8;M8|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "crc32"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F38 }; rm_reg = Reg; opcode = 240 }
+}
+let cvtdq2pd = {
+    id = Cvtdq2pd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtdq2pd"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
+}
+let cvtdq2ps = {
+    id = Cvtdq2ps
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtdq2ps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 91 }
+}
+let cvtpd2dq = {
+    id = Cvtpd2dq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtpd2dq"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
+}
+let cvtpd2ps = {
+    id = Cvtpd2ps
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtpd2ps"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
+}
 let cvtps2dq = {
     id = Cvtps2dq
+  ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
   ; mnemonic = "cvtps2dq"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 91 }
 }
-let orps = {
-    id = Orps
+let cvtps2pd = {
+    id = Cvtps2pd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtps2pd"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
+}
+let cvtsd2si_r32_Xm64 = {
+    id = Cvtsd2si_r32_Xm64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtsd2si"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
+}
+let cvtsd2si_r64_Xm64 = {
+    id = Cvtsd2si_r64_Xm64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtsd2si"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
+}
+let cvtsd2ss = {
+    id = Cvtsd2ss
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtsd2ss"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
+}
+let cvtsi2sd_X_r32m32 = {
+    id = Cvtsi2sd_X_r32m32
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtsi2sd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
+}
+let cvtsi2sd_X_r64m64 = {
+    id = Cvtsi2sd_X_r64m64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtsi2sd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
+}
+let cvtsi2ss_X_r32m32 = {
+    id = Cvtsi2ss_X_r32m32
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtsi2ss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
+}
+let cvtsi2ss_X_r64m64 = {
+    id = Cvtsi2ss_X_r64m64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtsi2ss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
+}
+let cvtss2sd = {
+    id = Cvtss2sd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtss2sd"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
+}
+let cvtss2si_r32_Xm32 = {
+    id = Cvtss2si_r32_Xm32
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtss2si"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
+}
+let cvtss2si_r64_Xm32 = {
+    id = Cvtss2si_r64_Xm32
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvtss2si"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
+}
+let cvttpd2dq = {
+    id = Cvttpd2dq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvttpd2dq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
+}
+let cvttps2dq = {
+    id = Cvttps2dq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvttps2dq"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 91 }
+}
+let cvttsd2si_r32_Xm64 = {
+    id = Cvttsd2si_r32_Xm64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvttsd2si"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
+}
+let cvttsd2si_r64_Xm64 = {
+    id = Cvttsd2si_r64_Xm64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvttsd2si"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
+}
+let cvttss2si_r32_Xm32 = {
+    id = Cvttss2si_r32_Xm32
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvttss2si"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
+}
+let cvttss2si_r64_Xm32 = {
+    id = Cvttss2si_r64_Xm32
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "cvttss2si"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
+}
+let divpd = {
+    id = Divpd
+  ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
-  ; mnemonic = "orps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 86 }
+  ; imm = Imm_none
+  ; mnemonic = "divpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
+}
+let divps = {
+    id = Divps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "divps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
+}
+let divsd = {
+    id = Divsd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "divsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
+}
+let divss = {
+    id = Divss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "divss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
+}
+let dppd = {
+    id = Dppd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "dppd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 65 }
+}
+let dpps = {
+    id = Dpps
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "dpps"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 64 }
+}
+let extractps = {
+    id = Extractps
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M32|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "extractps"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 23 }
+}
+let haddpd = {
+    id = Haddpd
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "haddpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 124 }
+}
+let haddps = {
+    id = Haddps
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "haddps"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 124 }
+}
+let hsubpd = {
+    id = Hsubpd
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "hsubpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 125 }
+}
+let hsubps = {
+    id = Hsubps
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "hsubps"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 125 }
+}
+let insertps = {
+    id = Insertps
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "insertps"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 33 }
+}
+let lddqu = {
+    id = Lddqu
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "lddqu"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 240 }
+}
+let ldmxcsr = {
+    id = Ldmxcsr
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "ldmxcsr"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 174 }
+}
+let lzcnt_r16_r16m16 = {
+    id = Lzcnt_r16_r16m16
+  ; ext = [|LZCNT|]
+  ; args = [|{ loc = Temp [|R16;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R16|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "lzcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 189 }
+}
+let lzcnt_r32_r32m32 = {
+    id = Lzcnt_r32_r32m32
+  ; ext = [|LZCNT|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "lzcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 189 }
+}
+let lzcnt_r64_r64m64 = {
+    id = Lzcnt_r64_r64m64
+  ; ext = [|LZCNT|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "lzcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 189 }
+}
+let maskmovdqu = {
+    id = Maskmovdqu
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Pin RDI; enc = Implicit }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "maskmovdqu"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 247 }
+}
+let maxpd = {
+    id = Maxpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "maxpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
+}
+let maxps = {
+    id = Maxps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "maxps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
+}
+let maxsd = {
+    id = Maxsd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "maxsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
+}
+let maxss = {
+    id = Maxss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "maxss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
+}
+let minpd = {
+    id = Minpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "minpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+}
+let minps = {
+    id = Minps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "minps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+}
+let minsd = {
+    id = Minsd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "minsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+}
+let minss = {
+    id = Minss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "minss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+}
+let movapd_X_Xm128 = {
+    id = Movapd_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movapd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 40 }
+}
+let movapd_Xm128_X = {
+    id = Movapd_Xm128_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movapd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
+}
+let movapd_m128_X = {
+    id = Movapd_m128_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movapd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
+}
+let movaps_X_Xm128 = {
+    id = Movaps_X_Xm128
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movaps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 40 }
+}
+let movaps_Xm128_X = {
+    id = Movaps_Xm128_X
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movaps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
+}
+let movd_X_r32m32 = {
+    id = Movd_X_r32m32
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 110 }
+}
+let movd_r32m32_X = {
+    id = Movd_r32m32_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
+}
+let movddup = {
+    id = Movddup
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movddup"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+}
+let movdqa_X_Xm128 = {
+    id = Movdqa_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movdqa"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 111 }
+}
+let movdqa_Xm128_X = {
+    id = Movdqa_Xm128_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movdqa"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 127 }
+}
+let movdqu_X_Xm128 = {
+    id = Movdqu_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movdqu"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 111 }
+}
+let movdqu_Xm128_X = {
+    id = Movdqu_Xm128_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movdqu"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 127 }
+}
+let movhlps = {
+    id = Movhlps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movhlps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+}
+let movhpd_X_m64 = {
+    id = Movhpd_X_m64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movhpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
+}
+let movhpd_m64_X = {
+    id = Movhpd_m64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movhpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 23 }
+}
+let movhps_X_m64 = {
+    id = Movhps_X_m64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movhps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
+}
+let movhps_m64_X = {
+    id = Movhps_m64_X
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movhps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 23 }
+}
+let movlhps = {
+    id = Movlhps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movlhps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
+}
+let movlpd_X_m64 = {
+    id = Movlpd_X_m64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movlpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+}
+let movlpd_m64_X = {
+    id = Movlpd_m64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movlpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 19 }
+}
+let movlps_X_m64 = {
+    id = Movlps_X_m64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movlps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+}
+let movlps_m64_X = {
+    id = Movlps_m64_X
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movlps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 19 }
+}
+let movmskpd = {
+    id = Movmskpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movmskpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 80 }
+}
+let movmskps = {
+    id = Movmskps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movmskps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 80 }
+}
+let movntdq = {
+    id = Movntdq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movntdq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 231 }
+}
+let movntdqa = {
+    id = Movntdqa
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movntdqa"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 42 }
+}
+let movnti_m32_r32 = {
+    id = Movnti_m32_r32
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movnti"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 195 }
+}
+let movnti_m64_r64 = {
+    id = Movnti_m64_r64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movnti"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 195 }
+}
+let movntpd = {
+    id = Movntpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movntpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 43 }
+}
+let movntps = {
+    id = Movntps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movntps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 43 }
+}
+let movq_X_Xm64 = {
+    id = Movq_X_Xm64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movq"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
+}
+let movq_X_r64m64 = {
+    id = Movq_X_r64m64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 110 }
+}
+let movq_Xm64_X = {
+    id = Movq_Xm64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 214 }
+}
+let movq_r64m64_X = {
+    id = Movq_r64m64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
+}
+let movsd_X_X = {
+    id = Movsd_X_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+}
+let movsd_X_m64 = {
+    id = Movsd_X_m64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+}
+let movsd_Xm64_X = {
+    id = Movsd_Xm64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
+let movsd_m64_X = {
+    id = Movsd_m64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
+let movshdup = {
+    id = Movshdup
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movshdup"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
+}
+let movsldup = {
+    id = Movsldup
+  ; ext = [|SSE3|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movsldup"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+}
+let movss_X_X = {
+    id = Movss_X_X
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+}
+let movss_X_m32 = {
+    id = Movss_X_m32
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "movss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+}
+let movss_Xm32_X = {
+    id = Movss_Xm32_X
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
+let movss_m32_X = {
+    id = Movss_m32_X
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
+let movupd_X_Xm128 = {
+    id = Movupd_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "movupd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+}
+let movupd_Xm128_X = {
+    id = Movupd_Xm128_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movupd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
+let movupd_m128_X = {
+    id = Movupd_m128_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movupd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
 }
 let movups_X_Xm128 = {
     id = Movups_X_Xm128
+  ; ext = [|SSE|]
   ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
   ; mnemonic = "movups"
   ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
 }
-let punpckhwd = {
-    id = Punpckhwd
+let movups_Xm128_X = {
+    id = Movups_Xm128_X
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "movups"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
+let mpsadbw = {
+    id = Mpsadbw
+  ; ext = [|SSE4_1|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
-  ; mnemonic = "punpckhwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 105 }
+  ; imm = Imm_spec
+  ; mnemonic = "mpsadbw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 66 }
 }
-let pcmpistri = {
-    id = Pcmpistri
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Pin RCX; enc = Implicit }
-  ; imm = true
-  ; mnemonic = "pcmpistri"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 99 }
-}
-let pmovsxwd = {
-    id = Pmovsxwd
-  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "pmovsxwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 35 }
-}
-let pmaddubsw_X_Xm128 = {
-    id = Pmaddubsw_X_Xm128
+let mulpd = {
+    id = Mulpd
+  ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
-  ; mnemonic = "pmaddubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 4 }
+  ; imm = Imm_none
+  ; mnemonic = "mulpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+}
+let mulps = {
+    id = Mulps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "mulps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+}
+let mulsd = {
+    id = Mulsd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "mulsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+}
+let mulss = {
+    id = Mulss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "mulss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+}
+let mulx_r32_r32_r32m32_rdx = {
+    id = Mulx_r32_r32_r32m32_rdx
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Pin RDX; enc = Implicit }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r };{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; imm = Imm_none
+  ; mnemonic = "mulx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 246 }
+}
+let mulx_r64_r64_r64m64_rdx = {
+    id = Mulx_r64_r64_r64m64_rdx
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Pin RDX; enc = Implicit }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r };{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; imm = Imm_none
+  ; mnemonic = "mulx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 246 }
+}
+let orpd = {
+    id = Orpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "orpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 86 }
+}
+let orps = {
+    id = Orps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "orps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 86 }
+}
+let pabsb_M_Mm64 = {
+    id = Pabsb_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|MM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pabsb"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 28 }
+}
+let pabsb_X_Xm128 = {
+    id = Pabsb_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pabsb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 28 }
+}
+let pabsd_M_Mm64 = {
+    id = Pabsd_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|MM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pabsd"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 30 }
+}
+let pabsd_X_Xm128 = {
+    id = Pabsd_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pabsd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 30 }
+}
+let pabsw_M_Mm64 = {
+    id = Pabsw_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|MM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pabsw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 29 }
+}
+let pabsw_X_Xm128 = {
+    id = Pabsw_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pabsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 29 }
+}
+let packssdw = {
+    id = Packssdw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "packssdw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 107 }
+}
+let packsswb = {
+    id = Packsswb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "packsswb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 99 }
+}
+let packusdw = {
+    id = Packusdw
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "packusdw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 43 }
+}
+let packuswb = {
+    id = Packuswb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "packuswb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 103 }
+}
+let paddb = {
+    id = Paddb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "paddb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 252 }
+}
+let paddd = {
+    id = Paddd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "paddd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 254 }
+}
+let paddq = {
+    id = Paddq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "paddq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 212 }
+}
+let paddsb = {
+    id = Paddsb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "paddsb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 236 }
+}
+let paddsw = {
+    id = Paddsw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "paddsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 237 }
+}
+let paddusb = {
+    id = Paddusb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "paddusb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 220 }
+}
+let paddusw = {
+    id = Paddusw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "paddusw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 221 }
+}
+let paddw = {
+    id = Paddw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "paddw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 253 }
+}
+let palignr_M_Mm64 = {
+    id = Palignr_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "palignr"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 15 }
+}
+let palignr_X_Xm128 = {
+    id = Palignr_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "palignr"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 15 }
+}
+let pand = {
+    id = Pand
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pand"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 219 }
+}
+let pandn = {
+    id = Pandn
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pandn"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 223 }
+}
+let pavgb_M_Mm64 = {
+    id = Pavgb_M_Mm64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pavgb"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 224 }
+}
+let pavgb_X_Xm128 = {
+    id = Pavgb_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pavgb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 224 }
+}
+let pavgw_M_Mm64 = {
+    id = Pavgw_M_Mm64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pavgw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 227 }
+}
+let pavgw_X_Xm128 = {
+    id = Pavgw_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pavgw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 227 }
+}
+let pblendvb = {
+    id = Pblendvb
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin XMM0; enc = Implicit }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pblendvb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 16 }
+}
+let pblendw = {
+    id = Pblendw
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pblendw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 14 }
+}
+let pclmulqdq = {
+    id = Pclmulqdq
+  ; ext = [|PCLMULQDQ|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pclmulqdq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 68 }
+}
+let pcmpeqb = {
+    id = Pcmpeqb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pcmpeqb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 116 }
+}
+let pcmpeqd = {
+    id = Pcmpeqd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pcmpeqd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 118 }
+}
+let pcmpeqq = {
+    id = Pcmpeqq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pcmpeqq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 41 }
+}
+let pcmpeqw = {
+    id = Pcmpeqw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pcmpeqw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 117 }
+}
+let pcmpestri = {
+    id = Pcmpestri
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin RAX; enc = Implicit };{ loc = Pin RDX; enc = Implicit }|]
+  ; res = Res [|{ loc = Pin RCX; enc = Implicit }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pcmpestri"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 97 }
+}
+let pcmpestrm = {
+    id = Pcmpestrm
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin RAX; enc = Implicit };{ loc = Pin RDX; enc = Implicit }|]
+  ; res = Res [|{ loc = Pin XMM0; enc = Implicit }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pcmpestrm"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 96 }
+}
+let pcmpgtb = {
+    id = Pcmpgtb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pcmpgtb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 100 }
+}
+let pcmpgtd = {
+    id = Pcmpgtd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pcmpgtd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 102 }
+}
+let pcmpgtq = {
+    id = Pcmpgtq
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pcmpgtq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 55 }
 }
 let pcmpgtw = {
     id = Pcmpgtw
+  ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
+  ; imm = Imm_none
   ; mnemonic = "pcmpgtw"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 101 }
 }
-let roundps = {
-    id = Roundps
-  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = true
-  ; mnemonic = "roundps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 8 }
+let pcmpistri = {
+    id = Pcmpistri
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Pin RCX; enc = Implicit }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pcmpistri"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 99 }
 }
-let phsubw_M_Mm64 = {
-    id = Phsubw_M_Mm64
-  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = false
-  ; mnemonic = "phsubw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 5 }
+let pcmpistrm = {
+    id = Pcmpistrm
+  ; ext = [|SSE4_2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Pin XMM0; enc = Implicit }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pcmpistrm"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 98 }
 }
-let sarx_r64_r64m64_r64 = {
-    id = Sarx_r64_r64m64_r64
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
-  ; mnemonic = "sarx"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 247 }
+let pdep_r32_r32_r32m32 = {
+    id = Pdep_r32_r32_r32m32
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R32|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pdep"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 245 }
 }
 let pdep_r64_r64_r64m64 = {
     id = Pdep_r64_r64_r64m64
+  ; ext = [|BMI2|]
   ; args = [|{ loc = Temp [|R64|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|R64|]; enc = RM_r }
-  ; imm = false
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
   ; mnemonic = "pdep"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 245 }
 }
-let stmxcsr = {
-    id = Stmxcsr
-  ; args = [||]
-  ; res = Res { loc = Temp [|M32|]; enc = RM_rm }
-  ; imm = false
-  ; mnemonic = "stmxcsr"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 3; opcode = 174 }
+let pext_r32_r32_r32m32 = {
+    id = Pext_r32_r32_r32m32
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R32|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pext"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 245 }
+}
+let pext_r64_r64_r64m64 = {
+    id = Pext_r64_r64_r64m64
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R64|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pext"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 245 }
+}
+let pextrb = {
+    id = Pextrb
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M8|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pextrb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 20 }
+}
+let pextrd = {
+    id = Pextrd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pextrd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 22 }
+}
+let pextrq = {
+    id = Pextrq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pextrq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A }; rm_reg = Reg; opcode = 22 }
+}
+let pextrw_r64_M = {
+    id = Pextrw_r64_M
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pextrw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 197 }
+}
+let pextrw_r64_X = {
+    id = Pextrw_r64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pextrw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 197 }
+}
+let pextrw_r64m16_X = {
+    id = Pextrw_r64m16_X
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M16|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pextrw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 21 }
+}
+let phaddd_M_Mm64 = {
+    id = Phaddd_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phaddd"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 2 }
 }
 let phaddd_X_Xm128 = {
     id = Phaddd_X_Xm128
+  ; ext = [|SSSE3|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = First_arg
-  ; imm = false
+  ; imm = Imm_none
   ; mnemonic = "phaddd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 2 }
+}
+let phaddsw_M_Mm64 = {
+    id = Phaddsw_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phaddsw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 3 }
+}
+let phaddsw_X_Xm128 = {
+    id = Phaddsw_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phaddsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 3 }
+}
+let phaddw_M_Mm64 = {
+    id = Phaddw_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phaddw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 1 }
+}
+let phaddw_X_Xm128 = {
+    id = Phaddw_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phaddw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 1 }
+}
+let phminposuw = {
+    id = Phminposuw
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "phminposuw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 65 }
+}
+let phsubd_M_Mm64 = {
+    id = Phsubd_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phsubd"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 6 }
+}
+let phsubd_X_Xm128 = {
+    id = Phsubd_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phsubd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 6 }
+}
+let phsubsw_M_Mm64 = {
+    id = Phsubsw_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phsubsw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 7 }
+}
+let phsubsw_X_Xm128 = {
+    id = Phsubsw_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phsubsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 7 }
+}
+let phsubw_M_Mm64 = {
+    id = Phsubw_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phsubw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 5 }
+}
+let phsubw_X_Xm128 = {
+    id = Phsubw_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "phsubw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 5 }
+}
+let pinsrb = {
+    id = Pinsrb
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|R32;M8|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pinsrb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 32 }
+}
+let pinsrd = {
+    id = Pinsrd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pinsrd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 34 }
+}
+let pinsrq = {
+    id = Pinsrq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pinsrq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A }; rm_reg = Reg; opcode = 34 }
+}
+let pinsrw_M_r32m16 = {
+    id = Pinsrw_M_r32m16
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|R32;M16|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pinsrw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 196 }
+}
+let pinsrw_X_r32m16 = {
+    id = Pinsrw_X_r32m16
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|R32;M16|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pinsrw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 196 }
+}
+let pmaddubsw_M_Mm64 = {
+    id = Pmaddubsw_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaddubsw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 4 }
+}
+let pmaddubsw_X_Xm128 = {
+    id = Pmaddubsw_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaddubsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 4 }
+}
+let pmaddwd = {
+    id = Pmaddwd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaddwd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 245 }
+}
+let pmaxsb = {
+    id = Pmaxsb
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaxsb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 60 }
+}
+let pmaxsd = {
+    id = Pmaxsd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaxsd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 61 }
+}
+let pmaxsw_M_Mm64 = {
+    id = Pmaxsw_M_Mm64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaxsw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 238 }
+}
+let pmaxsw_X_Xm128 = {
+    id = Pmaxsw_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaxsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 238 }
+}
+let pmaxub_M_Mm64 = {
+    id = Pmaxub_M_Mm64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaxub"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 222 }
+}
+let pmaxub_X_Xm128 = {
+    id = Pmaxub_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaxub"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 222 }
+}
+let pmaxud = {
+    id = Pmaxud
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaxud"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 63 }
+}
+let pmaxuw = {
+    id = Pmaxuw
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmaxuw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 62 }
+}
+let pminsb = {
+    id = Pminsb
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pminsb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 56 }
+}
+let pminsd = {
+    id = Pminsd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pminsd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 57 }
+}
+let pminsw_M_Mm64 = {
+    id = Pminsw_M_Mm64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pminsw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 234 }
+}
+let pminsw_X_Xm128 = {
+    id = Pminsw_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pminsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 234 }
+}
+let pminub_M_Mm64 = {
+    id = Pminub_M_Mm64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pminub"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 218 }
+}
+let pminub_X_Xm128 = {
+    id = Pminub_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pminub"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 218 }
+}
+let pminud = {
+    id = Pminud
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pminud"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 59 }
+}
+let pminuw = {
+    id = Pminuw
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pminuw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 58 }
+}
+let pmovmskb_r64_M = {
+    id = Pmovmskb_r64_M
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovmskb"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 215 }
+}
+let pmovmskb_r64_X = {
+    id = Pmovmskb_r64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovmskb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 215 }
+}
+let pmovsxbd = {
+    id = Pmovsxbd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovsxbd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 33 }
+}
+let pmovsxbq = {
+    id = Pmovsxbq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovsxbq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 34 }
+}
+let pmovsxbw = {
+    id = Pmovsxbw
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovsxbw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 32 }
+}
+let pmovsxdq = {
+    id = Pmovsxdq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovsxdq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 37 }
+}
+let pmovsxwd = {
+    id = Pmovsxwd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovsxwd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 35 }
+}
+let pmovsxwq = {
+    id = Pmovsxwq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovsxwq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 36 }
+}
+let pmovzxbd = {
+    id = Pmovzxbd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovzxbd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 49 }
+}
+let pmovzxbq = {
+    id = Pmovzxbq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovzxbq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 50 }
+}
+let pmovzxbw = {
+    id = Pmovzxbw
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovzxbw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 48 }
+}
+let pmovzxdq = {
+    id = Pmovzxdq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovzxdq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 53 }
+}
+let pmovzxwd = {
+    id = Pmovzxwd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovzxwd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 51 }
+}
+let pmovzxwq = {
+    id = Pmovzxwq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "pmovzxwq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 52 }
+}
+let pmuldq = {
+    id = Pmuldq
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmuldq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 40 }
+}
+let pmulhrsw_M_Mm64 = {
+    id = Pmulhrsw_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmulhrsw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 11 }
+}
+let pmulhrsw_X_Xm128 = {
+    id = Pmulhrsw_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmulhrsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 11 }
+}
+let pmulhuw_M_Mm64 = {
+    id = Pmulhuw_M_Mm64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmulhuw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 228 }
+}
+let pmulhuw_X_Xm128 = {
+    id = Pmulhuw_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmulhuw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 228 }
+}
+let pmulhw = {
+    id = Pmulhw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmulhw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 229 }
+}
+let pmulld = {
+    id = Pmulld
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmulld"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 64 }
+}
+let pmullw = {
+    id = Pmullw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmullw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 213 }
+}
+let pmuludq_M_Mm64 = {
+    id = Pmuludq_M_Mm64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmuludq"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 244 }
+}
+let pmuludq_X_Xm128 = {
+    id = Pmuludq_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pmuludq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 244 }
+}
+let popcnt_r16_r16m16 = {
+    id = Popcnt_r16_r16m16
+  ; ext = [|POPCNT|]
+  ; args = [|{ loc = Temp [|R16;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R16|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "popcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 184 }
+}
+let popcnt_r32_r32m32 = {
+    id = Popcnt_r32_r32m32
+  ; ext = [|POPCNT|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "popcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 184 }
+}
+let popcnt_r64_r64m64 = {
+    id = Popcnt_r64_r64m64
+  ; ext = [|POPCNT|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "popcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 184 }
+}
+let por = {
+    id = Por
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "por"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 235 }
+}
+let psadbw_M_Mm64 = {
+    id = Psadbw_M_Mm64
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psadbw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 246 }
+}
+let psadbw_X_Xm128 = {
+    id = Psadbw_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psadbw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 246 }
+}
+let pshufb_M_Mm64 = {
+    id = Pshufb_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pshufb"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 0 }
+}
+let pshufb_X_Xm128 = {
+    id = Pshufb_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pshufb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 0 }
+}
+let pshufd = {
+    id = Pshufd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pshufd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
+}
+let pshufhw = {
+    id = Pshufhw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pshufhw"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
+}
+let pshuflw = {
+    id = Pshuflw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "pshuflw"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
+}
+let psignb_M_Mm64 = {
+    id = Psignb_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psignb"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 8 }
+}
+let psignb_X_Xm128 = {
+    id = Psignb_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psignb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 8 }
+}
+let psignd_M_Mm64 = {
+    id = Psignd_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psignd"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 10 }
+}
+let psignd_X_Xm128 = {
+    id = Psignd_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psignd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 10 }
+}
+let psignw_M_Mm64 = {
+    id = Psignw_M_Mm64
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psignw"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 9 }
+}
+let psignw_X_Xm128 = {
+    id = Psignw_X_Xm128
+  ; ext = [|SSSE3|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psignw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 9 }
+}
+let pslld_X = {
+    id = Pslld_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pslld"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 114 }
+}
+let pslld_X_Xm128 = {
+    id = Pslld_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pslld"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 242 }
+}
+let pslldq = {
+    id = Pslldq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "pslldq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 7; opcode = 115 }
+}
+let psllq_X = {
+    id = Psllq_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "psllq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 115 }
+}
+let psllq_X_Xm128 = {
+    id = Psllq_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psllq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 243 }
+}
+let psllw_X = {
+    id = Psllw_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "psllw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 113 }
+}
+let psllw_X_Xm128 = {
+    id = Psllw_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psllw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 241 }
+}
+let psrad_X = {
+    id = Psrad_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "psrad"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 4; opcode = 114 }
+}
+let psrad_X_Xm128 = {
+    id = Psrad_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psrad"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 226 }
+}
+let psraw_X = {
+    id = Psraw_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "psraw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 4; opcode = 113 }
+}
+let psraw_X_Xm128 = {
+    id = Psraw_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psraw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 225 }
+}
+let psrld_X = {
+    id = Psrld_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "psrld"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 114 }
+}
+let psrld_X_Xm128 = {
+    id = Psrld_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psrld"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 210 }
+}
+let psrldq = {
+    id = Psrldq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "psrldq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 3; opcode = 115 }
+}
+let psrlq_X = {
+    id = Psrlq_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "psrlq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 115 }
+}
+let psrlq_X_Xm128 = {
+    id = Psrlq_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psrlq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 211 }
+}
+let psrlw_X = {
+    id = Psrlw_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "psrlw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 113 }
+}
+let psrlw_X_Xm128 = {
+    id = Psrlw_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psrlw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 209 }
+}
+let psubb = {
+    id = Psubb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 248 }
+}
+let psubd = {
+    id = Psubd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 250 }
+}
+let psubq_M_Mm64 = {
+    id = Psubq_M_Mm64
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|MM|]; enc = RM_r };{ loc = Temp [|MM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubq"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 251 }
+}
+let psubq_X_Xm128 = {
+    id = Psubq_X_Xm128
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 251 }
+}
+let psubsb = {
+    id = Psubsb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubsb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 232 }
+}
+let psubsw = {
+    id = Psubsw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubsw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 233 }
+}
+let psubusb = {
+    id = Psubusb
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubusb"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 216 }
+}
+let psubusw = {
+    id = Psubusw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubusw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 217 }
+}
+let psubw = {
+    id = Psubw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "psubw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 249 }
+}
+let ptest = {
+    id = Ptest
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = Implicit }|]
+  ; imm = Imm_none
+  ; mnemonic = "ptest"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 23 }
+}
+let punpckhbw = {
+    id = Punpckhbw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "punpckhbw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 104 }
+}
+let punpckhdq = {
+    id = Punpckhdq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "punpckhdq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 106 }
+}
+let punpckhqdq = {
+    id = Punpckhqdq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "punpckhqdq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 109 }
+}
+let punpckhwd = {
+    id = Punpckhwd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "punpckhwd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 105 }
+}
+let punpcklbw = {
+    id = Punpcklbw
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "punpcklbw"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 96 }
+}
+let punpckldq = {
+    id = Punpckldq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "punpckldq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 98 }
+}
+let punpcklqdq = {
+    id = Punpcklqdq
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "punpcklqdq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 108 }
+}
+let punpcklwd = {
+    id = Punpcklwd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "punpcklwd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 97 }
+}
+let pxor = {
+    id = Pxor
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "pxor"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 239 }
+}
+let rcpps = {
+    id = Rcpps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "rcpps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 83 }
+}
+let rcpss = {
+    id = Rcpss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "rcpss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 83 }
+}
+let rorx_r32_r32m32 = {
+    id = Rorx_r32_r32m32
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "rorx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 240 }
+}
+let rorx_r64_r64m64 = {
+    id = Rorx_r64_r64m64
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "rorx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 240 }
+}
+let roundpd = {
+    id = Roundpd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "roundpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 9 }
+}
+let roundps = {
+    id = Roundps
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "roundps"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 8 }
+}
+let roundsd = {
+    id = Roundsd
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "roundsd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 11 }
+}
+let roundss = {
+    id = Roundss
+  ; ext = [|SSE4_1|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "roundss"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 10 }
+}
+let rsqrtps = {
+    id = Rsqrtps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "rsqrtps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 82 }
+}
+let rsqrtss = {
+    id = Rsqrtss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "rsqrtss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 82 }
+}
+let sarx_r32_r32m32_r32 = {
+    id = Sarx_r32_r32m32_r32
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "sarx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 247 }
+}
+let sarx_r64_r64m64_r64 = {
+    id = Sarx_r64_r64m64_r64
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "sarx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 247 }
+}
+let shlx_r32_r32m32_r32 = {
+    id = Shlx_r32_r32m32_r32
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "shlx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 247 }
+}
+let shlx_r64_r64m64_r64 = {
+    id = Shlx_r64_r64m64_r64
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "shlx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 247 }
+}
+let shrx_r32_r32m32_r32 = {
+    id = Shrx_r32_r32m32_r32
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm };{ loc = Temp [|R32|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "shrx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 247 }
+}
+let shrx_r64_r64m64_r64 = {
+    id = Shrx_r64_r64m64_r64
+  ; ext = [|BMI2|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm };{ loc = Temp [|R64|]; enc = Vex_v }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "shrx"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 247 }
+}
+let shufpd = {
+    id = Shufpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "shufpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 198 }
+}
+let shufps = {
+    id = Shufps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_spec
+  ; mnemonic = "shufps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 198 }
+}
+let sqrtpd = {
+    id = Sqrtpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "sqrtpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
+}
+let sqrtps = {
+    id = Sqrtps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "sqrtps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
+}
+let sqrtsd = {
+    id = Sqrtsd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "sqrtsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
+}
+let sqrtss = {
+    id = Sqrtss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "sqrtss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
+}
+let stmxcsr = {
+    id = Stmxcsr
+  ; ext = [|SSE|]
+  ; args = [||]
+  ; res = Res [|{ loc = Temp [|M32|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "stmxcsr"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 3; opcode = 174 }
+}
+let subpd = {
+    id = Subpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "subpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
+}
+let subps = {
+    id = Subps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "subps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
+}
+let subsd = {
+    id = Subsd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "subsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
+}
+let subss = {
+    id = Subss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "subss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
+}
+let tzcnt_r16_r16m16 = {
+    id = Tzcnt_r16_r16m16
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R16;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R16|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "tzcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 188 }
+}
+let tzcnt_r32_r32m32 = {
+    id = Tzcnt_r32_r32m32
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "tzcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 188 }
+}
+let tzcnt_r64_r64m64 = {
+    id = Tzcnt_r64_r64m64
+  ; ext = [|BMI|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "tzcnt"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 188 }
+}
+let ucomisd = {
+    id = Ucomisd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "ucomisd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 46 }
+}
+let ucomiss = {
+    id = Ucomiss
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "ucomiss"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 46 }
+}
+let unpckhpd = {
+    id = Unpckhpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "unpckhpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 21 }
+}
+let unpckhps = {
+    id = Unpckhps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "unpckhps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 21 }
+}
+let unpcklpd = {
+    id = Unpcklpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "unpcklpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 20 }
+}
+let unpcklps = {
+    id = Unpcklps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "unpcklps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 20 }
+}
+let vaddpd_X_X_Xm128 = {
+    id = Vaddpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 88 }
+}
+let vaddpd_Y_Y_Ym256 = {
+    id = Vaddpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 88 }
+}
+let vaddps_X_X_Xm128 = {
+    id = Vaddps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 88 }
+}
+let vaddps_Y_Y_Ym256 = {
+    id = Vaddps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 88 }
+}
+let vaddsd = {
+    id = Vaddsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 88 }
+}
+let vaddss = {
+    id = Vaddss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 88 }
+}
+let vaddsubpd_X_X_Xm128 = {
+    id = Vaddsubpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddsubpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 208 }
+}
+let vaddsubpd_Y_Y_Ym256 = {
+    id = Vaddsubpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddsubpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 208 }
+}
+let vaddsubps_X_X_Xm128 = {
+    id = Vaddsubps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddsubps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 208 }
+}
+let vaddsubps_Y_Y_Ym256 = {
+    id = Vaddsubps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vaddsubps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 208 }
+}
+let vandnpd_X_X_Xm128 = {
+    id = Vandnpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vandnpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 85 }
+}
+let vandnpd_Y_Y_Ym256 = {
+    id = Vandnpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vandnpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 85 }
+}
+let vandnps_X_X_Xm128 = {
+    id = Vandnps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vandnps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 85 }
+}
+let vandnps_Y_Y_Ym256 = {
+    id = Vandnps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vandnps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 85 }
+}
+let vandpd_X_X_Xm128 = {
+    id = Vandpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vandpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 84 }
+}
+let vandpd_Y_Y_Ym256 = {
+    id = Vandpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vandpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 84 }
+}
+let vandps_X_X_Xm128 = {
+    id = Vandps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vandps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 84 }
+}
+let vandps_Y_Y_Ym256 = {
+    id = Vandps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vandps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 84 }
+}
+let vblendpd_X_X_Xm128 = {
+    id = Vblendpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vblendpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 13 }
+}
+let vblendpd_Y_Y_Ym256 = {
+    id = Vblendpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vblendpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 13 }
+}
+let vblendps_X_X_Xm128 = {
+    id = Vblendps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vblendps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 12 }
+}
+let vblendps_Y_Y_Ym256 = {
+    id = Vblendps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vblendps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 12 }
+}
+let vblendvpd_X_X_Xm128_X = {
+    id = Vblendvpd_X_X_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Immediate }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_reg
+  ; mnemonic = "vblendvpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 75 }
+}
+let vblendvpd_Y_Y_Ym256_Y = {
+    id = Vblendvpd_Y_Y_Ym256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Immediate }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_reg
+  ; mnemonic = "vblendvpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 75 }
+}
+let vblendvps_X_X_Xm128_X = {
+    id = Vblendvps_X_X_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Immediate }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_reg
+  ; mnemonic = "vblendvps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 74 }
+}
+let vblendvps_Y_Y_Ym256_Y = {
+    id = Vblendvps_Y_Y_Ym256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Immediate }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_reg
+  ; mnemonic = "vblendvps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 74 }
+}
+let vbroadcastf128 = {
+    id = Vbroadcastf128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vbroadcastf128"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 26 }
+}
+let vbroadcasti128 = {
+    id = Vbroadcasti128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vbroadcasti128"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 90 }
+}
+let vbroadcastsd_Y_X = {
+    id = Vbroadcastsd_Y_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vbroadcastsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 25 }
+}
+let vbroadcastsd_Y_m64 = {
+    id = Vbroadcastsd_Y_m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vbroadcastsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 25 }
+}
+let vbroadcastss_X_X = {
+    id = Vbroadcastss_X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vbroadcastss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 24 }
+}
+let vbroadcastss_X_m32 = {
+    id = Vbroadcastss_X_m32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vbroadcastss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 24 }
+}
+let vbroadcastss_Y_X = {
+    id = Vbroadcastss_Y_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vbroadcastss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 24 }
+}
+let vbroadcastss_Y_m32 = {
+    id = Vbroadcastss_Y_m32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vbroadcastss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 24 }
+}
+let vcmppd_X_X_Xm128 = {
+    id = Vcmppd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vcmppd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 194 }
+}
+let vcmppd_Y_Y_Ym256 = {
+    id = Vcmppd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vcmppd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 194 }
+}
+let vcmpps_X_X_Xm128 = {
+    id = Vcmpps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vcmpps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 194 }
+}
+let vcmpps_Y_Y_Ym256 = {
+    id = Vcmpps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vcmpps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 194 }
+}
+let vcmpsd = {
+    id = Vcmpsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vcmpsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 194 }
+}
+let vcmpss = {
+    id = Vcmpss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vcmpss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 194 }
+}
+let vcomisd = {
+    id = Vcomisd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcomisd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 47 }
+}
+let vcomiss = {
+    id = Vcomiss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcomiss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 47 }
+}
+let vcvtdq2pd_X_Xm64 = {
+    id = Vcvtdq2pd_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtdq2pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 230 }
+}
+let vcvtdq2pd_Y_Xm128 = {
+    id = Vcvtdq2pd_Y_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtdq2pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 230 }
+}
+let vcvtdq2ps_X_Xm128 = {
+    id = Vcvtdq2ps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtdq2ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 91 }
+}
+let vcvtdq2ps_Y_Ym256 = {
+    id = Vcvtdq2ps_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtdq2ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 91 }
+}
+let vcvtpd2dq_X_Xm128 = {
+    id = Vcvtpd2dq_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtpd2dq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 230 }
+}
+let vcvtpd2dq_X_Ym256 = {
+    id = Vcvtpd2dq_X_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtpd2dq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 230 }
+}
+let vcvtpd2ps_X_Xm128 = {
+    id = Vcvtpd2ps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtpd2ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 90 }
+}
+let vcvtpd2ps_X_Ym256 = {
+    id = Vcvtpd2ps_X_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtpd2ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 90 }
+}
+let vcvtph2ps_X_Xm64 = {
+    id = Vcvtph2ps_X_Xm64
+  ; ext = [|F16C|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtph2ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 19 }
+}
+let vcvtph2ps_Y_Xm128 = {
+    id = Vcvtph2ps_Y_Xm128
+  ; ext = [|F16C|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtph2ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 19 }
+}
+let vcvtps2dq_X_Xm128 = {
+    id = Vcvtps2dq_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtps2dq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 91 }
+}
+let vcvtps2dq_Y_Ym256 = {
+    id = Vcvtps2dq_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtps2dq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 91 }
+}
+let vcvtps2pd_X_Xm64 = {
+    id = Vcvtps2pd_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtps2pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 90 }
+}
+let vcvtps2pd_Y_Xm128 = {
+    id = Vcvtps2pd_Y_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtps2pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 90 }
+}
+let vcvtps2ph_Xm128_Y = {
+    id = Vcvtps2ph_Xm128_Y
+  ; ext = [|F16C|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vcvtps2ph"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 29 }
+}
+let vcvtps2ph_Xm64_X = {
+    id = Vcvtps2ph_Xm64_X
+  ; ext = [|F16C|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vcvtps2ph"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 29 }
+}
+let vcvtsd2si_r32_Xm64 = {
+    id = Vcvtsd2si_r32_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtsd2si"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 45 }
+}
+let vcvtsd2si_r64_Xm64 = {
+    id = Vcvtsd2si_r64_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtsd2si"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 45 }
+}
+let vcvtsd2ss = {
+    id = Vcvtsd2ss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtsd2ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 90 }
+}
+let vcvtsi2sd_X_X_r32m32 = {
+    id = Vcvtsi2sd_X_X_r32m32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtsi2sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 42 }
+}
+let vcvtsi2sd_X_X_r64m64 = {
+    id = Vcvtsi2sd_X_X_r64m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtsi2sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 42 }
+}
+let vcvtsi2ss_X_X_r32m32 = {
+    id = Vcvtsi2ss_X_X_r32m32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtsi2ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 42 }
+}
+let vcvtsi2ss_X_X_r64m64 = {
+    id = Vcvtsi2ss_X_X_r64m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtsi2ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 42 }
+}
+let vcvtss2sd = {
+    id = Vcvtss2sd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtss2sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 90 }
+}
+let vcvtss2si_r32_Xm32 = {
+    id = Vcvtss2si_r32_Xm32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtss2si"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 45 }
+}
+let vcvtss2si_r64_Xm32 = {
+    id = Vcvtss2si_r64_Xm32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvtss2si"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 45 }
+}
+let vcvttpd2dq_X_Xm128 = {
+    id = Vcvttpd2dq_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvttpd2dq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 230 }
+}
+let vcvttpd2dq_X_Ym256 = {
+    id = Vcvttpd2dq_X_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvttpd2dq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 230 }
+}
+let vcvttps2dq_X_Xm128 = {
+    id = Vcvttps2dq_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvttps2dq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 91 }
+}
+let vcvttps2dq_Y_Ym256 = {
+    id = Vcvttps2dq_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvttps2dq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 91 }
+}
+let vcvttsd2si_r32_Xm64 = {
+    id = Vcvttsd2si_r32_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvttsd2si"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 44 }
+}
+let vcvttsd2si_r64_Xm64 = {
+    id = Vcvttsd2si_r64_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvttsd2si"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 44 }
+}
+let vcvttss2si_r32_Xm32 = {
+    id = Vcvttss2si_r32_Xm32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvttss2si"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 44 }
+}
+let vcvttss2si_r64_Xm32 = {
+    id = Vcvttss2si_r64_Xm32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vcvttss2si"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 44 }
+}
+let vdivpd_X_X_Xm128 = {
+    id = Vdivpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vdivpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 94 }
+}
+let vdivpd_Y_Y_Ym256 = {
+    id = Vdivpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vdivpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 94 }
+}
+let vdivps_X_X_Xm128 = {
+    id = Vdivps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vdivps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 94 }
+}
+let vdivps_Y_Y_Ym256 = {
+    id = Vdivps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vdivps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 94 }
+}
+let vdivsd = {
+    id = Vdivsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vdivsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 94 }
+}
+let vdivss = {
+    id = Vdivss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vdivss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 94 }
+}
+let vdppd = {
+    id = Vdppd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vdppd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 65 }
+}
+let vdpps_X_X_Xm128 = {
+    id = Vdpps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vdpps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 64 }
+}
+let vdpps_Y_Y_Ym256 = {
+    id = Vdpps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vdpps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 64 }
+}
+let vextractf128 = {
+    id = Vextractf128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vextractf128"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 25 }
+}
+let vextracti128 = {
+    id = Vextracti128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vextracti128"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 57 }
+}
+let vextractps = {
+    id = Vextractps
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M32|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vextractps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 23 }
+}
+let vfmadd132pd_X_X_Xm128 = {
+    id = Vfmadd132pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 152 }
+}
+let vfmadd132pd_Y_Y_Ym256 = {
+    id = Vfmadd132pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 152 }
+}
+let vfmadd132ps_X_X_Xm128 = {
+    id = Vfmadd132ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 152 }
+}
+let vfmadd132ps_Y_Y_Ym256 = {
+    id = Vfmadd132ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 152 }
+}
+let vfmadd132sd = {
+    id = Vfmadd132sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd132sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 153 }
+}
+let vfmadd132ss = {
+    id = Vfmadd132ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd132ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 153 }
+}
+let vfmadd213pd_X_X_Xm128 = {
+    id = Vfmadd213pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 168 }
+}
+let vfmadd213pd_Y_Y_Ym256 = {
+    id = Vfmadd213pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 168 }
+}
+let vfmadd213ps_X_X_Xm128 = {
+    id = Vfmadd213ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 168 }
+}
+let vfmadd213ps_Y_Y_Ym256 = {
+    id = Vfmadd213ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 168 }
+}
+let vfmadd213sd = {
+    id = Vfmadd213sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd213sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 169 }
+}
+let vfmadd213ss = {
+    id = Vfmadd213ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd213ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 169 }
+}
+let vfmadd231pd_X_X_Xm128 = {
+    id = Vfmadd231pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 184 }
+}
+let vfmadd231pd_Y_Y_Ym256 = {
+    id = Vfmadd231pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 184 }
+}
+let vfmadd231ps_X_X_Xm128 = {
+    id = Vfmadd231ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 184 }
+}
+let vfmadd231ps_Y_Y_Ym256 = {
+    id = Vfmadd231ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 184 }
+}
+let vfmadd231sd = {
+    id = Vfmadd231sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd231sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 185 }
+}
+let vfmadd231ss = {
+    id = Vfmadd231ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmadd231ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 185 }
+}
+let vfmaddsub132pd_X_X_Xm128 = {
+    id = Vfmaddsub132pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 150 }
+}
+let vfmaddsub132pd_Y_Y_Ym256 = {
+    id = Vfmaddsub132pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 150 }
+}
+let vfmaddsub132ps_X_X_Xm128 = {
+    id = Vfmaddsub132ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 150 }
+}
+let vfmaddsub132ps_Y_Y_Ym256 = {
+    id = Vfmaddsub132ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 150 }
+}
+let vfmaddsub213pd_X_X_Xm128 = {
+    id = Vfmaddsub213pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 166 }
+}
+let vfmaddsub213pd_Y_Y_Ym256 = {
+    id = Vfmaddsub213pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 166 }
+}
+let vfmaddsub213ps_X_X_Xm128 = {
+    id = Vfmaddsub213ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 166 }
+}
+let vfmaddsub213ps_Y_Y_Ym256 = {
+    id = Vfmaddsub213ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 166 }
+}
+let vfmaddsub231pd_X_X_Xm128 = {
+    id = Vfmaddsub231pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 182 }
+}
+let vfmaddsub231pd_Y_Y_Ym256 = {
+    id = Vfmaddsub231pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 182 }
+}
+let vfmaddsub231ps_X_X_Xm128 = {
+    id = Vfmaddsub231ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 182 }
+}
+let vfmaddsub231ps_Y_Y_Ym256 = {
+    id = Vfmaddsub231ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmaddsub231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 182 }
+}
+let vfmsub132pd_X_X_Xm128 = {
+    id = Vfmsub132pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 154 }
+}
+let vfmsub132pd_Y_Y_Ym256 = {
+    id = Vfmsub132pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 154 }
+}
+let vfmsub132ps_X_X_Xm128 = {
+    id = Vfmsub132ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 154 }
+}
+let vfmsub132ps_Y_Y_Ym256 = {
+    id = Vfmsub132ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 154 }
+}
+let vfmsub132sd = {
+    id = Vfmsub132sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub132sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 155 }
+}
+let vfmsub132ss = {
+    id = Vfmsub132ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub132ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 155 }
+}
+let vfmsub213pd_X_X_Xm128 = {
+    id = Vfmsub213pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 170 }
+}
+let vfmsub213pd_Y_Y_Ym256 = {
+    id = Vfmsub213pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 170 }
+}
+let vfmsub213ps_X_X_Xm128 = {
+    id = Vfmsub213ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 170 }
+}
+let vfmsub213ps_Y_Y_Ym256 = {
+    id = Vfmsub213ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 170 }
+}
+let vfmsub213sd = {
+    id = Vfmsub213sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub213sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 171 }
+}
+let vfmsub213ss = {
+    id = Vfmsub213ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub213ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 171 }
+}
+let vfmsub231pd_X_X_Xm128 = {
+    id = Vfmsub231pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 186 }
+}
+let vfmsub231pd_Y_Y_Ym256 = {
+    id = Vfmsub231pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 186 }
+}
+let vfmsub231ps_X_X_Xm128 = {
+    id = Vfmsub231ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 186 }
+}
+let vfmsub231ps_Y_Y_Ym256 = {
+    id = Vfmsub231ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 186 }
+}
+let vfmsub231sd = {
+    id = Vfmsub231sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub231sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 187 }
+}
+let vfmsub231ss = {
+    id = Vfmsub231ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsub231ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 187 }
+}
+let vfmsubadd132pd_X_X_Xm128 = {
+    id = Vfmsubadd132pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 151 }
+}
+let vfmsubadd132pd_Y_Y_Ym256 = {
+    id = Vfmsubadd132pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 151 }
+}
+let vfmsubadd132ps_X_X_Xm128 = {
+    id = Vfmsubadd132ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 151 }
+}
+let vfmsubadd132ps_Y_Y_Ym256 = {
+    id = Vfmsubadd132ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 151 }
+}
+let vfmsubadd213pd_X_X_Xm128 = {
+    id = Vfmsubadd213pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 167 }
+}
+let vfmsubadd213pd_Y_Y_Ym256 = {
+    id = Vfmsubadd213pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 167 }
+}
+let vfmsubadd213ps_X_X_Xm128 = {
+    id = Vfmsubadd213ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 167 }
+}
+let vfmsubadd213ps_Y_Y_Ym256 = {
+    id = Vfmsubadd213ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 167 }
+}
+let vfmsubadd231pd_X_X_Xm128 = {
+    id = Vfmsubadd231pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 183 }
+}
+let vfmsubadd231pd_Y_Y_Ym256 = {
+    id = Vfmsubadd231pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 183 }
+}
+let vfmsubadd231ps_X_X_Xm128 = {
+    id = Vfmsubadd231ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 183 }
+}
+let vfmsubadd231ps_Y_Y_Ym256 = {
+    id = Vfmsubadd231ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfmsubadd231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 183 }
+}
+let vfnmadd132pd_X_X_Xm128 = {
+    id = Vfnmadd132pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 156 }
+}
+let vfnmadd132pd_Y_Y_Ym256 = {
+    id = Vfnmadd132pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 156 }
+}
+let vfnmadd132ps_X_X_Xm128 = {
+    id = Vfnmadd132ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 156 }
+}
+let vfnmadd132ps_Y_Y_Ym256 = {
+    id = Vfnmadd132ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 156 }
+}
+let vfnmadd132sd = {
+    id = Vfnmadd132sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd132sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 157 }
+}
+let vfnmadd132ss = {
+    id = Vfnmadd132ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd132ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 157 }
+}
+let vfnmadd213pd_X_X_Xm128 = {
+    id = Vfnmadd213pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 172 }
+}
+let vfnmadd213pd_Y_Y_Ym256 = {
+    id = Vfnmadd213pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 172 }
+}
+let vfnmadd213ps_X_X_Xm128 = {
+    id = Vfnmadd213ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 172 }
+}
+let vfnmadd213ps_Y_Y_Ym256 = {
+    id = Vfnmadd213ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 172 }
+}
+let vfnmadd213sd = {
+    id = Vfnmadd213sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd213sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 173 }
+}
+let vfnmadd213ss = {
+    id = Vfnmadd213ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd213ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 173 }
+}
+let vfnmadd231pd_X_X_Xm128 = {
+    id = Vfnmadd231pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 188 }
+}
+let vfnmadd231pd_Y_Y_Ym256 = {
+    id = Vfnmadd231pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 188 }
+}
+let vfnmadd231ps_X_X_Xm128 = {
+    id = Vfnmadd231ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 188 }
+}
+let vfnmadd231ps_Y_Y_Ym256 = {
+    id = Vfnmadd231ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 188 }
+}
+let vfnmadd231sd = {
+    id = Vfnmadd231sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd231sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 189 }
+}
+let vfnmadd231ss = {
+    id = Vfnmadd231ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmadd231ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 189 }
+}
+let vfnmsub132pd_X_X_Xm128 = {
+    id = Vfnmsub132pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 158 }
+}
+let vfnmsub132pd_Y_Y_Ym256 = {
+    id = Vfnmsub132pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub132pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 158 }
+}
+let vfnmsub132ps_X_X_Xm128 = {
+    id = Vfnmsub132ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 158 }
+}
+let vfnmsub132ps_Y_Y_Ym256 = {
+    id = Vfnmsub132ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub132ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 158 }
+}
+let vfnmsub132sd = {
+    id = Vfnmsub132sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub132sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 159 }
+}
+let vfnmsub132ss = {
+    id = Vfnmsub132ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub132ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 159 }
+}
+let vfnmsub213pd_X_X_Xm128 = {
+    id = Vfnmsub213pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 174 }
+}
+let vfnmsub213pd_Y_Y_Ym256 = {
+    id = Vfnmsub213pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub213pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 174 }
+}
+let vfnmsub213ps_X_X_Xm128 = {
+    id = Vfnmsub213ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 174 }
+}
+let vfnmsub213ps_Y_Y_Ym256 = {
+    id = Vfnmsub213ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub213ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 174 }
+}
+let vfnmsub213sd = {
+    id = Vfnmsub213sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub213sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 175 }
+}
+let vfnmsub213ss = {
+    id = Vfnmsub213ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub213ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 175 }
+}
+let vfnmsub231pd_X_X_Xm128 = {
+    id = Vfnmsub231pd_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 190 }
+}
+let vfnmsub231pd_Y_Y_Ym256 = {
+    id = Vfnmsub231pd_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub231pd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 190 }
+}
+let vfnmsub231ps_X_X_Xm128 = {
+    id = Vfnmsub231ps_X_X_Xm128
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 190 }
+}
+let vfnmsub231ps_Y_Y_Ym256 = {
+    id = Vfnmsub231ps_Y_Y_Ym256
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub231ps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 190 }
+}
+let vfnmsub231sd = {
+    id = Vfnmsub231sd
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub231sd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 191 }
+}
+let vfnmsub231ss = {
+    id = Vfnmsub231ss
+  ; ext = [|FMA|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vfnmsub231ss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 191 }
+}
+let vgatherdpd_X_M32X_X = {
+    id = Vgatherdpd_X_M32X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM32X|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vgatherdpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 146 }
+}
+let vgatherdpd_Y_M32X_Y = {
+    id = Vgatherdpd_Y_M32X_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|VM32X|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vgatherdpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 146 }
+}
+let vgatherdps_X_M32X_X = {
+    id = Vgatherdps_X_M32X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM32X|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vgatherdps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 146 }
+}
+let vgatherdps_Y_M32Y_Y = {
+    id = Vgatherdps_Y_M32Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|VM32Y|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vgatherdps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 146 }
+}
+let vgatherqpd_X_M64X_X = {
+    id = Vgatherqpd_X_M64X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM64X|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vgatherqpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 147 }
+}
+let vgatherqpd_Y_M64Y_Y = {
+    id = Vgatherqpd_Y_M64Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|VM64Y|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vgatherqpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 147 }
+}
+let vgatherqps_X_M64X_X = {
+    id = Vgatherqps_X_M64X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM64X|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vgatherqps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 147 }
+}
+let vgatherqps_X_M64Y_X = {
+    id = Vgatherqps_X_M64Y_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM64Y|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vgatherqps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 147 }
+}
+let vhaddpd_X_X_Xm128 = {
+    id = Vhaddpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vhaddpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 124 }
+}
+let vhaddpd_Y_Y_Ym256 = {
+    id = Vhaddpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vhaddpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 124 }
+}
+let vhaddps_X_X_Xm128 = {
+    id = Vhaddps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vhaddps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 124 }
+}
+let vhaddps_Y_Y_Ym256 = {
+    id = Vhaddps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vhaddps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 124 }
+}
+let vhsubpd_X_X_Xm128 = {
+    id = Vhsubpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vhsubpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 125 }
+}
+let vhsubpd_Y_Y_Ym256 = {
+    id = Vhsubpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vhsubpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 125 }
+}
+let vhsubps_X_X_Xm128 = {
+    id = Vhsubps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vhsubps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 125 }
+}
+let vhsubps_Y_Y_Ym256 = {
+    id = Vhsubps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vhsubps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 125 }
+}
+let vinsertf128 = {
+    id = Vinsertf128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vinsertf128"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 24 }
+}
+let vinserti128 = {
+    id = Vinserti128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vinserti128"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 56 }
+}
+let vinsertps = {
+    id = Vinsertps
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vinsertps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 33 }
+}
+let vlddqu_X_m128 = {
+    id = Vlddqu_X_m128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vlddqu"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 240 }
+}
+let vlddqu_Y_m256 = {
+    id = Vlddqu_Y_m256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vlddqu"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 240 }
+}
+let vldmxcsr = {
+    id = Vldmxcsr
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vldmxcsr"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 2; opcode = 174 }
+}
+let vmaskmovdqu = {
+    id = Vmaskmovdqu
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Pin RDI; enc = Implicit }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovdqu"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 247 }
+}
+let vmaskmovpd_X_X_m128 = {
+    id = Vmaskmovpd_X_X_m128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 45 }
+}
+let vmaskmovpd_Y_Y_m256 = {
+    id = Vmaskmovpd_Y_Y_m256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 45 }
+}
+let vmaskmovpd_m128_X_X = {
+    id = Vmaskmovpd_m128_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 47 }
+}
+let vmaskmovpd_m256_Y_Y = {
+    id = Vmaskmovpd_m256_Y_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 47 }
+}
+let vmaskmovps_X_X_m128 = {
+    id = Vmaskmovps_X_X_m128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 44 }
+}
+let vmaskmovps_Y_Y_m256 = {
+    id = Vmaskmovps_Y_Y_m256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 44 }
+}
+let vmaskmovps_m128_X_X = {
+    id = Vmaskmovps_m128_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 46 }
+}
+let vmaskmovps_m256_Y_Y = {
+    id = Vmaskmovps_m256_Y_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmaskmovps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 46 }
+}
+let vmaxpd_X_X_Xm128 = {
+    id = Vmaxpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaxpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 95 }
+}
+let vmaxpd_Y_Y_Ym256 = {
+    id = Vmaxpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaxpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 95 }
+}
+let vmaxps_X_X_Xm128 = {
+    id = Vmaxps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaxps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 95 }
+}
+let vmaxps_Y_Y_Ym256 = {
+    id = Vmaxps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaxps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 95 }
+}
+let vmaxsd = {
+    id = Vmaxsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaxsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 95 }
+}
+let vmaxss = {
+    id = Vmaxss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmaxss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 95 }
+}
+let vminpd_X_X_Xm128 = {
+    id = Vminpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vminpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 93 }
+}
+let vminpd_Y_Y_Ym256 = {
+    id = Vminpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vminpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 93 }
+}
+let vminps_X_X_Xm128 = {
+    id = Vminps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vminps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 93 }
+}
+let vminps_Y_Y_Ym256 = {
+    id = Vminps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vminps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 93 }
+}
+let vminsd = {
+    id = Vminsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vminsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 93 }
+}
+let vminss = {
+    id = Vminss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vminss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 93 }
+}
+let vmovapd_X_Xm128 = {
+    id = Vmovapd_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovapd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 40 }
+}
+let vmovapd_Xm128_X = {
+    id = Vmovapd_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovapd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
+}
+let vmovapd_Y_Ym256 = {
+    id = Vmovapd_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovapd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 40 }
+}
+let vmovapd_Ym256_Y = {
+    id = Vmovapd_Ym256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovapd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
+}
+let vmovapd_m128_X = {
+    id = Vmovapd_m128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovapd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
+}
+let vmovapd_m256_Y = {
+    id = Vmovapd_m256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovapd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
+}
+let vmovaps_X_Xm128 = {
+    id = Vmovaps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovaps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 40 }
+}
+let vmovaps_Xm128_X = {
+    id = Vmovaps_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovaps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 41 }
+}
+let vmovaps_Y_Ym256 = {
+    id = Vmovaps_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovaps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 40 }
+}
+let vmovaps_Ym256_Y = {
+    id = Vmovaps_Ym256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovaps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 41 }
+}
+let vmovd_X_r32m32 = {
+    id = Vmovd_X_r32m32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 110 }
+}
+let vmovd_r32m32_X = {
+    id = Vmovd_r32m32_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 126 }
+}
+let vmovddup_X_Xm64 = {
+    id = Vmovddup_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovddup"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 18 }
+}
+let vmovddup_Y_Ym256 = {
+    id = Vmovddup_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovddup"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 18 }
+}
+let vmovdqa_X_Xm128 = {
+    id = Vmovdqa_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovdqa"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 111 }
+}
+let vmovdqa_Xm128_X = {
+    id = Vmovdqa_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovdqa"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 127 }
+}
+let vmovdqa_Y_Ym256 = {
+    id = Vmovdqa_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovdqa"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 111 }
+}
+let vmovdqa_Ym256_Y = {
+    id = Vmovdqa_Ym256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovdqa"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 127 }
+}
+let vmovdqu_X_Xm128 = {
+    id = Vmovdqu_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovdqu"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 111 }
+}
+let vmovdqu_Xm128_X = {
+    id = Vmovdqu_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovdqu"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 127 }
+}
+let vmovdqu_Y_Ym256 = {
+    id = Vmovdqu_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovdqu"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 111 }
+}
+let vmovdqu_Ym256_Y = {
+    id = Vmovdqu_Ym256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovdqu"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 127 }
+}
+let vmovhlps = {
+    id = Vmovhlps
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovhlps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 18 }
+}
+let vmovhpd_X_X_m64 = {
+    id = Vmovhpd_X_X_m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovhpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 22 }
+}
+let vmovhpd_m64_X = {
+    id = Vmovhpd_m64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovhpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 23 }
+}
+let vmovhps_X_X_m64 = {
+    id = Vmovhps_X_X_m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovhps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 22 }
+}
+let vmovhps_m64_X = {
+    id = Vmovhps_m64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovhps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 23 }
+}
+let vmovlhps = {
+    id = Vmovlhps
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovlhps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 22 }
+}
+let vmovlpd_X_X_m64 = {
+    id = Vmovlpd_X_X_m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovlpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 18 }
+}
+let vmovlpd_m64_X = {
+    id = Vmovlpd_m64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovlpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 19 }
+}
+let vmovlps_X_X_m64 = {
+    id = Vmovlps_X_X_m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovlps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 18 }
+}
+let vmovlps_m64_X = {
+    id = Vmovlps_m64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovlps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 19 }
+}
+let vmovmskpd_r64_X = {
+    id = Vmovmskpd_r64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovmskpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 80 }
+}
+let vmovmskpd_r64_Y = {
+    id = Vmovmskpd_r64_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovmskpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 80 }
+}
+let vmovmskps_r64_X = {
+    id = Vmovmskps_r64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovmskps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 80 }
+}
+let vmovmskps_r64_Y = {
+    id = Vmovmskps_r64_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovmskps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 80 }
+}
+let vmovntdq_m128_X = {
+    id = Vmovntdq_m128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovntdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 231 }
+}
+let vmovntdq_m256_Y = {
+    id = Vmovntdq_m256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovntdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 231 }
+}
+let vmovntdqa_X_m128 = {
+    id = Vmovntdqa_X_m128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovntdqa"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 42 }
+}
+let vmovntdqa_Y_m256 = {
+    id = Vmovntdqa_Y_m256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovntdqa"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 42 }
+}
+let vmovntpd_m128_X = {
+    id = Vmovntpd_m128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovntpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 43 }
+}
+let vmovntpd_m256_Y = {
+    id = Vmovntpd_m256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovntpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 43 }
+}
+let vmovntps_m128_X = {
+    id = Vmovntps_m128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovntps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 43 }
+}
+let vmovntps_m256_Y = {
+    id = Vmovntps_m256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovntps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 43 }
+}
+let vmovq_X_Xm64 = {
+    id = Vmovq_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 126 }
+}
+let vmovq_X_r64m64 = {
+    id = Vmovq_X_r64m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 110 }
+}
+let vmovq_Xm64_X = {
+    id = Vmovq_Xm64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 214 }
+}
+let vmovq_r64m64_X = {
+    id = Vmovq_r64m64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 126 }
+}
+let vmovsd_X_X_X = {
+    id = Vmovsd_X_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 16 }
+}
+let vmovsd_X_m64 = {
+    id = Vmovsd_X_m64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 16 }
+}
+let vmovsd_m64_X = {
+    id = Vmovsd_m64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 17 }
+}
+let vmovshdup_X_Xm128 = {
+    id = Vmovshdup_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovshdup"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 22 }
+}
+let vmovshdup_Y_Ym256 = {
+    id = Vmovshdup_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovshdup"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 22 }
+}
+let vmovsldup_X_Xm128 = {
+    id = Vmovsldup_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovsldup"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 18 }
+}
+let vmovsldup_Y_Ym256 = {
+    id = Vmovsldup_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovsldup"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 18 }
+}
+let vmovss_X_X_X = {
+    id = Vmovss_X_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 16 }
+}
+let vmovss_X_m32 = {
+    id = Vmovss_X_m32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 16 }
+}
+let vmovss_m32_X = {
+    id = Vmovss_m32_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 17 }
+}
+let vmovupd_X_Xm128 = {
+    id = Vmovupd_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovupd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 16 }
+}
+let vmovupd_Xm128_X = {
+    id = Vmovupd_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovupd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 17 }
+}
+let vmovupd_Y_Ym256 = {
+    id = Vmovupd_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovupd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 16 }
+}
+let vmovupd_Ym256_Y = {
+    id = Vmovupd_Ym256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovupd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 17 }
+}
+let vmovupd_m128_X = {
+    id = Vmovupd_m128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovupd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 17 }
+}
+let vmovupd_m256_Y = {
+    id = Vmovupd_m256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovupd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 17 }
+}
+let vmovups_X_Xm128 = {
+    id = Vmovups_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovups"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 16 }
+}
+let vmovups_Xm128_X = {
+    id = Vmovups_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovups"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 17 }
+}
+let vmovups_Y_Ym256 = {
+    id = Vmovups_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovups"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 16 }
+}
+let vmovups_Ym256_Y = {
+    id = Vmovups_Ym256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmovups"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 17 }
+}
+let vmpsadbw_X_X_Xm128 = {
+    id = Vmpsadbw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vmpsadbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 66 }
+}
+let vmpsadbw_Y_Y_Ym256 = {
+    id = Vmpsadbw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vmpsadbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 66 }
+}
+let vmulpd_X_X_Xm128 = {
+    id = Vmulpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmulpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 89 }
+}
+let vmulpd_Y_Y_Ym256 = {
+    id = Vmulpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmulpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 89 }
+}
+let vmulps_X_X_Xm128 = {
+    id = Vmulps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmulps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 89 }
+}
+let vmulps_Y_Y_Ym256 = {
+    id = Vmulps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmulps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 89 }
+}
+let vmulsd = {
+    id = Vmulsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmulsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 89 }
+}
+let vmulss = {
+    id = Vmulss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vmulss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 89 }
+}
+let vorpd_X_X_Xm128 = {
+    id = Vorpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vorpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 86 }
+}
+let vorpd_Y_Y_Ym256 = {
+    id = Vorpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vorpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 86 }
+}
+let vorps_X_X_Xm128 = {
+    id = Vorps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vorps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 86 }
+}
+let vorps_Y_Y_Ym256 = {
+    id = Vorps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vorps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 86 }
+}
+let vpabsb_X_Xm128 = {
+    id = Vpabsb_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpabsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 28 }
+}
+let vpabsb_Y_Ym256 = {
+    id = Vpabsb_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpabsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 28 }
+}
+let vpabsd_X_Xm128 = {
+    id = Vpabsd_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpabsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 30 }
+}
+let vpabsd_Y_Ym256 = {
+    id = Vpabsd_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpabsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 30 }
+}
+let vpabsw_X_Xm128 = {
+    id = Vpabsw_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpabsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 29 }
+}
+let vpabsw_Y_Ym256 = {
+    id = Vpabsw_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpabsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 29 }
+}
+let vpackssdw_X_X_Xm128 = {
+    id = Vpackssdw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpackssdw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 107 }
+}
+let vpackssdw_Y_Y_Ym256 = {
+    id = Vpackssdw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpackssdw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 107 }
+}
+let vpacksswb_X_X_Xm128 = {
+    id = Vpacksswb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpacksswb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 99 }
+}
+let vpacksswb_Y_Y_Ym256 = {
+    id = Vpacksswb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpacksswb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 99 }
+}
+let vpackusdw_X_X_Xm128 = {
+    id = Vpackusdw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpackusdw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 43 }
+}
+let vpackusdw_Y_Y_Ym256 = {
+    id = Vpackusdw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpackusdw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 43 }
+}
+let vpackuswb_X_X_Xm128 = {
+    id = Vpackuswb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpackuswb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 103 }
+}
+let vpackuswb_Y_Y_Ym256 = {
+    id = Vpackuswb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpackuswb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 103 }
+}
+let vpaddb_X_X_Xm128 = {
+    id = Vpaddb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 252 }
+}
+let vpaddb_Y_Y_Ym256 = {
+    id = Vpaddb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 252 }
+}
+let vpaddd_X_X_Xm128 = {
+    id = Vpaddd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 254 }
+}
+let vpaddd_Y_Y_Ym256 = {
+    id = Vpaddd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 254 }
+}
+let vpaddq_X_X_Xm128 = {
+    id = Vpaddq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 212 }
+}
+let vpaddq_Y_Y_Ym256 = {
+    id = Vpaddq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 212 }
+}
+let vpaddsb_X_X_Xm128 = {
+    id = Vpaddsb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 236 }
+}
+let vpaddsb_Y_Y_Ym256 = {
+    id = Vpaddsb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 236 }
+}
+let vpaddsw_X_X_Xm128 = {
+    id = Vpaddsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 237 }
+}
+let vpaddsw_Y_Y_Ym256 = {
+    id = Vpaddsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 237 }
+}
+let vpaddusb_X_X_Xm128 = {
+    id = Vpaddusb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddusb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 220 }
+}
+let vpaddusb_Y_Y_Ym256 = {
+    id = Vpaddusb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddusb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 220 }
+}
+let vpaddusw_X_X_Xm128 = {
+    id = Vpaddusw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddusw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 221 }
+}
+let vpaddusw_Y_Y_Ym256 = {
+    id = Vpaddusw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddusw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 221 }
+}
+let vpaddw_X_X_Xm128 = {
+    id = Vpaddw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 253 }
+}
+let vpaddw_Y_Y_Ym256 = {
+    id = Vpaddw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpaddw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 253 }
+}
+let vpalignr_X_X_Xm128 = {
+    id = Vpalignr_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpalignr"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 15 }
+}
+let vpalignr_Y_Y_Ym256 = {
+    id = Vpalignr_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpalignr"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 15 }
+}
+let vpand_X_X_Xm128 = {
+    id = Vpand_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpand"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 219 }
+}
+let vpand_Y_Y_Ym256 = {
+    id = Vpand_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpand"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 219 }
+}
+let vpandn_X_X_Xm128 = {
+    id = Vpandn_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpandn"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 223 }
+}
+let vpandn_Y_Y_Ym256 = {
+    id = Vpandn_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpandn"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 223 }
+}
+let vpavgb_X_X_Xm128 = {
+    id = Vpavgb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpavgb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 224 }
+}
+let vpavgb_Y_Y_Ym256 = {
+    id = Vpavgb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpavgb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 224 }
+}
+let vpavgw_X_X_Xm128 = {
+    id = Vpavgw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpavgw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 227 }
+}
+let vpavgw_Y_Y_Ym256 = {
+    id = Vpavgw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpavgw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 227 }
+}
+let vpblendd_X_X_Xm128 = {
+    id = Vpblendd_X_X_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpblendd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 2 }
+}
+let vpblendd_Y_Y_Ym256 = {
+    id = Vpblendd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpblendd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 2 }
+}
+let vpblendvb_X_X_Xm128_X = {
+    id = Vpblendvb_X_X_Xm128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Immediate }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_reg
+  ; mnemonic = "vpblendvb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 76 }
+}
+let vpblendvb_Y_Y_Ym256_Y = {
+    id = Vpblendvb_Y_Y_Ym256_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Immediate }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_reg
+  ; mnemonic = "vpblendvb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 76 }
+}
+let vpblendw_X_X_Xm128 = {
+    id = Vpblendw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpblendw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 14 }
+}
+let vpblendw_Y_Y_Ym256 = {
+    id = Vpblendw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpblendw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 14 }
+}
+let vpbroadcastb_X_Xm8 = {
+    id = Vpbroadcastb_X_Xm8
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M8|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpbroadcastb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 120 }
+}
+let vpbroadcastb_Y_Xm8 = {
+    id = Vpbroadcastb_Y_Xm8
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M8|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpbroadcastb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 120 }
+}
+let vpbroadcastd_X_Xm32 = {
+    id = Vpbroadcastd_X_Xm32
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpbroadcastd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 88 }
+}
+let vpbroadcastd_Y_Xm32 = {
+    id = Vpbroadcastd_Y_Xm32
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpbroadcastd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 88 }
+}
+let vpbroadcastq_X_Xm64 = {
+    id = Vpbroadcastq_X_Xm64
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpbroadcastq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 89 }
+}
+let vpbroadcastq_Y_Xm64 = {
+    id = Vpbroadcastq_Y_Xm64
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpbroadcastq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 89 }
+}
+let vpbroadcastw_X_Xm16 = {
+    id = Vpbroadcastw_X_Xm16
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpbroadcastw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 121 }
+}
+let vpbroadcastw_Y_Xm16 = {
+    id = Vpbroadcastw_Y_Xm16
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpbroadcastw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 121 }
+}
+let vpclmulqdq = {
+    id = Vpclmulqdq
+  ; ext = [|PCLMULQDQ;AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpclmulqdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 68 }
+}
+let vpcmpeqb_X_X_Xm128 = {
+    id = Vpcmpeqb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpeqb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 116 }
+}
+let vpcmpeqb_Y_Y_Ym256 = {
+    id = Vpcmpeqb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpeqb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 116 }
+}
+let vpcmpeqd_X_X_Xm128 = {
+    id = Vpcmpeqd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpeqd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 118 }
+}
+let vpcmpeqd_Y_Y_Ym256 = {
+    id = Vpcmpeqd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpeqd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 118 }
+}
+let vpcmpeqq_X_X_Xm128 = {
+    id = Vpcmpeqq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpeqq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
+}
+let vpcmpeqq_Y_Y_Ym256 = {
+    id = Vpcmpeqq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpeqq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
+}
+let vpcmpeqw_X_X_Xm128 = {
+    id = Vpcmpeqw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpeqw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 117 }
+}
+let vpcmpeqw_Y_Y_Ym256 = {
+    id = Vpcmpeqw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpeqw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 117 }
+}
+let vpcmpestri = {
+    id = Vpcmpestri
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin RAX; enc = Implicit };{ loc = Pin RDX; enc = Implicit }|]
+  ; res = Res [|{ loc = Pin RCX; enc = Implicit }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpcmpestri"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 97 }
+}
+let vpcmpestrm = {
+    id = Vpcmpestrm
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Pin RAX; enc = Implicit };{ loc = Pin RDX; enc = Implicit }|]
+  ; res = Res [|{ loc = Pin XMM0; enc = Implicit }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpcmpestrm"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 96 }
+}
+let vpcmpgtb_X_X_Xm128 = {
+    id = Vpcmpgtb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpgtb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 100 }
+}
+let vpcmpgtb_Y_Y_Ym256 = {
+    id = Vpcmpgtb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpgtb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 100 }
+}
+let vpcmpgtd_X_X_Xm128 = {
+    id = Vpcmpgtd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpgtd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 102 }
+}
+let vpcmpgtd_Y_Y_Ym256 = {
+    id = Vpcmpgtd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpgtd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 102 }
+}
+let vpcmpgtq_X_X_Xm128 = {
+    id = Vpcmpgtq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpgtq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 55 }
+}
+let vpcmpgtq_Y_Y_Ym256 = {
+    id = Vpcmpgtq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpgtq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 55 }
+}
+let vpcmpgtw_X_X_Xm128 = {
+    id = Vpcmpgtw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpgtw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 101 }
+}
+let vpcmpgtw_Y_Y_Ym256 = {
+    id = Vpcmpgtw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpcmpgtw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 101 }
+}
+let vpcmpistri = {
+    id = Vpcmpistri
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Pin RCX; enc = Implicit }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpcmpistri"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 99 }
+}
+let vpcmpistrm = {
+    id = Vpcmpistrm
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Pin XMM0; enc = Implicit }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpcmpistrm"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 98 }
+}
+let vperm2f128 = {
+    id = Vperm2f128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vperm2f128"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 6 }
+}
+let vperm2i128 = {
+    id = Vperm2i128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vperm2i128"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 70 }
+}
+let vpermd = {
+    id = Vpermd
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpermd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 54 }
+}
+let vpermilpd_X_X_Xm128 = {
+    id = Vpermilpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpermilpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 13 }
+}
+let vpermilpd_X_Xm128 = {
+    id = Vpermilpd_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpermilpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 5 }
+}
+let vpermilpd_Y_Y_Ym256 = {
+    id = Vpermilpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpermilpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 13 }
+}
+let vpermilpd_Y_Ym256 = {
+    id = Vpermilpd_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpermilpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 5 }
+}
+let vpermilps_X_X_Xm128 = {
+    id = Vpermilps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpermilps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 12 }
+}
+let vpermilps_X_Xm128 = {
+    id = Vpermilps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpermilps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 4 }
+}
+let vpermilps_Y_Y_Ym256 = {
+    id = Vpermilps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpermilps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 12 }
+}
+let vpermilps_Y_Ym256 = {
+    id = Vpermilps_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpermilps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 4 }
+}
+let vpermpd = {
+    id = Vpermpd
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpermpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 1 }
+}
+let vpermps = {
+    id = Vpermps
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpermps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 22 }
+}
+let vpermq = {
+    id = Vpermq
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpermq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 0 }
+}
+let vpextrb = {
+    id = Vpextrb
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M8|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpextrb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 20 }
+}
+let vpextrd = {
+    id = Vpextrd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpextrd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 22 }
+}
+let vpextrq = {
+    id = Vpextrq
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpextrq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 22 }
+}
+let vpextrw_r64_X = {
+    id = Vpextrw_r64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpextrw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 197 }
+}
+let vpextrw_r64m16_X = {
+    id = Vpextrw_r64m16_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|R64;M16|]; enc = RM_rm }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpextrw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 21 }
+}
+let vpgatherdd_X_M32X_X = {
+    id = Vpgatherdd_X_M32X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM32X|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vpgatherdd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 144 }
+}
+let vpgatherdd_Y_M32Y_Y = {
+    id = Vpgatherdd_Y_M32Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|VM32Y|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vpgatherdd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 144 }
+}
+let vpgatherdq_X_M32X_X = {
+    id = Vpgatherdq_X_M32X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM32X|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vpgatherdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 144 }
+}
+let vpgatherdq_Y_M32X_Y = {
+    id = Vpgatherdq_Y_M32X_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|VM32X|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vpgatherdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 144 }
+}
+let vpgatherqd_X_M64X_X = {
+    id = Vpgatherqd_X_M64X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM64X|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vpgatherqd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 145 }
+}
+let vpgatherqd_X_M64Y_X = {
+    id = Vpgatherqd_X_M64Y_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM64Y|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vpgatherqd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 145 }
+}
+let vpgatherqq_X_M64X_X = {
+    id = Vpgatherqq_X_M64X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|VM64X|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vpgatherqq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 145 }
+}
+let vpgatherqq_Y_M64Y_Y = {
+    id = Vpgatherqq_Y_M64Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|VM64Y|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "vpgatherqq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 145 }
+}
+let vphaddd_X_X_Xm128 = {
+    id = Vphaddd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphaddd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 2 }
+}
+let vphaddd_Y_Y_Ym256 = {
+    id = Vphaddd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphaddd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 2 }
+}
+let vphaddsw_X_X_Xm128 = {
+    id = Vphaddsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphaddsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 3 }
+}
+let vphaddsw_Y_Y_Ym256 = {
+    id = Vphaddsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphaddsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 3 }
+}
+let vphaddw_X_X_Xm128 = {
+    id = Vphaddw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphaddw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 1 }
+}
+let vphaddw_Y_Y_Ym256 = {
+    id = Vphaddw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphaddw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 1 }
+}
+let vphminposuw = {
+    id = Vphminposuw
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphminposuw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 65 }
+}
+let vphsubd_X_X_Xm128 = {
+    id = Vphsubd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphsubd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 6 }
+}
+let vphsubd_Y_Y_Ym256 = {
+    id = Vphsubd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphsubd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 6 }
+}
+let vphsubsw_X_X_Xm128 = {
+    id = Vphsubsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphsubsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 7 }
+}
+let vphsubsw_Y_Y_Ym256 = {
+    id = Vphsubsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphsubsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 7 }
+}
+let vphsubw_X_X_Xm128 = {
+    id = Vphsubw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphsubw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 5 }
+}
+let vphsubw_Y_Y_Ym256 = {
+    id = Vphsubw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vphsubw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 5 }
+}
+let vpinsrb = {
+    id = Vpinsrb
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M8|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpinsrb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 32 }
+}
+let vpinsrd = {
+    id = Vpinsrd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpinsrd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
+}
+let vpinsrq = {
+    id = Vpinsrq
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpinsrq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
+}
+let vpinsrw = {
+    id = Vpinsrw
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpinsrw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 196 }
+}
+let vpmaddubsw_X_X_Xm128 = {
+    id = Vpmaddubsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaddubsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 4 }
+}
+let vpmaddubsw_Y_Y_Ym256 = {
+    id = Vpmaddubsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaddubsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 4 }
+}
+let vpmaddwd_X_X_Xm128 = {
+    id = Vpmaddwd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaddwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 245 }
+}
+let vpmaddwd_Y_Y_Ym256 = {
+    id = Vpmaddwd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaddwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 245 }
+}
+let vpmaskmovd_X_X_m128 = {
+    id = Vpmaskmovd_X_X_m128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaskmovd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 140 }
+}
+let vpmaskmovd_Y_Y_m256 = {
+    id = Vpmaskmovd_Y_Y_m256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaskmovd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 140 }
+}
+let vpmaskmovd_m128_X_X = {
+    id = Vpmaskmovd_m128_X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaskmovd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 142 }
+}
+let vpmaskmovd_m256_Y_Y = {
+    id = Vpmaskmovd_m256_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaskmovd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 142 }
+}
+let vpmaskmovq_X_X_m128 = {
+    id = Vpmaskmovq_X_X_m128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaskmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 140 }
+}
+let vpmaskmovq_Y_Y_m256 = {
+    id = Vpmaskmovq_Y_Y_m256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaskmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 140 }
+}
+let vpmaskmovq_m128_X_X = {
+    id = Vpmaskmovq_m128_X_X
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M128|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaskmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 142 }
+}
+let vpmaskmovq_m256_Y_Y = {
+    id = Vpmaskmovq_m256_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res [|{ loc = Temp [|M256|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaskmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 142 }
+}
+let vpmaxsb_X_X_Xm128 = {
+    id = Vpmaxsb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 60 }
+}
+let vpmaxsb_Y_Y_Ym256 = {
+    id = Vpmaxsb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 60 }
+}
+let vpmaxsd_X_X_Xm128 = {
+    id = Vpmaxsd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 61 }
+}
+let vpmaxsd_Y_Y_Ym256 = {
+    id = Vpmaxsd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 61 }
+}
+let vpmaxsw_X_X_Xm128 = {
+    id = Vpmaxsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 238 }
+}
+let vpmaxsw_Y_Y_Ym256 = {
+    id = Vpmaxsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 238 }
+}
+let vpmaxub_X_X_Xm128 = {
+    id = Vpmaxub_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxub"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 222 }
+}
+let vpmaxub_Y_Y_Ym256 = {
+    id = Vpmaxub_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxub"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 222 }
+}
+let vpmaxud_X_X_Xm128 = {
+    id = Vpmaxud_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxud"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 63 }
+}
+let vpmaxud_Y_Y_Ym256 = {
+    id = Vpmaxud_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxud"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 63 }
+}
+let vpmaxuw_X_X_Xm128 = {
+    id = Vpmaxuw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxuw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 62 }
+}
+let vpmaxuw_Y_Y_Ym256 = {
+    id = Vpmaxuw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmaxuw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 62 }
+}
+let vpminsb_X_X_Xm128 = {
+    id = Vpminsb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 56 }
+}
+let vpminsb_Y_Y_Ym256 = {
+    id = Vpminsb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 56 }
+}
+let vpminsd_X_X_Xm128 = {
+    id = Vpminsd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 57 }
+}
+let vpminsd_Y_Y_Ym256 = {
+    id = Vpminsd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 57 }
+}
+let vpminsw_X_X_Xm128 = {
+    id = Vpminsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 234 }
+}
+let vpminsw_Y_Y_Ym256 = {
+    id = Vpminsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 234 }
+}
+let vpminub_X_X_Xm128 = {
+    id = Vpminub_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminub"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 218 }
+}
+let vpminub_Y_Y_Ym256 = {
+    id = Vpminub_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminub"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 218 }
+}
+let vpminud_X_X_Xm128 = {
+    id = Vpminud_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminud"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 59 }
+}
+let vpminud_Y_Y_Ym256 = {
+    id = Vpminud_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminud"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 59 }
+}
+let vpminuw_X_X_Xm128 = {
+    id = Vpminuw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminuw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 58 }
+}
+let vpminuw_Y_Y_Ym256 = {
+    id = Vpminuw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpminuw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 58 }
+}
+let vpmovmskb_r64_X = {
+    id = Vpmovmskb_r64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovmskb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 215 }
+}
+let vpmovmskb_r64_Y = {
+    id = Vpmovmskb_r64_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovmskb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 215 }
+}
+let vpmovsxbd_X_Xm32 = {
+    id = Vpmovsxbd_X_Xm32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxbd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 33 }
+}
+let vpmovsxbd_Y_Xm64 = {
+    id = Vpmovsxbd_Y_Xm64
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxbd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 33 }
+}
+let vpmovsxbq_X_Xm16 = {
+    id = Vpmovsxbq_X_Xm16
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxbq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
+}
+let vpmovsxbq_Y_Xm32 = {
+    id = Vpmovsxbq_Y_Xm32
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxbq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
+}
+let vpmovsxbw_X_Xm64 = {
+    id = Vpmovsxbw_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 32 }
+}
+let vpmovsxbw_Y_Xm128 = {
+    id = Vpmovsxbw_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 32 }
+}
+let vpmovsxdq_X_Xm64 = {
+    id = Vpmovsxdq_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 37 }
+}
+let vpmovsxdq_Y_Xm128 = {
+    id = Vpmovsxdq_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 37 }
+}
+let vpmovsxwd_X_Xm64 = {
+    id = Vpmovsxwd_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 35 }
+}
+let vpmovsxwd_Y_Xm128 = {
+    id = Vpmovsxwd_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 35 }
+}
+let vpmovsxwq_X_Xm32 = {
+    id = Vpmovsxwq_X_Xm32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxwq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 36 }
+}
+let vpmovsxwq_Y_Xm64 = {
+    id = Vpmovsxwq_Y_Xm64
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovsxwq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 36 }
+}
+let vpmovzxbd_X_Xm32 = {
+    id = Vpmovzxbd_X_Xm32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxbd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 49 }
+}
+let vpmovzxbd_Y_Xm64 = {
+    id = Vpmovzxbd_Y_Xm64
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxbd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 49 }
+}
+let vpmovzxbq_X_Xm16 = {
+    id = Vpmovzxbq_X_Xm16
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M16|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxbq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 50 }
+}
+let vpmovzxbq_Y_Xm32 = {
+    id = Vpmovzxbq_Y_Xm32
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxbq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 50 }
+}
+let vpmovzxbw_X_Xm64 = {
+    id = Vpmovzxbw_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 48 }
+}
+let vpmovzxbw_Y_Xm128 = {
+    id = Vpmovzxbw_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 48 }
+}
+let vpmovzxdq_X_Xm64 = {
+    id = Vpmovzxdq_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 53 }
+}
+let vpmovzxdq_Y_Xm128 = {
+    id = Vpmovzxdq_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 53 }
+}
+let vpmovzxwd_X_Xm64 = {
+    id = Vpmovzxwd_X_Xm64
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 51 }
+}
+let vpmovzxwd_Y_Xm128 = {
+    id = Vpmovzxwd_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 51 }
+}
+let vpmovzxwq_X_Xm32 = {
+    id = Vpmovzxwq_X_Xm32
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxwq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 52 }
+}
+let vpmovzxwq_Y_Xm64 = {
+    id = Vpmovzxwq_Y_Xm64
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmovzxwq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 52 }
+}
+let vpmuldq_X_X_Xm128 = {
+    id = Vpmuldq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmuldq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 40 }
+}
+let vpmuldq_Y_Y_Ym256 = {
+    id = Vpmuldq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmuldq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 40 }
+}
+let vpmulhrsw_X_X_Xm128 = {
+    id = Vpmulhrsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmulhrsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 11 }
+}
+let vpmulhrsw_Y_Y_Ym256 = {
+    id = Vpmulhrsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmulhrsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 11 }
+}
+let vpmulhuw_X_X_Xm128 = {
+    id = Vpmulhuw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmulhuw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 228 }
+}
+let vpmulhuw_Y_Y_Ym256 = {
+    id = Vpmulhuw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmulhuw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 228 }
+}
+let vpmulhw_X_X_Xm128 = {
+    id = Vpmulhw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmulhw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 229 }
+}
+let vpmulhw_Y_Y_Ym256 = {
+    id = Vpmulhw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmulhw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 229 }
+}
+let vpmulld_X_X_Xm128 = {
+    id = Vpmulld_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmulld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 64 }
+}
+let vpmulld_Y_Y_Ym256 = {
+    id = Vpmulld_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmulld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 64 }
+}
+let vpmullw_X_X_Xm128 = {
+    id = Vpmullw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmullw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 213 }
+}
+let vpmullw_Y_Y_Ym256 = {
+    id = Vpmullw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmullw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 213 }
+}
+let vpmuludq_X_X_Xm128 = {
+    id = Vpmuludq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmuludq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 244 }
+}
+let vpmuludq_Y_Y_Ym256 = {
+    id = Vpmuludq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpmuludq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 244 }
+}
+let vpor_X_X_Xm128 = {
+    id = Vpor_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpor"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 235 }
+}
+let vpor_Y_Y_Ym256 = {
+    id = Vpor_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpor"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 235 }
+}
+let vpsadbw_X_X_Xm128 = {
+    id = Vpsadbw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsadbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 246 }
+}
+let vpsadbw_Y_Y_Ym256 = {
+    id = Vpsadbw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsadbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 246 }
+}
+let vpshufb_X_X_Xm128 = {
+    id = Vpshufb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpshufb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 0 }
+}
+let vpshufb_Y_Y_Ym256 = {
+    id = Vpshufb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpshufb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 0 }
+}
+let vpshufd_X_Xm128 = {
+    id = Vpshufd_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpshufd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 112 }
+}
+let vpshufd_Y_Ym256 = {
+    id = Vpshufd_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpshufd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 112 }
+}
+let vpshufhw_X_Xm128 = {
+    id = Vpshufhw_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpshufhw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 112 }
+}
+let vpshufhw_Y_Ym256 = {
+    id = Vpshufhw_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpshufhw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 112 }
+}
+let vpshuflw_X_Xm128 = {
+    id = Vpshuflw_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpshuflw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 112 }
+}
+let vpshuflw_Y_Ym256 = {
+    id = Vpshuflw_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpshuflw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 112 }
+}
+let vpsignb_X_X_Xm128 = {
+    id = Vpsignb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsignb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 8 }
+}
+let vpsignb_Y_Y_Ym256 = {
+    id = Vpsignb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsignb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 8 }
+}
+let vpsignd_X_X_Xm128 = {
+    id = Vpsignd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsignd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 10 }
+}
+let vpsignd_Y_Y_Ym256 = {
+    id = Vpsignd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsignd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 10 }
+}
+let vpsignw_X_X_Xm128 = {
+    id = Vpsignw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsignw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 9 }
+}
+let vpsignw_Y_Y_Ym256 = {
+    id = Vpsignw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsignw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 9 }
+}
+let vpslld_X_X = {
+    id = Vpslld_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpslld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 6; opcode = 114 }
+}
+let vpslld_X_X_Xm128 = {
+    id = Vpslld_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpslld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 242 }
+}
+let vpslld_Y_Y = {
+    id = Vpslld_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpslld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 6; opcode = 114 }
+}
+let vpslld_Y_Y_Xm128 = {
+    id = Vpslld_Y_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpslld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 242 }
+}
+let vpslldq_X_X = {
+    id = Vpslldq_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpslldq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 7; opcode = 115 }
+}
+let vpslldq_Y_Y = {
+    id = Vpslldq_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpslldq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 7; opcode = 115 }
+}
+let vpsllq_X_X = {
+    id = Vpsllq_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsllq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 6; opcode = 115 }
+}
+let vpsllq_X_X_Xm128 = {
+    id = Vpsllq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsllq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 243 }
+}
+let vpsllq_Y_Y = {
+    id = Vpsllq_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsllq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 6; opcode = 115 }
+}
+let vpsllq_Y_Y_Xm128 = {
+    id = Vpsllq_Y_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsllq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 243 }
+}
+let vpsllvd_X_X_Xm128 = {
+    id = Vpsllvd_X_X_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsllvd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 71 }
+}
+let vpsllvd_Y_Y_Ym256 = {
+    id = Vpsllvd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsllvd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 71 }
+}
+let vpsllvq_X_X_Xm128 = {
+    id = Vpsllvq_X_X_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsllvq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 71 }
+}
+let vpsllvq_Y_Y_Ym256 = {
+    id = Vpsllvq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsllvq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 71 }
+}
+let vpsllw_X_X = {
+    id = Vpsllw_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsllw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 6; opcode = 113 }
+}
+let vpsllw_X_X_Xm128 = {
+    id = Vpsllw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsllw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 241 }
+}
+let vpsllw_Y_Y = {
+    id = Vpsllw_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsllw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 6; opcode = 113 }
+}
+let vpsllw_Y_Y_Xm128 = {
+    id = Vpsllw_Y_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsllw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 241 }
+}
+let vpsrad_X_X = {
+    id = Vpsrad_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrad"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 4; opcode = 114 }
+}
+let vpsrad_X_X_Xm128 = {
+    id = Vpsrad_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrad"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 226 }
+}
+let vpsrad_Y_Y = {
+    id = Vpsrad_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrad"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 4; opcode = 114 }
+}
+let vpsrad_Y_Y_Xm128 = {
+    id = Vpsrad_Y_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrad"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 226 }
+}
+let vpsravd_X_X_Xm128 = {
+    id = Vpsravd_X_X_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsravd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 70 }
+}
+let vpsravd_Y_Y_Ym256 = {
+    id = Vpsravd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsravd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 70 }
+}
+let vpsraw_X_X = {
+    id = Vpsraw_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsraw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 4; opcode = 113 }
+}
+let vpsraw_X_X_Xm128 = {
+    id = Vpsraw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsraw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 225 }
+}
+let vpsraw_Y_Y = {
+    id = Vpsraw_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsraw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 4; opcode = 113 }
+}
+let vpsraw_Y_Y_Xm128 = {
+    id = Vpsraw_Y_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsraw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 225 }
+}
+let vpsrld_X_X = {
+    id = Vpsrld_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 2; opcode = 114 }
+}
+let vpsrld_X_X_Xm128 = {
+    id = Vpsrld_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 210 }
+}
+let vpsrld_Y_Y = {
+    id = Vpsrld_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 2; opcode = 114 }
+}
+let vpsrld_Y_Y_Xm128 = {
+    id = Vpsrld_Y_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrld"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 210 }
+}
+let vpsrldq_X_X = {
+    id = Vpsrldq_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrldq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 3; opcode = 115 }
+}
+let vpsrldq_Y_Y = {
+    id = Vpsrldq_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrldq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 3; opcode = 115 }
+}
+let vpsrlq_X_X = {
+    id = Vpsrlq_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrlq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 2; opcode = 115 }
+}
+let vpsrlq_X_X_Xm128 = {
+    id = Vpsrlq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrlq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 211 }
+}
+let vpsrlq_Y_Y = {
+    id = Vpsrlq_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrlq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 2; opcode = 115 }
+}
+let vpsrlq_Y_Y_Xm128 = {
+    id = Vpsrlq_Y_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrlq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 211 }
+}
+let vpsrlvd_X_X_Xm128 = {
+    id = Vpsrlvd_X_X_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrlvd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 69 }
+}
+let vpsrlvd_Y_Y_Ym256 = {
+    id = Vpsrlvd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrlvd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 69 }
+}
+let vpsrlvq_X_X_Xm128 = {
+    id = Vpsrlvq_X_X_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrlvq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 69 }
+}
+let vpsrlvq_Y_Y_Ym256 = {
+    id = Vpsrlvq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrlvq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = true; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 69 }
+}
+let vpsrlw_X_X = {
+    id = Vpsrlw_X_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrlw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Spec 2; opcode = 113 }
+}
+let vpsrlw_X_X_Xm128 = {
+    id = Vpsrlw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrlw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 209 }
+}
+let vpsrlw_Y_Y = {
+    id = Vpsrlw_Y_Y
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = Vex_v }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vpsrlw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Spec 2; opcode = 113 }
+}
+let vpsrlw_Y_Y_Xm128 = {
+    id = Vpsrlw_Y_Y_Xm128
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsrlw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 209 }
+}
+let vpsubb_X_X_Xm128 = {
+    id = Vpsubb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 248 }
+}
+let vpsubb_Y_Y_Ym256 = {
+    id = Vpsubb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 248 }
+}
+let vpsubd_X_X_Xm128 = {
+    id = Vpsubd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 250 }
+}
+let vpsubd_Y_Y_Ym256 = {
+    id = Vpsubd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 250 }
+}
+let vpsubq_X_X_Xm128 = {
+    id = Vpsubq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 251 }
+}
+let vpsubq_Y_Y_Ym256 = {
+    id = Vpsubq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 251 }
+}
+let vpsubsb_X_X_Xm128 = {
+    id = Vpsubsb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 232 }
+}
+let vpsubsb_Y_Y_Ym256 = {
+    id = Vpsubsb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubsb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 232 }
+}
+let vpsubsw_X_X_Xm128 = {
+    id = Vpsubsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 233 }
+}
+let vpsubsw_Y_Y_Ym256 = {
+    id = Vpsubsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 233 }
+}
+let vpsubusb_X_X_Xm128 = {
+    id = Vpsubusb_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubusb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 216 }
+}
+let vpsubusb_Y_Y_Ym256 = {
+    id = Vpsubusb_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubusb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 216 }
+}
+let vpsubusw_X_X_Xm128 = {
+    id = Vpsubusw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubusw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 217 }
+}
+let vpsubusw_Y_Y_Ym256 = {
+    id = Vpsubusw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubusw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 217 }
+}
+let vpsubw_X_X_Xm128 = {
+    id = Vpsubw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 249 }
+}
+let vpsubw_Y_Y_Ym256 = {
+    id = Vpsubw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpsubw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 249 }
+}
+let vptest_r64_X_Xm128 = {
+    id = Vptest_r64_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = Implicit }|]
+  ; imm = Imm_none
+  ; mnemonic = "vptest"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 23 }
+}
+let vptest_r64_Y_Ym256 = {
+    id = Vptest_r64_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|R64|]; enc = Implicit }|]
+  ; imm = Imm_none
+  ; mnemonic = "vptest"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 23 }
+}
+let vpunpckhbw_X_X_Xm128 = {
+    id = Vpunpckhbw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckhbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 104 }
+}
+let vpunpckhbw_Y_Y_Ym256 = {
+    id = Vpunpckhbw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckhbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 104 }
+}
+let vpunpckhdq_X_X_Xm128 = {
+    id = Vpunpckhdq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckhdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 106 }
+}
+let vpunpckhdq_Y_Y_Ym256 = {
+    id = Vpunpckhdq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckhdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 106 }
+}
+let vpunpckhqdq_X_X_Xm128 = {
+    id = Vpunpckhqdq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckhqdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 109 }
+}
+let vpunpckhqdq_Y_Y_Ym256 = {
+    id = Vpunpckhqdq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckhqdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 109 }
+}
+let vpunpckhwd_X_X_Xm128 = {
+    id = Vpunpckhwd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckhwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 105 }
+}
+let vpunpckhwd_Y_Y_Ym256 = {
+    id = Vpunpckhwd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckhwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 105 }
+}
+let vpunpcklbw_X_X_Xm128 = {
+    id = Vpunpcklbw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpcklbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 96 }
+}
+let vpunpcklbw_Y_Y_Ym256 = {
+    id = Vpunpcklbw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpcklbw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 96 }
+}
+let vpunpckldq_X_X_Xm128 = {
+    id = Vpunpckldq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckldq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 98 }
+}
+let vpunpckldq_Y_Y_Ym256 = {
+    id = Vpunpckldq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpckldq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 98 }
+}
+let vpunpcklqdq_X_X_Xm128 = {
+    id = Vpunpcklqdq_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpcklqdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 108 }
+}
+let vpunpcklqdq_Y_Y_Ym256 = {
+    id = Vpunpcklqdq_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpcklqdq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 108 }
+}
+let vpunpcklwd_X_X_Xm128 = {
+    id = Vpunpcklwd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpcklwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 97 }
+}
+let vpunpcklwd_Y_Y_Ym256 = {
+    id = Vpunpcklwd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpunpcklwd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 97 }
+}
+let vpxor_X_X_Xm128 = {
+    id = Vpxor_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpxor"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 239 }
+}
+let vpxor_Y_Y_Ym256 = {
+    id = Vpxor_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vpxor"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 239 }
+}
+let vrcpps_X_Xm128 = {
+    id = Vrcpps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vrcpps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 83 }
+}
+let vrcpps_Y_Ym256 = {
+    id = Vrcpps_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vrcpps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 83 }
+}
+let vrcpss = {
+    id = Vrcpss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vrcpss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 83 }
+}
+let vroundpd_X_Xm128 = {
+    id = Vroundpd_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vroundpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 9 }
+}
+let vroundpd_Y_Ym256 = {
+    id = Vroundpd_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vroundpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 9 }
+}
+let vroundps_X_Xm128 = {
+    id = Vroundps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vroundps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 8 }
+}
+let vroundps_Y_Ym256 = {
+    id = Vroundps_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vroundps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 8 }
+}
+let vroundsd = {
+    id = Vroundsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vroundsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 11 }
+}
+let vroundss = {
+    id = Vroundss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vroundss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 10 }
+}
+let vrsqrtps_X_Xm128 = {
+    id = Vrsqrtps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vrsqrtps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 82 }
+}
+let vrsqrtps_Y_Ym256 = {
+    id = Vrsqrtps_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vrsqrtps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 82 }
+}
+let vrsqrtss = {
+    id = Vrsqrtss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vrsqrtss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 82 }
+}
+let vshufpd_X_X_Xm128 = {
+    id = Vshufpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vshufpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 198 }
+}
+let vshufpd_Y_Y_Ym256 = {
+    id = Vshufpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vshufpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 198 }
+}
+let vshufps_X_X_Xm128 = {
+    id = Vshufps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vshufps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 198 }
+}
+let vshufps_Y_Y_Ym256 = {
+    id = Vshufps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "vshufps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 198 }
+}
+let vsqrtpd_X_Xm128 = {
+    id = Vsqrtpd_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsqrtpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 81 }
+}
+let vsqrtpd_Y_Ym256 = {
+    id = Vsqrtpd_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsqrtpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 81 }
+}
+let vsqrtps_X_Xm128 = {
+    id = Vsqrtps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsqrtps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 81 }
+}
+let vsqrtps_Y_Ym256 = {
+    id = Vsqrtps_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsqrtps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 81 }
+}
+let vsqrtsd = {
+    id = Vsqrtsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsqrtsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 81 }
+}
+let vsqrtss = {
+    id = Vsqrtss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsqrtss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 81 }
+}
+let vstmxcsr = {
+    id = Vstmxcsr
+  ; ext = [|AVX|]
+  ; args = [||]
+  ; res = Res [|{ loc = Temp [|M32|]; enc = RM_rm }|]
+  ; imm = Imm_none
+  ; mnemonic = "vstmxcsr"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 3; opcode = 174 }
+}
+let vsubpd_X_X_Xm128 = {
+    id = Vsubpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsubpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 92 }
+}
+let vsubpd_Y_Y_Ym256 = {
+    id = Vsubpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsubpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 92 }
+}
+let vsubps_X_X_Xm128 = {
+    id = Vsubps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsubps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 92 }
+}
+let vsubps_Y_Y_Ym256 = {
+    id = Vsubps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsubps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 92 }
+}
+let vsubsd = {
+    id = Vsubsd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsubsd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 92 }
+}
+let vsubss = {
+    id = Vsubss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vsubss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 92 }
+}
+let vtestpd_X_Xm128 = {
+    id = Vtestpd_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vtestpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 15 }
+}
+let vtestpd_Y_Ym256 = {
+    id = Vtestpd_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vtestpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 15 }
+}
+let vtestps_X_Xm128 = {
+    id = Vtestps_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vtestps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 14 }
+}
+let vtestps_Y_Ym256 = {
+    id = Vtestps_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vtestps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 14 }
+}
+let vucomisd = {
+    id = Vucomisd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vucomisd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 46 }
+}
+let vucomiss = {
+    id = Vucomiss
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vucomiss"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 46 }
+}
+let vunpckhpd_X_X_Xm128 = {
+    id = Vunpckhpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vunpckhpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 21 }
+}
+let vunpckhpd_Y_Y_Ym256 = {
+    id = Vunpckhpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vunpckhpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 21 }
+}
+let vunpckhps_X_X_Xm128 = {
+    id = Vunpckhps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vunpckhps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 21 }
+}
+let vunpckhps_Y_Y_Ym256 = {
+    id = Vunpckhps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vunpckhps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 21 }
+}
+let vunpcklpd_X_X_Xm128 = {
+    id = Vunpcklpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vunpcklpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 20 }
+}
+let vunpcklpd_Y_Y_Ym256 = {
+    id = Vunpcklpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vunpcklpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 20 }
+}
+let vunpcklps_X_X_Xm128 = {
+    id = Vunpcklps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vunpcklps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 20 }
+}
+let vunpcklps_Y_Y_Ym256 = {
+    id = Vunpcklps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vunpcklps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 20 }
+}
+let vxorpd_X_X_Xm128 = {
+    id = Vxorpd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vxorpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 87 }
+}
+let vxorpd_Y_Y_Ym256 = {
+    id = Vxorpd_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vxorpd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 87 }
+}
+let vxorps_X_X_Xm128 = {
+    id = Vxorps_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vxorps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 87 }
+}
+let vxorps_Y_Y_Ym256 = {
+    id = Vxorps_Y_Y_Ym256
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "vxorps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 87 }
+}
+let vzeroall = {
+    id = Vzeroall
+  ; ext = [|AVX|]
+  ; args = [||]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vzeroall"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 119 }
+}
+let vzeroupper = {
+    id = Vzeroupper
+  ; ext = [|AVX|]
+  ; args = [||]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vzeroupper"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 119 }
+}
+let xorpd = {
+    id = Xorpd
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "xorpd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 87 }
+}
+let xorps = {
+    id = Xorps
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = First_arg
+  ; imm = Imm_none
+  ; mnemonic = "xorps"
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 87 }
 }

@@ -1,0 +1,131 @@
+;; CR-someday mslater: with layout polymorphism, the tests could be
+;; functorized instead concatenating files.
+
+(rule
+ (targets utils_u.ml)
+ (deps unbox_types.ml utils.ml)
+ (action
+  (with-stdout-to
+   utils_u.ml
+   (cat "unbox_types.ml" "utils.ml"))))
+
+(rule
+ (targets utils256.ml)
+ (deps unbox_types.ml)
+ (enabled_if
+  (<> %{architecture} "amd64"))
+ (action
+  (with-stdout-to
+   utils256.ml
+   (echo ""))))
+
+(rule
+ (targets utils256_u.ml)
+ (deps unbox_types.ml utils256.ml)
+ (action
+  (with-stdout-to
+   utils256_u.ml
+   (progn
+    (echo "module Utils = Utils_u\n")
+    (cat "utils256.ml")))))
+
+(rule
+ (targets builtins_u.ml)
+ (deps unbox_types.ml builtins.ml)
+ (action
+  (with-stdout-to
+   builtins_u.ml
+   (cat "unbox_types.ml" "builtins.ml"))))
+
+(library
+ (name simd_test_builtins)
+ (wrapped false)
+ (libraries stdlib_stable stdlib_upstream_compatible)
+ (flags
+  (:standard -extension simd_beta))
+ (modules
+  utils
+  utils_u
+  utils256
+  utils256_u
+  float32_reference
+  float64_reference
+  builtins
+  builtins_u))
+
+(copy_files#
+ (files "%{env:ARCH=amd64}/*.{ml,c}"))
+
+; Stubs
+
+(foreign_library
+ (archive_name stubs)
+ (language c)
+ (names stubs stubs256 stub_builtins)
+ (flags
+  (:standard
+   (:include flags.sexp)))
+ (include_dirs "../../../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}"))
+
+(rule
+ (targets flags.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags.sexp
+   (echo "-mavx2"))))
+
+(rule
+ (targets flags.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags.sexp
+   (echo "()"))))
+
+(include dune.inc)
+
+(rule
+ (with-stdout-to
+  dune.inc.gen
+  (run ./gen/gen_dune.exe)))
+
+(rule
+ (alias runtest)
+ (action
+  (diff dune.inc dune.inc.gen)))
+
+; Bytecode
+
+(executables
+ (names bytecode)
+ (modules bytecode)
+ (modes byte))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (targets bytecode.out)
+ (deps bytecode.bc)
+ (action
+  (with-outputs-to
+   bytecode.out
+   (run
+    bash
+    -c
+    "%{ocaml_where}/../../bin/ocamlrun bytecode.bc 2>&1 | head -n 1; echo \"Exit status: ${PIPESTATUS[0]}\""))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (diff bytecode.expected bytecode.out)))

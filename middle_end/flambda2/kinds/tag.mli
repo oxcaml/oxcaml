@@ -22,11 +22,13 @@ type tag = t
 
 val create_exn : int -> t
 
-val create_from_targetint : Targetint_31_63.t -> t option
+val create_from_targetint :
+  Target_system.Machine_width.t -> Target_ocaml_int.t -> t option
 
 val to_int : t -> int
 
-val to_targetint_31_63 : t -> Targetint_31_63.t
+val to_targetint_31_63 :
+  Target_system.Machine_width.t -> t -> Target_ocaml_int.t
 
 val zero : t
 
@@ -71,7 +73,7 @@ module Scannable : sig
 
   val to_int : t -> int
 
-  val to_targetint : t -> Targetint_32_64.t
+  val to_targetint : Target_system.Machine_width.t -> t -> Targetint_32_64.t
 
   val to_tag : t -> tag
 

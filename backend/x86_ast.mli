@@ -62,6 +62,8 @@ type data_type =
   | REAL4 | REAL8 (* floating point values *)
   | BYTE | WORD | DWORD | QWORD (* integer values *)
   | VEC128 (* vector values (float & integer) *)
+  | VEC256
+  | VEC512
   | NEAR | PROC
 
 type reg64 =
@@ -71,7 +73,14 @@ type reg64 =
 type reg8h =
   | AH | BH | CH | DH
 
-type regf = XMM of int
+type regf =
+  | XMM of int
+  | YMM of int
+  | ZMM of int
+
+type reg_idx =
+  | Scalar of reg64
+  | Vector of regf
 
 type arch = X64 | X86
 
@@ -79,7 +88,7 @@ type addr =
   {
     arch: arch;
     typ: data_type;
-    idx: reg64;
+    idx: reg_idx;
     scale: int;
     base: reg64 option;
     sym: string option;
@@ -96,7 +105,7 @@ type arg =
   | Imm of int64
   (** Operand is an immediate constant integer *)
 
-  | Sym of  string
+  | Sym of string
   (** Address of a symbol (absolute address except for call/jmp target
       where it is interpreted as a relative displacement *)
 
@@ -112,9 +121,8 @@ type arg =
 
 type instruction =
   | ADD of arg * arg
-  | ADDSD of arg * arg
+  | ADC of arg * arg
   | AND of arg * arg
-  | ANDPD of arg * arg
   | BSF of arg * arg
   | BSR of arg * arg
   | BSWAP of arg
@@ -123,17 +131,8 @@ type instruction =
   | CLDEMOTE of arg
   | CMOV of condition * arg * arg
   | CMP of arg * arg
-  | CMPSD of float_condition * arg * arg
-  | COMISD of arg * arg
   | CQO
-  | CVTSD2SS of arg * arg
-  | CVTSI2SS of arg * arg
-  | CVTSS2SD of arg * arg
-  | CVTSI2SD of arg * arg
-  | CVTTSD2SI of arg * arg
-  | CVTTSS2SI of arg * arg
   | DEC of arg
-  | DIVSD of arg * arg
   | HLT
   | IDIV of arg
   | IMUL of arg * arg option
@@ -151,23 +150,14 @@ type instruction =
   | LOCK_XOR of arg * arg
   | LEAVE
   | MOV of arg * arg
-  | MOVAPD of arg * arg
-  | MOVUPD of arg * arg
-  | MOVD of arg * arg
-  | MOVQ of arg * arg
-  | MOVLPD of arg * arg
-  | MOVSD of arg * arg
-  | MOVSS of arg * arg
   | MOVSX of arg * arg
   | MOVSXD of arg * arg
   | MOVZX of arg * arg
-  | MULSD of arg * arg
   | NEG of arg
   | NOP
   | OR of arg * arg
   | PAUSE
   | POP of arg
-  | POPCNT of arg * arg
   | PREFETCH of bool * prefetch_temporal_locality_hint * arg
   | PUSH of arg
   | RDTSC
@@ -181,23 +171,10 @@ type instruction =
   | SET of condition * arg
   | SHR of arg * arg
   | SUB of arg * arg
-  | SUBSD of arg * arg
+  | SBB of arg * arg
   | TEST of arg * arg
-  | UCOMISD of arg * arg
   | XCHG of arg * arg
   | XOR of arg * arg
-  | XORPD of arg * arg
-  | ADDSS of arg * arg
-  | SUBSS of arg * arg
-  | MULSS of arg * arg
-  | DIVSS of arg * arg
-  | COMISS of arg * arg
-  | UCOMISS of arg * arg
-  | XORPS of arg * arg
-  | ANDPS of arg * arg
-  | CMPSS of float_condition * arg * arg
-  | TZCNT of arg * arg
-  | LZCNT of arg * arg
   | SIMD of Amd64_simd_instrs.instr * arg array
 
 (* ELF specific *)
@@ -213,51 +190,6 @@ type reloc =
 (* CR gyorsh: use inline record for Section and File constructors. *)
 type asm_line =
   | Ins of instruction
+  | Directive of Asm_targets.Asm_directives.Directive.t
 
-  | Align of bool * int
-  | Byte of constant
-  | Bytes of string
-  (** directive for an 8-bit constant *)
-  | Comment of string
-  | Global of string
-  | Protected of string
-  | Hidden of string
-  | Weak of string
-  | Long of constant
-  (** directive for a 32-bit constant *)
-  | NewLabel of string * data_type
-  | NewLine
-  | Quad of constant
-  (** directive for a 64-bit constant *)
-  | Section of string list * string option * string list * bool
-  | Sleb128 of constant
-  | Space of int
-  | Uleb128 of constant
-  | Word of constant
-  (** directive for a 16-bit constant *)
-
-  (* masm only (the gas emitter will fail on them) *)
-  | External of string * data_type
-  | Mode386
-  | Model of string
-
-  (* gas only (the masm emitter will fail on them) *)
-  | Cfi_adjust_cfa_offset of int
-  | Cfi_endproc
-  | Cfi_startproc
-  | Cfi_remember_state
-  | Cfi_restore_state
-  | Cfi_def_cfa_register of string
-  | Cfi_def_cfa_offset of int
-  | Cfi_offset of int * int
-  | File of int * string (* (file_num, file_name) *)
-  | Indirect_symbol of string
-  | Loc of { file_num:int; line:int; col:int; discriminator: int option }
-  | Private_extern of string
-  | Set of string * constant
-  | Size of string * constant
-  | Type of string * string
-  | Reloc of reloc
-
-
-type asm_program = asm_line list
+type asm_program = asm_line Oxcaml_utils.Doubly_linked_list.t

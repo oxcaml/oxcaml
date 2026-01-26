@@ -6,6 +6,7 @@ type token =
   | TILDE
   | SYMBOL of (Fexpr.compilation_unit option * string)
   | STRING of (string)
+  | STATIC_CONST_VALUE_ARRAY
   | STATIC_CONST_FLOAT_BLOCK
   | STATIC_CONST_FLOAT_ARRAY
   | STATIC_CONST_EMPTY_ARRAY
@@ -138,6 +139,7 @@ type token =
   | KWD_HEAP_OR_LOCAL
   | KWD_HCF
   | KWD_GENERIC
+  | KWD_GC_IGNORABLE
   | KWD_FLOAT
   | KWD_EXN
   | KWD_ERROR

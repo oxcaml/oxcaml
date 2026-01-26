@@ -36,14 +36,14 @@ We say that all immediate types *mode-cross* along the locality axis. However,
 this is sometimes undesirable. For example, we might want a declaration like
 
 ```ocaml
-val with_file : filename -> (local_ handle -> 'r) -> 'r
+val with_file : filename -> (handle @ local -> 'r) -> 'r
 ```
 
 The `with_file` function opens a file, passes the file's handle to a continuation
 function, and then closes the file when the called function is done. However,
 it would be an error if that function stored the file handle somewhere for later
 access -- the file would be closed by then. So the author of this function puts
-a `local_` annotation to say that the `handle` should not be allowed to escape.
+a `local` annotation to say that the `handle` should not be allowed to escape.
 
 Yet the designer of this API may want to use an `int` as the underlying representation
 of a `handle`. If no extra information is necessary to store, then we don't want
@@ -72,7 +72,7 @@ can be optimized just like `immediate`s are today. Accordingly, the actual
 definition of `immediate` is
 
 ```ocaml
-kind immediate = 
+kind immediate =
   value & always external & always global & always unique & always many
 ```
 

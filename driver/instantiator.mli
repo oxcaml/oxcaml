@@ -43,7 +43,7 @@ val instantiate
       output_prefix:string ->
       compilation_unit:CU.t ->
       runtime_args:Translmod.runtime_arg list ->
-      main_module_block_size:int ->
+      main_module_block_repr:Lambda.module_representation ->
       arg_descr:Lambda.arg_descr option -> unit)
   -> unit
 
@@ -63,15 +63,15 @@ type error =
       compilation_unit : CU.t;
       filename : Misc.filepath;
     }
-  | Missing_argument of { param : Global_module.Name.t }
+  | Missing_argument of { param : Global_module.Parameter_name.t }
   | No_such_parameter of {
       base_unit : CU.t;
-      available_params : Global_module.Name.t list;
-      param : Global_module.Name.t;
+      available_params : Global_module.Parameter_name.t list;
+      param : Global_module.Parameter_name.t;
       arg : Global_module.Name.t
     }
   | Repeated_parameter of {
-      param : Global_module.Name.t;
+      param : Global_module.Parameter_name.t;
       arg1 : CU.t;
       arg2 : CU.t;
     }

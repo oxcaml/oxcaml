@@ -13,10 +13,13 @@ let equal_data_type left right =
   | DWORD, DWORD
   | QWORD, QWORD
   | VEC128, VEC128
+  | VEC256, VEC256
+  | VEC512, VEC512
   | NEAR, NEAR
   | PROC, PROC ->
     true
-  | (NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD | VEC128 | NEAR | PROC), _ ->
+  | (NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD |
+     VEC128 | VEC256 | VEC512 | NEAR | PROC), _ ->
     false
 
 let equal_reg64 left right =
@@ -52,7 +55,10 @@ let equal_reg8h left right =
 
 let equal_regf left right =
   match left, right with
-  | XMM l, XMM r -> Int.equal l r
+  | XMM l, XMM r
+  | YMM l, YMM r
+  | ZMM l, ZMM r -> Int.equal l r
+  | (XMM _ | YMM _ | ZMM _), _ -> false
 
 let equal_arch left right =
   match left, right with
@@ -61,10 +67,16 @@ let equal_arch left right =
     true
   | (X64 | X86), _ -> false
 
+let equal_reg_idx left right =
+  match left, right with
+  | Scalar left, Scalar right -> equal_reg64 left right
+  | Vector left, Vector right -> equal_regf left right
+  | (Scalar _ | Vector _), _ -> false
+
 let equal_addr left right =
   equal_arch left.arch right.arch
   && equal_data_type left.typ right.typ
-  && equal_reg64 left.idx right.idx
+  && equal_reg_idx left.idx right.idx
   && Int.equal left.scale right.scale
   && Option.equal equal_reg64 left.base right.base
   && Option.equal String.equal left.sym right.sym
@@ -84,3 +96,14 @@ let equal_arg left right =
   | Mem64_RIP (l_dt, l_s, l_i), Mem64_RIP (r_dt, r_s, r_i) ->
     equal_data_type l_dt r_dt && String.equal l_s r_s && Int.equal l_i r_i
   | (Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Mem _ | Mem64_RIP _), _ -> false
+
+let is_mem = function
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ ->
+    false
+  | Mem _ | Mem64_RIP _ -> true
+
+let is_regf = function
+  | Regf _ -> true
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Mem _
+  | Mem64_RIP _ ->
+    false

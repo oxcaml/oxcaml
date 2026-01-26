@@ -15,6 +15,7 @@
 
 type t_bits32 : bits32
 type ('a : bits32) t_bits32_id = 'a
+external of_i32 : int32# -> t_bits32 = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
@@ -25,6 +26,7 @@ let f1_3 (x : int32#) = x;;
 [%%expect{|
 type t_bits32 : bits32
 type ('a : bits32) t_bits32_id = 'a
+external of_i32 : int32# -> t_bits32 = "%opaque"
 val f1_1 : t_bits32 -> t_bits32 = <fun>
 val f1_2 : ('a : bits32). 'a t_bits32_id -> 'a t_bits32_id = <fun>
 val f1_3 : int32# -> int32# = <fun>
@@ -49,58 +51,40 @@ val f2_2 : ('a : bits32). 'a t_bits32_id -> 'a t_bits32_id = <fun>
 val f2_3 : int32# -> int32# = <fun>
 |}];;
 
-(*****************************************)
-(* Test 3: No module-level bindings yet. *)
+(**********************************)
+(* Test 3: Module-level bindings. *)
 
-let x3_1 : t_bits32 = assert false;;
+let x3_1 : t_bits32 = of_i32 #42l;;
 [%%expect{|
-Line 1, characters 4-8:
-1 | let x3_1 : t_bits32 = assert false;;
-        ^^^^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x3_1" has layout "bits32".
+val x3_1 : t_bits32 = <abstr>
 |}];;
 
-let x3_2 : 'a t_bits32_id = assert false;;
+let x3_2_1 : 'a t_bits32_id = #42l;;
+let x3_2_2 : 'a t_bits32_id = of_i32 #42l;;
 [%%expect{|
-Line 1, characters 4-8:
-1 | let x3_2 : 'a t_bits32_id = assert false;;
-        ^^^^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x3_2" has layout "bits32".
+val x3_2_1 : int32# t_bits32_id = <abstr>
+val x3_2_2 : t_bits32 t_bits32_id = <abstr>
 |}];;
 
-let x3_3 : int32# = assert false;;
+let x3_3 : int32# = #42l;;
 [%%expect{|
-Line 1, characters 4-8:
-1 | let x3_3 : int32# = assert false;;
-        ^^^^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x3_3" has layout "bits32".
+val x3_3 : int32# = <abstr>
 |}];;
 
 module M3_4 = struct
-  let x : t_bits32 = assert false
+  let x : t_bits32 = of_i32 #42l
 end
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let x : t_bits32 = assert false
-          ^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x" has layout "bits32".
+module M3_4 : sig val x : t_bits32 end
 |}];;
 
 module M3_5 = struct
   let f (x : int32#) = x
 
-  let y = f (assert false)
+  let y = f #42l
 end
 [%%expect{|
-Line 4, characters 6-7:
-4 |   let y = f (assert false)
-          ^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "y" has layout "bits32".
+module M3_5 : sig val f : int32# -> int32# val y : int32# end
 |}];;
 
 (*************************************)
@@ -248,44 +232,24 @@ type t5_6 = A of t_bits32 [@@unboxed];;
 type t5_6 = A of t_bits32 [@@unboxed]
 |}];;
 
-(****************************************************)
-(* Test 6: Can't be put at top level of signatures. *)
+(**************************************************)
+(* Test 6: Can be put at top level of signatures. *)
 module type S6_1 = sig val x : t_bits32 end
 
 let f6 (m : (module S6_1)) = let module M6 = (val m) in M6.x;;
 [%%expect{|
-Line 1, characters 31-39:
-1 | module type S6_1 = sig val x : t_bits32 end
-                                   ^^^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type t_bits32 is bits32
-         because of the definition of t_bits32 at line 1, characters 0-22.
-       But the layout of type t_bits32 must be a sublayout of value
-         because it's the type of something stored in a module structure.
+module type S6_1 = sig val x : t_bits32 end
+val f6 : (module S6_1) -> t_bits32 = <fun>
 |}];;
 
 module type S6_2 = sig val x : 'a t_bits32_id end
 [%%expect{|
-Line 1, characters 31-45:
-1 | module type S6_2 = sig val x : 'a t_bits32_id end
-                                   ^^^^^^^^^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type 'a t_bits32_id is bits32
-         because of the definition of t_bits32_id at line 2, characters 0-35.
-       But the layout of type 'a t_bits32_id must be a sublayout of value
-         because it's the type of something stored in a module structure.
+module type S6_2 = sig val x : ('a : bits32). 'a t_bits32_id end
 |}];;
 
 module type S6_3 = sig val x : int32# end
 [%%expect{|
-Line 1, characters 31-37:
-1 | module type S6_3 = sig val x : int32# end
-                                   ^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type int32# is bits32
-         because it is the unboxed version of the primitive type int32.
-       But the layout of type int32# must be a sublayout of value
-         because it's the type of something stored in a module structure.
+module type S6_3 = sig val x : int32# end
 |}];;
 
 
@@ -475,8 +439,8 @@ external f10_9 : (int32#[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 18-24:
 1 | external f10_9 : (int32#[@untagged]) -> bool -> string  = "foo" "bar";;
                       ^^^^^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}];;
 
 external f10_10 : string -> (int32#[@untagged])  = "foo" "bar";;
@@ -484,8 +448,8 @@ external f10_10 : string -> (int32#[@untagged])  = "foo" "bar";;
 Line 1, characters 29-35:
 1 | external f10_10 : string -> (int32#[@untagged])  = "foo" "bar";;
                                  ^^^^^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}];;
 
 (*************************************************)

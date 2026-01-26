@@ -18,10 +18,22 @@ open Datalog_imports
 type action
 
 val bind_iterator :
-  'a option ref with_name -> 'a Trie.Iterator.t with_name -> action
+  'a option Channel.receiver with_name -> 'a Trie.Iterator.t with_name -> action
 
 val unless :
-  ('t, 'k, 'v) Table.Id.t -> 't ref -> 'k Option_ref.hlist with_names -> action
+  ('t, 'k, 'v) Table.Id.t ->
+  't Channel.receiver ->
+  'k Option_receiver.hlist with_names ->
+  action
+
+val unless_eq :
+  'k Value.repr ->
+  'k option Channel.receiver with_name ->
+  'k option Channel.receiver with_name ->
+  action
+
+val filter :
+  ('k Constant.hlist -> bool) -> 'k Option_receiver.hlist with_names -> action
 
 type actions
 
@@ -36,16 +48,31 @@ module Order : sig
 end
 
 module Level : sig
+  type cardinality =
+    | All_values
+    | Any_value
+
   type 'a t
 
   val print : Format.formatter -> 'a t -> unit
 
   (** Returns a reference to the current value at this level.
 
+      The [cardinality] argument can be used to indicate whether all the values
+      of the output are needed ([All_values], the default), or if a single value
+      is enough ([Any_value]). If [Any_value] is provided, the runtime makes no
+      guarantees regarding the value that will actually be returned, and all
+      values can be returned if there is another use with of the level with
+      [All_values] cardinality or the structure of the program prevents early
+      exits. As such, the [Any_value] cardinality should only be used when the
+      value is solely used for debugging purposes, and never when it has a
+      semantic impact on the evaluation.
+
       {b Note}: This reference is set to any new value found prior to executing
       the associated actions, if any, and can thus be used in actions for this
       level or levels of later orders. *)
-  val use_output : 'a t -> 'a option ref with_name
+  val use_output :
+    ?cardinality:cardinality -> 'a t -> 'a option Channel.receiver with_name
 
   (** Actions to execute immediately after a value is found at this level. *)
   val actions : 'a t -> actions
@@ -67,7 +94,7 @@ val add_new_level : context -> string -> 'a Level.t
 val add_iterator :
   context -> ('t, 'k, 'v) Table.Id.t -> 'k Trie.Iterator.hlist with_names
 
-val add_naive_binder : context -> ('t, 'k, 'v) Table.Id.t -> 't ref
+val add_naive_binder : context -> ('t, 'k, 'v) Table.Id.t -> 't Channel.receiver
 
 (** Initial actions are always executed when iterating over a cursor, before
     opening the first level. *)
@@ -82,13 +109,17 @@ val print : Format.formatter -> 'a t -> unit
 type call
 
 val create_call :
-  ('a Constant.hlist -> unit) ->
+  ('c -> 'a Constant.hlist -> unit) ->
   name:string ->
-  'a Option_ref.hlist with_names ->
+  context:'c ->
+  'a Option_receiver.hlist with_names ->
   call
 
 val create :
-  ?calls:call list -> ?output:'v Option_ref.hlist with_names -> context -> 'v t
+  ?calls:call list ->
+  ?output:'v Option_receiver.hlist with_names ->
+  context ->
+  'v t
 
 val naive_fold :
   'v t -> Table.Map.t -> ('v Constant.hlist -> 'a -> 'a) -> 'a -> 'a
@@ -113,18 +144,18 @@ val naive_iter : 'v t -> Table.Map.t -> ('v Constant.hlist -> unit) -> unit
     by iterating over [join(P, Q)]. If [P = P + ΔP] and [Q = P + ΔQ], we can
     rewrite:
 
-    ```
+    {v
     join(P + ΔP, Q + ΔQ) = join(P, Q) + join(ΔP, Q) + join(P + ΔP, ΔQ)
-    ```
+    v}
 
     Seminaive evaluation ignores the [join(P, Q)] term and only computes the
     last two terms. Note that the term [join(P + ΔP, ΔQ)] does not need to be
     further decomposed, so that in the general case we only need to combine
     linearly many terms of the form:
 
-    ```
+    {v
     join(P₁ + ΔP₁, …, Pᵢ-₁ + ΔPᵢ-₁, ΔPᵢ, Pᵢ+₁, …, Pₙ
-    ```
+    v}
 
     The terms on the left use the [current] databse, the middle term uses the
     [diff] database, and the terms on the right use the [previous] database.
@@ -137,16 +168,16 @@ val seminaive_run :
   unit
 
 module With_parameters : sig
-  type ('p, 'v) t
+  type ('p, !'v) t
 
   val print : Format.formatter -> ('p, 'v) t -> unit
 
   val without_parameters : (nil, 'v) t -> 'v cursor
 
   val create :
-    parameters:'p Option_ref.hlist ->
+    parameters:'p Option_sender.hlist ->
     ?calls:call list ->
-    ?output:'v Option_ref.hlist with_names ->
+    ?output:'v Option_receiver.hlist with_names ->
     context ->
     ('p, 'v) t
 

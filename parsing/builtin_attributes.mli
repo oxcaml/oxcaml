@@ -119,7 +119,6 @@ val mark_deprecated_mutable_used : Parsetree.attributes -> unit
     in late stages of compilation in the backend.
     Registering them helps detect code that is not checked,
     because it is optimized away by the middle-end.  *)
-val register_zero_alloc_attribute : string Location.loc -> unit
 val mark_zero_alloc_attribute_checked : string -> Location.t -> unit
 val warn_unchecked_zero_alloc_attribute : unit -> unit
 
@@ -212,7 +211,6 @@ val parse_standard_implementation_attributes : Parsetree.attribute -> unit
 val curry_attr_name : string
 val curry_attr : Location.t -> Parsetree.attribute
 
-val has_no_mutable_implied_modalities: Parsetree.attributes -> bool
 val has_local_opt: Parsetree.attributes -> bool
 val has_layout_poly: Parsetree.attributes -> bool
 val has_curry: Parsetree.attributes -> bool
@@ -346,3 +344,10 @@ type tracing_probe =
 *)
 val get_tracing_probe_payload :
   Parsetree.payload -> (tracing_probe, unit) result
+
+(** Gets the payload of a [eval] extension node which evaluates quotes,
+    for example: [%eval: int] *)
+val get_eval_payload :
+  Parsetree.payload -> (Parsetree.core_type, unit) result
+
+val has_atomic: Parsetree.attributes -> bool

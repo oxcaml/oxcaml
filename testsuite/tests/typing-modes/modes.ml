@@ -8,7 +8,7 @@ let local_ foo : string @ unique = "hello"
 Line 1, characters 4-42:
 1 | let local_ foo : string @ unique = "hello"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let local_ foo @ unique = "hello"
@@ -16,7 +16,7 @@ let local_ foo @ unique = "hello"
 Line 1, characters 4-33:
 1 | let local_ foo @ unique = "hello"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
@@ -24,7 +24,7 @@ let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
 Line 1, characters 4-53:
 1 | let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo : type a. (a -> a) @ unique = fun x -> x
@@ -37,7 +37,7 @@ let (x, y) @ local unique = "hello", "world"
 Line 1, characters 4-44:
 1 | let (x, y) @ local unique = "hello", "world"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let (x, y) : _ @ local unique = "hello", "world"
@@ -45,7 +45,7 @@ let (x, y) : _ @ local unique = "hello", "world"
 Line 1, characters 4-48:
 1 | let (x, y) : _ @ local unique = "hello", "world"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo @ foo = "hello"
@@ -71,8 +71,10 @@ let foo a b @ local = local_ "hello"
 Line 1, characters 22-36:
 1 | let foo a b @ local = local_ "hello"
                           ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ "hello"
@@ -80,18 +82,20 @@ let foo = fun a b @ local -> local_ "hello"
 Line 1, characters 29-43:
 1 | let foo = fun a b @ local -> local_ "hello"
                                  ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo a b @ local = exclave_ "hello"
 [%%expect{|
-val foo : 'a -> 'b -> local_ string = <fun>
+val foo : 'a -> 'b -> string @ local = <fun>
 |}]
 
 let foo = fun a b @ local -> exclave_ "hello"
 [%%expect{|
-val foo : 'a -> 'b -> local_ string = <fun>
+val foo : 'a -> 'b -> string @ local = <fun>
 |}]
 
 
@@ -100,8 +104,10 @@ let foo a b @ local = local_ 42
 Line 1, characters 22-31:
 1 | let foo a b @ local = local_ 42
                           ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ 42
@@ -109,18 +115,20 @@ let foo = fun a b @ local -> local_ 42
 Line 1, characters 29-38:
 1 | let foo = fun a b @ local -> local_ 42
                                  ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo a b : int @ local = local_ 42
 [%%expect{|
-val foo : 'a -> 'b -> local_ int = <fun>
+val foo : 'a -> 'b -> int @ local = <fun>
 |}]
 
 let foo = fun a b @ local -> exclave_ 42
 [%%expect{|
-val foo : 'a -> 'b -> local_ int = <fun>
+val foo : 'a -> 'b -> int @ local = <fun>
 |}]
 
 let foo a b @ local = local_ 42
@@ -128,8 +136,10 @@ let foo a b @ local = local_ 42
 Line 1, characters 22-31:
 1 | let foo a b @ local = local_ 42
                           ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ 42
@@ -137,8 +147,10 @@ let foo = fun a b @ local -> local_ 42
 Line 1, characters 29-38:
 1 | let foo = fun a b @ local -> local_ 42
                                  ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 
@@ -146,7 +158,7 @@ Error: This value escapes its region.
     expected currying behavior *)
 let foo a : (string -> string -> unit) @ local = fun b c -> ()
 [%%expect{|
-val foo : 'a -> local_ (string -> string -> unit) = <fun>
+val foo : 'a -> (string -> string -> unit) @ local = <fun>
 |}]
 
 (* the return mode annotation overrides the whole-function mode annotation, even when they
@@ -156,7 +168,7 @@ let bar () = exclave_
   let (foo @ local) a : (string -> string -> unit) @ nonportable = fun b c -> () in
   foo
 [%%expect{|
-val bar : unit -> local_ ('a -> (string -> string -> unit)) = <fun>
+val bar : unit -> ('a -> (string -> string -> unit)) @ local = <fun>
 |}]
 
 (* Expressions *)
@@ -165,7 +177,7 @@ let foo = ("hello" : _ @ local)
 Line 1, characters 10-31:
 1 | let foo = ("hello" : _ @ local)
               ^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* this is not mode annotation *)
@@ -309,7 +321,7 @@ type r = string @ local unique once -> string
 
 type t = Foo of string @@ global * global_ string
 [%%expect{|
-type t = Foo of global_ string * global_ string
+type t = Foo of string @@ global * string @@ global
 |}]
 
 type t = Foo of string @@ foo
@@ -321,16 +333,20 @@ Error: Unrecognized modality foo.
 |}]
 
 type t = Foo of global_ string @@ global
-(* CR reduced-modality: this should warn. *)
 [%%expect{|
-type t = Foo of global_ string
+Line 1, characters 16-23:
+1 | type t = Foo of global_ string @@ global
+                    ^^^^^^^
+Warning 213: This locality is overriden by global later.
+
+type t = Foo of string @@ global
 |}]
 
 type r = {
   x : string @@ global
 }
 [%%expect{|
-type r = { global_ x : string; }
+type r = { x : string @@ global; }
 |}]
 
 type r = {
@@ -346,43 +362,51 @@ Error: Unrecognized modality foo.
 type r = {
   global_ x : string @@ global
 }
-(* CR reduced-modality: this should warn. *)
 [%%expect{|
-type r = { global_ x : string; }
+Line 2, characters 2-9:
+2 |   global_ x : string @@ global
+      ^^^^^^^
+Warning 213: This locality is overriden by global later.
+
+type r = { x : string @@ global; }
 |}]
 
-(* Modalities don't imply each other; this will change as we add borrowing. *)
+(* [global] implies [aliased]. *)
 type r = {
   global_ x : string @@ aliased
 }
 [%%expect{|
-type r = { x : string @@ global aliased; }
+type r = { x : string @@ global; }
 |}]
 
 type r = {
   x : string @@ aliased global many
 }
 [%%expect{|
-type r = { x : string @@ global many aliased; }
+type r = { x : string @@ global many; }
 |}]
 
 type r = {
   x : string @@ aliased global many aliased
 }
-(* CR reduced-modality: this should warn. *)
 [%%expect{|
-type r = { x : string @@ global many aliased; }
+Line 2, characters 16-23:
+2 |   x : string @@ aliased global many aliased
+                    ^^^^^^^
+Warning 213: This uniqueness is overriden by aliased later.
+
+type r = { x : string @@ global many; }
 |}]
 
 type r = Foo of string @@ global aliased many
 [%%expect{|
-type r = Foo of string @@ global many aliased
+type r = Foo of string @@ global many
 |}]
 
-(* mutable implies global aliased many. No warnings are given since we imagine
-   that the coupling will be removed soon. *)
+(* mutable implies [global many unyielding], and legacy modalities for monadic
+   axes. *)
 type r = {
-  mutable x : string @@ global aliased many
+  mutable x : string @@ global unyielding aliased many
 }
 [%%expect{|
 type r = { mutable x : string; }
@@ -462,7 +486,7 @@ let use_local (f : (_ -> _ -> _) @ local) x y =
   f x y
 let result = use_local (^) "hello" " world"
 [%%expect{|
-val use_local : local_ ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
+val use_local : ('a -> 'b -> 'c) @ local -> 'a -> 'b -> 'c = <fun>
 val result : string = "hello world"
 |}]
 
@@ -471,7 +495,7 @@ let use_local_ret (f : _ -> _ @ local) x y =
 let global_ret : string -> string @ global = fun x -> x
 let result = use_local_ret global_ret "hello"
 [%%expect{|
-val use_local_ret : ('a -> local_ 'b) -> 'a -> 'c -> unit = <fun>
+val use_local_ret : ('a -> 'b @ local) -> 'a -> 'c -> unit = <fun>
 val global_ret : string -> string = <fun>
 val result : '_weak1 -> unit = <fun>
 |}]
@@ -481,11 +505,11 @@ let local_ret a = exclave_ (Some a)
 let bad_use = use_global_ret local_ret "hello"
 [%%expect{|
 val use_global_ret : ('a -> 'b) -> 'a -> 'b lazy_t = <fun>
-val local_ret : 'a -> local_ 'a option = <fun>
+val local_ret : 'a -> 'a option @ local = <fun>
 Line 3, characters 29-38:
 3 | let bad_use = use_global_ret local_ret "hello"
                                  ^^^^^^^^^
-Error: This expression has type "'a -> local_ 'a option"
+Error: This expression has type "'a -> 'a option @ local"
        but an expression was expected of type "'b -> 'c"
 |}]
 
@@ -555,10 +579,10 @@ let bar (local_ x) (local_ y) = let _ = x +. y in ()
 
 let result = use_local foo 1. 2.
 [%%expect{|
-val use_local : local_ ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
+val use_local : ('a -> 'b -> 'c) @ local -> 'a -> 'b -> 'c = <fun>
 val use_global : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
 val foo : float -> float -> float = <fun>
-val bar : local_ float -> local_ float -> unit = <fun>
+val bar : float @ local -> float @ local -> unit = <fun>
 val result : float = 3.
 |}]
 
@@ -577,8 +601,8 @@ let result = use_global bar 1. 2.
 Line 1, characters 24-27:
 1 | let result = use_global bar 1. 2.
                             ^^^
-Error: This expression has type "local_ float -> local_ float -> unit"
-       but an expression was expected of type "local_ 'a -> ('b -> 'c)"
+Error: This expression has type "float @ local -> float @ local -> unit"
+       but an expression was expected of type "'a @ local -> ('b -> 'c)"
 |}]
 
 let use_portable_arg (f : (_ -> _) @ portable -> _) g = f g
@@ -627,4 +651,22 @@ Line 3, characters 32-47:
                                     ^^^^^^^^^^^^^^^
 Error: This expression has type "'a -> unit"
        but an expression was expected of type "'b @ contended -> 'c"
+|}]
+
+let f : unit -> (unit -> string) @ local = fun () -> fun () -> "hello"
+[%%expect{|
+val f : unit -> (unit -> string) @ local = <fun>
+|}]
+
+(* type error should preempt the mode error *)
+let _ : string @ global = f ()
+[%%expect{|
+Line 1, characters 26-30:
+1 | let _ : string @ global = f ()
+                              ^^^^
+Error: This expression has type "unit -> string"
+       but an expression was expected of type "string"
+       Hint: Did you forget to provide "()" as argument?
+  Hint: This function application is partial,
+  maybe some arguments are missing.
 |}]

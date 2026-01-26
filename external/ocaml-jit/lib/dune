@@ -1,0 +1,24 @@
+(library
+ (name jit)
+ (enabled_if
+  (= %{architecture} "amd64"))
+ (libraries ocamlcommon ocamloptcomp flambda2 unix)
+ (foreign_stubs
+  (language c)
+  (names jit_stubs)))
+
+(install
+ (enabled_if
+  (= %{architecture} "amd64"))
+ (files
+  (.jit.objs/native/jit.cmx as ocaml-jit/jit.cmx)
+  (jit.cmxa as ocaml-jit/jit.cmxa)
+  (jit.a as ocaml-jit/jit.a)
+  (libjit_stubs.a as ocaml-jit/libjit_stubs.a)
+  (jit.cmxs as ocaml-jit/jit.cmxs)
+  (jit.cma as ocaml-jit/jit.cma)
+  (.jit.objs/byte/jit.cmi as ocaml-jit/jit.cmi)
+  (.jit.objs/byte/jit.cmt as ocaml-jit/jit.cmt)
+  (.jit.objs/byte/jit.cmti as ocaml-jit/jit.cmti))
+ (section lib)
+ (package ocaml))

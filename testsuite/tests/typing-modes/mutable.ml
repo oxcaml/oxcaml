@@ -13,23 +13,67 @@ type r = { mutable s : string; }
 Line 2, characters 31-32:
 2 | let foo (local_ s) = exclave_ {s}
                                    ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global"
+       because it is the field "s" (with some modality) of the record at Line 2, characters 30-33.
 |}]
 
-(* [@no_mutable_implied_modalities] disables those implied modalities on the
-   comonadic axes, and allows us to test [mutable] alone *)
-
-(* Note the attribute is not printed back, which might be confusing.
-   Considering this is a short-term workaround, let's not worry too much. *)
-type 'a r = {mutable s : 'a [@no_mutable_implied_modalities]}
+(* you can override those implied modalities *)
+type r = {mutable s : string @@ local}
+let foo (local_ s) = exclave_ {s}
 [%%expect{|
-type 'a r = { mutable s : 'a; }
+type r = { mutable s : string @@ local; }
+val foo : string @ local -> r @ local = <fun>
+|}]
+
+type r = {mutable s : string @@ global}
+[%%expect{|
+type r = { mutable s : string; }
+|}]
+
+type r = {mutable s : string @@ global yielding}
+[%%expect{|
+type r = { mutable s : string @@ yielding; }
+|}]
+
+type r = {mutable s : string @@ yielding global}
+[%%expect{|
+type r = { mutable s : string @@ yielding; }
+|}]
+
+type r = {mutable s : string @@ yielding}
+[%%expect{|
+type r = { mutable s : string @@ yielding; }
+|}]
+
+type r = {mutable s : string @@ local yielding}
+[%%expect{|
+type r = { mutable s : string @@ local; }
+|}]
+
+type r = {mutable s : string @@ yielding local}
+[%%expect{|
+type r = { mutable s : string @@ local; }
+|}]
+
+type r = {mutable s : string @@ local unyielding}
+[%%expect{|
+type r = { mutable s : string @@ local unyielding; }
+|}]
+
+type r = {mutable s : string @@ unyielding local}
+[%%expect{|
+type r = { mutable s : string @@ local unyielding; }
+|}]
+
+type 'a r = {mutable s : 'a @@ local}
+[%%expect{|
+type 'a r = { mutable s : 'a @@ local; }
 |}]
 
 (* We can now construct a local record using a local field. *)
 let foo (local_ s) = exclave_ {s}
 [%%expect{|
-val foo : local_ 'a -> local_ 'a r = <fun>
+val foo : 'a @ local -> 'a r @ local = <fun>
 |}]
 
 (* Mutation needs to be global *)
@@ -39,7 +83,7 @@ let foo (local_ r) =
 Line 2, characters 9-25:
 2 |   r.s <- (local_ "hello")
              ^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (local_ r) = ref r.s
@@ -47,20 +91,23 @@ let foo (local_ r) = ref r.s
 Line 1, characters 25-28:
 1 | let foo (local_ r) = ref r.s
                              ^^^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region
+       because it is the field "s" of the record at Line 1, characters 25-26
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (local_ r) =
   r.s <- "hello"
 [%%expect{|
-val foo : local_ string r -> unit = <fun>
+val foo : string r @ local -> unit = <fun>
 |}]
 
-(* We can still add modalities explicitly. Of course, the print-back is
-   confusing. *)
-type r' = {mutable s' : string @@ global [@no_mutable_implied_modalities]}
+(* We can still add modalities explicitly. But they might be omitted if they are
+  the same as the mutable-implied ones. *)
+type r' = {mutable s' : string @@ global}
 [%%expect{|
-type r' = { mutable global_ s' : string; }
+type r' = { mutable s' : string; }
 |}]
 
 let foo (local_ s') = exclave_ {s'}
@@ -68,7 +115,8 @@ let foo (local_ s') = exclave_ {s'}
 Line 1, characters 32-34:
 1 | let foo (local_ s') = exclave_ {s'}
                                     ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global"
+       because it is the field "s'" (with some modality) of the record at Line 1, characters 31-35.
 |}]
 
 (* mutable defaults to mutable(legacy = nonportable), so currently we can't construct a
@@ -78,7 +126,7 @@ let foo (s @ portable) = ({s} : _ @ portable)
 Line 1, characters 26-29:
 1 | let foo (s @ portable) = ({s} : _ @ portable)
                               ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* This attribute doesn't disable implied modalities on monadic axes. For
@@ -100,11 +148,13 @@ let foo (r @ unique) = (r.s : _ @ unique)
 Line 1, characters 24-27:
 1 | let foo (r @ unique) = (r.s : _ @ unique)
                             ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "s" (with some modality) of the record at Line 1, characters 24-25.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 module M : sig
-  type t = { mutable s : string [@no_mutable_implied_modalities] }
+  type t = { mutable s : string @@ local }
 end = struct
   type t = { mutable s : string }
 end
@@ -117,39 +167,39 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t = { mutable s : string; } end
        is not included in
-         sig type t = { mutable s : string; } end
+         sig type t = { mutable s : string @@ local; } end
        Type declarations do not match:
          type t = { mutable s : string; }
        is not included in
-         type t = { mutable s : string; }
+         type t = { mutable s : string @@ local; }
        Fields do not match:
          "mutable s : string;"
        is not the same as:
-         "mutable s : string;"
+         "mutable s : string @@ local;"
        The first is global and the second is not.
 |}]
 
 module M : sig
   type t = { mutable s : string }
 end = struct
-  type t = { mutable s : string [@no_mutable_implied_modalities] }
+  type t = { mutable s : string @@ local}
 end
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = { mutable s : string [@no_mutable_implied_modalities] }
+4 |   type t = { mutable s : string @@ local}
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type t = { mutable s : string; } end
+         sig type t = { mutable s : string @@ local; } end
        is not included in
          sig type t = { mutable s : string; } end
        Type declarations do not match:
-         type t = { mutable s : string; }
+         type t = { mutable s : string @@ local; }
        is not included in
          type t = { mutable s : string; }
        Fields do not match:
-         "mutable s : string;"
+         "mutable s : string @@ local;"
        is not the same as:
          "mutable s : string;"
        The second is global and the first is not.
@@ -214,5 +264,5 @@ type 'a r = { f : string -> string; mutable a : 'a; }
 Lines 6-7, characters 2-12:
 6 | ..{ f = (fun x -> x);
 7 |     a = 42 }
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]

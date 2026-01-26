@@ -21,13 +21,13 @@
 
 open Cmx_format
 
-val reset : Compilation_unit.t -> unit
+val reset : Unit_info.t -> unit
         (* Reset the environment and record the name of the unit being
            compiled (including any associated -for-pack prefix). *)
 
 val reset_info_tables: unit -> unit
 
-val current_unit_infos: unit -> unit_infos
+val current_unit_infos: unit -> unit unit_infos_gen
         (* Return the infos for the unit being compiled *)
 
 val get_global_export_info : Compilation_unit.t

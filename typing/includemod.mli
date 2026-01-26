@@ -18,26 +18,21 @@
 open Typedtree
 open Types
 
-(** Type describing which arguments of an inclusion to consider as used
-    for the usage warnings. [Mark_both] is the default. *)
-type mark =
-  | Mark_both
-      (** Mark definitions used from both arguments *)
-  | Mark_positive
-      (** Mark definitions used from the positive (first) argument *)
-  | Mark_negative
-      (** Mark definitions used from the negative (second) argument *)
-  | Mark_neither
-      (** Do not mark definitions used from either argument *)
-
 module Error: sig
 
+  type ('elt, 'explanation) mdiff = {
+    got:'elt;
+    expected:'elt;
+    modes:Includecore.mmodes;
+    symptom:'explanation
+  }
   type ('elt,'explanation) diff = {
     got:'elt;
     expected:'elt;
     symptom:'explanation
   }
   type 'elt core_diff =('elt,unit) diff
+  type 'elt core_mdiff =('elt,unit) mdiff
 
   type functor_arg_descr =
     | Anonymous
@@ -47,9 +42,13 @@ module Error: sig
      (** For backward compatibility's sake, an empty struct can be implicitly
          converted to an unit module. *)
 
+  type class_declaration_symptom =
+    | Class_type of Ctype.class_match_failure list
+    | Class_mode of Mode.Value.error
+
   type core_sigitem_symptom =
     | Value_descriptions of
-        (Types.value_description, Includecore.value_mismatch) diff
+        (Types.value_description, Includecore.value_mismatch) mdiff
     | Type_declarations of
         (Types.type_declaration, Includecore.type_mismatch) diff
     | Extension_constructors of
@@ -58,7 +57,8 @@ module Error: sig
     | Class_type_declarations of
         (Types.class_type_declaration, Ctype.class_match_failure list) diff
     | Class_declarations of
-        (Types.class_declaration, Ctype.class_match_failure list) diff
+        (Types.class_declaration, class_declaration_symptom) mdiff
+    | Modalities of Mode.Modality.error
 
   type core_module_type_symptom =
     | Not_an_alias
@@ -73,9 +73,10 @@ module Error: sig
     | Functor of functor_symptom
     | Invalid_module_alias of Path.t
     | After_alias_expansion of module_type_diff
+    | Mode of Mode.Value.error
 
 
-  and module_type_diff = (Types.module_type, module_type_symptom) diff
+  and module_type_diff = (Types.module_type, module_type_symptom) mdiff
 
   and functor_symptom =
     | Params of functor_params_diff
@@ -88,8 +89,17 @@ module Error: sig
   and arg_functor_param_symptom =
     (Types.functor_parameter, Ident.t) functor_param_symptom
 
+  and functor_params_symptom =
+    | Param of (functor_parameter, unit) functor_param_symptom
+    (** One of the parameters is mismatched *)
+    | Incompatible
+    (** One side is a functor but the other side is not *)
+
   and functor_params_diff =
-    (Types.functor_parameter list * Types.module_type) core_diff
+    (Types.functor_parameter list * Types.module_type,
+     functor_params_symptom) diff
+    (** the return mode of the functor is intentionally omitted, since the diff
+        is only about parameters. *)
 
   and signature_symptom = {
     env: Env.t;
@@ -152,45 +162,67 @@ val is_runtime_component: Types.signature_item -> bool
 
 type modes = Includecore.mmodes
 
+(** The modes used for compilation unit inclusion check *)
+val modes_unit : modes
+
+(** The modes used for top-level inclusion check, where top-level is similiar to
+  a structure *)
+val modes_toplevel : modes
+
 (* Typechecking *)
 
 val modtypes:
-  loc:Location.t -> Env.t -> mark:mark -> modes:modes ->
+  loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
   module_type -> module_type -> module_coercion
 
-val modtypes_with_shape:
-  shape:Shape.t -> loc:Location.t -> Env.t -> mark:mark -> modes:modes ->
+(** [modtypes_constraint ~shape ~loc env ~mark exp_modtype constraint_modtype]
+    checks that [exp_modtype] is a subtype of [constraint_modtype], and returns
+    the module coercion and the shape of the constrained module.
+    It also marks as used paired items in positive position in [exp_modtype],
+    and also paired items in negative position in [constraint_modtype].
+    This marking in negative position allows to raise an [unused item] warning
+    whenever an item in a functor parameter in [constraint_modtype] does not
+    exist in [exp_modtypes]. This behaviour differs from the one in
+    {!check_implementation} and {!compunit} which assumes that is not
+    appropriate to raise warning about the interface file while typechecking the
+    implementation file.
+*)
+val modtypes_constraint:
+  shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
   module_type -> module_type -> module_coercion * Shape.t
 
 val strengthened_module_decl:
-  loc:Location.t -> aliasable:bool -> Env.t -> mark:mark -> mmodes:modes ->
+  loc:Location.t -> aliasable:bool -> Env.t -> mark:bool -> mmodes:modes ->
   module_declaration -> Path.t -> module_declaration -> module_coercion
 
-val check_modtype_inclusion :
+val check_functor_application :
   loc:Location.t -> Env.t -> Types.module_type -> Path.t -> Types.module_type ->
   explanation option
-(** [check_modtype_inclusion ~loc env mty1 path1 mty2] checks that the
+(** [check_functor_application ~loc env mty1 path1 mty2] checks that the
     functor application F(M) is well typed, where mty2 is the type of
     the argument of F and path1/mty1 is the path/unstrenghened type of M. *)
 
 val check_modtype_equiv:
   loc:Location.t -> Env.t -> Ident.t -> module_type -> module_type -> unit
 
-val signatures: Env.t -> mark:mark -> modes:modes ->
+val signatures: Env.t -> mark:bool -> modes:modes ->
   signature -> signature -> module_coercion
 
-val include_functor_signatures : Env.t -> mark:mark ->
-  signature -> signature -> (Ident.t * module_coercion) list
+val include_functor_signatures : Env.t -> mark:bool ->
+  signature -> signature -> modes:modes -> (Ident.t * module_coercion) list
+
+val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
+(** Check an implementation against an interface *)
 
 val compunit:
-      Env.t -> mark:mark -> string -> signature ->
+      Env.t -> mark:bool -> string -> signature ->
       string -> signature -> Shape.t -> module_coercion * Shape.t
 
 val compunit_as_argument:
       Env.t -> string -> signature -> string -> signature -> module_coercion
 
 val type_declarations:
-  loc:Location.t -> Env.t -> mark:mark ->
+  loc:Location.t -> Env.t -> mark:bool ->
   Ident.t -> type_declaration -> type_declaration -> unit
 
 val print_coercion: Format.formatter -> module_coercion -> unit
@@ -213,7 +245,8 @@ exception Apply_error of {
     env : Env.t ;
     app_name : application_name ;
     mty_f : module_type ;
-    args : (Error.functor_arg_descr * Types.module_type)  list ;
+    args : (Error.functor_arg_descr * Types.module_type *
+      Typedtree.mode_with_locks)  list ;
   }
 
 val expand_module_alias: strengthen:bool -> Env.t -> Path.t -> Types.module_type
@@ -234,7 +267,8 @@ end
 
 module Functor_app_diff: sig
   module Defs: sig
-    type left = Error.functor_arg_descr * Types.module_type
+    type left = Error.functor_arg_descr * Types.module_type *
+      Typedtree.mode_with_locks
     type right = Types.functor_parameter
     type eq = Typedtree.module_coercion
     type diff = (Error.functor_arg_descr, unit) Error.functor_param_symptom
@@ -243,6 +277,7 @@ module Functor_app_diff: sig
   val diff:
     Env.t ->
     f:Types.module_type ->
-    args:(Error.functor_arg_descr * Types.module_type) list ->
+    args:(Error.functor_arg_descr * Types.module_type *
+      Typedtree.mode_with_locks) list ->
     Diffing.Define(Defs).patch
 end

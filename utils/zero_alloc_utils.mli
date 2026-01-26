@@ -1,5 +1,5 @@
-(** Abstract domain used in static analysis for checking @zero_alloc annotations.
-    See [backend/zero_alloc_checker] for details of the analysis.
+(** Abstract domain used in static analysis for checking [@zero_alloc]
+    annotations. See [backend/zero_alloc_checker] for details of the analysis.
     See this module's .ml file for details about the translation of
     user-provided annotations to abstract values in this domain.
 *)

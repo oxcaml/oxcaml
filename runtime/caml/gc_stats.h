@@ -33,15 +33,22 @@
 */
 
 struct heap_stats {
-  intnat pool_words;
-  intnat pool_max_words;
-  intnat pool_live_words;
-  intnat pool_live_blocks;
-  intnat pool_frag_words;
-  intnat large_words;
-  intnat large_max_words;
-  intnat large_blocks;
+  intnat pool_words;         /* words in pools in use, including pool headers and wastage */
+  intnat pool_max_words;     /* maximum of pool_words over time */
+  intnat pool_live_words;    /* words in live blocks in pools, including block headers */
+  intnat pool_live_blocks;   /* live blocks in pools */
+  intnat pool_frag_words;    /* overhead in pools, including pool header, wastage, and */
+                             /* per-block trailing fragments */
+  intnat large_words;        /* words in large blocks, including large block headers */
+  intnat large_max_words;    /* maximum of large_words over time */
+  intnat large_blocks;       /* number of large blocks */
   intnat dependent_bytes;
+};
+
+/* Stats which are global, not per-domain */
+struct global_heap_stats {
+  uintnat chunk_words;       /* total words in "chunks", including free pools */
+  uintnat max_chunk_words;   /* maximum of chunk_words over time */
 };
 
 /* Note: accumulating stats then removing them is not a no-op, as
@@ -73,13 +80,15 @@ void caml_collect_alloc_stats_sample(
 struct gc_stats {
   struct alloc_stats alloc_stats;
   struct heap_stats heap_stats;
+  struct global_heap_stats global_stats;
 };
 
 void caml_orphan_alloc_stats(caml_domain_state *);
 
 /* Update the sampled stats of a domain from its live stats.
    May only be called during STW, so that it does not race
-   with mutators calling [caml_compute_gc_stats]. */
+   with mutators calling [caml_compute_gc_stats].
+   global_stats field is zeroed. */
 void caml_collect_gc_stats_sample_stw(caml_domain_state *domain);
 
 /* Compute global runtime stats.

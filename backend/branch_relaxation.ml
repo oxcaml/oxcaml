@@ -16,6 +16,9 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
+(* CR gyorsh/mshinwell: This pass needs fixing for register availability set
+   propagation *)
+
 open! Int_replace_polymorphic_compare
 open Linear
 
@@ -28,8 +31,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Llabel { label = lbl; _ } ->
         Hashtbl.add map lbl pc;
         fill_map pc instr.next
-      | ( Lprologue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap | Lop _
-        | Lcall_op _ | Lbranch _
+      | ( Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
+        | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
         | Lcondbranch (_, _)
         | Lcondbranch3 (_, _, _)
         | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -70,19 +73,21 @@ module Make (T : Branch_relaxation_intf.S) = struct
         || opt_branch_overflows map pc lbl1 max_branch_offset
         || opt_branch_overflows map pc lbl2 max_branch_offset
       | Lop
-          ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-          | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-          | Const_vec128 _ | Stackoffset _ | Load _
+          ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
+          | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
+          | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+          | Stackoffset _ | Load _
           | Store (_, _, _)
-          | Intop _
+          | Intop _ | Int128op _
           | Intop_imm (_, _)
           | Intop_atomic _
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ | External_without_caml_c_call _ )
-      | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap
-      | Lcall_op _ | Llabel _ | Lbranch _ | Lswitch _ | Ladjust_stack_offset _
-      | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
         Misc.fatal_error "Unsupported instruction for branch relaxation")
 
   let fixup_branches ~code_size ~max_out_of_line_code_offset map code =
@@ -91,14 +96,15 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | None -> next
       | Some l ->
         instr_cons
-          (Lcondbranch (Iinttest_imm (Isigned Cmm.Ceq, n), l))
-          arg [||] next ~available_before:None ~available_across:None
+          (Lcondbranch (Iinttest_imm (Ceq, n), l))
+          arg [||] next ~available_before:Reg_availability_set.Unreachable
+          ~available_across:Reg_availability_set.Unreachable
     in
     let rec fixup did_fix pc instr =
       match instr.desc with
       | Lend -> did_fix
-      | Lprologue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap | Lop _
-      | Lcall_op _ | Llabel _ | Lbranch _
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
       | Lcondbranch (_, _)
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -121,9 +127,11 @@ module Make (T : Branch_relaxation_intf.S) = struct
             let llabel = Llabel { label = lbl2; section_name = None } in
             let cont =
               instr_cons (Lbranch lbl) [||] [||]
-                (instr_cons llabel [||] [||] instr.next ~available_before:None
-                   ~available_across:None)
-                ~available_before:None ~available_across:None
+                (instr_cons llabel [||] [||] instr.next
+                   ~available_before:Reg_availability_set.Unreachable
+                   ~available_across:Reg_availability_set.Unreachable)
+                ~available_before:Reg_availability_set.Unreachable
+                ~available_across:Reg_availability_set.Unreachable
             in
             instr.desc <- Lcondbranch (Operation.invert_test test, lbl2);
             instr.next <- cont;
@@ -137,15 +145,17 @@ module Make (T : Branch_relaxation_intf.S) = struct
             instr.desc <- cont.desc;
             instr.next <- cont.next;
             fixup true pc instr
-          | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap
-          | Lcall_op _ | Llabel _ | Lbranch _ | Lswitch _
-          | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
+          | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+          | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _
+          | Lbranch _ | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _
+          | Lraise _ | Lstackcheck _
           | Lop
-              ( Move | Spill | Reload | Opaque | Begin_region | End_region
-              | Dls_get | Const_int _ | Const_float32 _ | Const_float _
-              | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
+              ( Move | Spill | Reload | Opaque | Pause | Begin_region
+              | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
+              | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+              | Const_vec512 _ | Stackoffset _ | Load _
               | Store (_, _, _)
-              | Intop _
+              | Intop _ | Int128op _
               | Intop_imm (_, _)
               | Intop_atomic _
               | Floatop (_, _)

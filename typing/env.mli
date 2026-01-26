@@ -17,6 +17,7 @@
 
 open Types
 open Misc
+module Jkind = Btype.Jkind0
 
 type value_unbound_reason =
   | Val_unbound_instance_variable
@@ -25,14 +26,20 @@ type value_unbound_reason =
   | Val_unbound_ghost_recursive of Location.t
 
 type module_unbound_reason =
-  | Mod_unbound_illegal_recursion
+  | Mod_unbound_illegal_recursion of
+      { container : string option; unbound: string }
+
+type locks
 
 type summary =
     Env_empty
   | Env_value of summary * Ident.t * value_description * Mode.Value.l
   | Env_type of summary * Ident.t * type_declaration
   | Env_extension of summary * Ident.t * extension_constructor
-  | Env_module of summary * Ident.t * module_presence * module_declaration
+  | Env_module of summary * Ident.t * module_presence * module_declaration *
+      Mode.Value.l * locks
+  (* CR zqian: change to [locks option], so for module aliases it could be
+  [Some []]. *)
   | Env_modtype of summary * Ident.t * modtype_declaration
   | Env_class of summary * Ident.t * class_declaration
   | Env_cltype of summary * Ident.t * class_type_declaration
@@ -50,9 +57,11 @@ type summary =
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * Jkind_types.Sort.t array * int
 
 type t
+
+type stage
 
 val empty: t
 
@@ -125,6 +134,11 @@ val find_constructor_address: Path.t -> t -> address
 val shape_of_path:
   namespace:Shape.Sig_component_kind.t -> t -> Path.t -> Shape.t
 
+val shape_of_path_opt:
+  namespace:Shape.Sig_component_kind.t -> t -> Path.t -> Shape.t option
+
+val shape_for_constr: t -> Path.t -> args:Shape.t list -> Shape.t option
+
 val add_functor_arg: Ident.t -> t -> t
 val is_functor_arg: Path.t -> t -> bool
 
@@ -162,16 +176,19 @@ val mark_value_used: Uid.t -> unit
 val mark_module_used: Uid.t -> unit
 val mark_type_used: Uid.t -> unit
 
+(* Mark mutable variable as mutated *)
+val mark_value_mutated: Uid.t -> unit
+
 type constructor_usage = Positive | Pattern | Exported_private | Exported
 val mark_constructor_used:
-    constructor_usage -> constructor_declaration -> unit
+    constructor_usage -> Uid.t -> unit
 val mark_extension_used:
-    constructor_usage -> extension_constructor -> unit
+    constructor_usage -> Uid.t -> unit
 
 type label_usage =
     Projection | Mutation | Construct | Exported_private | Exported
 val mark_label_used:
-    label_usage -> label_declaration -> unit
+    label_usage -> Uid.t -> unit
 
 (* Lookup by long identifiers *)
 
@@ -181,36 +198,7 @@ type unbound_value_hint =
   | No_hint
   | Missing_rec of Location.t
 
-type locality_context =
-  | Tailcall_function
-  | Tailcall_argument
-  | Partial_application
-  | Return
-  | Lazy
-
-type closure_context =
-  | Function of locality_context option
-  | Lazy
-
-type escaping_context =
-  | Letop
-  | Probe
-  | Class
-  | Module
-
-type shared_context =
-  | For_loop
-  | While_loop
-  | Letop
-  | Closure
-  | Comprehension
-  | Class
-  | Module
-  | Probe
-
-type locks
-
-type held_locks = locks * Longident.t * Location.t
+type mode_with_locks = Mode.Value.l * locks
 (** Sometimes we get the locks for something, but either want to walk them later, or
 walk them for something else. The [Longident.t] and [Location.t] are only for error
 messages, and point to the variable for which we actually want to walk the locks. *)
@@ -219,27 +207,33 @@ val locks_empty : locks
 
 val locks_is_empty : locks -> bool
 
-(** Items whose accesses are affected by locks *)
-type lock_item =
-  | Value
-  | Module
-  | Class
+val mode_unit : Mode.Value.lr
 
 type structure_components_reason =
   | Project
   | Open
 
+type no_open_quotations_context =
+  | Object_qt
+  | Struct_qt
+  | Sig_qt
+  | Open_qt
+
+type none_in_quotations_context =
+  | Constructor
+  | Label
+
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
   | Unbound_type of Longident.t
   | Unbound_constructor of Longident.t
-  | Unbound_label of (Longident.t * record_form_packed)
+  | Unbound_label of Longident.t * record_form_packed * label_usage
   | Unbound_module of Longident.t
   | Unbound_class of Longident.t
   | Unbound_modtype of Longident.t
   | Unbound_cltype of Longident.t
-  | Unbound_instance_variable of string
-  | Not_an_instance_variable of string
+  | Unbound_settable_variable of string
+  | Not_a_settable_variable of string
   | Masked_instance_variable of Longident.t
   | Masked_self_variable of Longident.t
   | Masked_ancestor_variable of Longident.t
@@ -248,15 +242,24 @@ type lookup_error =
   | Functor_used_as_structure of Longident.t * structure_components_reason
   | Abstract_used_as_structure of Longident.t * Path.t * structure_components_reason
   | Generative_used_as_applicative of Longident.t
-  | Illegal_reference_to_recursive_module
+  | Illegal_reference_to_recursive_module of
+      { container : string option; unbound : string }
+  | Illegal_reference_to_recursive_class_type of
+      { container : string option;
+        unbound : string;
+        unbound_class_type : Longident.t;
+        container_class_type : string
+      }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_escaping of lock_item * Longident.t * escaping_context
-  | Once_value_used_in of lock_item * Longident.t * shared_context
-  | Value_used_in_closure of lock_item * Longident.t * Mode.Value.Comonadic.error * closure_context
-  | Local_value_used_in_exclave of lock_item * Longident.t
+  | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
-  | No_unboxed_version of Longident.t
+  | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
+  | Mutable_value_used_in_closure of Mode.Hint.pinpoint
+  | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
+  | Unbound_in_stage of
+      none_in_quotations_context * Longident.t * Location.t * stage * stage
+
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
 
@@ -272,28 +275,23 @@ val lookup_error: Location.t -> t -> lookup_error -> 'a
    [lookup_foo ~use:true] exactly one time -- otherwise warnings may be
    emitted the wrong number of times. *)
 
-type actual_mode = {
-  mode : Mode.Value.l;
-  context : shared_context option
-  (** Explains why [mode] is high. *)
-}
-
-(** Takes the [mode] and [ty] of a value at definition site, walks through the list of
-    locks and constrains [mode] and [ty]. Return the access mode of the value allowed by
-    the locks. [ty] is optional as the function works on modules and classes as well, for
-    which [ty] should be [None]. *)
-val walk_locks : env:t -> item:lock_item -> Mode.Value.l -> type_expr option ->
-  held_locks -> actual_mode
+(** Takes the mode and the type of a value at definition site, walks through the
+    list of locks and constrains the mode and the type. Return the access mode
+    of the value allowed by the locks. [ty] is optional as the function works on
+    modules and classes as well, for which [ty] should be [None]. *)
+val walk_locks : env:t -> loc:Location.t -> Longident.t ->
+  item:Mode.Hint.lock_item ->
+  type_expr option -> mode_with_locks -> Mode.Value.l
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
-  Path.t * value_description * Mode.Value.l * locks
+  Path.t * value_description * mode_with_locks
 val lookup_type:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * type_declaration
 val lookup_module:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
-  Path.t * module_declaration * locks
+  Path.t * module_declaration * mode_with_locks
 val lookup_modtype:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * modtype_declaration
@@ -308,7 +306,7 @@ val lookup_cltype:
   defined (always legacy), and thus not returned. *)
 val lookup_module_path:
   ?use:bool -> loc:Location.t -> load:bool -> Longident.t -> t ->
-    Path.t * locks
+    Path.t * mode_with_locks
 val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
 val lookup_module_instance_path:
@@ -317,14 +315,14 @@ val lookup_module_instance_path:
 
 val lookup_constructor:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  constructor_description
+  constructor_description * locks
 val lookup_all_constructors:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  ((constructor_description * (unit -> unit)) list,
+  (((constructor_description * locks) * (unit -> unit)) list,
    Location.t * t * lookup_error) result
 val lookup_all_constructors_from_type:
   ?use:bool -> loc:Location.t -> constructor_usage -> Path.t -> t ->
-  (constructor_description * (unit -> unit)) list
+  ((constructor_description * locks) * (unit -> unit)) list
 
 val lookup_label:
   ?use:bool -> record_form:'rcd record_form -> loc:Location.t -> label_usage -> Longident.t -> t ->
@@ -337,18 +335,25 @@ val lookup_all_labels_from_type:
   ?use:bool -> record_form:'rcd record_form -> loc:Location.t -> label_usage -> Path.t -> t ->
   ('rcd gen_label_description * (unit -> unit)) list
 
-val lookup_instance_variable:
-  ?use:bool -> loc:Location.t -> string -> t ->
-  Path.t * Asttypes.mutable_flag * string * type_expr
+type settable_variable =
+  | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
+  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind_types.Sort.t
+
+(** For a mutable variable, [use] means mark as mutated. For an instance
+    variable, it means mark as used. *)
+val lookup_settable_variable:
+  ?use:bool -> loc:Location.t -> string -> t -> settable_variable
 
 val find_value_by_name:
   Longident.t -> t -> Path.t * value_description
+val find_value_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.value_description
 val find_type_by_name:
   Longident.t -> t -> Path.t * type_declaration
-val find_module_by_name:
-  Longident.t -> t -> Path.t * module_declaration
-val find_modtype_by_name:
-  Longident.t -> t -> Path.t * modtype_declaration
+val find_module_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.module_declaration
+val find_modtype_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.modtype_declaration
 val find_class_by_name:
   Longident.t -> t -> Path.t * class_declaration
 val find_cltype_by_name:
@@ -406,14 +411,18 @@ val add_type:
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
+(* Modules can be added without modes, which defaults to the max mode *)
 val add_module: ?arg:bool -> ?shape:Shape.t ->
-  Ident.t -> module_presence -> module_type -> t -> t
+  Ident.t -> module_presence -> module_type -> ?mode:Mode.Value.l -> t -> t
 val add_module_lazy: update_summary:bool ->
-  Ident.t -> module_presence -> Subst.Lazy.module_type -> t -> t
+  Ident.t -> module_presence -> Subst.Lazy.module_type -> ?mode:Mode.Value.l ->
+  t -> t
 val add_module_declaration: ?arg:bool -> ?shape:Shape.t -> check:bool ->
-  Ident.t -> module_presence -> module_declaration -> ?locks:locks -> t -> t
+  Ident.t -> module_presence -> module_declaration ->
+  ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks -> t -> t
 val add_module_declaration_lazy: ?arg:bool -> update_summary:bool ->
-  Ident.t -> module_presence -> Subst.Lazy.module_declaration -> t -> t
+  Ident.t -> module_presence -> Subst.Lazy.module_declaration ->
+  ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks -> t -> t
 val add_modtype: Ident.t -> modtype_declaration -> t -> t
 val add_modtype_lazy: update_summary:bool ->
    Ident.t -> Subst.Lazy.modtype_declaration -> t -> t
@@ -435,6 +444,9 @@ val add_persistent_structure : Ident.t -> t -> t
    directory. *)
 val persistent_structures_of_dir : Load_path.Dir.t -> Misc.Stdlib.String.Set.t
 
+(* Convert the given list of basenames to the set of persistent structures. *)
+val persistent_structures_of_basenames : string list -> Misc.Stdlib.String.Set.t
+
 (* [filter_non_loaded_persistent f env] removes all the persistent
    structures that are not yet loaded and for which [f] returns
    [false]. *)
@@ -452,12 +464,11 @@ val open_signature:
     used_slot:bool ref ->
     loc:Location.t -> toplevel:bool ->
     Asttypes.override_flag -> Longident.t Location.loc ->
-    t -> Path.t * t
+    t -> Path.t * mode_with_locks * t
 
-(* CR zqian: locks beyond the open are not tracked. Fix that. *)
 val open_signature_by_path: Path.t -> t -> t
 
-val open_pers_signature: string -> t -> Path.t * t
+val open_pers_signature: string -> t -> Path.t * mode_with_locks * t
 
 val remove_last_open: Path.t -> t -> t option
 
@@ -472,10 +483,11 @@ val enter_extension:
   extension_constructor -> t -> Ident.t * t
 val enter_module:
   scope:int -> ?arg:bool -> string -> module_presence ->
-  module_type -> t -> Ident.t * t
+  module_type -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> t -> Ident.t * t
 val enter_module_declaration:
   scope:int -> ?arg:bool -> ?shape:Shape.t -> string -> module_presence ->
-  module_declaration -> ?locks:locks -> t -> Ident.t * t
+  module_declaration -> ?mode:(Mode.allowed * 'r) Mode.Value.t ->
+  ?locks:locks -> t -> Ident.t * t
 val enter_modtype:
   scope:int -> string -> modtype_declaration -> t -> Ident.t * t
 val enter_class: scope:int -> string -> class_declaration -> t -> Ident.t * t
@@ -484,14 +496,15 @@ val enter_cltype:
 
 (* Same as [add_signature] but refreshes (new stamp) and rescopes bound idents
    in the process. *)
-val enter_signature: ?mod_shape:Shape.t -> scope:int -> signature -> t ->
-  signature * t
+val enter_signature: ?mod_shape:Shape.t -> scope:int -> signature ->
+  ?mode:(Mode.allowed * 'r) Mode.Value.t -> t -> signature * t
 
 (* Same as [enter_signature] but also extends the shape map ([parent_shape])
    with all the the items from the signature, their shape being a projection
    from the given shape. *)
 val enter_signature_and_shape: scope:int -> parent_shape:Shape.Map.t ->
-  Shape.t -> signature -> t -> signature * Shape.Map.t * t
+  Shape.t -> signature -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> t ->
+  signature * Shape.Map.t * t
 
 val enter_unbound_value : string -> value_unbound_reason -> t -> t
 
@@ -499,17 +512,25 @@ val enter_unbound_module : string -> module_unbound_reason -> t -> t
 
 (* Lock the environment *)
 
-val add_escape_lock : escaping_context -> t -> t
-
-(** `once` variables beyond the share lock cannot be accessed. Moreover,
-    `unique` variables beyond the lock can still be accessed, but will be
-    relaxed to `shared` *)
-val add_share_lock : shared_context -> t -> t
-val add_closure_lock : closure_context
+val add_closure_lock : Mode.Hint.pinpoint
   -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
+
+(** A variant of [add_closure_lock] where the mode of the closure is a constant
+due to the nature of the pinpoint. As a result, the mode is not printed in error
+messages. [ghost = true] means the closure is not a value (such as
+a loop) *)
+val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
+  Mode.Value.Comonadic.Const.t -> t -> t
+
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
+val enter_quotation : t -> t
+val enter_splice : loc:Location.t -> t -> t
+
+val check_no_open_quotations :
+  Location.t -> t -> no_open_quotations_context -> unit
+val stage : t -> stage
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit
@@ -518,8 +539,8 @@ val reset_cache: preserve_persistent_env:bool -> unit
 val reset_cache_toplevel: unit -> unit
 
 (* Remember the name of the current compilation unit. *)
-val set_unit_name: Compilation_unit.t option -> unit
-val get_unit_name: unit -> Compilation_unit.t option
+val set_unit_name: Unit_info.t option -> unit
+val get_unit_name: unit -> Unit_info.t option
 
 (* Read, save a signature to/from a file. *)
 val read_signature:
@@ -539,7 +560,7 @@ val save_signature_with_imports:
            file name, imported units with their CRCs. *)
 
 (* Register a module as a parameter to this unit. *)
-val register_parameter: Global_module.Name.t -> unit
+val register_parameter: Global_module.Parameter_name.t -> unit
 
 (* Return the CRC of the interface of the given compilation unit *)
 val crc_of_unit: Compilation_unit.Name.t -> Digest.t
@@ -550,6 +571,13 @@ val imports: unit -> Import_info.t list
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
 
+(* Require that the provided compilation unit will be available at quotation
+   compile time. *)
+val require_global_for_quote: Compilation_unit.Name.t -> unit
+
+(* Return the set of compilation units referenced by quotes *)
+val quoted_globals: unit -> Compilation_unit.Name.t list
+
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
 val runtime_parameter_bindings: unit -> (Global_module.t * Ident.t) list
@@ -559,7 +587,7 @@ val is_bound_to_runtime_parameter: Ident.t -> bool
 
 (* Return the list of parameters specified for the current unit, in
    alphabetical order *)
-val parameters: unit -> Global_module.Name.t list
+val parameters: unit -> Global_module.Parameter_name.t list
 
 (* [is_imported_opaque md] returns true if [md] is an opaque imported module *)
 val is_imported_opaque: Compilation_unit.Name.t -> bool
@@ -573,7 +601,8 @@ val is_parameter_unit: Global_module.Name.t -> bool
 
 (* [implemented_parameter md] is the argument given to -as-argument-for when
    [md] was compiled *)
-val implemented_parameter: Global_module.Name.t -> Global_module.Name.t option
+val implemented_parameter:
+  Global_module.Name.t -> Global_module.Parameter_name.t option
 
 (* [is_imported_parameter md] is true if [md] has been imported and is a
    parameter to this module *)
@@ -597,21 +626,26 @@ type error =
   | Missing_module of Location.t * Path.t * Path.t
   | Illegal_value_name of Location.t * string
   | Lookup_error of Location.t * t * lookup_error
-  | Incomplete_instantiation of { unset_param : Global_module.Name.t; }
+  | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
+  | Toplevel_splice of Location.t
+  | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
 exception Error of error
 
 open Format
 
-val report_error: formatter -> error -> unit
+val report_error: level:int -> formatter -> error -> unit
 
-val report_lookup_error: Location.t -> t -> formatter -> lookup_error -> unit
+val report_lookup_error:
+    level:int -> Location.t -> t -> formatter -> lookup_error -> unit
 
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool
 
 val set_value_used_callback:
+    Subst.Lazy.value_description -> (unit -> unit) -> unit
+val set_value_mutated_callback:
     Subst.Lazy.value_description -> (unit -> unit) -> unit
 val set_type_used_callback:
     type_declaration -> ((unit -> unit) -> unit) -> unit
@@ -643,6 +677,10 @@ val print_longident: (Format.formatter -> Longident.t -> unit) ref
 val print_path: (Format.formatter -> Path.t -> unit) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_type_expr: (Format.formatter -> Types.type_expr -> unit) ref
+(* Forward declaration to break mutual recursion with Jkind. *)
+val report_jkind_violation_with_offender:
+  (offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
+   Jkind.Violation.t -> unit) ref
 
 
 (** Folds *)
@@ -662,11 +700,11 @@ val fold_labels:
 
 (** Persistent structures are only traversed if they are already loaded. *)
 val fold_modules:
-  (string -> Path.t -> module_declaration -> 'a -> 'a) ->
+  (string -> Path.t -> Subst.Lazy.module_declaration -> 'a -> 'a) ->
   Longident.t option -> t -> 'a -> 'a
 
 val fold_modtypes:
-  (string -> Path.t -> modtype_declaration -> 'a -> 'a) ->
+  (string -> Path.t -> Subst.Lazy.modtype_declaration -> 'a -> 'a) ->
   Longident.t option -> t -> 'a -> 'a
 val fold_classes:
   (string -> Path.t -> class_declaration -> 'a -> 'a) ->
@@ -687,4 +725,7 @@ type address_head =
 
 val address_head : address -> address_head
 
-val sharedness_hint : Format.formatter -> shared_context -> unit
+val print_stage : Format.formatter -> stage -> unit
+
+val print_with_quote_promote :
+  Format.formatter -> (string * stage * stage) -> unit

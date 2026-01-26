@@ -16,8 +16,7 @@
 (* Emission of Intel x86_64 assembly code *)
 
 (* Correctness: carefully consider any use of [Config], [Clflags],
-   [Flambda_backend_flags] and shared variables. For details, see
-   [asmgen.mli]. *)
+   [Oxcaml_flags] and shared variables. For details, see [asmgen.mli]. *)
 
 [@@@ocaml.warning "+a-40-41-42"]
 
@@ -40,100 +39,97 @@ module Simd_instrs = Amd64_simd_instrs
 [@@@ocaml.warning "-66"]
 
 open! Branch_relaxation
-module ND = Asm_targets.Asm_directives_new
+module D = Asm_targets.Asm_directives
+module S = Asm_targets.Asm_symbol
+module L = Asm_targets.Asm_label
 
-let rec to_x86_constant (c : ND.Directive.Constant.t) : X86_ast.constant =
-  match c with
-  | Signed_int i -> Const i
-  (* CR sspies: Is this cast safe? Seems to be just the identity. *)
-  | Unsigned_int i -> Const (Numbers.Uint64.to_int64 i)
-  | This -> ConstThis
-  | Named_thing s ->
-    ConstLabel s
-    (* both seem to be printed directly to the buffer without any conversion*)
-  | Add (c1, c2) -> ConstAdd (to_x86_constant c1, to_x86_constant c2)
-  | Sub (c1, c2) -> ConstSub (to_x86_constant c1, to_x86_constant c2)
+(* Name of current function *)
+let function_name = ref ""
 
-let to_x86_constant_with_width (c : ND.Directive.Constant_with_width.t) :
-    X86_ast.asm_line =
-  let width = ND.Directive.Constant_with_width.width_in_bytes c in
-  let const = ND.Directive.Constant_with_width.constant c in
-  let const = to_x86_constant const in
-  match width with
-  | Eight -> Byte const
-  (* on x86 Word is 2 bytes; warning this is not the same on Arm *)
-  | Sixteen -> Word const
-  | Thirty_two -> Long const
-  | Sixty_four -> Quad const
+(* Keep the name of the current block section to get back to it after emitting
+   data. *)
+let current_basic_block_section = ref ""
 
-let to_x86_directive (dir : ND.Directive.t) : X86_ast.asm_line list =
-  let comment_lines comment =
-    Option.to_list (Option.map (fun s -> X86_ast.Comment s) comment)
-  in
-  match dir with
-  | Align { bytes } ->
-    [X86_ast.Align (false, bytes)]
-    (* The data field is currently ignored by both assembler backends. The bytes
-       field is only converted to the final value when printing. *)
-  | Bytes { str; comment } -> comment_lines comment @ [X86_ast.Bytes str]
-  | Comment s -> [X86_ast.Comment s]
-  | Const { constant; comment } ->
-    comment_lines comment @ [to_x86_constant_with_width constant]
-  | Direct_assignment (s, c) ->
-    (* We use [.set s c] for direct assignments, since it evaluates [c]
-       directly. The alternative, [s = c], is sensitive to relocations. *)
-    [X86_ast.Set (s, to_x86_constant c)]
-  | File { file_num = None; _ } ->
-    Misc.fatal_error "file directive must always carry a number on x86"
-  | File { file_num = Some file_num; filename } ->
-    [X86_ast.File (file_num, filename)]
-  | Global s -> [X86_ast.Global s]
-  | Indirect_symbol s -> [X86_ast.Indirect_symbol s]
-  | Loc { file_num; line; col; discriminator } ->
-    (* Behavior differs for negative column values. x86 will not output
-       anything, but new directives will output 0. *)
-    [X86_ast.Loc { file_num; line; col; discriminator }]
-  | New_label (s, _typ) ->
-    [X86_ast.NewLabel (s, NONE)]
-    (* typ is ignored on x86 and in the new directives*)
-  | New_line -> [X86_ast.NewLine]
-  | Private_extern s -> [X86_ast.Private_extern s]
-  | Section { names; flags; args } ->
-    [X86_ast.Section (names, flags, args, false)]
-    (* delayed for this directive is always ignored in GAS printing, and section
-       is not supported in binary emitter. In MASM, it only supports .text and
-       .data. *)
-  | Size (s, c) -> [X86_ast.Size (s, to_x86_constant c)]
-  | Sleb128 { constant; comment } ->
-    comment_lines comment @ [X86_ast.Sleb128 (to_x86_constant constant)]
-  | Space { bytes } -> [Space bytes]
-  | Type (n, st) ->
-    let typ = match st with Function -> "STT_FUNC" | Object -> "STT_OBJECT" in
-    [Type (n, typ)]
-  | Uleb128 { constant; comment } ->
-    comment_lines comment @ [X86_ast.Uleb128 (to_x86_constant constant)]
-  | Cfi_adjust_cfa_offset n -> [X86_ast.Cfi_adjust_cfa_offset n]
-  | Cfi_def_cfa_offset n -> [X86_ast.Cfi_def_cfa_offset n]
-  | Cfi_endproc -> [X86_ast.Cfi_endproc]
-  | Cfi_offset { reg; offset } -> [X86_ast.Cfi_offset (reg, offset)]
-  | Cfi_startproc -> [X86_ast.Cfi_startproc]
-  | Protected s -> [X86_ast.Protected s]
+module I = struct
+  include I
 
-let _label s = D.label ~typ:QWORD s
+  exception Extension_disabled of string
+
+  let () =
+    Printexc.register_printer (function
+      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
+      | _ -> None)
+
+  let require_vec256 () =
+    if not (Arch.Extension.enabled_vec256 ())
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found 256-bit register whilst emitting %s, but AVX is not \
+               enabled."
+              !function_name))
+
+  let require_vec512 () =
+    if not (Arch.Extension.enabled_vec512 ())
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found 512-bit register whilst emitting %s, but AVX512F is not \
+               enabled."
+              !function_name))
+
+  let simd (simd : Simd_instrs.instr) args =
+    if not (Arch.Extension.enabled_instruction simd)
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found '%s' whilst emitting %s, but %s is not enabled."
+              simd.mnemonic !function_name
+              (Amd64_simd_defs.exts_to_string simd.ext)));
+    I.simd simd args
+end
+
+(** Turn a Linear label into an assembly label. The section is checked against the
+    section tracked by [D] when emitting label definitions. *)
+let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
+    =
+  L.create_int section (Label.to_int l)
+
+(* X86 operands for jumping to the respective label. [emit_asm_label_arg] can be
+   used with [L.t] labels and [emit_label_arg] with Linear [label] arguments. *)
+let emit_asm_label_arg lbl = sym (L.encode lbl)
+
+let emit_label_arg ~section lbl_str =
+  sym (L.encode (label_to_asm_label ~section lbl_str))
 
 (* Override proc.ml *)
 
 let int_reg_name : X86_ast.reg64 array =
   [| RAX; RBX; RDI; RSI; RDX; RCX; R8; R9; R12; R13; R10; R11; RBP |]
 
-let float_reg_name = Array.init 16 (fun i -> X86_ast.XMM i)
+let xmm_reg_name = Array.init 16 (fun i -> X86_ast.XMM i)
+
+let ymm_reg_name = Array.init 16 (fun i -> X86_ast.YMM i)
+
+let zmm_reg_name = Array.init 16 (fun i -> X86_ast.ZMM i)
 
 let register_name typ r : X86_ast.arg =
   match (typ : Cmm.machtype_component) with
   | Int | Val | Addr -> Reg64 int_reg_name.(r)
-  | Float | Float32 | Vec128 | Valx2 -> Regf float_reg_name.(r - 100)
+  | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
+  | Vec256 ->
+    I.require_vec256 ();
+    Regf ymm_reg_name.(r - 100)
+  | Vec512 ->
+    I.require_vec512 ();
+    Regf zmm_reg_name.(r - 100)
 
 let phys_rax = phys_reg Int 0
+
+let phys_rdi = phys_reg Int 2
 
 let phys_rdx = phys_reg Int 4
 
@@ -141,26 +137,11 @@ let phys_rcx = phys_reg Int 5
 
 let phys_xmm0v () = phys_reg Vec128 100
 
-(* CFI directives *)
-
-let cfi_startproc () = if Config.asm_cfi_supported then D.cfi_startproc ()
-
-let cfi_endproc () = if Config.asm_cfi_supported then D.cfi_endproc ()
-
-let cfi_adjust_cfa_offset n =
-  if Config.asm_cfi_supported then D.cfi_adjust_cfa_offset n
-
-let cfi_remember_state () =
-  if Config.asm_cfi_supported then D.cfi_remember_state ()
-
-let cfi_restore_state () =
-  if Config.asm_cfi_supported then D.cfi_restore_state ()
-
-let cfi_def_cfa_register reg =
-  if Config.asm_cfi_supported then D.cfi_def_cfa_register reg
+let file_emitter ~file_num ~file_name =
+  D.file ~file_num:(Some file_num) ~file_name
 
 let emit_debug_info ?discriminator dbg =
-  emit_debug_info_gen ?discriminator dbg D.file D.loc
+  emit_debug_info_gen ?discriminator dbg file_emitter D.loc
 
 let emit_debug_info_linear i =
   match i.fdo with
@@ -200,24 +181,22 @@ let slot_offset loc stack_class =
 
 let emit_stack_offset n =
   if n < 0 then I.add (int (-n)) rsp else if n > 0 then I.sub (int n) rsp;
-  if n <> 0 then cfi_adjust_cfa_offset n;
+  if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n;
   stack_offset := !stack_offset + n
 
 let push r =
   I.push r;
-  cfi_adjust_cfa_offset 8;
+  D.cfi_adjust_cfa_offset ~bytes:8;
   stack_offset := !stack_offset + 8
 
 let pop r =
   I.pop r;
-  cfi_adjust_cfa_offset (-8);
+  D.cfi_adjust_cfa_offset ~bytes:(-8);
   stack_offset := !stack_offset - 8
 
 (* Symbols *)
 
-let symbol_prefix = if is_macosx system then "_" else ""
-
-let emit_symbol s = string_of_symbol symbol_prefix s
+let emit_symbol s = S.encode (S.create s)
 
 (* Record symbols used and defined - at the end generate extern for those used
    but not defined *)
@@ -242,14 +221,14 @@ let get_imp_symbol s =
     imps
   | imps -> imps
 
-let emit_imp_table () =
+let emit_imp_table ~section () =
   let f s imps =
-    _label (emit_symbol imps);
-    D.qword (ConstLabel (emit_symbol s))
+    D.define_symbol_label ~section (S.create imps);
+    D.symbol (S.create s)
   in
   D.data ();
   D.comment "relocation table start";
-  D.align ~data:true 8;
+  D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
   Hashtbl.iter f imp_table;
   D.comment "relocation table end"
 
@@ -261,8 +240,6 @@ let mem__imp s =
 
 let label_name lbl =
   if is_macosx system || is_win64 system then "L" ^ lbl else ".L" ^ lbl
-
-let emit_label lbl = label_name (Label.to_string lbl)
 
 let rel_plt (s : Cmm.symbol) =
   match (s.sym_global : Cmm.is_global) with
@@ -278,16 +255,23 @@ let emit_call s = I.call (rel_plt s)
 
 let emit_jump s = I.jmp (rel_plt s)
 
-let domain_field f = mem64 QWORD (Domainstate.idx_of_field f * 8) R14
-
-let label s = sym (emit_label s)
-
-let def_label ?typ s = D.label ?typ (emit_label s)
+let domain_field f = mem64 QWORD (Domainstate.idx_of_field f * 8) (Scalar R14)
 
 let emit_cmm_symbol (s : Cmm.symbol) =
+  let sym = S.create s.sym_name in
   match (s.sym_global : Cmm.is_global) with
-  | Global -> emit_symbol s.sym_name
-  | Local -> label_name (emit_symbol s.sym_name)
+  | Global -> `Symbol sym
+  (* This label is special in that it is not of the form "Lnumber". Instead, we
+     take the symbol, encode it, and turn the resulting string into a label. The
+     label will still be prefixed by ".L"/"L" when emitting. *)
+  (* CR sspies: Improve the handling of these local symbols in the rest of the
+     emission code. *)
+  | Local -> `Label (L.create_label_for_local_symbol Text sym)
+
+let emit_cmm_symbol_str (s : Cmm.symbol) =
+  match emit_cmm_symbol s with
+  | `Symbol s -> S.encode s
+  | `Label l -> L.encode l
 
 let load_symbol_addr (s : Cmm.symbol) arg =
   match (s.sym_global : Cmm.is_global) with
@@ -308,8 +292,15 @@ let load_symbol_addr (s : Cmm.symbol) arg =
    supported on the target system. *)
 
 let emit_named_text_section ?(suffix = "") func_name =
-  if !Clflags.function_sections || !Flambda_backend_flags.basic_block_sections
-  then
+  (* CR-someday ksvetlitski: In the future we should consider extending this to
+     also place other known-cold functions in a separate section (specifically
+     [.text.unlikely.caml]). This would necessitate adding a new constructor to
+     [Cfg.codegen_option], and at that point we could add a constructor for
+     module-entry-functions too so that we don't have to inspect [func_name]
+     like we do now. *)
+  if !Oxcaml_flags.module_entry_functions_section
+     && String.ends_with func_name ~suffix:"__entry"
+  then (
     match[@ocaml.warning "-4"] system with
     | S_macosx
     (* Names of section segments in macosx are restricted to 16 characters, but
@@ -320,17 +311,36 @@ let emit_named_text_section ?(suffix = "") func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      D.section
-        [Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
-        (Some "ax") ["@progbits"]
+      D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
+        ~args:["@progbits"] ~is_delayed:false;
+      (* Warning: We set the internal section ref to Text here, because it
+         currently does not supported named text sections. In the rest of this
+         file, we pretend the section is called Text rather than the function
+         specific text section. *)
+      (* CR sspies: Add proper support for named text sections. *)
+      D.unsafe_set_internal_section_ref Text)
+  else if !Clflags.function_sections || !Oxcaml_flags.basic_block_sections
+  then (
+    match[@ocaml.warning "-4"] system with
+    | S_macosx
+    (* Names of section segments in macosx are restricted to 16 characters, but
+       function names are often longer, especially anonymous functions. *)
+    | S_win64 | S_mingw64
+    | S_cygwin
+      (* Win systems provide named text sections, but configure on these systems
+         does not support function sections. *) ->
+      assert false
+    | _ ->
+      D.switch_to_section_raw
+        ~names:[Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
+        ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
+      (* Warning: We set the internal section ref to Text here, because it
+         currently does not supported named text sections. In the rest of this
+         file, we pretend the section is called Text rather than the function
+         specific text section. *)
+      (* CR sspies: Add proper support for named text sections. *)
+      D.unsafe_set_internal_section_ref Text)
   else D.text ()
-
-(* Name of current function *)
-let function_name = ref ""
-
-(* Keep the name of the current block section to get back to it after emitting
-   data. *)
-let current_basic_block_section = ref ""
 
 let emit_function_or_basic_block_section_name () =
   let suffix =
@@ -341,19 +351,20 @@ let emit_function_or_basic_block_section_name () =
   emit_named_text_section !function_name ~suffix
 
 let emit_Llabel fallthrough lbl section_name =
-  (if !Flambda_backend_flags.basic_block_sections
+  (if !Oxcaml_flags.basic_block_sections
   then
     match section_name with
     | Some name ->
       if not (String.equal name !current_basic_block_section)
       then (
         current_basic_block_section := name;
-        cfi_endproc ();
+        D.cfi_endproc ();
         emit_function_or_basic_block_section_name ();
-        cfi_startproc ())
+        D.cfi_startproc ())
     | None -> ());
-  if (not fallthrough) && !fastcode_flag then D.align ~data:false 4;
-  def_label lbl
+  if (not fallthrough) && !fastcode_flag
+  then D.align ~fill_x86_bin_emitter:Nop ~bytes:4;
+  D.define_label lbl
 
 (* Output a pseudo-register *)
 
@@ -361,6 +372,12 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
   function
   | Float -> REAL8
   | Vec128 -> VEC128
+  | Vec256 ->
+    I.require_vec256 ();
+    VEC256
+  | Vec512 ->
+    I.require_vec512 ();
+    VEC512
   | Valx2 -> VEC128
   | Int | Addr | Val -> QWORD
   | Float32 -> REAL4
@@ -371,11 +388,11 @@ let reg : Reg.t -> X86_ast.arg =
   | { loc = Reg.Reg r; typ = ty; _ } -> register_name ty r
   | { loc = Stack (Domainstate n); typ = ty; _ } ->
     let ofs = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
-    mem64 (x86_data_type_for_stack_slot ty) ofs R14
+    mem64 (x86_data_type_for_stack_slot ty) ofs (Scalar R14)
   | { loc = Stack ((Reg.Local _ | Incoming _ | Outgoing _) as s); typ = ty; _ }
     as r ->
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
-    mem64 (x86_data_type_for_stack_slot ty) ofs RSP
+    mem64 (x86_data_type_for_stack_slot ty) ofs (Scalar RSP)
   | { loc = Unknown; _ } -> assert false
 
 let reg64 = function
@@ -397,7 +414,8 @@ let reg_low_32_name = Array.map (fun r -> X86_ast.Reg32 r) int_reg_name
 let emit_subreg tbl typ r =
   match r.loc with
   | Reg.Reg r when r < 13 -> tbl.(r)
-  | Stack s -> mem64 typ (slot_offset s (Stack_class.of_machtype r.Reg.typ)) RSP
+  | Stack s ->
+    mem64 typ (slot_offset s (Stack_class.of_machtype r.Reg.typ)) (Scalar RSP)
   | Reg _ | Unknown -> assert false
 
 let arg8 i n = emit_subreg reg_low_8_name BYTE i.arg.(n)
@@ -414,6 +432,25 @@ let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
 
 let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
+let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
+  | Regf (YMM r | ZMM r) -> Regf (XMM r)
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+    | Regf (XMM _)
+    | Mem _ | Mem64_RIP _ ) as res ->
+    res
+
+let arg_idx i n : X86_ast.reg_idx =
+  match arg i n with
+  | Reg64 reg -> Scalar reg
+  | Regf reg -> Vector reg
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Mem _ | Mem64_RIP _
+    ->
+    assert false
+
+let argX i n = narrow_to_xmm (reg i.arg.(n))
+
+let resX i n = narrow_to_xmm (reg i.res.(n))
+
 (* Output an addressing mode *)
 
 let addressing addr typ i n =
@@ -423,30 +460,61 @@ let addressing addr typ i n =
     let sym_global : Cmm.is_global =
       match sym_global with Global -> Global | Local -> Local
     in
-    mem64_rip typ (emit_cmm_symbol { sym_name; sym_global }) ~ofs
-  | Iindexed d -> mem64 typ d (arg64 i n)
-  | Iindexed2 d -> mem64 typ ~base:(arg64 i n) d (arg64 i (n + 1))
-  | Iscaled (2, d) -> mem64 typ ~base:(arg64 i n) d (arg64 i n)
-  | Iscaled (scale, d) -> mem64 typ ~scale d (arg64 i n)
+    mem64_rip typ (emit_cmm_symbol_str { sym_name; sym_global }) ~ofs
+  | Iindexed d -> mem64 typ d (arg_idx i n)
+  | Iindexed2 d -> mem64 typ ~base:(arg64 i n) d (arg_idx i (n + 1))
+  | Iscaled (2, d) -> mem64 typ ~base:(arg64 i n) d (arg_idx i n)
+  | Iscaled (scale, d) -> mem64 typ ~scale d (arg_idx i n)
   | Iindexed2scaled (scale, d) ->
-    mem64 typ ~scale ~base:(arg64 i n) d (arg64 i (n + 1))
+    mem64 typ ~scale ~base:(arg64 i n) d (arg_idx i (n + 1))
 
 (* Record live pointers at call points -- see Emitaux *)
+
+type save_simd_regs = Reg_class.save_simd_regs =
+  | Save_xmm
+  | Save_ymm
+  | Save_zmm
+
+let must_save_simd_regs live =
+  let v256, v512 = ref false, ref false in
+  Reg.Set.iter
+    (fun r ->
+      if not (Reg.is_reg r)
+      then ()
+      else
+        match r.typ with
+        | Vec256 -> v256 := true
+        | Vec512 -> v512 := true
+        | Val | Addr | Int | Float | Vec128 | Float32 | Valx2 -> ())
+    live;
+  if !v512
+  then (
+    I.require_vec512 ();
+    Save_zmm)
+  else if !v256
+  then (
+    I.require_vec256 ();
+    Save_ymm)
+  else Save_xmm
+
+(* CR sspies: Consider whether more of [record_frame_label] can be shared with
+   the Arm backend. *)
 
 let record_frame_label live dbg =
   let lbl = Cmm.new_label () in
   let live_offset = ref [] in
+  let simd = must_save_simd_regs live in
   Reg.Set.iter
     (fun (r : Reg.t) ->
       match r with
       | { typ = Val; loc = Reg r; _ } ->
-        assert (Reg_class.gc_regs_offset Val r = r);
+        assert (Reg_class.gc_regs_offset ~simd Val r = r);
         live_offset := ((r lsl 1) + 1) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := slot_offset s (Stack_class.of_machtype reg.typ) :: !live_offset
       | { typ = Valx2; loc = Reg r; _ } ->
-        let n = Reg_class.gc_regs_offset Valx2 r in
+        let n = Reg_class.gc_regs_offset ~simd Valx2 r in
         let encode n = (n lsl 1) + 1 in
         live_offset := encode n :: encode (n + 1) :: !live_offset
       | { typ = Valx2; loc = Stack s; _ } as reg ->
@@ -456,23 +524,26 @@ let record_frame_label live dbg =
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
       | { typ = Val | Valx2; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128; _ } -> ())
+      | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512; _ } -> ())
     live;
+  (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
+     of Linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(frame_size ())
     ~live_offset:!live_offset dbg;
-  lbl
+  label_to_asm_label ~section:Text lbl
 
 let record_frame live dbg =
   let lbl = record_frame_label live dbg in
-  def_label lbl
+  D.define_label lbl
 
 (* Record calls to the GC -- we've moved them out of the way *)
 
 type gc_call =
-  { gc_lbl : label; (* Entry label *)
-    gc_return_lbl : label; (* Where to branch after GC *)
-    gc_frame : label; (* Label of frame descriptor *)
-    gc_dbg : Debuginfo.t (* Location of the original instruction *)
+  { gc_lbl : L.t; (* Entry label *)
+    gc_return_lbl : L.t; (* Where to branch after GC *)
+    gc_frame : L.t; (* Label of frame descriptor *)
+    gc_dbg : Debuginfo.t; (* Location of the original instruction *)
+    gc_save_simd : save_simd_regs (* Whether we need to save SIMD regs. *)
   }
 
 let call_gc_sites = ref ([] : gc_call list)
@@ -480,28 +551,41 @@ let call_gc_sites = ref ([] : gc_call list)
 let call_gc_local_sym : Cmm.symbol =
   { sym_name = "caml_call_gc_"; sym_global = Local }
 
+let call_gc_local_sym_avx : Cmm.symbol =
+  { sym_name = "caml_call_gc_avx_"; sym_global = Local }
+
+let call_gc_local_sym_avx512 : Cmm.symbol =
+  { sym_name = "caml_call_gc_avx512_"; sym_global = Local }
+
 let emit_call_gc gc =
-  def_label gc.gc_lbl;
+  D.define_label gc.gc_lbl;
   emit_debug_info gc.gc_dbg;
-  emit_call call_gc_local_sym;
-  def_label gc.gc_frame;
-  I.jmp (label gc.gc_return_lbl)
+  (match gc.gc_save_simd with
+  | Save_xmm -> emit_call call_gc_local_sym
+  | Save_ymm -> emit_call call_gc_local_sym_avx
+  | Save_zmm -> emit_call call_gc_local_sym_avx512);
+  D.define_label gc.gc_frame;
+  I.jmp (emit_asm_label_arg gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
 
 type local_realloc_call =
-  { lr_lbl : label;
-    lr_return_lbl : label;
-    lr_dbg : Debuginfo.t
+  { lr_lbl : L.t;
+    lr_return_lbl : L.t;
+    lr_dbg : Debuginfo.t;
+    lr_save_simd : save_simd_regs
   }
 
 let local_realloc_sites = ref ([] : local_realloc_call list)
 
 let emit_local_realloc lr =
-  def_label lr.lr_lbl;
+  D.define_label lr.lr_lbl;
   emit_debug_info lr.lr_dbg;
-  emit_call (Cmm.global_symbol "caml_call_local_realloc");
-  I.jmp (label lr.lr_return_lbl)
+  (match lr.lr_save_simd with
+  | Save_xmm -> emit_call (Cmm.global_symbol "caml_call_local_realloc")
+  | Save_ymm -> emit_call (Cmm.global_symbol "caml_call_local_realloc_avx")
+  | Save_zmm -> emit_call (Cmm.global_symbol "caml_call_local_realloc_avx512"));
+  I.jmp (emit_asm_label_arg lr.lr_return_lbl)
 
 (* Record calls to caml_ml_array_bound_error and caml_ml_array_align_error. In
    -g mode we maintain one call per bound check site. Without -g, we can share a
@@ -512,14 +596,14 @@ type safety_check =
   | Align_check
 
 type safety_check_failure =
-  { sc_lbl : label; (* Entry label *)
-    sc_frame : label; (* Label of frame descriptor *)
+  { sc_lbl : L.t; (* Entry label *)
+    sc_frame : L.t; (* Label of frame descriptor *)
     sc_dbg : Debuginfo.t (* As for [gc_call]. *)
   }
 
 type safety_check_sites =
   { mutable sc_sites : safety_check_failure list;
-    mutable sc_call : label option
+    mutable sc_call : L.t option
   }
 
 let bound_checks = { sc_sites = []; sc_call = None }
@@ -527,12 +611,12 @@ let bound_checks = { sc_sites = []; sc_call = None }
 let align_checks = { sc_sites = []; sc_call = None }
 
 let emit_call_safety_error kind sc =
-  def_label sc.sc_lbl;
+  D.define_label sc.sc_lbl;
   emit_debug_info sc.sc_dbg;
   (match kind with
   | Bound_check -> emit_call (Cmm.global_symbol "caml_ml_array_bound_error")
   | Align_check -> emit_call (Cmm.global_symbol "caml_ml_array_align_error"));
-  def_label sc.sc_frame
+  D.define_label sc.sc_frame
 
 let clear_safety_checks () =
   bound_checks.sc_sites <- [];
@@ -545,20 +629,21 @@ let emit_call_safety_errors () =
   (match bound_checks.sc_call with
   | None -> ()
   | Some sc_call ->
-    def_label sc_call;
+    D.define_label sc_call;
     emit_call (Cmm.global_symbol "caml_ml_array_bound_error"));
   List.iter (emit_call_safety_error Align_check) align_checks.sc_sites;
   match align_checks.sc_call with
   | None -> ()
   | Some sc_call ->
-    def_label sc_call;
+    D.define_label sc_call;
     emit_call (Cmm.global_symbol "caml_ml_array_align_error")
 
 (* Stack reallocation *)
 type stack_realloc =
-  { sc_label : Label.t; (* Label of the reallocation code. *)
-    sc_return : Label.t; (* Label to return to after reallocation. *)
-    sc_size_in_bytes : int (* Size for reallocation. *)
+  { sc_label : L.t; (* Label of the reallocation code. *)
+    sc_return : L.t; (* Label to return to after reallocation. *)
+    sc_size_in_bytes : int; (* Size for reallocation. *)
+    sc_save_simd : save_simd_regs (* Whether we need to save SIMD regs. *)
   }
 
 let stack_realloc = ref ([] : stack_realloc list)
@@ -567,158 +652,86 @@ let clear_stack_realloc () = stack_realloc := []
 
 let emit_stack_realloc () =
   List.iter
-    (fun { sc_label; sc_return; sc_size_in_bytes } ->
-      def_label sc_label;
+    (fun { sc_label; sc_return; sc_size_in_bytes; sc_save_simd } ->
+      D.define_label sc_label;
       (* Pass the desired frame size on the stack, since all of the
          argument-passing registers may be in use. Also serves to align the
          stack properly before the call *)
       I.push (int (Config.stack_threshold + (sc_size_in_bytes / 8)));
-      cfi_adjust_cfa_offset 8;
+      D.cfi_adjust_cfa_offset ~bytes:8;
       (* measured in words *)
-      emit_call (Cmm.global_symbol "caml_call_realloc_stack");
+      (match sc_save_simd with
+      | Save_xmm -> emit_call (Cmm.global_symbol "caml_call_realloc_stack")
+      | Save_ymm -> emit_call (Cmm.global_symbol "caml_call_realloc_stack_avx")
+      | Save_zmm ->
+        emit_call (Cmm.global_symbol "caml_call_realloc_stack_avx512"));
       I.add (int 8) rsp;
-      cfi_adjust_cfa_offset (-8);
-      I.jmp (label sc_return))
+      D.cfi_adjust_cfa_offset ~bytes:(-8);
+      I.jmp (emit_asm_label_arg sc_return))
     !stack_realloc
 
-let emit_stack_check ~size_in_bytes ~save_registers =
-  let overflow = Cmm.new_label () and ret = Cmm.new_label () in
+let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
+  let overflow = L.create Text and ret = L.create Text in
   let threshold_offset =
     (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
   in
   if save_registers then I.push r10;
-  I.lea (mem64 NONE (-(size_in_bytes + threshold_offset)) RSP) r10;
+  I.lea (mem64 NONE (-(size_in_bytes + threshold_offset)) (Scalar RSP)) r10;
   I.cmp (domain_field Domainstate.Domain_current_stack) r10;
   if save_registers then I.pop r10;
-  I.jb (label overflow);
-  def_label ret;
+  I.jb (emit_asm_label_arg overflow);
+  D.define_label ret;
   stack_realloc
     := { sc_label = overflow;
          sc_return = ret;
-         sc_size_in_bytes = size_in_bytes
+         sc_size_in_bytes = size_in_bytes;
+         sc_save_simd = save_simd
        }
        :: !stack_realloc
 
 (* Record jump tables *)
 type jump_table =
-  { table_lbl : string;
+  { table_lbl : L.t;
     elems : Linear.label array
   }
 
 let jump_tables = ref ([] : jump_table list)
 
 let emit_jump_table t =
-  _label t.table_lbl;
+  D.define_label t.table_lbl;
   for i = 0 to Array.length t.elems - 1 do
-    D.long
-      (ConstSub (ConstLabel (emit_label t.elems.(i)), ConstLabel t.table_lbl))
+    let upper = label_to_asm_label ~section:Text t.elems.(i) in
+    D.between_labels_32_bit ~upper ~lower:t.table_lbl ()
   done
 
 let emit_jump_tables () =
-  D.align ~data:true 4;
+  D.align ~fill_x86_bin_emitter:Zero ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
 
-let file_emitter ~file_num ~file_name =
-  ND.file ~file_num:(Some file_num) ~file_name
-
-let build_asm_directives () : (module Asm_targets.Asm_directives_intf.S) =
-  (module Asm_targets.Asm_directives.Make (struct
-    let emit_line line = ND.comment line
-
-    let get_file_num file_name = Emitaux.get_file_num ~file_emitter file_name
-
-    let debugging_comments_in_asm_files = !Flambda_backend_flags.dasm_comments
-
-    module D = struct
-      type constant = ND.Directive.Constant.t
-
-      let const_int64 num = ND.Directive.Constant.Signed_int num
-
-      let const_label str = ND.Directive.Constant.Named_thing str
-
-      let const_add c1 c2 = ND.Directive.Constant.Add (c1, c2)
-
-      let const_sub c1 c2 = ND.Directive.Constant.Sub (c1, c2)
-
-      (* CR sspies: The functions depending on [emit_directive] below break
-         abstractions. This is intensional at the moment, because this is only
-         the first step of getting rid of the first-class module entirely. *)
-      let emit_directive d = List.iter directive (to_x86_directive d)
-
-      type data_type =
-        | NONE
-        | DWORD
-        | QWORD
-        | VEC128
-
-      let file = file_emitter
-
-      let loc ~file_num ~line ~col ?discriminator () =
-        ignore discriminator;
-        D.loc ~file_num ~line ~col ?discriminator ()
-
-      let comment str = D.comment str
-
-      let label ?data_type str =
-        let _ = data_type in
-        emit_directive (New_label (str, Code))
-
-      let section ?delayed:_ name flags args =
-        match name, flags, args with
-        | [".data"], _, _ -> ND.data ()
-        | [".text"], _, _ -> ND.text ()
-        | name, flags, args -> ND.switch_to_section_raw ~names:name ~flags ~args
-
-      let text () = D.text ()
-
-      let new_line () = D.new_line ()
-
-      let emit_constant const size =
-        emit_directive
-          (Const
-             { constant = ND.Directive.Constant_with_width.create const size;
-               comment = None
-             })
-
-      let global sym = emit_directive (Global sym)
-
-      let protected sym =
-        if not (is_macosx system) then emit_directive (Protected sym)
-
-      let type_ sym typ_ =
-        let typ_ : ND.symbol_type =
-          match typ_ with
-          | "@function" -> Function
-          | "@object" -> Object
-          | "STT_OBJECT" -> Object
-          | "STT_FUNC" -> Function
-          | _ -> Misc.fatal_error "Unsupported type"
-        in
-        emit_directive (Type (sym, typ_))
-
-      let byte const = emit_constant const Eight
-
-      let word const = emit_constant const Sixteen
-
-      let long const = emit_constant const Thirty_two
-
-      let qword const = emit_constant const Sixty_four
-
-      let bytes str = ND.string str
-
-      let uleb128 const =
-        emit_directive (Uleb128 { constant = const; comment = None })
-
-      let sleb128 const =
-        emit_directive (Sleb128 { constant = const; comment = None })
-
-      let direct_assignment var const =
-        emit_directive (Direct_assignment (var, const))
-    end
-  end))
-
 (* Names for instructions *)
+
+let sse_or_avx sse vex src dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| src; dst |]
+  else I.simd sse [| src; dst |]
+
+let sse_or_avx3 sse vex src1 src2 dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| src2; src1; dst |]
+  else (
+    assert (equal_arg src1 dst);
+    I.simd sse [| src2; dst |])
+
+let sse_or_avx_dst sse vex src dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| src; dst; dst |]
+  else I.simd sse [| src; dst |]
+
+let cmp_sse_or_avx sse vex cond src1 src2 dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| imm_of_float_condition cond; src1; src2; dst |]
+  else I.simd sse [| imm_of_float_condition cond; src1; src2 |]
 
 let instr_for_intop = function
   | Iadd -> I.add
@@ -733,41 +746,41 @@ let instr_for_intop = function
   | Idiv | Imod | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
+  let open Simd_instrs in
   match width, op with
-  | Float64, Iaddf -> I.addsd
-  | Float64, Isubf -> I.subsd
-  | Float64, Imulf -> I.mulsd
-  | Float64, Idivf -> I.divsd
-  | Float32, Iaddf -> I.addss
-  | Float32, Isubf -> I.subss
-  | Float32, Imulf -> I.mulss
-  | Float32, Idivf -> I.divss
+  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd
+  | Float64, Isubf -> sse_or_avx3 subsd vsubsd
+  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd
+  | Float64, Idivf -> sse_or_avx3 divsd vdivsd
+  | Float32, Iaddf -> sse_or_avx3 addss vaddss
+  | Float32, Isubf -> sse_or_avx3 subss vsubss
+  | Float32, Imulf -> sse_or_avx3 mulss vmulss
+  | Float32, Idivf -> sse_or_avx3 divss vdivss
   | (Float32 | Float64), (Inegf | Iabsf | Icompf _) -> assert false
 
 let instr_for_floatarithmem (width : Cmm.float_width) op =
+  let open Simd_instrs in
   match width, op with
-  | Float64, Ifloatadd -> I.addsd
-  | Float64, Ifloatsub -> I.subsd
-  | Float64, Ifloatmul -> I.mulsd
-  | Float64, Ifloatdiv -> I.divsd
-  | Float32, Ifloatadd -> I.addss
-  | Float32, Ifloatsub -> I.subss
-  | Float32, Ifloatmul -> I.mulss
-  | Float32, Ifloatdiv -> I.divss
+  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd
+  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd
+  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd
+  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd
+  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss
+  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss
+  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss
+  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss
 
 let cond : Operation.integer_comparison -> X86_ast.condition = function
-  | Isigned Ceq -> E
-  | Isigned Cne -> NE
-  | Isigned Cle -> LE
-  | Isigned Cgt -> G
-  | Isigned Clt -> L
-  | Isigned Cge -> GE
-  | Iunsigned Ceq -> E
-  | Iunsigned Cne -> NE
-  | Iunsigned Cle -> BE
-  | Iunsigned Cgt -> A
-  | Iunsigned Clt -> B
-  | Iunsigned Cge -> AE
+  | Ceq -> E
+  | Cne -> NE
+  | Cle -> LE
+  | Cgt -> G
+  | Clt -> L
+  | Cge -> GE
+  | Cult -> B (* unsigned less than *)
+  | Cule -> BE (* unsigned less or equal *)
+  | Cugt -> A (* unsigned greater than *)
+  | Cuge -> AE (* unsigned greater or equal *)
 
 (* Output an = 0 or <> 0 test. *)
 
@@ -792,23 +805,24 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
      If FP traps are on (they are off by default),
      comisd traps on QNaN and SNaN but ucomisd traps on SNaN only.
   *)
+  let open Simd_instrs in
   let ucomi, comi =
     match width with
-    | Float64 -> I.ucomisd, I.comisd
-    | Float32 -> I.ucomiss, I.comiss
+    | Float64 -> sse_or_avx ucomisd vucomisd, sse_or_avx comisd vcomisd
+    | Float32 -> sse_or_avx ucomiss vucomiss, sse_or_avx comiss vcomiss
   in
   match cmp with
   | CFeq when equal_arg (arg i 1) (arg i 0) ->
     ucomi (arg i 1) (arg i 0);
     taken NP
   | CFeq ->
-    let next = Cmm.new_label () in
+    let next = L.create Text in
     ucomi (arg i 1) (arg i 0);
-    I.jp (label next);
+    I.jp (emit_asm_label_arg next);
     (* skip if unordered *)
     taken E;
     (* branch taken if x=y *)
-    def_label next
+    D.define_label next
   | CFneq when equal_arg (arg i 1) (arg i 0) ->
     ucomi (arg i 1) (arg i 0);
     taken P
@@ -856,14 +870,11 @@ let emit_test i ~(taken : X86_ast.condition -> unit) = function
   | Iinttest cmp ->
     I.cmp (arg i 1) (arg i 0);
     taken (cond cmp)
-  | Iinttest_imm
-      (((Isigned Ceq | Isigned Cne | Iunsigned Ceq | Iunsigned Cne) as cmp), 0)
-    ->
+  | Iinttest_imm (((Ceq | Cne) as cmp), 0) ->
     output_test_zero i.arg.(0);
     taken (cond cmp)
   | Iinttest_imm
-      ( (( Isigned (Ceq | Cne | Clt | Cgt | Cle | Cge)
-         | Iunsigned (Ceq | Cne | Clt | Cgt | Cle | Cge) ) as cmp),
+      ( ((Ceq | Cne | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge) as cmp),
         n ) ->
     I.cmp (int n) (arg i 0);
     taken (cond cmp)
@@ -875,58 +886,85 @@ let emit_test i ~(taken : X86_ast.condition -> unit) = function
     I.test (int 1) (arg8 i 0);
     taken E
 
-(* Deallocate the stack frame before a return or tail call *)
-
-let output_epilogue f =
-  if !frame_required
-  then (
-    let n = frame_size () - 8 - if fp then 8 else 0 in
-    if n <> 0
-    then (
-      I.add (int n) rsp;
-      cfi_adjust_cfa_offset (-n));
-    if fp then I.pop rbp;
-    f ();
-    (* reset CFA back cause function body may continue *)
-    if n <> 0 then cfi_adjust_cfa_offset n)
-  else f ()
-
 (* Floating-point constants *)
 
-let float_constants = ref ([] : (int64 * label) list)
+let float_constants = ref ([] : (int64 * L.t) list)
 
 let add_float_constant cst =
   try List.assoc cst !float_constants
   with Not_found ->
-    let lbl = Cmm.new_label () in
+    let lbl = L.create Eight_byte_literals in
     float_constants := (cst, lbl) :: !float_constants;
     lbl
 
 let emit_float_constant f lbl =
-  _label (emit_label lbl);
-  D.qword (Const f)
+  D.define_label lbl;
+  D.float64_from_bits f
 
 (* Vector constants *)
 
-let vec128_constants = ref ([] : (Cmm.vec128_bits * label) list)
+let vec128_constants = ref ([] : (Cmm.vec128_bits * L.t) list)
+
+let vec256_constants = ref ([] : (Cmm.vec256_bits * L.t) list)
+
+let vec512_constants = ref ([] : (Cmm.vec512_bits * L.t) list)
 
 let add_vec128_constant bits =
   try List.assoc bits !vec128_constants
   with Not_found ->
-    let lbl = Cmm.new_label () in
+    let lbl = L.create Sixteen_byte_literals in
     vec128_constants := (bits, lbl) :: !vec128_constants;
     lbl
 
-let emit_vec128_constant ({ high; low } : Cmm.vec128_bits) lbl =
-  (* SIMD vectors respect little-endian byte order *)
-  _label (emit_label lbl);
-  D.qword (Const low);
-  D.qword (Const high)
+let add_vec256_constant bits =
+  try List.assoc bits !vec256_constants
+  with Not_found ->
+    let lbl = L.create Thirtytwo_byte_literals in
+    vec256_constants := (bits, lbl) :: !vec256_constants;
+    lbl
 
-let global_maybe_protected sym =
+let add_vec512_constant bits =
+  try List.assoc bits !vec512_constants
+  with Not_found ->
+    let lbl = L.create Sixtyfour_byte_literals in
+    vec512_constants := (bits, lbl) :: !vec512_constants;
+    lbl
+
+let emit_vec128_constant ({ word0; word1 } : Cmm.vec128_bits) lbl =
+  (* SIMD vectors respect little-endian byte order *)
+  D.define_label lbl;
+  D.float64_from_bits word0;
+  D.float64_from_bits word1
+
+let emit_vec256_constant ({ word0; word1; word2; word3 } : Cmm.vec256_bits) lbl
+    =
+  (* SIMD vectors respect little-endian byte order *)
+  D.define_label lbl;
+  D.float64_from_bits word0;
+  D.float64_from_bits word1;
+  D.float64_from_bits word2;
+  D.float64_from_bits word3
+
+let emit_vec512_constant
+    ({ word0; word1; word2; word3; word4; word5; word6; word7 } :
+      Cmm.vec512_bits) lbl =
+  (* SIMD vectors respect little-endian byte order *)
+  D.define_label lbl;
+  D.float64_from_bits word0;
+  D.float64_from_bits word1;
+  D.float64_from_bits word2;
+  D.float64_from_bits word3;
+  D.float64_from_bits word4;
+  D.float64_from_bits word5;
+  D.float64_from_bits word6;
+  D.float64_from_bits word7
+
+let global_maybe_protected (sym : S.t) =
   D.global sym;
-  if !Flambda_backend_flags.symbol_visibility_protected
+  if !Oxcaml_flags.symbol_visibility_protected
   then
+    (* CR sspies: This match should probably moved into asm directives. Check
+       what Arm does. *)
     match system with
     | S_macosx | S_win32 | S_win64 | S_mingw64 | S_cygwin | S_mingw | S_unknown
       ->
@@ -938,17 +976,67 @@ let global_maybe_protected sym =
          inlining. *)
       D.protected sym
 
-let emit_global_label_for_symbol lbl =
+(* CR sspies: The naming of these functions is confusing. *)
+let emit_global_label_for_symbol ~section lbl =
   add_def_symbol lbl;
-  let lbl = emit_symbol lbl in
+  let lbl = S.create lbl in
   global_maybe_protected lbl;
-  _label lbl
+  D.define_symbol_label ~section lbl
 
-let emit_global_label s =
+let emit_global_label ~section s =
   let lbl = Cmm_helpers.make_symbol s in
-  emit_global_label_for_symbol lbl
+  emit_global_label_for_symbol ~section lbl
+
+let movd src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_regf src with
+  | false, false -> I.simd movd_X_r32m32 [| src; dst |]
+  | false, true -> I.simd movd_r32m32_X [| src; dst |]
+  | true, false -> I.simd vmovd_X_r32m32 [| src; dst |]
+  | true, true -> I.simd vmovd_r32m32_X [| src; dst |]
+
+let movq src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_regf src with
+  | false, false -> I.simd movq_X_r64m64 [| src; dst |]
+  | false, true -> I.simd movq_r64m64_X [| src; dst |]
+  | true, false -> I.simd vmovq_X_r64m64 [| src; dst |]
+  | true, true -> I.simd vmovq_r64m64_X [| src; dst |]
+
+let movss src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_mem src, is_mem dst with
+  | _, true, true -> assert false
+  | false, false, _ -> I.simd movss_Xm32_X [| src; dst |]
+  | false, true, _ -> I.simd movss_X_m32 [| src; dst |]
+  | true, false, false -> I.simd vmovss_X_X_X [| src; dst; dst |]
+  | true, false, true -> I.simd vmovss_m32_X [| src; dst |]
+  | true, true, false -> I.simd vmovss_X_m32 [| src; dst |]
+
+let movsd src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_mem src, is_mem dst with
+  | _, true, true -> assert false
+  | false, false, _ -> I.simd movsd_Xm64_X [| src; dst |]
+  | false, true, _ -> I.simd movsd_X_m64 [| src; dst |]
+  | true, false, false -> I.simd vmovsd_X_X_X [| src; dst; dst |]
+  | true, false, true -> I.simd vmovsd_m64_X [| src; dst |]
+  | true, true, false -> I.simd vmovsd_X_m64 [| src; dst |]
+
+let movpd ~unaligned src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_mem src, unaligned with
+  | false, true, false -> I.simd movapd_X_Xm128 [| src; dst |]
+  | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
+  | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
+  | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
+  | true, false, false -> I.simd vmovapd_Xm128_X [| src; dst |]
+  | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, true, false -> I.simd vmovapd_X_Xm128 [| src; dst |]
+  | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
 let move (src : Reg.t) (dst : Reg.t) =
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc src dst) in
   match src.typ, src.loc, dst.typ, dst.loc with
   | _, Stack _, _, Stack _ ->
@@ -956,15 +1044,23 @@ let move (src : Reg.t) (dst : Reg.t) =
       src Printreg.reg dst
   | Float, Reg _, Float, Reg _
   | Float32, Reg _, Float32, Reg _
-  | ( (Vec128 | Valx2),
-      (Reg _ | Stack _),
-      (Vec128 | Valx2),
-      (Reg _ | Stack _ (* Vec128 stack slots are always aligned. *)) ) ->
-    if distinct then I.movapd (reg src) (reg dst)
+  | (Vec128 | Valx2), (Reg _ | Stack _), (Vec128 | Valx2), (Reg _ | Stack _) ->
+    (* Vec128 stack slots are aligned, domainstate slots are not. *)
+    let unaligned = Reg.is_domainstate src || Reg.is_domainstate dst in
+    if distinct then movpd ~unaligned (reg src) (reg dst)
+  | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct then I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
+  | Vec256, Stack _, Vec256, Reg _ ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct then I.simd vmovupd_Y_Ym256 [| reg src; reg dst |]
+  | Vec512, _, Vec512, _ ->
+    (* CR-soon mslater: avx512 *)
+    Misc.fatal_error "avx512 instructions not yet implemented"
   | Float, (Reg _ | Stack _), Float, (Reg _ | Stack _) ->
-    if distinct then I.movsd (reg src) (reg dst)
+    if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->
-    if distinct then I.movss (reg src) (reg dst)
+    if distinct then movss (reg src) (reg dst)
   | (Int | Val | Addr), (Reg _ | Stack _), (Int | Val | Addr), (Reg _ | Stack _)
     ->
     if distinct then I.mov (reg src) (reg dst)
@@ -973,7 +1069,7 @@ let move (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
+  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Int | Val | Addr | Valx2),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -990,7 +1086,7 @@ let stack_to_stack_move (src : Reg.t) (dst : Reg.t) =
       (* Not calling move because r15 is not in int_reg_name. *)
       I.mov (reg src) r15;
       I.mov r15 (reg dst)
-    | Float | Addr | Vec128 | Valx2 | Float32 ->
+    | Float | Addr | Vec128 | Vec256 | Vec512 | Valx2 | Float32 ->
       Misc.fatal_errorf
         "Unexpected register type for stack to stack move: from %a to %a\n"
         Printreg.reg src Printreg.reg dst
@@ -1005,55 +1101,9 @@ let tailrec_entry_point = ref None
 
 (* Emit tracing probes *)
 
-type probe =
-  { stack_offset : int;
-    num_stack_slots : int Stack_class.Tbl.t;
-    (* Record frame info held in the corresponding mutable variables. *)
-    probe_label : label;
-    (* Probe site, recorded in .note.stapsdt section for enabling and disabling
-       the probes *)
-    probe_insn : Linear.instruction
-        (* Iprobe instruction, recorded at probe site and used for emitting the
-           notes and the wrapper code at the end of the compilation unit. *)
-  }
-
 let probe_handler_wrapper_name probe_label =
   let w = Printf.sprintf "probe_wrapper_%s" (Label.to_string probe_label) in
-  Cmm_helpers.make_symbol w |> emit_symbol
-
-let probes = ref []
-
-let probe_semaphores = ref String.Map.empty
-
-let stapsdt_base_emitted = ref false
-
-let reset_probes () =
-  probes := [];
-  probe_semaphores := String.Map.empty
-
-let find_or_add_semaphore name enabled_at_init dbg =
-  match String.Map.find_opt name !probe_semaphores with
-  | Some (label, e) ->
-    (match e, enabled_at_init with
-    | None, None -> ()
-    | None, Some _ ->
-      let d = label, enabled_at_init in
-      probe_semaphores
-        := String.Map.remove name !probe_semaphores |> String.Map.add name d
-    | Some _, None ->
-      (* [find_or_add_semaphore] is called with None for Iprobe_is_enabled
-         during code emission only. [find_or_add_semaphore] us called with Some
-         to emit probe notes only after all code is emitted. *)
-      assert false
-    | Some b, Some b' ->
-      if not (Bool.equal b b')
-      then raise (Emitaux.Error (Inconsistent_probe_init (name, dbg))));
-    label
-  | None ->
-    let sym = "caml_probes_semaphore_" ^ name in
-    let d = sym, enabled_at_init in
-    probe_semaphores := String.Map.add name d !probe_semaphores;
-    sym
+  Cmm_helpers.make_symbol w |> S.create
 
 let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
   assert !frame_required;
@@ -1064,7 +1114,7 @@ let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
      the call is a displacement relative to the next instruction. Hence, the
      immediate operand of cmp is set up to have that value. *)
   if enabled_at_init
-  then I.call (sym wrap_label)
+  then I.call (sym (S.encode wrap_label))
   else if !Clflags.pic_code
   then (
     (* Manually emit encoding of cmp and an explicit relocation on it as needed
@@ -1072,11 +1122,11 @@ let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
        an assembler that might choose a different encoding which produces an
        incorrect relocation and changes the meaning of the program. *)
     (* Emit the required encoding of "cmp $0, %eax" directly using .byte *)
-    D.byte (Const 0x3dL);
-    D.byte (Const 0L);
-    D.byte (Const 0L);
-    D.byte (Const 0L);
-    D.byte (Const 0L);
+    D.int8 (Numbers.Int8.of_int_exn 0x3d);
+    D.int8 (Numbers.Int8.of_int_exn 0);
+    D.int8 (Numbers.Int8.of_int_exn 0);
+    D.int8 (Numbers.Int8.of_int_exn 0);
+    D.int8 (Numbers.Int8.of_int_exn 0);
     (* Emit the relocation for the call target *)
     (* [rel_size] is the number of bytes taken by the operand of cmp/call that
        needs to be relocated. It is used to form reloc's offset.
@@ -1087,16 +1137,14 @@ let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
        arch is little endian. *)
     let rel_size = 4L in
     let rel_offset_from_next = 4L in
-    D.reloc
-      ~offset:(ConstSub (ConstThis, Const rel_size))
-      ~name:R_X86_64_PLT32
-      ~expr:(ConstSub (ConstLabel wrap_label, Const rel_offset_from_next)))
+    D.reloc_x86_64_plt32 ~offset_from_this:rel_size ~target_symbol:wrap_label
+      ~rel_offset_from_next)
   else
     (* Emit absolute value, no relocation. The immediate operand of cmp is the
        offset of the wrapper from the current instruction's address "." minus
        the length of the current instruction, which is 5, and the wrapper is
        emitted at the end of the compilation unit. *)
-    I.cmp (sym (Printf.sprintf "%s - . - 5" wrap_label)) eax;
+    I.cmp (sym (Printf.sprintf "%s - . - 5" (S.encode wrap_label))) eax;
   (* Live registers are saved by the probe wrapper, so they are not recorded as
      gc roots at the probe site. *)
   let stack_live = Reg.Set.filter Reg.is_stack i.live in
@@ -1105,28 +1153,28 @@ let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
 (* Emit trap handler notes *)
 
 type traps =
-  { mutable push_traps : label list;
-    mutable pop_traps : label list;
-    mutable enter_traps : Label.Set.t
+  { mutable push_traps : L.t list;
+    mutable pop_traps : L.t list;
+    mutable enter_traps : L.Set.t
   }
 
-let traps = { push_traps = []; pop_traps = []; enter_traps = Label.Set.empty }
+let traps = { push_traps = []; pop_traps = []; enter_traps = L.Set.empty }
 
 let reset_traps () =
   traps.push_traps <- [];
   traps.pop_traps <- [];
-  traps.enter_traps <- Label.Set.empty
+  traps.enter_traps <- L.Set.empty
 
 let emit_pop_trap_label () =
-  let lbl = Cmm.new_label () in
-  def_label lbl;
+  let lbl = L.create Text in
+  D.define_label lbl;
   traps.pop_traps <- lbl :: traps.pop_traps
 
 let emit_push_trap_label handler =
-  let lbl = Cmm.new_label () in
-  def_label lbl;
+  let lbl = L.create Text in
+  D.define_label lbl;
   traps.push_traps <- lbl :: traps.push_traps;
-  traps.enter_traps <- Label.Set.add handler traps.enter_traps
+  traps.enter_traps <- L.Set.add handler traps.enter_traps
 
 (* Emit Code *)
 
@@ -1139,6 +1187,7 @@ module Address_sanitizer : sig
   (** Implements [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping]. *)
   val emit_sanitize :
     ?dependencies:X86_ast.arg array ->
+    instr:instruction ->
     address:X86_ast.arg ->
     Cmm.memory_chunk ->
     memory_access ->
@@ -1166,6 +1215,8 @@ end = struct
       | I32
       | I64
       | I128
+      | I256
+      | I512
 
     let of_memory_chunk : Cmm.memory_chunk -> t = function
       | Byte_unsigned | Byte_signed -> I8
@@ -1173,61 +1224,112 @@ end = struct
       | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> I32
       | Word_int | Word_val | Double -> I64
       | Onetwentyeight_unaligned | Onetwentyeight_aligned -> I128
+      | Twofiftysix_unaligned | Twofiftysix_aligned -> I256
+      | Fivetwelve_unaligned | Fivetwelve_aligned -> I512
 
     external to_bytes_log2 : t -> int = "%identity"
 
     let to_bytes t = 1 lsl to_bytes_log2 t
 
-    let is_small = function I8 | I16 | I32 -> true | I64 | I128 -> false
+    let is_small = function
+      | I8 | I16 | I32 -> true
+      | I64 | I128 | I256 | I512 -> false
   end
 
-  let mov_address src dest =
-    match (src : X86_ast.arg) with
-    | Mem
-        { scale = 1;
-          base = None;
-          sym = None;
-          displ = 0;
-          idx;
-          arch = _;
-          typ = _
-        } ->
+  let mov_address ~offset src dest =
+    match (src : X86_ast.arg), offset with
+    | Mem { idx = Vector _; _ }, _ ->
+      Misc.fatal_error "Cannot load vectorized address."
+    | ( Mem
+          { scale = 1;
+            base = None;
+            sym = None;
+            displ = 0;
+            idx = Scalar idx;
+            arch = _;
+            typ = _
+          },
+        0 ) ->
       I.mov (Reg64 idx) dest
-    | Mem _ | Mem64_RIP _ | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _
-    | Reg32 _ | Reg64 _ | Regf _ ->
-      I.lea src dest
+    | Mem ({ idx = Scalar _; _ } as mem), offset ->
+      I.lea (Mem { mem with displ = mem.displ + offset }) dest
+    | Mem64_RIP (ty, sym, displ), offset ->
+      I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
+    | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+        | Regf _ ),
+        offset ) ->
+      I.lea src dest;
+      if offset <> 0 then I.add (int offset) dest
 
   let[@inline always] is_stack_16_byte_aligned () =
     (* Yes, sadly this does result in materially better assembly than
        [(!stack_offset mod 16) = 0]
-       https://github.com/ocaml-flambda/flambda-backend/issues/2187 *)
+       https://github.com/oxcaml/oxcaml/issues/2187 *)
     !stack_offset land 15 = 0
 
-  let asan_report_function memory_chunk_size memory_access : X86_ast.arg =
-    let index =
-      (Memory_chunk_size.to_bytes_log2 memory_chunk_size lsl 1)
-      +
+  let asan_report_function simd_regs memory_chunk_size memory_access :
+      X86_ast.arg =
+    let chunk_size = Memory_chunk_size.to_bytes_log2 memory_chunk_size in
+    let access =
       match memory_access with
       | Load -> 0
       | Store_initialize | Store_modify -> 1
     in
+    let index = (chunk_size lsl 1) + access in
     (* We take extra care to structure our code such that these are statically
        allocated as manifest constants in a flat array. *)
-    match index with
-    | 0 -> Sym "caml_asan_report_load1_noabort"
-    | 1 -> Sym "caml_asan_report_store1_noabort"
-    | 2 -> Sym "caml_asan_report_load2_noabort"
-    | 3 -> Sym "caml_asan_report_store2_noabort"
-    | 4 -> Sym "caml_asan_report_load4_noabort"
-    | 5 -> Sym "caml_asan_report_store4_noabort"
-    | 6 -> Sym "caml_asan_report_load8_noabort"
-    | 7 -> Sym "caml_asan_report_store8_noabort"
-    | 8 -> Sym "caml_asan_report_load16_noabort"
-    | 9 -> Sym "caml_asan_report_store16_noabort"
-    | _ ->
-      (* Larger loads and stores can be reported using
-         [__asan_report_load_n_noabort], but we don't support this yet. *)
-      assert false
+    match simd_regs with
+    | Save_xmm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort"
+      | 1 -> Sym "caml_asan_report_store1_noabort"
+      | 2 -> Sym "caml_asan_report_load2_noabort"
+      | 3 -> Sym "caml_asan_report_store2_noabort"
+      | 4 -> Sym "caml_asan_report_load4_noabort"
+      | 5 -> Sym "caml_asan_report_store4_noabort"
+      | 6 -> Sym "caml_asan_report_load8_noabort"
+      | 7 -> Sym "caml_asan_report_store8_noabort"
+      | 8 -> Sym "caml_asan_report_load16_noabort"
+      | 9 -> Sym "caml_asan_report_store16_noabort"
+      | 10 -> Sym "caml_asan_report_load32_noabort"
+      | 11 -> Sym "caml_asan_report_store32_noabort"
+      | 12 -> Sym "caml_asan_report_load64_noabort"
+      | 13 -> Sym "caml_asan_report_store64_noabort"
+      | _ -> assert false)
+    | Save_ymm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort_avx"
+      | 1 -> Sym "caml_asan_report_store1_noabort_avx"
+      | 2 -> Sym "caml_asan_report_load2_noabort_avx"
+      | 3 -> Sym "caml_asan_report_store2_noabort_avx"
+      | 4 -> Sym "caml_asan_report_load4_noabort_avx"
+      | 5 -> Sym "caml_asan_report_store4_noabort_avx"
+      | 6 -> Sym "caml_asan_report_load8_noabort_avx"
+      | 7 -> Sym "caml_asan_report_store8_noabort_avx"
+      | 8 -> Sym "caml_asan_report_load16_noabort_avx"
+      | 9 -> Sym "caml_asan_report_store16_noabort_avx"
+      | 10 -> Sym "caml_asan_report_load32_noabort_avx"
+      | 11 -> Sym "caml_asan_report_store32_noabort_avx"
+      | 12 -> Sym "caml_asan_report_load64_noabort_avx"
+      | 13 -> Sym "caml_asan_report_store64_noabort_avx"
+      | _ -> assert false)
+    | Save_zmm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort_avx512"
+      | 1 -> Sym "caml_asan_report_store1_noabort_avx512"
+      | 2 -> Sym "caml_asan_report_load2_noabort_avx512"
+      | 3 -> Sym "caml_asan_report_store2_noabort_avx512"
+      | 4 -> Sym "caml_asan_report_load4_noabort_avx512"
+      | 5 -> Sym "caml_asan_report_store4_noabort_avx512"
+      | 6 -> Sym "caml_asan_report_load8_noabort_avx512"
+      | 7 -> Sym "caml_asan_report_store8_noabort_avx512"
+      | 8 -> Sym "caml_asan_report_load16_noabort_avx512"
+      | 9 -> Sym "caml_asan_report_store16_noabort_avx512"
+      | 10 -> Sym "caml_asan_report_load32_noabort_avx512"
+      | 11 -> Sym "caml_asan_report_store32_noabort_avx512"
+      | 12 -> Sym "caml_asan_report_load64_noabort_avx512"
+      | 13 -> Sym "caml_asan_report_store64_noabort_avx512"
+      | _ -> assert false)
 
   (* CR-soon ksvetlitski: find a way to accomplish this without breaking the
      abstraction barrier of [X86_ast]. *)
@@ -1235,19 +1337,22 @@ end = struct
     match arg with
     | Reg8L register' | Reg16 register' | Reg32 register' | Reg64 register' ->
       equal_reg64 register register'
-    | Mem { idx = register'; base = None; scale; _ } ->
+    | Mem { idx = Scalar register'; base = None; scale; _ } ->
       scale <> 0 && equal_reg64 register register'
-    | Mem { idx = register'; base = Some register''; _ } ->
+    | Mem { idx = Scalar register'; base = Some register''; _ } ->
       equal_reg64 register register' || equal_reg64 register register''
-    | Imm _ | Sym _ | Reg8H _ | Regf _ | Mem64_RIP (_, _, _) -> false
+    | Mem { idx = Vector _; _ }
+    | Regf _ | Imm _ | Sym _ | Reg8H _
+    | Mem64_RIP (_, _, _) ->
+      false
 
   (* The C code snippets in the comments throughout this function refer to the
      implementation given in
      [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping].
      I'd recommend reading that first for reference before touching this
      function. *)
-  let emit_sanitize ?(dependencies = [||]) ~address
-      (memory_chunk : Cmm.memory_chunk) (memory_access : memory_access) =
+  let emit_shadow_check ?(dependencies = [||]) ?(offset = 0) ~address ~report
+      (memory_chunk : Cmm.memory_chunk) =
     let[@inline always] need_to_save_register register =
       uses_register register address
       || Array.exists (uses_register register) dependencies
@@ -1263,7 +1368,7 @@ end = struct
        You could do this at the end of the prologue if you wanted to; the point
        is just that you have to do this before you modify the contents of any
        registers (other than [rsp]). *)
-    mov_address address rdi;
+    mov_address ~offset address rdi;
     let need_to_save_r11 = need_to_save_register R11 in
     if need_to_save_r11 then push r11;
     let need_to_save_r10 =
@@ -1271,22 +1376,22 @@ end = struct
     in
     if need_to_save_r10 then push r10;
     (* -------- End prologue -------- *)
-    let asan_check_succeded_label = Cmm.new_label () in
+    let asan_check_succeded_label = L.create Text in
     I.mov rdi r11;
     (* These constants come from
        [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#64-bit]. *)
     I.shr (int 3) r11;
-    let shadow_address = mem64 BYTE 0x7FFF8000 R11 in
+    let shadow_address = mem64 BYTE 0x7FFF8000 (Scalar R11) in
     let () =
       if not (Memory_chunk_size.is_small memory_chunk_size)
       then (
         I.cmp (int 0) shadow_address;
-        I.je (label asan_check_succeded_label)
+        I.je (emit_asm_label_arg asan_check_succeded_label)
         (* There is no slow-path check for word-sized and larger accesses *))
       else (
         I.movzx shadow_address r11;
         I.test (Reg8L R11) (Reg8L R11);
-        I.je (label asan_check_succeded_label);
+        I.je (emit_asm_label_arg asan_check_succeded_label);
         (* Begin the [SlowPathCheck]. Place [last_accessed_byte] in [r10]. ```
            last_accessed_byte = (address & 7) + kAccessSize - 1; ``` *)
         I.mov rdi r10;
@@ -1301,7 +1406,7 @@ end = struct
         in
         (* [ return (last_accessed_byte >= shadow_value) ] *)
         I.cmp (Reg8L R11) (Reg8L R10);
-        I.jl (label asan_check_succeded_label))
+        I.jl (emit_asm_label_arg asan_check_succeded_label))
     in
     (* [ ReportError(address, kAccessSize, kIsWrite); ] *)
     let () =
@@ -1311,21 +1416,22 @@ end = struct
         (* [push rax] is a single-byte instruction, as opposed to something like
            [push 0] which is a 2-byte instruction. *)
         push rax;
-      (* The asan report wrappers use a special calling convention via the C
-         attribute [__attribute__((preserve_all))] so that all registers except
-         for [r11] (which is clobbered) are callee-saved, in order to minimize
-         the amount of spilling we have to do here. [address] is already in
-         [rdi], and this function accepts just a single argument. *)
-      I.call (asan_report_function memory_chunk_size memory_access);
+      (* Pass base address to report function. *)
+      if offset <> 0 then I.add (int (-offset)) rdi;
+      (* The asan report wrappers preserve all registers except for [r11] (which
+         is clobbered), in order to minimize the amount of spilling we have to
+         do here. [address] is already in [rdi], and this function accepts just
+         a single argument. *)
+      I.call report;
       if need_to_align_stack then pop rax
     in
-    def_label asan_check_succeded_label;
+    D.define_label asan_check_succeded_label;
     if need_to_save_r10 then pop r10;
     if need_to_save_r11 then pop r11;
     if need_to_save_rdi then pop rdi
 
-  let[@inline always] emit_sanitize ?dependencies ~address memory_chunk
-      memory_access =
+  let[@inline always] emit_sanitize ?dependencies ~instr ~address
+      (memory_chunk : Cmm.memory_chunk) memory_access =
     (* Checking [Config.with_address_sanitizer] is redundant, but we do it
        because it's a compile-time constant, so it enables the compiler to
        completely optimize-out the AddressSanitizer code when the compiler was
@@ -1337,8 +1443,30 @@ end = struct
          on the grounds that the backing memory for freshly allocated records is
          provided directly by the runtime and guaranteed to be safe to use. *)
       | Store_initialize -> ()
-      | Load | Store_modify ->
-        emit_sanitize ?dependencies ~address memory_chunk memory_access
+      | Load | Store_modify -> (
+        let report =
+          asan_report_function
+            (must_save_simd_regs instr.live)
+            (Memory_chunk_size.of_memory_chunk memory_chunk)
+            memory_access
+        in
+        match memory_chunk with
+        | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
+        | Double | Onetwentyeight_aligned ->
+          emit_shadow_check ?dependencies ~address ~report memory_chunk
+        | Onetwentyeight_unaligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:15 ~address ~report
+            Byte_unsigned
+        | Twofiftysix_unaligned | Twofiftysix_aligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:31 ~address ~report
+            Byte_unsigned
+        | Fivetwelve_unaligned | Fivetwelve_aligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:63 ~address ~report
+            Byte_unsigned)
 end
 
 let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
@@ -1357,7 +1485,7 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     | Sixtyfour | Word -> X86_ast.QWORD, arg instr src_index
   in
   let dst = addressing addr typ instr first_memory_arg_index in
-  Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address:dst
+  Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr ~address:dst
     Thirtytwo_unsigned Store_modify;
   match op with
   | Fetch_and_add ->
@@ -1388,51 +1516,78 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     I.xchg src dst
 
 let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
   | Int_of_value | Value_of_int -> if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
-    if distinct then I.movss (arg i 0) (res i 0)
-  | V128_of_v128 -> if distinct then I.movapd (arg i 0) (res i 0)
-  | Float_of_int64 | Int64_of_float -> I.movq (arg i 0) (res i 0)
-  | Float32_of_int32 -> I.movd (arg32 i 0) (res i 0)
-  | Int32_of_float32 -> I.movd (arg i 0) (res32 i 0)
+    if distinct then movss (arg i 0) (res i 0)
+  | V128_of_vec (Vec128 | Vec256) ->
+    if distinct then movpd ~unaligned:false (argX i 0) (res i 0)
+  | V256_of_vec Vec128 ->
+    if distinct then movpd ~unaligned:false (arg i 0) (resX i 0)
+  | V256_of_vec Vec256 ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct
+    then
+      if Reg.is_stack i.arg.(0)
+      then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
+      else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
+  | V128_of_vec Vec512 | V256_of_vec Vec512 | V512_of_vec _ ->
+    (* CR-soon mslater: avx512 *)
+    Misc.fatal_error "avx512 instructions not yet implemented"
+  | Float_of_int64 | Int64_of_float -> movq (arg i 0) (res i 0)
+  | Float32_of_int32 -> movd (arg32 i 0) (res i 0)
+  | Int32_of_float32 -> movd (arg i 0) (res32 i 0)
 
 let emit_static_cast (cast : Cmm.static_cast) i =
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
-  | Float_of_int Float64 -> I.cvtsi2sd (arg i 0) (res i 0)
-  | Int_of_float Float64 -> I.cvttsd2si (arg i 0) (res i 0)
-  | Float_of_int Float32 -> I.cvtsi2ss (arg i 0) (res i 0)
-  | Int_of_float Float32 -> I.cvttss2si (arg i 0) (res i 0)
-  | Float_of_float32 -> I.cvtss2sd (arg i 0) (res i 0)
-  | Float32_of_float -> I.cvtsd2ss (arg i 0) (res i 0)
-  | V128_of_scalar Float64x2 | Scalar_of_v128 Float64x2 ->
-    if distinct then I.movsd (arg i 0) (res i 0)
-  | Scalar_of_v128 Int64x2 | V128_of_scalar Int64x2 ->
-    I.movq (arg i 0) (res i 0)
-  | Scalar_of_v128 Int32x4 -> I.movd (arg i 0) (res32 i 0)
-  | V128_of_scalar Int32x4 -> I.movd (arg32 i 0) (res i 0)
-  | V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4 ->
-    if distinct then I.movss (arg i 0) (res i 0)
-  | Scalar_of_v128 Int16x8 ->
-    (* [movw] and [movzx] cannot operate on vector registers. We must zero
-       extend as the result is an untagged positive int. CR mslater: (SIMD)
-       remove zx once we have unboxed int16 *)
-    I.movd (arg i 0) (res32 i 0);
-    I.movzx (res16 i 0) (res i 0)
-  | Scalar_of_v128 Int8x16 ->
-    (* [movb] and [movzx] cannot operate on vector registers. We must zero
-       extend as the result is an untagged positive int. CR mslater: (SIMD)
-       remove zx once we have unboxed int8 *)
-    I.movd (arg i 0) (res32 i 0);
-    I.movzx (res8 i 0) (res i 0)
-  | V128_of_scalar Int16x8 | V128_of_scalar Int8x16 ->
+  | Float_of_int Float64 ->
+    sse_or_avx_dst cvtsi2sd_X_r64m64 vcvtsi2sd_X_X_r64m64 (arg i 0) (res i 0)
+  | Int_of_float Float64 ->
+    sse_or_avx cvttsd2si_r64_Xm64 vcvttsd2si_r64_Xm64 (arg i 0) (res i 0)
+  | Float_of_int Float32 ->
+    sse_or_avx_dst cvtsi2ss_X_r64m64 vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
+  | Int_of_float Float32 ->
+    sse_or_avx cvttss2si_r64_Xm32 vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
+  | Float_of_float32 -> sse_or_avx_dst cvtss2sd vcvtss2sd (arg i 0) (res i 0)
+  | Float32_of_float -> sse_or_avx_dst cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)
+  | Scalar_of_v128 Float64x2 | Scalar_of_v256 Float64x4 ->
+    if distinct then movsd (argX i 0) (res i 0)
+  | V128_of_scalar Float64x2 | V256_of_scalar Float64x4 ->
+    if distinct then movsd (arg i 0) (resX i 0)
+  | Scalar_of_v128 Int64x2 | Scalar_of_v256 Int64x4 -> movq (argX i 0) (res i 0)
+  | V128_of_scalar Int64x2 | V256_of_scalar Int64x4 -> movq (arg i 0) (resX i 0)
+  | Scalar_of_v128 Int32x4 | Scalar_of_v256 Int32x8 ->
+    movd (argX i 0) (res32 i 0)
+  | V128_of_scalar Int32x4 | V256_of_scalar Int32x8 ->
+    movd (arg32 i 0) (resX i 0)
+  | Scalar_of_v128 Float32x4 | Scalar_of_v256 Float32x8 ->
+    if distinct then movss (argX i 0) (res i 0)
+  | V128_of_scalar Float32x4 | V256_of_scalar Float32x8 ->
+    if distinct then movss (arg i 0) (resX i 0)
+  | Scalar_of_v128 Float16x8
+  | V128_of_scalar Float16x8
+  | Scalar_of_v256 Float16x16
+  | V256_of_scalar Float16x16 ->
+    Misc.fatal_error "float16 scalar type not supported"
+  | Scalar_of_v128 Int16x8 | Scalar_of_v256 Int16x16 ->
+    movd (argX i 0) (res32 i 0)
+  | Scalar_of_v128 Int8x16 | Scalar_of_v256 Int8x32 ->
+    movd (argX i 0) (res32 i 0)
+  | V128_of_scalar Int16x8
+  | V128_of_scalar Int8x16
+  | V256_of_scalar Int16x16
+  | V256_of_scalar Int8x32 ->
     (* [movw] and [movb] cannot operate on vector registers. Moving 32 bits is
-       OK because the argument is an untagged positive int and these operations
-       leave the top bits of the vector unspecified. CR mslater: (SIMD) don't
-       load 32 bits once we have unboxed int16/int8 *)
-    I.movd (arg32 i 0) (res i 0)
+       OK because the argument is an untagged int and these operations leave the
+       top bits of the vector unspecified. *)
+    movd (arg32 i 0) (resX i 0)
+  | V512_of_scalar _ | Scalar_of_v512 _ ->
+    (* CR-soon mslater: avx512 *)
+    Misc.fatal_error "avx512 instructions not yet implemented"
 
 let assert_loc (loc : Simd.loc) arg =
   (match Reg.is_reg arg with
@@ -1440,53 +1595,132 @@ let assert_loc (loc : Simd.loc) arg =
   | false -> assert (Simd.loc_allows_mem loc));
   match Simd.loc_is_pinned loc with
   | Some RAX -> assert (Reg.same_loc arg phys_rax)
+  | Some RDI -> assert (Reg.same_loc arg phys_rdi)
   | Some RCX -> assert (Reg.same_loc arg phys_rcx)
   | Some RDX -> assert (Reg.same_loc arg phys_rdx)
   | Some XMM0 -> assert (Reg.same_loc arg (phys_xmm0v ()))
   | None -> ()
 
-let check_simd_instr (simd : Simd.instr) imm instr =
-  assert (Bool.equal simd.imm (Option.is_some imm));
-  Array.iteri
-    (fun j (arg : Simd.arg) -> assert_loc arg.loc instr.arg.(j))
-    simd.args;
-  match simd.res with
-  | First_arg -> assert (Reg.same_loc instr.arg.(0) instr.res.(0))
-  | Res { loc; _ } -> assert_loc loc instr.res.(0)
+let check_simd_instr ?mode (simd : Simd.instr) imm instr =
+  (match simd.imm with
+  | Imm_none | Imm_reg -> assert (Option.is_none imm)
+  | Imm_spec -> assert (Option.is_some imm));
+  let addr_used_or_not_provided = ref (Option.is_none mode) in
+  let use_addr () =
+    assert (not !addr_used_or_not_provided);
+    addr_used_or_not_provided := true
+  in
+  let args_used =
+    Array.fold_left
+      (fun idx (arg : Simd.arg) ->
+        if not (Simd.loc_allows_reg arg.loc) then assert (Option.is_some mode);
+        match Simd.loc_allows_mem arg.loc, mode with
+        | true, Some (mode, _) ->
+          use_addr ();
+          idx + num_args_addressing mode
+        | _ ->
+          assert_loc arg.loc instr.arg.(idx);
+          idx + 1)
+      0 simd.args
+  in
+  assert !addr_used_or_not_provided;
+  assert (args_used = Array.length instr.arg);
+  let res_used =
+    match simd.res with
+    | Res_none -> 0
+    | First_arg ->
+      assert (Reg.same_loc instr.arg.(0) instr.res.(0));
+      1
+    | Res rr ->
+      Array.iteri
+        (fun i ({ loc; _ } : Simd.arg) -> assert_loc loc instr.res.(i))
+        rr;
+      Array.length rr
+  in
+  assert (res_used = Array.length instr.res)
 
 let to_arg_with_width loc instr i =
-  match Simd.loc_requires_width loc with
-  | Some Eight -> arg8 instr i
-  | Some Sixteen -> arg16 instr i
-  | Some Thirtytwo -> arg32 instr i
-  | Some Sixtyfour | None -> arg instr i
+  match Simd.loc_register_width loc with
+  | Some R8 -> arg8 instr i
+  | Some R16 -> arg16 instr i
+  | Some R32 -> arg32 instr i
+  | Some (R64 | R128 | R256) | None -> arg instr i
 
 let to_res_with_width loc instr i =
-  match Simd.loc_requires_width loc with
-  | Some Eight -> res8 instr i
-  | Some Sixteen -> res16 instr i
-  | Some Thirtytwo -> res32 instr i
-  | Some Sixtyfour | None -> res instr i
+  match Simd.loc_register_width loc with
+  | Some R8 -> res8 instr i
+  | Some R16 -> res16 instr i
+  | Some R32 -> res32 instr i
+  | Some (R64 | R128 | R256) | None -> res instr i
 
-let emit_simd_instr (simd : Simd.instr) imm instr =
-  check_simd_instr simd imm instr;
-  let total_args = Array.length instr.arg in
-  if total_args <> Array.length simd.args
-  then Misc.fatal_errorf "wrong number of arguments for %s" simd.mnemonic;
+let to_addr_width loc : X86_ast.data_type =
+  match Simd.loc_memory_width loc with
+  | M8 -> BYTE
+  | M16 -> WORD
+  | M32 -> DWORD
+  | M64 -> QWORD
+  | M128 -> VEC128
+  | M256 -> VEC256
+  | M32X | M32Y | M64X | M64Y ->
+    (* Will not be used by the assembler. *)
+    NONE
+
+let emit_simd_sanitize ~address ~instr ~loc ~kind =
+  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+  then
+    let chunk : Cmm.memory_chunk option =
+      match Simd.loc_memory_width loc with
+      | M8 -> Some Byte_unsigned
+      | M16 -> Some Sixteen_unsigned
+      | M32 -> Some Thirtytwo_unsigned
+      | M64 -> Some Word_int
+      (* Conservatively assumes unaligned memory; generates slower checks. *)
+      | M128 -> Some Onetwentyeight_unaligned
+      | M256 -> Some Twofiftysix_unaligned
+      (* We do not sanitize gather/scatter instructions. *)
+      | M32X | M32Y | M64X | M64Y -> None
+    in
+    match chunk with
+    | None -> ()
+    | Some chunk ->
+      (* May duplicate dependencies, including anything in [address]. *)
+      let arg = Array.init (Array.length instr.arg) (fun i -> arg instr i) in
+      let res = Array.init (Array.length instr.res) (fun i -> res instr i) in
+      let dependencies = Array.append arg res in
+      Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
+  else ()
+
+let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
+  check_simd_instr ?mode simd imm instr;
   let args =
-    List.init total_args (fun i ->
-        if Simd.arg_is_implicit simd.args.(i)
-        then None
-        else Some (to_arg_with_width simd.args.(i).loc instr i))
-    |> List.filter_map (fun arg -> arg)
+    Array.fold_left
+      (fun (idx, args) (arg : Simd.arg) ->
+        if Simd.arg_is_implicit arg
+        then idx + 1, args
+        else
+          match Simd.loc_allows_mem arg.loc, mode with
+          | true, Some (mode, kind) ->
+            let n = num_args_addressing mode in
+            let typ = to_addr_width arg.loc in
+            let address = addressing mode typ instr idx in
+            emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
+            idx + n, address :: args
+          | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
+      (0, []) simd.args
+    |> fun (_, args) -> List.rev args
   in
   let args =
     match simd.res with
-    | First_arg | Res { enc = Implicit; _ } -> args
-    | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
-      match Simd.loc_is_pinned loc with
-      | Some _ -> args
-      | None -> to_res_with_width loc instr 0 :: args)
+    | Res_none | First_arg -> args
+    | Res rr ->
+      Array.fold_left
+        (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
+          match enc with
+          | Implicit | Immediate -> idx, acc
+          | RM_r | RM_rm | Vex_v ->
+            idx + 1, to_res_with_width loc instr idx :: acc)
+        (0, args) rr
+      |> snd
   in
   let args =
     match imm with
@@ -1495,18 +1729,37 @@ let emit_simd_instr (simd : Simd.instr) imm instr =
   in
   I.simd simd (Array.of_list args)
 
-let emit_simd (op : Simd.operation) instr =
+(* Only used for instructions that have an implicit memory operand. Explicit
+   load/store operations are sanitized automatically by [emit_simd_instr]. *)
+let emit_implicit_simd_sanitize (op : Simd.operation) instr =
+  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+     && Simd.is_memory_operation op
+  then
+    let simd = Simd.Pseudo_instr.instr op.instr in
+    match[@warning "-4"] simd.id with
+    | Maskmovdqu | Vmaskmovdqu ->
+      let address = addressing identity_addressing VEC128 instr 2 in
+      emit_simd_sanitize ~address ~instr ~loc:(Temp [| M128 |])
+        ~kind:Store_modify
+    | _ ->
+      (* Must handle all impure cases in [Simd.class_of_operation] *)
+      Misc.fatal_errorf
+        "Don't know how to sanitize implicit memory operand of %s" simd.mnemonic
+
+let emit_simd ?mode (op : Simd.operation) instr =
+  let open Simd_instrs in
+  emit_implicit_simd_sanitize op instr;
   let imm = op.imm in
   match op.instr with
-  | Instruction simd -> emit_simd_instr simd imm instr
+  | Instruction simd -> emit_simd_instr ?mode simd imm instr
   | Sequence seq -> (
     match seq.id with
     | Sqrtss | Sqrtsd | Roundss | Roundsd ->
       (* Avoids partial register stall *)
       if not (equal_arg (arg instr 0) (res instr 0))
-      then I.xorpd (res instr 0) (res instr 0);
-      emit_simd_instr seq.instr imm instr
-    | Pcompare_string p ->
+      then sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res instr 0) (res instr 0);
+      emit_simd_instr ?mode seq.instr imm instr
+    | Pcompare_string p | Vpcompare_string p ->
       let cond : X86_ast.condition =
         match p with
         | Pcmpestra -> A
@@ -1520,31 +1773,37 @@ let emit_simd (op : Simd.operation) instr =
         | Pcmpistrs -> S
         | Pcmpistrz -> E
       in
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestz | Vptestz_X | Vptestz_Y ->
+      emit_simd_instr ?mode seq.instr imm instr;
+      I.set E (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestc | Vptestc_X | Vptestc_Y ->
+      emit_simd_instr ?mode seq.instr imm instr;
+      I.set B (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
+      emit_simd_instr ?mode seq.instr imm instr;
+      I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
-let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i addr =
-  let open Simd_instrs in
-  assert (Reg.is_reg i.arg.(0));
-  assert (not (Reg.is_reg i.arg.(1)));
-  assert (Reg.same_loc i.arg.(0) i.res.(0));
+let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
   match simd with
-  | SSE2 Add_f64 -> I.simd addpd [| addr; res i 0 |]
-  | SSE2 Sub_f64 -> I.simd subpd [| addr; res i 0 |]
-  | SSE2 Mul_f64 -> I.simd mulpd [| addr; res i 0 |]
-  | SSE2 Div_f64 -> I.simd divpd [| addr; res i 0 |]
-  | SSE Add_f32 -> I.simd addps [| addr; res i 0 |]
-  | SSE Sub_f32 -> I.simd subps [| addr; res i 0 |]
-  | SSE Mul_f32 -> I.simd mulps [| addr; res i 0 |]
-  | SSE Div_f32 -> I.simd divps [| addr; res i 0 |]
+  | Load op -> emit_simd ~mode:(mode, Load) op i
+  | Store op -> emit_simd ~mode:(mode, Store_modify) op i
+
+let prologue_stack_offset () =
+  assert !frame_required;
+  frame_size () - 8 - if fp then 8 else 0
 
 let emit_extcall i ~func ~alloc ~stack_ofs =
   add_used_symbol func;
   if Config.runtime5 && stack_ofs > 0
   then (
     I.mov rsp r13;
-    I.lea (mem64 QWORD stack_ofs RSP) r12;
+    I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
     load_symbol_addr (Cmm.global_symbol func) rax;
     emit_call (Cmm.global_symbol "caml_c_call_stack_args");
     record_frame i.live (Dbg_other i.dbg))
@@ -1567,8 +1826,8 @@ let emit_extcall i ~func ~alloc ~stack_ofs =
     if Config.runtime5
     then (
       I.mov rsp rbx;
-      cfi_remember_state ();
-      cfi_def_cfa_register "rbx";
+      D.cfi_remember_state ();
+      D.cfi_def_cfa_register ~reg:"rbx";
       (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
          through this unless we were to tag this calling frame with
          cfi_signal_frame in it's definition. *)
@@ -1577,10 +1836,11 @@ let emit_extcall i ~func ~alloc ~stack_ofs =
     if Config.runtime5
     then (
       I.mov rbx rsp;
-      cfi_restore_state ()))
+      D.cfi_restore_state ()))
 
 (* Emit an instruction *)
 let emit_instr ~first ~fallthrough i =
+  let open Simd_instrs in
   emit_debug_info_linear i;
   match i.desc with
   | Lend -> ()
@@ -1589,15 +1849,27 @@ let emit_instr ~first ~fallthrough i =
     if fp
     then (
       I.push rbp;
-      cfi_adjust_cfa_offset 8;
+      D.cfi_adjust_cfa_offset ~bytes:8;
       I.mov rsp rbp);
     if !frame_required
     then
-      let n = frame_size () - 8 - if fp then 8 else 0 in
+      let n = prologue_stack_offset () in
       if n <> 0
       then (
         I.sub (int n) rsp;
-        cfi_adjust_cfa_offset n)
+        D.cfi_adjust_cfa_offset ~bytes:n)
+  | Lepilogue_open ->
+    (* Deallocate the stack frame before a return or tail call *)
+    let n = prologue_stack_offset () in
+    if n <> 0
+    then (
+      I.add (int n) rsp;
+      D.cfi_adjust_cfa_offset ~bytes:(-n));
+    if fp then I.pop rbp
+  | Lepilogue_close ->
+    (* reset CFA back cause function body may continue *)
+    let n = prologue_stack_offset () in
+    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->
     if Nativeint.equal n 0n
@@ -1627,26 +1899,41 @@ let emit_instr ~first ~fallthrough i =
     match f with
     | 0x0000_0000l ->
       (* +0.0 *)
-      I.xorpd (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
-      (* float32 constants still take up 8 bytes; we load the lower half. *)
+      (* float32 constants take up 8 bytes when we emit them with
+         [float_literal] (see the conversion from int32 to int64 below). Thus,
+         we load the lower half. Note that this is different from Cmm 32-bit
+         floats ([Csingle]), which are emitted as 4-byte constants. *)
       let lbl = add_float_constant (Int64.of_int32 f) in
-      I.movss (mem64_rip REAL4 (emit_label lbl)) (res i 0))
+      movss (mem64_rip REAL4 (L.encode lbl)) (res i 0))
   | Lop (Const_float f) -> (
     match f with
     | 0x0000_0000_0000_0000L ->
       (* +0.0 *)
-      I.xorpd (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
       let lbl = add_float_constant f in
-      I.movsd (mem64_rip REAL8 (emit_label lbl)) (res i 0))
-  | Lop (Const_vec128 { high; low }) -> (
-    match high, low with
+      movsd (mem64_rip REAL8 (L.encode lbl)) (res i 0))
+  | Lop (Const_vec128 { word0; word1 }) -> (
+    match word1, word0 with
     | 0x0000_0000_0000_0000L, 0x0000_0000_0000_0000L ->
-      I.xorpd (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
-      let lbl = add_vec128_constant { high; low } in
-      I.movapd (mem64_rip VEC128 (emit_label lbl)) (res i 0))
+      let lbl = add_vec128_constant { word0; word1 } in
+      movpd ~unaligned:false (mem64_rip VEC128 (L.encode lbl)) (res i 0))
+  | Lop (Const_vec256 { word0; word1; word2; word3 }) -> (
+    match
+      List.for_all (fun w -> Int64.equal w 0L) [word3; word2; word1; word0]
+    with
+    | true -> I.simd vxorpd_Y_Y_Ym256 [| res i 0; res i 0; res i 0 |]
+    | false ->
+      let lbl = add_vec256_constant { word0; word1; word2; word3 } in
+      I.simd vmovapd_Y_Ym256 [| mem64_rip VEC256 (L.encode lbl); res i 0 |])
+  | Lop (Const_vec512 _) ->
+    (* CR-soon mslater: avx512 *)
+    ignore add_vec512_constant;
+    Misc.fatal_error "avx512 instructions not yet implemented"
   | Lop (Const_symbol s) ->
     add_used_symbol s.sym_name;
     load_symbol_addr s (res i 0)
@@ -1657,26 +1944,68 @@ let emit_instr ~first ~fallthrough i =
     add_used_symbol func.sym_name;
     emit_call func;
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op Ltailcall_ind -> output_epilogue (fun () -> I.jmp (arg i 0))
+  | Lcall_op Ltailcall_ind -> I.jmp (arg i 0)
   | Lcall_op (Ltailcall_imm { func }) ->
     if String.equal func.sym_name !function_name
     then
       match !tailrec_entry_point with
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
-      | Some tailrec_entry_point -> I.jmp (label tailrec_entry_point)
-    else
-      output_epilogue (fun () ->
-          add_used_symbol func.sym_name;
-          emit_jump func)
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
-    emit_extcall i ~func ~alloc ~stack_ofs
+      | Some tailrec_entry_point ->
+        I.jmp (emit_label_arg ~section:Text tailrec_entry_point)
+    else (
+      add_used_symbol func.sym_name;
+      emit_jump func)
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
+    add_used_symbol func;
+    if stack_ofs > 0
+       && (Config.runtime5 || not (Cmm.equal_stack_align stack_align Align_16))
+    then (
+      I.mov rsp r13;
+      I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
+      load_symbol_addr (Cmm.global_symbol func) rax;
+      (match stack_align with
+      | Align_16 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args")
+      | Align_32 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx")
+      | Align_64 ->
+        emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx512"));
+      record_frame i.live (Dbg_other i.dbg))
+    else if alloc
+    then (
+      load_symbol_addr (Cmm.global_symbol func) rax;
+      emit_call (Cmm.global_symbol "caml_c_call");
+      record_frame i.live (Dbg_other i.dbg);
+      if (not Config.runtime5) && not (is_win64 system)
+      then
+        (* In amd64.S, "caml_c_call" tail-calls the C function (in order to
+           produce nicer backtraces), so we need to restore r15 manually after
+           it returns (note that this increases code size).
+
+           In amd64nt.asm (used for Win64), "caml_c_call" invokes the C function
+           via a regular call, and restores r15 itself, thus avoiding the code
+           size increase. *)
+        I.mov (domain_field Domainstate.Domain_young_ptr) r15)
+    else (
+      if Config.runtime5
+      then (
+        I.mov rsp rbx;
+        D.cfi_remember_state ();
+        D.cfi_def_cfa_register ~reg:"rbx";
+        (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
+           through this unless we were to tag this calling frame with
+           cfi_signal_frame in it's definition. *)
+        I.mov (domain_field Domainstate.Domain_c_stack) rsp);
+      emit_call (Cmm.global_symbol func);
+      if Config.runtime5
+      then (
+        I.mov rbx rsp;
+        D.cfi_restore_state ()))
   | Lop (External_without_caml_c_call { func_symbol = func; stack_ofs; _ }) ->
     emit_extcall i ~func ~alloc:false ~stack_ofs
   | Lop (Stackoffset n) -> emit_stack_offset n
   | Lop (Load { memory_chunk; addressing_mode; _ }) -> (
     let[@inline always] load ~dest data_type instruction =
       let address = addressing addressing_mode data_type i 0 in
-      Address_sanitizer.emit_sanitize ~address memory_chunk Load;
+      Address_sanitizer.emit_sanitize ~address ~instr:i memory_chunk Load;
       instruction address dest
     in
     match memory_chunk with
@@ -1687,11 +2016,23 @@ let emit_instr ~first ~fallthrough i =
     | Sixteen_signed -> load ~dest:(res i 0) WORD I.movsx
     | Thirtytwo_unsigned -> load ~dest:(res32 i 0) DWORD I.mov
     | Thirtytwo_signed -> load ~dest:(res i 0) DWORD I.movsxd
-    | Onetwentyeight_unaligned -> load ~dest:(res i 0) VEC128 I.movupd
-    | Onetwentyeight_aligned -> load ~dest:(res i 0) VEC128 I.movapd
-    | Single { reg = Float64 } -> load ~dest:(res i 0) REAL4 I.cvtss2sd
-    | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 I.movss
-    | Double -> load ~dest:(res i 0) REAL8 I.movsd)
+    | Onetwentyeight_unaligned ->
+      load ~dest:(res i 0) VEC128 (movpd ~unaligned:true)
+    | Onetwentyeight_aligned ->
+      load ~dest:(res i 0) VEC128 (movpd ~unaligned:false)
+    | Twofiftysix_unaligned ->
+      load ~dest:(res i 0) VEC256 (fun src dst ->
+          I.simd vmovupd_Y_Ym256 [| src; dst |])
+    | Twofiftysix_aligned ->
+      load ~dest:(res i 0) VEC256 (fun src dst ->
+          I.simd vmovapd_Y_Ym256 [| src; dst |])
+    | Fivetwelve_unaligned | Fivetwelve_aligned ->
+      (* CR-soon mslater: avx512 *)
+      Misc.fatal_error "avx512 instructions not yet implemented"
+    | Single { reg = Float64 } ->
+      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd)
+    | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 movss
+    | Double -> load ~dest:(res i 0) REAL8 movsd)
   | Lop (Store (chunk, addr, is_modify)) -> (
     let memory_access : Address_sanitizer.memory_access =
       if is_modify then Store_modify else Store_initialize
@@ -1699,8 +2040,8 @@ let emit_instr ~first ~fallthrough i =
     let[@inline always] store data_type arg_func instruction =
       let address = addressing addr data_type i 1 in
       let src = arg_func i 0 in
-      Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address chunk
-        memory_access;
+      Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr:i ~address
+        chunk memory_access;
       instruction src address
     in
     match chunk with
@@ -1708,85 +2049,109 @@ let emit_instr ~first ~fallthrough i =
     | Byte_unsigned | Byte_signed -> store BYTE arg8 I.mov
     | Sixteen_unsigned | Sixteen_signed -> store WORD arg16 I.mov
     | Thirtytwo_signed | Thirtytwo_unsigned -> store DWORD arg32 I.mov
-    | Onetwentyeight_unaligned -> store VEC128 arg I.movupd
-    | Onetwentyeight_aligned -> store VEC128 arg I.movapd
+    | Onetwentyeight_unaligned -> store VEC128 arg (movpd ~unaligned:true)
+    | Onetwentyeight_aligned -> store VEC128 arg (movpd ~unaligned:false)
+    | Twofiftysix_unaligned ->
+      store VEC256 arg (fun src dst -> I.simd vmovupd_Ym256_Y [| src; dst |])
+    | Twofiftysix_aligned ->
+      store VEC256 arg (fun src dst -> I.simd vmovapd_Ym256_Y [| src; dst |])
+    | Fivetwelve_unaligned | Fivetwelve_aligned ->
+      (* CR-soon mslater: avx512 *)
+      Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
       let src = arg i 0 in
-      I.cvtsd2ss src xmm15;
+      sse_or_avx_dst cvtsd2ss vcvtsd2ss src xmm15;
       let address = addressing addr REAL4 i 1 in
-      Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~address
-        chunk memory_access;
-      I.movss xmm15 address
-    | Single { reg = Float32 } -> store REAL4 arg I.movss
-    | Double -> store REAL8 arg I.movsd)
+      Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~instr:i
+        ~address chunk memory_access;
+      movss xmm15 address
+    | Single { reg = Float32 } -> store REAL4 arg movss
+    | Double -> store REAL8 arg movsd)
   | Lop (Specific (Istore_int (n, addr, is_modify))) ->
     let address = addressing addr QWORD i 0 in
     let src = nat n in
     let memory_access : Address_sanitizer.memory_access =
       if is_modify then Store_modify else Store_initialize
     in
-    Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address Word_int
-      memory_access;
+    Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr:i ~address
+      Word_int memory_access;
     I.mov src address
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assert (n <= (Config.max_young_wosize + 1) * Arch.size_addr);
+    let gc_save_simd = must_save_simd_regs i.live in
     if !fastcode_flag
     then (
       I.sub (int n) r15;
       I.cmp (domain_field Domainstate.Domain_young_limit) r15;
-      let lbl_call_gc = Cmm.new_label () in
+      let lbl_call_gc = L.create Text in
       let lbl_frame = record_frame_label i.live (Dbg_alloc dbginfo) in
-      I.jb (label lbl_call_gc);
-      let lbl_after_alloc = Cmm.new_label () in
-      def_label lbl_after_alloc;
-      I.lea (mem64 NONE 8 R15) (res i 0);
+      I.jb (emit_asm_label_arg lbl_call_gc);
+      let lbl_after_alloc = L.create Text in
+      D.define_label lbl_after_alloc;
+      I.lea (mem64 NONE 8 (Scalar R15)) (res i 0);
       call_gc_sites
         := { gc_lbl = lbl_call_gc;
              gc_return_lbl = lbl_after_alloc;
              gc_dbg = i.dbg;
-             gc_frame = lbl_frame
+             gc_frame = lbl_frame;
+             gc_save_simd
            }
            :: !call_gc_sites)
     else (
-      (match n with
-      | 16 -> emit_call (Cmm.global_symbol "caml_alloc1")
-      | 24 -> emit_call (Cmm.global_symbol "caml_alloc2")
-      | 32 -> emit_call (Cmm.global_symbol "caml_alloc3")
-      | _ ->
+      (match n, gc_save_simd with
+      | 16, Save_xmm -> emit_call (Cmm.global_symbol "caml_alloc1")
+      | 16, Save_ymm -> emit_call (Cmm.global_symbol "caml_alloc1_avx")
+      | 16, Save_zmm -> emit_call (Cmm.global_symbol "caml_alloc1_avx512")
+      | 24, Save_xmm -> emit_call (Cmm.global_symbol "caml_alloc2")
+      | 24, Save_ymm -> emit_call (Cmm.global_symbol "caml_alloc2_avx")
+      | 24, Save_zmm -> emit_call (Cmm.global_symbol "caml_alloc2_avx512")
+      | 32, Save_xmm -> emit_call (Cmm.global_symbol "caml_alloc3")
+      | 32, Save_ymm -> emit_call (Cmm.global_symbol "caml_alloc3_avx")
+      | 32, Save_zmm -> emit_call (Cmm.global_symbol "caml_alloc3_avx512")
+      | _, (Save_xmm | Save_ymm | Save_zmm) -> (
         I.sub (int n) r15;
-        emit_call (Cmm.global_symbol "caml_allocN"));
+        match gc_save_simd with
+        | Save_xmm -> emit_call (Cmm.global_symbol "caml_allocN")
+        | Save_ymm -> emit_call (Cmm.global_symbol "caml_allocN_avx")
+        | Save_zmm -> emit_call (Cmm.global_symbol "caml_allocN_avx512")));
       let label = record_frame_label i.live (Dbg_alloc dbginfo) in
-      def_label label;
-      I.lea (mem64 NONE 8 R15) (res i 0))
+      D.define_label label;
+      I.lea (mem64 NONE 8 (Scalar R15)) (res i 0))
   | Lop (Alloc { bytes = n; dbginfo = _; mode = Local }) ->
     let r = res i 0 in
     I.mov (domain_field Domainstate.Domain_local_sp) r;
     I.sub (int n) r;
     I.mov r (domain_field Domainstate.Domain_local_sp);
     I.cmp (domain_field Domainstate.Domain_local_limit) r;
-    let lbl_call = Cmm.new_label () in
-    I.j L (label lbl_call);
-    let lbl_after_alloc = Cmm.new_label () in
-    def_label lbl_after_alloc;
+    let lbl_call = L.create Text in
+    I.j L (emit_asm_label_arg lbl_call);
+    let lbl_after_alloc = L.create Text in
+    D.define_label lbl_after_alloc;
     I.add (domain_field Domainstate.Domain_local_top) r;
     I.add (int 8) r;
     local_realloc_sites
-      := { lr_lbl = lbl_call; lr_dbg = i.dbg; lr_return_lbl = lbl_after_alloc }
+      := { lr_lbl = lbl_call;
+           lr_dbg = i.dbg;
+           lr_return_lbl = lbl_after_alloc;
+           lr_save_simd = must_save_simd_regs i.live
+         }
          :: !local_realloc_sites
   | Lop Poll ->
     I.cmp (domain_field Domainstate.Domain_young_limit) r15;
-    let gc_call_label = Cmm.new_label () in
-    let lbl_after_poll = Cmm.new_label () in
+    let gc_call_label = L.create Text in
+    let lbl_after_poll = L.create Text in
     let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
-    I.jbe (label gc_call_label);
+    I.jbe (emit_asm_label_arg gc_call_label);
     call_gc_sites
       := { gc_lbl = gc_call_label;
            gc_return_lbl = lbl_after_poll;
            gc_dbg = i.dbg;
-           gc_frame = lbl_frame
+           gc_frame = lbl_frame;
+           gc_save_simd = must_save_simd_regs i.live
          }
          :: !call_gc_sites;
-    def_label lbl_after_poll
+    D.define_label lbl_after_poll
+  | Lop Pause -> I.pause ()
   | Lop (Intop (Icomp cmp)) ->
     I.cmp (arg i 1) (arg i 0);
     I.set (cond cmp) al;
@@ -1805,6 +2170,14 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop (Idiv | Imod)) ->
     I.cqo ();
     I.idiv (arg i 1)
+  | Lop (Int128op Iadd128) ->
+    I.add (arg i 2) (res i 0);
+    I.adc (arg i 3) (res i 1)
+  | Lop (Int128op Isub128) ->
+    I.sub (arg i 2) (res i 0);
+    I.sbb (arg i 3) (res i 1)
+  | Lop (Int128op (Imul64 { signed = true })) -> I.imul (arg i 1) None
+  | Lop (Int128op (Imul64 { signed = false })) -> I.mul (arg i 1)
   | Lop (Intop ((Ilsl | Ilsr | Iasr) as op)) ->
     (* We have i.arg.(0) = i.res.(0) and i.arg.(1) = %rcx *)
     instr_for_intop op cl (res i 0)
@@ -1815,7 +2188,7 @@ let emit_instr ~first ~fallthrough i =
     instr_for_intop op (arg i 1) (res i 0)
   | Lop (Intop_imm (Iadd, n))
     when not (Reg.equal_location i.arg.(0).loc i.res.(0).loc) ->
-    I.lea (mem64 NONE n (arg64 i 0)) (res i 0)
+    I.lea (mem64 NONE n (arg_idx i 0)) (res i 0)
   | Lop (Intop_imm (Iadd, 1) | Intop_imm (Isub, -1)) -> I.inc (res i 0)
   | Lop (Intop_imm (Iadd, -1) | Intop_imm (Isub, 1)) -> I.dec (res i 0)
   | Lop (Intop_imm (op, n)) ->
@@ -1824,29 +2197,39 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop_atomic { op; size; addr }) -> emit_atomic i op size addr
   | Lop (Floatop (Float64, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
+    let r0, r1 = res i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    I.cmpsd cond a1 a0;
-    I.movq a0 (res i 0);
-    I.neg (res i 0)
+    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0 r1;
+    movq r1 r0;
+    I.neg r0
   | Lop (Floatop (Float32, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
+    let r0, r0_32, r1 = res i 0, res32 i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    I.cmpss cond a1 a0;
-    I.movd a0 (res32 i 0);
+    cmp_sse_or_avx cmpss vcmpss cond a1 a0 r1;
+    movd r1 r0_32;
     (* CMPSS only sets the bottom 32 bits of the result, so we sign-extend to
        copy the result to the top 32 bits. *)
-    I.movsxd (res32 i 0) (res i 0);
-    I.neg (res i 0)
+    I.movsxd r0_32 r0;
+    I.neg r0
   | Lop (Floatop (Float64, Inegf)) ->
-    I.xorpd (mem64_rip VEC128 (emit_symbol "caml_negf_mask")) (res i 0)
+    sse_or_avx_dst xorpd vxorpd_X_X_Xm128
+      (mem64_rip VEC128 (emit_symbol "caml_negf_mask"))
+      (res i 0)
   | Lop (Floatop (Float64, Iabsf)) ->
-    I.andpd (mem64_rip VEC128 (emit_symbol "caml_absf_mask")) (res i 0)
+    sse_or_avx_dst andpd vandpd_X_X_Xm128
+      (mem64_rip VEC128 (emit_symbol "caml_absf_mask"))
+      (res i 0)
   | Lop (Floatop (Float32, Inegf)) ->
-    I.xorps (mem64_rip VEC128 (emit_symbol "caml_negf32_mask")) (res i 0)
+    sse_or_avx_dst xorps vxorps_X_X_Xm128
+      (mem64_rip VEC128 (emit_symbol "caml_negf32_mask"))
+      (res i 0)
   | Lop (Floatop (Float32, Iabsf)) ->
-    I.andps (mem64_rip VEC128 (emit_symbol "caml_absf32_mask")) (res i 0)
+    sse_or_avx_dst andps vandps_X_X_Xm128
+      (mem64_rip VEC128 (emit_symbol "caml_absf32_mask"))
+      (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
-    instr_for_floatop width floatop (arg i 1) (res i 0)
+    instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
   | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
   | Lop (Specific (Ilea addr)) -> I.lea (addressing addr NONE i 0) (res i 0)
   | Lop (Specific (Ioffset_loc (n, addr))) ->
@@ -1854,16 +2237,16 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Specific (Ifloatarithmem (Float64, op, addr))) ->
     let address = addressing addr REAL8 i 1 in
     let dest = res i 0 in
-    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~address Double
-      Load;
-    instr_for_floatarithmem Float64 op address dest
+    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~instr:i ~address
+      Double Load;
+    instr_for_floatarithmem Float64 op (arg i 0) address dest
   | Lop (Specific (Ifloatarithmem (Float32, op, addr))) ->
     let address = addressing addr REAL4 i 1 in
     let dest = res i 0 in
-    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~address
+    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~instr:i ~address
       (Single { reg = Float32 })
       Load;
-    instr_for_floatarithmem Float32 op address dest
+    instr_for_floatarithmem Float32 op (arg i 0) address dest
   | Lop (Specific (Ibswap { bitwidth = Sixteen })) ->
     I.xchg ah al;
     I.movzx (res16 i 0) (res i 0)
@@ -1878,7 +2261,7 @@ let emit_instr ~first ~fallthrough i =
        maybe the change should be left for later. mshinwell: The current
        situation is fine for now. *)
     if Arch.Extension.enabled LZCNT
-    then I.lzcnt (arg i 0) (res i 0)
+    then I.simd lzcnt_r64_r64m64 [| arg i 0; res i 0 |]
     else if arg_is_non_zero
     then (
       (* No need to handle that bsr is undefined on 0 input. *)
@@ -1886,32 +2269,30 @@ let emit_instr ~first ~fallthrough i =
       (* We need (63 - result_of_bsr), which can be done with xor. *)
       I.xor (int 63) (res i 0))
     else
-      let lbl_z = Cmm.new_label () in
-      let lbl_nz = Cmm.new_label () in
+      let lbl_z = L.create Text in
+      let lbl_nz = L.create Text in
       I.bsr (arg i 0) (res i 0);
-      I.je (label lbl_z);
+      I.je (emit_asm_label_arg lbl_z);
       I.xor (int 63) (res i 0);
-      I.jmp (label lbl_nz);
-      def_label lbl_z;
+      I.jmp (emit_asm_label_arg lbl_nz);
+      D.define_label lbl_z;
       I.mov (int 64) (res i 0);
-      def_label lbl_nz
+      D.define_label lbl_nz
   | Lop (Intop (Ictz { arg_is_non_zero })) ->
     (* CR-someday gyorsh: can we do it at selection? *)
     if Arch.Extension.enabled BMI
-    then I.tzcnt (arg i 0) (res i 0)
+    then I.simd tzcnt_r64_r64m64 [| arg i 0; res i 0 |]
     else if arg_is_non_zero
     then
       (* No need to handle that bsf is undefined on 0 input. *)
       I.bsf (arg i 0) (res i 0)
     else
-      let lbl_nz = Cmm.new_label () in
+      let lbl_nz = L.create Text in
       I.bsf (arg i 0) (res i 0);
-      I.jne (label lbl_nz);
+      I.jne (emit_asm_label_arg lbl_nz);
       I.mov (int 64) (res i 0);
-      def_label lbl_nz
-  | Lop (Intop Ipopcnt) ->
-    assert (Arch.Extension.enabled POPCNT);
-    I.popcnt (arg i 0) (res i 0)
+      D.define_label lbl_nz
+  | Lop (Intop Ipopcnt) -> I.simd popcnt_r64_r64m64 [| arg i 0; res i 0 |]
   | Lop (Csel tst) ->
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -1954,22 +2335,22 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Specific Ipackf32) ->
     let arg0, arg1 = i.arg.(0), i.arg.(1) in
     assert (Reg.is_reg arg0 && Reg.is_reg arg1 && Reg.same_loc arg0 i.res.(0));
-    I.simd Simd_instrs.unpcklps [| arg i 1; res i 0 |]
+    if Arch.Extension.enabled AVX
+    then I.simd vunpcklps_X_X_Xm128 [| arg i 1; res i 0; res i 0 |]
+    else I.simd unpcklps [| arg i 1; res i 0 |]
   | Lop (Specific (Isimd op)) -> emit_simd op i
   | Lop (Specific (Isimd_mem (op, addressing_mode))) ->
-    let address = addressing addressing_mode VEC128 i 1 in
-    Address_sanitizer.emit_sanitize
-      ~dependencies:[| res i 0 |]
-      ~address Onetwentyeight_unaligned Store_modify;
-    emit_simd_instr_with_memory_arg op i address
+    emit_simd_instr_with_memory_arg op i addressing_mode
+  | Lop (Specific (Illvm_intrinsic intr)) ->
+    Misc.fatal_errorf
+      "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
-  | Lop (Specific Ipause) -> I.pause ()
   | Lop (Specific (Icldemote addr)) ->
     let address = addressing addr QWORD i 0 in
     (* This isn't really a [Load] or a [Store], but it is closer to [Store]
        semantically. *)
-    Address_sanitizer.emit_sanitize ~address Word_val Store_modify;
+    Address_sanitizer.emit_sanitize ~instr:i ~address Word_val Store_modify;
     I.cldemote address
   | Lop (Specific (Iprefetch { is_write; locality; addr })) ->
     let address = addressing addr QWORD i 0 in
@@ -1985,7 +2366,7 @@ let emit_instr ~first ~fallthrough i =
 
        On these grounds I would consider prefetching invalid addresses to
        usually be a bug, and so we do sanitize such accesses. *)
-    Address_sanitizer.emit_sanitize ~address Word_val memory_access;
+    Address_sanitizer.emit_sanitize ~instr:i ~address Word_val memory_access;
     let locality : X86_ast.prefetch_temporal_locality_hint =
       match locality with
       | Nonlocal -> Nta
@@ -1998,17 +2379,13 @@ let emit_instr ~first ~fallthrough i =
     I.mov (domain_field Domainstate.Domain_local_sp) (res i 0)
   | Lop End_region -> I.mov (arg i 0) (domain_field Domainstate.Domain_local_sp)
   | Lop (Name_for_debugger _) -> ()
-  | Lcall_op (Lprobe { enabled_at_init; _ }) ->
+  | Lcall_op (Lprobe { enabled_at_init; name; handler_code_sym }) ->
     let probe_label = Cmm.new_label () in
-    let probe =
-      { probe_label;
-        probe_insn = i;
-        stack_offset = !stack_offset;
-        num_stack_slots = Stack_class.Tbl.copy num_stack_slots
-      }
-    in
-    probes := probe :: !probes;
-    def_label probe_label;
+    Probe_emission.add_probe ~probe_label ~probe_insn:i ~probe_name:name
+      ~probe_enabled_at_init:enabled_at_init
+      ~probe_handler_code_sym:handler_code_sym ~stack_offset:!stack_offset
+      ~num_stack_slots:(Stack_class.Tbl.copy num_stack_slots);
+    D.define_label (label_to_asm_label ~section:Text probe_label);
     I.nop ();
     (* for uprobes and usdt probes as well *)
     (* A probe site does not directly call the probe handler. There is an
@@ -2016,8 +2393,10 @@ let emit_instr ~first ~fallthrough i =
        the correct place and managing the spilling/reloading of live registers.
        See [emit_probe_handler_wrapper] below. *)
     emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label
-  | Lop (Probe_is_enabled { name }) ->
-    let semaphore_sym = find_or_add_semaphore name None i.dbg in
+  | Lop (Probe_is_enabled { name; enabled_at_init }) ->
+    let semaphore_sym =
+      Probe_emission.find_or_add_semaphore name enabled_at_init i.dbg
+    in
     (* Load unsigned 2-byte integer value of the semaphore. According to the
        documentation [1], semaphores are of type unsigned short. [1]
        https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation *)
@@ -2028,27 +2407,34 @@ let emit_instr ~first ~fallthrough i =
     I.mov (addressing (Ibased (semaphore_sym, Global, 2)) WORD i 0) (res16 i 0);
     (* If the semaphore is 0, then the result is 0, otherwise 1. *)
     I.cmp (int 0) (res16 i 0);
-    I.set (cond (Iunsigned Cne)) (res8 i 0);
+    I.set (cond Cne) (res8 i 0);
     I.movzx (res8 i 0) (res i 0)
   | Lop Dls_get ->
     if Config.runtime5
-    then I.mov (domain_field Domainstate.Domain_dls_root) (res i 0)
+    then I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
     else Misc.fatal_error "Dls is not supported in runtime4."
+  | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
   | Lreloadretaddr -> ()
-  | Lreturn -> output_epilogue (fun () -> I.ret ())
+  | Lreturn -> I.ret ()
   | Llabel { label = lbl; section_name } ->
+    let lbl = label_to_asm_label ~section:Text lbl in
     emit_Llabel fallthrough lbl section_name
-  | Lbranch lbl -> I.jmp (label lbl)
+  | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
-    let lbl = label lbl in
-    emit_test i tst ~taken:(fun c -> I.j c lbl)
+    emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))
   | Lcondbranch3 (lbl0, lbl1, lbl2) -> (
     I.cmp (int 1) (arg i 0);
-    (match lbl0 with None -> () | Some lbl -> I.jb (label lbl));
-    (match lbl1 with None -> () | Some lbl -> I.je (label lbl));
-    match lbl2 with None -> () | Some lbl -> I.ja (label lbl))
+    (match lbl0 with
+    | None -> ()
+    | Some lbl -> I.jb (emit_label_arg ~section:Text lbl));
+    (match lbl1 with
+    | None -> ()
+    | Some lbl -> I.je (emit_label_arg ~section:Text lbl));
+    match lbl2 with
+    | None -> ()
+    | Some lbl -> I.ja (emit_label_arg ~section:Text lbl))
   | Lswitch jumptbl ->
-    let lbl = emit_label (Cmm.new_label ()) in
+    let lbl = L.create Text in
     (* rax and rdx are clobbered by the Lswitch, meaning that no variable that
        is live across the Lswitch is assigned to rax or rdx. However, the
        argument to Lswitch can still be assigned to one of these two registers,
@@ -2058,8 +2444,10 @@ let emit_instr ~first ~fallthrough i =
       then phys_rdx, phys_rax
       else phys_rax, phys_rdx
     in
-    I.lea (mem64_rip NONE lbl) (reg tmp1);
-    I.movsxd (mem64 DWORD 0 (arg64 i 0) ~scale:4 ~base:(reg64 tmp1)) (reg tmp2);
+    I.lea (mem64_rip NONE (L.encode lbl)) (reg tmp1);
+    I.movsxd
+      (mem64 DWORD 0 (arg_idx i 0) ~scale:4 ~base:(reg64 tmp1))
+      (reg tmp2);
     I.add (reg tmp2) (reg tmp1);
     I.jmp (reg tmp1);
     let table = { table_lbl = lbl; elems = jumptbl } in
@@ -2068,30 +2456,31 @@ let emit_instr ~first ~fallthrough i =
     if fp
     then
       let delta = frame_size () - 16 (* retaddr + rbp *) in
-      I.lea (mem64 NONE delta RSP) rbp
+      I.lea (mem64 NONE delta (Scalar RSP)) rbp
   | Ladjust_stack_offset { delta_bytes } ->
-    cfi_adjust_cfa_offset delta_bytes;
+    D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
     stack_offset := !stack_offset + delta_bytes
   | Lpushtrap { lbl_handler } ->
+    let lbl_handler = label_to_asm_label ~section:Text lbl_handler in
     emit_push_trap_label lbl_handler;
     let load_label_addr s arg =
       if !Clflags.pic_code
-      then I.lea (mem64_rip NONE (emit_label s)) arg
-      else I.mov (sym (emit_label s)) arg
+      then I.lea (mem64_rip NONE (L.encode s)) arg
+      else I.mov (emit_asm_label_arg s) arg
     in
     load_label_addr lbl_handler r11;
     I.push r11;
-    cfi_adjust_cfa_offset 8;
+    D.cfi_adjust_cfa_offset ~bytes:8;
     I.push (domain_field Domainstate.Domain_exn_handler);
-    cfi_adjust_cfa_offset 8;
+    D.cfi_adjust_cfa_offset ~bytes:8;
     I.mov rsp (domain_field Domainstate.Domain_exn_handler);
     stack_offset := !stack_offset + 16
-  | Lpoptrap ->
+  | Lpoptrap _ ->
     emit_pop_trap_label ();
     I.pop (domain_field Domainstate.Domain_exn_handler);
-    cfi_adjust_cfa_offset (-8);
+    D.cfi_adjust_cfa_offset ~bytes:(-8);
     I.add (int 8) rsp;
-    cfi_adjust_cfa_offset (-8);
+    D.cfi_adjust_cfa_offset ~bytes:(-8);
     stack_offset := !stack_offset - 16
   | Lraise k -> (
     match k with
@@ -2112,10 +2501,12 @@ let emit_instr ~first ~fallthrough i =
   | Lstackcheck { max_frame_size_bytes } ->
     emit_stack_check ~size_in_bytes:max_frame_size_bytes
       ~save_registers:(not first)
+      ~save_simd:(must_save_simd_regs i.live)
 
 let emit_instr ~first ~fallthrough i =
-  try emit_instr ~first ~fallthrough i
-  with exn ->
+  try emit_instr ~first ~fallthrough i with
+  | I.Extension_disabled _ as exn -> raise exn
+  | exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
       Printlinear.instr i;
     raise exn
@@ -2123,33 +2514,27 @@ let emit_instr ~first ~fallthrough i =
 let rec emit_all ~first ~fallthrough i =
   match i.desc with
   | Lend -> ()
-  | Lprologue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap | Lop _
-  | Lcall_op _ | Llabel _ | Lbranch _
+  | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+  | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
   | Lcondbranch (_, _)
   | Lcondbranch3 (_, _, _)
   | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
     ->
-    (try emit_instr ~first ~fallthrough i
-     with exn ->
-       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
-         Printlinear.instr i;
-       raise exn);
+    (try emit_instr ~first ~fallthrough i with
+    | I.Extension_disabled _ as exn -> raise exn
+    | exn ->
+      Format.eprintf "Exception whilst emitting instruction:@ %a\n"
+        Printlinear.instr i;
+      raise exn);
     emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
 
 let all_functions = ref []
 
-let emit_function_type_and_size fun_name =
-  match system with
-  | S_gnu | S_linux ->
-    D.type_ (emit_symbol fun_name) "@function";
-    if not !Flambda_backend_flags.basic_block_sections
-    then
-      D.size (emit_symbol fun_name)
-        (ConstSub (ConstThis, ConstLabel (emit_symbol fun_name)))
-  | S_macosx | S_cygwin | S_solaris | S_win32 | S_linux_elf | S_bsd_elf | S_beos
-  | S_mingw | S_win64 | S_mingw64 | S_freebsd | S_netbsd | S_openbsd | S_unknown
-    ->
-    ()
+let emit_function_type_and_size fun_sym =
+  (* Note: Symbol types and sizes are only needed on some platforms/systems.
+     These functions check internally whether they are needed. *)
+  D.type_symbol ~ty:Function fun_sym;
+  if not !Oxcaml_flags.basic_block_sections then D.size fun_sym
 
 (* Emission of a function declaration *)
 
@@ -2176,20 +2561,30 @@ let fundecl fundecl =
   current_basic_block_section
     := Option.value fundecl.fun_section_name ~default:"";
   emit_function_or_basic_block_section_name ();
-  D.align ~data:false 16;
+  D.align ~fill_x86_bin_emitter:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
+  let fundecl_sym = S.create fundecl.fun_name in
   if is_macosx system
      && (not !Clflags.output_c_object)
      && is_generic_function fundecl.fun_name
   then (* PR#4690 *)
-    D.private_extern (emit_symbol fundecl.fun_name)
-  else global_maybe_protected (emit_symbol fundecl.fun_name);
-  (* Even if the function name is Local, still emit an actual linker symbol for
-     it. This provides symbols for perf, gdb, and similar tools *)
-  D.label (emit_symbol fundecl.fun_name);
-  D.label (label_name (emit_symbol fundecl.fun_name));
+    D.private_extern fundecl_sym
+  else global_maybe_protected fundecl_sym;
+  (*= Even if the function name is Local, still emit an actual linker symbol for
+      it. This provides symbols for perf, gdb, and similar tools.
+
+      This means that, for example, the function [let g (x: int) = x] will be
+      emitted as follows on GAS-like systems (and with slightly different label
+      names on macOS):
+
+      camlFile__g_0_1_code:
+      .LcamlFile__g_0_1_code:
+         ...
+  *)
+  D.define_joint_label_and_symbol ~section:Text fundecl_sym;
   emit_debug_info fundecl.fun_dbg;
-  cfi_startproc ();
+  D.cfi_startproc ();
+  D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
   if Config.runtime5
      && (not Config.no_stack_checks)
      && String.equal !Clflags.runtime_variant "d"
@@ -2202,45 +2597,75 @@ let fundecl fundecl =
   (if !frame_required
   then
     let n = frame_size () - 8 - if fp then 8 else 0 in
-    if n <> 0 then cfi_adjust_cfa_offset (-n));
-  (match fun_end_label with Some l -> def_label l | None -> ());
-  cfi_endproc ();
-  emit_function_type_and_size fundecl.fun_name
+    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
+  (match fun_end_label with
+  | Some l -> D.define_label (label_to_asm_label ~section:Text l)
+  | None -> ());
+  D.comment ("LLVM-MCA-END " ^ !function_name);
+  D.cfi_endproc ();
+  emit_function_type_and_size fundecl_sym
 
 (* Emission of data *)
 
+(* CR sspies: Share the [emit_item] code with the Arm backend in emitaux. *)
 let emit_item : Cmm.data_item -> unit = function
   | Cdefine_symbol s -> (
+    let sym = S.create s.sym_name in
     match s.sym_global with
-    | Local -> _label (label_name (emit_symbol s.sym_name))
+    | Local -> D.define_label (L.create_string_unchecked Data (S.encode sym))
     | Global ->
-      global_maybe_protected (emit_symbol s.sym_name);
+      global_maybe_protected sym;
       add_def_symbol s.sym_name;
-      _label (emit_symbol s.sym_name);
-      _label (label_name (emit_symbol s.sym_name)))
-  | Cint8 n -> D.byte (const n)
-  | Cint16 n -> D.word (const n)
-  | Cint32 n -> D.long (const_nat n)
-  | Cint n -> D.qword (const_nat n)
-  | Csingle f -> D.long (Const (Int64.of_int32 (Int32.bits_of_float f)))
-  | Cdouble f -> D.qword (Const (Int64.bits_of_float f))
+      (* Following the same convention as for function symbols above, we emit
+         both a label and a linker symbol for [sym]. *)
+      D.define_joint_label_and_symbol ~section:Data sym)
+  | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
+  | Cint16 n -> D.int16 (Numbers.Int16.of_int_exn n)
+  | Cint32 n -> D.int32 (Numbers.Int64.to_int32_exn (Int64.of_nativeint n))
+  (* CR mshinwell: Add [Targetint.of_nativeint] *)
+  | Cint n -> D.targetint (Targetint.of_int64 (Int64.of_nativeint n))
+  | Csingle f -> D.float32 f
+  | Cdouble f -> D.float64 f
   (* SIMD vectors respect little-endian byte order *)
-  | Cvec128 { high; low } ->
-    D.qword (Const low);
-    D.qword (Const high)
-  | Csymbol_address s ->
+  | Cvec128 { word0; word1 } ->
+    (* Least significant *)
+    D.float64_from_bits word0;
+    D.float64_from_bits word1
+  | Cvec256 { word0; word1; word2; word3 } ->
+    (* Least significant *)
+    D.float64_from_bits word0;
+    D.float64_from_bits word1;
+    D.float64_from_bits word2;
+    D.float64_from_bits word3
+  | Cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
+    (* Least significant *)
+    D.float64_from_bits word0;
+    D.float64_from_bits word1;
+    D.float64_from_bits word2;
+    D.float64_from_bits word3;
+    D.float64_from_bits word4;
+    D.float64_from_bits word5;
+    D.float64_from_bits word6;
+    D.float64_from_bits word7
+  | Csymbol_address s -> (
     add_used_symbol s.sym_name;
-    D.qword (ConstLabel (emit_cmm_symbol s))
-  | Csymbol_offset (s, o) ->
+    match emit_cmm_symbol s with
+    | `Symbol s -> D.symbol s
+    | `Label l -> D.label l)
+  | Csymbol_offset (s, o) -> (
     add_used_symbol s.sym_name;
-    D.qword (ConstLabelOffset (emit_cmm_symbol s, o))
-  | Cstring s -> D.bytes s
-  | Cskip n -> if n > 0 then D.space n
-  | Calign n -> D.align ~data:true n
+    match emit_cmm_symbol s with
+    | `Symbol s ->
+      D.symbol_plus_offset s ~offset_in_bytes:(Targetint.of_int_exn o)
+    | `Label l ->
+      D.label_plus_offset l ~offset_in_bytes:(Targetint.of_int_exn o))
+  | Cstring s -> D.string s
+  | Cskip n -> D.space ~bytes:n
+  | Calign n -> D.align ~fill_x86_bin_emitter:Zero ~bytes:n
 
 let data l =
   D.data ();
-  D.align ~data:true 8;
+  D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
   List.iter emit_item l
 
 (* Beginning / end of an assembly file *)
@@ -2251,74 +2676,91 @@ let reset_all () =
   reset_debug_info ();
   (* PR#5603 *)
   reset_imp_table ();
-  reset_probes ();
-  stapsdt_base_emitted := false;
+  Probe_emission.reset ();
   reset_traps ();
   float_constants := [];
   all_functions := []
 
 let begin_assembly unix =
   reset_all ();
-  if !Flambda_backend_flags.internal_assembler
-     && !Emitaux.binary_backend_available
+  if !Oxcaml_flags.internal_assembler && !Emitaux.binary_backend_available
   then X86_proc.register_internal_assembler (Internal_assembler.assemble unix);
   (* We initialize the new assembly directives. *)
   Asm_targets.Asm_label.initialize ~new_label:(fun () ->
       Cmm.new_label () |> Label.to_int);
-  ND.initialize
-    ~big_endian:Arch.big_endian
+  D.initialize ~big_endian:Arch.big_endian
+    ~emit_assembly_comments:!Oxcaml_flags.dasm_comments
       (* As a first step, we emit by calling the corresponding x86 emit
-         directives. *) ~emit:(fun d ->
-      List.iter directive (to_x86_directive d));
+         directives. *) ~emit:(fun d -> directive (Directive d));
   let code_begin = Cmm_helpers.make_symbol "code_begin" in
   let code_end = Cmm_helpers.make_symbol "code_end" in
-  Emitaux.Dwarf_helpers.begin_dwarf ~build_asm_directives ~code_begin ~code_end
-    ~file_emitter:D.file;
+  Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter;
   if is_win64 system
   then (
-    D.extrn "caml_call_gc" NEAR;
-    D.extrn "caml_c_call" NEAR;
-    D.extrn "caml_allocN" NEAR;
-    D.extrn "caml_alloc1" NEAR;
-    D.extrn "caml_alloc2" NEAR;
-    D.extrn "caml_alloc3" NEAR;
-    D.extrn "caml_ml_array_bound_error" NEAR;
-    D.extrn "caml_raise_exn" NEAR);
+    D.extrn S.Predef.caml_call_gc;
+    D.extrn S.Predef.caml_call_gc_avx;
+    D.extrn S.Predef.caml_call_gc_avx512;
+    D.extrn S.Predef.caml_c_call;
+    D.extrn S.Predef.caml_allocN;
+    D.extrn S.Predef.caml_allocN_avx;
+    D.extrn S.Predef.caml_allocN_avx512;
+    D.extrn S.Predef.caml_alloc1;
+    D.extrn S.Predef.caml_alloc1_avx;
+    D.extrn S.Predef.caml_alloc1_avx512;
+    D.extrn S.Predef.caml_alloc2;
+    D.extrn S.Predef.caml_alloc2_avx;
+    D.extrn S.Predef.caml_alloc2_avx512;
+    D.extrn S.Predef.caml_alloc3;
+    D.extrn S.Predef.caml_alloc3_avx;
+    D.extrn S.Predef.caml_alloc3_avx512;
+    D.extrn S.Predef.caml_ml_array_bound_error;
+    D.extrn S.Predef.caml_ml_array_align_error;
+    D.extrn S.Predef.caml_raise_exn);
   if !Clflags.dlcode || Arch.win64
   then (
     (* from amd64.S; could emit these constants on demand *)
-    (match system with
-    | S_macosx -> D.section ["__TEXT"; "__literal16"] None ["16byte_literals"]
-    | S_mingw64 | S_cygwin -> D.section [".rdata"] (Some "dr") []
-    | S_win64 -> D.data ()
-    | S_gnu | S_solaris | S_win32 | S_linux_elf | S_bsd_elf | S_beos | S_mingw
-    | S_linux | S_freebsd | S_netbsd | S_openbsd | S_unknown ->
-      D.section [".rodata.cst16"] (Some "aM") ["@progbits"; "16"]);
-    D.align ~data:true 16;
-    _label (emit_symbol "caml_negf_mask");
-    D.qword (Const 0x8000000000000000L);
-    D.qword (Const 0L);
-    D.align ~data:true 16;
-    _label (emit_symbol "caml_absf_mask");
-    D.qword (Const 0x7FFFFFFFFFFFFFFFL);
-    D.qword (Const 0xFFFFFFFFFFFFFFFFL);
-    _label (emit_symbol "caml_negf32_mask");
-    D.qword (Const 0x80000000L);
-    D.qword (Const 0L);
-    D.align ~data:true 16;
-    _label (emit_symbol "caml_absf32_mask");
-    D.qword (Const 0xFFFFFFFF7FFFFFFFL);
-    D.qword (Const 0xFFFFFFFFFFFFFFFFL));
+    D.switch_to_section Sixteen_byte_literals;
+    D.align ~fill_x86_bin_emitter:Zero ~bytes:16;
+    D.define_symbol_label ~section:Sixteen_byte_literals S.Predef.caml_negf_mask;
+    D.int64 0x8000000000000000L;
+    D.int64 0L;
+    D.align ~fill_x86_bin_emitter:Zero ~bytes:16;
+    D.define_symbol_label ~section:Sixteen_byte_literals S.Predef.caml_absf_mask;
+    D.int64 0x7FFFFFFFFFFFFFFFL;
+    D.int64 0xFFFFFFFFFFFFFFFFL;
+    D.define_symbol_label ~section:Sixteen_byte_literals
+      S.Predef.caml_negf32_mask;
+    D.int64 0x80000000L;
+    D.int64 0L;
+    D.align ~fill_x86_bin_emitter:Zero ~bytes:16;
+    D.define_symbol_label ~section:Sixteen_byte_literals
+      S.Predef.caml_absf32_mask;
+    D.int64 0xFFFFFFFF7FFFFFFFL;
+    D.int64 0xFFFFFFFFFFFFFFFFL);
   D.data ();
-  emit_global_label "data_begin";
+  emit_global_label ~section:Data "data_begin";
   emit_named_text_section code_begin;
-  emit_global_label_for_symbol code_begin;
+  emit_global_label_for_symbol ~section:Text code_begin;
   if is_macosx system then I.nop ();
   (* PR#4690 *)
-  D.label (emit_cmm_symbol call_gc_local_sym);
-  cfi_startproc ();
+  (match emit_cmm_symbol call_gc_local_sym with
+  | `Symbol sym -> D.define_symbol_label ~section:Text sym
+  | `Label lbl -> D.define_label lbl);
+  D.cfi_startproc ();
   I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc"));
-  cfi_endproc ();
+  D.cfi_endproc ();
+  (match emit_cmm_symbol call_gc_local_sym_avx with
+  | `Symbol sym -> D.define_symbol_label ~section:Text sym
+  | `Label lbl -> D.define_label lbl);
+  D.cfi_startproc ();
+  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc_avx"));
+  D.cfi_endproc ();
+  (match emit_cmm_symbol call_gc_local_sym_avx512 with
+  | `Symbol sym -> D.define_symbol_label ~section:Text sym
+  | `Label lbl -> D.define_label lbl);
+  D.cfi_startproc ();
+  I.jmp (rel_plt (Cmm.global_symbol "caml_call_gc_avx512"));
+  D.cfi_endproc ();
   ()
 
 let make_stack_loc ~offset n (r : Reg.t) =
@@ -2387,7 +2829,9 @@ let size_of_regs regs =
       | Float | Float32 ->
         (* Float32 slots still take up a full word *)
         acc + size_float
-      | Vec128 | Valx2 -> acc + size_vec128)
+      | Vec128 | Valx2 -> acc + size_vec128
+      | Vec256 -> acc + size_vec256
+      | Vec512 -> acc + size_vec512)
     regs 0
 
 let stack_locations ~offset regs =
@@ -2403,28 +2847,18 @@ let stack_locations ~offset regs =
             (* Float32 slots still take up a full word *)
             size_float
           | Vec128 | Valx2 -> size_vec128
+          | Vec256 -> size_vec256
+          | Vec512 -> size_vec512
         in
         next, make_stack_loc n r ~offset :: offsets)
       regs (0, [])
   in
   locs |> Array.of_list
 
-let emit_probe_handler_wrapper p =
+let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let wrap_label = probe_handler_wrapper_name p.probe_label in
-  let probe_name, handler_code_sym =
-    match p.probe_insn.desc with
-    | Lcall_op (Lprobe { name; handler_code_sym; enabled_at_init = _ }) ->
-      name, handler_code_sym
-    | Lcall_op
-        (Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _ | Lextcall _)
-    | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap
-    | Lop _ | Llabel _ | Lbranch _
-    | Lcondbranch (_, _)
-    | Lcondbranch3 (_, _, _)
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
-      assert false
-  in
+  let probe_name = p.probe_name in
+  let handler_code_sym = p.probe_handler_code_sym in
   (*= Restore stack frame info as it was at the probe site, so we can easily
      refer to slots in the corresponding frame.  (As per the comment above,
      recall that the wrapper does however have its own frame.) *)
@@ -2435,10 +2869,10 @@ let emit_probe_handler_wrapper p =
   stack_offset := !stack_offset + 8;
   (* Emit function entry code *)
   D.comment (Printf.sprintf "probe %s %s" probe_name handler_code_sym);
-  emit_named_text_section wrap_label;
-  D.align ~data:false 16;
-  _label wrap_label;
-  cfi_startproc ();
+  emit_named_text_section (S.encode wrap_label);
+  D.align ~fill_x86_bin_emitter:Nop ~bytes:16;
+  D.define_symbol_label ~section:Text wrap_label;
+  D.cfi_startproc ();
   if fp
   then (
     push rbp;
@@ -2468,7 +2902,9 @@ let emit_probe_handler_wrapper p =
   if Config.runtime5
      && (not Config.no_stack_checks)
      && n >= Stack_check.stack_threshold_size
-  then emit_stack_check ~size_in_bytes:n ~save_registers:true;
+  then
+    emit_stack_check ~size_in_bytes:n ~save_registers:true
+      ~save_simd:(must_save_simd_regs p.probe_insn.live);
   emit_stack_offset n;
   (* Save all live hard registers *)
   let offset = aux_offset + tmp_offset + loc_offset in
@@ -2503,7 +2939,7 @@ let emit_probe_handler_wrapper p =
         | Stack (Outgoing k) -> (
           match r.typ with
           | Val -> k :: acc
-          | Int | Float | Vec128 | Float32 -> acc
+          | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> acc
           | Valx2 -> k :: (k + Arch.size_addr) :: acc
           | Addr -> Misc.fatal_errorf "bad GC root %a" Printreg.reg r)
         | Stack (Incoming _ | Reg.Local _ | Domainstate _) | Reg _ | Unknown ->
@@ -2512,131 +2948,15 @@ let emit_probe_handler_wrapper p =
   in
   record_frame_descr ~label ~frame_size:(wrapper_frame_size n) ~live_offset
     (Dbg_other Debuginfo.none);
-  def_label label;
+  D.define_label (label_to_asm_label ~section:Text label);
   (* After the probe handler has finished executing, restore all live registers
      and free stack space. *)
   Array.iteri (fun i reg -> move saved_live.(i) reg) live;
   emit_stack_offset (-n);
   if fp then pop rbp;
   I.ret ();
-  cfi_endproc ();
+  D.cfi_endproc ();
   emit_function_type_and_size wrap_label
-
-let emit_stapsdt_base_section () =
-  if not !stapsdt_base_emitted
-  then (
-    stapsdt_base_emitted := true;
-    D.section [".stapsdt.base"] (Some "aG")
-      ["\"progbits\""; ".stapsdt.base"; "comdat"];
-    D.weak "_.stapsdt.base";
-    D.hidden "_.stapsdt.base";
-    D.label "_.stapsdt.base";
-    D.space 1;
-    D.size "_.stapsdt.base" (const 1))
-
-let emit_elf_note ~owner ~typ ~emit_desc =
-  D.align ~data:true 4;
-  let a = Cmm.new_label () in
-  let b = Cmm.new_label () in
-  let c = Cmm.new_label () in
-  let d = Cmm.new_label () in
-  D.long (ConstSub (ConstLabel (emit_label b), ConstLabel (emit_label a)));
-  D.long (ConstSub (ConstLabel (emit_label d), ConstLabel (emit_label c)));
-  D.long (const_32 typ);
-  def_label a;
-  D.bytes (owner ^ "\000");
-  def_label b;
-  D.align ~data:true 4;
-  def_label c;
-  emit_desc ();
-  def_label d;
-  D.align ~data:true 4
-
-let emit_probe_notes0 () =
-  let is_macosx_system =
-    match system with
-    | S_macosx -> (* CR-someday gyorsh: emit dtrace format on mac *) true
-    | S_gnu | S_solaris | S_linux_elf | S_bsd_elf | S_beos | S_linux -> false
-    | S_cygwin | S_mingw | S_mingw64 | S_win64 | S_win32 | S_unknown | S_freebsd
-    | S_netbsd | S_openbsd ->
-      Misc.fatal_error "emit_probe_notes: unexpected system"
-  in
-  (match is_macosx_system with
-  | false -> D.section [".note.stapsdt"] (Some "?") ["\"note\""]
-  | true -> D.section ["__DATA"; "__note_stapsdt"] None ["regular"]);
-  let stap_arg arg =
-    let arg_name =
-      match arg.loc with
-      | Stack s ->
-        Printf.sprintf "%d(%%rsp)"
-          (slot_offset s (Stack_class.of_machtype arg.Reg.typ))
-      | Reg reg -> Reg_class.register_name arg.Reg.typ reg
-      | Unknown ->
-        Misc.fatal_errorf "Cannot create probe: illegal argument: %a"
-          Printreg.reg arg
-    in
-    Printf.sprintf "%d@%s" (Select_utils.size_component arg.Reg.typ) arg_name
-  in
-  let describe_one_probe p =
-    let probe_name, enabled_at_init =
-      match p.probe_insn.desc with
-      | Lcall_op (Lprobe { name; enabled_at_init; handler_code_sym = _ }) ->
-        name, enabled_at_init
-      | Lcall_op
-          ( Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _
-          | Lextcall _ )
-      | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap
-      | Lop _ | Llabel _ | Lbranch _
-      | Lcondbranch (_, _)
-      | Lcondbranch3 (_, _, _)
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-      | Lstackcheck _ ->
-        assert false
-    in
-    let args =
-      Array.fold_right (fun arg acc -> stap_arg arg :: acc) p.probe_insn.arg []
-      |> String.concat " "
-    in
-    let semsym =
-      find_or_add_semaphore probe_name (Some enabled_at_init) p.probe_insn.dbg
-    in
-    let semaphore_label = emit_symbol semsym in
-    let emit_desc () =
-      D.qword (ConstLabel (emit_label p.probe_label));
-      (match is_macosx_system with
-      | false -> D.qword (ConstLabel "_.stapsdt.base")
-      | true -> D.qword (const 0));
-      D.qword (ConstLabel semaphore_label);
-      D.bytes "ocaml_1\000";
-      D.bytes (probe_name ^ "\000");
-      D.bytes (args ^ "\000")
-    in
-    emit_elf_note ~owner:"stapsdt" ~typ:3l ~emit_desc
-  in
-  List.iter describe_one_probe !probes;
-  (match is_macosx_system with
-  | false ->
-    emit_stapsdt_base_section ();
-    D.section [".probes"] (Some "wa") ["\"progbits\""]
-  | true -> D.section ["__TEXT"; "__probes"] None ["regular"]);
-  D.align ~data:true 2;
-  String.Map.iter
-    (fun _ (label, enabled_at_init) ->
-      (* Unresolved weak symbols have a zero value regardless of the following
-         initialization. *)
-      let enabled_at_init = Option.value enabled_at_init ~default:false in
-      D.weak label;
-      D.hidden label;
-      _label label;
-      D.word (const 0);
-      (* for systemtap probes *)
-      D.word (const (Bool.to_int enabled_at_init));
-      (* for ocaml probes *)
-      add_def_symbol label)
-    !probe_semaphores
-
-let emit_probe_notes () =
-  match !probes with [] -> () | _ -> emit_probe_notes0 ()
 
 let emit_trap_notes () =
   (* Don't emit trap notes on windows and macos systems *)
@@ -2650,114 +2970,119 @@ let emit_trap_notes () =
       false
   in
   let emit_labels list =
-    List.iter (fun l -> D.qword (ConstLabel (emit_label l))) list;
-    D.qword (const 0)
+    List.iter (fun l -> D.label l) list;
+    D.int64 0L
   in
   let emit_desc () =
-    D.qword (ConstLabel "_.stapsdt.base");
-    emit_labels (Label.Set.elements traps.enter_traps);
+    D.symbol S.Predef.stapsdt_base;
+    emit_labels (L.Set.elements traps.enter_traps);
     emit_labels traps.push_traps;
     emit_labels traps.pop_traps
   in
   if is_system_supported && !Arch.trap_notes
-     && not (Label.Set.is_empty traps.enter_traps)
+     && not (L.Set.is_empty traps.enter_traps)
   then (
-    D.section [".note.ocaml_eh"] (Some "?") ["\"note\""];
-    emit_elf_note ~owner:"OCaml" ~typ:1l ~emit_desc;
-    (* Reuse stapsdt base section for calcluating addresses after pre-link *)
-    emit_stapsdt_base_section ();
+    D.switch_to_section Note_ocaml_eh;
+    Emitaux.emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l
+      ~emit_desc;
+    (* Reuse stapsdt base section for calculating addresses after prelinking *)
+    Emitaux.emit_stapsdt_base_section ();
     (* Switch back to Data section *)
     D.data ())
 
 let end_assembly () =
   if not (Misc.Stdlib.List.is_empty !float_constants)
   then (
-    (match system with
-    | S_macosx -> D.section ["__TEXT"; "__literal8"] None ["8byte_literals"]
-    | S_mingw64 | S_cygwin -> D.section [".rdata"] (Some "dr") []
-    | S_win64 -> D.data ()
-    | S_linux | S_gnu | S_solaris | S_win32 | S_linux_elf | S_bsd_elf | S_beos
-    | S_mingw | S_freebsd | S_netbsd | S_openbsd | S_unknown ->
-      D.section [".rodata.cst8"] (Some "aM") ["@progbits"; "8"]);
-    D.align ~data:true 8;
+    D.switch_to_section Eight_byte_literals;
+    D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
     List.iter (fun (cst, lbl) -> emit_float_constant cst lbl) !float_constants);
   if not (Misc.Stdlib.List.is_empty !vec128_constants)
   then (
-    (match system with
-    | S_macosx -> D.section ["__TEXT"; "__literal16"] None ["16byte_literals"]
-    | S_mingw64 | S_cygwin -> D.section [".rdata"] (Some "dr") []
-    | S_win64 -> D.data ()
-    | S_linux | S_gnu | S_solaris | S_win32 | S_linux_elf | S_bsd_elf | S_beos
-    | S_mingw | S_freebsd | S_netbsd | S_openbsd | S_unknown ->
-      D.section [".rodata.cst16"] (Some "aM") ["@progbits"; "16"]);
-    D.align ~data:true 16;
+    D.switch_to_section Sixteen_byte_literals;
+    D.align ~fill_x86_bin_emitter:Zero ~bytes:16;
     List.iter (fun (cst, lbl) -> emit_vec128_constant cst lbl) !vec128_constants);
+  if not (Misc.Stdlib.List.is_empty !vec256_constants)
+  then (
+    D.switch_to_section Thirtytwo_byte_literals;
+    D.align ~fill_x86_bin_emitter:Zero ~bytes:32;
+    List.iter (fun (cst, lbl) -> emit_vec256_constant cst lbl) !vec256_constants);
+  if not (Misc.Stdlib.List.is_empty !vec512_constants)
+  then (
+    D.switch_to_section Sixtyfour_byte_literals;
+    D.align ~fill_x86_bin_emitter:Zero ~bytes:64;
+    List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
   (* Emit probe handler wrappers *)
-  List.iter emit_probe_handler_wrapper !probes;
+  List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
   emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");
   emit_jump_tables ();
   let code_end = Cmm_helpers.make_symbol "code_end" in
   emit_named_text_section code_end;
   if is_macosx system then I.nop ();
   (* suppress "ld warning: atom sorting error" *)
-  emit_global_label_for_symbol code_end;
-  emit_imp_table ();
+  emit_global_label_for_symbol ~section:Text code_end;
+  emit_imp_table ~section:Text ();
   D.data ();
-  D.qword (const 0);
+  D.int64 0L;
   (* PR#6329 *)
-  emit_global_label "data_end";
-  D.qword (const 0);
+  emit_global_label ~section:Data "data_end";
+  D.int64 0L;
   D.text ();
-  D.align ~data:true 8;
+  (* We align to 8 bytes before the frame table. Perhaps somewhat
+     counterintuitively, we use [~fill_x86_bin_emitter:Zero] even though we are
+     now in the text section. The reason is that the additional padding will
+     never be executed, so there is no need to pad it with nops in the X86
+     binary emitter. *)
+  (* CR sspies: We should just determine the filling based on the current
+     section for the binary emitter and then remove the argument
+     [fill_x86_bin_emitter]. This is the only place, where it does not seem to
+     match the current section, and it seems it does not matter whether we pad
+     with zeros or nops here. *)
+  D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
   (* PR#7591 *)
-  emit_global_label "frametable";
-  let setcnt = ref 0 in
+  emit_global_label ~section:Text "frametable";
+  (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
   emit_frames
-    { efa_code_label = (fun l -> D.qword (ConstLabel (emit_label l)));
-      efa_data_label = (fun l -> D.qword (ConstLabel (emit_label l)));
-      efa_8 = (fun n -> D.byte (const n));
-      efa_16 = (fun n -> D.word (const n));
-      efa_32 = (fun n -> D.long (const_32 n));
-      efa_word = (fun n -> D.qword (const n));
-      efa_align = D.align ~data:true;
+    { efa_code_label =
+        (fun l ->
+          let l = label_to_asm_label ~section:Text l in
+          D.label l);
+      efa_data_label =
+        (fun l ->
+          let l = label_to_asm_label ~section:Data l in
+          D.label l);
+      efa_i8 = (fun n -> D.int8 n);
+      efa_i16 = (fun n -> D.int16 n);
+      efa_i32 = (fun n -> D.int32 n);
+      efa_u8 = (fun n -> D.uint8 n);
+      efa_u16 = (fun n -> D.uint16 n);
+      efa_u32 = (fun n -> D.uint32 n);
+      efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
+      efa_align = (fun n -> D.align ~fill_x86_bin_emitter:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let open X86_ast in
-          let c =
-            ConstAdd
-              (ConstSub (ConstLabel (emit_label lbl), ConstThis), const_32 ofs)
-          in
-          if is_macosx system
-          then (
-            incr setcnt;
-            let s = Printf.sprintf "L$set$%d" !setcnt in
-            D.setvar (s, c);
-            D.long (ConstLabel s))
-          else D.long c);
-      efa_def_label = (fun l -> _label (emit_label l));
-      efa_string = (fun s -> D.bytes (s ^ "\000"))
+          let lbl = label_to_asm_label ~section:Text lbl in
+          let ofs = Targetint.of_int32 ofs in
+          D.between_this_and_label_offset_32bit_expr ~upper:lbl
+            ~offset_upper:ofs);
+      efa_def_label =
+        (fun l ->
+          let lbl = label_to_asm_label ~section:Text l in
+          D.define_label lbl);
+      efa_string = (fun s -> D.string (s ^ "\000"))
     };
-  (match system with
-  | S_linux | S_freebsd | S_netbsd | S_openbsd ->
-    let frametable = emit_symbol (Cmm_helpers.make_symbol "frametable") in
-    D.size frametable (ConstSub (ConstThis, ConstLabel frametable))
-  | S_macosx | S_gnu | S_cygwin | S_solaris | S_win32 | S_linux_elf | S_bsd_elf
-  | S_beos | S_mingw | S_win64 | S_mingw64 | S_unknown ->
-    ());
+  let frametable_sym = S.create (Cmm_helpers.make_symbol "frametable") in
+  D.size frametable_sym;
   D.data ();
-  emit_probe_notes ();
+  Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol;
   emit_trap_notes ();
-  if is_linux system
-  then
-    (* Mark stack as non-executable, PR#4564 *)
-    D.section [".note.GNU-stack"] (Some "") ["%progbits"];
+  D.mark_stack_non_executable ();
+  (* Note that [mark_stack_non_executable] switches the section on Linux. *)
   if is_win64 system
   then (
     D.comment "External functions";
     String.Set.iter
       (fun s ->
-        if not (String.Set.mem s !symbols_defined)
-        then D.extrn (emit_symbol s) NEAR)
+        if not (String.Set.mem s !symbols_defined) then D.extrn (S.create s))
       !symbols_used;
     symbols_used := String.Set.empty;
     symbols_defined := String.Set.empty);
@@ -2769,8 +3094,8 @@ let end_assembly () =
            !Emitaux.output_channel)
     else None
   in
-  if not !Flambda_backend_flags.internal_assembler
+  if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   X86_proc.generate_code asm;
   (* The internal assembler does not work if reset_all is called here *)
-  if not !Flambda_backend_flags.internal_assembler then reset_all ()
+  if not !Oxcaml_flags.internal_assembler then reset_all ()

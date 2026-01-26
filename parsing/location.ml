@@ -277,6 +277,16 @@ let show_filename file =
 let print_filename ppf file =
   Format.pp_print_string ppf (show_filename file)
 
+let linenum ppf line =
+  if !Clflags.locs
+  then Format.fprintf ppf "%i" line
+  else Format.fprintf ppf "_"
+
+let colnum ppf char =
+  if !Clflags.locs
+  then Format.fprintf ppf "%i" char
+  else Format.fprintf ppf "_"
+
 (* Best-effort printing of the text describing a location, of the form
    'File "foo.ml", line 3, characters 10-12'.
 
@@ -326,15 +336,19 @@ let print_loc ~capitalize_first ppf loc =
   comma ();
   let startline = if line_valid startline then startline else 1 in
   let endline = if line_valid endline then endline else startline in
+
   begin if startline = endline then
-    Format.fprintf ppf "%s %i" (capitalize "line") startline
+    Format.fprintf ppf "%s %a"
+      (capitalize "line") linenum startline
   else
-    Format.fprintf ppf "%s %i-%i" (capitalize "lines") startline endline
+    Format.fprintf ppf "%s %a-%a"
+      (capitalize "lines") linenum startline linenum endline
   end;
 
   if chars_valid ~startchar ~endchar then (
     comma ();
-    Format.fprintf ppf "%s %i-%i" (capitalize "characters") startchar endchar
+    Format.fprintf ppf "%s %a-%a"
+      (capitalize "characters") colnum startchar colnum endchar
   );
 
   Format.fprintf ppf "@}"
@@ -565,9 +579,12 @@ let highlight_quote ppf
         |> List.map (fun ({ text; start_pos } as line) ->
           let end_pos = start_pos + String.length text - 1 in
           let line_nb =
-            match ISet.find_bound_in iset ~range:(start_pos, end_pos) with
-            | None -> None
-            | Some (p, _) -> Some p.pos_lnum
+            match
+              ISet.find_bound_in iset ~range:(start_pos, end_pos),
+              !Clflags.locs
+            with
+            | None, _ | _, false -> None
+            | Some (p, _), true -> Some p.pos_lnum
           in
           (line_nb, line))
         |> infer_line_numbers

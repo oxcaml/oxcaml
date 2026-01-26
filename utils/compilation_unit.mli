@@ -47,7 +47,7 @@ module Name : sig
 
   val of_head_of_global_name : Global_module.Name.t -> t
 
-  val of_global_name_no_args_exn : Global_module.Name.t -> t
+  val of_parameter_name : Global_module.Parameter_name.t -> t
 
   val to_global_name : t -> Global_module.Name.t
 
@@ -100,12 +100,14 @@ val print_debug : Format.formatter -> t -> unit
     mangled in any way). *)
 val create : Prefix.t -> Name.t -> t
 
-(** Create a compilation unit contained by another. Effectively uses the
-    parent compilation unit as the prefix. *)
+(** Convert a compilation unit to a prefix. Used to form a child of a pack. *)
+val to_prefix : t -> Prefix.t
+
+(** Combines [create] and [to_prefix]. *)
 val create_child : t -> Name.t -> t
 
 type argument =
-  { param : t;
+  { param : Name.t;
     value : t
   }
 
@@ -113,26 +115,6 @@ type argument =
     given arguments. The arguments will be sorted alphabetically by
     parameter name. *)
 val create_instance : t -> argument list -> t
-
-(* CR lmaurer: [of_global_name] would be better if (a) it insisted on taking a
-   complete instantiation (the exceptional cases mentioned are handled by other
-   functions) and (b) it took a [Global_module.t], which would allow it to
-   verify that it's complete. (For (b), we'll also want an [of_parameter]
-   function taking [Parameter.t] once that exists.) *)
-
-(** Create the compilation unit named by the given [Global_module.Name.t].
-    Usually only meaningful if the global name is a _complete instantiation_,
-    which is to say either (a) the named module has no parameters, or (b) there
-    is an argument for each parameter and each argument is itself a complete
-    instantiation. This ensures the name determines a compile-time constant, and
-    then the [t] returned here is the module corresponding to that constant.
-
-    The exception to the above is that a global name with _no_ arguments makes
-    sense even if the named module takes parameters, only in this case the [t]
-    refers to the module with the instantiating functor. This is only relevant
-    in two cases: when we're compiling the parameterised module itself, and
-    when we're instantiating it. *)
-val of_global_name : Global_module.Name.t -> t
 
 (** Convert the compilation unit to a [Global_module.Name.t], if possible (which
     is to say, if its prefix is empty). *)
@@ -182,17 +164,17 @@ val is_parent : t -> child:t -> bool
 
     For example:
 
-    * [A.B.C] _can_ access [A.Q] because [A.Q] is a member of [A] and [A] is
+    - [A.B.C] _can_ access [A.Q] because [A.Q] is a member of [A] and [A] is
       an ancestor of [A.B.C]. In other words, [A.Q]'s prefix is [A] and [A] is a
       prefix of [A.B.C].
-    * [A.Q] _cannot_ access [A.B.C] because [A.B] is not a prefix of [A.Q].
-    * [A.Q] _can_ however access [A.B], because [A] _is_ a prefix of [A.Q].
-    * [A.Q] _can_ also access its own member, [A.Q.R], because [A.Q.R]'s prefix
+    - [A.Q] _cannot_ access [A.B.C] because [A.B] is not a prefix of [A.Q].
+    - [A.Q] _can_ however access [A.B], because [A] _is_ a prefix of [A.Q].
+    - [A.Q] _can_ also access its own member, [A.Q.R], because [A.Q.R]'s prefix
       is exactly [A.Q].
-    * [A.Q] _cannot_ access [A.Q.R.S], because [A.Q.R] is not a prefix of [A.Q].
-    * [A.Q] _can_ access [F], since [F]'s prefix is the empty path, which is
+    - [A.Q] _cannot_ access [A.Q.R.S], because [A.Q.R] is not a prefix of [A.Q].
+    - [A.Q] _can_ access [F], since [F]'s prefix is the empty path, which is
       trivially a prefix of [A.Q].
-    * [A.Q] _cannot_ access [F.G] (by criterion 1) or [A] (by criterion 2). *)
+    - [A.Q] _cannot_ access [F.G] (by criterion 1) or [A] (by criterion 2). *)
 val can_access_by_name : t -> accessed_by:t -> bool
 
 (** A clearer name for [can_access_by_name] when the .cmx file is what's of
@@ -264,10 +246,10 @@ val base_filename : t -> Misc.filepath
     arguments with nesting levels attached. Good for implementing horrible name
     mangling and little else. So:
 
-      * [Foo] ==> [[], "Foo", []]
-      * [Foo[X:Bar]] ==> [[], "Foo", [(0, "X", "Bar")]]
-      * [Foo[X:Bar][Y:Baz]] ==> [[], "Foo", [(0, "X", "Bar"); (0, "Y", "Baz")]]
-      * [Foo[X:Bar[Y:Baz]]] ==> [[], "Foo", [(0, "X", "Bar"); (1, "Y", "Baz")]]
+    - [Foo] ==> [[], "Foo", []]
+    - [Foo[X:Bar]] ==> [[], "Foo", [(0, "X", "Bar")]]
+    - [Foo[X:Bar][Y:Baz]] ==> [[], "Foo", [(0, "X", "Bar"); (0, "Y", "Baz")]]
+    - [Foo[X:Bar[Y:Baz]]] ==> [[], "Foo", [(0, "X", "Bar"); (1, "Y", "Baz")]]
 
     I believe it's possible to parse this form back to the usual nested form,
     which one should only want to do in order to prove the encoding is
@@ -290,14 +272,12 @@ val split_instance_exn : t -> t * argument list
 type error = private
   | Invalid_character of char * string
   | Bad_compilation_unit_name of string
-  | Child_of_instance of { child_name : string }
+  | Child_of_instance of { parent_name : string }
   | Packed_instance of { name : string }
   | Already_an_instance of { name : string }
 
 (** The exception raised by conversion functions in this module. *)
 exception Error of error
-
-val set_current : t option -> unit
 
 val get_current : unit -> t option
 
@@ -306,3 +286,7 @@ val get_current_or_dummy : unit -> t
 val get_current_exn : unit -> t
 
 val is_current : t -> bool
+
+module Private : sig
+  val fwd_get_current : (unit -> t option) ref
+end

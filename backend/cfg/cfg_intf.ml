@@ -33,7 +33,7 @@ open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 module S = struct
   type func_call_operation =
-    | Indirect
+    | Indirect of Cmm.symbol list option
     | Direct of Cmm.symbol
 
   type external_call_operation =
@@ -50,7 +50,8 @@ module S = struct
       effects : Cmm.effects;
       ty_res : Cmm.machtype;
       ty_args : Cmm.exttype list;
-      stack_ofs : int
+      stack_ofs : int;
+      stack_align : Cmm.stack_align
     }
 
   type call_operation =
@@ -84,7 +85,7 @@ module S = struct
     { lt : Label.t;  (** if x < y (resp. x < n) goto [lt] label *)
       eq : Label.t;  (** if x = y (resp. x = n) goto [eq] label *)
       gt : Label.t;  (** if x > y (resp. x > n) goto [gt] label *)
-      is_signed : bool;
+      is_signed : Scalar.Signedness.t;
       imm : int option
     }
 
@@ -100,14 +101,6 @@ module S = struct
       uo : Label.t  (** if at least one of x or y is NaN *)
     }
 
-  type irc_work_list =
-    | Unknown_list
-    | Coalesced
-    | Constrained
-    | Frozen
-    | Work_list
-    | Active
-
   type 'a instruction =
     { desc : 'a;
       id : InstructionId.t;
@@ -117,10 +110,10 @@ module S = struct
       mutable fdo : Fdo_info.t;
       mutable live : Reg.Set.t;
       mutable stack_offset : int;
-      mutable irc_work_list : irc_work_list;
-      mutable ls_order : int;
-      mutable available_before : Reg_availability_set.t option;
-      mutable available_across : Reg_availability_set.t option
+      mutable available_before : Reg_availability_set.t;
+      mutable available_across : Reg_availability_set.t
+          (** The availability sets will be set to [Unreachable] prior to the
+              availability analysis having run. *)
     }
 
   (* [basic] instruction cannot raise *)
@@ -134,6 +127,7 @@ module S = struct
     | Pushtrap of { lbl_handler : Label.t }
     | Poptrap of { lbl_handler : Label.t }
     | Prologue
+    | Epilogue
     | Stack_check of { max_frame_size_bytes : int }
 
   (* Properties of the representation of successors:

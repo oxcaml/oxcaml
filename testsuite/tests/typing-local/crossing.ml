@@ -39,7 +39,7 @@ val f' : int -> int = <fun>
 let f : local_ _ -> _ =
   fun n -> f' n
 [%%expect{|
-val f : local_ int -> int = <fun>
+val f : int @ local -> int = <fun>
 |}]
 
 (* As comparison, string won't cross modes *)
@@ -54,16 +54,14 @@ let f : local_ _ -> _ =
 Line 2, characters 14-15:
 2 |   fun x -> f' x
                   ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* 2. constructor argument crosses mode at construction *)
 let f : local_ _ -> bar =
     fun n -> Bar0 (n, "hello")
 [%%expect{|
-val f : local_ int -> bar = <fun>
+val f : int @ local -> bar = <fun>
 |}]
 
 let f : local_ _ -> bar =
@@ -72,14 +70,16 @@ let f : local_ _ -> bar =
 Line 2, characters 21-22:
 2 |   fun n -> Bar0 (42, n)
                          ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "Bar0") in the value at Line 2, characters 11-23
+       which is expected to be "global".
 |}]
 
 (* 3. record field crosses mode at construction *)
 let f : local_ _ -> foo =
   fun n -> {x = n; y = "hello"}
 [%%expect{|
-val f : local_ int -> foo = <fun>
+val f : int @ local -> foo = <fun>
 |}]
 
 let f : local_ _ -> foo =
@@ -88,14 +88,16 @@ let f : local_ _ -> foo =
 Line 2, characters 24-25:
 2 |   fun n -> {x = 42; y = n}
                             ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is the field "y" of the record at Line 2, characters 11-26
+       which is expected to be "global".
 |}]
 
 (* 4. expression crosses mode when being constrained *)
 let f : local_ _ -> _ =
   fun n -> (n : int)
 [%%expect{|
-val f : local_ int -> int = <fun>
+val f : int @ local -> int = <fun>
 |}]
 
 let f : local_ _ -> _ =
@@ -104,14 +106,14 @@ let f : local_ _ -> _ =
 Line 2, characters 12-13:
 2 |   fun n -> (n : string)
                 ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* 5. polymorphic variant arguments crosses mode on construction*)
 let f : local_ _ -> [> `Number of int] =
   fun n -> `Number n
 [%%expect{|
-val f : local_ int -> [> `Number of int ] = <fun>
+val f : int @ local -> [> `Number of int ] = <fun>
 |}]
 
 let f : local_ _ -> [> `Text of string] =
@@ -120,14 +122,14 @@ let f : local_ _ -> [> `Text of string] =
 Line 2, characters 17-18:
 2 |   fun n -> `Text n
                      ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* tuple elements crosses mode at construction *)
 let f : local_ _ -> int * int =
   fun n -> (n, n)
 [%%expect{|
-val f : local_ int -> int * int = <fun>
+val f : int @ local -> int * int = <fun>
 |}]
 
 let f : local_ _ -> string * string =
@@ -136,14 +138,16 @@ let f : local_ _ -> string * string =
 Line 2, characters 12-13:
 2 |   fun n -> (n, n)
                 ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 2, characters 11-17
+       which is expected to be "global".
 |}]
 
 (* array elements crosses mode at construction *)
 let f : local_ _ -> int array =
   fun n -> [|n; n|]
 [%%expect{|
-val f : local_ int -> int array = <fun>
+val f : int @ local -> int array = <fun>
 |}]
 
 let f: local_ _ -> string array =
@@ -152,7 +156,9 @@ let f: local_ _ -> string array =
 Line 2, characters 13-14:
 2 |   fun n -> [|n; n|]
                  ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the array at Line 2, characters 11-19
+       which is expected to be "global".
 |}]
 
 (* after discussion with sdolan, we agree that
@@ -164,14 +170,16 @@ let f: local_ _ -> int lazy_t =
 Line 2, characters 16-17:
 2 |   fun n -> lazy n
                     ^
-Error: The value "n" is local, so cannot be used inside a lazy expression.
+Error: The value "n" is "local" to the parent region but is expected to be "global"
+       because it is used inside the lazy expression at Line 2, characters 11-17
+       which is expected to be "global".
 |}]
 
 (* record field crosses mode at projection  *)
 let f : local_ foo -> _  =
   fun r -> r.x
 [%%expect{|
-val f : local_ foo -> int = <fun>
+val f : foo @ local -> int = <fun>
 |}]
 
 let f : local_ foo -> _ =
@@ -180,7 +188,10 @@ let f : local_ foo -> _ =
 Line 2, characters 11-14:
 2 |   fun r -> r.y
                ^^^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region
+       because it is the field "y" of the record at Line 2, characters 11-12
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* the expected type is not considered when mode crossing the result of
@@ -189,7 +200,7 @@ the body will be used to mode cross *)
 let f : local_ _ -> int =
   fun r -> r.x
 [%%expect{|
-val f : local_ (int, 'a) foo0 -> int = <fun>
+val f : (int, 'a) foo0 @ local -> int = <fun>
 |}]
 
 (* expression crosses mode when prefixed with local_ *)
@@ -216,16 +227,14 @@ val g : string -> string = <fun>
 Line 6, characters 6-22:
 6 |     g (local_ "world")
           ^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* the result of function application crosses mode *)
 let f : _ -> local_ _ =
   fun () -> exclave_ 42
 [%%expect{|
-val f : unit -> local_ int = <fun>
+val f : unit -> int @ local = <fun>
 |}]
 
 let g : _ -> _ =
@@ -237,7 +246,7 @@ val g : unit -> int = <fun>
 let f : _ -> local_ _ =
   fun () -> exclave_ "hello"
 [%%expect{|
-val f : unit -> local_ string = <fun>
+val f : unit -> string @ local = <fun>
 |}]
 
 let g : _ -> _ =
@@ -246,7 +255,7 @@ let g : _ -> _ =
 Line 2, characters 28-29:
 2 |   fun () -> let x = f () in x
                                 ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* constructor argument crosses modes upon pattern matching *)
@@ -255,7 +264,7 @@ let f : local_ bar -> _ =
     match b with
     | Bar0 (x, _) -> x
 [%%expect{|
-val f : local_ bar -> int = <fun>
+val f : bar @ local -> int = <fun>
 |}]
 
 (* This example is identical to the last one,
@@ -267,7 +276,7 @@ let f : local_ _ -> int =
     match b with
     | Bar0 (x, _) -> x
 [%%expect{|
-val f : local_ (int, 'a) bar0 -> int = <fun>
+val f : (int, 'a) bar0 @ local -> int = <fun>
 |}]
 
 let f : local_ bar -> _ =
@@ -278,7 +287,10 @@ let f : local_ bar -> _ =
 Line 4, characters 21-22:
 4 |     | Bar0 (_, y) -> y
                          ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region
+       because it is contained (via constructor "Bar0") in the value at Line 4, characters 6-17
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* record fields crosses modes upon pattern matching *)
@@ -287,7 +299,7 @@ let f : local_ foo -> _ =
   match r with
   | {x; _} -> x
 [%%expect{|
-val f : local_ foo -> int = <fun>
+val f : foo @ local -> int = <fun>
 |}]
 
 (* this example works again because function body crosses modes
@@ -297,7 +309,7 @@ let f : local_ _ -> int =
   match r with
   | {x; _} -> x
 [%%expect{|
-val f : local_ (int, 'a) foo0 -> int = <fun>
+val f : (int, 'a) foo0 @ local -> int = <fun>
 |}]
 
 let f : local_ foo -> _ =
@@ -308,14 +320,17 @@ let f : local_ foo -> _ =
 Line 4, characters 16-17:
 4 |     | {y; _} -> y
                     ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region
+       because it is the field "y" of the record at Line 4, characters 6-12
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* constraint crosses modes upon pattern matching  *)
 let f : local_ _ -> _ =
   fun (x : int) -> x
 [%%expect{|
-val f : local_ int -> int = <fun>
+val f : int @ local -> int = <fun>
 |}]
 
 let f : local_ _ -> _ =
@@ -324,7 +339,7 @@ let f : local_ _ -> _ =
 Line 2, characters 22-23:
 2 |   fun (x : string) -> x
                           ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 
@@ -346,8 +361,8 @@ let f : local_ _ -> t2 =
 [%%expect{|
 module M : sig type t : immediate end
 type t2 = { x : int; } [@@unboxed]
-val f : local_ M.t -> M.t = <fun>
-val f : local_ t2 -> t2 = <fun>
+val f : M.t @ local -> M.t = <fun>
+val f : t2 @ local -> t2 = <fun>
 |}]
 
 (* This test needs the snapshotting in [type_jkind_purely] to prevent a type error
@@ -372,14 +387,14 @@ val foo : int -> int = <fun>
 
 let foo' : int -> local_ int = fun x -> exclave_ x
 [%%expect{|
-val foo' : int -> local_ int = <fun>
+val foo' : int -> int @ local = <fun>
 |}]
 
 
 
 let bar (f : local_ int -> int) = f 42
 [%%expect{|
-val bar : (local_ int -> int) -> int = <fun>
+val bar : (int @ local -> int) -> int = <fun>
 |}]
 
 (* Implicit mode crossing is not good enough *)
@@ -389,7 +404,7 @@ Line 1, characters 12-15:
 1 | let _ = bar foo
                 ^^^
 Error: This expression has type "int -> int"
-       but an expression was expected of type "local_ int -> int"
+       but an expression was expected of type "int @ local -> int"
 |}]
 
 let _ = bar (foo :> local_ int -> int)
@@ -408,7 +423,7 @@ let _ = bar (foo : int -> int :> local_ _ -> _)
 Line 1, characters 12-47:
 1 | let _ = bar (foo : int -> int :> local_ _ -> _)
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "int -> int" is not a subtype of "local_ 'a -> 'b"
+Error: Type "int -> int" is not a subtype of "'a @ local -> 'b"
 |}]
 
 
@@ -422,7 +437,7 @@ val foo : [< `A | `B of string ] -> unit = <fun>
 
 let foo_ = (foo : [`A | `B of string] -> unit :> local_ [`A] -> unit)
 [%%expect{|
-val foo_ : local_ [ `A ] -> unit = <fun>
+val foo_ : [ `A ] @ local -> unit = <fun>
 |}]
 
 let foo_ = (foo : [`A | `B of string] -> unit :> local_ [`B of string] -> unit)
@@ -431,7 +446,7 @@ Line 1, characters 11-79:
 1 | let foo_ = (foo : [`A | `B of string] -> unit :> local_ [`B of string] -> unit)
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "[ `A | `B of string ] -> unit" is not a subtype of
-         "local_ [ `B of string ] -> unit"
+         "[ `B of string ] @ local -> unit"
 |}]
 
 (* You can't erase the info that a function might allocate in parent region *)
@@ -440,7 +455,7 @@ let _ = bar (foo' :> local_ int -> int)
 Line 1, characters 12-39:
 1 | let _ = bar (foo' :> local_ int -> int)
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "int -> local_ int" is not a subtype of "local_ int -> int"
+Error: Type "int -> int @ local" is not a subtype of "int @ local -> int"
 |}]
 
 (* Testing mode crossing in [enlarge_type] *)
@@ -450,7 +465,7 @@ end = struct
   let foo f = (f :> local_ int -> unit)
 end
 [%%expect{|
-module M : sig val foo : (int -> unit) -> local_ int -> unit end
+module M : sig val foo : (int -> unit) -> int @ local -> unit end
 |}]
 
 (* Same, but in opposite variance.
@@ -462,7 +477,7 @@ end = struct
 end
 [%%expect{|
 module M :
-  sig val foo : ((local_ int -> int) -> unit) -> (int -> int) -> unit end
+  sig val foo : ((int @ local -> int) -> unit) -> (int -> int) -> unit end
 |}]
 
 (* Mode crossing at identifiers - in the following, x and y are added to the
@@ -482,5 +497,5 @@ let foo (local_ x : int) =
   let bar y = x + y in
   ref bar
 [%%expect{|
-val foo : local_ int -> (int -> int) ref = <fun>
+val foo : int @ local -> (int -> int) ref = <fun>
 |}]

@@ -1,5 +1,4 @@
 # 2 "thread.ml"
-
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -19,11 +18,13 @@
 
 [@@@ocaml.flambda_o3]
 
+module TLS = Domain.Safe.TLS
+
 type t : value mod contended portable
 
 external thread_initialize : unit -> unit = "caml_thread_initialize"
 external thread_cleanup : unit -> unit @@ portable = "caml_thread_cleanup"
-external thread_new : (unit -> unit) -> t @@ portable = "caml_thread_new"
+external thread_new : (unit -> unit) @ once -> t @@ portable = "caml_thread_new"
 external thread_uncaught_exception : exn -> unit @@ portable =
             "caml_thread_uncaught_exception"
 
@@ -41,13 +42,17 @@ let default_uncaught_exception_handler = thread_uncaught_exception
 
 let uncaught_exception_handler = Atomic.make { Modes.Portable.portable = default_uncaught_exception_handler }
 
-let set_uncaught_exception_handler (fn @ portable) = Atomic.Contended.set uncaught_exception_handler { Modes.Portable.portable = fn }
+let set_uncaught_exception_handler (fn @ portable) =
+  Atomic.set uncaught_exception_handler { Modes.Portable.portable = fn }
 
 exception Exit
 
-let create fn arg =
+let create (fn @ once) arg =
+  let tls_keys = Domain.TLS.Private.get_initial_keys () in
   thread_new
     (fun () ->
+      Domain.TLS.Private.init ();
+      Domain.TLS.Private.set_initial_keys tls_keys;
       try
         fn arg;
         ignore (Sys.opaque_identity (check_memprof_cb ()))
@@ -58,7 +63,7 @@ let create fn arg =
         let raw_backtrace = Printexc.get_raw_backtrace () in
         flush stdout; flush stderr;
         try
-          (Atomic.Contended.get uncaught_exception_handler).portable exn
+          (Atomic.get uncaught_exception_handler).portable exn
         with
         | Exit -> ()
         | exn' ->
@@ -73,8 +78,10 @@ let create fn arg =
           flush stderr)
 
 module Portable = struct
-  let create = create
+  let create (fn @ once portable) arg = create fn arg
 end
+
+let create (fn @ many) arg = create fn arg
 
 let exit () =
   raise Exit
@@ -98,6 +105,12 @@ let select = Unix.select
 
 let wait_pid p = Unix.waitpid [] p
 
+
 external sigmask : Unix.sigprocmask_command -> int list -> int list @@ portable
    = "caml_thread_sigmask"
 external wait_signal : int list -> int @@ portable = "caml_wait_signal"
+
+external use_domains : unit -> unit @@ portable = "caml_thread_use_domains"
+
+external set_current_thread_name  : string -> unit @@ portable =
+  "caml_set_current_thread_name"

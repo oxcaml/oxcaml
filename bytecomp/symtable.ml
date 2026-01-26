@@ -275,8 +275,10 @@ external float32_of_string : string -> Obj.t = "caml_float32_of_string"
 external int_as_pointer : int -> Obj.t = "%int_as_pointer"
 
 let rec transl_const = function
-    Const_base(Const_int i) -> Obj.repr i
-  | Const_base(Const_char c) -> Obj.repr c
+    Const_base(Const_int i)
+  | Const_base(Const_untagged_int i) -> Obj.repr i
+  | Const_base(Const_char c)
+  | Const_base(Const_untagged_char c) -> Obj.repr c
   | Const_base(Const_string (s, _, _)) -> Obj.repr s
   | Const_base(Const_float32 f)
   | Const_base(Const_unboxed_float32 f) ->
@@ -285,6 +287,10 @@ let rec transl_const = function
       else Obj.repr (float32_of_string f)
   | Const_base(Const_float f)
   | Const_base(Const_unboxed_float f) -> Obj.repr (float_of_string f)
+  | Const_base(Const_int8 i)
+  | Const_base(Const_untagged_int8 i) -> Obj.repr i
+  | Const_base(Const_int16 i)
+  | Const_base(Const_untagged_int16 i) -> Obj.repr i
   | Const_base(Const_int32 i)
   | Const_base(Const_unboxed_int32 i) -> Obj.repr i
   | Const_base(Const_int64 i)
@@ -354,7 +360,7 @@ type bytecode_sections =
 
 (* Initialize the linker for toplevel use *)
 
-(* In flambda-backend, [get_bytecode_sections] is passed in, because it is
+(* In oxcaml, [get_bytecode_sections] is passed in, because it is
    absent from the 4.x runtime as used by the current system compiler. *)
 let init_toplevel ~get_bytecode_sections =
   let sect = get_bytecode_sections () in

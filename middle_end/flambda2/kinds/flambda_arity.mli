@@ -43,7 +43,8 @@ module Component_for_creation : sig
     | Unboxed_product : _ t list -> [`Complex] t
 
   (** Conversion from a Lambda layout, which might involve unboxed products. *)
-  val from_lambda : Lambda.layout -> [`Complex] t
+  val from_lambda :
+    Lambda.layout -> machine_width:Target_system.Machine_width.t -> [`Complex] t
 end
 
 (** One component per function or continuation parameter, for example. Each
@@ -98,9 +99,14 @@ val fresh_idents_unarized :
 (** The length of the list returned by [unarize]. *)
 val cardinal_unarized : _ t -> int
 
+val group_by_parameter : [`Complex] t -> 'a list -> 'a list list
+
 (** Take a list of Lambda layouts, one per parameter, and form the
     corresponding arity. *)
-val from_lambda_list : Lambda.layout list -> [`Complex] t
+val from_lambda_list :
+  Lambda.layout list ->
+  machine_width:Target_system.Machine_width.t ->
+  [`Complex] t
 
 (** Remove the first portion of an arity to correspond to a partial
     application (or other similar situation). *)

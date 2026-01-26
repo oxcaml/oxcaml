@@ -36,7 +36,7 @@ m4_define([OCAML__VERSION_MINOR], [2])
 m4_define([OCAML__VERSION_PATCHLEVEL], [0])
 # Note that the OCAML__VERSION_EXTRA string defined below is always empty
 # for officially-released versions of OCaml.
-m4_define([OCAML__VERSION_EXTRA], [jst])
+m4_define([OCAML__VERSION_EXTRA], [ox])
 
 # The OCAML__VERSION_EXTRA_PREFIX macro defined below should be a
 # single character:
@@ -97,7 +97,7 @@ m4_define([OCAML__RELEASE_EXTRA],
 # - A 3-bytes version number
 
 m4_define([MAGIC_NUMBER__PREFIX], [Caml1999])
-m4_define([MAGIC_NUMBER__VERSION], [559])
+m4_define([MAGIC_NUMBER__VERSION], [571])
 
 # The following macro is used to define all our magic numbers
 # Its first argument is the name of the file type described by that
@@ -120,6 +120,8 @@ DEFINE_MAGIC_NUMBER([AST_INTF], [N])
 DEFINE_MAGIC_NUMBER([CMXS], [D])
 DEFINE_MAGIC_NUMBER([CMT], [T])
 DEFINE_MAGIC_NUMBER([CMS], [S])
+DEFINE_MAGIC_NUMBER([CMJ], [J])
+DEFINE_MAGIC_NUMBER([CMJA], [K])
 DEFINE_MAGIC_NUMBER([CFG], [G])
 DEFINE_MAGIC_NUMBER([LINEAR], [L])
 m4_define([MAGIC_NUMBER__LENGTH], m4_len(EXEC__MAGIC_NUMBER))

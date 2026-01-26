@@ -17,6 +17,8 @@
 open! Flambda.Import
 open Closure_conversion_aux
 module P = Flambda_primitive
+module K = Flambda_kind
+module L = Lambda
 module VB = Bound_var
 
 type failure =
@@ -31,6 +33,12 @@ type expr_primitive =
   | Binary of P.binary_primitive * simple_or_prim * simple_or_prim
   | Ternary of
       P.ternary_primitive * simple_or_prim * simple_or_prim * simple_or_prim
+  | Quaternary of
+      P.quaternary_primitive
+      * simple_or_prim
+      * simple_or_prim
+      * simple_or_prim
+      * simple_or_prim
   | Variadic of P.variadic_primitive * simple_or_prim list
   | Checked of
       { validity_conditions : expr_primitive list;
@@ -51,9 +59,20 @@ and simple_or_prim =
   | Simple of Simple.t
   | Prim of expr_primitive
 
+let simple_untagged_int ~machine_width x : simple_or_prim =
+  Simple
+    (Simple.const
+       (Reg_width_const.naked_immediate
+          (Target_ocaml_int.of_int machine_width x)))
+
+let simple_i64 x : simple_or_prim =
+  Simple (Simple.const (Reg_width_const.naked_int64 x))
+
+let simple_i64_expr x : expr_primitive =
+  Simple (Simple.const (Reg_width_const.naked_int64 x))
+
 let maybe_create_unboxed_product expr_prims =
   match expr_prims with
-  | [] -> Misc.fatal_error "Empty unboxed product"
   | [expr_prim] -> expr_prim
   | _ -> Unboxed_product expr_prims
 
@@ -65,6 +84,7 @@ let rec print_expr_primitive ppf expr_primitive =
   | Unary (prim, _) -> W.print ppf (Unary prim)
   | Binary (prim, _, _) -> W.print ppf (Binary prim)
   | Ternary (prim, _, _, _) -> W.print ppf (Ternary prim)
+  | Quaternary (prim, _, _, _, _) -> W.print ppf (Quaternary prim)
   | Variadic (prim, _) -> W.print ppf (Variadic prim)
   | Checked { primitive; _ } ->
     Format.fprintf ppf "@[<hov 1>(Checked@ %a)@]" print_expr_primitive primitive
@@ -246,6 +266,27 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
       bind_rec_primitive acc exn_cont ~register_const0 args2 dbg cont
     in
     bind_rec_primitive acc exn_cont ~register_const0 args3 dbg cont
+  | Quaternary (prim, args1, args2, args3, args4) ->
+    let cont acc (args4 : Simple.t list) =
+      let arg4 = must_be_singleton args4 in
+      let cont acc (args3 : Simple.t list) =
+        let arg3 = must_be_singleton args3 in
+        let cont acc (args2 : Simple.t list) =
+          let arg2 = must_be_singleton args2 in
+          let cont acc (args1 : Simple.t list) =
+            let arg1 = must_be_singleton args1 in
+            let named =
+              Named.create_prim (Quaternary (prim, arg1, arg2, arg3, arg4)) dbg
+            in
+            cont acc [named]
+          in
+          bind_rec_primitive acc exn_cont ~register_const0 args1 dbg cont
+        in
+        bind_rec_primitive acc exn_cont ~register_const0 args2 dbg cont
+      in
+      bind_rec_primitive acc exn_cont ~register_const0 args3 dbg cont
+    in
+    bind_rec_primitive acc exn_cont ~register_const0 args4 dbg cont
   | Variadic (prim, args) ->
     let cont acc args =
       let named = Named.create_prim (Variadic (prim, args)) dbg in
@@ -286,12 +327,15 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
                   Apply_cont_with_acc.goto acc condition_passed_cont
                 in
                 let acc, failure = Apply_cont_with_acc.goto acc failure_cont in
+                let machine_width = Acc.machine_width acc in
                 Expr_with_acc.create_switch acc
                   (Switch.create ~condition_dbg:dbg ~scrutinee:prim_result
                      ~arms:
-                       (Targetint_31_63.Map.of_list
-                          [ Targetint_31_63.bool_true, condition_passed;
-                            Targetint_31_63.bool_false, failure ])))
+                       (Target_ocaml_int.Map.of_list
+                          [ ( Target_ocaml_int.bool_true machine_width,
+                              condition_passed );
+                            Target_ocaml_int.bool_false machine_width, failure
+                          ])))
           in
           Let_cont_with_acc.build_non_recursive acc condition_passed_cont
             ~handler_params:Bound_parameters.empty
@@ -308,21 +352,31 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
       ~handler_params:Bound_parameters.empty ~handler:primitive_handler_expr
       ~body ~is_exn_handler:false ~is_cold:false
   | If_then_else (cond, ifso, ifnot, result_kinds) ->
-    let cond_result = Variable.create "cond_result" in
-    let cond_result_pat = Bound_var.create cond_result Name_mode.normal in
+    let cond_result =
+      Variable.create "cond_result" Flambda_kind.naked_immediate
+    in
+    let cond_result_duid = Flambda_debug_uid.none in
+    let cond_result_pat =
+      Bound_var.create cond_result cond_result_duid Name_mode.normal
+    in
     let ifso_cont = Continuation.create () in
     let ifnot_cont = Continuation.create () in
     let join_point_cont = Continuation.create () in
     let result_vars =
-      List.map (fun _ -> Variable.create "if_then_else_result") result_kinds
+      List.map
+        (fun k ->
+          ( Variable.create "if_then_else_result"
+              (Flambda_kind.With_subkind.kind k),
+            Flambda_debug_uid.none ))
+        result_kinds
     in
     let result_params =
       List.map2
-        (fun result_var result_kind ->
-          Bound_parameter.create result_var result_kind)
+        (fun (result_var, result_var_duid) result_kind ->
+          Bound_parameter.create result_var result_kind result_var_duid)
         result_vars result_kinds
     in
-    let result_simples = List.map Simple.var result_vars in
+    let result_simples = List.map (fun (v, _) -> Simple.var v) result_vars in
     let result_nameds = List.map Named.create_simple result_simples in
     bind_recs acc exn_cont ~register_const0 cond dbg @@ fun acc cond ->
     let cond = must_be_singleton_named cond in
@@ -330,12 +384,13 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
       let acc, ifso_cont = Apply_cont_with_acc.goto acc ifso_cont in
       let acc, ifnot_cont = Apply_cont_with_acc.goto acc ifnot_cont in
       let acc, switch =
+        let machine_width = Acc.machine_width acc in
         Expr_with_acc.create_switch acc
           (Switch.create ~condition_dbg:dbg ~scrutinee:(Simple.var cond_result)
              ~arms:
-               (Targetint_31_63.Map.of_list
-                  [ Targetint_31_63.bool_true, ifso_cont;
-                    Targetint_31_63.bool_false, ifnot_cont ]))
+               (Target_ocaml_int.Map.of_list
+                  [ Target_ocaml_int.bool_true machine_width, ifso_cont;
+                    Target_ocaml_int.bool_false machine_width, ifnot_cont ]))
       in
       Let_with_acc.create acc
         (Bound_pattern.singleton cond_result_pat)
@@ -346,14 +401,20 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
       bind_recs acc exn_cont ~register_const0 ifso_or_ifnot dbg
       @@ fun acc ifso_or_ifnot ->
       let result_vars =
-        List.map (fun _ -> Variable.create (name ^ "_result")) ifso_or_ifnot
+        List.map
+          (fun k ->
+            ( Variable.create (name ^ "_result")
+                (Flambda_kind.With_subkind.kind k),
+              Flambda_debug_uid.none ))
+          result_kinds
       in
       let result_pats =
         List.map
-          (fun result_var -> Bound_var.create result_var Name_mode.normal)
+          (fun (result_var, result_var_duid) ->
+            Bound_var.create result_var result_var_duid Name_mode.normal)
           result_vars
       in
-      let result_simples = List.map Simple.var result_vars in
+      let result_simples = List.map (fun (v, _) -> Simple.var v) result_vars in
       let acc, apply_cont =
         Apply_cont_with_acc.create acc join_point_cont ~args:result_simples ~dbg
       in
@@ -389,11 +450,14 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
           (fun acc nameds ->
             let named = must_be_singleton_named nameds in
             let pat =
-              Bound_var.create (Variable.create "seq") Name_mode.normal
+              Bound_var.create
+                (Variable.create "seq" Flambda_kind.value)
+                Flambda_debug_uid.none Name_mode.normal
               |> Bound_pattern.singleton
             in
             Let_with_acc.create acc pat named ~body))
-      (cont acc [Named.create_simple Simple.const_unit])
+      (let machine_width = Acc.machine_width acc in
+       cont acc [Named.create_simple (Simple.const_unit machine_width)])
       (List.rev expr_primitives)
   | Unboxed_product (expr_primitive :: expr_primitives) ->
     bind_recs acc exn_cont ~register_const0 expr_primitive dbg
@@ -410,12 +474,44 @@ and bind_rec_primitive acc exn_cont ~register_const0 (prim : simple_or_prim)
   | Simple s -> cont acc [s]
   | Prim p ->
     let cont acc (nameds : Named.t list) =
-      let vars = List.map (fun _ -> Variable.create "prim") nameds in
-      let vars' = List.map (fun var -> VB.create var Name_mode.normal) vars in
-      let acc, body = cont acc (List.map Simple.var vars) in
+      let vars =
+        List.map
+          (fun named ->
+            Variable.create "prim" (Named.kind named), Flambda_debug_uid.none)
+          nameds
+      in
+      let vars' =
+        List.map
+          (fun (var, var_duid) -> VB.create var var_duid Name_mode.normal)
+          vars
+      in
+      let acc, body = cont acc (List.map (fun (v, _) -> Simple.var v) vars) in
       List.fold_left2
         (fun (acc, body) pat prim ->
           Let_with_acc.create acc (Bound_pattern.singleton pat) prim ~body)
         (acc, body) (List.rev vars') (List.rev nameds)
     in
     bind_recs acc exn_cont ~register_const0 p dbg cont
+
+let convert_block_access_field_kind_from_value_kind
+    ({ raw_kind; nullable = _ } : L.value_kind) : P.Block_access_field_kind.t =
+  match raw_kind with
+  | Pintval -> Immediate
+  | Pvariant { consts = _; non_consts } -> (
+    match non_consts with [] -> Immediate | _ :: _ -> Any_value)
+  | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ ->
+    Any_value
+
+let mixed_block_access_field_kind
+    (elt : 'a Mixed_block_shape.Singleton_mixed_block_element.t) :
+    P.Mixed_block_access_field_kind.t =
+  match elt with
+  | Value value_kind ->
+    Value_prefix (convert_block_access_field_kind_from_value_kind value_kind)
+  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+    | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
+    Flat_suffix
+      (K.Flat_suffix_element.from_singleton_mixed_block_element
+         mixed_block_element)
+  | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float

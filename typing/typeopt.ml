@@ -22,18 +22,18 @@ open Lambda
 
 type error =
     Non_value_layout of type_expr * Jkind.Violation.t option
-  | Non_value_sort of Jkind.Sort.t * type_expr
   | Sort_without_extension of
       Jkind.Sort.t * Language_extension.maturity * type_expr option
-  | Non_value_sort_unknown_ty of Jkind.Sort.t
   | Small_number_sort_without_extension of Jkind.Sort.t * type_expr option
   | Simd_sort_without_extension of Jkind.Sort.t * type_expr option
   | Not_a_sort of type_expr * Jkind.Violation.t
-  | Unsupported_sort of Jkind.Sort.Const.t
   | Unsupported_product_in_lazy of Jkind.Sort.Const.t
   | Unsupported_vector_in_product_array
-  | Mixed_product_array of Jkind.Sort.Const.t
-  | Product_iarrays_unsupported
+  | Mixed_product_array of Jkind.Sort.Const.t * type_expr
+  | Unsupported_void_in_array
+  | Opaque_array_non_value of
+      { array_type: type_expr;
+        elt_kinding_failure: (type_expr * Jkind.Violation.t) option }
 
 exception Error of Location.t * error
 
@@ -87,21 +87,10 @@ let is_base_type env ty base_ty_path =
   | Tconstr(p, _, _) -> Path.same p base_ty_path
   | _ -> false
 
-let is_always_gc_ignorable env ty =
-  let ext : Jkind_axis.Externality.t =
-    (* We check that we're compiling to (64-bit) native code before counting
-       External64 types as gc_ignorable, because bytecode is intended to be
-       platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64
-    then External64
-    else External
-  in
-  Ctype.check_type_externality env ty ext
-
 let maybe_pointer_type env ty =
   let ty = scrape_ty env ty in
   let immediate_or_pointer =
-    match is_always_gc_ignorable env ty with
+    match Ctype.is_always_gc_ignorable env ty with
     | true -> Immediate
     | false -> Pointer
   in
@@ -114,15 +103,15 @@ let maybe_pointer_type env ty =
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
-(* CR layouts v2.8: Calling [type_legacy_sort] in [typeopt] is not ideal
+(* CR layouts v2.8: Calling [type_sort] in [typeopt] is not ideal
    and this function should be removed at some point. To do that, there
    needs to be a way to store sort vars on [Tconstr]s. That means
    either introducing a [Tpoly_constr], allow type parameters with
-   sort info, or do something else. *)
+   sort info, or do something else. Internal ticket 5093. *)
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
-let type_legacy_sort ~why env loc ty =
-  match Ctype.type_legacy_sort ~why env ty with
+let type_sort ~why env loc ty =
+  match Ctype.type_sort ~why ~fixed:false env ty with
   | Ok sort -> sort
   | Error err -> raise (Error (loc, Not_a_sort (ty, err)))
 
@@ -131,10 +120,12 @@ let type_legacy_sort ~why env loc ty =
    products and in the latter it would be wasteful to compute that information,
    so this type is polymorphic in what it remembers about products. *)
 type 'a classification =
-  | Int   (* any immediate type *)
+  | Immediate
+  | Immediate_or_null
   | Float
+  | Void
   | Unboxed_float of unboxed_float
-  | Unboxed_int of unboxed_integer
+  | Unboxed_int of Primitive.unboxed_or_untagged_integer
   | Unboxed_vector of unboxed_vector
   | Lazy
   | Addr  (* any value except a float or a lazy *)
@@ -144,11 +135,14 @@ type 'a classification =
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
-let classify ~classify_product env loc ty sort : _ classification =
+let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   match (sort : Jkind.Sort.Const.t) with
   | Base Value -> begin
-  if is_always_gc_ignorable env ty then Int
+  if Ctype.is_always_gc_ignorable env ty
+  then
+    if Ctype.check_type_nullability env ty Non_null
+    then Immediate else Immediate_or_null
   else match get_desc ty with
   | Tvar _ | Tunivar _ ->
       Any
@@ -167,8 +161,24 @@ let classify ~classify_product env loc ty sort : _ classification =
            || Path.same p Predef.path_int16x8
            || Path.same p Predef.path_int32x4
            || Path.same p Predef.path_int64x2
+           || Path.same p Predef.path_float16x8
            || Path.same p Predef.path_float32x4
-           || Path.same p Predef.path_float64x2 then Addr
+           || Path.same p Predef.path_float64x2
+           || Path.same p Predef.path_int8x32
+           || Path.same p Predef.path_int16x16
+           || Path.same p Predef.path_int32x8
+           || Path.same p Predef.path_int64x4
+           || Path.same p Predef.path_float16x16
+           || Path.same p Predef.path_float32x8
+           || Path.same p Predef.path_float64x4
+           || Path.same p Predef.path_int8x64
+           || Path.same p Predef.path_int16x32
+           || Path.same p Predef.path_int32x16
+           || Path.same p Predef.path_int64x8
+           || Path.same p Predef.path_float16x32
+           || Path.same p Predef.path_float32x16
+           || Path.same p Predef.path_float64x8
+           then Addr
       else begin
         try
           match (Env.find_type p env).type_kind with
@@ -184,35 +194,42 @@ let classify ~classify_product env loc ty sort : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _ ->
-      Addr
-  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ ->
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
+  | Tquote _ | Tsplice _-> Addr
+  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
       assert false
   end
   | Base Float64 -> Unboxed_float Unboxed_float64
   | Base Float32 -> Unboxed_float Unboxed_float32
+  | Base Bits8 -> Unboxed_int Untagged_int8
+  | Base Bits16 -> Unboxed_int Untagged_int16
   | Base Bits32 -> Unboxed_int Unboxed_int32
   | Base Bits64 -> Unboxed_int Unboxed_int64
   | Base Vec128 -> Unboxed_vector Unboxed_vec128
+  | Base Vec256 -> Unboxed_vector Unboxed_vec256
+  | Base Vec512 -> Unboxed_vector Unboxed_vec512
   | Base Word -> Unboxed_int Unboxed_nativeint
-  | Base Void as c ->
-    raise (Error (loc, Unsupported_sort c))
+  | Base Untagged_immediate -> Unboxed_int Untagged_int
+  | Base Void -> Void
   | Product c -> Product (classify_product ty c)
 
-let rec scannable_product_array_kind loc sorts =
-  List.map (sort_to_scannable_product_element_kind loc) sorts
+let rec scannable_product_array_kind elt_ty_for_error loc sorts =
+  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
 
-and sort_to_scannable_product_element_kind loc (s : Jkind.Sort.Const.t) =
+and sort_to_scannable_product_element_kind elt_ty_for_error loc
+      (s : Jkind.Sort.Const.t) =
   (* Unfortunate: this never returns `Pint_scannable`.  Doing so would require
      this to traverse the type, rather than just the kind, or to add product
      kinds. *)
   match s with
   | Base Value -> Paddr_scannable
-  | Base (Float64 | Float32 | Bits32 | Bits64 | Word | Vec128) as c ->
-    raise (Error (loc, Mixed_product_array c))
-  | Base Void as c ->
-    raise (Error (loc, Unsupported_sort c))
-  | Product sorts -> Pproduct_scannable (scannable_product_array_kind loc sorts)
+  | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
+          Untagged_immediate | Vec128 | Vec256 | Vec512) as c ->
+    raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
+  | Base Void ->
+    raise (Error (loc, Unsupported_void_in_array))
+  | Product sorts ->
+    Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
 
 let rec ignorable_product_array_kind loc sorts =
   List.map (sort_to_ignorable_product_element_kind loc) sorts
@@ -222,11 +239,15 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   | Base Value -> Pint_ignorable
   | Base Float64 -> Punboxedfloat_ignorable Unboxed_float64
   | Base Float32 -> Punboxedfloat_ignorable Unboxed_float32
-  | Base Bits32 -> Punboxedint_ignorable Unboxed_int32
-  | Base Bits64 -> Punboxedint_ignorable Unboxed_int64
-  | Base Word -> Punboxedint_ignorable Unboxed_nativeint
-  | Base Vec128 -> raise (Error (loc, Unsupported_vector_in_product_array))
-  | Base Void as c -> raise (Error (loc, Unsupported_sort c))
+  | Base Bits8 -> Punboxedoruntaggedint_ignorable Untagged_int8
+  | Base Bits16 -> Punboxedoruntaggedint_ignorable Untagged_int16
+  | Base Bits32 -> Punboxedoruntaggedint_ignorable Unboxed_int32
+  | Base Bits64 -> Punboxedoruntaggedint_ignorable Unboxed_int64
+  | Base Word -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
+  | Base Untagged_immediate -> Punboxedoruntaggedint_ignorable Untagged_int
+  | Base (Vec128 | Vec256 | Vec512) ->
+    raise (Error (loc, Unsupported_vector_in_product_array))
+  | Base Void -> raise (Error (loc, Unsupported_void_in_array))
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
 
 let array_kind_of_elt ~elt_sort env loc ty =
@@ -235,43 +256,82 @@ let array_kind_of_elt ~elt_sort env loc ty =
     | Some s -> s
     | None ->
       Jkind.Sort.default_for_transl_and_get
-        (type_legacy_sort ~why:Array_element env loc ty)
+        (type_sort ~why:Array_element env loc ty)
   in
+  let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
-    if is_always_gc_ignorable env ty then
+    if Ctype.is_always_gc_ignorable env ty then
       Pgcignorableproductarray (ignorable_product_array_kind loc sorts)
     else
-      Pgcscannableproductarray (scannable_product_array_kind loc sorts)
+      Pgcscannableproductarray
+        (scannable_product_array_kind elt_ty_for_error loc sorts)
   in
-  match classify ~classify_product env loc ty elt_sort with
-  | Any -> if Config.flat_float_array then Pgenarray else Paddrarray
+  (* CR dkalinichenko: many checks in [classify] are redundant
+     with separability. *)
+  match classify ~classify_product env ty elt_sort with
+  | Any ->
+    if Config.flat_float_array
+      && not (Language_extension.is_at_least Separability ()
+          && Ctype.check_type_separability env ty Non_float)
+    then Pgenarray
+    else Paddrarray
   | Float -> if Config.flat_float_array then Pfloatarray else Paddrarray
   | Addr | Lazy -> Paddrarray
-  | Int -> Pintarray
+  | Immediate -> Pintarray
+  | Immediate_or_null -> Pgcignorableaddrarray
   | Unboxed_float f -> Punboxedfloatarray f
-  | Unboxed_int i -> Punboxedintarray i
+  | Unboxed_int Untagged_int -> Punboxedoruntaggedintarray Untagged_int
+  | Unboxed_int Unboxed_int64 -> Punboxedoruntaggedintarray Unboxed_int64
+  | Unboxed_int Unboxed_nativeint ->
+    Punboxedoruntaggedintarray Unboxed_nativeint
+  | Unboxed_int Unboxed_int32 -> Punboxedoruntaggedintarray Unboxed_int32
+  | Unboxed_int Untagged_int16 -> Punboxedoruntaggedintarray Untagged_int16
+  | Unboxed_int Untagged_int8 -> Punboxedoruntaggedintarray Untagged_int8
   | Unboxed_vector v -> Punboxedvectorarray v
   | Product c -> c
+  | Void ->
+    raise (Error (loc, Unsupported_void_in_array))
 
-let array_type_kind ~elt_sort env loc ty =
+let array_type_kind ~elt_sort ~elt_ty env loc ty =
   match scrape_poly env ty with
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array ->
+  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
+                              || Path.same p Predef.path_iarray ->
       array_kind_of_elt ~elt_sort env loc elt_ty
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_iarray ->
-      let kind = array_kind_of_elt ~elt_sort env loc elt_ty in
-      (* CR layouts v7.1: allow iarrays of products. *)
-      begin match kind with
-      | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
-        raise (Error (loc, Product_iarrays_unsupported))
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-      | Punboxedintarray _ | Punboxedvectorarray _  ->
-        kind
-      end
   | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
       Pfloatarray
   | _ ->
-      (* This can happen with e.g. Obj.field *)
-      Pgenarray
+    begin match elt_ty with
+    | Some elt_ty ->
+      let rhs = Jkind.Builtin.value ~why:Array_type_kind in
+      begin match Ctype.constrain_type_jkind env elt_ty rhs with
+      | Ok _ -> Pgenarray
+      | Error e ->
+        (* CR layouts v4: rather than constraining [elt_ty]'s jkind to be value,
+           we could instead use its jkind to determine a non-value array kind.
+
+           We are choosing to error in this case for now because it is safer,
+           and because it could be potentially confusing that there is a second
+           source of information used to determine array type kinds (in addition
+           to the type kind of the array parameter). See PR #4098.
+
+           Using its jkind to determine a non-value array kind would also only
+           be useful for explicit user-written primitives. In other cases where
+           we compute an array kind (array matching, array comprehension),
+           [elt_ty] is [None].
+        *)
+        raise (Error(loc,
+          Opaque_array_non_value {
+            array_type = ty;
+            elt_kinding_failure = Some (elt_ty, e);
+          }))
+      end
+    | None ->
+      raise (Error(loc,
+        Opaque_array_non_value {
+          array_type = ty;
+          elt_kinding_failure = None;
+        }))
+    end
 
 let array_type_mut env ty =
   match scrape_poly env ty with
@@ -280,12 +340,12 @@ let array_type_mut env ty =
 
 let array_kind exp elt_sort =
   array_type_kind
-    ~elt_sort:(Some elt_sort)
+    ~elt_sort:(Some elt_sort) ~elt_ty:None
     exp.exp_env exp.exp_loc exp.exp_type
 
 let array_pattern_kind pat elt_sort =
   array_type_kind
-    ~elt_sort:(Some elt_sort)
+    ~elt_sort:(Some elt_sort) ~elt_ty:None
     pat.pat_env pat.pat_loc pat.pat_type
 
 let bigarray_decode_type env ty tbl dfl =
@@ -338,16 +398,17 @@ let value_kind_of_value_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_value jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
-  let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
-  let externality_upper_bound = Jkind.get_externality_upper_bound ~jkind_of_type jkind in
-  match layout, externality_upper_bound with
-  | Base Value, External -> Pintval
-  | Base Value, External64 ->
-    if !Clflags.native_code && Sys.word_size = 64 then Pintval else Pgenval
-  | Base Value, Internal -> Pgenval
-  | Any, _
-  | Product _, _
-  | Base (Void | Float64 | Float32 | Word | Bits32 | Bits64 | Vec128) , _ ->
+  let context = Ctype.mk_jkind_context_always_principal env in
+  let externality_upper_bound =
+    Jkind.get_externality_upper_bound ~context jkind
+  in
+  match layout with
+  | Base Value ->
+    value_kind_of_value_with_externality externality_upper_bound
+  | Any
+  | Product _
+  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
+          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
     Misc.fatal_error "expected a layout of value"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
@@ -428,9 +489,9 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
    have a jkind. We should pick one, or rationalize why there are two.
 *)
 let add_nullability_from_jkind env jkind raw_kind =
-  let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+  let context = Ctype.mk_jkind_context_always_principal env in
   let nullable =
-    match Jkind.get_nullability ~jkind_of_type jkind with
+    match Jkind.get_nullability ~context jkind with
     | Non_null -> Non_nullable
     | Maybe_null -> Nullable
   in
@@ -498,6 +559,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     num_nodes_visited, non_nullable Pintval
   | Tconstr(p, _, _) when Path.same p Predef.path_int16 ->
     num_nodes_visited, non_nullable Pintval
+  | Tconstr(p, _, _) when Path.same p Predef.path_floatarray ->
+    num_nodes_visited, non_nullable (Parrayval Pfloatarray)
   | Tconstr(p, _, _) when Path.same p Predef.path_float ->
     num_nodes_visited, non_nullable (Pboxedfloatval Boxed_float64)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32 ->
@@ -516,23 +579,54 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_int64x2 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x8 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32x4 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_float64x2 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
-  | Tconstr(p, _, _)
+  | Tconstr(p, _, _) when Path.same p Predef.path_int8x32 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_int16x16 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_int32x8 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_int64x4 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x16 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float32x8->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float64x4 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_int8x64 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_int16x32 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_int32x16 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_int64x8 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x32->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float32x16->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float64x8 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
-          || Path.same p Predef.path_floatarray) ->
+          || Path.same p Predef.path_iarray) ->
     (* CR layouts: [~elt_sort:None] here is bad for performance. To
        fix it, we need a place to store the sort on a [Tconstr]. *)
-    num_nodes_visited, non_nullable (Parrayval (array_type_kind ~elt_sort:None env loc ty))
+    let ak = array_type_kind ~elt_ty:(Some arg) ~elt_sort:None env loc ty in
+    num_nodes_visited, non_nullable (Parrayval ak)
   | Tconstr(p, _, _) -> begin
       (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
          with with-kinds, [decl.type_jkind] will mention variables bound
          by the parameters of the declaration. The code below loses this
          connection and will continue processing with e.g. ['a : value]
          instead of [string] when looking at a [string list]. This should
-         probably just call a [type_jkind] function. *)
+         probably just call a [type_jkind] function. Internal ticket 5101. *)
       let decl =
         try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in
@@ -599,7 +693,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
                       non_consts = [0, Constructor_uniform fields] }))
   | Tvariant row ->
     num_nodes_visited,
-    if Ctype.tvariant_not_immediate row
+    if Btype.tvariant_not_immediate row
     then non_nullable Pgenval
     else non_nullable Pintval
   | _ ->
@@ -611,17 +705,64 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   : int * unit Lambda.mixed_block_element =
   match field with
   | Value ->
-    let num_nodes_visited, kind =
-      value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
-    in
-    num_nodes_visited, Value kind
+    begin match ty with
+    | Some ty ->
+      let num_nodes_visited, kind =
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
+      in
+      num_nodes_visited, Value kind
+    | None -> num_nodes_visited, Value (nullable Pgenval)
+    (* CR layouts v7.1: assess whether it is important for performance to
+       support deep value_kinds here *)
+    end
   | Float_boxed -> num_nodes_visited, Float_boxed ()
   | Float64 -> num_nodes_visited, Float64
   | Float32 -> num_nodes_visited, Float32
+  | Bits8 -> num_nodes_visited, Bits8
+  | Bits16 -> num_nodes_visited, Bits16
   | Bits32 -> num_nodes_visited, Bits32
   | Bits64 -> num_nodes_visited, Bits64
   | Vec128 -> num_nodes_visited, Vec128
+  | Vec256 -> num_nodes_visited, Vec256
+  | Vec512 -> num_nodes_visited, Vec512
   | Word -> num_nodes_visited, Word
+  | Untagged_immediate -> num_nodes_visited, Untagged_immediate
+  | Product fs ->
+    let unknown () = Array.init (Array.length fs) (fun _ -> None) in
+    let types =
+      match ty with
+      | None -> unknown ()
+      | Some ty ->
+        let ty = scrape_ty env ty in
+        match get_desc ty with
+        | Tunboxed_tuple fields ->
+          Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
+        | Tconstr(p, _, _) ->
+          begin match (Env.find_type p env).type_kind with
+          | exception Not_found -> unknown ()
+          | Type_record_unboxed_product (lbls, _, _) ->
+            Misc.Stdlib.Array.of_list_map (fun {Types.ld_type} -> Some ld_type)
+              lbls
+          | Type_variant _ | Type_record _ | Type_abstract _ | Type_open ->
+            (* We don't need to handle [@@unboxed] records/variants here,
+               because [scrape_ty] looks though them. *)
+            unknown ()
+          end
+        | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
+        | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
+        | Tquote _ | Tsplice _ | Tof_kind _ -> unknown ()
+    in
+    let (_, num_nodes_visited), kinds =
+      Array.fold_left_map (fun (i, num_nodes_visited) field ->
+        let num_nodes_visited, kind =
+          value_kind_mixed_block_field env ~loc ~visited ~depth
+            ~num_nodes_visited field types.(i)
+        in
+        (i + 1, num_nodes_visited), kind
+      ) (0, num_nodes_visited) fs
+    in
+    num_nodes_visited, Product kinds
+  | Void -> num_nodes_visited, Product [||]
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =
@@ -689,7 +830,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                 ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-                ~shape (List.map field_to_type fields)
+                ~shape (List.map (fun f -> Some (field_to_type f)) fields)
         in
         (false, num_nodes_visited), fields
       | Cstr_record labels ->
@@ -707,16 +848,24 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                 ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-                ~shape (List.map field_to_type labels)
+                ~shape (List.map (fun f -> Some (field_to_type f)) labels)
         in
         (is_mutable, num_nodes_visited), fields
     in
     let is_constant (cstr: Types.constructor_declaration) =
-      (* CR layouts v5: This won't count constructors with void args as
-         constant. *)
       match cstr.cd_args with
       | Cstr_tuple [] -> true
-      | (Cstr_tuple (_::_) | Cstr_record _) -> false
+      | Cstr_tuple args ->
+        List.for_all (fun ca -> Jkind.Sort.Const.all_void ca.ca_sort) args
+      | Cstr_record lbls ->
+        List.for_all (fun lbl -> Jkind.Sort.Const.all_void lbl.ld_sort) lbls
+    in
+    let rec mixed_block_shape_is_empty shape =
+      Array.for_all mixed_block_element_is_empty shape
+    and mixed_block_element_is_empty (element : _ mixed_block_element) =
+      match element with
+      | Product shape -> mixed_block_shape_is_empty shape
+      | _ -> false
     in
     let num_nodes_visited, raw_kind =
     if List.for_all is_constant cstrs then
@@ -737,6 +886,10 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
             if is_mutable then None
             else match fields with
             | Constructor_uniform xs when List.compare_length_with xs 0 = 0 ->
+              let consts = next_const :: consts in
+              Some (num_nodes_visited,
+                    next_const + 1, consts, next_tag, non_consts)
+            | Constructor_mixed shape when mixed_block_shape_is_empty shape ->
               let consts = next_const :: consts in
               Some (num_nodes_visited,
                     next_const + 1, consts, next_tag, non_consts)
@@ -794,11 +947,6 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                   (fun num_nodes_visited (label:Types.label_declaration) ->
                     let num_nodes_visited = num_nodes_visited + 1 in
                     let num_nodes_visited, field =
-                      (* CR layouts v5: when we add other layouts, we'll need to
-                        check here that we aren't about to call value_kind on a
-                        different sort (we can get this info from the
-                        label.ld_jkind). For now we rely on the layout check at
-                        the top of value_kind to rule out void. *)
                       (* We're using the `Pboxedfloatval` value kind for unboxed
                         floats inside of records. This is kind of a lie, but
                          that was already happening here due to the float record
@@ -822,7 +970,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_mixed shape ->
             let types = List.map (fun label -> label.Types.ld_type) labels in
             value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-              ~shape types
+              ~shape (List.map (fun t -> Some t) types)
         in
         let non_consts =
           match rep with
@@ -853,31 +1001,59 @@ let value_kind env loc ty =
   with
   | Missing_cmi_fallback -> raise (Error (loc, Non_value_layout (ty, None)))
 
+let transl_mixed_block_element env loc ty mbe =
+  try
+    let (_num_nodes_visited, value_kind) =
+      value_kind_mixed_block_field env ~loc ~visited:Numbers.Int.Set.empty
+        ~depth:0 ~num_nodes_visited:0 mbe (Some ty)
+    in
+    value_kind
+  with
+  | Missing_cmi_fallback -> raise (Error (loc, Non_value_layout (ty, None)))
+
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function
   | Base Value -> Lambda.Pvalue (Lazy.force value_kind)
   | Base Float64 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.Punboxed_int Unboxed_nativeint
+    Lambda.Punboxed_or_untagged_integer Unboxed_nativeint
+  | Base Untagged_immediate as const ->
+    if
+      Language_extension.(is_at_least Layouts Stable)
+      && Language_extension.(is_at_least Small_numbers Stable) then
+      Lambda.Punboxed_or_untagged_integer Untagged_int
+    else error const
+  | Base Bits8 when Language_extension.(is_at_least Layouts Stable) ->
+    Lambda.Punboxed_or_untagged_integer Untagged_int8
+  | Base Bits16 when Language_extension.(is_at_least Layouts Stable) ->
+    Lambda.Punboxed_or_untagged_integer Untagged_int16
   | Base Bits32 when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.Punboxed_int Unboxed_int32
+    Lambda.Punboxed_or_untagged_integer Unboxed_int32
   | Base Bits64 when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.Punboxed_int Unboxed_int64
-  | Base Float32 when Language_extension.(is_at_least Layouts Stable) &&
-                      Language_extension.(is_enabled Small_numbers) ->
+    Lambda.Punboxed_or_untagged_integer Unboxed_int64
+  | Base Float32 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float32
   | Base Vec128 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Stable) ->
     Lambda.Punboxed_vector Unboxed_vec128
+  | Base Vec256 when Language_extension.(is_at_least Layouts Stable) &&
+                     Language_extension.(is_at_least SIMD Stable) ->
+    Lambda.Punboxed_vector Unboxed_vec256
+  | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
+                     Language_extension.(is_at_least SIMD Alpha) ->
+    Lambda.Punboxed_vector Unboxed_vec512
+  | Base Void when Language_extension.(is_at_least Layouts Stable) ->
+    Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
-    (* CR layouts v7.1: assess whether it is important for performance to support
-       deep value_kinds here *)
+    (* CR layouts v7.1: assess whether it is important for performance to
+       support deep value_kinds here *)
     Lambda.Punboxed_product
       (List.map (layout_of_const_sort_generic
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
-  | ((  Base (Void | Float32 | Float64 | Word | Bits32 | Bits64 | Vec128)
+  | ((  Base (Void | Float32 | Float64 | Word | Bits8 |
+             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _) as const) ->
     error const
 
@@ -886,15 +1062,19 @@ let layout env loc sort ty =
     ~value_kind:(lazy (value_kind env loc ty))
     ~error:(function
       | Base Value -> assert false
-      | Base Void ->
-        raise (Error (loc, Non_value_sort (Jkind.Sort.void,ty)))
+      | Base Void as const ->
+        raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
+                                                   Alpha,
+                                                   Some ty)))
       | Base Float32 as const ->
         raise (Error (loc, Small_number_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
-      | Base Vec128 as const ->
+      | Base (Vec128 | Vec256 | Vec512) as const ->
         raise (Error (loc, Simd_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
-      | (Base (Float64 | Word | Bits32 | Bits64) | Product _) as const ->
+      | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
+               Bits64) | Product _)
+        as const ->
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
                                                    Some ty)))
@@ -904,15 +1084,19 @@ let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
     ~error:(function
     | Base Value -> assert false
-    | Base Void ->
-      raise (Error (loc, Non_value_sort_unknown_ty Jkind.Sort.void))
+    | Base Void as const ->
+      raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
+                                                 Alpha,
+                                                 None)))
     | Base Float32 as const ->
       raise (Error (loc, Small_number_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
-    | Base Vec128 as const ->
+    | Base (Vec128 | Vec256 | Vec512) as const ->
       raise (Error (loc, Simd_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
-    | (Base (Float64 | Word | Bits32 | Bits64) | Product _) as const ->
+    | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
+             Bits64) | Product _)
+      as const ->
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
     )
@@ -948,16 +1132,16 @@ let lazy_val_requires_forward env loc ty =
     let kind = Jkind.Sort.Const.Product sorts in
     raise (Error (loc, Unsupported_product_in_lazy kind))
   in
-  match classify ~classify_product env loc ty sort with
+  match classify ~classify_product env ty sort with
   | Any | Lazy -> true
   (* CR layouts: Fix this when supporting lazy unboxed values.
      Blocks with forward_tag can get scanned by the gc thus can't
      store unboxed values. Not boxing is also incorrect since the lazy
      type has layout [value] which is different from these unboxed layouts. *)
-  | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ ->
+  | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Void ->
     Misc.fatal_error "Unboxed value encountered inside lazy expression"
   | Float -> Config.flat_float_array
-  | Addr | Int -> false
+  | Addr | Immediate | Immediate_or_null -> false
   | Product _ -> assert false (* because [classify_product] raises *)
 
 (** The compilation of the expression [lazy e] depends on the form of e:
@@ -987,32 +1171,6 @@ let classify_lazy_argument : Typedtree.expression ->
     | _ ->
        `Other
 
-let value_kind_union (k1 : Lambda.value_kind) (k2 : Lambda.value_kind) =
-  if Lambda.equal_value_kind k1 k2 then k1
-    (* CR vlaviron: we could be more precise by comparing nullability and
-       raw kinds separately *)
-  else Lambda.generic_value
-
-let rec layout_union l1 l2 =
-  match l1, l2 with
-  | Pbottom, l
-  | l, Pbottom -> l
-  | Pvalue layout1, Pvalue layout2 ->
-      Pvalue (value_kind_union layout1 layout2)
-  | Punboxed_float f1, Punboxed_float f2 ->
-      if Primitive.equal_unboxed_float f1 f2 then l1 else Ptop
-  | Punboxed_int bi1, Punboxed_int bi2 ->
-      if Primitive.equal_unboxed_integer bi1 bi2 then l1 else Ptop
-  | Punboxed_vector vi1, Punboxed_vector vi2 ->
-      if Primitive.equal_unboxed_vector vi1 vi2 then l1 else Ptop
-  | Punboxed_product layouts1, Punboxed_product layouts2 ->
-      if List.compare_lengths layouts1 layouts2 <> 0 then Ptop
-      else Punboxed_product (List.map2 layout_union layouts1 layouts2)
-  | (Ptop | Pvalue _ | Punboxed_float _ | Punboxed_int _ |
-     Punboxed_vector _ | Punboxed_product _),
-    _ ->
-      Ptop
-
 (* Error report *)
 open Format
 
@@ -1027,18 +1185,9 @@ let report_error ppf = function
       | Some err ->
         fprintf ppf "@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) err
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(Ctype.get_current_level ())) err
       end
-  | Non_value_sort (sort, ty) ->
-      fprintf ppf
-        "Non-value layout %a detected in [Typeopt.layout] as sort for type@ %a.@ \
-         Please report this error to the Jane Street compilers team."
-        Jkind.Sort.format sort Printtyp.type_expr ty
-  | Non_value_sort_unknown_ty sort ->
-      fprintf ppf
-        "Non-value layout %a detected in [layout_of_sort]@ Please report this \
-         error to the Jane Street compilers team."
-        Jkind.Sort.format sort
   | Sort_without_extension (sort, maturity, ty) ->
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
       begin match ty with
@@ -1094,10 +1243,8 @@ let report_error ppf = function
   | Not_a_sort (ty, err) ->
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) err
-  | Unsupported_sort const ->
-      fprintf ppf "Layout %a is not supported yet."
-        Jkind.Sort.Const.format const
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(Ctype.get_current_level ()) ) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
@@ -1107,15 +1254,39 @@ let report_error ppf = function
       fprintf ppf
         "Unboxed vector types are not yet supported in arrays of unboxed@ \
          products."
-  | Mixed_product_array const ->
+  | Unsupported_void_in_array ->
       fprintf ppf
-        "Unboxed product array elements must be external or contain all gc@ \
-         scannable types. The product type this function is applied at is@ \
-         not external but contains an element of sort %a."
+        "Types whose layout contains [void] are not yet supported in arrays."
+  | Mixed_product_array (const, elt_ty) ->
+      fprintf ppf
+        "An unboxed product array element must be formed from all@ \
+         external types (which are ignored by the gc) or all gc-scannable \
+         types.@ But this array operation is peformed for an array whose@ \
+         element type is %a, which is an unboxed product@ \
+         that is not external and contains a type with the non-scannable@ \
+         layout %a.@ \
+         @[Hint: if the array contents should not be scanned, annotating@ \
+         contained abstract types as [mod external] may resolve this error.@]"
+        Printtyp.type_expr elt_ty
         Jkind.Sort.Const.format const
-  | Product_iarrays_unsupported ->
-      fprintf ppf
-        "Immutable arrays of unboxed products are not yet supported."
+  | Opaque_array_non_value { array_type; elt_kinding_failure }  ->
+      begin match elt_kinding_failure with
+      | Some (ty, err) ->
+        fprintf ppf
+        "This array operation cannot tell whether %a is an array type,@ \
+         possibly because it is abstract. In this case, the element type@ \
+         %a must be a value:@ @\n@[%a@]"
+          Printtyp.type_expr array_type
+          Printtyp.type_expr ty
+          (Jkind.Violation.report_with_offender
+             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+             ~level:(Ctype.get_current_level ())) err
+      | None ->
+        fprintf ppf
+          "This array operation expects an array type, but %a does not appear@ \
+           to be one.@ (Hint: it is abstract?)"
+          Printtyp.type_expr array_type;
+      end
 
 let () =
   Location.register_error_of_exn

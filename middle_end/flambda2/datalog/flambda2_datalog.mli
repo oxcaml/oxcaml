@@ -70,13 +70,20 @@ module Datalog : sig
     end) : S with type t = int
   end
 
-  type ('t, 'k, 'v) table
+  type (!'t, !'k, !'v) table
 
+  (** The [provenance] argument is [true] by default. If set to [false],
+      provenance tracking will be disabled for this table. This is useful for
+      derived tables that are defined by a single rule, such as indices defined
+      by a permutation of another table. *)
   val create_table :
+    ?provenance:bool ->
     name:string ->
     default_value:'v ->
     ('t, 'k, 'v) Column.hlist ->
     ('t, 'k, 'v) table
+
+  val columns : ('t, 'k, 'v) table -> ('t, 'k, 'v) Column.hlist
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 
@@ -89,6 +96,8 @@ module Datalog : sig
         a map from [ty1] whose values are maps from [ty2] to [ty2]. The order of
         arguments provided to a relation thus have profound implication for the
         performance of iterations on the relation, and needs to be chosen carefully.
+
+        See documentation of [create_table] for the [provenance] argument.
 
         @raise Misc.Fatal_error if [schema] is empty.
 
@@ -107,7 +116,10 @@ module Datalog : sig
         ]}
           *)
   val create_relation :
-    name:string -> ('t, 'k, unit) Column.hlist -> ('t, 'k) relation
+    ?provenance:bool ->
+    name:string ->
+    ('t, 'k, unit) Column.hlist ->
+    ('t, 'k) relation
 
   module Constant : sig
     (** The [Constant] module only provides a heterogenous list to represent
@@ -132,9 +144,15 @@ module Datalog : sig
 
   type atom
 
+  type equality
+
+  type filter
+
   type hypothesis =
     [ `Atom of atom
-    | `Not_atom of atom ]
+    | `Not_atom of atom
+    | `Distinct of equality
+    | `Filter of filter ]
 
   (** [atom rel args] represents the application of relation [rel] to the
       arguments [args].
@@ -152,6 +170,12 @@ module Datalog : sig
   val atom : ('t, 'k) relation -> 'k Term.hlist -> [> `Atom of atom]
 
   val not : [< `Atom of atom] -> [> `Not_atom of atom]
+
+  val distinct :
+    (_, 'k, _) Column.id -> 'k Term.t -> 'k Term.t -> [> `Distinct of equality]
+
+  val filter :
+    ('k Constant.hlist -> bool) -> 'k Term.hlist -> [> `Filter of filter]
 
   type database
 
@@ -231,7 +255,7 @@ module Datalog : sig
         cases will raise an error.
 
         It is, however, possible to iterate on the query
-        [[edge [x; y]; edge [y; x]] using the [[y; x]] binding order: we
+        [[edge [x; y]; edge [y; x]]] using the [[y; x]] binding order: we
         can use the [edge [y; x]] instance to bind the variables for [y] and [x]
         in this order, then check if [(x, y)] is in the [edge] relation for
         each [(y, x)] pair that we find. In this case, the occurrences of [y] and
@@ -445,7 +469,7 @@ module Datalog : sig
 
     type stats
 
-    val create_stats : unit -> stats
+    val create_stats : ?with_provenance:bool -> database -> stats
 
     val print_stats : Format.formatter -> stats -> unit
 
@@ -456,6 +480,10 @@ module Datalog : sig
       *)
     val run : ?stats:stats -> t -> database -> database
   end
+
+  type bindings
+
+  val print_bindings : Format.formatter -> bindings -> unit
 
   (** The type [('p, 'v) program] is the type of programs returning values
       of type ['v] with parameters ['p].
@@ -476,8 +504,11 @@ module Datalog : sig
     *)
   val compile : 'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> 'a
 
-  val with_parameters :
-    'p String.hlist -> ('p Term.hlist -> ('p, 'a) program) -> (nil, 'a) program
+  val compile_with_parameters :
+    'p String.hlist ->
+    'v String.hlist ->
+    ('p Term.hlist -> 'v Term.hlist -> ('p, 'a) program) ->
+    'a
 
   (** [foreach vars prog] binds the variables [vars] in [prog].
 

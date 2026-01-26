@@ -21,8 +21,8 @@ arm64/stack_check.ml
 arm64/stack_class.ml
 arm64/vectorize_specific.ml
 arm64/regalloc_stack_operands.ml
-arm64_ast.ml
-arm64_ast.mli
+arm64/ast/*.ml
+arm64/ast/*.mli
 asm_targets/**/*.ml
 asm_targets/**/*.mli
 branch_relaxation.ml
@@ -45,6 +45,8 @@ cmm_helpers.ml
 cmm_helpers.mli
 cmmgen_state.ml
 cmmgen_state.mli
+cmm_peephole_engine.ml
+cmm_peephole_engine.mli
 debug/**/*.ml
 debug/**/*.mli
 emitaux.ml
@@ -55,6 +57,8 @@ operation.ml
 operation.mli
 linear.ml
 linear.mli
+llvm/**/*.ml
+llvm/**/*.mli
 polling_utils.ml
 polling_utils.mli
 peephole/**/*.ml
@@ -67,6 +71,10 @@ printoperation.ml
 printoperation.mli
 printreg.ml
 printreg.mli
+probe_emission.ml
+probe_emission.mli
+reg.ml
+reg.mli
 reg_class.mli
 reg_class_utils.ml
 reg_class_utils.mli

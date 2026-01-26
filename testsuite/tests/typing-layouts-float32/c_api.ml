@@ -9,23 +9,23 @@
    flags = "-extension small_numbers";
    bytecode;
  }{
-   flags = "-extension layouts_alpha -extension small_numbers";
+   flags = "-extension layouts_alpha";
    native;
  }{
-   flags = "-extension layouts_alpha -extension small_numbers";
+   flags = "-extension layouts_alpha";
    bytecode;
  }{
-   flags = "-extension layouts_beta -extension small_numbers";
+   flags = "-extension layouts_beta";
    native;
  }{
-   flags = "-extension layouts_beta -extension small_numbers";
+   flags = "-extension layouts_beta";
    bytecode;
  }
 *)
 
 (* mshinwell: This test is now only run with flambda2, as the corresponding
    ocamltest predicate is reliable for testing whether this is an
-   flambda-backend build. *)
+   oxcaml build. *)
 
 (* This file tests using external C functions with float32#. *)
 

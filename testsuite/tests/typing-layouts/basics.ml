@@ -24,17 +24,13 @@ type t_any : any
 
 type t_void  : void;;
 [%%expect{|
-Line 1, characters 15-19:
-1 | type t_void  : void;;
-                   ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+type t_void : void
 |}];;
 
-type t_any_non_null : any_non_null;;
+type t_any_mod_separable : any mod separable;;
 
 [%%expect{|
-type t_any_non_null : any_non_null
+type t_any_mod_separable : any mod separable
 |}]
 
 type t_value_or_null : value_or_null;;
@@ -260,7 +256,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-55.
 |}]
 
@@ -294,7 +291,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-50.
 |}]
 
@@ -312,7 +310,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-70.
 |}]
 
@@ -330,7 +329,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-65.
 |}]
 
@@ -452,16 +452,10 @@ module F2 (X : sig val x : t_float64 end) = struct
   let f () = X.x
 end;;
 [%%expect{|
-Line 1, characters 27-36:
-1 | module F2 (X : sig val x : t_float64 end) = struct
-                               ^^^^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of type t_float64 must be a sublayout of value
-         because it's the type of something stored in a module structure.
+module F2 :
+  functor (X : sig val x : t_float64 end) ->
+    sig val f : unit -> t_float64 end
 |}];;
-(* CR layouts v5: the test above should be made to work *)
 
 module F2 (X : sig val f : t_float64 -> unit end) = struct
   let g z = X.f z
@@ -604,16 +598,12 @@ and ('a : any) t4
 
 type ('a : void) void4 = Void4  of 'a;;
 [%%expect{|
-Line 1, characters 11-15:
-1 | type ('a : void) void4 = Void4  of 'a;;
-               ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+type ('a : void) void4 = Void4 of 'a
 |}];;
 
 type ('a : any) any4 = Any4 of 'a
 [%%expect{|
-type 'a any4 = Any4 of 'a
+type ('a : value_or_null) any4 = Any4 of 'a
 |}];;
 
 (************************************************************)
@@ -732,7 +722,8 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -974,11 +965,14 @@ module M11_1 = struct
     t.v # baz11
 end;;
 [%%expect{|
-Line 2, characters 13-17:
-2 |   type ('a : void) t = { x : int; v : 'a }
-                 ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+Line 5, characters 4-7:
+5 |     t.v # baz11
+        ^^^
+Error: Object types must have layout value.
+       The layout of the type of this expression is void
+         because of the definition of t at line 2, characters 2-42.
+       But the layout of the type of this expression must overlap with value
+         because it's the type of an object.
 |}]
 
 module M11_1f = struct
@@ -1404,11 +1398,7 @@ type ('a : float64, 'b) foo15 = 'a t15 -> 'a t15 constraint 'b = 'a
 
 type 'a t_void_16 : void;;
 [%%expect{|
-Line 1, characters 20-24:
-1 | type 'a t_void_16 : void;;
-                        ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+type 'a t_void_16 : void
 |}];;
 
 (**************************************************************************)
@@ -1806,7 +1796,7 @@ Error: This expression has type "t_float64"
          because it's the type of the field of a polymorphic variant.
 |}]
 
-(******************************************************)
+(****************************************************)
 (* Test 33: Externals must have representable types *)
 
 external foo33 : t_any = "foo33";;
@@ -1815,11 +1805,11 @@ external foo33 : t_any = "foo33";;
 Line 1, characters 17-22:
 1 | external foo33 : t_any = "foo33";;
                      ^^^^^
-Error: This type signature for "foo33" is not a value type.
+Error: The type of a module-level value must have a representable layout.
        The layout of type t_any is any
          because of the definition of t_any at line 5, characters 0-18.
-       But the layout of type t_any must be a sublayout of value
-         because it's the type of something stored in a module structure.
+       But the layout of type t_any must be representable
+         because it's the type of something stored in a module.
 |}]
 
 external foo44 : ('a : any). 'a -> unit = "foo44";;
@@ -1886,7 +1876,7 @@ Line 2, characters 19-31:
 2 | let f35 : 'a t35 = fun () -> ()
                        ^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable
+       The kind of 'a -> 'b is value mod aliased immutable non_float
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of immediate
          because of the definition of t35 at line 1, characters 0-30.
@@ -2871,23 +2861,25 @@ Error: This expression has type "float#" but an expression was expected of type
 let f (x : ('a : bits64)) = x ()
 
 [%%expect{|
-Line 1, characters 28-29:
+Line 1, characters 28-32:
 1 | let f (x : ('a : bits64)) = x ()
-                                ^
-Error: This expression is used as a function, but its type "'a"
-       has kind "bits64", which cannot be the kind of a function.
-       (Functions always have kind "value mod aliased immutable".)
+                                ^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "bits64", which cannot
+       be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
 |}]
 
 let f (x : ('a : value mod portable)) = x ()
 
 [%%expect{|
-Line 1, characters 40-41:
+Line 1, characters 40-44:
 1 | let f (x : ('a : value mod portable)) = x ()
-                                            ^
-Error: This expression is used as a function, but its type "'a"
-       has kind "value mod portable", which cannot be the kind of a function.
-       (Functions always have kind "value mod aliased immutable".)
+                                            ^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "value mod portable", which cannot
+       be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
 |}]
 
 let f (x : ('a : value)) = x ()
@@ -2896,4 +2888,71 @@ let f (x : ('a : value mod uncontended)) = x ()
 [%%expect{|
 val f : (unit -> 'a) -> 'a = <fun>
 val f : (unit -> 'a) -> 'a = <fun>
+|}]
+
+(***************************************)
+(* Test 47: Error message on bad label *)
+
+(* reduced from a test case in the wild *)
+
+type ('v : immediate) t
+
+module M : sig
+  val f : 'v t -> int -> 'v
+end = struct
+  let f _ _ = assert false
+end
+
+let g t = M.f t ~key:0
+
+[%%expect{|
+type ('v : immediate) t
+module M : sig val f : ('v : immediate). 'v t -> int -> 'v end
+Line 9, characters 10-22:
+9 | let g t = M.f t ~key:0
+              ^^^^^^^^^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "immediate", which cannot
+       be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
+       Hint: Perhaps you have over-applied the function or used an incorrect label.
+|}]
+
+let h t = M.f ~key:0 t
+
+[%%expect{|
+Line 1, characters 10-22:
+1 | let h t = M.f ~key:0 t
+              ^^^^^^^^^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "immediate", which cannot
+       be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
+       Hint: Perhaps you have over-applied the function or used an incorrect label.
+|}]
+
+(********************************************************************)
+(* Test 48: not changing the kinds of existentially bound variables *)
+
+(* this uses products only to avoid the separability restriction *)
+type t1 = T1 : ('a : value). #('a * 'a) -> t1 [@@unboxed]
+type ('a : immediate & immediate) t2
+
+[%%expect{|
+type t1 = T1 : #('a * 'a) -> t1 [@@unboxed]
+type ('a : immediate & immediate) t2
+|}]
+
+type t3 = t1 t2  (* it is important to reject this *)
+
+[%%expect{|
+Line 1, characters 10-12:
+1 | type t3 = t1 t2  (* it is important to reject this *)
+              ^^
+Error: This type "t1" should be an instance of type
+         "('a : immediate & immediate)"
+       The kind of t1 is value mod non_float & value mod non_float
+         because it is an unboxed tuple.
+       But the kind of t1 must be a subkind of immediate & immediate
+         because of the definition of t2 at line 2, characters 0-36.
 |}]

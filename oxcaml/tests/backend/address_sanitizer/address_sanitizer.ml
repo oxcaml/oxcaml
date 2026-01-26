@@ -1,0 +1,1539 @@
+let run_test func_name ~test ~validate =
+  Gc.minor ();
+  let read_fd, write_fd = Unix.pipe () in
+  match Unix.fork () with
+  | 0 ->
+    (match
+       Unix.close read_fd;
+       Unix.dup2 write_fd Unix.stderr;
+       Unix.dup2 write_fd Unix.stdout;
+       test ()
+     with
+     | () -> exit 0
+     | exception _ -> exit 1)
+  | child_pid ->
+    (try
+       Unix.close write_fd;
+       ignore (Unix.waitpid [] child_pid);
+       let child_output = Unix.in_channel_of_descr read_fd |> In_channel.input_all in
+       try validate child_output with
+       | exn ->
+         Printf.eprintf
+            "Validation failed for '%s':\n%s\nOutput: %s\n\n%!"
+            func_name
+            (Printexc.to_string exn)
+            child_output
+     with
+     | exn ->
+       Printf.eprintf
+         "Error encountered while running '%s':\n%s\n\n%!"
+         func_name
+         (Printexc.to_string exn))
+;;
+
+external alloc_gen
+  :  len:(int[@untagged])
+  -> tag:(int[@untagged])
+  -> 'a
+  = "caml_no_bytecode_impl" "ocaml_address_sanitizer_test_alloc"
+[@@noalloc]
+
+external free : 'a -> unit = "ocaml_address_sanitizer_test_free" [@@noalloc]
+
+let[@inline always] alloc_gen ~len ~tag =
+  let t : Obj.t = alloc_gen ~len ~tag in
+  assert (Obj.size t = len);
+  assert (Obj.tag t = tag);
+  Obj.obj t
+;;
+
+let[@inline always] alloc_floatarray len = alloc_gen ~len ~tag:Obj.double_array_tag
+let[@inline always] alloc_abstract len = alloc_gen ~len ~tag:Obj.abstract_tag
+let[@inline always] alloc_array len = alloc_gen ~len ~tag:0
+let alloc_value_record = alloc_array
+
+let use_after_free_regex = Str.regexp_string "AddressSanitizer: heap-use-after-free"
+
+let out_of_bounds_access_regex =
+  Str.regexp_string "AddressSanitizer: heap-buffer-overflow"
+;;
+
+let read_regex = Str.regexp "^READ of size "
+let write_regex = Str.regexp "^WRITE of size "
+
+let assert_asan_detected_read_use_after_free test_output =
+  ignore (Str.search_forward use_after_free_regex test_output 0);
+  ignore (Str.search_forward read_regex test_output 0)
+;;
+
+let assert_asan_detected_write_use_after_free test_output =
+  ignore (Str.search_forward use_after_free_regex test_output 0);
+  ignore (Str.search_forward write_regex test_output 0)
+;;
+
+let assert_asan_detected_out_of_bounds_read ?(access_size = 8) test_output =
+  ignore (Str.search_forward out_of_bounds_access_regex test_output 0);
+  let read_regex = Str.regexp ("^READ of size " ^ Int.to_string access_size ^ " ") in
+  ignore (Str.search_forward read_regex test_output 0)
+;;
+
+let assert_asan_detected_out_of_bounds_write ?(access_size = 8) test_output =
+  ignore (Str.search_forward out_of_bounds_access_regex test_output 0);
+  let write_regex = Str.regexp ("^WRITE of size " ^ Int.to_string access_size ^ " ") in
+  ignore (Str.search_forward write_regex test_output 0)
+;;
+
+type i64 = int64#
+type i32 = int32#
+type f64 = float#
+type f32 = float32#
+
+module Bigstring = struct
+  type t = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
+  let create len : t = Bigarray.Array1.create Char C_layout len
+end
+
+module Vec128_bigarray = struct
+  type t = Bigstring.t
+  type elem = int64x2#
+
+  external create_elem
+    :  i64
+    -> i64
+    -> elem
+    = "caml_no_bytecode_impl" "ocaml_address_sanitizer_test_vec128_of_int64s"
+  [@@noalloc]
+
+  external unsafe_aligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_geta128u#"
+
+  external unsafe_aligned_set
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    -> unit
+    = "%caml_bigstring_seta128u#"
+
+  external unsafe_unaligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_getu128u#"
+
+  external unsafe_unaligned_set
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    -> unit
+    = "%caml_bigstring_setu128u#"
+end
+
+module Vec256_bigarray = struct
+  type t = Bigstring.t
+  type elem = int64x4#
+
+  external create_elem
+    :  i64
+    -> i64
+    -> i64
+    -> i64
+    -> elem
+    = "caml_no_bytecode_impl" "ocaml_address_sanitizer_test_vec256_of_int64s"
+  [@@noalloc]
+
+  external unsafe_aligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_geta256u#"
+
+  external unsafe_aligned_set
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    -> unit
+    = "%caml_bigstring_seta256u#"
+
+  external unsafe_unaligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_getu256u#"
+
+  external unsafe_unaligned_set
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    -> unit
+    = "%caml_bigstring_setu256u#"
+
+  external safe_aligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_geta256#"
+
+  let find_alignment t =
+    try let _ : _ = safe_aligned_get t ~byte:0 in 0
+    with Invalid_argument _ -> 16
+end
+
+module Test_use_after_free = struct
+  type t0 = { mutable x : int }
+
+  let field_get_immediate () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- 0;
+      free t;
+      let _ = Sys.opaque_identity t.x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  let field_set_immediate () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- 0;
+      free t;
+      t.x <- 1;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  (* Storing pointers to the OCaml heap in out-of-heap allocations like this is
+     not actually safe, but it's fine for the sake of what this test is trying
+     to demonstrate. *)
+  type t1 = { mutable x : int array }
+
+  let field_get_value () =
+    let test () =
+      let t = alloc_array 1 in
+      t.x <- [||];
+      free t;
+      let _ = Sys.opaque_identity t.x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  let field_set_value () =
+    let test () =
+      let t = alloc_value_record 1 in
+      t.x <- [||];
+      free t;
+      t.x <- Sys.opaque_identity [| 1 |];
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  type t2 = { mutable x : i64 }
+
+  let field_get_i64 () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- #0L;
+      free t;
+      let _ = Sys.opaque_identity t.x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  let field_set_i64 () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- #0L;
+      free t;
+      t.x <- #1L;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  type t3 = { mutable x : i32 }
+
+  let field_get_i32 () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- #0l;
+      free t;
+      let _ = Sys.opaque_identity t.x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  let field_set_i32 () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- #0l;
+      free t;
+      t.x <- #1l;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  type t4 =
+    { mutable x : float
+    ; mutable y : int
+    }
+
+  let field_get_float () =
+    let test () =
+      let t = alloc_value_record 2 in
+      t.x <- 0.;
+      t.y <- 0;
+      let _ = Sys.opaque_identity t.y in
+      free t;
+      let _ = Sys.opaque_identity t.x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  type t5 = { mutable x : f64 }
+
+  let field_get_f64 () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- #0.;
+      free t;
+      let _ = Sys.opaque_identity t.x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  let field_set_f64 () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- #0.;
+      free t;
+      t.x <- #1.;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  type t6 = { mutable x : f32 }
+
+  let field_get_f32 () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- #0.s;
+      free t;
+      let _ = Sys.opaque_identity t.x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  let field_set_f32 () =
+    let test () =
+      let t = alloc_abstract 1 in
+      t.x <- #0.s;
+      free t;
+      t.x <- #1.s;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  type t7 = { mutable x : float }
+
+  let field_get_float_hack () =
+    let test () =
+      let t : t7 = alloc_floatarray 1 in
+      t.x <- 0.;
+      free t;
+      let _ = Sys.opaque_identity t.x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  let field_set_float_hack () =
+    let test () =
+      let t : t7 = alloc_floatarray 1 in
+      t.x <- 0.;
+      free t;
+      t.x <- 1.;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  external prefetch_read : 'a -> unit = "caml_prefetch_ignore" "caml_prefetch_read_low"
+  [@@noalloc] [@@builtin]
+
+  external prefetch_write : 'a -> unit = "caml_prefetch_ignore" "caml_prefetch_write_low"
+  [@@noalloc] [@@builtin]
+
+  external cldemote : 'a -> unit = "caml_no_bytecode_impl" "caml_cldemote"
+  [@@noalloc] [@@builtin]
+
+  type t8 =
+    { mutable x : i64
+    ; mutable y : i64
+    }
+
+  let prefetch_read_record () =
+    let test () =
+      let t : t8 = alloc_abstract 2 in
+      t.x <- t.x;
+      t.y <- t.y;
+      free t;
+      prefetch_read t;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_read_use_after_free
+  ;;
+
+  let prefetch_write_record () =
+    let test () =
+      let t : t8 = alloc_abstract 2 in
+      t.x <- t.x;
+      t.y <- t.y;
+      free t;
+      prefetch_write t;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  let cldemote_record () =
+    let test () =
+      let t : t8 = alloc_abstract 2 in
+      t.x <- t.x;
+      t.y <- t.y;
+      free t;
+      cldemote t;
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_write_use_after_free
+  ;;
+
+  let valid_accesses_are_unaffected () =
+    let test () =
+      let t0 : t0 = alloc_abstract 1 in
+      t0.x <- 0;
+      let t1 : t1 = alloc_value_record 1 in
+      t1.x <- [||];
+      let t2 : t2 = alloc_abstract 1 in
+      t2.x <- #0L;
+      let t3 : t3 = alloc_abstract 1 in
+      t3.x <- #0l;
+      let t4 : t4 = alloc_value_record 2 in
+      t4.x <- 0.0;
+      t4.y <- 0;
+      let t5 : t5 = alloc_abstract 1 in
+      t5.x <- #0.0;
+      let t6 : t6 = alloc_abstract 1 in
+      t6.x <- #0.0s;
+      let t7 : t7 = alloc_floatarray 1 in
+      t7.x <- 0.0;
+      let _t0_x = Sys.opaque_identity t0.x in
+      let _t1_x = Sys.opaque_identity t1.x in
+      let _t2_x = Sys.opaque_identity t2.x in
+      let _t3_x = Sys.opaque_identity t3.x in
+      let _t4_x = Sys.opaque_identity t4.x in
+      let _t5_x = Sys.opaque_identity t5.x in
+      let _t6_x = Sys.opaque_identity t6.x in
+      let _t7_x = Sys.opaque_identity t7.x in
+      free t0;
+      free t1;
+      free t2;
+      free t3;
+      free t4;
+      free t5;
+      free t6;
+      free t7;
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:(fun test_output ->
+      if test_output <> "" then failwith ("Failed: " ^ test_output))
+  ;;
+
+  let valid_vector_accesses_are_unaffected () =
+    let test () =
+      let bigstring = Bigstring.create 48 in
+      let x = Vec128_bigarray.create_elem #0L #1L in
+      Vec128_bigarray.unsafe_unaligned_set bigstring ~byte:8 x;
+      let _x = Sys.opaque_identity (Vec128_bigarray.unsafe_unaligned_get bigstring ~byte:8) in
+      Vec128_bigarray.unsafe_aligned_set bigstring ~byte:0 x;
+      let _x = Sys.opaque_identity (Vec128_bigarray.unsafe_aligned_get bigstring ~byte:0) in
+      let x = Vec256_bigarray.create_elem #0L #1L #2L #3L in
+      Vec256_bigarray.unsafe_unaligned_set bigstring ~byte:8 x;
+      let _x = Sys.opaque_identity (Vec256_bigarray.unsafe_unaligned_get bigstring ~byte:8) in
+      (* Requires 32-byte alignment, which is true at either byte 0 or 16. *)
+      let byte = Vec256_bigarray.find_alignment bigstring in
+      Vec256_bigarray.unsafe_aligned_set bigstring ~byte x;
+      let _x = Sys.opaque_identity (Vec256_bigarray.unsafe_aligned_get bigstring ~byte) in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:(fun test_output ->
+      if test_output <> "" then failwith ("Failed: " ^ test_output))
+  ;;
+end
+
+module Test_out_of_bounds_accesses = struct
+  let read_int_array () =
+    let test () =
+      let len = 8 in
+      let t : int array = alloc_array len in
+      let x = Array.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_read
+  ;;
+
+  let write_int_array () =
+    let test () =
+      let len = 8 in
+      let t : int array = alloc_array len in
+      let () = Array.unsafe_set t len 0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_write
+  ;;
+
+  let read_obj_array () =
+    let test () =
+      let len = 8 in
+      let t : Obj.t array = alloc_array len in
+      let x = Array.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_read
+  ;;
+
+  let write_obj_array () =
+    let test () =
+      let len = 8 in
+      let t : Obj.t array = alloc_array len in
+      let () = Array.unsafe_set t len (Obj.repr None) in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_write
+  ;;
+
+  let read_float_array () =
+    let test () =
+      let len = 8 in
+      let t : float array = alloc_floatarray len in
+      let x = Array.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_read
+  ;;
+
+  let write_float_array () =
+    let test () =
+      let len = 8 in
+      let t : float array = alloc_floatarray len in
+      let () = Array.unsafe_set t len 0.0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_write
+  ;;
+
+  let write_float_array_via_floatarithmem () =
+    let test () =
+      let len = 8 in
+      let t : float array = alloc_floatarray len in
+      Array.unsafe_set t len (Array.unsafe_get t len +. 1.0);
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_write
+  ;;
+
+  let read_int_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_read
+  ;;
+
+  let write_int_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len 0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_write
+  ;;
+
+  let read_int64_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int64 C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_read
+  ;;
+
+  let write_int64_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int64 C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len 0L in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_write
+  ;;
+
+  let read_float_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Float64 C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_read
+  ;;
+
+  let write_float_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Float64 C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len 0.0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:assert_asan_detected_out_of_bounds_write
+  ;;
+
+  (* [access_size] is currently 8 for complex64 bigarrays instead of 16 like you
+     might expect. This might change with the upcoming vectorizer features. *)
+
+  let read_complex64_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Complex64 C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
+  ;;
+
+  let write_complex64_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Complex64 C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len Complex.zero in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:8)
+  ;;
+
+  let read_int32_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int32 C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:4)
+  ;;
+
+  let write_int32_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int32 C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len 0l in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:4)
+  ;;
+
+  let read_int16_signed_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int16_signed C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:2)
+  ;;
+
+  let write_int16_signed_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int16_signed C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len 0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:2)
+  ;;
+
+  let read_int16_unsigned_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int16_unsigned C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:2)
+  ;;
+
+  let write_int16_unsigned_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int16_unsigned C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len 0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:2)
+  ;;
+
+  let read_int8_signed_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int8_signed C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:1)
+  ;;
+
+  let write_int8_signed_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int8_signed C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len 0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:1)
+  ;;
+
+  let read_int8_unsigned_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int8_unsigned C_layout len in
+      let x = Bigarray.Array1.unsafe_get t len in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:1)
+  ;;
+
+  let write_int8_unsigned_bigarray () =
+    let test () =
+      let len = 8 in
+      let t = Bigarray.Array1.create Int8_unsigned C_layout len in
+      let () = Bigarray.Array1.unsafe_set t len 0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:1)
+  ;;
+
+  let read_vec128_bigarray_aligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 16 in
+      let t = Bigstring.create (len * elem_size) in
+      let x = Vec128_bigarray.unsafe_aligned_get t ~byte:(len * elem_size) in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let write_vec128_bigarray_aligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 16 in
+      let t = Bigstring.create (len * elem_size) in
+      Vec128_bigarray.unsafe_aligned_set
+        t
+        ~byte:(len * elem_size)
+        (Vec128_bigarray.create_elem #0L #1L);
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  let read_vec128_bigarray_unaligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 16 in
+      let offset = 4 in
+      let t = Bigstring.create (len * elem_size) in
+      let x =
+        Vec128_bigarray.unsafe_unaligned_get t
+          ~byte:((len * elem_size) - offset)
+      in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+
+  let write_vec128_bigarray_unaligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 16 in
+      let offset = 4 in
+      let t = Bigstring.create (len * elem_size) in
+      Vec128_bigarray.unsafe_unaligned_set t
+        ~byte:((len * elem_size) - offset)
+        (Vec128_bigarray.create_elem #0L #1L);
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+
+  let read_vec256_bigarray_aligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 32 in
+      let t = Bigstring.create (len * elem_size) in
+      let x = Vec256_bigarray.unsafe_aligned_get t ~byte:(len * elem_size) in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let write_vec256_bigarray_aligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 32 in
+      let t = Bigstring.create (len * elem_size) in
+      Vec256_bigarray.unsafe_aligned_set
+        t
+        ~byte:(len * elem_size)
+        (Vec256_bigarray.create_elem #0L #1L #2L #3L);
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
+
+  let read_vec256_bigarray_unaligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 32 in
+      let offset = 4 in
+      let t = Bigstring.create (len * elem_size) in
+      let x =
+        Vec256_bigarray.unsafe_unaligned_get t
+          ~byte:((len * elem_size) - offset)
+      in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+
+  let write_vec256_bigarray_unaligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 32 in
+      let offset = 4 in
+      let t = Bigstring.create (len * elem_size) in
+      Vec256_bigarray.unsafe_unaligned_set t
+        ~byte:((len * elem_size) - offset)
+        (Vec256_bigarray.create_elem #0L #1L #2L #3L);
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+
+  external bigstring_fetch_and_add_int
+    :  Bigstring.t
+    -> pos:(int[@untagged])
+    -> (int[@untagged])
+    -> (int[@untagged])
+    = "caml_no_bytecode_impl" "caml_bigstring_fetch_and_add_int_untagged"
+  [@@noalloc] [@@builtin]
+
+  let atomic_fetch_and_add_bigstring () =
+    let test () =
+      let len = 32 in
+      let t = Bigstring.create len in
+      let (_ : int) = bigstring_fetch_and_add_int t ~pos:len 0 in
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:4)
+  ;;
+
+  type void : void
+
+  external malloc : nativeint# -> nativeint# = "" "malloc"
+
+  external vec128_load_aligned : nativeint# -> int64x2# = "" "caml_sse_vec128_load_aligned"
+  [@@noalloc] [@@builtin]
+  external vec128_load_unaligned : nativeint# -> int64x2# = "" "caml_sse_vec128_load_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec128_load_known_unaligned : nativeint# -> int64x2# = "" "caml_sse3_vec128_load_known_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec128_store_aligned : nativeint# -> int64x2# -> void = "" "caml_sse_vec128_store_aligned"
+  [@@noalloc] [@@builtin]
+  external vec128_store_unaligned : nativeint# -> int64x2# -> void = "" "caml_sse_vec128_store_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec128_load_aligned_uncached : nativeint# -> int64x2# = "" "caml_sse41_vec128_load_aligned_uncached"
+  [@@noalloc] [@@builtin]
+  external vec128_store_aligned_uncached : nativeint# -> int64x2# -> void = "" "caml_sse_vec128_store_aligned_uncached"
+  [@@noalloc] [@@builtin]
+  external vec128_load_low64 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_low64"
+  [@@noalloc] [@@builtin]
+  external vec128_load_low64_copy_high64 : int64x2# -> nativeint# -> int64x2# = "" "caml_sse2_vec128_load_low64_copy_high64"
+  [@@noalloc] [@@builtin]
+  external vec128_load_high64_copy_low64 : int64x2# -> nativeint# -> int64x2# = "" "caml_sse2_vec128_load_high64_copy_low64"
+  [@@noalloc] [@@builtin]
+  external vec128_load_zero_low64 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_zero_low64"
+  [@@noalloc] [@@builtin]
+  external vec128_load_broadcast64 : nativeint# -> int64x2# = "" "caml_sse3_vec128_load_broadcast64"
+  [@@noalloc] [@@builtin]
+  external vec128_store_low64 : nativeint# -> int64x2# -> void = "" "caml_sse2_vec128_store_low64"
+  [@@noalloc] [@@builtin]
+  external vec128_load_low32 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_low32"
+  [@@noalloc] [@@builtin]
+  external vec128_load_zero_low32 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_zero_low32"
+  [@@noalloc] [@@builtin]
+  external vec128_store_low32 : nativeint# -> int64x2# -> void = "" "caml_sse2_vec128_store_low32"
+  [@@noalloc] [@@builtin]
+  external vec128_store_mask8 : int64x2# -> int64x2# -> nativeint# -> void = "" "caml_sse2_vec128_store_mask8"
+  [@@noalloc] [@@builtin]
+  external vec128_store_int32_uncached : nativeint# -> int32# -> void = "" "caml_sse2_int32_store_uncached"
+  [@@noalloc] [@@builtin]
+  external vec128_store_int64_uncached : nativeint# -> int64# -> void = "" "caml_sse2_int64_store_uncached"
+  [@@noalloc] [@@builtin]
+
+  let vec128_load_aligned () =
+    let test () = let _ = vec128_load_aligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec128_load_unaligned () =
+    let test () = let _ = vec128_load_unaligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec128_load_known_unaligned () =
+    let test () = let _ = vec128_load_known_unaligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec128_store_aligned () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_aligned (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  let vec128_store_unaligned () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_unaligned (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  let vec128_load_aligned_uncached () =
+    let test () = let _ = vec128_load_aligned_uncached (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec128_store_aligned_uncached () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_aligned_uncached (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  let vec128_load_low64 () =
+    let test () = let _ = vec128_load_low64 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
+  ;;
+
+  let vec128_load_low64_copy_high64 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_load_low64_copy_high64 x (malloc #1n) |> Sys.opaque_identity in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
+  ;;
+
+  let vec128_load_high64_copy_low64 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_load_high64_copy_low64 x (malloc #1n) |> Sys.opaque_identity in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
+  ;;
+
+  let vec128_load_zero_low64 () =
+    let test () = let _ = vec128_load_zero_low64 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
+  ;;
+
+  let vec128_load_broadcast64 () =
+    let test () = let _ = vec128_load_broadcast64 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
+  ;;
+
+  let vec128_store_low64 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_low64 (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:8)
+  ;;
+
+  let vec128_load_low32 () =
+    let test () = let _ = vec128_load_low32 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:4)
+  ;;
+
+  let vec128_load_zero_low32 () =
+    let test () = let _ = vec128_load_zero_low32 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:4)
+  ;;
+
+  let vec128_store_low32 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_low32 (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:4)
+  ;;
+
+  let vec128_store_mask8 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_mask8 x x (malloc #1n) in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  let vec128_store_int32_uncached () =
+    let test () =
+      let _ = vec128_store_int32_uncached (malloc #1n) #0l in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:4)
+  ;;
+
+  let vec128_store_int64_uncached () =
+    let test () =
+      let _ = vec128_store_int64_uncached (malloc #1n) #0L in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:8)
+  ;;
+
+  external vec256_load_aligned : nativeint# -> int64x4# = "" "caml_avx_vec256_load_aligned"
+  [@@noalloc] [@@builtin]
+  external vec256_load_unaligned : nativeint# -> int64x4# = "" "caml_avx_vec256_load_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec256_load_known_unaligned : nativeint# -> int64x4# = "" "caml_avx_vec256_load_known_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec256_store_aligned : nativeint# -> int64x4# -> void = "" "caml_avx_vec256_store_aligned"
+  [@@noalloc] [@@builtin]
+  external vec256_store_unaligned : nativeint# -> int64x4# -> void = "" "caml_avx_vec256_store_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec256_load_aligned_uncached : nativeint# -> int64x4# = "" "caml_avx_vec256_load_aligned_uncached"
+  [@@noalloc] [@@builtin]
+  external vec256_store_aligned_uncached : nativeint# -> int64x4# -> void = "" "caml_avx_vec256_store_aligned_uncached"
+  [@@noalloc] [@@builtin]
+  external vec256_broadcast128 : nativeint# -> int64x4# = "" "caml_avx_vec256_load_broadcast128"
+  [@@noalloc] [@@builtin]
+  external vec256_broadcast64 : nativeint# -> int64x4# = "" "caml_avx_vec256_load_broadcast64"
+  [@@noalloc] [@@builtin]
+  external vec256_broadcast32x8 : nativeint# -> int64x4# = "" "caml_avx_vec256_load_broadcast32"
+  [@@noalloc] [@@builtin]
+  external vec256_broadcast32x4 : nativeint# -> int32x4# = "" "caml_avx_vec128_load_broadcast32"
+  [@@noalloc] [@@builtin]
+  external vec256_load_mask64x4 : int64x4# -> nativeint# -> int64x4# = "" "caml_avx_vec256_load_mask64"
+  [@@noalloc] [@@builtin]
+  external vec256_load_mask32x8 : int64x4# -> nativeint# -> int64x4# = "" "caml_avx_vec256_load_mask32"
+  [@@noalloc] [@@builtin]
+  external vec256_store_mask64x4 : nativeint# -> int64x4# -> int64x4# -> void = "" "caml_avx_vec256_store_mask64"
+  [@@noalloc] [@@builtin]
+  external vec256_store_mask32x8 : nativeint# -> int64x4# -> int64x4# -> void = "" "caml_avx_vec256_store_mask32"
+  [@@noalloc] [@@builtin]
+
+  external vec128_load_mask64x2 : int64x2# -> nativeint# -> int64x2# = "" "caml_avx_vec128_load_mask64"
+  [@@noalloc] [@@builtin]
+  external vec128_store_mask64x2 : nativeint# -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask64"
+  [@@noalloc] [@@builtin]
+  external vec128_load_mask32x4 : int64x2# -> nativeint# -> int64x2# = "" "caml_avx_vec128_load_mask32"
+  [@@noalloc] [@@builtin]
+  external vec128_store_mask32x4 : nativeint# -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask32"
+  [@@noalloc] [@@builtin]
+
+  let vec256_load_aligned () =
+    let test () = let _ = vec256_load_aligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec256_load_unaligned () =
+    let test () = let _ = vec256_load_unaligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec256_load_known_unaligned () =
+    let test () = let _ = vec256_load_known_unaligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec256_store_aligned () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_store_aligned (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
+
+  let vec256_store_unaligned () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_store_unaligned (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
+
+  let vec256_load_aligned_uncached () =
+    let test () = let _ = vec256_load_aligned_uncached (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec256_store_aligned_uncached () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_store_aligned_uncached (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
+
+  let vec256_broadcast128 () =
+    let test () = let _ = vec256_broadcast128 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec256_broadcast64 () =
+    let test () = let _ = vec256_broadcast64 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
+  ;;
+
+  let vec256_broadcast32x8 () =
+    let test () = let _ = vec256_broadcast32x8 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:4)
+  ;;
+
+  let vec256_broadcast32x4 () =
+    let test () = let _ = vec256_broadcast32x4 (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:4)
+  ;;
+
+  let vec128_load_mask64x2 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_load_mask64x2 x (malloc #1n) |> Sys.opaque_identity in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec256_load_mask64x4 () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_load_mask64x4 x (malloc #1n) |> Sys.opaque_identity in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec128_load_mask32x4 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_load_mask32x4 x (malloc #1n) |> Sys.opaque_identity in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec256_load_mask32x8 () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_load_mask32x8 x (malloc #1n) |> Sys.opaque_identity in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec128_store_mask64x2 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_mask64x2 (malloc #1n) x x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  let vec256_store_mask64x4 () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_store_mask64x4 (malloc #1n) x x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
+
+  let vec128_store_mask32x4 () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_mask32x4 (malloc #1n) x x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  let vec256_store_mask32x8 () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_store_mask32x8 (malloc #1n) x x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
+end
+
+(* Main entry point *)
+let () =
+  (* We print *something* out regardless of whether or not this test is enabled
+     so that if we somehow fail to run this test at all, it will cause a
+     visible failure. *)
+  print_endline "Possibly running AddressSanitizer tests";
+  (* These tests are only enabled when the compiler was built with AddressSanitizer support *)
+  let should_run_tests =
+    String.equal "true\n" (In_channel.with_open_text Sys.argv.(1) In_channel.input_all)
+  in
+  if should_run_tests
+  then (
+    let () =
+      let open Test_use_after_free in
+      (* Ensure that we aren't producing false-positives *)
+      valid_accesses_are_unaffected ();
+      valid_vector_accesses_are_unaffected ();
+      (* Record use-after-free tests *)
+      field_get_immediate ();
+      field_set_immediate ();
+      field_get_value ();
+      field_set_value ();
+      field_get_i64 ();
+      field_set_i64 ();
+      field_get_i32 ();
+      field_set_i32 ();
+      field_get_float ();
+      field_get_f64 ();
+      field_set_f64 ();
+      field_get_f32 ();
+      field_set_f32 ();
+      field_get_float_hack ();
+      field_set_float_hack ();
+      prefetch_read_record ();
+      prefetch_write_record ();
+      cldemote_record ()
+    in
+    let () =
+      let open Test_out_of_bounds_accesses in
+      (* Out-of-bounds sse load/store tests *)
+      vec128_load_aligned ();
+      vec128_load_unaligned ();
+      vec128_load_known_unaligned ();
+      vec128_store_aligned ();
+      vec128_store_unaligned ();
+      vec128_load_aligned_uncached ();
+      vec128_store_aligned_uncached ();
+      vec128_load_low64 ();
+      vec128_load_low64_copy_high64 ();
+      vec128_load_high64_copy_low64 ();
+      vec128_load_zero_low64 ();
+      vec128_load_broadcast64 ();
+      vec128_store_low64 ();
+      vec128_load_low32 ();
+      vec128_load_zero_low32 ();
+      vec128_store_low32 ();
+      vec128_store_mask8 ();
+      vec128_store_int32_uncached ();
+      vec128_store_int64_uncached ();
+      (* Out-of-bounds avx load/store tests *)
+      vec128_load_mask64x2 ();
+      vec128_store_mask64x2 ();
+      vec128_load_mask32x4 ();
+      vec128_store_mask32x4 ();
+      vec256_load_aligned ();
+      vec256_load_aligned ();
+      vec256_load_unaligned ();
+      vec256_load_known_unaligned ();
+      vec256_store_aligned ();
+      vec256_store_unaligned ();
+      vec256_load_aligned_uncached ();
+      vec256_store_aligned_uncached ();
+      vec256_broadcast128 ();
+      vec256_broadcast64 ();
+      vec256_broadcast32x8 ();
+      vec256_broadcast32x4 ();
+      vec256_load_mask64x4 ();
+      vec256_load_mask32x8 ();
+      vec256_store_mask64x4 ();
+      vec256_store_mask32x8 ();
+      (* Out-of-bounds array access tests *)
+      read_int_array ();
+      write_int_array ();
+      read_obj_array ();
+      write_obj_array ();
+      read_float_array ();
+      write_float_array ();
+      write_float_array_via_floatarithmem ();
+      (* Out-of-bounds bigarray access tests *)
+      read_int_bigarray ();
+      write_int_bigarray ();
+      read_int64_bigarray ();
+      write_int64_bigarray ();
+      read_float_bigarray ();
+      write_float_bigarray ();
+      read_complex64_bigarray ();
+      write_complex64_bigarray ();
+      read_int32_bigarray ();
+      write_int32_bigarray ();
+      read_int16_signed_bigarray ();
+      write_int16_signed_bigarray ();
+      read_int16_unsigned_bigarray ();
+      write_int16_unsigned_bigarray ();
+      read_int8_signed_bigarray ();
+      write_int8_signed_bigarray ();
+      read_int8_unsigned_bigarray ();
+      write_int8_unsigned_bigarray ();
+      read_vec128_bigarray_aligned ();
+      write_vec128_bigarray_aligned ();
+      read_vec128_bigarray_unaligned ();
+      write_vec128_bigarray_unaligned ();
+      read_vec256_bigarray_aligned ();
+      write_vec256_bigarray_aligned ();
+      read_vec256_bigarray_unaligned ();
+      write_vec256_bigarray_unaligned ();
+      atomic_fetch_and_add_bigstring ()
+    in
+    ())
+;;

@@ -32,7 +32,9 @@ open Misc
    of these infos *)
 
 (* Declare machtype here to avoid depending on [Cmm]. *)
-type machtype_component = Val | Addr | Int | Float | Vec128 | Float32 | Valx2
+type machtype_component =
+  Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2
+
 type machtype = machtype_component array
 
 (* [alloc_mode] should be isomorphic to [Cmm.Alloc_mode.t],
@@ -49,7 +51,7 @@ type generic_fns =
     apply_fun: apply_fn list;
     send_fun: apply_fn list }
 
-type unit_infos =
+type 'format unit_infos_gen =
   { mutable ui_unit: Compilation_unit.t;  (* Compilation unit implemented *)
     mutable ui_defines: Compilation_unit.t list;
                                           (* All compilation units in the
@@ -62,7 +64,9 @@ type unit_infos =
                                           (* Interfaces imported *)
     mutable ui_imports_cmx: Import_info.t list;
                                           (* Infos imported *)
-    mutable ui_format: Lambda.main_module_block_format;
+    mutable ui_quoted_globals: Compilation_unit.Name.t list;
+                                          (* Globals that are used in quotes *)
+    mutable ui_format: 'format;
                                           (* Structure of the main module block *)
     mutable ui_generic_fns: generic_fns;  (* Generic functions needed *)
     mutable ui_export_info: Flambda2_cmx.Flambda_cmx_format.t option;
@@ -71,12 +75,15 @@ type unit_infos =
     mutable ui_external_symbols: string list; (* Set of external symbols *)
   }
 
+type unit_infos = Lambda.main_module_block_format unit_infos_gen
+
 type unit_infos_raw =
   { uir_unit: Compilation_unit.t;
     uir_defines: Compilation_unit.t list;
     uir_arg_descr: Lambda.arg_descr option;
     uir_imports_cmi: Import_info.t array;
     uir_imports_cmx: Import_info.t array;
+    uir_quoted_globals: Compilation_unit.Name.t array;
     uir_format: Lambda.main_module_block_format;
     uir_generic_fns: generic_fns;
     uir_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
@@ -99,12 +106,14 @@ type lib_unit_info =
     li_force_link: bool;
     li_imports_cmi : Bitmap.t;  (* subset of lib_imports_cmi *)
     li_imports_cmx : Bitmap.t;  (* subset of lib_imports_cmx *)
+    li_quoted_globals : Bitmap.t;    (* subset of lib_quoted_globals *)
     li_external_symbols: string array;
   }
 
 type library_infos =
   { lib_imports_cmi: Import_info.t array;
     lib_imports_cmx: Import_info.t array;
+    lib_quoted_globals: Compilation_unit.Name.t array;
     lib_units: lib_unit_info list;
     lib_generic_fns: generic_fns;
     (* In the following fields the lists are reversed with respect to

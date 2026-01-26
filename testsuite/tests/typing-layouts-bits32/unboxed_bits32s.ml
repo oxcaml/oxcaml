@@ -131,7 +131,7 @@ let test1 () =
   print_int32u "Test 1, thrice_minus_five" thrice_minus_five;
 
   let twice_minus_five_again = thrice_minus_five - minus_five in
-  print_int32u "Test 1, twice_minus_five_again" twice_minus_five;
+  print_int32u "Test 1, twice_minus_five_again" twice_minus_five_again;
 
   let minus_five_again = twice_minus_five_again / #2l in
   print_int32u "Test 1, minus_five_again" minus_five_again;
@@ -268,6 +268,7 @@ let test3 () =
       3 * (1 + 2 + 3 + 5 + 8) = 57
       6 * (1 + 2 + 3 + 5 + 8) = 114
       9 * (1 + 2 + 3 + 5 + 8) = 171
+     12 * (1 + 2 + 3 + 5 + 8) = 228
   *)
   let steps = Array.init 10 (fun _ -> 0l) in
   let x1 = #1l in
@@ -283,7 +284,7 @@ let test3 () =
   let x8 = (-2, 22) in
 
   let f3_manyargs = f3_manyargs (4,8) x1 x2 x3 x4 x5 x6 x7 x8 x9 steps in
-  print_int32u "Test 3, 171: " (f3_manyargs ());
+  print_int32u "Test 3, 228: " (f3_manyargs ());
   Array.iteri (Printf.printf "  Test 3, step %d: %ld\n") steps
 
 let _ = test3 ()

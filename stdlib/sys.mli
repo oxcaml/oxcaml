@@ -218,12 +218,28 @@ val max_unboxed_int32_array_length : int
 (** Maximum length of a [int32# array].
     In non-native backends, equal to [max_array_length]. *)
 
+val max_untagged_int16_array_length : int
+(** Maximum length of a [int16# array].
+    In non-native backends, equal to [max_array_length]. *)
+
+val max_untagged_int8_array_length : int
+(** Maximum length of a [int8# array].
+    In non-native backends, equal to [max_array_length]. *)
+
+val max_untagged_int_array_length : int
+(** Maximum length of a [int8 array].
+    In non-native backends, equal to [max_array_length]. *)
+
 val max_unboxed_nativeint_array_length : int
 (** Maximum length of a [nativeint# array].
     In non-native backends, equal to [max_array_length]. *)
 
 val max_unboxed_vec128_array_length : int
 (** Maximum length of an unboxed 128-bit simd vector array.
+    Only supported in 64-bit native code. *)
+
+val max_unboxed_vec256_array_length : int
+(** Maximum length of an unboxed 256-bit simd vector array.
     Only supported in 64-bit native code. *)
 
 external runtime_variant : unit -> string = "caml_runtime_variant"
@@ -451,7 +467,8 @@ val runtime_warnings_enabled: unit -> bool
 
 (** {1 Optimization} *)
 
-external[@layout_poly] opaque_identity : ('a : any). 'a -> 'a = "%opaque"
+external[@layout_poly] opaque_identity :
+  ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
 (** For the purposes of optimization, [opaque_identity] behaves like an
     unknown (and thus possibly side-effecting) function.
 
@@ -510,3 +527,15 @@ module Safe : sig
       The provided [signal_behavior] must be [portable] as it is shared between all
       domains. *)
 end
+
+type arch =
+  | Amd64
+  | Arm64
+
+val arch : arch
+
+val amd64 : bool
+(** True if [Sys.arch = Amd64]. *)
+
+val arm64 : bool
+(** True if [Sys.arch = Arm64]. *)

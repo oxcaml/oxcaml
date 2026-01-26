@@ -21,6 +21,7 @@ module Use_info : sig
     | Expected_to_be_used
     | Unused_because_of_call_site_decision
     | Unused_because_function_unknown
+    | Jsir_inlining_disabled
 
   val explanation : t -> string option
 end

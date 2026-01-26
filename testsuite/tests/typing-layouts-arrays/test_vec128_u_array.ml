@@ -2,7 +2,6 @@
  readonly_files = "gen_u_array.ml test_gen_u_array.ml";
  modules = "${readonly_files} stubs.c";
  include stdlib_upstream_compatible;
- arch_amd64;
  flambda2;
  {
    flags = "-extension layouts_beta -extension simd_beta";
@@ -274,6 +273,13 @@ let () =
   let d = [| const #1L; const #2L |] in
   (match d with
     | [| a; b |] ->
+      assert (a = const #1L);
+      assert (b = const #2L)
+    | _ -> assert false);
+
+  let d = [: const #1L; const #2L :] in
+  (match d with
+    | [: a; b :] ->
       assert (a = const #1L);
       assert (b = const #2L)
     | _ -> assert false);

@@ -63,7 +63,7 @@ let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
   let comp_unit = Symbol.compilation_unit symbol in
   match load_cmx_file_contents loader comp_unit with
-  | None -> Value_unknown
+  | None -> Unknown Flambda_kind.value
   | Some typing_env ->
     let find_code code_id =
       match Exported_code.find loader.imported_code code_id with
@@ -82,12 +82,16 @@ let all_predefined_exception_symbols () =
   Predef.all_predef_exns |> List.map symbol_for_global |> Symbol.Set.of_list
 
 let predefined_exception_typing_env () =
-  let comp_unit = Compilation_unit.get_current () in
-  Compilation_unit.set_current (Some Compilation_unit.predef_exn);
+  let unit_info = Env.get_unit_name () in
+  let predef_unit_info =
+    Unit_info.make_dummy ~input_name:"<predefined exceptions>"
+      Compilation_unit.predef_exn
+  in
+  Env.set_unit_name (Some predef_unit_info);
   let typing_env =
     TE.Serializable.predefined_exceptions (all_predefined_exception_symbols ())
   in
-  Compilation_unit.set_current comp_unit;
+  Env.set_unit_name unit_info;
   typing_env
 
 let create_loader ~get_module_info =
@@ -216,13 +220,16 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   let exported_offsets =
     exported_offsets
     |> Exported_offsets.reexport_function_slots
-         (Name_occurrences.all_function_slots free_names_of_all_code)
+         (Name_occurrences.all_function_slots_at_normal_mode
+            free_names_of_all_code)
     |> Exported_offsets.reexport_value_slots
-         (Name_occurrences.all_value_slots free_names_of_all_code)
+         (Name_occurrences.all_value_slots_at_normal_mode free_names_of_all_code)
     |> Exported_offsets.reexport_function_slots
-         (Name_occurrences.all_function_slots slots_used_in_typing_env)
+         (Name_occurrences.all_function_slots_at_normal_mode
+            slots_used_in_typing_env)
     |> Exported_offsets.reexport_value_slots
-         (Name_occurrences.all_value_slots slots_used_in_typing_env)
+         (Name_occurrences.all_value_slots_at_normal_mode
+            slots_used_in_typing_env)
   in
   let cmx =
     Flambda_cmx_format.create ~final_typing_env ~all_code ~exported_offsets
@@ -251,8 +258,8 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
     prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
       ~used_value_slots ~canonicalise ~exported_offsets all_code
 
-let prepare_cmx_from_approx ~approxs ~module_symbol ~exported_offsets
-    ~used_value_slots all_code =
+let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
+    ~exported_offsets ~used_value_slots all_code =
   if Flambda_features.opaque ()
   then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
   else
@@ -262,7 +269,8 @@ let prepare_cmx_from_approx ~approxs ~module_symbol ~exported_offsets
           (fun sym _ -> Name_occurrences.mem_symbol reachable_names sym)
           approxs
       in
-      TE.Serializable.create_from_closure_conversion_approx approxs
+      TE.Serializable.create_from_closure_conversion_approx ~machine_width
+        approxs
     in
     let free_names_of_name name =
       let symbol = Name.must_be_symbol name in

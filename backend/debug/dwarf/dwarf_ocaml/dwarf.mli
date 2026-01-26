@@ -26,7 +26,7 @@ type t
 val create :
   sourcefile:string ->
   unit_name:Ident.t ->
-  asm_directives:(module Asm_directives.S) ->
+  asm_directives:Asm_directives_dwarf.t ->
   get_file_id:(string -> int) ->
   code_begin:Asm_symbol.t ->
   code_end:Asm_symbol.t ->
@@ -38,7 +38,11 @@ type fundecl = private
   }
 
 val dwarf_for_fundecl :
-  t -> Linear.fundecl -> fun_end_label:Cmm.label -> fundecl
+  t ->
+  Linear.fundecl ->
+  fun_end_label:Cmm.label ->
+  ppf_dump:Format.formatter ->
+  fundecl
 
 (** Write the DWARF information to the assembly file. This should only be called
     once all (in)constants and function declarations have been passed to the

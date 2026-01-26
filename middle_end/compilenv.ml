@@ -24,7 +24,7 @@
 open Config
 open Cmx_format
 
-module File_sections = Flambda_backend_utils.File_sections
+module File_sections = Oxcaml_utils.File_sections
 
 module CU = Compilation_unit
 
@@ -57,7 +57,8 @@ let current_unit =
     ui_arg_descr = None;
     ui_imports_cmi = [];
     ui_imports_cmx = [];
-    ui_format = Mb_struct { mb_size = -1 };
+    ui_quoted_globals = [];
+    ui_format = ();
     ui_generic_fns = { curry_fun = []; apply_fun = []; send_fun = [] };
     ui_force_link = false;
     ui_zero_alloc_info = Zero_alloc_info.create ();
@@ -65,16 +66,18 @@ let current_unit =
     ui_external_symbols = [];
   }
 
-let reset compilation_unit =
+let reset unit_info =
+  let compilation_unit = Unit_info.modname unit_info in
   Infos_table.clear global_infos_table;
   Zero_alloc_info.reset cached_zero_alloc_info;
-  CU.set_current (Some compilation_unit);
+  Env.set_unit_name (Some unit_info);
   current_unit.ui_unit <- compilation_unit;
   current_unit.ui_defines <- [compilation_unit];
   current_unit.ui_arg_descr <- None;
   current_unit.ui_imports_cmi <- [];
   current_unit.ui_imports_cmx <- [];
-  current_unit.ui_format <- Mb_struct { mb_size = -1 };
+  current_unit.ui_quoted_globals <- [];
+  current_unit.ui_format <- ();
   current_unit.ui_generic_fns <-
     { curry_fun = []; apply_fun = []; send_fun = [] };
   current_unit.ui_force_link <- !Clflags.link_everything;
@@ -117,6 +120,7 @@ let read_unit_info filename =
       ui_arg_descr = uir.uir_arg_descr;
       ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
       ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
+      ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
       ui_generic_fns = uir.uir_generic_fns;
       ui_export_info = export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
@@ -144,13 +148,13 @@ let read_library_info filename =
 let equal_args arg1 arg2 =
   let ({ param = name1; value = value1 } : CU.argument) = arg1 in
   let ({ param = name2; value = value2 } : CU.argument) = arg2 in
-  CU.equal name1 name2 && CU.equal value1 value2
+  CU.Name.equal name1 name2 && CU.equal value1 value2
 
 let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
   && List.equal equal_args (CU.instance_arguments cu1) (CU.instance_arguments cu2)
 
-let get_unit_info comp_unit =
+let get_unit_export_info comp_unit =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
@@ -159,51 +163,51 @@ let get_unit_info comp_unit =
      that. *)
   if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
   then
-    Some current_unit
+    current_unit.ui_export_info
   else begin
     let name = CU.to_global_name_without_prefix comp_unit in
     try
-      Infos_table.find global_infos_table name
+      let ui = Infos_table.find global_infos_table name in
+      Option.bind ui (fun ui -> ui.ui_export_info)
     with Not_found ->
       let (infos, crc) =
         if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
         else begin
+          let missing_extension =
+            match !Clflags.jsir with
+            | false -> "cmx"
+            | true -> "cmjx"
+          in
           try
             let filename =
               Load_path.find_normalized
-                (CU.base_filename comp_unit ^ ".cmx") in
+                (CU.base_filename comp_unit ^ "." ^ missing_extension) in
             let (ui, crc) = read_unit_info filename in
             if not (CU.equal ui.ui_unit comp_unit) then
               raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
             cache_zero_alloc_info ui.ui_zero_alloc_info;
             (Some ui, Some crc)
           with Not_found ->
-            let warn = Warnings.No_cmx_file (Global_module.Name.to_string name) in
-              Location.prerr_warning Location.none warn;
-              (None, None)
+            let warn =
+              Warnings.No_cmx_file
+                { missing_extension
+                ; module_name = Global_module.Name.to_string name }
+            in
+            Location.prerr_warning Location.none warn;
+            (None, None)
           end
       in
       let import = Import_info.create_normal comp_unit ~crc in
       current_unit.ui_imports_cmx <- import :: current_unit.ui_imports_cmx;
       Infos_table.add global_infos_table name infos;
-      infos
+      Option.bind infos (fun ui -> ui.ui_export_info)
   end
 
 let which_cmx_file comp_unit =
   CU.which_cmx_file comp_unit ~accessed_by:(CU.get_current_exn ())
 
-let get_unit_export_info comp_unit =
-  match get_unit_info comp_unit with
-  | None -> None
-  | Some ui -> ui.ui_export_info
-
-let get_global_info comp_unit =
-  get_unit_info (which_cmx_file comp_unit)
-
-let get_global_export_info id =
-  match get_global_info id with
-  | None -> None
-  | Some ui -> ui.ui_export_info
+let get_global_export_info comp_unit =
+  get_unit_export_info (which_cmx_file comp_unit)
 
 let cache_unit_info ui =
   cache_zero_alloc_info ui.ui_zero_alloc_info;
@@ -275,6 +279,7 @@ let write_unit_info info filename =
     uir_arg_descr = info.ui_arg_descr;
     uir_imports_cmi = Array.of_list info.ui_imports_cmi;
     uir_imports_cmx = Array.of_list info.ui_imports_cmx;
+    uir_quoted_globals = Array.of_list info.ui_quoted_globals;
     uir_format = info.ui_format;
     uir_generic_fns = info.ui_generic_fns;
     uir_export_info = raw_export_info;
@@ -284,25 +289,25 @@ let write_unit_info info filename =
     uir_sections_length = total_length;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
   } in
-  let oc = open_out_bin filename in
+  Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
   output_value oc raw_info;
   Array.iter (output_string oc) serialized_sections;
   flush oc;
   let crc = Digest.file filename in
-  Digest.output oc crc;
-  close_out oc
+  Digest.output oc crc)
 
 let save_unit_info filename ~main_module_block_format ~arg_descr =
   current_unit.ui_imports_cmi <- Env.imports();
+  current_unit.ui_quoted_globals <- Env.quoted_globals();
   (* We could have [set_main_module_block_format] and [set_arg_descr] instead
      of passing these in as arguments but, unlike most of the state that this
      module keeps track of, they're not values that get accumulated over time,
      they just get computed once. (Arguably we should remove [set_export_info]
      by the same reasoning.) *)
   current_unit.ui_arg_descr <- arg_descr;
-  current_unit.ui_format <- main_module_block_format;
-  write_unit_info current_unit filename
+  write_unit_info
+    { current_unit with ui_format = main_module_block_format } filename
 
 let new_const_symbol () =
   Symbol.for_new_const_in_current_unit ()
@@ -310,7 +315,9 @@ let new_const_symbol () =
   |> Linkage_name.to_string
 
 let require_global global_ident =
-  ignore (get_global_info global_ident : Cmx_format.unit_infos option)
+  ignore
+    (get_global_export_info global_ident
+     : Flambda2_cmx.Flambda_cmx_format.t option)
 
 (* Error report *)
 

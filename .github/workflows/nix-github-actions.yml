@@ -1,0 +1,49 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+name: Nix Flake Actions
+
+on:
+  push:
+    branches:
+      - main
+      - '*microbranch'
+    tags:
+      - '*'
+  pull_request:
+
+jobs:
+  nix-matrix:
+    runs-on: warp-ubuntu-latest-arm64-8x
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - id: set-matrix
+        name: Generate Nix Matrix
+        run: |
+          set -Eeuo pipefail
+          echo -n 'matrix=' >> "$GITHUB_OUTPUT"
+          nix eval --json '.#githubActions.matrix' | tee -a "$GITHUB_OUTPUT"
+
+  nix-build:
+    name: ${{ matrix.name }} (${{ matrix.system }})
+    needs: nix-matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix: ${{fromJSON(needs.nix-matrix.outputs.matrix)}}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - run: nix build -L '.#${{ matrix.attr }}'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true

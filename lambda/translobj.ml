@@ -88,7 +88,7 @@ let prim_makearray =
 
 (* Also use it for required globals *)
 let transl_label_init_general f =
-  let expr, size = f () in
+  let expr, repr = f () in
   let expr =
     Hashtbl.fold
       (fun c id expr ->
@@ -99,7 +99,8 @@ let transl_label_init_general f =
          (* CR ncourant: this *should* not be too precise for the moment,
             but we should take care, or fix the underlying cause that led
             us to using [Popaque]. *)
-         Llet(Alias, layout, id, const, expr))
+         (* CR sspies: Can we find a better [debug_uid] here? *)
+         Llet(Alias, layout, id, Lambda.debug_uid_none, const, expr))
       consts expr
   in
   (*let expr =
@@ -109,52 +110,31 @@ let transl_label_init_general f =
   in
   Env.reset_required_globals ();*)
   reset_labels ();
-  expr, size
+  expr, repr
 
 let transl_label_init_flambda f =
   assert(Config.flambda || Config.flambda2);
   let method_cache_id = Ident.create_local "method_cache" in
+  let method_cache_duid = Lambda.debug_uid_none in
   method_cache := Lvar method_cache_id;
   (* Calling f (usually Translmod.transl_struct) requires the
      method_cache variable to be initialised to be able to generate
      method accesses. *)
-  let expr, size = f () in
+  let expr, repr = f () in
   let expr =
     if !method_count = 0 then expr
     else
       Llet (Strict, Lambda.layout_array Pgenarray, method_cache_id,
+        method_cache_duid,
         Lprim (Pccall prim_makearray,
                [int !method_count; int 0],
                Loc_unknown),
         expr)
   in
-  transl_label_init_general (fun () -> expr, size)
-
-let transl_store_label_init glob size f arg =
-  assert(not (Config.flambda || Config.flambda2));
-  assert(!Clflags.native_code);
-  method_cache := Lprim(mod_field ~read_semantics:Reads_vary size,
-                        (* XXX KC: conservative *)
-                        [Lprim(Pgetglobal glob, [], Loc_unknown)],
-                        Loc_unknown);
-  let expr = f arg in
-  let (size, expr) =
-    if !method_count = 0 then (size, expr) else
-    (size+1,
-     Lsequence(
-     Lprim(mod_setfield size,
-           [Lprim(Pgetglobal glob, [], Loc_unknown);
-            Lprim (Pccall prim_makearray,
-                   [int !method_count; int 0],
-                   Loc_unknown)],
-           Loc_unknown),
-     expr))
-  in
-  let lam, size = transl_label_init_general (fun () -> (expr, size)) in
-  size, lam
+  transl_label_init_general (fun () -> expr, repr)
 
 let transl_label_init f =
-  if !Clflags.native_code then
+  if !Clflags.native_code || Clflags.is_flambda2 () then
     transl_label_init_flambda f
   else
     transl_label_init_general f
@@ -192,6 +172,8 @@ let oo_wrap_gen env req f x =
                         Loc_unknown)
                 in
                 Llet(StrictOpt, Lambda.layout_class, id,
+                     Lambda.debug_uid_none,
+                     (* CR sspies: Can we find a better [debug_uid] here? *)
                      Lprim (Popaque Lambda.layout_class, [cl], Loc_unknown),
                      lambda))
              lambda !classes

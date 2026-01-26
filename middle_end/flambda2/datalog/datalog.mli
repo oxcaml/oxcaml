@@ -33,6 +33,14 @@ module String : sig
   include Heterogenous_list.S with type 'a t := string
 end
 
+type bindings
+
+type bindings_ref
+
+val get_bindings : bindings_ref -> bindings
+
+val print_bindings : Format.formatter -> bindings -> unit
+
 (** The type [('p, 'v) program] is the type of programs returning
       values of type ['v] with parameters ['p].
 
@@ -45,8 +53,11 @@ val map_program : ('p, 'a) program -> ('a -> 'b) -> ('p, 'b) program
 
 val compile : 'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> 'a
 
-val with_parameters :
-  'p String.hlist -> ('p Term.hlist -> ('p, 'a) program) -> (nil, 'a) program
+val compile_with_parameters :
+  'p String.hlist ->
+  'v String.hlist ->
+  ('p Term.hlist -> 'v Term.hlist -> ('p, 'a) program) ->
+  'a
 
 val foreach :
   'a String.hlist -> ('a Term.hlist -> ('p, 'b) program) -> ('p, 'b) program
@@ -63,10 +74,26 @@ val unless_atom :
   ('p, 'a) program ->
   ('p, 'a) program
 
+val unless_eq :
+  'k Value.repr ->
+  'k Term.t ->
+  'k Term.t ->
+  ('p, 'a) program ->
+  ('p, 'a) program
+
+val filter :
+  ('k Constant.hlist -> bool) ->
+  'k Term.hlist ->
+  ('p, 'a) program ->
+  ('p, 'a) program
+
 type callback
 
-val create_callback :
-  ('a Constant.hlist -> unit) -> name:string -> 'a Term.hlist -> callback
+val create_callback_with_bindings :
+  (bindings_ref -> 'a Constant.hlist -> unit) ->
+  name:string ->
+  'a Term.hlist ->
+  callback
 
 val yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.With_parameters.t) program
 

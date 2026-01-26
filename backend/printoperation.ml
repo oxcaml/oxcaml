@@ -15,7 +15,12 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Const_float32 f -> fprintf ppf "%Fs" (Int32.float_of_bits f)
   | Const_float f -> fprintf ppf "%F" (Int64.float_of_bits f)
   | Const_symbol s -> fprintf ppf "\"%s\"" s.sym_name
-  | Const_vec128 { high; low } -> fprintf ppf "%016Lx:%016Lx" high low
+  | Const_vec128 { word0; word1 } -> fprintf ppf "%016Lx:%016Lx" word0 word1
+  | Const_vec256 { word0; word1; word2; word3 } ->
+    fprintf ppf "%016Lx:%016Lx:%016Lx:%016Lx" word0 word1 word2 word3
+  | Const_vec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
+    fprintf ppf "%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx" word0
+      word1 word2 word3 word4 word5 word6 word7
   | Stackoffset n -> fprintf ppf "offset stack %i" n
   | Load { memory_chunk; addressing_mode; mutability = Immutable; is_atomic } ->
     fprintf ppf "%s %a[%a]"
@@ -51,6 +56,16 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
       fprintf ppf "%a%s%a" reg arg.(0)
         (Operation.string_of_integer_operation op)
         reg arg.(1))
+  | Int128op (Imul64 _ as op) ->
+    assert (Array.length arg = 2);
+    fprintf ppf "%a%s%a" reg arg.(0)
+      (Operation.string_of_int128_operation op)
+      reg arg.(1)
+  | Int128op ((Iadd128 | Isub128) as op) ->
+    assert (Array.length arg = 4);
+    fprintf ppf "(%a,%a)%s(%a,%a)" reg arg.(0) reg arg.(1)
+      (Operation.string_of_int128_operation op)
+      reg arg.(2) reg arg.(3)
   | Intop_imm (op, n) ->
     fprintf ppf "%a%s%i" reg arg.(0)
       (Operation.string_of_integer_operation op)
@@ -99,8 +114,7 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Static_cast cast ->
     fprintf ppf "%s %a" (Printcmm.static_cast cast) reg arg.(0)
   | Opaque -> fprintf ppf "opaque %a" reg arg.(0)
-  | Name_for_debugger
-      { ident; which_parameter; regs = r; provenance = _; is_assignment = _ } ->
+  | Name_for_debugger { ident; which_parameter; regs = r; provenance = _ } ->
     fprintf ppf "%a holds the value of %a%s" regs r Backend_var.print ident
       (match which_parameter with
       | None -> ""
@@ -109,8 +123,14 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | End_region -> fprintf ppf "endregion %a" reg arg.(0)
   | Specific op -> Arch.print_specific_operation reg op ppf arg
   | Dls_get -> fprintf ppf "dls_get"
+  | Tls_get -> fprintf ppf "tls_get"
   | Poll -> fprintf ppf "poll call"
-  | Probe_is_enabled { name } -> fprintf ppf "probe_is_enabled \"%s\"" name
+  | Pause -> fprintf ppf "pause"
+  | Probe_is_enabled { name; enabled_at_init } ->
+    fprintf ppf "probe_is_enabled \"%s\"%s" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")
   | External_without_caml_c_call
       { func_symbol; effects = _; ty_res = _; ty_args = _; stack_ofs = _ } ->
     fprintf ppf "extcall %s" func_symbol

@@ -20,6 +20,8 @@
 module Expanded_type : sig
   type t
 
+  val create_const : Reg_width_const.t -> t
+
   val create_value : Type_grammar.head_of_kind_value -> t
 
   val create_naked_immediate : Type_grammar.head_of_kind_naked_immediate -> t
@@ -28,6 +30,10 @@ module Expanded_type : sig
 
   val create_naked_float : Type_grammar.head_of_kind_naked_float -> t
 
+  val create_naked_int8 : Type_grammar.head_of_kind_naked_int8 -> t
+
+  val create_naked_int16 : Type_grammar.head_of_kind_naked_int16 -> t
+
   val create_naked_int32 : Type_grammar.head_of_kind_naked_int32 -> t
 
   val create_naked_int64 : Type_grammar.head_of_kind_naked_int64 -> t
@@ -35,6 +41,10 @@ module Expanded_type : sig
   val create_naked_nativeint : Type_grammar.head_of_kind_naked_nativeint -> t
 
   val create_naked_vec128 : Type_grammar.head_of_kind_naked_vec128 -> t
+
+  val create_naked_vec256 : Type_grammar.head_of_kind_naked_vec256 -> t
+
+  val create_naked_vec512 : Type_grammar.head_of_kind_naked_vec512 -> t
 
   val create_rec_info : Type_grammar.head_of_kind_rec_info -> t
 
@@ -52,6 +62,8 @@ module Expanded_type : sig
 
   val is_unknown : t -> bool
 
+  val is_unknown_maybe_null : t -> bool
+
   val to_type : t -> Type_grammar.t
 
   type descr = private
@@ -59,10 +71,14 @@ module Expanded_type : sig
     | Naked_immediate of Type_grammar.head_of_kind_naked_immediate
     | Naked_float32 of Type_grammar.head_of_kind_naked_float32
     | Naked_float of Type_grammar.head_of_kind_naked_float
+    | Naked_int8 of Type_grammar.head_of_kind_naked_int8
+    | Naked_int16 of Type_grammar.head_of_kind_naked_int16
     | Naked_int32 of Type_grammar.head_of_kind_naked_int32
     | Naked_int64 of Type_grammar.head_of_kind_naked_int64
     | Naked_nativeint of Type_grammar.head_of_kind_naked_nativeint
     | Naked_vec128 of Type_grammar.head_of_kind_naked_vec128
+    | Naked_vec256 of Type_grammar.head_of_kind_naked_vec256
+    | Naked_vec512 of Type_grammar.head_of_kind_naked_vec512
     | Rec_info of Type_grammar.head_of_kind_rec_info
     | Region of Type_grammar.head_of_kind_region
 
@@ -76,6 +92,9 @@ module Expanded_type : sig
         Type_grammar.head_of_kind_naked_float32 Or_unknown_or_bottom.t
     | Naked_float of
         Type_grammar.head_of_kind_naked_float Or_unknown_or_bottom.t
+    | Naked_int8 of Type_grammar.head_of_kind_naked_int8 Or_unknown_or_bottom.t
+    | Naked_int16 of
+        Type_grammar.head_of_kind_naked_int16 Or_unknown_or_bottom.t
     | Naked_int32 of
         Type_grammar.head_of_kind_naked_int32 Or_unknown_or_bottom.t
     | Naked_int64 of
@@ -84,6 +103,10 @@ module Expanded_type : sig
         Type_grammar.head_of_kind_naked_nativeint Or_unknown_or_bottom.t
     | Naked_vec128 of
         Type_grammar.head_of_kind_naked_vec128 Or_unknown_or_bottom.t
+    | Naked_vec256 of
+        Type_grammar.head_of_kind_naked_vec256 Or_unknown_or_bottom.t
+    | Naked_vec512 of
+        Type_grammar.head_of_kind_naked_vec512 Or_unknown_or_bottom.t
     | Rec_info of Type_grammar.head_of_kind_rec_info Or_unknown_or_bottom.t
     | Region of Type_grammar.head_of_kind_region Or_unknown_or_bottom.t
 
@@ -101,6 +124,8 @@ val expand_head0 :
 val is_bottom : Typing_env.t -> Type_grammar.t -> bool
 
 val is_unknown : Typing_env.t -> Type_grammar.t -> bool
+
+val is_unknown_maybe_null : Typing_env.t -> Type_grammar.t -> bool
 
 val is_alias_to_a_symbol : Type_grammar.t -> bool
 

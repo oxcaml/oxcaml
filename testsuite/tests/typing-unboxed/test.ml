@@ -266,7 +266,7 @@ Error: Signature mismatch:
          external f : int -> int = "f" "f_nat" [@@noalloc]
        is not included in
          external f : int -> int = "f" "f_nat"
-       The first primitive is "[@@noalloc]" but the second is not
+       The left-hand side primitive is "[@@noalloc]" but the right-hand side is not
 |}]
 
 (* Bad: attributes in the interface but not in the implementation *)
@@ -429,7 +429,7 @@ Error: Signature mismatch:
          external f : int -> int = "f" "f_nat"
        is not included in
          external f : int -> int = "f" "f_nat" [@@noalloc]
-       The second primitive is "[@@noalloc]" but the first is not
+       The right-hand side primitive is "[@@noalloc]" but the left-hand side is not
 |}]
 
 (* Bad: claiming something is a primitive when it isn't *)
@@ -636,8 +636,8 @@ external g : (float [@untagged]) -> float = "g" "g_nat";;
 Line 1, characters 14-19:
 1 | external g : (float [@untagged]) -> float = "g" "g_nat";;
                   ^^^^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 external h : (int [@unboxed]) -> float = "h" "h_nat";;
 [%%expect{|

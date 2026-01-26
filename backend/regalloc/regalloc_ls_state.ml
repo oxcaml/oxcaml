@@ -3,26 +3,27 @@
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
 open! Regalloc_ls_utils
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 type t =
   { interval_dll : Interval.t DLL.t;
     active : ClassIntervals.t Reg_class.Tbl.t;
     stack_slots : Regalloc_stack_slots.t;
-    instruction_id : InstructionId.sequence
+    affinity : Regalloc_affinity.t;
+    ls_order_tbl : int InstructionId.Tbl.t
   }
 
 let for_fatal t =
   ( DLL.map t.interval_dll ~f:Interval.copy,
     Reg_class.Tbl.map t.active ~f:ClassIntervals.copy )
 
-let[@inline] make ~stack_slots ~last_used =
+let[@inline] make ~stack_slots ~affinity =
   let interval_dll = DLL.make_empty () in
   let active =
     Reg_class.Tbl.init ~f:(fun _reg_class -> ClassIntervals.make ())
   in
-  let instruction_id = InstructionId.make_sequence ~last_used () in
-  { interval_dll; active; stack_slots; instruction_id }
+  let ls_order_tbl = InstructionId.Tbl.create 32 in
+  { interval_dll; active; stack_slots; affinity; ls_order_tbl }
 
 (* CR-someday xclerc: consider using Dynarray *)
 type class_interval_array =
@@ -112,8 +113,19 @@ let[@inline] active_classes state = state.active
 
 let[@inline] stack_slots state = state.stack_slots
 
-let[@inline] get_and_incr_instruction_id state =
-  InstructionId.get_and_incr state.instruction_id
+let[@inline] affinity state = state.affinity
+
+let[@inline] set_ls_order state ~instruction_id ~ls_order =
+  InstructionId.Tbl.replace state.ls_order_tbl instruction_id ls_order
+
+let[@inline] get_ls_order state ~instruction_id =
+  try InstructionId.Tbl.find state.ls_order_tbl instruction_id
+  with Not_found ->
+    fatal "Regalloc_ls_state.get_ls_order: instruction_id %a not found"
+      InstructionId.print instruction_id
+
+let ls_order_mapping state : InstructionId.t -> int =
+ fun instruction_id -> get_ls_order state ~instruction_id
 
 let rec check_ranges (prev : Range.t) (cell : Range.t DLL.cell option) : int =
   if prev.begin_ > prev.end_
@@ -184,17 +196,18 @@ let[@inline] invariant_intervals state cfg_with_infos =
                interval_map"
               Printreg.reg reg
           | Some interval ->
-            if instr.ls_order < interval.begin_
+            let ls_order = get_ls_order state ~instruction_id:instr.id in
+            if ls_order < interval.begin_
             then
               fatal
                 "Regalloc_ls_state.invariant_intervals: instr.ls_order < \
                  interval.begin_";
-            if instr.ls_order > interval.end_
+            if ls_order > interval.end_
             then
               fatal
                 "Regalloc_ls_state.invariant_intervals: instr.ls_order > \
                  interval.end_";
-            if not (is_in_a_range instr.ls_order (DLL.hd_cell interval.ranges))
+            if not (is_in_a_range ls_order (DLL.hd_cell interval.ranges))
             then
               fatal
                 "Regalloc_ls_state.invariant_intervals: not (is_in_a_range \

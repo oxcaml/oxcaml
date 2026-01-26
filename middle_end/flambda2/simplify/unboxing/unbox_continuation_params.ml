@@ -19,7 +19,7 @@ module U = Unboxing_types
 module Decisions = U.Decisions
 
 let refine_decision_based_on_arg_types_at_uses ~pass ~rewrite_ids_seen
-    ~rewrites_ids_known_as_invalid nth_arg arg_type_by_use_id
+    ~rewrites_ids_known_as_invalid ~machine_width nth_arg arg_type_by_use_id
     (decision : U.decision) =
   match decision with
   | Do_not_unbox _ as decision -> decision, rewrites_ids_known_as_invalid
@@ -46,7 +46,8 @@ let refine_decision_based_on_arg_types_at_uses ~pass ~rewrite_ids_seen
           try
             let decision =
               Unboxing_epa.compute_extra_args_for_one_decision_and_use ~pass
-                rewrite_id ~typing_env_at_use unboxed_arg decision
+                rewrite_id ~typing_env_at_use ~machine_width unboxed_arg
+                decision
             in
             decision, invalids
           with Unboxing_epa.Invalid_apply_cont ->
@@ -112,10 +113,11 @@ let make_decisions ~continuation_arg_types denv params params_types :
                be great most of the time. *)
             decision, invalids
           else
+            let machine_width = DE.machine_width denv in
             let decision, invalids =
               refine_decision_based_on_arg_types_at_uses ~rewrite_ids_seen:empty
-                ~rewrites_ids_known_as_invalid:invalids nth arg_type_by_use_id
-                ~pass:Filter decision
+                ~rewrites_ids_known_as_invalid:invalids ~machine_width nth
+                arg_type_by_use_id ~pass:Filter decision
             in
             let decision =
               Is_unboxing_beneficial.filter_non_beneficial_decisions decision
@@ -151,7 +153,32 @@ let make_decisions ~continuation_arg_types denv params params_types :
   ( denv,
     { decisions; rewrite_ids_seen; rewrites_ids_known_as_invalid = invalids } )
 
-let compute_extra_params_and_args
+let make_decisions ~continuation_arg_types denv params params_types =
+  Profile.record_call_with_counters ~accumulate:true
+    ~counter_f:(fun (_, ({ decisions; _ } : Decisions.t)) ->
+      let counters = Profile.Counters.create () in
+      List.fold_left
+        (fun counters (_, (decision : U.decision)) ->
+          match decision with
+          | Unbox _ ->
+            (* For reference: how many times did we suceed? *)
+            Profile.Counters.incr "unbox" counters
+          | Do_not_unbox
+              ( Not_beneficial | Incomplete_parameter_type
+              | Not_enough_information_at_use | All_fields_invalid ) ->
+            Profile.Counters.incr "do_not_unbox" counters
+          | Do_not_unbox Max_depth_exceeded ->
+            (* Should be rare, but interesting to know if it's not. *)
+            Profile.Counters.incr "max_depth_exceeded" counters
+          | Do_not_unbox (Not_of_kind_value | Unboxing_not_requested) ->
+            (* Not interesting to count these -- we can't do better and we
+               probably didn't even try. *)
+            counters)
+        counters decisions)
+    "make_unboxing_decisions"
+    (fun () -> make_decisions ~continuation_arg_types denv params params_types)
+
+let compute_extra_params_and_args ~machine_width
     ({ decisions; rewrite_ids_seen; rewrites_ids_known_as_invalid } :
       Decisions.t) ~arg_types_by_use_id existing_extra_params_and_args =
   let _, extra_params_and_args, _ =
@@ -161,8 +188,8 @@ let compute_extra_params_and_args
         let decision, invalids =
           refine_decision_based_on_arg_types_at_uses
             ~pass:Compute_all_extra_args ~rewrite_ids_seen
-            ~rewrites_ids_known_as_invalid:invalids nth arg_type_by_use_id
-            decision
+            ~rewrites_ids_known_as_invalid:invalids ~machine_width nth
+            arg_type_by_use_id decision
         in
         let extra_params_and_args =
           Unboxing_epa.add_extra_params_and_args extra_params_and_args ~invalids

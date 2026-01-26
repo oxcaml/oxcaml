@@ -84,109 +84,21 @@ val ebp : arg
 val esp : arg
 
 val mem32 :
-  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg64 -> arg
+  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg_idx -> arg
 
 val mem64 :
-  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg64 -> arg
+  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg_idx -> arg
 
 val mem64_rip : data_type -> ?ofs:int -> string -> arg
-
-module D : sig
-  (** Directives *)
-
-  (* If data is true then null bytes are used for padding, otherwise nops are
-     used *)
-  val align : data:bool -> int -> unit
-
-  (** directive for an 8-bit constant *)
-  val byte : constant -> unit
-
-  val bytes : string -> unit
-
-  val cfi_adjust_cfa_offset : int -> unit
-
-  val cfi_endproc : unit -> unit
-
-  val cfi_startproc : unit -> unit
-
-  val cfi_remember_state : unit -> unit
-
-  val cfi_restore_state : unit -> unit
-
-  val cfi_def_cfa_register : string -> unit
-
-  val cfi_def_cfa_offset : int -> unit
-
-  val comment : string -> unit
-
-  val data : unit -> unit
-
-  val extrn : string -> data_type -> unit
-
-  val file : file_num:int -> file_name:string -> unit
-
-  val global : string -> unit
-
-  val protected : string -> unit
-
-  val hidden : string -> unit
-
-  val indirect_symbol : string -> unit
-
-  val label : ?typ:data_type -> string -> unit
-
-  val loc :
-    file_num:int -> line:int -> col:int -> ?discriminator:int -> unit -> unit
-
-  (** directive for a 32-bit constant *)
-  val long : constant -> unit
-
-  val mode386 : unit -> unit
-
-  val model : string -> unit
-
-  val new_line : unit -> unit
-
-  val private_extern : string -> unit
-
-  (** directive for a 64-bit constant *)
-  val qword : constant -> unit
-
-  val reloc : offset:constant -> name:reloc_type -> expr:constant -> unit
-
-  val section :
-    ?delayed:bool -> string list -> string option -> string list -> unit
-
-  val setvar : string * constant -> unit
-
-  val size : string -> constant -> unit
-
-  val sleb128 : constant -> unit
-
-  val space : int -> unit
-
-  val text : unit -> unit
-
-  val type_ : string -> string -> unit
-
-  val uleb128 : constant -> unit
-
-  val weak : string -> unit
-
-  (** directive for a 16-bit constant *)
-  val word : constant -> unit
-end
 
 module I : sig
   (* Instructions *)
 
   val add : arg -> arg -> unit
 
-  val addsd : arg -> arg -> unit
+  val adc : arg -> arg -> unit
 
   val and_ : arg -> arg -> unit
-
-  val andpd : arg -> arg -> unit
 
   val bsf : arg -> arg -> unit
 
@@ -204,27 +116,9 @@ module I : sig
 
   val cmp : arg -> arg -> unit
 
-  val cmpsd : float_condition -> arg -> arg -> unit
-
-  val comisd : arg -> arg -> unit
-
   val cqo : unit -> unit
 
-  val cvtsi2ss : arg -> arg -> unit
-
-  val cvtsd2ss : arg -> arg -> unit
-
-  val cvtsi2sd : arg -> arg -> unit
-
-  val cvtss2sd : arg -> arg -> unit
-
-  val cvttss2si : arg -> arg -> unit (* truncate *)
-
-  val cvttsd2si : arg -> arg -> unit (* truncate *)
-
   val dec : arg -> unit
-
-  val divsd : arg -> arg -> unit
 
   val hlt : unit -> unit
 
@@ -276,25 +170,11 @@ module I : sig
 
   val mov : arg -> arg -> unit
 
-  val movapd : arg -> arg -> unit
-
-  val movupd : arg -> arg -> unit
-
-  val movd : arg -> arg -> unit
-
-  val movq : arg -> arg -> unit
-
-  val movsd : arg -> arg -> unit
-
-  val movss : arg -> arg -> unit
-
   val movsx : arg -> arg -> unit
 
   val movsxd : arg -> arg -> unit
 
   val movzx : arg -> arg -> unit
-
-  val mulsd : arg -> arg -> unit
 
   val neg : arg -> unit
 
@@ -305,8 +185,6 @@ module I : sig
   val pause : unit -> unit
 
   val pop : arg -> unit
-
-  val popcnt : arg -> arg -> unit
 
   val prefetch : bool -> prefetch_temporal_locality_hint -> arg -> unit
 
@@ -334,43 +212,13 @@ module I : sig
 
   val sub : arg -> arg -> unit
 
-  val subsd : arg -> arg -> unit
+  val sbb : arg -> arg -> unit
 
   val test : arg -> arg -> unit
-
-  val ucomisd : arg -> arg -> unit
 
   val xchg : arg -> arg -> unit
 
   val xor : arg -> arg -> unit
-
-  val xorpd : arg -> arg -> unit
-
-  (* Float32 arithmetic *)
-
-  val addss : arg -> arg -> unit
-
-  val subss : arg -> arg -> unit
-
-  val mulss : arg -> arg -> unit
-
-  val divss : arg -> arg -> unit
-
-  val comiss : arg -> arg -> unit
-
-  val ucomiss : arg -> arg -> unit
-
-  val xorps : arg -> arg -> unit
-
-  val andps : arg -> arg -> unit
-
-  val cmpss : float_condition -> arg -> arg -> unit
-
-  (* BMI instructions *)
-
-  val lzcnt : arg -> arg -> unit
-
-  val tzcnt : arg -> arg -> unit
 
   (* SIMD instructions *)
 

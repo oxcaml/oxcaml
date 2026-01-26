@@ -93,92 +93,12 @@ let mem64 typ ?(scale = 1) ?base ?sym displ idx =
 
 let mem64_rip typ ?(ofs = 0) s = Mem64_RIP (typ, s, ofs)
 
-module D = struct
-  let section ?(delayed = false) segment flags args =
-    directive (Section (segment, flags, args, delayed))
-
-  let align ~data n = directive (Align (data, n))
-
-  let byte n = directive (Byte n)
-
-  let bytes s = directive (Bytes s)
-
-  let cfi_adjust_cfa_offset n = directive (Cfi_adjust_cfa_offset n)
-
-  let cfi_endproc () = directive Cfi_endproc
-
-  let cfi_startproc () = directive Cfi_startproc
-
-  let cfi_remember_state () = directive Cfi_remember_state
-
-  let cfi_restore_state () = directive Cfi_restore_state
-
-  let cfi_def_cfa_register reg = directive (Cfi_def_cfa_register reg)
-
-  let cfi_def_cfa_offset n = directive (Cfi_def_cfa_offset n)
-
-  let comment s = directive (Comment s)
-
-  let data () = section [".data"] None []
-
-  let extrn s ptr = directive (External (s, ptr))
-
-  let file ~file_num ~file_name = directive (File (file_num, file_name))
-
-  let global s = directive (Global s)
-
-  let protected s = directive (Protected s)
-
-  let hidden s = directive (Hidden s)
-
-  let weak s = directive (Weak s)
-
-  let indirect_symbol s = directive (Indirect_symbol s)
-
-  let label ?(typ = NONE) s = directive (NewLabel (s, typ))
-
-  let loc ~file_num ~line ~col ?discriminator () =
-    directive (Loc { file_num; line; col; discriminator })
-
-  let long cst = directive (Long cst)
-
-  let mode386 () = directive Mode386
-
-  let model name = directive (Model name)
-
-  let new_line () = directive NewLine
-
-  let private_extern s = directive (Private_extern s)
-
-  let qword cst = directive (Quad cst)
-
-  let reloc ~offset ~name ~expr = directive (Reloc { offset; name; expr })
-
-  let setvar (x, y) = directive (Set (x, y))
-
-  let size name cst = directive (Size (name, cst))
-
-  let sleb128 n = directive (Sleb128 n)
-
-  let space n = directive (Space n)
-
-  let text () = section [".text"] None []
-
-  let type_ name typ = directive (Type (name, typ))
-
-  let uleb128 n = directive (Uleb128 n)
-
-  let word cst = directive (Word cst)
-end
-
 module I = struct
   let add x y = emit (ADD (x, y))
 
-  let addsd x y = emit (ADDSD (x, y))
+  let adc x y = emit (ADC (x, y))
 
   let and_ x y = emit (AND (x, y))
-
-  let andpd x y = emit (ANDPD (x, y))
 
   let bsf x y = emit (BSF (x, y))
 
@@ -196,27 +116,9 @@ module I = struct
 
   let cmp x y = emit (CMP (x, y))
 
-  let cmpsd cond x y = emit (CMPSD (cond, x, y))
-
-  let comisd x y = emit (COMISD (x, y))
-
   let cqo () = emit CQO
 
-  let cvtsi2ss x y = emit (CVTSI2SS (x, y))
-
-  let cvtsd2ss x y = emit (CVTSD2SS (x, y))
-
-  let cvtsi2sd x y = emit (CVTSI2SD (x, y))
-
-  let cvtss2sd x y = emit (CVTSS2SD (x, y))
-
-  let cvttss2si x y = emit (CVTTSS2SI (x, y))
-
-  let cvttsd2si x y = emit (CVTTSD2SI (x, y))
-
   let dec x = emit (DEC x)
-
-  let divsd x y = emit (DIVSD (x, y))
 
   let hlt () = emit HLT
 
@@ -268,25 +170,11 @@ module I = struct
 
   let mov x y = emit (MOV (x, y))
 
-  let movapd x y = emit (MOVAPD (x, y))
-
-  let movupd x y = emit (MOVUPD (x, y))
-
-  let movd x y = emit (MOVD (x, y))
-
-  let movq x y = emit (MOVQ (x, y))
-
-  let movsd x y = emit (MOVSD (x, y))
-
-  let movss x y = emit (MOVSS (x, y))
-
   let movsx x y = emit (MOVSX (x, y))
 
   let movsxd x y = emit (MOVSXD (x, y))
 
   let movzx x y = emit (MOVZX (x, y))
-
-  let mulsd x y = emit (MULSD (x, y))
 
   let neg x = emit (NEG x)
 
@@ -297,8 +185,6 @@ module I = struct
   let pause () = emit PAUSE
 
   let pop x = emit (POP x)
-
-  let popcnt x y = emit (POPCNT (x, y))
 
   let prefetch is_write locality x = emit (PREFETCH (is_write, locality, x))
 
@@ -326,39 +212,13 @@ module I = struct
 
   let sub x y = emit (SUB (x, y))
 
-  let subsd x y = emit (SUBSD (x, y))
+  let sbb x y = emit (SBB (x, y))
 
   let test x y = emit (TEST (x, y))
-
-  let ucomisd x y = emit (UCOMISD (x, y))
 
   let xchg x y = emit (XCHG (x, y))
 
   let xor x y = emit (XOR (x, y))
-
-  let xorpd x y = emit (XORPD (x, y))
-
-  let addss x y = emit (ADDSS (x, y))
-
-  let subss x y = emit (SUBSS (x, y))
-
-  let mulss x y = emit (MULSS (x, y))
-
-  let divss x y = emit (DIVSS (x, y))
-
-  let comiss x y = emit (COMISS (x, y))
-
-  let ucomiss x y = emit (UCOMISS (x, y))
-
-  let xorps x y = emit (XORPS (x, y))
-
-  let andps x y = emit (ANDPS (x, y))
-
-  let cmpss i x y = emit (CMPSS (i, x, y))
-
-  let lzcnt x y = emit (LZCNT (x, y))
-
-  let tzcnt x y = emit (TZCNT (x, y))
 
   let simd instr args = emit (SIMD (instr, args))
 end

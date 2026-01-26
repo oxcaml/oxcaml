@@ -1,0 +1,6 @@
+int# -> int#, ~42: -43
+int -> int#, ~(-100): 99
+int# -> int, ~255: -256
+(int[@untagged]) -> int#, ~1024: -1025
+int# -> (int[@untagged]), ~(-1726): 1725
+Function of 7 args, 1+2+3+4+5+6+7: 28

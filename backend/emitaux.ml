@@ -28,112 +28,9 @@ exception Error of error
 
 let output_channel = ref stdout
 
-let femit_string out s = output_string out s
+let emit_string s = output_string !output_channel s
 
-let emit_string s = femit_string !output_channel s
-
-let femit_int out n = output_string out (Int.to_string n)
-
-let emit_int n = femit_int !output_channel n
-
-let femit_char out c = output_char out c
-
-let emit_char c = femit_char !output_channel c
-
-let femit_nativeint out n = output_string out (Nativeint.to_string n)
-
-let emit_nativeint n = femit_nativeint !output_channel n
-
-let emit_printf fmt = Printf.fprintf !output_channel fmt
-
-let femit_int32 out n = Printf.fprintf out "0x%lx" n
-
-let emit_int32 n = femit_int32 !output_channel n
-
-let pp_symbol fmt s =
-  for i = 0 to String.length s - 1 do
-    let c = s.[i] in
-    match c with
-    | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '.' ->
-      Format.pp_print_char fmt c
-    | _ -> Format.fprintf fmt "$%02x" (Char.code c)
-  done
-
-let symbol_to_string s = Format.asprintf "%a" pp_symbol s
-
-let femit_symbol out s = output_string out (symbol_to_string s)
-
-let emit_symbol s = femit_symbol !output_channel s
-
-let femit_string_literal out s =
-  let between x low high =
-    Char.compare x low >= 0 && Char.compare x high <= 0
-  in
-  let last_was_escape = ref false in
-  femit_string out "\"";
-  for i = 0 to String.length s - 1 do
-    let c = s.[i] in
-    if between c '0' '9'
-    then
-      if !last_was_escape
-      then Printf.fprintf out "\\%o" (Char.code c)
-      else output_char out c
-    else if between c ' ' '~'
-            && (not (Char.equal c '"' (* '"' *)))
-            && not (Char.equal c '\\')
-    then (
-      output_char out c;
-      last_was_escape := false)
-    else (
-      Printf.fprintf out "\\%o" (Char.code c);
-      last_was_escape := true)
-  done;
-  emit_string "\""
-
-let emit_string_literal s = femit_string_literal !output_channel s
-
-let emit_string_directive directive s =
-  let l = String.length s in
-  if l = 0
-  then ()
-  else if l < 80
-  then (
-    emit_string directive;
-    emit_string_literal s;
-    emit_char '\n')
-  else
-    let i = ref 0 in
-    while !i < l do
-      let n = min (l - !i) 80 in
-      emit_string directive;
-      emit_string_literal (String.sub s !i n);
-      emit_char '\n';
-      i := !i + n
-    done
-
-let emit_bytes_directive directive s =
-  let pos = ref 0 in
-  for i = 0 to String.length s - 1 do
-    if !pos = 0 then emit_string directive else emit_char ',';
-    emit_int (Char.code s.[i]);
-    incr pos;
-    if !pos >= 16
-    then (
-      emit_char '\n';
-      pos := 0)
-  done;
-  if !pos > 0 then emit_char '\n'
-
-let emit_float64_directive directive x = emit_printf "\t%s\t0x%Lx\n" directive x
-
-let emit_float64_split_directive directive x =
-  let lo = Int64.logand x 0xFFFF_FFFFL
-  and hi = Int64.shift_right_logical x 32 in
-  emit_printf "\t%s\t0x%Lx, 0x%Lx\n" directive
-    (if Arch.big_endian then hi else lo)
-    (if Arch.big_endian then lo else hi)
-
-let emit_float32_directive directive x = emit_printf "\t%s\t0x%lx\n" directive x
+let emit_buffer b = Buffer.output_buffer !output_channel b
 
 (* Record live pointers at call points *)
 
@@ -168,7 +65,7 @@ let is_long n =
   (* Long frames must fit in 32-bit integer and not truncated upon conversion
      from int on any target. *)
   if n > 0x3FFF_FFFF then raise (Error (Stack_frame_way_too_large n));
-  n >= !Flambda_backend_flags.long_frames_threshold
+  n >= !Oxcaml_flags.long_frames_threshold
 
 let is_long_stack_index n =
   let is_reg n = n land 1 = 1 in
@@ -184,7 +81,7 @@ let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
     || is_long (List.length live_offset)
     || List.exists is_long_stack_index live_offset
   in
-  if fd_long && not !Flambda_backend_flags.allow_long_frames
+  if fd_long && not !Oxcaml_flags.allow_long_frames
   then raise (Error (Stack_frame_too_large frame_size));
   frame_descriptors
     := { fd_lbl = label;
@@ -198,9 +95,12 @@ let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
 type emit_frame_actions =
   { efa_code_label : Label.t -> unit;
     efa_data_label : Label.t -> unit;
-    efa_8 : int -> unit;
-    efa_16 : int -> unit;
-    efa_32 : int32 -> unit;
+    efa_i8 : Numbers.Int8.t -> unit;
+    efa_i16 : Numbers.Int16.t -> unit;
+    efa_i32 : Int32.t -> unit;
+    efa_u8 : Numbers.Uint8.t -> unit;
+    efa_u16 : Numbers.Uint16.t -> unit;
+    efa_u32 : Numbers.Uint32.t -> unit;
     efa_word : int -> unit;
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
@@ -209,6 +109,40 @@ type emit_frame_actions =
   }
 
 let emit_frames a =
+  (* The emit functions below perform bounds checks for the corresponding ranges
+     via the conversion functions that raise exceptions. [int32] does not have
+     such a function so we perform the check manually here. *)
+  let emit_u8 n =
+    let n = Numbers.Uint8.of_nonnegative_int_exn n in
+    a.efa_u8 n
+  in
+  let[@warning "-26"] emit_i8 n =
+    (* unused, but here for completeness *)
+    let n = Numbers.Int8.of_int_exn n in
+    a.efa_i8 n
+  in
+  let emit_i16 n =
+    let n = Numbers.Int16.of_int_exn n in
+    a.efa_i16 n
+  in
+  let emit_u16 n =
+    let n = Numbers.Uint16.of_nonnegative_int_exn n in
+    a.efa_u16 n
+  in
+  let emit_i32 n =
+    let min_i32 = Int64.neg (Int64.shift_left 1L 31) (* -0x8000_0000 *)
+    and max_i32 = Int64.sub (Int64.shift_left 1L 31) 1L (* 0x7fff_ffff *)
+    and n_64 = Int64.of_int n in
+    if Int64.compare n_64 min_i32 < 0 || Int64.compare n_64 max_i32 > 0
+    then
+      Misc.fatal_errorf
+        "attempting to emit signed 32-bit integer %d out of range" n
+    else a.efa_i32 (Int32.of_int n)
+  in
+  let emit_u32 n =
+    let n = Numbers.Uint32.of_nonnegative_int_exn n in
+    a.efa_u32 n
+  in
   let filenames = Hashtbl.create 7 in
   let label_filename name =
     try Hashtbl.find filenames name
@@ -244,7 +178,6 @@ let emit_frames a =
       Label_table.add debuginfos key lbl;
       lbl
   in
-  let emit_32 n = n |> Int32.of_int |> a.efa_32 in
   let emit_frame fd =
     let flags = get_flags fd.fd_debuginfo in
     a.efa_label_rel fd.fd_lbl 0l;
@@ -252,12 +185,21 @@ let emit_frames a =
        below. *)
     if fd.fd_long
     then (
-      a.efa_16 Flambda_backend_flags.max_long_frames_threshold;
+      emit_u16 Oxcaml_flags.max_long_frames_threshold;
       a.efa_align 4);
-    let emit_16_or_32 = if fd.fd_long then emit_32 else a.efa_16 in
-    emit_16_or_32 (fd.fd_frame_size + flags);
-    emit_16_or_32 (List.length fd.fd_live_offset);
-    List.iter emit_16_or_32 fd.fd_live_offset;
+    let emit_signed_16_or_32 = if fd.fd_long then emit_i32 else emit_i16 in
+    let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
+    let emit_live_offset n =
+      (* On runtime 4, the live offsets can be negative. As such, we emit them
+         as signed integers (and truncate the upper bound to 0x7f...ff); on
+         runtime 5 they are always unsigned. *)
+      if Config.runtime5
+      then emit_unsigned_16_or_32 n
+      else emit_signed_16_or_32 n
+    in
+    emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
+    emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
+    List.iter emit_live_offset fd.fd_live_offset;
     (match fd.fd_debuginfo with
     | _ when flags = 0 -> ()
     | Dbg_other dbg ->
@@ -268,7 +210,7 @@ let emit_frames a =
       a.efa_label_rel (label_debuginfos true dbg) Int32.zero
     | Dbg_alloc dbg ->
       assert (List.length dbg < 256);
-      a.efa_8 (List.length dbg);
+      emit_u8 (List.length dbg);
       List.iter
         (fun Cmm.{ alloc_words; _ } ->
           (* Possible allocations range between 2 and 257 *)
@@ -276,7 +218,7 @@ let emit_frames a =
             2 <= alloc_words
             && alloc_words - 1 <= Config.max_young_wosize
             && Config.max_young_wosize <= 256);
-          a.efa_8 (alloc_words - 2))
+          emit_u8 (alloc_words - 2))
         dbg;
       if flags = 3
       then (
@@ -284,7 +226,7 @@ let emit_frames a =
         List.iter
           (fun Cmm.{ alloc_dbg; _ } ->
             if is_none_dbg alloc_dbg
-            then a.efa_32 Int32.zero
+            then emit_i32 0
             else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
           dbg));
     a.efa_align Arch.size_addr
@@ -295,9 +237,9 @@ let emit_frames a =
   in
   let emit_defname (_filename, defname, loc) (file_lbl, lbl) =
     let emit_loc (start_chr, end_chr, end_offset) =
-      a.efa_16 start_chr;
-      a.efa_16 end_chr;
-      a.efa_32 (Int32.of_int end_offset)
+      emit_u16 start_chr;
+      emit_u16 end_chr;
+      emit_i32 end_offset
     in
     (* These must be 32-bit aligned, both because they contain a 32-bit value,
        and because emit_debuginfo assumes the low 2 bits of their addresses are
@@ -389,7 +331,10 @@ let emit_frames a =
       a.efa_label_rel
         (label_defname d.dinfo_file defname loc)
         (Int64.to_int32 info);
-      a.efa_32 (Int64.to_int32 (Int64.shift_right info 32));
+      (* We use [efa_i32] directly here instead of [emit_i32] to avoid a
+         round-trip via [int], which would break on 32-bit platforms. The right
+         shift ensures that the integer is in range of [int32]. *)
+      a.efa_i32 (Int64.to_int32 (Int64.shift_right info 32));
       match rest with [] -> () | d :: rest -> emit false d rest
     in
     match rdbg with [] -> assert false | d :: rest -> emit rs d rest
@@ -417,47 +362,6 @@ let is_generic_function name =
 (* CFI directives *)
 
 let is_cfi_enabled () = Config.asm_cfi_supported
-
-let cfi_startproc () =
-  if is_cfi_enabled () then emit_string "\t.cfi_startproc\n"
-
-let cfi_endproc () = if is_cfi_enabled () then emit_string "\t.cfi_endproc\n"
-
-let cfi_remember_state () =
-  if is_cfi_enabled () then emit_string "\t.cfi_remember_state\n"
-
-let cfi_restore_state () =
-  if is_cfi_enabled () then emit_string "\t.cfi_restore_state\n"
-
-let cfi_adjust_cfa_offset n =
-  if is_cfi_enabled ()
-  then (
-    emit_string "\t.cfi_adjust_cfa_offset\t";
-    emit_int n;
-    emit_string "\n")
-
-let cfi_def_cfa_offset n =
-  if is_cfi_enabled ()
-  then (
-    emit_string "\t.cfi_def_cfa_offset\t";
-    emit_int n;
-    emit_string "\n")
-
-let cfi_offset ~reg ~offset =
-  if is_cfi_enabled ()
-  then (
-    emit_string "\t.cfi_offset ";
-    emit_int reg;
-    emit_string ", ";
-    emit_int offset;
-    emit_string "\n")
-
-let cfi_def_cfa_register ~reg =
-  if is_cfi_enabled ()
-  then (
-    emit_string "\t.cfi_def_cfa_register ";
-    emit_int reg;
-    emit_string "\n")
 
 (* Emit debug information *)
 
@@ -501,40 +405,6 @@ let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
         let file_num = get_file_num ~file_emitter file_name in
         loc_emitter ~file_num ~line ~col ?discriminator ()
 
-let femit_debug_info ?discriminator out dbg =
-  ignore discriminator;
-  emit_debug_info_gen dbg
-    (fun ~file_num ~file_name ->
-      femit_string out "\t.file\t";
-      femit_int out file_num;
-      femit_char out '\t';
-      femit_string_literal out file_name;
-      femit_char out '\n')
-    (fun ~file_num ~line ~col ?discriminator () ->
-      femit_string out "\t.loc\t";
-      femit_int out file_num;
-      femit_char out '\t';
-      femit_int out line;
-      femit_char out '\t';
-      (* PR#7726: Location.none uses column -1, breaks LLVM assembler *)
-      (* If we don't set the optional column field, debug_line program gets the
-         column value from the previous .loc directive. *)
-      if col >= 0 then femit_int out col else femit_int out 0;
-      (match discriminator with
-      | None -> ()
-      | Some k ->
-        femit_char out '\t';
-        femit_string out "discriminator ";
-        femit_int out k);
-      femit_char out '\n')
-
-let emit_debug_info ?discriminator dbg =
-  femit_debug_info ~discriminator !output_channel dbg
-
-let reset () =
-  reset_debug_info ();
-  frame_descriptors := []
-
 let binary_backend_available = ref false
 
 let reduce_heap_size ~reset =
@@ -542,8 +412,8 @@ let reduce_heap_size ~reset =
   (* Uses [major_words] because it doesn't require a heap traversal to compute
      and for this workload a majority of major words are live at this point. *)
   let heap_reduction_threshold =
-    if !Flambda_backend_flags.heap_reduction_threshold >= 0
-    then float !Flambda_backend_flags.heap_reduction_threshold
+    if !Oxcaml_flags.heap_reduction_threshold >= 0
+    then float !Oxcaml_flags.heap_reduction_threshold
     else Float.infinity
   in
   if Float.compare major_words heap_reduction_threshold > 0
@@ -557,17 +427,17 @@ module Dwarf_helpers = struct
 
   let sourcefile_for_dwarf = ref None
 
-  let begin_dwarf ~build_asm_directives ~code_begin ~code_end ~file_emitter =
+  let ppf_dump = ref Format.err_formatter
+
+  let begin_dwarf ~code_begin ~code_end ~file_emitter =
     match !sourcefile_for_dwarf with
     | None -> ()
     | Some sourcefile ->
-      let asm_directives = build_asm_directives () in
-      let (module Asm_directives : Asm_targets.Asm_directives_intf.S) =
-        asm_directives
+      let asm_directives =
+        Asm_targets.Asm_directives_dwarf.build_asm_directives ()
       in
-      Asm_targets.Asm_label.initialize ~new_label:(fun () ->
-          Cmm.new_label () |> Label.to_int);
-      Asm_directives.initialize ();
+      let get_file_num = get_file_num ~file_emitter in
+      Asm_targets.Asm_directives.debug_header ~get_file_num;
       let unit_name =
         (* CR lmaurer: This doesn't actually need to be an [Ident.t] *)
         Symbol.for_current_unit () |> Symbol.linkage_name
@@ -578,15 +448,15 @@ module Dwarf_helpers = struct
       dwarf
         := Some
              (Dwarf.create ~sourcefile ~unit_name ~asm_directives
-                ~get_file_id:(get_file_num ~file_emitter)
-                ~code_begin ~code_end)
+                ~get_file_id:get_file_num ~code_begin ~code_end)
 
-  let reset_dwarf () =
+  let reset_dwarf ppf =
     dwarf := None;
-    sourcefile_for_dwarf := None
+    sourcefile_for_dwarf := None;
+    ppf_dump := ppf
 
-  let init ~disable_dwarf ~sourcefile =
-    reset_dwarf ();
+  let init ~ppf_dump ~disable_dwarf ~sourcefile =
+    reset_dwarf ppf_dump;
     let can_emit_dwarf =
       !Clflags.debug
       && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
@@ -604,14 +474,14 @@ module Dwarf_helpers = struct
   let emit_dwarf () =
     Option.iter
       (Dwarf.emit
-         ~basic_block_sections:!Flambda_backend_flags.basic_block_sections
+         ~basic_block_sections:!Oxcaml_flags.basic_block_sections
          ~binary_backend_available:!binary_backend_available)
       !dwarf
 
   let emit_delayed_dwarf () =
     Option.iter
       (Dwarf.emit_delayed
-         ~basic_block_sections:!Flambda_backend_flags.basic_block_sections
+         ~basic_block_sections:!Oxcaml_flags.basic_block_sections
          ~binary_backend_available:!binary_backend_available)
       !dwarf
 
@@ -620,7 +490,8 @@ module Dwarf_helpers = struct
     | None -> None
     | Some dwarf ->
       let fun_end_label = Cmm.new_label () in
-      Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label)
+      let ppf_dump = !ppf_dump in
+      Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label ~ppf_dump)
 end
 
 let report_error ppf = function
@@ -649,18 +520,19 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lpushtrap _ ->
       let s = fs + trap_size in
       loop i.next s (max s max_fs) nontail_flag
-    | Lpoptrap -> loop i.next (fs - trap_size) max_fs nontail_flag
+    | Lpoptrap _ -> loop i.next (fs - trap_size) max_fs nontail_flag
     | Lop (Stackoffset n) ->
       let s = fs + n in
       loop i.next s (max s max_fs) nontail_flag
     | Lcall_op (Lcall_ind | Lcall_imm _) -> loop i.next fs max_fs true
-    | Lprologue
+    | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Poll | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Load _
+        | Tls_get | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Load _
         | Store (_, _, _)
-        | Intop _
+        | Intop _ | Int128op _
         | Intop_imm (_, _)
         | Intop_atomic _
         | Floatop (_, _)
@@ -695,6 +567,8 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     if insert_stack_check
     then
       let fun_body =
+        (* CR mshinwell: These availability sets aren't taking into account any
+           potential clobbers by the stack check. *)
         Linear.instr_cons
           (Lstackcheck { max_frame_size_bytes = max_frame_size })
           [||] [||] ~available_before:fundecl.fun_body.available_before
@@ -702,3 +576,51 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
       in
       { fundecl with fun_body }
     else fundecl
+
+let stapsdt_base_emitted = ref false
+
+let emit_stapsdt_base_section () =
+  let module D = Asm_targets.Asm_directives in
+  let module S = Asm_targets.Asm_symbol in
+  if not !stapsdt_base_emitted
+  then (
+    stapsdt_base_emitted := true;
+    D.switch_to_section Stapsdt_base;
+    (* Note that the Stapsdt symbols do not follow the usual symbol encoding
+       convention. Hence, in this rare case, we create the symbol as a raw
+       symbol for which no subsequent encoding will be done.*)
+    let stapsdt_sym = S.Predef.stapsdt_base in
+    if not (Target_system.is_macos ())
+    then (
+      D.weak stapsdt_sym;
+      D.hidden stapsdt_sym);
+    D.define_symbol_label ~section:Stapsdt_base stapsdt_sym;
+    D.space ~bytes:1;
+    D.size_const stapsdt_sym
+      1L (* 1 byte; alternative would be . - _.stapsdt.base *))
+
+let emit_elf_note ~section ~owner ~typ ~emit_desc =
+  let module D = Asm_targets.Asm_directives in
+  let module L = Asm_targets.Asm_label in
+  let bytes = if Target_system.is_macos () then 8 else 4 in
+  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  let a = L.create section in
+  let b = L.create section in
+  let c = L.create section in
+  let d = L.create section in
+  D.between_labels_32_bit ~upper:b ~lower:a ();
+  D.between_labels_32_bit ~upper:d ~lower:c ();
+  D.int32 typ;
+  D.define_label a;
+  D.string (owner ^ "\000");
+  D.define_label b;
+  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  D.define_label c;
+  emit_desc ();
+  D.define_label d;
+  D.align ~fill_x86_bin_emitter:Zero ~bytes
+
+let reset () =
+  reset_debug_info ();
+  frame_descriptors := [];
+  stapsdt_base_emitted := false

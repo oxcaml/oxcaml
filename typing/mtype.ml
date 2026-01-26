@@ -46,15 +46,15 @@ let rec reduce_strengthen_lazy ~aliasable mty p =
     Mty_signature sg ->
       Some (Mty_signature(strengthen_lazy_sig ~aliasable sg p))
 
-  | Mty_functor(Named (Some param, arg), res)
+  | Mty_functor(Named (Some param, arg, marg), res, mres)
     when !Clflags.applicative_functors ->
-      Some (Mty_functor(Named (Some param, arg),
-        strengthen_lazy ~aliasable:false res (Papply(p, Pident param))))
-  | Mty_functor(Named (None, arg), res)
+      Some (Mty_functor(Named (Some param, arg, marg),
+        strengthen_lazy ~aliasable:false res (Papply(p, Pident param)), mres))
+  | Mty_functor(Named (None, arg, marg), res, mres)
     when !Clflags.applicative_functors ->
       let param = Ident.create_scoped ~scope:(Path.scope p) "Arg" in
-      Some (Mty_functor(Named (Some param, arg),
-        strengthen_lazy ~aliasable:false res (Papply(p, Pident param))))
+      Some (Mty_functor(Named (Some param, arg, marg),
+        strengthen_lazy ~aliasable:false res (Papply(p, Pident param)), mres))
 
   | Mty_strengthen (mty,q,Not_aliasable) when aliasable ->
       (* Normally, we have S/M/N = S/M. However, if the inner strengthening is
@@ -199,6 +199,8 @@ let rec scrape_lazy ~aliases env mty =
   | Some mty -> scrape_lazy ~aliases env mty
   | None -> mty
 
+let reduce_alias_lazy env mty = reduce_lazy ~aliases:true env mty
+
 let reduce_lazy env mty = reduce_lazy ~aliases:false env mty
 
 let reduce env mty =
@@ -231,20 +233,22 @@ let rec expand_paths_lazy paths env =
   function
     Mty_signature sg ->
       Mty_signature (expand_paths_lazy_sig paths env sg)
-  | Mty_functor (param,res) ->
+  | Mty_functor (param,res,mres) ->
       let param, env = match param with
         Unit -> Unit, env
-      | Named (name,mty) ->
+      | Named (name,mty,mm) ->
           let mty = expand_paths_lazy paths env mty in
+          let mode = Mode.(alloc_as_value mm |> Value.disallow_right) in
           let env = match name with
             | Some param when !Clflags.applicative_functors ->
-                Env.add_module_lazy ~update_summary:false param Mp_present mty env
+                Env.add_module_lazy ~update_summary:false param Mp_present mty
+                  ~mode env
             | Some _ | None -> env
           in
-          Named (name, mty), env
+          Named (name, mty, mm), env
       in
       let res = expand_paths_lazy paths env res in
-      Mty_functor (param,res)
+      Mty_functor (param,res,mres)
   | Mty_strengthen (_,p,_) as mty when Path.Set.mem p paths ->
       (* If the path we're strengthening with is in paths then we need to
           unfold the node. *)
@@ -375,9 +379,9 @@ let rec make_aliases_absent ~aliased pres mty =
           item
       in
       pres, Mty_signature(List.map make_item sg)
-  | Mty_functor(arg, res) ->
+  | Mty_functor(arg, res, mres) ->
       let _, res = make_aliases_absent ~aliased:false Mp_present res in
-      pres, Mty_functor(arg, res)
+      pres, Mty_functor(arg, res, mres)
   | Mty_ident _ ->
       pres, mty
   | Mty_strengthen (mty,p,a) ->
@@ -462,19 +466,20 @@ let rec nondep_mty_with_presence env va ids pres mty =
   | Mty_signature sg ->
       let mty = Mty_signature(nondep_sig env va ids sg) in
       pres, mty
-  | Mty_functor(Unit, res) ->
-      pres, Mty_functor(Unit, nondep_mty env va ids res)
-  | Mty_functor(Named (param, arg), res) ->
+  | Mty_functor(Unit, res, mres) ->
+      pres, Mty_functor(Unit, nondep_mty env va ids res, mres)
+  | Mty_functor(Named (param, arg, marg), res, mres) ->
       let var_inv =
         match va with Co -> Contra | Contra -> Co | Strict -> Strict in
+      let mode = Mode.(alloc_as_value marg |> Value.disallow_right) in
       let res_env =
         match param with
         | None -> env
-        | Some param -> Env.add_module ~arg:true param Mp_present arg env
+        | Some param -> Env.add_module ~arg:true param Mp_present arg ~mode env
       in
       let mty =
-        Mty_functor(Named (param, nondep_mty env var_inv ids arg),
-                    nondep_mty res_env va ids res)
+        Mty_functor(Named (param, nondep_mty env var_inv ids arg, marg),
+                    nondep_mty res_env va ids res, mres)
       in
       pres, mty
   | Mty_strengthen (mty,p,a) ->
@@ -656,7 +661,7 @@ let rec contains_type env mty =
     Mty_ident _ -> raise Exit (* PR#6427 *)
   | Mty_signature sg ->
       contains_type_sig env sg
-  | Mty_functor (_, body) ->
+  | Mty_functor (_, body, _) ->
       contains_type env body
   | Mty_alias _ ->
       ()
@@ -734,9 +739,11 @@ let collect_arg_paths mty =
   and bindings = ref Ident.empty in
   (* let rt = Ident.create "Root" in
      and prefix = ref (Path.Pident rt) in *)
+  with_type_mark begin fun mark ->
+  let super = type_iterators mark in
   let it_path p = paths := Path.Set.union (get_arg_paths p) !paths
   and it_signature_item it si =
-    type_iterators.it_signature_item it si;
+    super.it_signature_item it si;
     match si with
     | Sig_module (id, _, {md_type=Mty_alias p}, _, _) ->
         bindings := Ident.add id p !bindings
@@ -749,11 +756,11 @@ let collect_arg_paths mty =
           sg
     | _ -> ()
   in
-  let it = {type_iterators with it_path; it_signature_item} in
+  let it = {super with it_path; it_signature_item} in
   it.it_module_type it mty;
-  it.it_module_type unmark_iterators mty;
   Path.Set.fold (fun p -> Ident.Set.union (collect_ids !subst !bindings p))
     !paths Ident.Set.empty
+  end
 
 type remove_alias_from =
   | Alias of Ident.t
@@ -840,14 +847,16 @@ let scrape_for_type_of ~remove_aliases env mty =
 
 let lower_nongen nglev mty =
   let open Btype in
-  let it_type_expr it ty =
+  with_type_mark begin fun mark ->
+  let super = type_iterators mark in
+  let it_do_type_expr it ty =
     match get_desc ty with
       Tvar _ ->
         let level = get_level ty in
         if level < generic_level && level > nglev then set_level ty nglev
     | _ ->
-        type_iterators.it_type_expr it ty
+        super.it_do_type_expr it ty
   in
-  let it = {type_iterators with it_type_expr} in
-  it.it_module_type it mty;
-  it.it_module_type unmark_iterators mty
+  let it = {super with it_do_type_expr} in
+  it.it_module_type it mty
+  end

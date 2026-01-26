@@ -11,21 +11,21 @@ module TE = T.Typing_env
 let create_env () =
   let resolver _ = None in
   let get_imported_names () = Name.Set.empty in
-  TE.create ~resolver ~get_imported_names
+  TE.create ~resolver ~get_imported_names ~machine_width:Sixty_four
 
 let test_meet_chains_two_vars () =
   let env = create_env () in
-  let var1 = Variable.create "var1" in
-  let var1' = Bound_var.create var1 Name_mode.normal in
+  let var1 = Variable.create "var1" K.value in
+  let var1' = Bound_var.create var1 Flambda_debug_uid.none Name_mode.normal in
   let env = TE.add_definition env (Bound_name.create_var var1') K.value in
   let env =
     TE.add_equation env (Name.var var1)
       (T.immutable_block ~is_unique:false Tag.zero
          ~shape:(K.Block_shape.Scannable Value_only) Alloc_mode.For_types.heap
-         ~fields:[T.any_tagged_immediate])
+         ~fields:[T.any_tagged_immediate] ~machine_width:Sixty_four)
   in
-  let var2 = Variable.create "var2" in
-  let var2' = Bound_var.create var2 Name_mode.normal in
+  let var2 = Variable.create "var2" K.value in
+  let var2' = Bound_var.create var2 Flambda_debug_uid.none Name_mode.normal in
   let env = TE.add_definition env (Bound_name.create_var var2') K.value in
   let first_type_for_var2 = T.alias_type_of K.value (Simple.var var1) in
   let env = TE.add_equation env (Name.var var2) first_type_for_var2 in
@@ -48,22 +48,22 @@ let test_meet_chains_two_vars () =
 
 let test_meet_chains_three_vars () =
   let env = create_env () in
-  let var1 = Variable.create "var1" in
-  let var1' = Bound_var.create var1 Name_mode.normal in
+  let var1 = Variable.create "var1" K.value in
+  let var1' = Bound_var.create var1 Flambda_debug_uid.none Name_mode.normal in
   let env = TE.add_definition env (Bound_name.create_var var1') K.value in
   let env =
     TE.add_equation env (Name.var var1)
       (T.immutable_block ~is_unique:false Tag.zero
          ~shape:(K.Block_shape.Scannable Value_only) Alloc_mode.For_types.heap
-         ~fields:[T.any_tagged_immediate])
+         ~fields:[T.any_tagged_immediate] ~machine_width:Sixty_four)
   in
-  let var2 = Variable.create "var2" in
-  let var2' = Bound_var.create var2 Name_mode.normal in
+  let var2 = Variable.create "var2" K.value in
+  let var2' = Bound_var.create var2 Flambda_debug_uid.none Name_mode.normal in
   let env = TE.add_definition env (Bound_name.create_var var2') K.value in
   let first_type_for_var2 = T.alias_type_of K.value (Simple.var var1) in
   let env = TE.add_equation env (Name.var var2) first_type_for_var2 in
-  let var3 = Variable.create "var3" in
-  let var3' = Bound_var.create var3 Name_mode.normal in
+  let var3 = Variable.create "var3" K.value in
+  let var3' = Bound_var.create var3 Flambda_debug_uid.none Name_mode.normal in
   let env = TE.add_definition env (Bound_name.create_var var3') K.value in
   let first_type_for_var3 = T.alias_type_of K.value (Simple.var var2) in
   let env = TE.add_equation env (Name.var var3) first_type_for_var3 in
@@ -87,15 +87,15 @@ let test_meet_chains_three_vars () =
 let meet_variants_don't_lose_aliases () =
   let env = create_env () in
   let define env v =
-    let v' = Bound_var.create v Name_mode.normal in
+    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
     TE.add_definition env (Bound_name.create_var v') K.value
   in
   let defines env l = List.fold_left define env l in
-  let vx = Variable.create "x" in
-  let vy = Variable.create "y" in
-  let va = Variable.create "a" in
-  let vb = Variable.create "b" in
-  let v_variant = Variable.create "variant" in
+  let vx = Variable.create "x" K.value in
+  let vy = Variable.create "y" K.value in
+  let va = Variable.create "a" K.value in
+  let vb = Variable.create "b" K.value in
+  let v_variant = Variable.create "variant" K.value in
   let env = defines env [vx; vy; va; vb; v_variant] in
   let const_ctors = T.bottom K.naked_immediate in
   let ty1 =
@@ -109,6 +109,7 @@ let meet_variants_don't_lose_aliases () =
               [T.alias_type_of K.value (Simple.var vy)] ) ) ]
     in
     T.variant ~const_ctors ~non_const_ctors Alloc_mode.For_types.heap
+      ~machine_width:Sixty_four
   in
   let ty2 =
     let non_const_ctors =
@@ -121,6 +122,7 @@ let meet_variants_don't_lose_aliases () =
               [T.alias_type_of K.value (Simple.var vb)] ) ) ]
     in
     T.variant ~const_ctors ~non_const_ctors Alloc_mode.For_types.heap
+      ~machine_width:Sixty_four
   in
   match T.meet env ty1 ty2 with
   | Bottom -> assert false
@@ -129,8 +131,10 @@ let meet_variants_don't_lose_aliases () =
       T.print ty2 T.print meet_ty TE.print env;
     (* Env extension should be empty *)
     let env = TE.add_equation env (Name.var v_variant) meet_ty in
-    let v_naked = Variable.create "naked" in
-    let bv_naked = Bound_var.create v_naked Name_mode.normal in
+    let v_naked = Variable.create "naked" K.naked_immediate in
+    let bv_naked =
+      Bound_var.create v_naked Flambda_debug_uid.none Name_mode.normal
+    in
     let env =
       TE.add_definition env (Bound_name.create_var bv_naked) K.naked_immediate
     in
@@ -138,7 +142,7 @@ let meet_variants_don't_lose_aliases () =
       TE.add_get_tag_relation env (Name.var v_naked)
         ~scrutinee:(Simple.var v_variant)
     in
-    let t_tag_1 = T.this_naked_immediate Targetint_31_63.one in
+    let t_tag_1 = T.this_naked_immediate (Target_ocaml_int.one Sixty_four) in
     let env = TE.add_equation env (Name.var v_naked) t_tag_1 in
     let tag_meet_ty = TE.find env (Name.var v_naked) (Some K.naked_immediate) in
     assert (T.Equal_types_for_debug.equal_type env tag_meet_ty t_tag_1);
@@ -150,6 +154,7 @@ let meet_variants_don't_lose_aliases () =
                 [T.alias_type_of K.value (Simple.var vb)] ) ) ]
       in
       T.variant ~const_ctors ~non_const_ctors Alloc_mode.For_types.heap
+        ~machine_width:Sixty_four
     in
     let meet_ty = TE.find env (Name.var v_variant) (Some K.value) in
     assert (T.Equal_types_for_debug.equal_type env meet_ty expected_ty);
@@ -158,14 +163,14 @@ let meet_variants_don't_lose_aliases () =
 
 let test_join_with_extensions () =
   let define ?(kind = K.value) env v =
-    let v' = Bound_var.create v Name_mode.normal in
+    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
     TE.add_definition env (Bound_name.create_var v') kind
   in
   let env = create_env () in
-  let y = Variable.create "y" in
-  let x = Variable.create "x" in
-  let a = Variable.create "a" in
-  let b = Variable.create "b" in
+  let y = Variable.create "y" K.value in
+  let x = Variable.create "x" K.value in
+  let a = Variable.create "a" K.naked_immediate in
+  let b = Variable.create "b" K.naked_immediate in
   let env = define env y in
   let env = define env x in
   let env = define ~kind:K.naked_immediate env a in
@@ -179,7 +184,7 @@ let test_join_with_extensions () =
         (Tag.Scannable.Map.of_list
            [ tag_0, (K.Block_shape.Scannable Value_only, [ty]);
              tag_1, (K.Block_shape.Scannable Value_only, []) ])
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let env = TE.add_equation env (Name.var y) (make (T.unknown K.value)) in
   let scope = TE.current_scope env in
@@ -202,7 +207,7 @@ let test_join_with_extensions () =
   in
   Format.eprintf "Left:@.%a@." TE.print left_env;
   Format.eprintf "Right:@.%a@." TE.print right_env;
-  let joined_env =
+  let joined_env, _analysis =
     T.cut_and_n_way_join scoped_env
       [ left_env, Apply_cont_rewrite_id.create (), Inlinable;
         right_env, Apply_cont_rewrite_id.create (), Inlinable ]
@@ -214,18 +219,18 @@ let test_join_with_extensions () =
 
 let test_join_with_complex_extensions () =
   let define ?(kind = K.value) env v =
-    let v' = Bound_var.create v Name_mode.normal in
+    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
     TE.add_definition env (Bound_name.create_var v') kind
   in
   let env = create_env () in
-  let y = Variable.create "y" in
-  let x = Variable.create "x" in
-  let w = Variable.create "w" in
-  let z = Variable.create "z" in
-  let a = Variable.create "a" in
-  let b = Variable.create "b" in
-  let c = Variable.create "c" in
-  let d = Variable.create "d" in
+  let y = Variable.create "y" K.value in
+  let x = Variable.create "x" K.value in
+  let w = Variable.create "w" K.value in
+  let z = Variable.create "z" K.value in
+  let a = Variable.create "a" K.naked_immediate in
+  let b = Variable.create "b" K.naked_immediate in
+  let c = Variable.create "c" K.naked_immediate in
+  let d = Variable.create "d" K.naked_immediate in
   let env = define env z in
   let env = define env x in
   let env = define env y in
@@ -243,7 +248,7 @@ let test_join_with_complex_extensions () =
         (Tag.Scannable.Map.of_list
            [ tag_0, (K.Block_shape.Scannable Value_only, tys);
              tag_1, (K.Block_shape.Scannable Value_only, []) ])
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let env =
     TE.add_equation env (Name.var z)
@@ -293,7 +298,7 @@ let test_join_with_complex_extensions () =
   in
   Format.eprintf "Left:@.%a@." TE.print left_env;
   Format.eprintf "Right:@.%a@." TE.print right_env;
-  let joined_env =
+  let joined_env, _analysis =
     T.cut_and_n_way_join scoped_env
       [ left_env, Apply_cont_rewrite_id.create (), Inlinable;
         right_env, Apply_cont_rewrite_id.create (), Inlinable ]
@@ -305,27 +310,29 @@ let test_join_with_complex_extensions () =
 
 let test_meet_two_blocks () =
   let define env v =
-    let v' = Bound_var.create v Name_mode.normal in
+    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
     TE.add_definition env (Bound_name.create_var v') K.value
   in
   let defines env l = List.fold_left define env l in
   let env = create_env () in
-  let block1 = Variable.create "block1" in
-  let field1 = Variable.create "field1" in
-  let block2 = Variable.create "block2" in
-  let field2 = Variable.create "field2" in
+  let block1 = Variable.create "block1" K.value in
+  let field1 = Variable.create "field1" K.value in
+  let block2 = Variable.create "block2" K.value in
+  let field2 = Variable.create "field2" K.value in
   let env = defines env [block1; block2; field1; field2] in
   let env =
     TE.add_equation env (Name.var block1)
       (T.immutable_block ~is_unique:false Tag.zero
          ~shape:(K.Block_shape.Scannable Value_only) Alloc_mode.For_types.heap
-         ~fields:[T.alias_type_of K.value (Simple.var field1)])
+         ~fields:[T.alias_type_of K.value (Simple.var field1)]
+         ~machine_width:Sixty_four)
   in
   let env =
     TE.add_equation env (Name.var block2)
       (T.immutable_block ~is_unique:false Tag.zero
          ~shape:(K.Block_shape.Scannable Value_only) Alloc_mode.For_types.heap
-         ~fields:[T.alias_type_of K.value (Simple.var field2)])
+         ~fields:[T.alias_type_of K.value (Simple.var field2)]
+         ~machine_width:Sixty_four)
   in
   (* let test b1 b2 env =
    *   let eq_block2 = T.alias_type_of K.value (Simple.var b2) in
@@ -366,18 +373,19 @@ let test_meet_recover_alias () =
 
      x: (= 0) *)
   let define env v =
-    let v' = Bound_var.create v Name_mode.normal in
+    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
     TE.add_definition env (Bound_name.create_var v') K.value
   in
   let env = create_env () in
-  let x = Variable.create "x" in
+  let x = Variable.create "x" K.value in
   let env = define env x in
   let existing_ty =
     T.variant Alloc_mode.For_types.heap
-      ~const_ctors:(T.this_naked_immediate Targetint_31_63.zero)
+      ~const_ctors:(T.this_naked_immediate (Target_ocaml_int.zero Sixty_four))
       ~non_const_ctors:
         (Tag.Scannable.Map.of_list
            [Tag.Scannable.zero, (K.Block_shape.Scannable Value_only, [])])
+      ~machine_width:Sixty_four
   in
   Format.eprintf "@[<hov 2>first type:@ %a@]@." T.print existing_ty;
   let env = TE.add_equation env (Name.var x) existing_ty in
@@ -404,18 +412,22 @@ let test_meet_bottom_after_alias () =
 
      ⊥ *)
   let define env v =
-    let v' = Bound_var.create v Name_mode.normal in
+    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
     TE.add_definition env (Bound_name.create_var v') K.value
   in
   let env = create_env () in
-  let x = Variable.create "x" in
+  let x = Variable.create "x" K.value in
   let env = define env x in
   let existing_ty =
-    T.these_tagged_immediates Targetint_31_63.zero_one_and_minus_one
+    T.these_tagged_immediates
+      (Target_ocaml_int.zero_one_and_minus_one Sixty_four)
   in
   Format.eprintf "@[<hov 2>first type:@ %a@]@." T.print existing_ty;
   let env = TE.add_equation env (Name.var x) existing_ty in
-  let new_ty = T.alias_type_of K.value (Simple.const_int_of_kind K.value 3) in
+  let new_ty =
+    T.alias_type_of K.value
+      (Simple.const_int_of_kind ~machine_width:Sixty_four K.value 3)
+  in
   Format.eprintf "@[<hov 2>second type:@ %a@]@." T.print new_ty;
   let env = TE.add_equation env (Name.var x) new_ty in
   let meet_ty = TE.find env (Name.var x) (Some K.value) in
@@ -424,7 +436,8 @@ let test_meet_bottom_after_alias () =
 
 let () =
   let comp_unit = "Meet_test" |> Compilation_unit.of_string in
-  Compilation_unit.set_current (Some comp_unit);
+  let unit_info = Unit_info.make_dummy ~input_name:"meet_test" comp_unit in
+  Env.set_unit_name (Some unit_info);
   Format.eprintf "MEET CHAINS WITH TWO VARS@\n@.";
   test_meet_chains_two_vars ();
   Format.eprintf "@.MEET CHAINS WITH THREE VARS@\n@.";

@@ -1,13 +1,14 @@
 [@@@ocaml.warning "+a-30-40-41-42"]
 
 open! Regalloc_ls_utils
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 type t
 
 val for_fatal : t -> Interval.t DLL.t * ClassIntervals.t Reg_class.Tbl.t
 
-val make : stack_slots:Regalloc_stack_slots.t -> last_used:InstructionId.t -> t
+val make :
+  stack_slots:Regalloc_stack_slots.t -> affinity:Regalloc_affinity.t -> t
 
 val update_intervals : t -> Interval.t Reg.Tbl.t -> unit
 
@@ -23,7 +24,13 @@ val active_classes : t -> ClassIntervals.t Reg_class.Tbl.t
 
 val stack_slots : t -> Regalloc_stack_slots.t
 
-val get_and_incr_instruction_id : t -> InstructionId.t
+val affinity : t -> Regalloc_affinity.t
+
+val set_ls_order : t -> instruction_id:InstructionId.t -> ls_order:int -> unit
+
+val get_ls_order : t -> instruction_id:InstructionId.t -> int
+
+val ls_order_mapping : t -> InstructionId.t -> int
 
 val invariant_intervals : t -> Cfg_with_infos.t -> unit
 

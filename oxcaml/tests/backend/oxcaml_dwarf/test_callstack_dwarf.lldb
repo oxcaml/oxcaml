@@ -1,0 +1,13 @@
+(lldb) b Test_callstack_dwarf.f_start
+(lldb) run
+(lldb) script print("=== Testing simple top-level backtrace ===")
+(lldb) b Test_callstack_dwarf.f_simple_backtrace
+(lldb) c
+(lldb) script print("Backtrace for simple function:")
+(lldb) bt 2
+(lldb) script print("=== Testing recursive countdown with leaf function ===")
+(lldb) b Test_callstack_dwarf.f_leaf
+(lldb) c
+(lldb) script print("Backtrace at leaf function (depth 4 countdown):")
+(lldb) bt 8
+(lldb) quit
