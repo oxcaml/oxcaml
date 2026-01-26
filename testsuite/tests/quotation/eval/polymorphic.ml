@@ -12,4 +12,4 @@ let eval1 (type a) = (eval : a expr -> a eval)
 
 let eval2 : 'a. 'a expr -> 'a eval = eval
 
-let id (type a) : a eval -> a eval = eval <[ fun x -> x ]>
+let id () (type a) : a eval -> a eval = eval <[ fun x -> x ]>

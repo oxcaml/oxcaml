@@ -98,7 +98,7 @@ type field_kind
 type commutable
 
 and type_desc =
-  | Tvar of { name : string option; jkind : jkind_lr }
+  | Tvar of { name : string option; jkind : jkind_lr; evals_to: type_expr option }
   (** [Tvar (Some "a")] ==> ['a] or ['_a]
       [Tvar None]       ==> [_] *)
 
@@ -181,7 +181,7 @@ and type_desc =
   | Tvariant of row_desc
   (** Representation of polymorphic variants, see [row_desc]. *)
 
-  | Tunivar of { name : string option; jkind : jkind_lr }
+  | Tunivar of { name : string option; jkind : jkind_lr; evals_to: type_expr option }
   (** Occurrence of a type variable introduced by a
       forall quantifier / [Tpoly]. *)
 
@@ -740,6 +740,7 @@ type type_declaration =
        the jkind stored here might be a subjkind of the jkind that would
        be computed from the decl kind. This happens in
        Ctype.add_jkind_equation. *)
+    type_evals_to: type_expr option;
 
     type_private: private_flag;
     type_manifest: type_expr option;

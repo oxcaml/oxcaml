@@ -312,6 +312,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
+      type_evals_to = None;
       type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -330,6 +331,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
+      type_evals_to = None;
       type_private = sdecl.ptype_private;
       type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1083,6 +1085,7 @@ let transl_declaration env sdecl (id, uid) =
         type_arity = arity;
         type_kind = kind;
         type_jkind = jkind;
+        type_evals_to = None;
         type_private = sdecl.ptype_private;
         type_manifest = man;
         type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1259,6 +1262,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_arity = decl.type_arity;
         type_kind = kind;
         type_jkind = jkind;
+        type_evals_to = None;
         type_private = decl.type_private;
         type_manifest;
         type_variance =
@@ -3195,9 +3199,9 @@ let transl_extension_constructor ~scope env type_path type_params
           List.iter
             (fun ty ->
               match get_desc ty with
-              | Tvar { name = Some "_"; jkind }
+              | Tvar { name = Some "_"; jkind; evals_to }
                 when List.exists (eq_type ty) vars ->
-                set_type_desc ty (Tvar { name = None; jkind })
+                set_type_desc ty (Tvar { name = None; jkind; evals_to })
               | _ -> ())
             typext_params
         end;
@@ -4105,11 +4109,13 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           | None, _ | _, false -> Type_abstract Definition
         in
         let type_jkind = decl.type_jkind in
+        let type_evals_to = decl.type_evals_to in
         Some {
           type_params = params;
           type_arity = arity;
           type_kind;
           type_jkind;
+          type_evals_to;
           type_private = priv;
           type_manifest = Some man;
           type_variance = [];
@@ -4130,19 +4136,24 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       end
     | _ -> None
   in
-  let type_kind, type_unboxed_default, type_jkind =
+  let type_kind, type_unboxed_default, type_jkind, type_evals_to =
     if arity_ok then
       sig_decl.type_kind,
       sig_decl.type_unboxed_default,
-      sig_decl.type_jkind
+      sig_decl.type_jkind,
+      sig_decl.type_evals_to
     else
-      Type_abstract Definition, false, sig_decl.type_jkind
+      Type_abstract Definition,
+      false,
+      sig_decl.type_jkind,
+      sig_decl.type_evals_to
   in
   let new_sig_decl =
     { type_params = params;
       type_arity = arity;
       type_kind;
       type_jkind;
+      type_evals_to;
       type_private = priv;
       type_manifest = Some man;
       type_variance = [];
@@ -4183,6 +4194,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_arity = new_sig_decl.type_arity;
       type_kind = new_sig_decl.type_kind;
       type_jkind = new_sig_decl.type_jkind;
+      type_evals_to = new_sig_decl.type_evals_to;
       type_private = new_sig_decl.type_private;
       type_manifest = new_sig_decl.type_manifest;
       type_unboxed_default = new_sig_decl.type_unboxed_default;
@@ -4247,6 +4259,7 @@ let transl_package_constraint ~loc ty =
     (* There is no reason to calculate an accurate jkind here.  This typedecl
        will be thrown away once it is used for the package constraint inclusion
        check, and that check will expand the manifest as needed. *)
+    type_evals_to = None;
     type_private = Public;
     type_manifest = Some ty;
     type_variance = [];
@@ -4270,6 +4283,7 @@ let abstract_type_decl ~injective ~jkind ~params =
       type_arity = arity;
       type_kind = Type_abstract Definition;
       type_jkind = jkind;
+      type_evals_to = None;
       type_private = Public;
       type_manifest = None;
       type_variance = Variance.unknown_signature ~injective ~arity;
@@ -4286,6 +4300,7 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_arity = arity;
           type_kind = Type_abstract Definition;
           type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+          type_evals_to = None;
           type_private = Public;
           type_manifest = None;
           type_variance = Variance.unknown_signature ~injective ~arity;
