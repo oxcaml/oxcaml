@@ -955,8 +955,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Ok rd
       | Terminator
           (Call
-            (External
-              { func_symbol; ty_args; ty_res; alloc; returns_to; effects; _ }))
+             (External
+                { func_symbol; ty_args; ty_res; alloc; returns_to; effects; _ }))
         -> (
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg

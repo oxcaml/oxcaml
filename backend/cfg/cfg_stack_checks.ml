@@ -40,7 +40,8 @@ let is_nontail_call : Cfg.terminator -> bool =
   | Call (External { returns_to = None; _ } | OCaml _) -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call (External { returns_to = Some _; _ } | Probe _) | Invalid _ ->
+  | Call (External { returns_to = Some _; _ } | Probe _)
+  | Invalid _ ->
     false
 
 (* Returns the stack check info, and the max of seen instruction ids. *)

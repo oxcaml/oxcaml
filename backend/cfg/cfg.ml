@@ -192,22 +192,24 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Switch labels -> Switch (Array.map f labels)
       | Tailcall_self { destination } ->
         Tailcall_self { destination = f destination }
-      | Tailcall_func (Indirect _) | Tailcall_func (Direct _) | Return | Raise _
+      | Tailcall_func (Indirect _)
+      | Tailcall_func (Direct _)
+      | Return | Raise _
       | Invalid { label_after = None; _ } ->
         block.terminator.desc
       | Call (OCaml { op; returns_to }) ->
         Call (OCaml { op; returns_to = f returns_to })
       | Call
           (External
-            { func_symbol;
-              ty_res;
-              ty_args;
-              alloc;
-              returns_to;
-              effects;
-              stack_ofs;
-              stack_align
-            }) ->
+             { func_symbol;
+               ty_res;
+               ty_args;
+               alloc;
+               returns_to;
+               effects;
+               stack_ofs;
+               stack_align
+             }) ->
         Call
           (External
              { func_symbol;
@@ -414,18 +416,24 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
     Format.fprintf ppf "%sgoto %a" sep Label.format returns_to
   | Call
       (External
-        { func_symbol = func;
-          ty_res;
-          ty_args;
-          alloc;
-          returns_to;
-          stack_ofs;
-          stack_align;
-          effects = _
-        }) ->
+         { func_symbol = func;
+           ty_res;
+           ty_args;
+           alloc;
+           returns_to;
+           stack_ofs;
+           stack_align;
+           effects = _
+         }) ->
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
       (Linear.Lextcall
-         { func; ty_res; ty_args; returns = true; alloc; stack_ofs; stack_align
+         { func;
+           ty_res;
+           ty_args;
+           returns = true;
+           alloc;
+           stack_ofs;
+           stack_align
          });
     Option.iter
       (fun label_after ->
@@ -704,19 +712,19 @@ let basic_block_contains_calls block =
     | Tailcall_func _ -> false
     | Call _ | Invalid _ -> true)
   || DLL.exists block.body ~f:(fun (instr : basic instruction) ->
-         match instr.desc with
-         | Op (Alloc _ | Poll | External_without_caml_c_call _) -> true
-         | Op
-             ( Move | Spill | Reload | Const_int _ | Const_float32 _
-             | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-             | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _
-             | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
-             | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
-             | Begin_region | End_region | Specific _ | Name_for_debugger _
-             | Dls_get | Tls_get | Pause )
-         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
-         | Stack_check _ ->
-           false)
+      match instr.desc with
+      | Op (Alloc _ | Poll | External_without_caml_c_call _) -> true
+      | Op
+          ( Move | Spill | Reload | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+          | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _
+          | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+          | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
+          | Begin_region | End_region | Specific _ | Name_for_debugger _
+          | Dls_get | Tls_get | Pause )
+      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ->
+        false)
 
 let max_instr_id t =
   fold_blocks t ~init:InstructionId.none ~f:(fun _label block acc ->

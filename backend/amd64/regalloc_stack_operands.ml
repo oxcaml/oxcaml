@@ -275,11 +275,11 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Reinterpret_cast (Int_of_value | Value_of_int))
   | Op
       (Specific
-        ( Isextend32 | Izextend32 | Ilea _
-        | Istore_int (_, _, _)
-        | Ioffset_loc (_, _)
-        | Ifloatarithmem (_, _, _)
-        | Icldemote _ | Iprefetch _ | Ibswap _ ))
+         ( Isextend32 | Izextend32 | Ilea _
+         | Istore_int (_, _, _)
+         | Ioffset_loc (_, _)
+         | Ifloatarithmem (_, _, _)
+         | Icldemote _ | Iprefetch _ | Ibswap _ ))
   | Op (External_without_caml_c_call _)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue ->
     (* no rewrite *)

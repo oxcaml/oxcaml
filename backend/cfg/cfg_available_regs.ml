@@ -389,8 +389,8 @@ module Transfer = struct
         match term.desc with
         | Never -> assert false
         | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-        | Switch _ | Call _ | Return | Raise _ | Tailcall_func _
-        | Invalid _ | Tailcall_self _ ->
+        | Switch _ | Call _ | Return | Raise _ | Tailcall_func _ | Invalid _
+        | Tailcall_self _ ->
           common ~avail_before ~destroyed_at:Proc.destroyed_at_terminator
             ~is_interesting_constructor:
               Cfg.(

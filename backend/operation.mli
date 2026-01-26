@@ -189,8 +189,8 @@ type t =
         stack_ofs : int
       }
       (** [External_without_caml_c_call]s cannot require [caml_c_call] or be
-          marked as diverging.  Use the terminator [Call (External ...)] for
-          such cases. *)
+          marked as diverging. Use the terminator [Call (External ...)] for such
+          cases. *)
 
 val is_pure : t -> bool
 

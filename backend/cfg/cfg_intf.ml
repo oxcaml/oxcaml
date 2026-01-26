@@ -41,7 +41,7 @@ module S = struct
       alloc : bool;
       (* CR mshinwell: rename [alloc] -> [needs_caml_c_call] *)
       returns_to : Label.t option;
-          (** At least one of [alloc] and [returns_to] must be set.  Otherwise,
+          (** At least one of [alloc] and [returns_to] must be set. Otherwise,
               use [Op]. *)
       (* CR mshinwell: same comment as in cmm.mli (see the [External]
          constructor) about [effects], [alloc] and [returns_to]. In addition

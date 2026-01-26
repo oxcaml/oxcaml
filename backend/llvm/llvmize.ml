@@ -798,10 +798,21 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
   | Tailcall_func op ->
     reject_addr_regs i.arg "tailcall func";
     call ~tail:true t i op
-  | Call (External { func_symbol; alloc; stack_ofs; stack_align; returns_to = None; _ }) ->
+  | Call
+      (External
+         { func_symbol; alloc; stack_ofs; stack_align; returns_to = None; _ })
+    ->
     extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
     emit_ins_no_res t I.unreachable
-  | Call (External { func_symbol; alloc; stack_ofs; stack_align; returns_to = Some label_after; _ }) ->
+  | Call
+      (External
+         { func_symbol;
+           alloc;
+           stack_ofs;
+           stack_align;
+           returns_to = Some label_after;
+           _
+         }) ->
     reject_addr_regs i.arg "prim";
     extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
     br_label t label_after

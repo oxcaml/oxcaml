@@ -66,7 +66,8 @@ module Instruction_requirements = struct
         Requires_no_prologue
       (* These are implemented by calling a function when emitted and therefore
          need a prologue. *)
-      | Call _ | Raise (Raise_regular | Raise_reraise)
+      | Call _
+      | Raise (Raise_regular | Raise_reraise)
       | Invalid _ (* CR-soon vkarvonen: Does [Invalid] require prologue? *) ->
         Requires_prologue
       | Tailcall_func (Direct _)

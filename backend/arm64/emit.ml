@@ -1504,8 +1504,8 @@ let emit_extcall i ~func ~alloc ~stack_ofs =
     A.ins1 BL (runtime_function S.Predef.caml_c_call);
     record_frame i.live (Dbg_other i.dbg))
   else (
-    (* Store OCaml stack pointer in the frame pointer register. No need to
-       store previous x29 because OCaml doesn't maintain frame pointers. *)
+    (* Store OCaml stack pointer in the frame pointer register. No need to store
+       previous x29 because OCaml doesn't maintain frame pointers. *)
     if Config.runtime5
     then (
       A.ins_mov_from_sp ~dst:O.fp;
@@ -1644,13 +1644,13 @@ let emit_instr i =
       D.cfi_restore_state ())
   | Lop
       (External_without_caml_c_call
-        { func_symbol = func;
-          effects = _;
-          ty_args = _;
-          ty_res = _;
-          stack_ofs;
-          _
-        }) ->
+         { func_symbol = func;
+           effects = _;
+           ty_args = _;
+           ty_res = _;
+           stack_ofs;
+           _
+         }) ->
     emit_extcall i ~func ~alloc:false ~stack_ofs
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);

@@ -161,15 +161,15 @@ let linearize_terminator cfg_with_layout (func : string) start
         Some destination )
     | Call
         (External
-          { func_symbol;
-            alloc;
-            returns_to = None;
-            ty_args;
-            ty_res;
-            stack_ofs;
-            stack_align;
-            effects = _
-          }) ->
+           { func_symbol;
+             alloc;
+             returns_to = None;
+             ty_args;
+             ty_res;
+             stack_ofs;
+             stack_align;
+             effects = _
+           }) ->
       single
         (L.Lcall_op
            (Lextcall
@@ -204,15 +204,15 @@ let linearize_terminator cfg_with_layout (func : string) start
       branch_or_fallthrough [L.Lcall_op op] returns_to, None
     | Call
         (External
-          { func_symbol;
-            alloc;
-            returns_to = Some label_after;
-            ty_args;
-            ty_res;
-            stack_ofs;
-            stack_align;
-            effects = _
-          }) ->
+           { func_symbol;
+             alloc;
+             returns_to = Some label_after;
+             ty_args;
+             ty_res;
+             stack_ofs;
+             stack_align;
+             effects = _
+           }) ->
       let op : Linear.call_operation =
         Lextcall
           { func = func_symbol;

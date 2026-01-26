@@ -586,8 +586,8 @@ end = struct
     (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
       when Stdlib.compare call1 call2 = 0 ->
       ()
-    | Call (OCaml { op = op1; returns_to = l1 }),
-      Call (OCaml { op = op2; returns_to = l2 })
+    | ( Call (OCaml { op = op1; returns_to = l1 }),
+        Call (OCaml { op = op2; returns_to = l2 }) )
     (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
       when Stdlib.compare op1 op2 = 0 ->
       compare_label l1 l2
@@ -613,8 +613,7 @@ end = struct
                stack_ofs = so2;
                stack_align = sa2
              }) )
-      when String.equal f1 f2
-           && Bool.equal a1 a2
+      when String.equal f1 f2 && Bool.equal a1 a2
            && Stdlib.compare e1 e2 = 0
            && Stdlib.compare tr1 tr2 = 0
            && Stdlib.compare ta1 ta2 = 0
@@ -624,17 +623,26 @@ end = struct
       | None, None -> ()
       | Some l1, Some l2 -> compare_label l1 l2
       | None, Some _ | Some _, None ->
-        Regalloc_utils.fatal
-          "Call External returns_to changed from %a to %a"
+        Regalloc_utils.fatal "Call External returns_to changed from %a to %a"
           (Format.pp_print_option Label.format)
           r1
           (Format.pp_print_option Label.format)
           r2)
-    | ( Call (Probe { name = n1; handler_code_sym = h1; enabled_at_init = e1; returns_to = l1 }),
-        Call (Probe { name = n2; handler_code_sym = h2; enabled_at_init = e2; returns_to = l2 }) )
-      when String.equal n1 n2
-           && String.equal h1 h2
-           && Bool.equal e1 e2 ->
+    | ( Call
+          (Probe
+             { name = n1;
+               handler_code_sym = h1;
+               enabled_at_init = e1;
+               returns_to = l1
+             }),
+        Call
+          (Probe
+             { name = n2;
+               handler_code_sym = h2;
+               enabled_at_init = e2;
+               returns_to = l2
+             }) )
+      when String.equal n1 n2 && String.equal h1 h2 && Bool.equal e1 e2 ->
       compare_label l1 l2
     | ( Invalid { message = m1; label_after = None; _ },
         Invalid { message = m2; label_after = None; _ } )
