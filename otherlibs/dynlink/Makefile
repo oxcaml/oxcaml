@@ -98,7 +98,6 @@ COMPILERLIBS_SOURCES=\
   utils/terminfo.ml \
   utils/warnings.ml \
   utils/int_replace_polymorphic_compare.ml \
-  typing/ident.ml \
   utils/compilation_unit.ml \
   utils/import_info.ml \
   utils/linkage_name.ml \
@@ -120,23 +119,37 @@ COMPILERLIBS_SOURCES=\
   parsing/builtin_attributes.ml \
   parsing/ast_mapper.ml \
   parsing/camlinternalMenhirLib.ml \
+  parsing/parser_types.ml \
   parsing/parser.ml \
   parsing/lexer.ml \
   parsing/pprintast.ml \
-  typing/solver.ml \
-  typing/mode.ml \
   parsing/attr_helper.ml \
+  typing/global_module.ml \
   typing/ident.ml \
   typing/path.ml \
   typing/shape.ml \
+  typing/shape_reduce.ml \
+  typing/allowance.ml \
+  typing/solver.ml \
+  typing/mode.ml \
+  typing/jkind_intf.ml \
+  typing/jkind_axis.ml \
   typing/jkind_types.ml \
   typing/scalar.ml \
   typing/primitive.ml \
   typing/zero_alloc.ml \
   typing/types.ml \
   typing/oprint.ml \
+  typing/typemode.ml \
   typing/jkind.ml \
   typing/typedtree.ml \
+  typing/global_counters.ml \
+  typing/ldd_intf.ml \
+  typing/ldd.ml \
+  typing/axis_lattice.ml \
+  typing/axis_lattice_array.ml \
+  typing/axis_lattice_array_conv.ml \
+  typing/ikind.ml \
   typing/btype.ml \
   typing/subst.ml \
   typing/signature_with_global_bindings.ml \

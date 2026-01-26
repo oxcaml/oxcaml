@@ -26,3 +26,4 @@ type_shape.mli
 type_shape.ml
 scalar.ml
 scalar.mli
+ikinds/*

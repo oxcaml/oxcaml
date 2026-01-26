@@ -248,6 +248,11 @@
   includemod_errorprinter
   typemode
   jkind_axis
+  ;; IKINDS
+  ldd_intf
+  ldd
+  axis_lattice
+  ikind
   typetexp
   patterns
   printpat

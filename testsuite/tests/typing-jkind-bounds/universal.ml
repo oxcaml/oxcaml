@@ -53,17 +53,8 @@ Error: This expression has type "'a t" but an expression was expected of type
 |}]
 
 type 'a t : immutable_data = { f : 'b. 'b t }
-(* CR layouts v2.8: This should be accepted. Internal ticket 5746. *)
 [%%expect {|
-Line 1, characters 0-45:
-1 | type 'a t : immutable_data = { f : 'b. 'b t }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'b. 'b t/2
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type 'a t = { f : 'b. 'b t; }
 |}]
 
 (******************************************)
@@ -93,34 +84,22 @@ type t = { foo : 'a. Abs.t * unit; }
 type t = { foo : 'a. Abs.t * unit; }
 val f : t -> unit = <fun>
 |}, Principal{|
-type t = { foo : 'a. Abs.t * unit; }
-type t = { foo : 'a. Abs.t * unit; }
-Line 7, characters 27-28:
-7 |     require_immutable_data t
-                               ^
-Error: This expression has type "t" but an expression was expected of type
-         "('a : immutable_data)"
-       The kind of t is immutable_data with Abs.t
-         because of the definition of t at line 3, characters 0-47.
-       But the kind of t must be a subkind of immutable_data
-         because of the definition of require_immutable_data at line 2, characters 27-58.
+Line 1, characters 0-75:
+1 | type t : immutable_data with Abs.t = { foo : 'a. (Abs.t * 'a ignore_type) }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with Abs.t
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data with Abs.t
+         because of the annotation on the declaration of the type t.
 |}]
 
 (******************************************)
 
 type 'a u
 type t : immutable_data with (type : value) u = { foo : 'a. 'a u }
-(* CR layouts v2.8: This should be accepted. Internal ticket 5770. *)
 [%%expect{|
 type 'a u
-Line 2, characters 0-66:
-2 | type t : immutable_data with (type : value) u = { foo : 'a. 'a u }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a. 'a u
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of
-           immutable_data with (type : value) u
-         because of the annotation on the declaration of the type t.
+type t = { foo : 'a. 'a u; }
 |}]
 
 (******************************************)

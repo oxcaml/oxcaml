@@ -310,10 +310,10 @@ module Axis_set = struct
 
   let[@inline] axis_index (type a) : a Axis.t -> _ = function
     | Modal (Comonadic Areality) -> 0
-    | Modal (Comonadic Linearity) -> 1
-    | Modal (Monadic Uniqueness) -> 2
-    | Modal (Comonadic Portability) -> 3
-    | Modal (Monadic Contention) -> 4
+    | Modal (Monadic Uniqueness) -> 1
+    | Modal (Comonadic Linearity) -> 2
+    | Modal (Monadic Contention) -> 3
+    | Modal (Comonadic Portability) -> 4
     | Modal (Comonadic Forkable) -> 5
     | Modal (Comonadic Yielding) -> 6
     | Modal (Comonadic Statefulness) -> 7
@@ -343,10 +343,10 @@ module Axis_set = struct
     in
     0
     |> set_axis (Modal (Comonadic Areality))
-    |> set_axis (Modal (Comonadic Linearity))
     |> set_axis (Modal (Monadic Uniqueness))
-    |> set_axis (Modal (Comonadic Portability))
+    |> set_axis (Modal (Comonadic Linearity))
     |> set_axis (Modal (Monadic Contention))
+    |> set_axis (Modal (Comonadic Portability))
     |> set_axis (Modal (Comonadic Forkable))
     |> set_axis (Modal (Comonadic Yielding))
     |> set_axis (Modal (Comonadic Statefulness))

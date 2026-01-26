@@ -18,6 +18,71 @@
 open Allowance
 open Asttypes
 
+module Rigid_name = struct
+  type unknown_id = Shape.Uid.t
+
+  type t =
+    | Atom of
+        { constr : Path.t;
+          arg_index : int
+        }
+    | Param of int
+    | Unknown of unknown_id
+
+  let compare a b =
+    if a == b
+    then 0
+    else
+      match a, b with
+      | Atom a1, Atom a2 ->
+        let h = Path.compare a1.constr a2.constr in
+        if h != 0 then h else Int.compare a1.arg_index a2.arg_index
+      | Param x, Param y -> Int.compare x y
+      | Atom _, Param _ -> -1
+      | Param _, Atom _ -> 1
+      | Unknown x, Unknown y -> Shape.Uid.compare x y
+      | Unknown _, _ -> 1
+      | _, Unknown _ -> -1
+
+  let to_string = function
+    | Atom { constr; arg_index } ->
+      let constr_s = Format.asprintf "%a" Path.print constr in
+      Printf.sprintf "%s.%d" constr_s arg_index
+    | Param i -> Printf.sprintf "param[%d]" i
+    | Unknown id ->
+      Format.asprintf "unknown[%a]" Shape.Uid.print id
+
+  let atomic constr arg_index = Atom { constr; arg_index }
+
+  let param i = Param i
+
+  let unknown uid = Unknown uid
+end
+
+module Ldd = struct
+  module Name = Rigid_name
+
+  include (Ldd.Make (Rigid_name) :
+             Ldd_intf.S with module Name := Rigid_name)
+end
+
+type constructor_ikind =
+  { base : Ldd.node;
+    coeffs : Ldd.node array;
+  }
+
+type constructor_ikind_entry =
+  | Constructor_ikind of constructor_ikind
+  | No_constructor_ikind of string
+
+type type_ikind = constructor_ikind_entry
+
+let ikind_debug : bool ref = Clflags.ikinds_debug
+
+let ikinds_todo (message : string) : type_ikind =
+  if !ikind_debug then Format.eprintf "[ikinds-todo] %s@." message;
+  No_constructor_ikind message
+
 type atomic =
   | Nonatomic
   | Atomic
@@ -215,6 +280,123 @@ module Jkind_mod_bounds = struct
      Nullability.(le max (nullability t))) &&
     (not (mem axes (Nonmodal Separability)) ||
      Separability.(le max (separability t)))
+
+  let extract_monadic axis t =
+    let (Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_with value)) = modal axis t
+    in
+    value
+
+  let extract_comonadic axis t =
+    let (Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_with value)) = modal axis t
+    in
+    value
+
+  let areality_const t = extract_comonadic areality t
+
+  let linearity_const t = extract_comonadic linearity t
+
+  let uniqueness_const t = extract_monadic uniqueness t
+
+  let portability_const t = extract_comonadic portability t
+
+  let contention_const t = extract_monadic contention t
+
+  let forkable_const t = extract_comonadic forkable t
+
+  let yielding_const t = extract_comonadic yielding t
+
+  let statefulness_const t = extract_comonadic statefulness t
+
+  let visibility_const t = extract_monadic visibility t
+
+  let staticity_const t = extract_monadic staticity t
+
+  let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
+      ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity :
+      Crossing.t =
+    let open Crossing in
+    let monadic =
+      Monadic.create
+        ~uniqueness:
+          (Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_with uniqueness))
+        ~contention:
+          (Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_with contention))
+        ~visibility:
+          (Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_with visibility))
+        ~staticity:
+          (Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_with staticity))
+    in
+    let comonadic =
+      Comonadic.create
+        ~regionality:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_with areality))
+        ~linearity:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_with linearity))
+        ~portability:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_with portability))
+        ~forkable:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_with forkable))
+        ~yielding:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_with yielding))
+        ~statefulness:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_with statefulness))
+    in
+    { monadic; comonadic }
+
+  let to_axis_lattice (t : t) : Axis_lattice.t =
+    let boxed : Axis_lattice.boxed =
+      { areality = areality_const t;
+        linearity = linearity_const t;
+        uniqueness = uniqueness_const t;
+        portability = portability_const t;
+        contention = contention_const t;
+        forkable = forkable_const t;
+        yielding = yielding_const t;
+        statefulness = statefulness_const t;
+        visibility = visibility_const t;
+        staticity = staticity_const t;
+        externality = externality t;
+        nullability = nullability t;
+        separability = separability t
+      }
+    in
+    Axis_lattice.of_boxed boxed
+
+  let of_axis_lattice (x : Axis_lattice.t) : t =
+    let ({ areality;
+           linearity;
+           uniqueness;
+           portability;
+           contention;
+           forkable;
+           yielding;
+           statefulness;
+           visibility;
+           staticity;
+           externality;
+           nullability;
+           separability
+         } :
+          Axis_lattice.boxed) =
+      Axis_lattice.to_boxed x
+    in
+    let crossing =
+      crossing_of_constants ~areality ~linearity ~uniqueness ~portability
+        ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity
+    in
+    create crossing ~externality ~nullability ~separability
 
   let max =
     { crossing = Mode.Crossing.max;
@@ -524,6 +706,7 @@ type type_declaration =
     type_arity: int;
     type_kind: type_decl_kind;
     type_jkind: jkind_l;
+    type_ikind: constructor_ikind_entry;
     type_private: private_flag;
     type_manifest: type_expr option;
     type_variance: Variance.t list;

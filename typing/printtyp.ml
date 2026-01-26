@@ -2538,6 +2538,7 @@ let dummy =
     type_arity = 0;
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+    type_ikind = Types.ikinds_todo "print dummy";
     type_private = Public;
     type_manifest = None;
     type_variance = [];
