@@ -550,8 +550,8 @@ module TLS0 = struct
       new_st
     end
 
-let[@inline] set (type a) (idx, _init) (x : a) =
-  (* Assures [idx] is in range. *)
+  let[@inline] set (type a) (idx, _init) (x : a) =
+    (* Assures [idx] is in range. *)
     let st = maybe_grow idx in
     Array.unsafe_set st idx (Obj_opt.some x)
 
