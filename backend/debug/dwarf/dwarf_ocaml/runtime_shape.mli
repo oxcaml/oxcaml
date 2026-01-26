@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2025--2026 Jane Street Group LLC                             *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -28,20 +28,26 @@
 
 module Sort = Jkind_types.Sort
 
-type 'a or_void =
-  | Other of 'a
-  | Void
+module Or_void : sig
+  type 'a t =
+    | Other of 'a
+    | Void
 
-val or_void_to_string : ('a -> string) -> 'a or_void -> string
+  (** Convert to string using the provided formatter for non-void values. *)
+  val to_string : ('a -> string) -> 'a t -> string
 
-val erase_void : 'a or_void list -> 'a list
+  (** Remove all [Void] elements from a list, returning only the values. *)
+  val erase_void : 'a t list -> 'a list
 
-val print_or_void :
-  (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a or_void -> unit
+  (** Pretty-print an [Or_void.t] value using the provided formatter for
+      non-void values. *)
+  val print :
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+end
 
 module Runtime_layout : sig
   type t =
-    | Value
+    | Value  (** Regular OCaml value, traversable by the GC *)
     | Float64
     | Float32
     | Bits8
@@ -54,25 +60,44 @@ module Runtime_layout : sig
     | Word
     | Untagged_immediate
 
+  (** Size in memory, accounting for padding in memory (minimum
+      [Arch.size_addr]). *)
   val size_in_memory : t -> int
 
+  (** Actual size of the value in bytes. *)
   val size : t -> int
 
-  val of_base_layout : Sort.base -> t or_void
+  (** Convert from [Sort.base], returning [Void] for void layouts. *)
+  val of_base_layout : Sort.base -> t Or_void.t
+
+  (** Convert back to [Sort.base]. *)
+  val to_base_layout : t -> Sort.base
 
   val to_string : t -> string
 
   val print : Format.formatter -> t -> unit
-
-  val to_base_layout : t -> Sort.base
 
   val equal : t -> t -> bool
 
   val hash : t -> int
 end
 
-(** Runtime shape, simplified shapes that can actually occur at runtime (with a
-    runtime layout). *)
+(** Runtime shapes describe the runtime representation of OxCaml values.
+
+    While a regular [Shape.t] can describe both types and module expressions,
+    runtime shapes are specifically concerned with how values are represented at
+    runtime. Every runtime shape has a [Runtime_layout.t] that describes its
+    physical representation (e.g., boxed value, unboxed float, SIMD vector), but
+    runtime shapes carry additional structural information beyond the layout:
+
+    - For tuples and records: the types of each field
+    - For variants: the constructors and their argument types
+    - For recursive types: the recursive definition
+    - For predefined types: specific information like array element types
+
+    This structural information is used during DWARF debug information
+    generation to produce accurate type descriptions that debuggers can use to
+    inspect values at runtime. *)
 type t = private
   { desc : desc;
     runtime_layout : Runtime_layout.t;
@@ -191,15 +216,21 @@ and simd_vec_split =
   | Float32x16
   | Float64x8
 
+(** Create an unknown shape with the given runtime layout. Used when more
+    precise type information is unavailable. *)
 val unknown : Runtime_layout.t -> t
 
+(** Create a shape for a predefined type. *)
 val predef : predef -> t
 
+(** Create a mixed block field with the given type and label. *)
 val mixed_block_field : field_type:t -> label:'label -> 'label mixed_block_field
 
+(** Transform the label of a mixed block field. *)
 val map_mixed_block_field_label :
   ('a -> 'b) -> 'a mixed_block_field -> 'b mixed_block_field
 
+(** Create a boxed tuple shape from a list of element shapes. *)
 val tuple : t list -> t
 
 (** Create a constructor with tuple-style arguments for use in variants.
@@ -216,12 +247,18 @@ val constructor_with_tuple_arg :
 val constructor_with_record_arg :
   name:string -> args:string mixed_block_field list -> constructor
 
+(** Get the name of a constructor. *)
 val constructor_name : constructor -> string
 
+(** Get the arguments of a constructor as a list of fields with optional labels.
+    Tuple-style constructors have [None] labels, record-style constructors have
+    [Some name] labels. *)
 val constructor_args : constructor -> string option mixed_block_field list
 
+(** Create a boxed variant shape from a list of constructors. *)
 val variant : constructors -> t
 
+(** Create a polymorphic variant shape from a list of constructors. *)
 val polymorphic_variant : constructors -> t
 
 (** Attribute-unboxed variant. Argument must have been flattened beforehand. See
@@ -239,14 +276,21 @@ val record_attribute_unboxed : contents:string mixed_block_field -> t
 *)
 val record_mixed : string mixed_block_field list -> t
 
+(** The shape of a function value (always has [Value] layout). *)
 val func : t
 
+(** Create a recursive type shape. The argument is the body of the recursive
+    type, which may reference [rec_var] to refer back to the recursive binding.
+*)
 val mu : t -> t
 
+(** Create a reference to a recursive binding using de Bruijn indexing. *)
 val rec_var : Shape.DeBruijn_index.t -> Runtime_layout.t -> t
 
+(** Get the runtime layout of a built-in unboxed type. *)
 val runtime_layout_of_unboxed : unboxed -> Runtime_layout.t
 
+(** Project the runtime layout of a shape. *)
 val runtime_layout : t -> Runtime_layout.t
 
 val print : Format.formatter -> t -> unit
@@ -257,4 +301,5 @@ val hash : t -> int
 
 module Cache : Hashtbl.S with type key = t
 
+(** Get the byte size of a SIMD vector type. *)
 val simd_vec_split_to_byte_size : simd_vec_split -> int

@@ -12,8 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@warning "+26+27+32"]
-
 open! Dwarf_low
 open! Dwarf_high
 module Uid = Flambda2_identifiers.Flambda_debug_uid
@@ -456,9 +454,9 @@ let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
   done
 
 let create_complex_variant_die ~reference ~parent_proto_die ?name
-    simple_constructors
-    (complex_constructors :
-      (string * (string option * Proto_die.reference * RL.t) list) list) =
+    ~simple_constructors
+    ~(complex_constructors :
+       (string * (string option * Proto_die.reference * RL.t) list) list) () =
   let complex_constructors_names =
     List.map (fun (name, _) -> name) complex_constructors
   in
@@ -776,7 +774,7 @@ let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
 *)
 
 let create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
-    simple_constructors complex_constructors =
+    ~simple_constructors ~complex_constructors () =
   let enum_constructor_for_poly_variant ~parent name =
     let hash = Btype.hash_variant name in
     let tagged_constructor_hash =
@@ -1219,6 +1217,20 @@ end = struct
     then RS.Cache.add cache runtime_shape reference
 end
 
+let partition_constructors constructors ~f =
+  List.partition_map
+    (fun (constr : RS.constructor) ->
+      let constr_name = RS.constructor_name constr in
+      let args = RS.constructor_args constr in
+      match args with
+      | [] -> Left constr_name
+      | _ :: _ ->
+        let args =
+          List.map (fun { RS.label; field_type } -> f label field_type) args
+        in
+        Right (constr_name, args))
+    constructors
+
 (* CR sspies: We have to be careful here, because LLDB currently disambiguates
    type dies based on the type name; however, we can easily have types with the
    same name and different definitions. The function
@@ -1305,51 +1317,23 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
           fields)
   | Variant { constructors; kind = Variant_polymorphic } ->
     let simple_constructors, complex_constructors =
-      List.partition_map
-        (fun (constr : RS.constructor) ->
-          let constr_name = RS.constructor_name constr in
-          let args = RS.constructor_args constr in
-          match args with
-          | [] -> Left constr_name
-          | _ :: _ ->
-            let arg_dies =
-              List.map (fun { RS.field_type; _ } -> die field_type) args
-            in
-            Right (constr_name, arg_dies))
-        constructors
+      partition_constructors constructors ~f:(fun _label field_type ->
+          die field_type)
     in
     create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
-      simple_constructors complex_constructors
+      ~simple_constructors ~complex_constructors ()
   | Variant { constructors; kind = Variant_boxed } -> (
     let simple_constructors, complex_constructors =
-      List.partition_map
-        (fun (constr : RS.constructor) ->
-          let constr_name = RS.constructor_name constr in
-          let args = RS.constructor_args constr in
-          match args with
-          | [] -> Left constr_name
-          | _ :: _ -> Right (constr_name, args))
-        constructors
+      partition_constructors constructors ~f:(fun label field_type ->
+          label, die field_type, RS.runtime_layout field_type)
     in
     match complex_constructors with
     | [] ->
       create_simple_variant_die ~reference ~parent_proto_die ?name
         simple_constructors
     | _ :: _ ->
-      let complex_constructors =
-        List.map
-          (fun (constr_name, args) ->
-            let args =
-              List.map
-                (fun { RS.label; field_type } ->
-                  label, die field_type, RS.runtime_layout field_type)
-                args
-            in
-            constr_name, args)
-          complex_constructors
-      in
       create_complex_variant_die ~reference ~parent_proto_die ?name
-        simple_constructors complex_constructors)
+        ~simple_constructors ~complex_constructors ())
   | Variant { constructors = [constr]; kind = Variant_attribute_unboxed layout }
     -> (
     let constr_name = RS.constructor_name constr in
@@ -1633,7 +1617,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
                 i
                 (List.length complex_shape_flattened)
                 (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                   (Runtime_shape.print_or_void RS.print))
+                   (RS.Or_void.print RS.print))
                 complex_shape_flattened)
         else
           match List.nth complex_shape_flattened i with

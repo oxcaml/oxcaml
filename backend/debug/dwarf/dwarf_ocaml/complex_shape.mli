@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2025--2026 Jane Street Group LLC                             *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -32,7 +32,7 @@ module Layout = Jkind_types.Sort.Const
 (** Complex shape types.
 
     Complex shapes represent type layouts that may include unboxed products and
-    void types, in addition to simple runtime shapes that fit in a single
+    void types, in addition to "simple" runtime shapes that fit in a single
     register. The term "complex" follows Flambda 2's naming convention (see
     [Flambda_arity.Component_for_creation] in middle_end/flambda2/kinds), where
     "complex" arities can contain unboxed products, as opposed to "singleton"
@@ -88,7 +88,7 @@ val runtime_shape : t -> RS.t option
 
 (** Flatten a complex shape into a list of runtime shapes and voids. Can be used
     to simulate the effect of unarization on function arguments. *)
-val flatten_complex_shape : t -> RS.t RS.or_void list
+val flatten_complex_shape : t -> RS.t RS.Or_void.t list
 
 (** Convert a type shape and layout to a complex shape for DWARF type
     generation. Requires the shape to be fully reduced and evaluated beforehand.

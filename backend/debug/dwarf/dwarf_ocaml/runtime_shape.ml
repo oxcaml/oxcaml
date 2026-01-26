@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2025--2026 Jane Street Group LLC                             *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -32,19 +32,21 @@ module S = Shape
 module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 
-type 'a or_void =
-  | Other of 'a
-  | Void
+module Or_void = struct
+  type 'a t =
+    | Other of 'a
+    | Void
 
-let print_or_void f fmt = function
-  | Other x -> f fmt x
-  | Void -> Format.fprintf fmt "void"
+  let print f fmt = function
+    | Other x -> f fmt x
+    | Void -> Format.fprintf fmt "void"
 
-let or_void_to_string to_string (t : 'a or_void) : string =
-  match t with Other layout -> to_string layout | Void -> "void"
+  let to_string to_string (t : 'a t) : string =
+    match t with Other layout -> to_string layout | Void -> "void"
 
-let erase_void (rs : 'a or_void list) : 'a list =
-  List.filter_map (function Other s -> Some s | Void -> None) rs
+  let erase_void (rs : 'a t list) : 'a list =
+    List.filter_map (function Other s -> Some s | Void -> None) rs
+end
 
 module Runtime_layout = struct
   type t =
@@ -78,7 +80,7 @@ module Runtime_layout = struct
 
   let size_in_memory t = Int.max (size t) Arch.size_addr
 
-  let of_base_layout (t : Sort.base) : t or_void =
+  let of_base_layout (t : Sort.base) : t Or_void.t =
     match t with
     | Void -> Void
     | Value -> Other Value
@@ -442,7 +444,8 @@ let hash_variant_kind = function
   | Variant_polymorphic -> 2
 
 let hash_record_kind = function
-  | Record_attribute_unboxed layout -> Hashtbl.hash (0, layout)
+  | Record_attribute_unboxed layout ->
+    Hashtbl.hash (0, Runtime_layout.hash layout)
   | Record_mixed -> 1
 
 let hash_tuple_kind = function Tuple_boxed -> 0
@@ -526,18 +529,6 @@ let variant_attribute_unboxed ~constructor_name
         ( hash_variant,
           hash_variant_kind (Variant_attribute_unboxed layout),
           List.map hash_constructor [constructor] )
-  }
-
-(* Using mixed records here, because they generalize regular records. *)
-let record fields =
-  let desc = Record { fields; kind = Record_mixed } in
-  { desc;
-    runtime_layout = Value;
-    hash =
-      Hashtbl.hash
-        ( hash_record,
-          hash_record_kind Record_mixed,
-          List.map (hash_mixed_block_field Hashtbl.hash) fields )
   }
 
 let record_attribute_unboxed ~contents =

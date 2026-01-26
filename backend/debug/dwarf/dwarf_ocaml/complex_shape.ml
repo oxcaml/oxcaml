@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2025--2026 Jane Street Group LLC                             *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -75,7 +75,7 @@ let runtime t =
   in
   { desc; layout; hash = Hashtbl.hash (hash_runtime, RS.hash t) }
 
-let rec unboxed_tuple args =
+let unboxed_tuple args =
   let desc = Unboxed_product { components = args; kind = Unboxed_tuple } in
   { desc;
     layout = Layout.Product (List.map to_layout args);
@@ -143,10 +143,10 @@ let rec equal { desc = desc1 } { desc = desc2 } =
 let runtime_shape (cs : t) =
   match cs.desc with Runtime s -> Some s | Void | Unboxed_product _ -> None
 
-let rec flatten_complex_shape (cs : t) : RS.t RS.or_void list =
+let rec flatten_complex_shape (cs : t) : RS.t RS.Or_void.t list =
   match cs.desc with
-  | Void -> [RS.Void]
-  | Runtime s -> [RS.Other s]
+  | Void -> [RS.Or_void.Void]
+  | Runtime s -> [RS.Or_void.Other s]
   | Unboxed_product { components; kind = _ } ->
     List.concat_map flatten_complex_shape components
 
@@ -343,7 +343,7 @@ and flatten_product_layout_exn (cs : t) =
 
 module Shape_cache : sig
   val find_in_cache :
-    Layout.t -> Shape.t -> rec_env:'a S.DeBruijn_env.t -> t option
+    Shape.t -> Layout.t -> rec_env:'a S.DeBruijn_env.t -> t option
 
   val add_to_cache :
     Shape.t -> Layout.t -> t -> rec_env:'a S.DeBruijn_env.t -> unit
@@ -369,7 +369,7 @@ end = struct
 
   let cache = Cache.create 100
 
-  let find_in_cache type_layout type_shape ~rec_env =
+  let find_in_cache type_shape type_layout ~rec_env =
     if S.DeBruijn_env.is_empty rec_env
     then Cache.find_opt cache { type_shape; type_layout }
     else None
@@ -385,7 +385,7 @@ end
     shapes for arrays. *)
 let lay_out_sequentially (cs : t) : RS.t list =
   (* CR sspies: Maybe bring back the names here for records? *)
-  flatten_complex_shape cs |> RS.erase_void
+  flatten_complex_shape cs |> RS.Or_void.erase_void
 
 let rec layout_to_unknown_shape (ly : Layout.t) : t =
   match ly with
@@ -724,20 +724,20 @@ and predef_to_complex_shape_exn ~rec_env (predef : S.Predef.t) ~args : RS.predef
     let children = lay_out_sequentially elem_shape in
     match children with
     | [] -> err_exn (fun f -> f "array cannot contain only void elements")
-    | [child] -> RS.Array (Regular child)
-    | children -> RS.Array (Packed children)
+    | [child] -> Array (Regular child)
+    | children -> Array (Packed children)
     (* case for an unboxed product inside *))
-  | Bytes, [] -> RS.Bytes
-  | Char, [] -> RS.Char
-  | Extension_constructor, [] -> RS.Extension_constructor
-  | Float, [] -> RS.Float
-  | Float32, [] -> RS.Float32
-  | Floatarray, [] -> RS.Floatarray
-  | Int, [] -> RS.Int
-  | Int8, [] -> RS.Int8
-  | Int16, [] -> RS.Int16
-  | Int32, [] -> RS.Int32
-  | Int64, [] -> RS.Int64
+  | Bytes, [] -> Bytes
+  | Char, [] -> Char
+  | Extension_constructor, [] -> Extension_constructor
+  | Float, [] -> Float
+  | Float32, [] -> Float32
+  | Floatarray, [] -> Floatarray
+  | Int, [] -> Int
+  | Int8, [] -> Int8
+  | Int16, [] -> Int16
+  | Int32, [] -> Int32
+  | Int64, [] -> Int64
   | Lazy_t, [elem_shape] ->
     let elem_shape =
       type_shape_to_complex_shape_exn ~rec_env elem_shape
@@ -748,12 +748,12 @@ and predef_to_complex_shape_exn ~rec_env (predef : S.Predef.t) ~args : RS.predef
       | Some s -> s
       | None -> RS.unknown Value
     in
-    RS.Lazy_t elem_shape
-  | Nativeint, [] -> RS.Nativeint
-  | String, [] -> RS.String
-  | Simd vec_split, [] -> RS.Simd (translate_simd_vec_split vec_split)
-  | Exception, [] -> RS.Exception
-  | Unboxed unb, [] -> RS.Unboxed (translate_unboxed unb)
+    Lazy_t elem_shape
+  | Nativeint, [] -> Nativeint
+  | String, [] -> String
+  | Simd vec_split, [] -> Simd (translate_simd_vec_split vec_split)
+  | Exception, [] -> Exception
+  | Unboxed unb, [] -> Unboxed (translate_unboxed unb)
   | ( ( Bytes | Char | Extension_constructor | Float | Float32 | Floatarray
       | Int | Int8 | Int16 | Int32 | Int64 | Nativeint | String | Simd _
       | Exception | Unboxed _ ),
@@ -787,7 +787,7 @@ and predef_to_complex_shape_exn ~rec_env (predef : S.Predef.t) ~args : RS.predef
           args)
 
 and type_shape_to_complex_shape ~rec_env type_shape type_layout : t =
-  match Shape_cache.find_in_cache type_layout type_shape ~rec_env with
+  match Shape_cache.find_in_cache type_shape type_layout ~rec_env with
   | Some shape -> shape
   | None ->
     let shape =
