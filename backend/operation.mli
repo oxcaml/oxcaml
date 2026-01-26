@@ -174,6 +174,7 @@ type t =
       }
   | Dls_get
   | Tls_get
+  | Domain_index
   | Poll
   | Pause
   | Alloc of

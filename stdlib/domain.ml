@@ -354,8 +354,12 @@ module Runtime_5 = struct
 
   let is_main_domain () = (self () :> int) = 0
 
-  external self_index : unit -> int @@ portable
-    = "caml_ml_domain_index" [@@noalloc]
+  external self_index : unit -> int# @@ portable
+    = "%domain_index" [@@noalloc]
+
+  external tag_int : int# -> int @@ portable = "%tag_int"
+
+  let[@inline] self_index () = tag_int (self_index ())
 
   (******** Callbacks **********)
 
@@ -546,8 +550,8 @@ module TLS0 = struct
       new_st
     end
 
-  let[@inline] set (type a) (idx, _init) (x : a) =
-    (* Assures [idx] is in range. *)
+let[@inline] set (type a) (idx, _init) (x : a) =
+  (* Assures [idx] is in range. *)
     let st = maybe_grow idx in
     Array.unsafe_set st idx (Obj_opt.some x)
 

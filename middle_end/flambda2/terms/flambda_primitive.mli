@@ -371,6 +371,7 @@ type nullary_primitive =
           This is then used in to_cmm to correctly add inlined debuginfo. *)
   | Dls_get  (** Obtain the domain-local state block. *)
   | Tls_get  (** Obtain the thread-local state block. *)
+  | Domain_index  (** Obtain the current domain's index. *)
   | Poll
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and GC

@@ -352,6 +352,7 @@ type primitive =
   (* Fetching domain-local state *)
   | Pdls_get
   | Ptls_get
+  | Pdomain_index
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
@@ -2151,6 +2152,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_lxor_field
   | Pdls_get
   | Ptls_get
+  | Pdomain_index
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
@@ -2310,7 +2312,7 @@ let primitive_can_raise prim =
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
   | Pwith_stack | Pwith_stack_bind | Pperform | Presume
   | Preperform -> true (* XXX! *)
-  | Pdls_get | Ptls_get | Ppoll | Pcpu_relax
+  | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
@@ -2701,6 +2703,7 @@ let primitive_result_layout (p : primitive) =
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
+  | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field
