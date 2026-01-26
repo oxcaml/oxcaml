@@ -419,7 +419,7 @@ let mk_ddissector_inputs f =
 let mk_verify_binary_emitter f =
   ( "-verify-binary-emitter",
     Arg.Unit f,
-    "Verify binary emitter output matches system assembler output. Exits with \
+    " Verify binary emitter output matches system assembler output. Exits with \
      error on mismatch." )
 
 let mk_gc_timings f =
