@@ -905,8 +905,9 @@ let num_call_gc_points instr =
            | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-        | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
-        | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
+        | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
+        | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
+        | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -977,9 +978,9 @@ module BR = Branch_relaxation.Make (struct
       | Lcondbranch3 _ -> Some Bcc
       | Lop
           ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
-          | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
-          | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
-          | Load _
+          | End_region | Dls_get | Tls_get | Domain_index | Const_int _
+          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+          | Stackoffset _ | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)
@@ -1161,6 +1162,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Probe_is_enabled _) -> 3
     | Lop Dls_get -> 1
     | Lop Tls_get -> 1
+    | Lop Domain_index -> 1
     | Lreloadretaddr -> 0
     | Lreturn -> epilogue_size ()
     | Llabel _ -> 0
@@ -1938,6 +1940,11 @@ let emit_instr i =
       (H.addressing (Iindexed offset) reg_domain_state_ptr)
   | Lop Tls_get ->
     let offset = Domainstate.(idx_of_field Domain_tls_state) * 8 in
+    A.ins2 LDR
+      (H.reg_x i.res.(0))
+      (H.addressing (Iindexed offset) reg_domain_state_ptr)
+  | Lop Domain_index ->
+    let offset = Domainstate.(idx_of_field Domain_id) * 8 in
     A.ins2 LDR
       (H.reg_x i.res.(0))
       (H.addressing (Iindexed offset) reg_domain_state_ptr)
