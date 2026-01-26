@@ -2046,7 +2046,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
         in
         let zap_modality =
-          Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
+          Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
         in
         let sg =
           sg
