@@ -389,25 +389,7 @@ end
    Tconstrs, checking to see if corresponding arguments are in a sub-kind relationship --
    but only if at least the argument on the right is best. Subtle. *)
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = P : ('a : immediate). 'a abstract -> t
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = P : ('a : immediate). 'a abstract -> t end
-       is not included in
-         sig type t : immutable_data with (type : value) abstract end
-       Type declarations do not match:
-         type t = P : ('a : immediate). 'a abstract -> t
-       is not included in
-         type t : immutable_data with (type : value) abstract
-       The kind of the first is
-           immutable_data with (type : immediate) abstract
-         because of the definition of t at line 4, characters 2-49.
-       But the kind of the first must be a subkind of
-           immutable_data with (type : value) abstract
-         because of the definition of t at line 2, characters 2-54.
+module M : sig type t : immutable_data with (type : value) abstract end
 |}]
 
 (* Some hard recursive types with existentials *)
