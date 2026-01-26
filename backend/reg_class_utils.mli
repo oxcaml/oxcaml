@@ -5,22 +5,26 @@ module type T = sig
   (** The "enum" representing the different classes. *)
   type t
 
+  module Reg_id : sig
+    type t = private int
+
+    include Identifiable.S with type t := t
+
+    val of_int : int -> t
+  end
+
   (** The list of all classes. *)
   val all : t list
 
-  val first_available_register : t -> int
+  val reg_index_in_class : t -> Reg_id.t -> int
+
+  val reg_id : t -> reg_index_in_class:int -> Reg_id.t
 
   val num_available_registers : t -> int
 
   val num_registers : t -> int
 
-  (** For a given register class, the DWARF register numbering for that class.
-      Given an allocated register with location [Reg n] and class [reg_class],
-      the returned array contains the corresponding DWARF register number at
-      index [n - first_available_register reg_class]. *)
-  val dwarf_register_numbers : t -> int array
-
-  val register_name : Cmm.machtype_component -> int -> string
+  val register_name : Cmm.machtype_component -> Reg_id.t -> string
 
   val equal : t -> t -> bool
 
@@ -29,6 +33,8 @@ module type T = sig
   val print : Format.formatter -> t -> unit
 
   val of_machtype : Cmm.machtype_component -> t
+
+  val dwarf_reg_number : Cmm.machtype_component -> Reg_id.t -> int option
 end
 
 (** Definition of tables with register classes as keys. All register classes are

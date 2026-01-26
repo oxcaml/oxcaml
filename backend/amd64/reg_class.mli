@@ -27,4 +27,4 @@ module Save_simd_regs : sig
 end
 
 val gc_regs_offset :
-  simd:Save_simd_regs.t -> Cmm.machtype_component -> int -> int
+  simd:Save_simd_regs.t -> Cmm.machtype_component -> Reg_id.t -> int

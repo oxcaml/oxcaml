@@ -116,16 +116,18 @@ let ymm_reg_name = Array.init 16 (fun i -> X86_ast.YMM i)
 
 let zmm_reg_name = Array.init 16 (fun i -> X86_ast.ZMM i)
 
-let register_name typ r : X86_ast.arg =
+let register_name typ reg_id : X86_ast.arg =
   match (typ : Cmm.machtype_component) with
-  | Int | Val | Addr -> Reg64 int_reg_name.(r)
-  | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
+  | Int | Val | Addr ->
+    Reg64 int_reg_name.(Reg_class.reg_index_in_class GPR reg_id)
+  | Float | Float32 | Vec128 | Valx2 ->
+    Regf xmm_reg_name.(Reg_class.reg_index_in_class SIMD reg_id)
   | Vec256 ->
     I.require_vec256 ();
-    Regf ymm_reg_name.(r - 100)
+    Regf ymm_reg_name.(Reg_class.reg_index_in_class SIMD reg_id)
   | Vec512 ->
     I.require_vec512 ();
-    Regf zmm_reg_name.(r - 100)
+    Regf zmm_reg_name.(Reg_class.reg_index_in_class SIMD reg_id)
 
 let phys_rax = phys_reg Int 0
 
@@ -393,7 +395,7 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
 let reg : Reg.t -> X86_ast.arg =
  fun reg ->
   match reg with
-  | { loc = Reg.Reg r; typ = ty; _ } -> register_name ty r
+  | { loc = Reg.Reg reg_id; typ = ty; _ } -> register_name ty reg_id
   | { loc = Stack (Domainstate n); typ = ty; _ } ->
     let ofs = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
     mem64 (x86_data_type_for_stack_slot ty) ofs (Scalar R14)
@@ -404,7 +406,7 @@ let reg : Reg.t -> X86_ast.arg =
   | { loc = Unknown; _ } -> assert false
 
 let reg64 = function
-  | { loc = Reg.Reg r; _ } -> int_reg_name.(r)
+  | { loc = Reg.Reg r; _ } -> int_reg_name.((r :> int))
   | { loc = Stack _ | Unknown; _ } -> assert false
 
 let res i n = reg i.res.(n)
@@ -421,7 +423,7 @@ let reg_low_32_name = Array.map (fun r -> X86_ast.Reg32 r) int_reg_name
 
 let emit_subreg tbl typ r =
   match r.loc with
-  | Reg.Reg r when r < 13 -> tbl.(r)
+  | Reg.Reg r when (r :> int) < 13 -> tbl.((r :> int))
   | Stack s ->
     mem64 typ (slot_offset s (Stack_class.of_machtype r.Reg.typ)) (Scalar RSP)
   | Reg _ | Unknown -> assert false
@@ -512,22 +514,25 @@ let must_save_simd_regs live : Reg_class.Save_simd_regs.t =
    the Arm backend. *)
 
 let record_frame_label live dbg =
+  let encode_reg_offset n = (n lsl 1) + 1 in
   let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   let simd = must_save_simd_regs live in
   Reg.Set.iter
     (fun (r : Reg.t) ->
       match r with
-      | { typ = Val; loc = Reg r; _ } ->
-        assert (Reg_class.gc_regs_offset ~simd Val r = r);
-        live_offset := ((r lsl 1) + 1) :: !live_offset
+      | { typ = Val; loc = Reg reg_id; _ } ->
+        let reg_offset = Reg_class.gc_regs_offset ~simd Val reg_id in
+        live_offset := encode_reg_offset reg_offset :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := slot_offset s (Stack_class.of_machtype reg.typ) :: !live_offset
-      | { typ = Valx2; loc = Reg r; _ } ->
-        let n = Reg_class.gc_regs_offset ~simd Valx2 r in
-        let encode n = (n lsl 1) + 1 in
-        live_offset := encode n :: encode (n + 1) :: !live_offset
+      | { typ = Valx2; loc = Reg reg_id; _ } ->
+        let reg_offset = Reg_class.gc_regs_offset ~simd Valx2 reg_id in
+        live_offset
+          := encode_reg_offset reg_offset
+             :: encode_reg_offset (reg_offset + 1)
+             :: !live_offset
       | { typ = Valx2; loc = Stack s; _ } as reg ->
         let n = slot_offset s (Stack_class.of_machtype reg.typ) in
         live_offset := n :: (n + Arch.size_addr) :: !live_offset
@@ -2402,7 +2407,9 @@ let emit_instr ~first ~fallthrough i =
        argument to Lswitch can still be assigned to one of these two registers,
        so we must be careful not to clobber it before use. *)
     let tmp1, tmp2 =
-      if Reg.equal_location i.arg.(0).loc (Reg 0) (* rax *)
+      if
+        Reg.equal_location i.arg.(0).loc (Reg (Reg_class.Reg_id.of_int 0))
+        (* rax *)
       then phys_rdx, phys_rax
       else phys_rax, phys_rdx
     in

@@ -366,8 +366,8 @@ let () =
       (Printf.sprintf
          ">> Fatal error: In function arguments: changed preassigned \
           register's location from %s to %s"
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 1))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 0))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 1)))
 
 let () =
   check "Location can't be unknown after allocation"
@@ -398,8 +398,8 @@ let () =
       (Printf.sprintf
          ">> Fatal error: In instruction's no 17 results: changed preassigned \
           register's location from %s to %s"
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 1))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 2))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 1)))
 
 let () =
   check "Duplicate instruction found when validating description"
@@ -858,22 +858,22 @@ let test_loop ~loop_loc_first n =
           Equations: R[%s]=%s R[%s]=%s R[%s]=%s\n\
           Function argument descriptions: R[%s], R[%s], R[%s]\n\
           Function argument locations: %s, %s, %s"
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 2))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 2))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 1))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 1))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 1))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 0))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 0))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 2))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 1))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 2))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 2))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 0))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 1))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 2))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 0))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 1))
+         (Reg_class.register_name Cmm.Int (Reg_class.Reg_id.of_int 2)))
     ~exp_err:"";
   let end_time = Sys.time () in
   Format.printf "  Time of loop test: %fs\n" (end_time -. start_time);
