@@ -107,8 +107,7 @@ let find_first_difference s1 s2 =
   loop 0
 
 let is_text_section name =
-  String.equal name "text"
-  || (String.length name >= 5 && String.sub name 0 5 = ".text")
+  String.equal name "text" || String.starts_with ~prefix:".text" name
 
 let align_to_instruction offset =
   match Target_system.architecture () with
@@ -160,14 +159,14 @@ let read_text_sections dir =
     let function_sections =
       Array.to_list files
       |> List.filter_map (fun f ->
-             if String.length f > 17
-                && String.sub f 0 13 = "section_text."
-                && String.sub f (String.length f - 4) 4 = ".bin"
-                && f <> "section_text.bin"
-             then
-               let name = "." ^ String.sub f 8 (String.length f - 12) in
-               Some (name, read_file (Filename.concat dir f))
-             else None)
+          if
+            String.starts_with ~prefix:"section_text." f
+            && String.ends_with ~suffix:".bin" f
+            && f <> "section_text.bin"
+          then
+            let name = "." ^ String.sub f 8 (String.length f - 12) in
+            Some (name, read_file (Filename.concat dir f))
+          else None)
     in
     match function_sections with
     | [] -> No_function_sections (read_section dir "text")
@@ -180,14 +179,14 @@ let read_text_relocations dir =
     let files = Sys.readdir dir in
     Array.to_list files
     |> List.filter_map (fun f ->
-           if String.length f > 20
-              && String.sub f 0 13 = "section_text."
-              && String.sub f (String.length f - 7) 7 = ".relocs"
-              && f <> "section_text.relocs"
-           then
-             let name_part = String.sub f 8 (String.length f - 15) in
-             Some ("." ^ name_part, read_relocations dir name_part)
-           else None)
+        if
+          String.starts_with ~prefix:"section_text." f
+          && String.ends_with ~suffix:".relocs" f
+          && f <> "section_text.relocs"
+        then
+          let name_part = String.sub f 8 (String.length f - 15) in
+          Some ("." ^ name_part, read_relocations dir name_part)
+        else None)
 
 (* Section comparison *)
 
@@ -371,10 +370,8 @@ let compare unix ~obj_file ~binary_sections_dir =
     let buf =
       try Owee_buf.map_binary unix obj_file
       with exn ->
-        raise
-          (Failure
-             (Printf.sprintf "Failed to read %s: %s" obj_file
-                (Printexc.to_string exn)))
+        Misc.fatal_errorf "Failed to read %s: %s" obj_file
+          (Printexc.to_string exn)
     in
     let be_text = read_text_sections binary_sections_dir in
     let be_data = read_section binary_sections_dir "data" in
@@ -452,7 +449,8 @@ let print_result ppf = function
   | Match { text_size; data_size } ->
     Format.fprintf ppf
       "@[<v>Binary emitter verification passed@,\
-       text: %d bytes, data: %d bytes@]@." text_size data_size
+       text: %d bytes, data: %d bytes@]@."
+      text_size data_size
   | Mismatch (Section_content m) ->
     Format.fprintf ppf
       "@[<v>Binary emitter verification FAILED@,\
@@ -467,7 +465,8 @@ let print_result ppf = function
       \  %s@,\
        @,\
        Binary emitter bytes:@,\
-      \  %s@]@." m.section_name m.actual_size m.expected_size m.byte_offset
+      \  %s@]@."
+      m.section_name m.actual_size m.expected_size m.byte_offset
       (match m.instruction_offset with
       | Some off when off <> m.byte_offset ->
         Printf.sprintf " (instruction at 0x%x)" off
@@ -487,7 +486,8 @@ let print_result ppf = function
        @,\
        Relocation mismatch in %s at offset 0x%x:@,\
        Assembler:      %s@,\
-       Binary emitter: %s@]@." r.section_name r.offset r.actual r.expected
+       Binary emitter: %s@]@."
+      r.section_name r.offset r.actual r.expected
   | Mismatch (Missing_section name) ->
     Format.fprintf ppf
       "@[<v>Binary emitter verification FAILED@,@,Missing section: %s@]@." name
@@ -496,14 +496,29 @@ let print_result ppf = function
       "@[<v>Binary emitter verification FAILED@,\
        @,\
        Binary sections directory not found: %s@,\
-       (Did the binary emitter run?)@]@." dir
+       (Did the binary emitter run?)@]@."
+      dir
   | Object_file_error msg ->
     Format.fprintf ppf
       "@[<v>Binary emitter verification FAILED@,\
        @,\
-       Error reading object file: %s@]@." msg
+       Error reading object file: %s@]@."
+      msg
 
 module For_testing = struct
+  let extract_text_sections buf =
+    match Owee_object.extract_individual_text_sections buf with
+    | [] -> (
+      match Owee_object.extract_text_section buf with
+      | Some s -> [".text", s]
+      | None -> [])
+    | sections -> sections
+
+  let extract_text_relocs buf =
+    match Owee_object.extract_individual_text_relocations buf with
+    | [] -> [".text", Owee_object.extract_text_relocations buf]
+    | relocs -> relocs
+
   let compare_object_files unix ~expected_pathname ~actual_pathname =
     let map_file pathname =
       try Owee_buf.map_binary unix pathname
@@ -515,37 +530,12 @@ module For_testing = struct
     in
     let expected_buf = map_file expected_pathname in
     let actual_buf = map_file actual_pathname in
-    (* Extract text sections from both *)
-    let expected_text_list =
-      match Owee_object.extract_individual_text_sections expected_buf with
-      | [] -> (
-        match Owee_object.extract_text_section expected_buf with
-        | Some s -> [".text", s]
-        | None -> [])
-      | sections -> sections
-    in
-    let actual_text_list =
-      match Owee_object.extract_individual_text_sections actual_buf with
-      | [] -> (
-        match Owee_object.extract_text_section actual_buf with
-        | Some s -> [".text", s]
-        | None -> [])
-      | sections -> sections
-    in
-    (* Extract data sections from both *)
+    let expected_text_list = extract_text_sections expected_buf in
+    let actual_text_list = extract_text_sections actual_buf in
     let expected_data = Owee_object.extract_data_section expected_buf in
     let actual_data = Owee_object.extract_data_section actual_buf in
-    (* Extract text relocations from both *)
-    let expected_text_relocs =
-      match Owee_object.extract_individual_text_relocations expected_buf with
-      | [] -> [".text", Owee_object.extract_text_relocations expected_buf]
-      | relocs -> relocs
-    in
-    let actual_text_relocs =
-      match Owee_object.extract_individual_text_relocations actual_buf with
-      | [] -> [".text", Owee_object.extract_text_relocations actual_buf]
-      | relocs -> relocs
-    in
+    let expected_text_relocs = extract_text_relocs expected_buf in
+    let actual_text_relocs = extract_text_relocs actual_buf in
     (* Compare text sections *)
     match
       compare_sections ~expected:expected_text_list ~actual:actual_text_list

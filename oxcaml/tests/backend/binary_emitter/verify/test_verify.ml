@@ -82,7 +82,7 @@ let is_data_size_mismatch = function
 let is_missing_text_section result =
   match result with
   | Binary_emitter_verify.Mismatch (Missing_section s) ->
-    String.length s >= 5 && String.sub s 0 5 = ".text"
+    String.starts_with ~prefix:".text" s
   | Binary_emitter_verify.Mismatch
       (Section_size { section_name; expected; actual }) ->
     section_name = ".text" && (expected = 0 || actual = 0)
@@ -91,7 +91,7 @@ let is_missing_text_section result =
 let is_missing_data_section result =
   match result with
   | Binary_emitter_verify.Mismatch (Missing_section s) ->
-    String.length s >= 4 && String.sub s 0 4 = "data"
+    String.starts_with ~prefix:"data" s
   | Binary_emitter_verify.Mismatch
       (Section_size { section_name; expected; actual }) ->
     section_name = "data" && (expected = 0 || actual = 0)

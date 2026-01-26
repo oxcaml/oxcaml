@@ -29,8 +29,7 @@
 
     This module compares the section contents produced by the binary emitter
     (saved in .binary-sections/ directories) against the corresponding sections
-    extracted from object files produced by the system assembler.
-*)
+    extracted from object files produced by the system assembler. *)
 
 type section_mismatch =
   { section_name : string;
@@ -73,8 +72,7 @@ type result =
     @param unix The Unix module (as first-class module)
     @param obj_file Path to the .o file produced by the system assembler
     @param binary_sections_dir Path to the .binary-sections/ directory
-    @return Comparison result
-*)
+    @return Comparison result *)
 val compare :
   (module Compiler_owee.Unix_intf.S) ->
   obj_file:string ->
@@ -86,13 +84,12 @@ val print_result : Format.formatter -> result -> unit
 
 (** Functions for testing the verification logic itself. *)
 module For_testing : sig
-  (** Compare two object files directly using Owee extraction.
-      Useful for testing the comparison logic without the binary emitter.
+  (** Compare two object files directly using Owee extraction. Useful for
+      testing the comparison logic without the binary emitter.
 
       @param expected_pathname Path to the "expected" object file
       @param actual_pathname Path to the "actual" object file to compare against
-      @return Comparison result
-  *)
+      @return Comparison result *)
   val compare_object_files :
     (module Compiler_owee.Unix_intf.S) ->
     expected_pathname:string ->
