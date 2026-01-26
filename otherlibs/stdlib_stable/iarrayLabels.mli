@@ -34,14 +34,16 @@ open! Stdlib
     sorting functions, which are given a copying API to replace the in-place
     one. *)
 
-type +'a t = 'a iarray
+type (+'a : any mod separable) t = 'a iarray
 (** An alias for the type of immutable arrays. *)
 
-external length : local_ 'a iarray -> int = "%array_length"
+external length : ('a : any mod separable). local_ 'a iarray -> int  = "%array_length"
+[@@layout_poly]
 (** Return the length (number of elements) of the given immutable array. *)
 
-external get : ('a iarray[@local_opt]) -> int -> ('a[@local_opt]) =
+external get : ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt]) =
   "%array_safe_get"
+[@@layout_poly]
 (** [get a n] returns the element number [n] of immutable array [a].
    The first element has number 0.
    The last element has number [length a - 1].
@@ -50,8 +52,9 @@ external get : ('a iarray[@local_opt]) -> int -> ('a[@local_opt]) =
    @raise Invalid_argument
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
-external ( .:() ) : ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+external ( .:() ) : ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
   = "%array_safe_get"
+[@@layout_poly]
 (** A synonym for [get]. *)
 
 val init : int -> f:local_ (int -> 'a) -> 'a iarray
@@ -64,7 +67,9 @@ val init : int -> f:local_ (int -> 'a) -> 'a iarray
    If the return type of [f] is [float], then the maximum
    size is only [Sys.max_array_length / 2]. *)
 
-val init_local : int -> f:local_ (int -> local_ 'a) -> local_ 'a iarray
+val init_local :
+  ('a : value_or_null mod separable).
+  int -> f:local_ (int -> local_ 'a) -> local_ 'a iarray
 (** The locally-allocating version of [init]. *)
 
 val append : 'a iarray -> 'a iarray -> 'a iarray
@@ -92,7 +97,7 @@ val sub : 'a iarray -> pos:int -> len:int -> 'a iarray
    designate a valid subarray of [a]; that is, if
    [pos < 0], or [len < 0], or [pos + len > length a]. *)
 
-val sub_local : local_ 'a iarray -> int -> int -> local_ 'a iarray
+val sub_local : local_ 'a iarray -> pos:int -> len:int -> local_ 'a iarray
 (** The locally-allocating version of [sub]. *)
 
 val to_list : 'a iarray -> 'a list
@@ -550,5 +555,6 @@ val of_seq_local : local_ 'a Seq.t -> local_ 'a iarray
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_get : ('a iarray[@local_opt]) -> int -> ('a[@local_opt]) =
+external unsafe_get : ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt]) =
   "%array_unsafe_get"
+[@@layout_poly]
