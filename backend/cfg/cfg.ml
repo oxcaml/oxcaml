@@ -708,13 +708,24 @@ let basic_block_contains_calls block =
          | Op (Alloc _ | Poll | External_without_caml_c_call _) -> true
          | Op
              ( Move | Spill | Reload | Const_int _ | Const_float32 _
-             | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
-             | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
-             | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
-             | Probe_is_enabled _ | Opaque | Begin_region | End_region
-             | Specific _ | Name_for_debugger _ | Dls_get )
-         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+             | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+             | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _
+             | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+             | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
+             | Begin_region | End_region | Specific _ | Name_for_debugger _
+             | Dls_get | Tls_get | Pause )
+         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+         | Stack_check _ ->
            false)
+
+let max_instr_id t =
+  fold_blocks t ~init:InstructionId.none ~f:(fun _label block acc ->
+      let acc =
+        DLL.fold_left block.body ~init:acc
+          ~f:(fun acc (instr : basic instruction) ->
+            InstructionId.max acc instr.id)
+      in
+      InstructionId.max acc block.terminator.id)
 
 let remove_trap_instructions t removed_trap_handlers =
   (* Remove Lpushtrap and Lpoptrap instructions that refer to dead labels and
@@ -755,7 +766,8 @@ let remove_trap_instructions t removed_trap_handlers =
         | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
         | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
         | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Alloc _ | Pause )
+        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Alloc _ | Pause
+        | External_without_caml_c_call _ )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
@@ -766,8 +778,8 @@ let remove_trap_instructions t removed_trap_handlers =
     (match terminator.desc with
     | Tailcall_self _ -> assert (Int.equal stack_offset 0)
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-    | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+    | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _ | Call _
+    | Invalid _ ->
       ());
     update_instruction terminator ~stack_offset
   and update_block label ~stack_offset =

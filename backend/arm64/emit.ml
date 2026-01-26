@@ -1491,38 +1491,33 @@ let emit_static_cast (cast : Cmm.static_cast) i =
 let emit_extcall i ~func ~alloc ~stack_ofs =
   if Config.runtime5 && stack_ofs > 0
   then (
-    DSL.ins I.MOV [| DSL.emit_reg reg_stack_arg_begin; DSL.sp |];
-    DSL.ins I.ADD
-      [| DSL.emit_reg reg_stack_arg_end;
-         DSL.sp;
-         DSL.imm (Misc.align stack_ofs 16)
-      |];
-    emit_load_symbol_addr reg_x8 (S.create func);
-    DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_c_call_stack_args") |];
+    A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
+    A.ins4 ADD_immediate reg_stack_arg_end O.sp
+      (O.imm (Misc.align stack_ofs 16))
+      O.optional_none;
+    emit_load_symbol_addr reg_x8 (S.create_global func);
+    A.ins1 BL (runtime_function S.Predef.caml_c_call_stack_args);
     record_frame i.live (Dbg_other i.dbg))
   else if alloc
   then (
-    emit_load_symbol_addr reg_x8 (S.create func);
-    DSL.ins I.BL [| DSL.emit_symbol (S.create "caml_c_call") |];
+    emit_load_symbol_addr reg_x8 (S.create_global func);
+    A.ins1 BL (runtime_function S.Predef.caml_c_call);
     record_frame i.live (Dbg_other i.dbg))
   else (
-    (*= store ocaml stack in the frame pointer register
-             NB: no need to store previous x29 because OCaml frames don't
-             maintain frame pointer *)
+    (* Store OCaml stack pointer in the frame pointer register. No need to
+       store previous x29 because OCaml doesn't maintain frame pointers. *)
     if Config.runtime5
     then (
-      DSL.ins I.MOV [| DSL.reg_x_29; DSL.sp |];
+      A.ins_mov_from_sp ~dst:O.fp;
       D.cfi_remember_state ();
-      D.cfi_def_cfa_register ~reg:(Int.to_string 29);
+      D.cfi_def_cfa_register ~reg:(Int.to_string (R.gp_encoding R.fp));
       let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
-      DSL.ins I.LDR
-        [| DSL.emit_reg reg_tmp1;
-           DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
-        |];
-      DSL.ins I.MOV [| DSL.sp; DSL.emit_reg reg_tmp1 |])
+      A.ins2 LDR reg_x_tmp1
+        (H.addressing (Iindexed offset) reg_domain_state_ptr);
+      A.ins_mov_to_sp ~src:reg_x_tmp1)
     else D.cfi_remember_state ();
-    DSL.ins I.BL [| DSL.emit_symbol (S.create func) |];
-    if Config.runtime5 then DSL.ins I.MOV [| DSL.sp; DSL.reg_x_29 |];
+    A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
+    if Config.runtime5 then A.ins_mov_to_sp ~src:O.fp;
     D.cfi_restore_state ())
 
 (* Output the assembly code for an instruction *)

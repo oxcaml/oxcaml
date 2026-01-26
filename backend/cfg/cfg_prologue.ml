@@ -97,7 +97,7 @@ module Instruction_requirements = struct
           | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
           | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
           | Begin_region | End_region | Specific _ | Name_for_debugger _
-          | Dls_get | Tls_get | Pause )
+          | Dls_get | Tls_get | Pause | External_without_caml_c_call _ )
       | Pushtrap _ | Poptrap _ | Reloadretaddr | Stack_check _ ->
         Requirements No_requirements
 end

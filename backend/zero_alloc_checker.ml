@@ -2725,8 +2725,8 @@ end = struct
           let desc =
             Printf.sprintf "probe %s handler %s" name handler_code_sym
           in
-          let w = create_witnesses t (Probe { name; handler_code_sym }) dbg in
-          transform_call t ~next ~exn handler_code_sym w ~desc dbg
+          let k = Witness.Probe { name; handler_code_sym } in
+          transform_call t ~next ~exn handler_code_sym k ~desc dbg
         | Call (OCaml { op = Indirect None; returns_to = _ }) ->
           let w = create_witnesses t (Indirect_call { callee = None }) dbg in
           transform_top t ~next ~exn w "indirect call" dbg
@@ -2735,8 +2735,8 @@ end = struct
             (fun callee -> Witness.Indirect_call { callee = Some callee })
             ~desc:"indirect call" dbg
         | Call (OCaml { op = Direct { sym_name = func; sym_global = _ }; _ }) ->
-          let w = create_witnesses t (Direct_call { callee = func }) dbg in
-          transform_call t ~next ~exn func w ~desc:("direct call to " ^ func)
+          let k = Witness.Direct_call { callee = func } in
+          transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
         | Invalid _ -> next
 
