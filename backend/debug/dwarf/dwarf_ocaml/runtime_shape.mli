@@ -216,12 +216,11 @@ and simd_vec_split =
   | Float32x16
   | Float64x8
 
-(** Create an unknown shape with the given runtime layout. Used when more
-    precise type information is unavailable. *)
-val unknown : Runtime_layout.t -> t
+(** Get the runtime layout of a built-in unboxed type. *)
+val runtime_layout_of_unboxed : unboxed -> Runtime_layout.t
 
-(** Create a shape for a predefined type. *)
-val predef : predef -> t
+(** Get the byte size of a SIMD vector type. *)
+val simd_vec_split_to_byte_size : simd_vec_split -> int
 
 (** Create a mixed block field with the given type and label. *)
 val mixed_block_field : field_type:t -> label:'label -> 'label mixed_block_field
@@ -229,9 +228,6 @@ val mixed_block_field : field_type:t -> label:'label -> 'label mixed_block_field
 (** Transform the label of a mixed block field. *)
 val map_mixed_block_field_label :
   ('a -> 'b) -> 'a mixed_block_field -> 'b mixed_block_field
-
-(** Create a boxed tuple shape from a list of element shapes. *)
-val tuple : t list -> t
 
 (** Create a constructor with tuple-style arguments for use in variants.
 
@@ -254,6 +250,16 @@ val constructor_name : constructor -> string
     Tuple-style constructors have [None] labels, record-style constructors have
     [Some name] labels. *)
 val constructor_args : constructor -> string option mixed_block_field list
+
+(** Create an unknown shape with the given runtime layout. Used when more
+    precise type information is unavailable. *)
+val unknown : Runtime_layout.t -> t
+
+(** Create a shape for a predefined type. *)
+val predef : predef -> t
+
+(** Create a boxed tuple shape from a list of element shapes. *)
+val tuple : t list -> t
 
 (** Create a boxed variant shape from a list of constructors. *)
 val variant : constructors -> t
@@ -287,9 +293,6 @@ val mu : t -> t
 (** Create a reference to a recursive binding using de Bruijn indexing. *)
 val rec_var : Shape.DeBruijn_index.t -> Runtime_layout.t -> t
 
-(** Get the runtime layout of a built-in unboxed type. *)
-val runtime_layout_of_unboxed : unboxed -> Runtime_layout.t
-
 (** Project the runtime layout of a shape. *)
 val runtime_layout : t -> Runtime_layout.t
 
@@ -300,6 +303,3 @@ val equal : t -> t -> bool
 val hash : t -> int
 
 module Cache : Hashtbl.S with type key = t
-
-(** Get the byte size of a SIMD vector type. *)
-val simd_vec_split_to_byte_size : simd_vec_split -> int
