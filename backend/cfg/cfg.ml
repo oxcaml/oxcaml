@@ -536,7 +536,8 @@ let is_noop_move instr =
       | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
       | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
       | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Begin_region
-      | End_region | Dls_get | Tls_get | Domain_index | Poll | Alloc _ | Pause )
+      | End_region | Dls_get | Tls_get | Domain_index | Poll | Alloc _ | Pause
+        )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false
@@ -722,8 +723,8 @@ let remove_trap_instructions t removed_trap_handlers =
         | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
         | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
         | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Alloc _
-        | Pause )
+        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+        | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
