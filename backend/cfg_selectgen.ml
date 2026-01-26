@@ -961,20 +961,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
-        let function_really_returns = Option.is_some returns_to in
-        let ty_res_orig = ty_res in
-        let returns_to, ty_res =
-          match returns_to with
-          | Some _ -> returns_to, ty_res
-          | None ->
-            let keep_for_checking =
-              !SU.current_function_is_check_enabled
-              && String.equal func_symbol Cmm.caml_flambda2_invalid
-            in
-            if not keep_for_checking
-            then returns_to, ty
-            else Some (Cmm.new_label ()), Cmm.typ_int
-        in
         let rd = Reg.createv ty_res in
         let term : Cfg.terminator =
           Call
@@ -983,7 +969,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                  alloc;
                  returns_to;
                  effects;
-                 ty_res = ty_res_orig;
+                 ty_res;
                  ty_args;
                  stack_ofs;
                  stack_align
@@ -998,9 +984,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         match returns_to with
         | Some label_after ->
           Sub_cfg.add_never_block sub_cfg ~label:label_after;
-          (* No need to insert result moves for [caml_flambda2_invalid] *)
-          if function_really_returns
-          then SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+          SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
           Ok rd
         | None -> Never_returns)
       | Terminator (Call (Probe _) as term) ->

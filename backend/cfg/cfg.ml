@@ -481,8 +481,7 @@ let print_instruction ppf i = print_instruction' ppf i
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Call (External { func_symbol; returns_to = None; _ }) ->
-    not (String.equal func_symbol Cmm.caml_flambda2_invalid)
+  | Call (External { returns_to = None; _ }) -> true
   | Raise _ | Tailcall_func _ | Call (OCaml _ | Probe _) -> true
   | Call (External { returns_to = Some _; alloc; effects; _ }) -> (
     if not alloc

@@ -650,8 +650,8 @@ let insert_op_debug' (_env : environment) sub_cfg op dbg rs rd =
 
 let insert_move env sub_cfg src dst =
   (* This should never be called on regs with incompatible [typ]s, but the
-     zero-alloc checker may unconditionally assume the result of
-     caml_flambda2_invalid is typ_int. *)
+     zero-alloc checker may unconditionally assume the result of the [Invalid]
+     terminator is typ_int. *)
   if not (Reg.same src dst)
   then insert env sub_cfg (Op Move) [| src |] [| dst |]
 

@@ -2798,26 +2798,6 @@ let drop_invalid_successors cfg_with_layout =
     let modified = ref false in
     Cfg.iter_blocks cfg ~f:(fun label block ->
         match block.terminator.desc with
-        | Call (External ({ func_symbol; _ } as ext)) ->
-          if String.equal func_symbol Cmm.caml_flambda2_invalid
-          then (
-            let successors =
-              Cfg.successor_labels ~normal:true ~exn:true block
-            in
-            block.terminator
-              <- { block.terminator with
-                   desc = Call (External { ext with returns_to = None })
-                 };
-            block.exn <- None;
-            block.can_raise <- false;
-            (* update predecessors for successors of [block]. *)
-            Label.Set.iter
-              (fun successor_label ->
-                let successor_block = Cfg.get_block_exn cfg successor_label in
-                successor_block.predecessors
-                  <- Label.Set.remove label successor_block.predecessors)
-              successors;
-            modified := true)
         | Invalid ({ label_after = Some _; _ } as r) ->
           let successors = Cfg.successor_labels ~normal:true ~exn:true block in
           block.terminator
@@ -2834,10 +2814,9 @@ let drop_invalid_successors cfg_with_layout =
             successors;
           modified := true
         | Invalid { label_after = None; _ }
-        | Call (OCaml _ | Probe _)
-        | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-        | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-        | Tailcall_func _ ->
+        | Call _ | Never | Always _ | Parity_test _ | Truth_test _
+        | Float_test _ | Int_test _ | Switch _ | Return | Raise _
+        | Tailcall_self _ | Tailcall_func _ ->
           ());
     if not !modified
     then cfg_with_layout
