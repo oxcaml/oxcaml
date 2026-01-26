@@ -629,10 +629,7 @@ let mutable_modalities mut =
   mutable_implied_modalities (Types.is_mutable mut) ~for_mutable_variable:false
 
 let transl_modalities ~maturity mut annots =
-  let default =
-    mutable_implied_modalities (Types.is_mutable mut)
-      ~for_mutable_variable:false
-  in
+  let default = mutable_modalities mut in
   transl_modalities_with_default ~maturity ~default annots
 
 let let_mutable_modalities =
