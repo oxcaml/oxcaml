@@ -52,7 +52,7 @@ module InstrWorkList : sig
 end
 
 module Color : sig
-  type t = int
+  type t = Reg.Index.t
 end
 
 module RegisterStamp : sig

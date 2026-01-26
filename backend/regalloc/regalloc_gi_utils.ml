@@ -374,7 +374,7 @@ module Hardware_register = struct
     let reg_index =
       Reg_class.first_available_register reg_class + reg_index_in_class
     in
-    Reg.Reg reg_index
+    Reg.Reg (Reg.Index.of_int reg_index)
 
   type assigned =
     { pseudo_reg : Reg.t;
@@ -439,7 +439,7 @@ module Hardware_registers = struct
     | Reg reg_index ->
       let reg_class : Reg_class.t = Reg_class.of_machtype reg.typ in
       let reg_index_in_class : int =
-        reg_index - Reg_class.first_available_register reg_class
+        (reg_index :> int) - Reg_class.first_available_register reg_class
       in
       let hw_regs = Reg_class.Tbl.find t reg_class in
       if reg_index_in_class < Array.length hw_regs

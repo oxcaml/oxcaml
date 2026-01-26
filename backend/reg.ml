@@ -29,6 +29,12 @@ module Name = struct
     | Var var -> Var (V.create_local (prefix ^ "-" ^ V.name var))
 end
 
+module Index = struct
+  type t = int
+
+  let of_int = Fun.id
+end
+
 type t =
   { name : Name.t;
     stamp : int;
@@ -39,7 +45,7 @@ type t =
 
 and location =
   | Unknown
-  | Reg of int
+  | Reg of Index.t
   | Stack of stack_location
 
 and stack_location =

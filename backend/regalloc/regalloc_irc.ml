@@ -12,7 +12,7 @@ let filter_unavailable : Reg.t array -> Reg.t array =
     | Unknown -> true
     | Reg r ->
       let reg_class = Reg_class.of_machtype reg.typ in
-      r - Reg_class.first_available_register reg_class
+      (r :> int) - Reg_class.first_available_register reg_class
       < Reg_class.num_available_registers reg_class
     | Stack _ -> true
   in
@@ -364,10 +364,12 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
             match State.color state alias with
             | None -> assert false
             | Some color ->
-              if debug then log "color %d is not available" color;
-              if Array.unsafe_get ok_colors (color - reg_first_avail)
+              if debug then log "color %d is not available" (color :> int);
+              if Array.unsafe_get ok_colors ((color :> int) - reg_first_avail)
               then (
-                Array.unsafe_set ok_colors (color - reg_first_avail) false;
+                Array.unsafe_set ok_colors
+                  ((color :> int) - reg_first_avail)
+                  false;
                 decr counter;
                 if !counter > 0
                 then mark_adjacent_colors_and_get_available tl
@@ -386,7 +388,7 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
         State.add_colored_nodes state n;
         let c = first_avail + reg_first_avail in
         if debug then log "coloring with %d" c;
-        State.set_color state n (Some c));
+        State.set_color state n (Some (Reg.Index.of_int c)));
       if debug then dedent ());
   State.iter_coalesced_nodes state ~f:(fun n ->
       let alias = State.find_alias state n in

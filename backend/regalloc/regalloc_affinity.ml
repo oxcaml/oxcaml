@@ -46,8 +46,8 @@ let temp_and_phys_reg_of_instr :
     let src = instr.arg.(0) in
     let dst = instr.res.(0) in
     match src.loc, dst.loc with
-    | Reg phys_reg, Unknown -> Some (dst, phys_reg)
-    | Unknown, Reg phys_reg -> Some (src, phys_reg)
+    | Reg phys_reg, Unknown -> Some (dst, (phys_reg :> int))
+    | Unknown, Reg phys_reg -> Some (src, (phys_reg :> int))
     | _ -> None)
   | _ -> None
 

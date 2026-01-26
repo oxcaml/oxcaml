@@ -30,7 +30,7 @@ let reg_location_description (reg : Reg.t) ~(offset : Stack_reg_offset.t option)
       let reg_class = Reg_class.of_machtype reg.typ in
       let first_available_reg = Reg_class.first_available_register reg_class in
       let num_hard_regs = Reg_class.num_available_registers reg_class in
-      let n = n - first_available_reg in
+      let n = (n :> int) - first_available_reg in
       (* This [None] case isn't an error to cover situations such as used to be
          found in the i386 backend where [num_available_registers] does not
          extend to the end of the register arrays (in that case for the x87 top

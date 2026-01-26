@@ -132,8 +132,8 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
     | num_available_registers ->
       let available = Array.make num_available_registers true in
       let num_still_available = ref num_available_registers in
-      let set_not_available (r : int) : unit =
-        let idx = r - first_available in
+      let set_not_available (r : Reg.Index.t) : unit =
+        let idx = (r :> int) - first_available in
         if available.(idx) then decr num_still_available;
         available.(idx) <- false;
         if !num_still_available = 0 then raise No_free_register
@@ -141,7 +141,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
       let set_not_available_if_valid_phys_reg (interval : Interval.t) : unit =
         match interval.reg.loc with
         | Reg r ->
-          if r - first_available < num_available_registers
+          if (r :> int) - first_available < num_available_registers
           then set_not_available r
         | Stack _ | Unknown -> ()
       in
@@ -150,8 +150,8 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         match itv.reg.loc with
         | Reg r ->
           if
-            r - first_available < num_available_registers
-            && available.(r - first_available)
+            (r :> int) - first_available < num_available_registers
+            && available.((r :> int) - first_available)
             && Interval.overlap itv interval
           then set_not_available r
         | Stack _ | Unknown -> ()
@@ -165,7 +165,9 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         if debug
         then (
           indent ();
-          log "assigning %d to register %a" phys_reg Printreg.reg reg;
+          log "assigning %d to register %a"
+            (phys_reg : Reg.Index.t :> int)
+            Printreg.reg reg;
           dedent ());
         Not_spilling
       in
@@ -174,7 +176,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         if idx >= num_available_registers
         then Misc.fatal_error "No_free_register should have been raised earlier"
         else if available.(idx)
-        then do_assign ~phys_reg:(first_available + idx)
+        then do_assign ~phys_reg:(Reg.Index.of_int (first_available + idx))
         else assign_first (succ idx)
       in
       (* assigns the available register with the highest affinity *)
@@ -183,7 +185,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
           let idx = phys_reg - first_available in
           if idx >= 0 && idx < num_available_registers && available.(idx)
-          then do_assign ~phys_reg
+          then do_assign ~phys_reg:(Reg.Index.of_int phys_reg)
           else assign_affinity tl
       in
       assign_affinity (Regalloc_affinity.get (State.affinity state) reg))

@@ -32,6 +32,12 @@ end
    that it remembers adjacency between machine registers aliased at multiple types.
 *)
 
+module Index : sig
+  type t = private int
+
+  val of_int : int -> t
+end
+
 type t = private
   { name : Name.t; (* Name *)
     stamp : int; (* Unique stamp *)
@@ -43,7 +49,7 @@ type t = private
 
 and location =
   | Unknown
-  | Reg of int
+  | Reg of Index.t
   | Stack of stack_location
 
 and stack_location =

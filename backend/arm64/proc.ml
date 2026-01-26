@@ -66,7 +66,7 @@ let hard_reg_gen typ =
   let n = Reg_class.num_registers reg_class in
   let v = Array.make n Reg.dummy in
   for i = 0 to n - 1 do
-    v.(i) <- Reg.create_at_location typ (Reg(first + i))
+    v.(i) <- Reg.create_at_location typ (Reg(Reg.Index.of_int (first + i)))
   done;
   v
 

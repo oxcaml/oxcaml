@@ -51,7 +51,7 @@ type t =
     mutable inst_temporaries : Reg.Set.t;
     mutable block_temporaries : Reg.Set.t;
     reg_work_list : RegWorkList.t Reg.Tbl.t;
-    reg_color : int option Reg.Tbl.t;
+    reg_color : Reg.Index.t option Reg.Tbl.t;
     reg_alias : Reg.t option Reg.Tbl.t;
     reg_interf : Reg.t list Reg.Tbl.t;
     reg_degree : int Reg.Tbl.t;
@@ -170,7 +170,7 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
           (Reg.Tbl.find state.reg_work_list reg)
           RegWorkList.Precolored);
       (match reg.Reg.loc, Reg.Tbl.find state.reg_color reg with
-      | Reg color, Some color' -> assert (color = color')
+      | Reg color, Some color' -> assert ((color :> int) = (color' :> int))
       | Reg _, None -> assert false
       | (Unknown | Stack _), _ -> assert false);
       Reg.Tbl.replace state.reg_alias reg None;
@@ -568,7 +568,7 @@ let update_register_locations state =
           (* because of rewrites, the register may no longer be present *)
           ()
         | Some color ->
-          if debug then log "updating %a to %d" Printreg.reg reg color;
+          if debug then log "updating %a to %d" Printreg.reg reg (color :> int);
           Reg.set_loc reg (Reg color)))
 
 let[@inline] check_disjoint sets ~is_disjoint =
