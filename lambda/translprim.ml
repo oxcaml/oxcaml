@@ -2364,6 +2364,8 @@ let lambda_primitive_needs_event_after = function
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
   | Pjoin_vec256 | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pwith_stack | Pwith_stack_bind | Pperform | Preperform | Presume

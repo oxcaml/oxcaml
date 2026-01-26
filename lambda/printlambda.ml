@@ -837,6 +837,10 @@ let primitive ppf = function
       fprintf ppf "reinterpret_tagged_int63_as_unboxed_int64"
   | Preinterpret_unboxed_int64_as_tagged_int63 ->
       fprintf ppf "reinterpret_unboxed_int64_as_tagged_int63"
+  | Preinterpret_boxed_vector_as_tuple v ->
+      fprintf ppf "reinterpret_boxed_%s_as_tuple" (boxed_vector v)
+  | Preinterpret_tuple_as_boxed_vector v ->
+      fprintf ppf "reinterpret_tuple_as_boxed_%s" (boxed_vector v)
   | Ppeek layout ->
       fprintf ppf "(peek@ %a)"
         peek_or_poke layout
@@ -1020,6 +1024,10 @@ let name_of_primitive = function
       "Preinterpret_tagged_int63_as_unboxed_int64"
   | Preinterpret_unboxed_int64_as_tagged_int63 ->
       "Preinterpret_unboxed_int64_as_tagged_int63"
+  | Preinterpret_boxed_vector_as_tuple _ ->
+      "Preinterpret_boxed_vector_as_tuple"
+  | Preinterpret_tuple_as_boxed_vector _ ->
+      "Preinterpret_tuple_as_boxed_vector"
   | Ppeek _ -> "Ppeek"
   | Ppoke _ -> "Ppoke"
   | Pget_idx _ -> "Pget_idx"

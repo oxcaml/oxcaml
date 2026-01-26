@@ -352,6 +352,8 @@ type primitive =
   | Pbox_vector of boxed_vector * locality_mode
   | Pjoin_vec256
   | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple of boxed_vector
+  | Preinterpret_tuple_as_boxed_vector of boxed_vector
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64
   (* Jane Street extensions *)
@@ -1226,6 +1228,34 @@ let layout_unboxed_vector v =
     else Punboxed_vector Unboxed_vec512
 
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
+
+let layout_tupled_vector v =
+  let fields =
+    match v with
+    | Boxed_vec128 -> [| Vec128 |]
+    | Boxed_vec256 -> [| Vec128; Vec128 |]
+    | Boxed_vec512 -> [| Vec128; Vec128; Vec128; Vec128 |]
+  in
+  Pvalue
+    { raw_kind =
+        Pvariant { consts = []; non_consts = [0, Constructor_mixed fields] };
+      nullable = Non_nullable
+    }
+
+let layout_unboxed_tupled_vector v =
+  let fields =
+    match v with
+    | Unboxed_vec128 -> [Punboxed_vector Unboxed_vec128]
+    | Unboxed_vec256 ->
+      [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
+    | Unboxed_vec512 ->
+      [ Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128 ]
+  in
+  Punboxed_product fields
+
 let layout_predef_value = nullable_value Pgenval
 
 let layout_lazy = nullable_value Pgenval
@@ -2285,6 +2315,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pdls_get
   | Ptls_get
   | Preinterpret_unboxed_int64_as_tagged_int63
+  | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
@@ -2447,6 +2479,8 @@ let primitive_can_raise prim =
   | Pdls_get | Ptls_get | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
+  | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _
@@ -2852,6 +2886,8 @@ let primitive_result_layout (p : primitive) =
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63 -> layout_int
+  | Preinterpret_boxed_vector_as_tuple v -> layout_tupled_vector v
+  | Preinterpret_tuple_as_boxed_vector v -> layout_boxed_vector v
   | Ppeek layout -> (
       match layout with
       | Ppp_tagged_immediate -> layout_int

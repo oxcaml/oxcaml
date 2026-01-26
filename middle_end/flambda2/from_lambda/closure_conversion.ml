@@ -1259,8 +1259,10 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get | Ppoll
       | Patomic_load_field _ | Patomic_set_field _
       | Preinterpret_tagged_int63_as_unboxed_int64
-      | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
-      | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
+      | Preinterpret_unboxed_int64_as_tagged_int63
+      | Preinterpret_tuple_as_boxed_vector _
+      | Preinterpret_boxed_vector_as_tuple _ | Ppeek _ | Ppoke _ | Pscalar _
+      | Pphys_equal _ | Pcpu_relax ->
         (* Inconsistent with outer match *)
         assert false
     in

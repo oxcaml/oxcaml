@@ -759,31 +759,15 @@ let offset ~loc ~idx ~index_kind n =
 
 let make_boxed_vec256 ~loc ~mode args =
   L.Lprim
-    ( Pobj_magic
-        (Pvalue
-           { raw_kind = Pboxedvectorval Boxed_vec256; nullable = Non_nullable }),
+    ( Preinterpret_tuple_as_boxed_vector Boxed_vec256,
       [ Lprim
           ( Pmakeblock (0, Immutable, Shape [| Vec128; Vec128 |], mode),
             args,
             loc ) ],
       loc )
 
-let boxed_vec256_mixed_layout =
-  L.Pvalue
-    { raw_kind =
-        Pvariant
-          { consts = [];
-            non_consts = [0, Constructor_mixed [| Vec128; Vec128 |]]
-          };
-      nullable = Non_nullable
-    }
-
-let unboxed_vec256_pair_layout =
-  L.Punboxed_product
-    [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
-
 let boxed_vec256_to_mixed ~loc arg =
-  L.Lprim (Pobj_magic boxed_vec256_mixed_layout, [arg], loc)
+  L.Lprim (Preinterpret_boxed_vector_as_tuple Boxed_vec256, [arg], loc)
 
 let unboxed_vec256_field ~loc i arg =
   L.Lprim
@@ -838,11 +822,11 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
     then
       ( boxed_vec256_field ~loc 0 (Lvar value_id),
         boxed_vec256_field ~loc 1 (Lvar value_id),
-        boxed_vec256_mixed_layout )
+        L.layout_tupled_vector Boxed_vec256 )
     else
       ( unboxed_vec256_field ~loc 0 (Lvar value_id),
         unboxed_vec256_field ~loc 1 (Lvar value_id),
-        unboxed_vec256_pair_layout )
+        L.layout_unboxed_tupled_vector Unboxed_vec256 )
   in
   let low = L.Lprim (store true, [arr; Lvar idx_id; low], loc) in
   let high =
@@ -1213,7 +1197,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     Transformed
       (Llet
          ( Strict,
-           boxed_vec256_mixed_layout,
+           L.layout_tupled_vector Boxed_vec256,
            arg_id,
            arg_duid,
            boxed_vec256_to_mixed ~loc arg,
@@ -1228,7 +1212,13 @@ let transform_primitive0 env (prim : L.primitive) args loc =
           unboxed_vec256_field ~loc 1 (Lvar arg_id) ]
     in
     Transformed
-      (Llet (Strict, unboxed_vec256_pair_layout, arg_id, arg_duid, arg, prim))
+      (Llet
+         ( Strict,
+           L.layout_unboxed_tupled_vector Unboxed_vec256,
+           arg_id,
+           arg_duid,
+           arg,
+           prim ))
   | Pccall desc, _ when L.split_vectors && ccall_involves_vec256 desc -> (
     let bindings = ref [] in
     let prim_native_repr_args, args =
@@ -1247,7 +1237,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
           let arg_id =
             rebind_arg
               (boxed_vec256_to_mixed ~loc arg)
-              boxed_vec256_mixed_layout
+              (L.layout_tupled_vector Boxed_vec256)
           in
           (* Tell flambda2 not to unbox the components *)
           let ext = mode, L.Same_as_ocaml_repr (Base Vec128) in
@@ -1255,7 +1245,9 @@ let transform_primitive0 env (prim : L.primitive) args loc =
             ext, boxed_vec256_field ~loc 1 (Lvar arg_id) ]
         (* vec256# as #(vec128# * vec128#) => vec128#, vec128# *)
         | Same_as_ocaml_repr (Base Vec256) ->
-          let arg_id = rebind_arg arg unboxed_vec256_pair_layout in
+          let arg_id =
+            rebind_arg arg (L.layout_unboxed_tupled_vector Unboxed_vec256)
+          in
           let ext = mode, L.Same_as_ocaml_repr (Base Vec128) in
           [ ext, unboxed_vec256_field ~loc 0 (Lvar arg_id);
             ext, unboxed_vec256_field ~loc 1 (Lvar arg_id) ]
@@ -1296,7 +1288,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       Transformed
         (Llet
            ( Strict,
-             unboxed_vec256_pair_layout,
+             L.layout_unboxed_tupled_vector Unboxed_vec256,
              res,
              res_duid,
              make_ccall repr_res,
