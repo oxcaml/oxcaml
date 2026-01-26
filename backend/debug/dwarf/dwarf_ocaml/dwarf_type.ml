@@ -1585,17 +1585,18 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         ~accumulate:true ()
     in
     D.record_after_reduction reduction_diagnostics type_shape;
-    let type_shape =
+    let evaluated_shape =
       Profile.record "unfold_and_evaluate"
         (fun () ->
-          Type_shape.unfold_and_evaluate
+          Type_shape.Evaluated_shape.unfold_and_evaluate
             ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
             type_shape)
         ~accumulate:true ()
     in
-    D.record_after_evaluation reduction_diagnostics type_shape;
+    D.record_after_evaluation reduction_diagnostics
+      (Type_shape.Evaluated_shape.shape evaluated_shape);
     let complex_shape =
-      Complex_shape.type_shape_to_complex_shape type_shape type_layout
+      Complex_shape.type_shape_to_complex_shape evaluated_shape type_layout
     in
     let complex_shape_flattened =
       Complex_shape.flatten_complex_shape complex_shape

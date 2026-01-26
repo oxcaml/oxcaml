@@ -65,16 +65,16 @@ module Evaluation_diagnostics : sig
   val get_reduction_steps : t -> int
 end
 
-(** [unfold_and_evaluate] performs call-by-value evaluation of shapes. It should
-    be applied after [reduce] (from [shape_reduce.ml]) has already been used.
-    More specifically, when producing a type shape with [of_type_expr], the
-    resulting shape is not a normal form. A normal form---at least for the
-    emission into DWARF debug information---should no longer contain structures
-    (from modules), lambdas (from functors and parametric types), application
-    (from functor instantiation and type application), mutually recursive
-    declarations and their projections ([Constr] and [Proj_decl]). (Due to
-    missing information, it might still contain compilation units [Comp_unit]
-    and projections [Proj] from them.)
+(** [Evaluated_shape.unfold_and_evaluate] performs call-by-value evaluation of
+    shapes. It should be applied after [reduce] (from [shape_reduce.ml]) has
+    already been used. More specifically, when producing a type shape with
+    [of_type_expr], the resulting shape is not a normal form. A normal form---at
+    least for the emission into DWARF debug information---should no longer
+    contain structures (from modules), lambdas (from functors and parametric
+    types), application (from functor instantiation and type application),
+    mutually recursive declarations and their projections ([Constr] and
+    [Proj_decl]). (Due to missing information, it might still contain
+    compilation units [Comp_unit] and projections [Proj] from them.)
 
     We reach the normal form of a type shape (e.g., during the emission of DWARF
     information) in two steps:
@@ -91,11 +91,20 @@ end
       mutually-recursive declarations, which have not been unfolded. Since we
       cannot directly emit these into DWARF, we then unfold recursive
       declarations applied to type shape arguments into recursive types with
-      [unfold_and_evaluate]. For example,
+      [Evaluated_shape.unfold_and_evaluate]. For example,
       [type 'a list = [] | :: of 'a * 'a list] applied to [int] becomes the type
       shape [Mu (Variant [] | :: of int * #0)]. *)
-val unfold_and_evaluate :
-  ?diagnostics:Evaluation_diagnostics.t -> Shape.t -> Shape.t
+module Evaluated_shape : sig
+  type t
+
+  (** Evaluate a shape that has already been reduced via [shape_reduce]. This
+      unfolds recursive declarations into recursive types using [Mu]. *)
+  val unfold_and_evaluate :
+    ?diagnostics:Evaluation_diagnostics.t -> Shape.t -> t
+
+  (** Access the underlying shape. *)
+  val shape : t -> Shape.t
+end
 
 type shape_with_layout = private
   { type_shape : Shape.t;

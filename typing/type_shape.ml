@@ -1076,6 +1076,18 @@ let unfold_and_evaluate ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t
     (Ident.Map.empty, Ident.Map.empty)
     t
 
+(** Instead of exposing [unfold_and_evaluate] directly, we expose the module
+    [Evaluated_shape] such that subsequent translations can, using types,
+    require evaluation to occur first. See
+    [Complex_shape.type_shape_to_complex_shape]. *)
+module Evaluated_shape = struct
+  type t = Shape.t
+
+  let unfold_and_evaluate = unfold_and_evaluate
+
+  let shape shape = shape
+end
+
 type shape_with_layout =
   { type_shape : Shape.t;
     type_layout : Layout.t;

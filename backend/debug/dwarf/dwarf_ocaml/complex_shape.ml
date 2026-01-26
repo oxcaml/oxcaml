@@ -797,6 +797,7 @@ and type_shape_to_complex_shape ~rec_env type_shape type_layout : t =
     Shape_cache.add_to_cache type_shape type_layout shape ~rec_env;
     shape
 
-let type_shape_to_complex_shape type_shape type_layout =
+let type_shape_to_complex_shape evaluated_shape type_layout =
+  let type_shape = Type_shape.Evaluated_shape.shape evaluated_shape in
   type_shape_to_complex_shape ~rec_env:Shape.DeBruijn_env.empty type_shape
     type_layout
