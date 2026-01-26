@@ -790,24 +790,35 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
     emit_label t default;
     emit_ins_no_res t I.unreachable
   | Raise raise_kind -> raise_ t i raise_kind
-  | Call { op; label_after } ->
+  | Call (OCaml { op; returns_to }) ->
     reject_addr_regs i.arg "call";
     call t i op;
-    br_label t label_after
+    br_label t returns_to
   | Tailcall_self { destination } -> br_label t destination
   | Tailcall_func op ->
     reject_addr_regs i.arg "tailcall func";
     call ~tail:true t i op
-  | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
+  | Call
+      (External
+         { func_symbol; alloc; stack_ofs; stack_align; returns_to = None; _ })
+    ->
     extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
     emit_ins_no_res t I.unreachable
-  | Prim { op; label_after } -> (
+  | Call
+      (External
+         { func_symbol;
+           alloc;
+           stack_ofs;
+           stack_align;
+           returns_to = Some label_after;
+           _
+         }) ->
     reject_addr_regs i.arg "prim";
-    match op with
-    | Probe _ -> not_implemented_terminator ~msg:"probe" i
-    | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
-      extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
-      br_label t label_after)
+    extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
+    br_label t label_after
+  | Call (Probe _) ->
+    reject_addr_regs i.arg "prim";
+    not_implemented_terminator ~msg:"probe" i
   | Invalid { message = _; stack_ofs; stack_align; label_after = _ } ->
     extcall t i ~func_symbol:Cmm.caml_flambda2_invalid ~alloc:false ~stack_ofs
       ~stack_align;
@@ -1301,6 +1312,8 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
   | Probe_is_enabled _ | Name_for_debugger _ -> not_implemented_basic i
+  | External_without_caml_c_call _ ->
+    not_implemented_basic ~msg:"External_without_caml_c_call" i
 
 let emit_basic t (i : Cfg.basic Cfg.instruction) =
   emit_comment t "%a" F.pp_dbg_instr_basic i;

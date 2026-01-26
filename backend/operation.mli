@@ -181,6 +181,16 @@ type t =
         dbginfo : Cmm.alloc_dbginfo;
         mode : Cmm.Alloc_mode.t
       }
+  | External_without_caml_c_call of
+      { func_symbol : string;
+        effects : Cmm.effects;
+        ty_res : Cmm.machtype;
+        ty_args : Cmm.exttype list;
+        stack_ofs : int
+      }
+      (** [External_without_caml_c_call]s cannot require [caml_c_call] or be
+          marked as diverging. Use the terminator [Call (External ...)] for such
+          cases. *)
 
 val is_pure : t -> bool
 

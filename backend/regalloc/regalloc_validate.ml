@@ -586,19 +586,63 @@ end = struct
     (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
       when Stdlib.compare call1 call2 = 0 ->
       ()
-    | Call_no_return call1, Call_no_return call2
+    | ( Call (OCaml { op = op1; returns_to = l1 }),
+        Call (OCaml { op = op2; returns_to = l2 }) )
     (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
-      ()
-    | ( Call { op = call1; label_after = l1 },
-        Call { op = call2; label_after = l2 } )
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Stdlib.compare op1 op2 = 0 ->
       compare_label l1 l2
-    | ( Prim { op = prim1; label_after = l1 },
-        Prim { op = prim2; label_after = l2 } )
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare prim1 prim2 = 0 ->
+    | ( Call
+          (External
+             { func_symbol = f1;
+               alloc = a1;
+               returns_to = r1;
+               effects = e1;
+               ty_res = tr1;
+               ty_args = ta1;
+               stack_ofs = so1;
+               stack_align = sa1
+             }),
+        Call
+          (External
+             { func_symbol = f2;
+               alloc = a2;
+               returns_to = r2;
+               effects = e2;
+               ty_res = tr2;
+               ty_args = ta2;
+               stack_ofs = so2;
+               stack_align = sa2
+             }) )
+      when String.equal f1 f2 && Bool.equal a1 a2
+           && Stdlib.compare e1 e2 = 0
+           && Stdlib.compare tr1 tr2 = 0
+           && Stdlib.compare ta1 ta2 = 0
+           && Int.equal so1 so2
+           && Stdlib.compare sa1 sa2 = 0 -> (
+      match r1, r2 with
+      | None, None -> ()
+      | Some l1, Some l2 -> compare_label l1 l2
+      | None, Some _ | Some _, None ->
+        Regalloc_utils.fatal "Call External returns_to changed from %a to %a"
+          (Format.pp_print_option Label.format)
+          r1
+          (Format.pp_print_option Label.format)
+          r2)
+    | ( Call
+          (Probe
+             { name = n1;
+               handler_code_sym = h1;
+               enabled_at_init = e1;
+               returns_to = l1
+             }),
+        Call
+          (Probe
+             { name = n2;
+               handler_code_sym = h2;
+               enabled_at_init = e2;
+               returns_to = l2
+             }) )
+      when String.equal n1 n2 && String.equal h1 h2 && Bool.equal e1 e2 ->
       compare_label l1 l2
     | ( Invalid { message = m1; label_after = None; _ },
         Invalid { message = m2; label_after = None; _ } )

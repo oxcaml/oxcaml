@@ -1,4 +1,5 @@
 open! Int_replace_polymorphic_compare
+module DLL = Oxcaml_utils.Doubly_linked_list
 module R = Reg
 module RAS = Reg_availability_set
 module RD = Reg_with_debug_info
@@ -363,7 +364,7 @@ module Transfer = struct
             | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
             | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
             | End_region | Specific _ | Dls_get | Tls_get | Poll | Alloc _
-            | Pause )
+            | Pause | External_without_caml_c_call _ )
         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
         | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in
@@ -388,18 +389,18 @@ module Transfer = struct
         match term.desc with
         | Never -> assert false
         | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-        | Switch _ | Call _ | Prim _ | Return | Raise _ | Tailcall_func _
-        | Call_no_return _ | Invalid _ | Tailcall_self _ ->
+        | Switch _ | Call _ | Return | Raise _ | Tailcall_func _ | Invalid _
+        | Tailcall_self _ ->
           common ~avail_before ~destroyed_at:Proc.destroyed_at_terminator
             ~is_interesting_constructor:
               Cfg.(
                 function
                 | Never -> assert false
-                | Call _ | Prim { op = Probe _; label_after = _ } -> true
+                | Call (OCaml _ | Probe _) -> true
                 | Always _ | Parity_test _ | Truth_test _ | Float_test _
                 | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-                | Tailcall_func _ | Call_no_return _ | Invalid _
-                | Prim { op = External _; label_after = _ } ->
+                | Tailcall_func _ | Invalid _
+                | Call (External _) ->
                   false)
             ~is_end_region:(fun _ -> false)
             term)
@@ -425,6 +426,32 @@ module Transfer = struct
 end
 
 module Analysis = Cfg_dataflow.Forward (Domain) (Transfer)
+
+let get_name_for_debugger_regs (b : Cfg.basic) =
+  match b with
+  | Op (Name_for_debugger { regs; _ }) -> Some regs
+  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
+  | Op
+      ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
+      | Tls_get | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _
+      | Store (_, _, _)
+      | Intop _ | Int128op _
+      | Intop_imm (_, _)
+      | Intop_atomic _
+      | Floatop (_, _)
+      | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+      | Specific _ | Alloc _ | External_without_caml_c_call _ ) ->
+    None
+
+let compute_all_regs_that_might_be_named : Cfg.t -> Reg.Set.t =
+ fun cfg ->
+  Cfg.fold_blocks cfg ~init:Reg.Set.empty ~f:(fun _label block acc ->
+      DLL.fold_left block.body ~init:acc ~f:(fun acc instr ->
+          match get_name_for_debugger_regs instr.Cfg.desc with
+          | Some regs -> Reg.add_set_array acc regs
+          | None -> acc))
 
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->

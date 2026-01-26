@@ -1806,6 +1806,46 @@ let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
 
+let emit_extcall i ~func ~alloc ~stack_ofs =
+  add_used_symbol func;
+  if Config.runtime5 && stack_ofs > 0
+  then (
+    I.mov rsp r13;
+    I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
+    load_symbol_addr (Cmm.global_symbol func) rax;
+    emit_call (Cmm.global_symbol "caml_c_call_stack_args");
+    record_frame i.live (Dbg_other i.dbg))
+  else if alloc
+  then (
+    load_symbol_addr (Cmm.global_symbol func) rax;
+    emit_call (Cmm.global_symbol "caml_c_call");
+    record_frame i.live (Dbg_other i.dbg);
+    if (not Config.runtime5) && not (is_win64 system)
+    then
+      (* In amd64.S, "caml_c_call" tail-calls the C function (in order to
+         produce nicer backtraces), so we need to restore r15 manually after it
+         returns (note that this increases code size).
+
+         In amd64nt.asm (used for Win64), "caml_c_call" invokes the C function
+         via a regular call, and restores r15 itself, thus avoiding the code
+         size increase. *)
+      I.mov (domain_field Domainstate.Domain_young_ptr) r15)
+  else (
+    if Config.runtime5
+    then (
+      I.mov rsp rbx;
+      D.cfi_remember_state ();
+      D.cfi_def_cfa_register ~reg:"rbx";
+      (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
+         through this unless we were to tag this calling frame with
+         cfi_signal_frame in it's definition. *)
+      I.mov (domain_field Domainstate.Domain_c_stack) rsp);
+    emit_call (Cmm.global_symbol func);
+    if Config.runtime5
+    then (
+      I.mov rbx rsp;
+      D.cfi_restore_state ()))
+
 (* Emit an instruction *)
 let emit_instr ~first ~fallthrough i =
   let open Simd_instrs in
@@ -1968,6 +2008,8 @@ let emit_instr ~first ~fallthrough i =
       then (
         I.mov rbx rsp;
         D.cfi_restore_state ()))
+  | Lop (External_without_caml_c_call { func_symbol = func; stack_ofs; _ }) ->
+    emit_extcall i ~func ~alloc:false ~stack_ofs
   | Lop (Stackoffset n) -> emit_stack_offset n
   | Lop (Load { memory_chunk; addressing_mode; _ }) -> (
     let[@inline always] load ~dest data_type instruction =

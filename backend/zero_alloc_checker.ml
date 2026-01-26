@@ -2656,6 +2656,7 @@ end = struct
           transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
         | Dls_get | Tls_get -> next
+        | External_without_caml_c_call _ -> next
 
       let basic next (i : Cfg.basic Cfg.instruction) t : (domain, error) result
           =
@@ -2701,39 +2702,39 @@ end = struct
           in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
-        | Call_no_return { alloc = false; _ } ->
+        | Call (External { returns_to = None; alloc = false; _ }) ->
           (* Sound to ignore [next] and [exn] because the call never returns or
              raises. *)
           Value.bot
-        | Call_no_return { alloc = true; func_symbol = func; _ } ->
+        | Call (External { returns_to = None; alloc = true; func_symbol; _ }) ->
           (* Sound to ignore [next] because the call never returns. *)
           (* CR gyorsh: we do not currently generate this, but may later. *)
-          let w = create_witnesses t (Extcall { callee = func }) dbg in
+          let w = create_witnesses t (Extcall { callee = func_symbol }) dbg in
           transform_top t ~next:Value.bot ~exn w
-            ("external call to " ^ func)
+            ("external call to " ^ func_symbol)
             dbg
-        | Prim { op = External { alloc = false; _ }; _ } ->
+        | Call (External { alloc = false; _ }) ->
           (* Sound to ignore [exn] because external call marked as noalloc does
              not raise. *)
           next
-        | Prim { op = External { alloc = true; func_symbol = func; _ }; _ } ->
-          let w = create_witnesses t (Extcall { callee = func }) dbg in
-          transform_top t ~next ~exn w ("external call to " ^ func) dbg
-        | Prim { op = Probe { name; handler_code_sym; enabled_at_init = _ }; _ }
+        | Call (External { func_symbol; alloc = true; returns_to = Some _; _ })
           ->
+          let w = create_witnesses t (Extcall { callee = func_symbol }) dbg in
+          transform_top t ~next ~exn w ("external call to " ^ func_symbol) dbg
+        | Call (Probe { name; handler_code_sym; _ }) ->
           let desc =
             Printf.sprintf "probe %s handler %s" name handler_code_sym
           in
           let k = Witness.Probe { name; handler_code_sym } in
           transform_call t ~next ~exn handler_code_sym k ~desc dbg
-        | Call { op = Indirect None; _ } ->
+        | Call (OCaml { op = Indirect None; returns_to = _ }) ->
           let w = create_witnesses t (Indirect_call { callee = None }) dbg in
           transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = Indirect (Some callees); _ } ->
+        | Call (OCaml { op = Indirect (Some callees); returns_to = _ }) ->
           transform_call_indirect t ~next ~exn callees
             (fun callee -> Witness.Indirect_call { callee = Some callee })
             ~desc:"indirect call" dbg
-        | Call { op = Direct { sym_name = func; _ }; _ } ->
+        | Call (OCaml { op = Direct { sym_name = func; sym_global = _ }; _ }) ->
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
@@ -2813,9 +2814,9 @@ let drop_invalid_successors cfg_with_layout =
             successors;
           modified := true
         | Invalid { label_after = None; _ }
-        | Prim _ | Never | Always _ | Parity_test _ | Truth_test _
+        | Call _ | Never | Always _ | Parity_test _ | Truth_test _
         | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-        | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _ ->
+        | Tailcall_self _ | Tailcall_func _ ->
           ());
     if not !modified
     then cfg_with_layout

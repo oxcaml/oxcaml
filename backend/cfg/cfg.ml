@@ -129,7 +129,6 @@ let successor_labels_normal ti =
   | Tailcall_self { destination } -> Label.Set.singleton destination
   | Switch labels -> Array.to_seq labels |> Label.Set.of_seq
   | Return | Raise _ | Tailcall_func _ -> Label.Set.empty
-  | Call_no_return _ -> Label.Set.empty
   | Never -> Label.Set.empty
   | Always l -> Label.Set.singleton l
   | Parity_test { ifso; ifnot } | Truth_test { ifso; ifnot } ->
@@ -139,8 +138,11 @@ let successor_labels_normal ti =
     |> Label.Set.add uo
   | Int_test { lt; gt; eq; imm = _; is_signed = _ } ->
     Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
-  | Call { op = _; label_after }
-  | Prim { op = _; label_after }
+  | Call (External { returns_to = None; _ }) -> Label.Set.empty
+  | Call
+      ( OCaml { returns_to = label_after; _ }
+      | External { returns_to = Some label_after; _ }
+      | Probe { returns_to = label_after; _ } )
   | Invalid { label_after = Some label_after; _ } ->
     Label.Set.singleton label_after
   | Invalid { label_after = None; _ } -> Label.Set.empty
@@ -192,11 +194,41 @@ let replace_successor_labels t ~normal ~exn block ~f =
         Tailcall_self { destination = f destination }
       | Tailcall_func (Indirect _)
       | Tailcall_func (Direct _)
-      | Return | Raise _ | Call_no_return _
+      | Return | Raise _
       | Invalid { label_after = None; _ } ->
         block.terminator.desc
-      | Call { op; label_after } -> Call { op; label_after = f label_after }
-      | Prim { op; label_after } -> Prim { op; label_after = f label_after }
+      | Call (OCaml { op; returns_to }) ->
+        Call (OCaml { op; returns_to = f returns_to })
+      | Call
+          (External
+             { func_symbol;
+               ty_res;
+               ty_args;
+               alloc;
+               returns_to;
+               effects;
+               stack_ofs;
+               stack_align
+             }) ->
+        Call
+          (External
+             { func_symbol;
+               ty_res;
+               ty_args;
+               alloc;
+               returns_to = Option.map f returns_to;
+               effects;
+               stack_ofs;
+               stack_align
+             })
+      | Call (Probe { name; handler_code_sym; enabled_at_init; returns_to }) ->
+        Call
+          (Probe
+             { name;
+               handler_code_sym;
+               enabled_at_init;
+               returns_to = f returns_to
+             })
       | Invalid ({ label_after = Some label_after; _ } as r) ->
         Invalid { r with label_after = Some (f label_after) }
     in
@@ -358,8 +390,6 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
       done;
       let i = label_count - 1 in
       fprintf ppf "case %d: goto %a" i Label.format labels.(i))
-  | Call_no_return { func_symbol; _ } ->
-    fprintf ppf "Call_no_return %s%a" func_symbol print_args args
   | Return -> fprintf ppf "Return%a" print_args args
   | Raise _ -> fprintf ppf "Raise%a" print_args args
   | Tailcall_self { destination } ->
@@ -378,36 +408,41 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
       (match call with
       | Indirect _callees -> Linear.Ltailcall_ind
       | Direct func -> Linear.Ltailcall_imm { func })
-  | Call { op = call; label_after } ->
+  | Call (OCaml { op; returns_to }) ->
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
-      (match call with
+      (match op with
       | Indirect _callees -> Linear.Lcall_ind
       | Direct func -> Linear.Lcall_imm { func });
-    Format.fprintf ppf "%sgoto %a" sep Label.format label_after
-  | Prim { op = prim; label_after } ->
+    Format.fprintf ppf "%sgoto %a" sep Label.format returns_to
+  | Call
+      (External
+         { func_symbol = func;
+           ty_res;
+           ty_args;
+           alloc;
+           returns_to;
+           stack_ofs;
+           stack_align;
+           effects = _
+         }) ->
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
-      (match prim with
-      | External
-          { func_symbol = func;
-            ty_res;
-            ty_args;
-            alloc;
-            stack_ofs;
-            stack_align;
-            effects = _
-          } ->
-        Linear.Lextcall
-          { func;
-            ty_res;
-            ty_args;
-            returns = true;
-            alloc;
-            stack_ofs;
-            stack_align
-          }
-      | Probe { name; handler_code_sym; enabled_at_init } ->
-        Linear.Lprobe { name; handler_code_sym; enabled_at_init });
-    Format.fprintf ppf "%sgoto %a" sep Label.format label_after
+      (Linear.Lextcall
+         { func;
+           ty_res;
+           ty_args;
+           returns = true;
+           alloc;
+           stack_ofs;
+           stack_align
+         });
+    Option.iter
+      (fun label_after ->
+        Format.fprintf ppf "%sgoto %a" sep Label.format label_after)
+      returns_to
+  | Call (Probe { name; handler_code_sym; enabled_at_init; returns_to }) ->
+    Format.fprintf ppf "%t%a" print_res dump_linear_call_op
+      (Linear.Lprobe { name; handler_code_sym; enabled_at_init });
+    Format.fprintf ppf "%sgoto %a" sep Label.format returns_to
   | Invalid { message; label_after; _ } ->
     Format.fprintf ppf "Invalid %S" message;
     Option.iter (Format.fprintf ppf "%sgoto %a" sep Label.format) label_after
@@ -446,10 +481,9 @@ let print_instruction ppf i = print_instruction' ppf i
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Call_no_return _ | Raise _ | Tailcall_func _ | Call _
-  | Prim { op = Probe _; label_after = _ } ->
-    true
-  | Prim { op = External { alloc; effects; _ }; label_after = _ } -> (
+  | Call (External { returns_to = None; _ }) -> true
+  | Raise _ | Tailcall_func _ | Call (OCaml _ | Probe _) -> true
+  | Call (External { returns_to = Some _; alloc; effects; _ }) -> (
     if not alloc
     then false
     else
@@ -469,8 +503,7 @@ let can_raise_terminator (i : terminator) =
    taking into account [effects] on extcalls *)
 let is_pure_terminator desc =
   match (desc : terminator) with
-  | Return | Raise _ | Call_no_return _ | Tailcall_func _ | Tailcall_self _
-  | Call _ | Prim _ | Invalid _ ->
+  | Return | Raise _ | Call _ | Tailcall_func _ | Tailcall_self _ | Invalid _ ->
     false
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
@@ -481,16 +514,16 @@ let is_never_terminator desc =
   match (desc : terminator) with
   | Never -> true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call _
+  | Invalid _ ->
     false
 
 let is_return_terminator desc =
   match (desc : terminator) with
   | Return -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ | Invalid _ ->
+  | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call _ | Invalid _
+    ->
     false
 
 let is_pure_basic : basic -> bool = function
@@ -536,7 +569,8 @@ let is_noop_move instr =
       | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
       | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
       | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Begin_region
-      | End_region | Dls_get | Tls_get | Poll | Alloc _ | Pause )
+      | End_region | Dls_get | Tls_get | Poll | Alloc _ | Pause
+      | External_without_caml_c_call _ )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false
@@ -620,7 +654,7 @@ let is_poll (instr : basic instruction) =
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Specific _ | Name_for_debugger _ ) ->
+      | Specific _ | Name_for_debugger _ | External_without_caml_c_call _ ) ->
     false
 
 let is_alloc (instr : basic instruction) =
@@ -638,7 +672,7 @@ let is_alloc (instr : basic instruction) =
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Specific _ | Name_for_debugger _ ) ->
+      | Specific _ | Name_for_debugger _ | External_without_caml_c_call _ ) ->
     false
 
 let is_end_region (b : basic) =
@@ -656,10 +690,8 @@ let is_end_region (b : basic) =
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Specific _ | Name_for_debugger _ ) ->
+      | Specific _ | Name_for_debugger _ | External_without_caml_c_call _ ) ->
     false
-
-let is_alloc_or_poll instr = is_alloc instr || is_poll instr
 
 let basic_block_contains_calls block =
   block.is_trap_handler
@@ -677,11 +709,30 @@ let basic_block_contains_calls block =
         true)
     | Tailcall_self _ -> false
     | Tailcall_func _ -> false
-    | Call_no_return _ -> true
-    | Call _ -> true
-    | Prim { op = External _; _ } | Invalid _ -> true
-    | Prim { op = Probe _; _ } -> true)
-  || DLL.exists block.body ~f:is_alloc_or_poll
+    | Call _ | Invalid _ -> true)
+  || DLL.exists block.body ~f:(fun (instr : basic instruction) ->
+      match instr.desc with
+      | Op (Alloc _ | Poll | External_without_caml_c_call _) -> true
+      | Op
+          ( Move | Spill | Reload | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+          | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _
+          | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+          | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
+          | Begin_region | End_region | Specific _ | Name_for_debugger _
+          | Dls_get | Tls_get | Pause )
+      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ->
+        false)
+
+let max_instr_id t =
+  fold_blocks t ~init:InstructionId.none ~f:(fun _label block acc ->
+      let acc =
+        DLL.fold_left block.body ~init:acc
+          ~f:(fun acc (instr : basic instruction) ->
+            InstructionId.max acc instr.id)
+      in
+      InstructionId.max acc block.terminator.id)
 
 let remove_trap_instructions t removed_trap_handlers =
   (* Remove Lpushtrap and Lpoptrap instructions that refer to dead labels and
@@ -722,7 +773,8 @@ let remove_trap_instructions t removed_trap_handlers =
         | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
         | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
         | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Alloc _ | Pause )
+        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Alloc _ | Pause
+        | External_without_caml_c_call _ )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
@@ -733,8 +785,8 @@ let remove_trap_instructions t removed_trap_handlers =
     (match terminator.desc with
     | Tailcall_self _ -> assert (Int.equal stack_offset 0)
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-    | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+    | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _ | Call _
+    | Invalid _ ->
       ());
     update_instruction terminator ~stack_offset
   and update_block label ~stack_offset =
@@ -763,6 +815,25 @@ let remove_trap_instructions t removed_trap_handlers =
        remove a few pushtrap/poptraps. *)
     (* update all blocks reachable from entry *)
     update_block t.entry_label ~stack_offset:0
+
+let print_block ppf block =
+  let fprintf = Format.fprintf in
+  let pp_with_id ppf ~pp (instr : _ instruction) =
+    fprintf ppf "(id:%a) %a\n" InstructionId.format instr.id pp instr
+  in
+  DLL.iter ~f:(pp_with_id ppf ~pp:print_basic) block.body;
+  pp_with_id ppf ~pp:print_terminator block.terminator;
+  fprintf ppf "\npredecessors:";
+  Label.Set.iter (fprintf ppf " %a" Label.format) block.predecessors;
+  fprintf ppf "\nsuccessors:";
+  Label.Set.iter
+    (fprintf ppf " %a" Label.format)
+    (successor_labels ~normal:true ~exn:false block);
+  fprintf ppf "\nexn-successor:";
+  Label.Set.iter
+    (fprintf ppf " %a" Label.format)
+    (successor_labels ~normal:false ~exn:true block);
+  fprintf ppf "\n"
 
 let remove_blocks t labels_to_remove =
   let removed_labels = ref Label.Set.empty in

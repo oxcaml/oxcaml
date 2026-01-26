@@ -40,7 +40,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Name_for_debugger _ | Alloc _ )
+      | Name_for_debugger _ | Alloc _ | External_without_caml_c_call _ )
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
     ->
     (* no rewrite *)
@@ -51,10 +51,10 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
 
 let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
   match term.desc with
-  | Prim { op = Probe _; _ } -> may_use_stack_operands_everywhere map term
-  | Prim { op = External _; _ }
+  | Call (Probe _) -> may_use_stack_operands_everywhere map term
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Invalid _ ->
+  | Invalid _
+  | Call (OCaml _ | External _) ->
     (* no rewrite *)
     May_still_have_spilled_registers

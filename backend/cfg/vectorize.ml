@@ -323,7 +323,8 @@ end = struct
     | Dls_get, _
     | Tls_get, _
     | Poll, _
-    | Alloc _, _ ->
+    | Alloc _, _
+    | External_without_caml_c_call _, _ ->
       false
 
   let have_isomorphic_op instruction1 instruction2 =
@@ -820,7 +821,7 @@ end = struct
                   | Floatop (_, _)
                   | Csel _ | Reinterpret_cast _ | Static_cast _
                   | Probe_is_enabled _ | Specific _ | Name_for_debugger _
-                  | Alloc _ ->
+                  | Alloc _ | External_without_caml_c_call _ ->
                     None))
               | _ -> None
             in
@@ -1067,7 +1068,8 @@ end = struct
           | Move | Reinterpret_cast _ | Static_cast _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop _
-          | Int128op _ | Intop_imm _ | Floatop _ | Csel _ | Alloc _ ->
+          | Int128op _ | Intop_imm _ | Floatop _ | Csel _ | Alloc _
+          | External_without_caml_c_call _ ->
             None)
 
       let create (instruction : Instruction.t) reaching_definitions : t option =
@@ -2323,7 +2325,7 @@ end = struct
         | Stackoffset _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
         | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
         | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-        | Poll ->
+        | Poll | External_without_caml_c_call _ ->
           None)
 
     let from_block (block : Block.t) deps : t list =

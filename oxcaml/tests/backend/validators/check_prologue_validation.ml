@@ -268,7 +268,8 @@ let () =
                 terminator =
                   { id = make_id ();
                     desc =
-                      Call { op = Indirect None; label_after = new_label 1 };
+                      Call
+                        (OCaml { op = Indirect None; returns_to = new_label 1 });
                     arg = [||];
                     res = [||]
                   }

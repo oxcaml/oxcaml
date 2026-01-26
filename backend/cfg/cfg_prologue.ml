@@ -66,9 +66,8 @@ module Instruction_requirements = struct
         Requires_no_prologue
       (* These are implemented by calling a function when emitted and therefore
          need a prologue. *)
-      | Call _ | Call_no_return _
+      | Call _
       | Raise (Raise_regular | Raise_reraise)
-      | Prim { op = External _ | Probe _; _ }
       | Invalid _ (* CR-soon vkarvonen: Does [Invalid] require prologue? *) ->
         Requires_prologue
       | Tailcall_func (Direct _)
@@ -99,7 +98,7 @@ module Instruction_requirements = struct
           | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
           | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
           | Begin_region | End_region | Specific _ | Name_for_debugger _
-          | Dls_get | Tls_get | Pause )
+          | Dls_get | Tls_get | Pause | External_without_caml_c_call _ )
       | Pushtrap _ | Poptrap _ | Reloadretaddr | Stack_check _ ->
         Requirements No_requirements
 end

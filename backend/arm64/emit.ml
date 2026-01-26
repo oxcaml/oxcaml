@@ -913,7 +913,7 @@ let num_call_gc_points instr =
         | Intop_atomic _
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Name_for_debugger _ )
+        | Name_for_debugger _ | External_without_caml_c_call _ )
     | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
     | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
     | Lcondbranch (_, _)
@@ -986,7 +986,7 @@ module BR = Branch_relaxation.Make (struct
           | Intop_atomic _
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-          | Name_for_debugger _ )
+          | Name_for_debugger _ | External_without_caml_c_call _ )
       | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
       | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -1050,6 +1050,7 @@ module BR = Branch_relaxation.Make (struct
              returns = _
            }) ->
       if Config.runtime5 && stack_ofs > 0 then 5 else if alloc then 3 else 5
+    | Lop (External_without_caml_c_call _) -> 5
     | Lop (Stackoffset _) -> 2
     | Lop (Load { memory_chunk; addressing_mode; is_atomic; mutability = _ }) ->
       let based = match addressing_mode with Iindexed _ -> 0 | Ibased _ -> 1
@@ -1487,6 +1488,38 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   | V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
 
+let emit_extcall i ~func ~alloc ~stack_ofs =
+  if Config.runtime5 && stack_ofs > 0
+  then (
+    A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
+    A.ins4 ADD_immediate reg_stack_arg_end O.sp
+      (O.imm (Misc.align stack_ofs 16))
+      O.optional_none;
+    emit_load_symbol_addr reg_x8 (S.create_global func);
+    A.ins1 BL (runtime_function S.Predef.caml_c_call_stack_args);
+    record_frame i.live (Dbg_other i.dbg))
+  else if alloc
+  then (
+    emit_load_symbol_addr reg_x8 (S.create_global func);
+    A.ins1 BL (runtime_function S.Predef.caml_c_call);
+    record_frame i.live (Dbg_other i.dbg))
+  else (
+    (* Store OCaml stack pointer in the frame pointer register. No need to store
+       previous x29 because OCaml doesn't maintain frame pointers. *)
+    if Config.runtime5
+    then (
+      A.ins_mov_from_sp ~dst:O.fp;
+      D.cfi_remember_state ();
+      D.cfi_def_cfa_register ~reg:(Int.to_string (R.gp_encoding R.fp));
+      let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
+      A.ins2 LDR reg_x_tmp1
+        (H.addressing (Iindexed offset) reg_domain_state_ptr);
+      A.ins_mov_to_sp ~src:reg_x_tmp1)
+    else D.cfi_remember_state ();
+    A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
+    if Config.runtime5 then A.ins_mov_to_sp ~src:O.fp;
+    D.cfi_restore_state ())
+
 (* Output the assembly code for an instruction *)
 
 let emit_instr i =
@@ -1609,6 +1642,16 @@ let emit_instr i =
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
       if Config.runtime5 then A.ins_mov_to_sp ~src:O.fp;
       D.cfi_restore_state ())
+  | Lop
+      (External_without_caml_c_call
+         { func_symbol = func;
+           effects = _;
+           ty_args = _;
+           ty_res = _;
+           stack_ofs;
+           _
+         }) ->
+    emit_extcall i ~func ~alloc:false ~stack_ofs
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);
     emit_stack_adjustment (-n);

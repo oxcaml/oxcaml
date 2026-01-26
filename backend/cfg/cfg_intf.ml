@@ -40,6 +40,13 @@ module S = struct
     { func_symbol : string;
       alloc : bool;
       (* CR mshinwell: rename [alloc] -> [needs_caml_c_call] *)
+      returns_to : Label.t option;
+          (** At least one of [alloc] and [returns_to] must be set. Otherwise,
+              use [Op]. *)
+      (* CR mshinwell: same comment as in cmm.mli (see the [External]
+         constructor) about [effects], [alloc] and [returns_to]. In addition
+         this should apply to the [OCaml] case below e.g. to know that an OCaml
+         function doesn't return. *)
       effects : Cmm.effects;
       ty_res : Cmm.machtype;
       ty_args : Cmm.exttype list;
@@ -47,12 +54,21 @@ module S = struct
       stack_align : Cmm.stack_align
     }
 
-  type prim_call_operation =
+  type call_operation =
+    | OCaml of
+        { op : func_call_operation;
+          returns_to : Label.t
+              (* CR mshinwell: we should track [Rc_nontail] here: at the moment
+                 it is impossible to turn a non-tail call into a tail call in
+                 Cfg, because this information has been dropped in
+                 [Cfg_selectgen]. *)
+        }
     | External of external_call_operation
     | Probe of
         { name : string;
           handler_code_sym : string;
-          enabled_at_init : bool
+          enabled_at_init : bool;
+          returns_to : Label.t
         }
 
   type bool_test =
@@ -114,11 +130,6 @@ module S = struct
     | Epilogue
     | Stack_check of { max_frame_size_bytes : int }
 
-  type 'a with_label_after =
-    { op : 'a;
-      label_after : Label.t
-    }
-
   (* Properties of the representation of successors:
    * - Tests of different types are not mixed. For example, a test that
    *   compares between variables of type int cannot be combined with a
@@ -143,16 +154,16 @@ module S = struct
     | Raise of Lambda.raise_kind
     | Tailcall_self of { destination : Label.t }
     | Tailcall_func of func_call_operation
-    | Call_no_return of external_call_operation
-    (* CR mshinwell: [Call_no_return] should have "external" in the name *)
+    (* CR mshinwell: [Invalid] from flambda2 should have its own terminator, to
+       avoid the hack in [can_raise_terminator] *)
     | Invalid of
         { message : string;
           stack_ofs : int;
           stack_align : Cmm.stack_align;
           label_after : Label.t Option.t
         }
-    | Call of func_call_operation with_label_after
-    | Prim of prim_call_operation with_label_after
+    (* CR mshinwell: move [Tailcall_*] into [call_operation] *)
+    | Call of call_operation
 
   type basic_or_terminator =
     | Basic of basic

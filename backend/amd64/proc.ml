@@ -629,6 +629,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Name_for_debugger _ | Dls_get | Tls_get | Pause)
   | Poptrap _ | Prologue | Epilogue ->
     if fp then [| rbp |] else [||]
+  | Op (External_without_caml_c_call { stack_ofs; _ }) ->
+    assert (stack_ofs >= 0);
+    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
   | Stack_check _ ->
     (* This case is used by [Cfg_available_regs].  r10 is actually saved and
        restored by the sequence to which [Stack_check] is expanded, but it may
@@ -641,21 +644,18 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Never -> assert false
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Return | Raise _ | Tailcall_self  _ | Tailcall_func _
-  | Prim {op = Probe _; _}
+  | Call (Probe _)
   ->
     if fp then [| rbp |] else [||]
   | Switch _ ->
     [| rax; rdx |]
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
-                     stack_ofs; stack_align = _; effects = _; }
-  | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
-                          stack_ofs; stack_align = _; effects = _; }; _} ->
+  | Call (External { alloc; stack_ofs; _ }) ->
     assert (stack_ofs >= 0);
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
     if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
+  | Call (OCaml { op = Indirect _ | Direct _; _ }) -> all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -668,18 +668,17 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
   | Never -> assert false
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Return | Raise _ | Tailcall_self  _ | Tailcall_func _
-  | Prim {op = Probe _; _} ->
+  | Call (Probe _) ->
     false
   | Switch _ ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; _ }
-  | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _; _ }; _} ->
+  | Call (External { alloc; _ }) ->
     if more_destruction_points then
       true
     else
       if alloc then true else false
   | Invalid _ -> more_destruction_points
-  | Call {op = Indirect _ | Direct _; _} ->
+  | Call (OCaml _) ->
     true
 
 (* Layout of the stack frame *)

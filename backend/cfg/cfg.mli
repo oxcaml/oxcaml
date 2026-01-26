@@ -262,4 +262,9 @@ val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 *)
 val basic_block_contains_calls : basic_block -> bool
 
+(* [max_instr_id cfg] returns the maximum instruction identifier in [cfg]. *)
+val max_instr_id : t -> InstructionId.t
+
+val print_block : Format.formatter -> basic_block -> unit
+
 val invalid_stack_offset : int

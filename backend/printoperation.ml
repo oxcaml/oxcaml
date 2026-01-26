@@ -131,3 +131,6 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
       (match enabled_at_init with
       | None | Some false -> ""
       | Some true -> " enabled_at_init")
+  | External_without_caml_c_call
+      { func_symbol; effects = _; ty_res = _; ty_args = _; stack_ofs = _ } ->
+    fprintf ppf "extcall %s" func_symbol

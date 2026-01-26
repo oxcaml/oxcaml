@@ -120,6 +120,14 @@ let check_tailrec_position t =
            followingsuccessors:@.%a@."
           Label.print tailrec_label Label.Set.print successors
 
+let check_call _t _label block =
+  match[@ocaml.warning "-fragile-match"] block.Cfg.terminator.desc with
+  (* CR mshinwell: re-enable once we generate the [External] op | Call (External
+     { alloc = false; returns_to = Some _; _ }) -> report t "[Call External]
+     with alloc=false and returns_to=Some must be encoded as \ [Op
+     External_without_caml_c_call]" *)
+  | _ -> ()
+
 let check_tailrec t _label block =
   (* check all Tailrec Self agree on the successor label *)
   match block.Cfg.terminator.desc with
@@ -131,9 +139,8 @@ let check_tailrec t _label block =
       then
         report t "Two self-tailcall terminators with different labels: %a %a"
           Label.print l Label.print destination)
-  | Call _ | Prim _ | Tailcall_func _ | Never | Always _ | Parity_test _
-  | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-  | Call_no_return _ | Invalid _ ->
+  | Call _ | Tailcall_func _ | Never | Always _ | Parity_test _ | Truth_test _
+  | Float_test _ | Int_test _ | Switch _ | Return | Raise _ | Invalid _ ->
     ()
 
 let check_can_raise t label (block : Cfg.basic_block) =
@@ -249,7 +256,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
             | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
             | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
             | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-            | Poll | Pause | Alloc _ )
+            | Poll | Pause | Alloc _ | External_without_caml_c_call _ )
         | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
           cur_stack_offset)
   in
@@ -262,6 +269,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
   ()
 
 let check_block t label (block : Cfg.basic_block) =
+  check_call t label block;
   check_tailrec t label block;
   check_can_raise t label block;
   (* exn and normal successors are disjoint *)

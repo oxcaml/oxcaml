@@ -205,7 +205,8 @@ let is_move_basic : Cfg.basic -> bool =
     | Tls_get -> false
     | Poll -> false
     | Pause -> false
-    | Alloc _ -> false)
+    | Alloc _ -> false
+    | External_without_caml_c_call _ -> false)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false

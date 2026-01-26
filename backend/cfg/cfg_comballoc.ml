@@ -39,7 +39,7 @@ let rec find_next_allocation : cell option -> allocation option =
         | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
         | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
         | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-        | Poll | Pause )
+        | Poll | Pause | External_without_caml_c_call _ )
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
       find_next_allocation (DLL.next cell))
@@ -103,7 +103,7 @@ let find_compatible_allocations :
               ( ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
                 | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ ),
                 _ )
-          | Intop_atomic _ ) ->
+          | Intop_atomic _ | External_without_caml_c_call _ ) ->
         loop allocations (DLL.next cell) ~curr_mode ~curr_size)
   in
   loop [] cell ~curr_mode ~curr_size

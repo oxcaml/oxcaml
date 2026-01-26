@@ -274,7 +274,7 @@ let pseudoregs_for_operation op arg res =
   | Intop_atomic _
   | Floatop (_, _)
   | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-  | Name_for_debugger _ | Alloc _ ->
+  | Name_for_debugger _ | Alloc _ | External_without_caml_c_call _ ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf

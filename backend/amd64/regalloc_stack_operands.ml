@@ -280,6 +280,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
          | Ioffset_loc (_, _)
          | Ifloatarithmem (_, _, _)
          | Icldemote _ | Iprefetch _ | Ibswap _ ))
+  | Op (External_without_caml_c_call _)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue ->
     (* no rewrite *)
     May_still_have_spilled_registers
@@ -305,9 +306,8 @@ let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
        the operands). *)
     May_still_have_spilled_registers
   | Always _ | Return | Raise _ | Switch _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Invalid _
-  | Prim { op = External _; _ }
-  | Call { op = Indirect _ | Direct _; _ } ->
+  | Invalid _
+  | Call (OCaml _ | External _) ->
     (* no rewrite *)
     May_still_have_spilled_registers
-  | Prim { op = Probe _; _ } -> may_use_stack_operands_everywhere map term
+  | Call (Probe _) -> may_use_stack_operands_everywhere map term

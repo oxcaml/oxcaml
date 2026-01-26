@@ -512,7 +512,7 @@ module Stack_offset_and_exn = struct
         InstructionId.format term.id
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ | Prim _ ->
+    | Tailcall_func _ | Invalid _ | Call _ ->
       stack_offset, traps
 
   let rec process_basic :
@@ -550,7 +550,8 @@ module Stack_offset_and_exn = struct
         | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
         | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
         | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause | Alloc _ )
+        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause | Alloc _
+        | External_without_caml_c_call _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
@@ -649,8 +650,8 @@ let insert_op_debug' (_env : environment) sub_cfg op dbg rs rd =
 
 let insert_move env sub_cfg src dst =
   (* This should never be called on regs with incompatible [typ]s, but the
-     zero-alloc checker may unconditionally assume the result of
-     caml_flambda2_invalid is typ_int. *)
+     zero-alloc checker may unconditionally assume the result of the [Invalid]
+     terminator is typ_int. *)
   if not (Reg.same src dst)
   then insert env sub_cfg (Op Move) [| src |] [| dst |]
 
