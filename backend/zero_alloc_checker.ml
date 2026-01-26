@@ -2513,9 +2513,7 @@ end = struct
           transform t ~effect ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
         | Dls_get -> next
-        | External_without_caml_c_call _ ->
-          (* This variety of external call operation cannot allocate. *)
-          next
+        | External_without_caml_c_call _ -> next
 
       let basic next (i : Cfg.basic Cfg.instruction) t : (domain, error) result
           =
