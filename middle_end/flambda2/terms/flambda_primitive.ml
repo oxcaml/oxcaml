@@ -1216,6 +1216,7 @@ type unary_primitive =
       }
   | Boolean_not
   | Reinterpret_64_bit_word of Reinterpret_64_bit_word.t
+  | Reinterpret_boxed_vector
   | Unbox_number of Flambda_kind.Boxable_number.t
   | Box_number of Flambda_kind.Boxable_number.t * Alloc_mode.For_allocations.t
   | Untag_immediate
@@ -1254,7 +1255,9 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Float_arith _ ->
     (* See comment in effects_and_coeffects *)
     Flambda_features.float_const_prop ()
-  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _ -> true
+  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Reinterpret_boxed_vector ->
+    true
   | Unbox_number _ | Untag_immediate -> false
   | Box_number (_, Local _) ->
     (* For the moment we don't CSE any local allocations. *)
@@ -1302,6 +1305,7 @@ let compare_unary_primitive p1 p2 =
     | Is_null -> 27
     | Peek _ -> 28
     | Make_lazy _ -> 29
+    | Reinterpret_boxed_vector -> 30
   in
   match p1, p2 with
   | ( Block_load { kind = kind1; mut = mut1; field = field1 },
@@ -1353,6 +1357,7 @@ let compare_unary_primitive p1 p2 =
   | Reinterpret_64_bit_word reinterpret1, Reinterpret_64_bit_word reinterpret2
     ->
     Reinterpret_64_bit_word.compare reinterpret1 reinterpret2
+  | Reinterpret_boxed_vector, Reinterpret_boxed_vector -> 0
   | Unbox_number kind1, Unbox_number kind2 ->
     K.Boxable_number.compare kind1 kind2
   | Box_number (kind1, alloc_mode1), Box_number (kind2, alloc_mode2) ->
@@ -1389,11 +1394,12 @@ let compare_unary_primitive p1 p2 =
   | ( ( Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _
       | Is_null | Get_tag | String_length _ | Int_as_pointer _
       | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
-      | Reinterpret_64_bit_word _ | Float_arith _ | Array_length _
-      | Bigarray_length _ | Unbox_number _ | Box_number _ | Untag_immediate
-      | Tag_immediate | Project_function_slot _ | Project_value_slot _
-      | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
-      | Obj_dup | Get_header | Peek _ | Make_lazy _ ),
+      | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
+      | Array_length _ | Bigarray_length _ | Unbox_number _ | Box_number _
+      | Untag_immediate | Tag_immediate | Project_function_slot _
+      | Project_value_slot _ | Is_boxed_float | Is_flat_float_array
+      | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _
+      | Make_lazy _ ),
       _ ) ->
     Stdlib.compare (unary_primitive_numbering p1) (unary_primitive_numbering p2)
 
@@ -1431,6 +1437,7 @@ let print_unary_primitive ppf p =
   | Reinterpret_64_bit_word reinterpret ->
     fprintf ppf "@[<hov 1>(Reinterpret_64_bit_word@ %a)@]"
       Reinterpret_64_bit_word.print reinterpret
+  | Reinterpret_boxed_vector -> fprintf ppf "Reinterpret_boxed_vector"
   | Float_arith (width, op) -> print_unary_float_arith_op ppf width op
   | Array_length ak ->
     fprintf ppf "(Array_length %a)" Array_kind_for_length.print ak
@@ -1476,6 +1483,7 @@ let arg_kind_of_unary_primitive p =
   | Int_arith (kind, _) -> K.Standard_int.to_kind kind
   | Num_conv { src; dst = _ } -> K.Standard_int_or_float.to_kind src
   | Boolean_not -> K.value
+  | Reinterpret_boxed_vector -> K.value
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
     | Tagged_int63_as_unboxed_int64 -> K.value
@@ -1513,6 +1521,7 @@ let result_kind_of_unary_primitive p : result_kind =
   | Int_arith (kind, _) -> Singleton (K.Standard_int.to_kind kind)
   | Num_conv { src = _; dst } -> Singleton (K.Standard_int_or_float.to_kind dst)
   | Boolean_not -> Singleton K.value
+  | Reinterpret_boxed_vector -> Singleton K.value
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
     | Tagged_int63_as_unboxed_int64 -> Singleton K.naked_int64
@@ -1586,7 +1595,8 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
   | Opaque_identity _ ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Int_arith (_, Swap_byte_endianness)
-  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _ ->
+  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Reinterpret_boxed_vector ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Float_arith (_width, (Abs | Neg)) ->
     (* Float operations are not really pure since they actually access the
@@ -1664,7 +1674,8 @@ let unary_classify_for_printing p =
   | Duplicate_array _ | Duplicate_block _ | Obj_dup -> Constructive
   | String_length _ | Get_tag -> Destructive
   | Is_int _ | Is_null | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Float_arith _ ->
+  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
+  | Float_arith _ ->
     Neither
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate ->
     Destructive
@@ -1692,10 +1703,10 @@ let free_names_unary_primitive p =
       project_from Name_mode.normal
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
   | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Float_arith _ | Array_length _
-  | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
-  | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
-  | Obj_dup | Get_header
+  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
+  | Float_arith _ | Array_length _ | Bigarray_length _ | Unbox_number _
+  | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
+  | End_region _ | End_try_region _ | Obj_dup | Get_header
   | Peek (_ : Flambda_kind.Standard_int_or_float.t)
   | Make_lazy _ ->
     Name_occurrences.empty
@@ -1714,10 +1725,11 @@ let apply_renaming_unary_primitive p renaming =
     if alloc_mode == alloc_mode' then p else Int_as_pointer alloc_mode'
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
   | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Float_arith _ | Array_length _
-  | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
-  | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
-  | Project_function_slot _ | Project_value_slot _ | Obj_dup | Get_header
+  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
+  | Float_arith _ | Array_length _ | Bigarray_length _ | Unbox_number _
+  | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
+  | End_region _ | End_try_region _ | Project_function_slot _
+  | Project_value_slot _ | Obj_dup | Get_header
   | Peek (_ : Flambda_kind.Standard_int_or_float.t)
   | Make_lazy _ ->
     p
@@ -1728,10 +1740,11 @@ let ids_for_export_unary_primitive p =
     Alloc_mode.For_allocations.ids_for_export alloc_mode
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
   | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Float_arith _ | Array_length _
-  | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
-  | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
-  | Project_function_slot _ | Project_value_slot _ | Obj_dup | Get_header
+  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
+  | Float_arith _ | Array_length _ | Bigarray_length _ | Unbox_number _
+  | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
+  | End_region _ | End_try_region _ | Project_function_slot _
+  | Project_value_slot _ | Obj_dup | Get_header
   | Peek (_ : Flambda_kind.Standard_int_or_float.t)
   | Make_lazy _ ->
     Ids_for_export.empty

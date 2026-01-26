@@ -293,6 +293,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
       | Tagged_int63_as_unboxed_int64 -> raise Primitive_not_supported
     in
     use_prim' (Extern extern_name)
+  | Reinterpret_boxed_vector -> identity ~env ~res x
   | Unbox_number _ | Box_number _ | Untag_immediate | Tag_immediate ->
     (* everything is untagged and "unboxed" in JS: see README *)
     identity ~env ~res x

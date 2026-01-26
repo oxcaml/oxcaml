@@ -3051,10 +3051,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         "Preinterpret_tagged_int63_as_unboxed_int64 can only be used on 64-bit \
          targets";
     [Unary (Reinterpret_64_bit_word Tagged_int63_as_unboxed_int64, i)]
-  | Preinterpret_boxed_vector_as_tuple v, [arg] ->
-    opaque ~machine_width (L.layout_tupled_vector v) arg ~middle_end_only:true
-  | Preinterpret_tuple_as_boxed_vector v, [arg] ->
-    opaque ~machine_width (L.layout_boxed_vector v) arg ~middle_end_only:true
+  | Preinterpret_boxed_vector_as_tuple _, [[arg]]
+  | Preinterpret_tuple_as_boxed_vector _, [[arg]] ->
+    [Unary (Reinterpret_boxed_vector, arg)]
   | Ppeek layout, [[ptr]] ->
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Unary (Peek kind, ptr)]

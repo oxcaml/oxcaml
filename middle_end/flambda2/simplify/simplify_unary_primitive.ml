@@ -682,6 +682,10 @@ let simplify_opaque_identity dacc ~kind ~original_term ~arg:_ ~arg_ty:_
     ~result_var =
   SPR.create_unknown dacc ~result_var kind ~original_term
 
+let simplify_reinterpret_boxed_vector dacc ~original_term ~arg:_ ~arg_ty:_
+    ~result_var =
+  SPR.create_unknown dacc ~result_var Flambda_kind.value ~original_term
+
 let simplify_end_region dacc ~original_term ~arg:_ ~arg_ty:_ ~result_var =
   let denv = DA.denv dacc in
   let machine_width = DE.machine_width denv in
@@ -1015,6 +1019,7 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | Boolean_not -> simplify_boolean_not
     | Reinterpret_64_bit_word reinterpret ->
       simplify_reinterpret_64_bit_word reinterpret
+    | Reinterpret_boxed_vector -> simplify_reinterpret_boxed_vector
     | Is_boxed_float -> simplify_is_boxed_float
     | Is_flat_float_array -> simplify_is_flat_float_array
     | Int_as_pointer mode -> simplify_int_as_pointer ~mode

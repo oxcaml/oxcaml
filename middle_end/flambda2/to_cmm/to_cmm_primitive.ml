@@ -1148,6 +1148,7 @@ let unary_primitive env res dbg f arg =
       | Unboxed_float64_as_unboxed_int64 -> C.float_as_int64 ~dbg arg
     in
     None, res, cmm
+  | Reinterpret_boxed_vector -> None, res, arg
   | Unbox_number kind -> None, res, unbox_number ~dbg kind arg
   | Untag_immediate -> Some (Env.Untag arg), res, C.untag_int arg dbg
   | Box_number (kind, alloc_mode) ->

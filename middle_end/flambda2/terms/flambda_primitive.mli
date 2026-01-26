@@ -450,6 +450,7 @@ type unary_primitive =
   (* CR-someday mshinwell: We should maybe change int32.ml and friends to use a
      %-primitive instead of directly calling C stubs for conversions *)
   | Reinterpret_64_bit_word of Reinterpret_64_bit_word.t
+  | Reinterpret_boxed_vector
   | Unbox_number of Flambda_kind.Boxable_number.t
   | Box_number of Flambda_kind.Boxable_number.t * Alloc_mode.For_allocations.t
   | Untag_immediate
