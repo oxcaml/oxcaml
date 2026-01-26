@@ -235,6 +235,29 @@ module Tester_no_set (Primitives : sig
   let () = List.iter test lengths
 end
 
+module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int64_u = Stdlib_upstream_compatible.Int64_u
+module Int32_u = Stdlib_upstream_compatible.Int32_u
+module Int16 = Stdlib_stable.Int16
+module Int16_u = Stdlib_stable.Int16_u
+module Int8 = Stdlib_stable.Int8
+module Int8_u = Stdlib_stable.Int8_u
+module Float32 = Stdlib_stable.Float32
+module Float32_u = Stdlib_stable.Float32_u
+
+external int64_of_int64 : int64 -> int64 = "%identity"
+external int64_to_int64 : int64 -> int64 = "%identity"
+external int32_of_int64 : int64 -> int32 = "%int32_of_int64"
+external int32_to_int64 : int32 -> int64 = "%int64_of_int32"
+external int16_of_int64 : int64 -> int16 = "%int16_of_int64"
+external int16_to_int64 : int16 -> int64 = "%int64_of_int16"
+external int8_of_int64 : int64 -> int8 = "%int8_of_int64"
+external int8_to_int64 : int8 -> int64 = "%int64_of_int8"
+external int_of_int64 : int64 -> int = "%int_of_int64"
+external int_to_int64 : int -> int64 = "%int64_of_int"
+external int_of_int : int -> int = "%identity"
+external int_to_int : int -> int = "%identity"
+
 |}^tests
 
 let test_group_template ~setup ~tests = {|
@@ -272,7 +295,8 @@ let one_test_template
   ~boxed_data
   ~tested_data
   ~index_sigil
-  ~data_sigil
+  ~get_sigil
+  ~set_sigil
   ~unboxed_sigil
   ~container
   ~create
@@ -292,13 +316,13 @@ module _ = |}^(if test_setters then "Tester" else "Tester_no_set")^{| (struct
       : |}^container^{|
       -> int
       -> |}^boxed_data^{|
-      = "%caml_|}^container^{|_get|}^data_sigil^{|"
+      = "%caml_|}^container^{|_get|}^get_sigil^{|"
 
     external get_safe
       :  |}^container^{|
       -> |}^index^{|
       -> |}^tested_data^{|
-      = "%caml_|}^container^{|_get|}^data_sigil^unboxed_sigil^index_sigil^{|"
+      = "%caml_|}^container^{|_get|}^get_sigil^unboxed_sigil^index_sigil^{|"
 
     let get_safe b i = box_data (get_safe b (unbox_index i))
 
@@ -306,7 +330,7 @@ module _ = |}^(if test_setters then "Tester" else "Tester_no_set")^{| (struct
       :  |}^container^{|
       -> |}^index^{|
       -> |}^tested_data^{|
-      = "%caml_|}^container^{|_get|}^data_sigil^{|u|}^unboxed_sigil^index_sigil^{|"
+      = "%caml_|}^container^{|_get|}^get_sigil^{|u|}^unboxed_sigil^index_sigil^{|"
 
     let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
 |}^(if test_setters then {|
@@ -315,14 +339,14 @@ module _ = |}^(if test_setters then "Tester" else "Tester_no_set")^{| (struct
       -> int
       -> |}^boxed_data^{|
       -> unit
-      = "%caml_|}^container^{|_set|}^data_sigil^{|"
+      = "%caml_|}^container^{|_set|}^set_sigil^{|"
 
     external set_safe
       :  |}^container^{|
       -> |}^index^{|
       -> |}^tested_data^{|
       -> unit
-      = "%caml_|}^container^{|_set|}^data_sigil^unboxed_sigil^index_sigil^{|"
+      = "%caml_|}^container^{|_set|}^set_sigil^unboxed_sigil^index_sigil^{|"
 
     let set_safe b i d = set_safe b (unbox_index i) (unbox_data d)
 
@@ -331,21 +355,23 @@ module _ = |}^(if test_setters then "Tester" else "Tester_no_set")^{| (struct
       -> |}^index^{|
       -> |}^tested_data^{|
       -> unit
-      = "%caml_|}^container^{|_set|}^data_sigil^{|u|}^unboxed_sigil^index_sigil^{|"
+      = "%caml_|}^container^{|_set|}^set_sigil^{|u|}^unboxed_sigil^index_sigil^{|"
 
     let set_unsafe b i d = set_unsafe b (unbox_index i) (unbox_data d)|} else "")^{|
   end)
 |}
 
-(* We can't always just look up min/max int in the module because of the [int16]
-   accessors, which use [Int]. *)
-let int_examples_template ~module_ ~min ~max ~min_for_rand ~max_for_rand ~type_ = {|
+let int_examples_template
+      ~module_ ~min ~max ~min_for_rand ~max_for_rand ~type_ ~type_for_rand = {|
 fun i ->
   match i mod 4 with
   | 0 -> |}^module_^{|.zero
   | 1 -> |}^min^{|
   | 2 -> |}^max^{|
-  | _ -> Random.|}^type_^{|_in_range ~min:|}^min_for_rand^{| ~max:|}^max_for_rand^{|
+  | _ -> Random.|}^type_for_rand^{|_in_range
+             ~min:|}^min_for_rand^{|
+             ~max:|}^max_for_rand^{|
+           |> |}^type_^{|_of_|}^type_for_rand^{|
 |}
 
 let int_examples_custom_bounds ~module_ ~width ~type_ =
@@ -361,11 +387,15 @@ let int_examples_custom_bounds ~module_ ~width ~type_ =
     ~min_for_rand:(module_^{|.zero|})
     ~max_for_rand:min_int
     ~type_
+    ~type_for_rand:type_
 
 let int_examples_default_bounds ~module_ ~width ~type_ =
   let min = module_^{|.min_int|} in
   let max = module_^{|.max_int|} in
-  int_examples_template ~module_ ~min ~max ~min_for_rand:min ~max_for_rand:max ~type_
+  let min_for_rand = {|(|}^type_^{|_to_int64 |}^min^{|)|} in
+  let max_for_rand = {|(|}^type_^{|_to_int64 |}^max^{|)|} in
+  int_examples_template
+    ~module_ ~min ~max ~min_for_rand ~max_for_rand ~type_ ~type_for_rand:"int64"
 
 let float_examples = {|
 fun _ ->
@@ -373,7 +403,7 @@ fun _ ->
     let f = Random.float Float.max_float in
     if Random.bool () then Float.neg f else f
   in
-  Stdlib_stable.Float32.of_float f
+  Float32.of_float f
 |}
 
 let int_extra_bounds_template ~module_ =
@@ -414,11 +444,11 @@ let int_result ~width ~unboxed ~module_ ~examples =
   ; unboxed_sigil
   ; box =
       (if unboxed
-       then "Stdlib_upstream_compatible." ^ module_ ^ "_u.to_" ^ type_
+       then module_ ^ "_u.to_" ^ type_
        else "fun x -> x")
   ; unbox =
       (if unboxed
-       then "Stdlib_upstream_compatible." ^ module_ ^ "_u.of_" ^ type_
+       then module_ ^ "_u.of_" ^ type_
        else "fun x -> x")
   ; eq = module_ ^ ".equal"
   ; example = examples ~module_ ~width ~type_ |> indent 2
@@ -429,27 +459,31 @@ let indices =
   [ { boxed_type = "nativeint"
     ; tested_type = "nativeint#"
     ; of_int = "Nativeint.of_int"
-    ; unbox = "Stdlib_upstream_compatible.Nativeint_u.of_nativeint"
+    ; unbox = "Nativeint_u.of_nativeint"
     ; extra_bounds = int_extra_bounds_template ~module_:"Nativeint"
     }
   ; { boxed_type = "int32"
     ; tested_type = "int32#"
     ; of_int = "Int32.of_int"
-    ; unbox = "Stdlib_upstream_compatible.Int32_u.of_int32"
+    ; unbox = "Int32_u.of_int32"
     ; extra_bounds = int_extra_bounds_template ~module_:"Int32"
     }
   ; { boxed_type = "int64"
     ; tested_type = "int64#"
     ; of_int = "Int64.of_int"
-    ; unbox = "Stdlib_upstream_compatible.Int64_u.of_int64"
+    ; unbox = "Int64_u.of_int64"
     ; extra_bounds = int_extra_bounds_template ~module_:"Int64"
     }
   ]
 ;;
 
 let datas =
-  [ int_result ~width:"16" ~unboxed:false ~module_:"Int"
+  [ int_result ~width:"i8" ~unboxed:false ~module_:"Int8"
+      ~examples:int_examples_default_bounds
+  ; int_result ~width:"16" ~unboxed:false ~module_:"Int"
       ~examples:int_examples_custom_bounds
+  ; int_result ~width:"i16" ~unboxed:false ~module_:"Int16"
+      ~examples:int_examples_default_bounds
   ; int_result ~width:"32" ~unboxed:false ~module_:"Int32"
       ~examples:int_examples_default_bounds
   ; int_result ~width:"64" ~unboxed:false ~module_:"Int64"
@@ -465,7 +499,7 @@ let datas =
       tested_type = "float32";
       box = "fun x -> x";
       unbox = "fun x -> x";
-      eq = "Stdlib_stable.Float32.equal";
+      eq = "Float32.equal";
       example = float_examples;
     }
   ; {
@@ -473,9 +507,9 @@ let datas =
       unboxed_sigil = "#";
       boxed_type = "float32";
       tested_type = "float32#";
-      box = "Stdlib_stable.Float32_u.to_float32";
-      unbox = "Stdlib_stable.Float32_u.of_float32";
-      eq = "Stdlib_stable.Float32.equal";
+      box = "Float32_u.to_float32";
+      unbox = "Float32_u.of_float32";
+      eq = "Float32.equal";
       example = float_examples;
     };
   ]
@@ -523,6 +557,11 @@ let tests =
       ~extra_bounds
   in
   let tests =
+    let set_sigil =
+      if String.starts_with ~prefix:"i" width
+      then String.sub width 1 (String.length width - 1)
+      else width
+    in
     List.map
       (fun { container; create; test_setters } ->
         one_test_template
@@ -531,7 +570,8 @@ let tests =
           ~boxed_data
           ~tested_data
           ~index_sigil:("_indexed_by_" ^ tested_index)
-          ~data_sigil:width
+          ~get_sigil:width
+          ~set_sigil
           ~unboxed_sigil
           ~container
           ~create)

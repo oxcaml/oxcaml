@@ -981,7 +981,9 @@ let print_bytes_like_value ppf b =
 
 type string_accessor_width =
   | Eight
+  | Eight_signed
   | Sixteen
+  | Sixteen_signed
   | Thirty_two
   | Single
   | Sixty_four
@@ -993,7 +995,9 @@ let print_string_accessor_width ppf w =
   let fprintf = Format.fprintf in
   match w with
   | Eight -> fprintf ppf "8"
+  | Eight_signed -> fprintf ppf "i8"
   | Sixteen -> fprintf ppf "16"
+  | Sixteen_signed -> fprintf ppf "i16"
   | Thirty_two -> fprintf ppf "32"
   | Single -> fprintf ppf "f32"
   | Sixty_four -> fprintf ppf "64"
@@ -1006,8 +1010,8 @@ let print_string_accessor_width ppf w =
 
 let byte_width_of_string_accessor_width width =
   match width with
-  | Eight -> 1
-  | Sixteen -> 2
+  | Eight | Eight_signed -> 1
+  | Sixteen | Sixteen_signed -> 2
   | Thirty_two -> 4
   | Single -> 4
   | Sixty_four -> 8
@@ -1017,7 +1021,7 @@ let byte_width_of_string_accessor_width width =
 
 let kind_of_string_accessor_width width =
   match width with
-  | Eight | Sixteen -> K.value
+  | Eight | Eight_signed | Sixteen | Sixteen_signed -> K.value
   | Thirty_two -> K.naked_int32
   | Single -> K.naked_float32
   | Sixty_four -> K.naked_int64
@@ -2002,7 +2006,8 @@ let result_kind_of_binary_primitive p : result_kind =
     Singleton
       (Array_load_kind.kind_of_loaded_value array_load_kind
       |> K.With_subkind.kind)
-  | String_or_bigstring_load (_, (Eight | Sixteen)) ->
+  | String_or_bigstring_load
+      (_, (Eight | Eight_signed | Sixteen | Sixteen_signed)) ->
     Singleton K.naked_immediate
   | String_or_bigstring_load (_, Thirty_two) -> Singleton K.naked_int32
   | String_or_bigstring_load (_, Single) -> Singleton K.naked_float32
@@ -2286,7 +2291,8 @@ let args_kind_of_ternary_primitive p =
     ( array_kind,
       array_index_kind,
       Array_set_kind.kind_of_new_value array_set_kind |> K.With_subkind.kind )
-  | Bytes_or_bigstring_set (Bytes, (Eight | Sixteen)) ->
+  | Bytes_or_bigstring_set
+      (Bytes, (Eight | Eight_signed | Sixteen | Sixteen_signed)) ->
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_immediate
   | Bytes_or_bigstring_set (Bytes, Thirty_two) ->
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_int32
@@ -2300,7 +2306,8 @@ let args_kind_of_ternary_primitive p =
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_vec256
   | Bytes_or_bigstring_set (Bytes, Five_twelve _) ->
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_vec512
-  | Bytes_or_bigstring_set (Bigstring, (Eight | Sixteen)) ->
+  | Bytes_or_bigstring_set
+      (Bigstring, (Eight | Eight_signed | Sixteen | Sixteen_signed)) ->
     bigstring_kind, bytes_or_bigstring_index_kind, K.naked_immediate
   | Bytes_or_bigstring_set (Bigstring, Thirty_two) ->
     bigstring_kind, bytes_or_bigstring_index_kind, K.naked_int32

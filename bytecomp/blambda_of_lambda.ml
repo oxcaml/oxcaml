@@ -630,8 +630,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pstringrefu -> binary Getstringchar
     | Pbytesrefu -> binary Getbyteschar
     | Pbytessetu -> ternary Setbyteschar
-    | Pstring_load_8 { index_kind; _ } ->
-      binary (indexing_primitive index_kind "caml_string_get8")
+    | Pstring_load_i8 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_geti8")
+    | Pstring_load_i16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_geti16")
     | Pstring_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_string_get16")
     | Pstring_load_32 { index_kind; _ } ->
@@ -650,8 +652,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       ternary (indexing_primitive index_kind "caml_bytes_setf32")
     | Pbytes_set_64 { index_kind; _ } ->
       ternary (indexing_primitive index_kind "caml_bytes_set64")
-    | Pbytes_load_8 { index_kind; _ } ->
-      binary (indexing_primitive index_kind "caml_bytes_get8")
+    | Pbytes_load_i8 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_geti8")
+    | Pbytes_load_i16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_geti16")
     | Pbytes_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_bytes_get16")
     | Pbytes_load_32 { index_kind; _ } ->
@@ -767,8 +771,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pbigarrayset (_, n, _, _) ->
       n_ary (Ccall ("caml_ba_set_" ^ Int.to_string n)) ~arity:(n + 2)
     | Pbigarraydim n -> unary (Ccall ("caml_ba_dim_" ^ Int.to_string n))
-    | Pbigstring_load_8 { unsafe = _; index_kind } ->
-      binary (indexing_primitive index_kind "caml_ba_uint8_get8")
+    | Pbigstring_load_i8 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_geti8")
+    | Pbigstring_load_i16 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_geti16")
     | Pbigstring_load_16 { unsafe = _; index_kind } ->
       binary (indexing_primitive index_kind "caml_ba_uint8_get16")
     | Pbigstring_load_32 { unsafe = _; mode = _; index_kind } ->

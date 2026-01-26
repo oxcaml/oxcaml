@@ -313,17 +313,20 @@ let compute_static_size lam =
     | Pisout
     | Pbigarrayref _
     | Pbigarraydim _
-    | Pstring_load_8 _
+    | Pstring_load_i8 _
+    | Pstring_load_i16 _
     | Pstring_load_16 _
     | Pstring_load_32 _
     | Pstring_load_f32 _
     | Pstring_load_64 _
-    | Pbytes_load_8 _
+    | Pbytes_load_i8 _
+    | Pbytes_load_i16 _
     | Pbytes_load_16 _
     | Pbytes_load_32 _
     | Pbytes_load_f32 _
     | Pbytes_load_64 _
-    | Pbigstring_load_8 _
+    | Pbigstring_load_i8 _
+    | Pbigstring_load_i16 _
     | Pbigstring_load_16 _
     | Pbigstring_load_32 _
     | Pbigstring_load_f32 _

@@ -788,8 +788,8 @@ let actual_max_length_for_string_like_access_as_nativeint ~machine_width
   let length_offset_of_size size =
     let offset =
       match (size : Flambda_primitive.string_accessor_width) with
-      | Eight -> 0
-      | Sixteen -> 1
+      | Eight | Eight_signed -> 0
+      | Sixteen | Sixteen_signed -> 1
       | Thirty_two | Single -> 3
       | Sixty_four -> 7
       | One_twenty_eight _ -> 15
@@ -806,9 +806,9 @@ let actual_max_length_for_string_like_access_as_nativeint ~machine_width
       (Unary (Num_conv { src = Naked_immediate; dst = Naked_nativeint }, length))
   in
   match access_size with
-  | Eight -> length (* micro-optimization *)
-  | Sixteen | Thirty_two | Single | Sixty_four | One_twenty_eight _
-  | Two_fifty_six _ | Five_twelve _ ->
+  | Eight | Eight_signed -> length (* micro-optimization *)
+  | Sixteen | Sixteen_signed | Thirty_two | Single | Sixty_four
+  | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
     let offset = length_offset_of_size access_size in
     let reduced_length =
       H.Prim
@@ -851,7 +851,8 @@ let bigstring_alignment_validity_condition ~machine_width bstr alignment
 let checked_string_or_bytes_access ~dbg ~machine_width ~access_size ~primitive
     kind string ~index_kind index =
   (match (access_size : P.string_accessor_width) with
-  | Eight | Sixteen | Thirty_two | Single | Sixty_four
+  | Eight | Eight_signed | Sixteen | Sixteen_signed | Thirty_two | Single
+  | Sixty_four
   | One_twenty_eight { aligned = false }
   | Two_fifty_six { aligned = false }
   | Five_twelve { aligned = false } ->
@@ -885,7 +886,8 @@ let checked_bigstring_access ~dbg ~machine_width ~access_size ~primitive arg1
         ~conditions:
           [ bigstring_alignment_validity_condition ~machine_width arg1 64
               (convert_index_to_tagged_int ~index:arg2 ~index_kind) ]
-    | Eight | Sixteen | Thirty_two | Single | Sixty_four
+    | Eight | Eight_signed | Sixteen | Sixteen_signed | Thirty_two | Single
+    | Sixty_four
     | One_twenty_eight { aligned = false }
     | Two_fifty_six { aligned = false }
     | Five_twelve { aligned = false } ->
@@ -905,7 +907,7 @@ let string_like_load ~dbg ~unsafe
     let index = convert_index_to_untagged_int ~index ~index_kind in
     let wrap =
       match access_size, mode with
-      | (Eight | Sixteen), None ->
+      | (Eight | Eight_signed | Sixteen | Sixteen_signed), None ->
         assert (not boxed);
         tag_int
       | Thirty_two, Some mode ->
@@ -920,7 +922,7 @@ let string_like_load ~dbg ~unsafe
         if boxed then box_vec256 mode ~current_region else Fun.id
       | Five_twelve _, Some mode ->
         if boxed then box_vec512 mode ~current_region else Fun.id
-      | (Eight | Sixteen), Some _
+      | (Eight | Eight_signed | Sixteen | Sixteen_signed), Some _
       | ( ( Thirty_two | Single | Sixty_four | One_twenty_eight _
           | Two_fifty_six _ | Five_twelve _ ),
           None ) ->
@@ -952,7 +954,7 @@ let bytes_like_set ~dbg ~unsafe
     let index = convert_index_to_untagged_int ~index ~index_kind in
     let wrap =
       match access_size with
-      | Eight | Sixteen ->
+      | Eight | Eight_signed | Sixteen | Sixteen_signed ->
         assert (not boxed);
         untag_int
       | Thirty_two -> if boxed then unbox_bint Boxed_int32 else Fun.id
@@ -2414,12 +2416,18 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ string_like_load ~unsafe:false ~dbg ~machine_width ~access_size:Eight
         Bytes ~boxed:false None bytes ~index_kind:Ptagged_int_index index
         ~current_region ]
-  | Pstring_load_8 { unsafe; index_kind }, [[str]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight String
-        ~boxed:false None str ~index_kind index ~current_region ]
-  | Pbytes_load_8 { unsafe; index_kind }, [[bytes]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight Bytes
-        ~boxed:false None bytes ~index_kind index ~current_region ]
+  | Pstring_load_i8 { unsafe; index_kind }, [[str]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight_signed
+        String ~boxed:false None str ~index_kind index ~current_region ]
+  | Pbytes_load_i8 { unsafe; index_kind }, [[bytes]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight_signed
+        Bytes ~boxed:false None bytes ~index_kind index ~current_region ]
+  | Pstring_load_i16 { unsafe; index_kind }, [[str]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen_signed
+        String ~boxed:false None str ~index_kind index ~current_region ]
+  | Pbytes_load_i16 { unsafe; index_kind }, [[bytes]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen_signed
+        Bytes ~boxed:false None bytes ~index_kind index ~current_region ]
   | Pstring_load_16 { unsafe; index_kind }, [[str]; [index]] ->
     [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen String
         ~boxed:false None str ~index_kind index ~current_region ]
@@ -2848,9 +2856,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
          with an unknown layout should have been removed by Lambda_to_flambda.")
   | Pbigarraydim dimension, [[arg]] ->
     [tag_int (Unary (Bigarray_length { dimension }, arg))]
-  | Pbigstring_load_8 { unsafe; index_kind }, [[big_str]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight Bigstring
-        ~boxed:false None big_str ~index_kind index ~current_region ]
+  | Pbigstring_load_i8 { unsafe; index_kind }, [[big_str]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Eight_signed
+        Bigstring ~boxed:false None big_str ~index_kind index ~current_region ]
+  | Pbigstring_load_i16 { unsafe; index_kind }, [[big_str]; [index]] ->
+    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen_signed
+        Bigstring ~boxed:false None big_str ~index_kind index ~current_region ]
   | Pbigstring_load_16 { unsafe; index_kind }, [[big_str]; [index]] ->
     [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen
         Bigstring ~boxed:false None big_str ~index_kind index ~current_region ]
@@ -3151,12 +3162,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Psetfield _ | Pstringrefu | Pbytesrefu | Pstringrefs | Pbytesrefs
-      | Pstring_load_8 _ | Pstring_load_16 _ | Pstring_load_32 _
-      | Pstring_load_f32 _ | Pstring_load_64 _ | Pstring_load_vec _
-      | Pbytes_load_8 _ | Pbytes_load_16 _ | Pbytes_load_32 _
-      | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout
-      | Pfield_computed _ | Psetfloatfield _ | Psetufloatfield _
-      | Psetmixedfield _ | Pbigstring_load_8 _ | Pbigstring_load_16 _
+      | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+      | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+      | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
+      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
+      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout | Pfield_computed _
+      | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
+      | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
       | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
       | Pint_array_load_vec _ | Punboxed_float_array_load_vec _

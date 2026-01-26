@@ -620,8 +620,12 @@ let primitive ppf = function
   | Pbigarrayset(unsafe, _n, kind, layout) ->
       print_bigarray "set" unsafe kind ppf layout
   | Pbigarraydim(n) -> fprintf ppf "Bigarray.dim_%i" n
-  | Pstring_load_8 {unsafe; index_kind} ->
-     fprintf ppf "string.%sget8[indexed by %a]"
+  | Pstring_load_i8 {unsafe; index_kind} ->
+     fprintf ppf "string.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
+  | Pstring_load_i16 {unsafe; index_kind} ->
+     fprintf ppf "string.%sgeti16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        array_index_kind index_kind
   | Pstring_load_16 {unsafe; index_kind} ->
@@ -645,8 +649,12 @@ let primitive ppf = function
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbytes_load_8 {unsafe; index_kind} ->
-     fprintf ppf "bytes.%sget8[indexed by %a]"
+  | Pbytes_load_i8 {unsafe; index_kind} ->
+     fprintf ppf "bytes.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
+  | Pbytes_load_i16 {unsafe; index_kind} ->
+     fprintf ppf "bytes.%sgeti16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        array_index_kind index_kind
   | Pbytes_load_16 {unsafe; index_kind} ->
@@ -694,8 +702,11 @@ let primitive ppf = function
      fprintf ppf "bytes.%sunaligned_set%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
-  | Pbigstring_load_8 { unsafe; index_kind } ->
-     fprintf ppf "bigarray.array1.%sget8[indexed by %a]"
+  | Pbigstring_load_i8 { unsafe; index_kind } ->
+     fprintf ppf "bigarray.array1.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "") array_index_kind index_kind
+  | Pbigstring_load_i16 { unsafe; index_kind } ->
+     fprintf ppf "bigarray.array1.%sgeti16[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind
   | Pbigstring_load_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sget16[indexed by %a]"
@@ -960,13 +971,15 @@ let name_of_primitive = function
   | Pbigarrayref _ -> "Pbigarrayref"
   | Pbigarrayset _ -> "Pbigarrayset"
   | Pbigarraydim _ -> "Pbigarraydim"
-  | Pstring_load_8 _ -> "Pstring_load_8"
+  | Pstring_load_i8 _ -> "Pstring_load_i8"
+  | Pstring_load_i16 _ -> "Pstring_load_i16"
   | Pstring_load_16 _ -> "Pstring_load_16"
   | Pstring_load_32 _ -> "Pstring_load_32"
   | Pstring_load_f32 _ -> "Pstring_load_f32"
   | Pstring_load_64 _ -> "Pstring_load_64"
   | Pstring_load_vec _ -> "Pstring_load_vec"
-  | Pbytes_load_8 _ -> "Pbytes_load_8"
+  | Pbytes_load_i8 _ -> "Pbytes_load_i8"
+  | Pbytes_load_i16 _ -> "Pbytes_load_i16"
   | Pbytes_load_16 _ -> "Pbytes_load_16"
   | Pbytes_load_32 _ -> "Pbytes_load_32"
   | Pbytes_load_f32 _ -> "Pbytes_load_f32"
@@ -978,7 +991,8 @@ let name_of_primitive = function
   | Pbytes_set_f32 _ -> "Pbytes_set_f32"
   | Pbytes_set_64 _ -> "Pbytes_set_64"
   | Pbytes_set_vec _ -> "Pbytes_set_vec"
-  | Pbigstring_load_8 _ -> "Pbigstring_load_8"
+  | Pbigstring_load_i8 _ -> "Pbigstring_load_i8"
+  | Pbigstring_load_i16 _ -> "Pbigstring_load_i16"
   | Pbigstring_load_16 _ -> "Pbigstring_load_16"
   | Pbigstring_load_32 _ -> "Pbigstring_load_32"
   | Pbigstring_load_f32 _ -> "Pbigstring_load_f32"

@@ -217,7 +217,9 @@ type primitive =
   (* size of the nth dimension of a Bigarray *)
   | Pbigarraydim of int
   (* load/set 8,16,32,64 bits from a string: (unsafe)*)
-  | Pstring_load_8 of { unsafe : bool; index_kind : array_index_kind }
+  (* load_i8/i16 is sign-extended *)
+  | Pstring_load_i8 of { unsafe : bool; index_kind : array_index_kind }
+  | Pstring_load_i16 of { unsafe : bool; index_kind : array_index_kind }
   | Pstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -228,7 +230,8 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
-  | Pbytes_load_8 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbytes_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbytes_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -251,7 +254,9 @@ type primitive =
                         index_kind : array_index_kind; boxed : bool }
   (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
-  | Pbigstring_load_8 of { unsafe : bool; index_kind : array_index_kind }
+  (* load_i8/i16 is sign-extended *)
+  | Pbigstring_load_i8 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbigstring_load_i16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }

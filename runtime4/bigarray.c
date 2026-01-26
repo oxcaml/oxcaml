@@ -795,7 +795,7 @@ CAMLprim value caml_ba_get_generic(value vb, value vind)
 }
 
 
-CAMLprim value caml_ba_uint8_get16(value vb, value vind)
+CAMLprim value caml_ba_uint8_get16_untagged(value vb, value vind)
 {
   intnat res;
   unsigned char b1, b2;
@@ -809,7 +809,17 @@ CAMLprim value caml_ba_uint8_get16(value vb, value vind)
 #else
   res = b2 << 8 | b1;
 #endif
-  return Val_int(res);
+  return res;
+}
+
+CAMLprim value caml_ba_uint8_get16(value vb, value vind)
+{
+  return Val_int(caml_ba_uint8_get16_untagged(vb, vind));
+}
+
+CAMLprim value caml_ba_uint8_geti16(value vb, value vind)
+{
+  return Val_int16(caml_ba_uint8_get16_untagged(vb, vind));
 }
 
 CAMLprim value caml_ba_uint8_get32(value vb, value vind)
@@ -1032,31 +1042,45 @@ CAMLprim value caml_ba_uint8_set64(value vb, value vind, value newval)
 
 CAMLprim value caml_ba_uint8_get16_indexed_by_int64(value, value);
 CAMLprim value caml_ba_uint8_get16_indexed_by_int32(value, value);
+CAMLprim value caml_ba_uint8_get16_indexed_by_int16(value, value);
+CAMLprim value caml_ba_uint8_get16_indexed_by_int8(value, value);
 CAMLprim value caml_ba_uint8_get16_indexed_by_nativeint(value, value);
 CAMLprim value caml_ba_uint8_get32_indexed_by_int64(value, value);
 CAMLprim value caml_ba_uint8_get32_indexed_by_int32(value, value);
+CAMLprim value caml_ba_uint8_get32_indexed_by_int16(value, value);
+CAMLprim value caml_ba_uint8_get32_indexed_by_int8(value, value);
 CAMLprim value caml_ba_uint8_get32_indexed_by_nativeint(value, value);
 CAMLprim value caml_ba_uint8_get64_indexed_by_int64(value, value);
 CAMLprim value caml_ba_uint8_get64_indexed_by_int32(value, value);
+CAMLprim value caml_ba_uint8_get64_indexed_by_int16(value, value);
+CAMLprim value caml_ba_uint8_get64_indexed_by_int8(value, value);
 CAMLprim value caml_ba_uint8_get64_indexed_by_nativeint(value, value);
 CAMLprim value caml_ba_uint8_set16_indexed_by_int64(value, value, value);
 CAMLprim value caml_ba_uint8_set16_indexed_by_int32(value, value, value);
+CAMLprim value caml_ba_uint8_set16_indexed_by_int16(value, value, value);
+CAMLprim value caml_ba_uint8_set16_indexed_by_int8(value, value, value);
 CAMLprim value caml_ba_uint8_set16_indexed_by_nativeint(value, value, value);
 CAMLprim value caml_ba_uint8_set32_indexed_by_int64(value, value, value);
 CAMLprim value caml_ba_uint8_set32_indexed_by_int32(value, value, value);
+CAMLprim value caml_ba_uint8_set32_indexed_by_int16(value, value, value);
+CAMLprim value caml_ba_uint8_set32_indexed_by_int8(value, value, value);
 CAMLprim value caml_ba_uint8_set32_indexed_by_nativeint(value, value, value);
 CAMLprim value caml_ba_uint8_set64_indexed_by_int64(value, value, value);
 CAMLprim value caml_ba_uint8_set64_indexed_by_int32(value, value, value);
+CAMLprim value caml_ba_uint8_set64_indexed_by_int16(value, value, value);
+CAMLprim value caml_ba_uint8_set64_indexed_by_int8(value, value, value);
 CAMLprim value caml_ba_uint8_set64_indexed_by_nativeint(value, value, value);
 
-#define Bigstring_access_index_by(width, name, index_type, val_func)        \
+#define Bigstring_get_index_by(width, name, index_type, val_func)           \
   CAMLprim value caml_ba_uint8_get##width##_indexed_by_##name(value vb,     \
                                                               value vind)   \
   {                                                                         \
     index_type idx = val_func(vind);                                        \
     if (idx != Long_val(Val_long(idx))) caml_array_bound_error();           \
     return caml_ba_uint8_get##width(vb, Val_long(idx));                     \
-  }                                                                         \
+  }
+
+#define Bigstring_set_index_by(width, name, index_type, val_func)           \
   CAMLprim value caml_ba_uint8_set##width##_indexed_by_##name(value vb,     \
                                                               value vind,   \
                                                               value newval) \
@@ -1066,14 +1090,24 @@ CAMLprim value caml_ba_uint8_set64_indexed_by_nativeint(value, value, value);
     return caml_ba_uint8_set##width(vb, Val_long(idx), newval);             \
   }
 
+#define Bigstring_access_index_by(width, name, index_type, val_func)        \
+  Bigstring_get_index_by(width, name, index_type, val_func)                 \
+  Bigstring_set_index_by(width, name, index_type, val_func)
+
 Bigstring_access_index_by(16, int64, int64_t, Int64_val)
 Bigstring_access_index_by(16, int32, int32_t, Int32_val)
+Bigstring_access_index_by(16, int16, int16_t, Int16_val)
+Bigstring_access_index_by(16, int8, int8_t, Int8_val)
 Bigstring_access_index_by(16, nativeint, intnat, Nativeint_val)
 Bigstring_access_index_by(32, int64, int64_t, Int64_val)
 Bigstring_access_index_by(32, int32, int32_t, Int32_val)
+Bigstring_access_index_by(32, int16, int16_t, Int16_val)
+Bigstring_access_index_by(32, int8, int8_t, Int8_val)
 Bigstring_access_index_by(32, nativeint, intnat, Nativeint_val)
 Bigstring_access_index_by(64, int64, int64_t, Int64_val)
 Bigstring_access_index_by(64, int32, int32_t, Int32_val)
+Bigstring_access_index_by(64, int16, int16_t, Int16_val)
+Bigstring_access_index_by(64, int8, int8_t, Int8_val)
 Bigstring_access_index_by(64, nativeint, intnat, Nativeint_val)
 
 /* Return the number of dimensions of a big array */

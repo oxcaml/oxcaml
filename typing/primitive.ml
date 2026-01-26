@@ -539,7 +539,10 @@ let prim_has_valid_reprs ~loc prim =
     let stringlike_indexing_primitives =
       let widths : (_ * _ * Jkind_types.Sort.Const.t) list =
         [
+          ("8", "", C.value);
+          ("i8", "", C.value);
           ("16", "", C.value);
+          ("i16", "", C.value);
           ("32", "", C.value);
           ("f32", "", C.value);
           ("64", "", C.value);
@@ -549,6 +552,10 @@ let prim_has_valid_reprs ~loc prim =
           ("u256", "", C.value);
           ("a512", "", C.value);
           ("u512", "", C.value);
+          ("8", "#", C.bits8);
+          ("i8", "#", C.bits8);
+          ("16", "#", C.bits16);
+          ("i16", "#", C.bits16);
           ("32", "#", C.bits32);
           ("f32", "#", C.float32);
           ("64", "#", C.bits64);
@@ -564,6 +571,8 @@ let prim_has_valid_reprs ~loc prim =
         [
           ("", C.value);
           ("_indexed_by_nativeint#", C.word);
+          ("_indexed_by_int8#", C.bits8);
+          ("_indexed_by_int16#", C.bits16);
           ("_indexed_by_int32#", C.bits32);
           ("_indexed_by_int64#", C.bits64);
         ]
@@ -620,12 +629,16 @@ let prim_has_valid_reprs ~loc prim =
         "int_array";
         "unboxed_int64_array";
         "unboxed_int32_array";
+        "untagged_int16_array";
+        "untagged_int8_array";
         "unboxed_nativeint_array";
       ] in
       let safe_sigils = [""; "u"] in
       let indices = [
         ("", C.value);
         ("_indexed_by_nativeint#", C.word);
+        ("_indexed_by_int8#", C.bits8);
+        ("_indexed_by_int16#", C.bits16);
         ("_indexed_by_int32#", C.bits32);
         ("_indexed_by_int64#", C.bits64);
       ] in

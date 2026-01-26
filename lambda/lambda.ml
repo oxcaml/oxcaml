@@ -219,7 +219,9 @@ type primitive =
   (* size of the nth dimension of a Bigarray *)
   | Pbigarraydim of int
   (* load/set 8,16,32,64 bits from a string: (unsafe)*)
-  | Pstring_load_8 of { unsafe : bool; index_kind : array_index_kind }
+  (* load_i8/i16 is sign-extended *)
+  | Pstring_load_i8 of { unsafe : bool; index_kind : array_index_kind }
+  | Pstring_load_i16 of { unsafe : bool; index_kind : array_index_kind }
   | Pstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -230,7 +232,8 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
-  | Pbytes_load_8 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbytes_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbytes_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -253,7 +256,9 @@ type primitive =
                         index_kind : array_index_kind; boxed : bool }
   (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
-  | Pbigstring_load_8 of { unsafe : bool; index_kind : array_index_kind }
+  (* load_i8/i16 is sign-extended *)
+  | Pbigstring_load_i8 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbigstring_load_i16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -2095,8 +2100,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbigarrayref (_, _, _, _) ->
      (* Boxes arising from Bigarray access are always Alloc_heap *)
      Some alloc_heap
-  | Pstring_load_8 _ | Pstring_load_16 _ | Pbytes_load_8 _
-  | Pbytes_load_16 _ -> None
+  | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+  | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _ -> None
   | Pstring_load_32 { mode = m; boxed = true; _ }
   | Pbytes_load_32 { mode = m; boxed = true; _ }
   | Pstring_load_f32 { mode = m; boxed = true; _ }
@@ -2136,7 +2141,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Punboxed_nativeint_array_load_vec { boxed = false; _ } -> None
   | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
   | Pbytes_set_64 _ | Pbytes_set_vec _ -> None
-  | Pbigstring_load_8 _ | Pbigstring_load_16 _ -> None
+  | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _ -> None
   | Pbigstring_load_32 { mode = m; boxed = true; _ }
   | Pbigstring_load_f32 { mode = m; boxed = true; _ }
   | Pbigstring_load_64 { mode = m; boxed = true; _ }
@@ -2205,13 +2210,15 @@ let primitive_can_raise prim =
   | Pphys_equal (Eq | Noteq) -> false
   | Pccall _ | Praise _ | Parrayrefs _ | Parraysets _
   | Pstringrefs | Pbytesrefs | Pbytessets
-  | Pstring_load_8 { unsafe = false; _ }
+  | Pstring_load_i8 { unsafe = false; _ }
+  | Pstring_load_i16 { unsafe = false; _ }
   | Pstring_load_16 { unsafe = false; _ }
   | Pstring_load_32 { unsafe = false; _ }
   | Pstring_load_f32 { unsafe = false; _ }
   | Pstring_load_64 { unsafe = false; _ }
   | Pstring_load_vec { unsafe = false; _ }
-  | Pbytes_load_8 { unsafe = false; _ }
+  | Pbytes_load_i8 { unsafe = false; _ }
+  | Pbytes_load_i16 { unsafe = false; _ }
   | Pbytes_load_16 { unsafe = false; _ }
   | Pbytes_load_32 { unsafe = false; _ }
   | Pbytes_load_f32 { unsafe = false; _ }
@@ -2223,7 +2230,8 @@ let primitive_can_raise prim =
   | Pbytes_set_f32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbytes_set_64 { unsafe = false; index_kind = _; boxed = _ }
   | Pbytes_set_vec { unsafe = false; _ }
-  | Pbigstring_load_8 { unsafe = false; index_kind = _ }
+  | Pbigstring_load_i8 { unsafe = false; index_kind = _ }
+  | Pbigstring_load_i16 { unsafe = false; index_kind = _ }
   | Pbigstring_load_16 { unsafe = false; index_kind = _ }
   | Pbigstring_load_32 { unsafe = false; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_f32 { unsafe = false; index_kind = _; mode = _; boxed = _ }
@@ -2295,13 +2303,15 @@ let primitive_can_raise prim =
         | Pbigarray_int64 | Pbigarray_caml_int | Pbigarray_native_int
         | Pbigarray_complex32 | Pbigarray_complex64 ),
         (Pbigarray_c_layout | Pbigarray_fortran_layout) )
-  | Pstring_load_8 { unsafe = true; _ }
+  | Pstring_load_i8 { unsafe = true; _ }
+  | Pstring_load_i16 { unsafe = true; _ }
   | Pstring_load_16 { unsafe = true; _ }
   | Pstring_load_32 { unsafe = true; _ }
   | Pstring_load_f32 { unsafe = true; _ }
   | Pstring_load_64 { unsafe = true; _ }
   | Pstring_load_vec { unsafe = true; _ }
-  | Pbytes_load_8 { unsafe = true; _ }
+  | Pbytes_load_i8 { unsafe = true; _ }
+  | Pbytes_load_i16 { unsafe = true; _ }
   | Pbytes_load_16 { unsafe = true; _ }
   | Pbytes_load_32 { unsafe = true; _ }
   | Pbytes_load_f32 { unsafe = true; _ }
@@ -2313,7 +2323,8 @@ let primitive_can_raise prim =
   | Pbytes_set_f32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbytes_set_64 { unsafe = true; index_kind = _; boxed = _ }
   | Pbytes_set_vec { unsafe = true; _ }
-  | Pbigstring_load_8 { unsafe = true; index_kind = _ }
+  | Pbigstring_load_i8 { unsafe = true; index_kind = _ }
+  | Pbigstring_load_i16 { unsafe = true; index_kind = _ }
   | Pbigstring_load_16 { unsafe = true; index_kind = _ }
   | Pbigstring_load_32 { unsafe = true; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_f32 { unsafe = true; index_kind = _; mode = _; boxed = _ }
@@ -2647,7 +2658,8 @@ let primitive_result_layout (p : primitive) =
   | Pstringlength | Pstringrefu | Pstringrefs
   | Pbyteslength | Pbytesrefu | Pbytesrefs
   | Parraylength _ | Pisint _ | Pisnull | Pisout
-  | Pstring_load_8 _ | Pbytes_load_8 _ | Pbigstring_load_8 _
+  | Pstring_load_i8 _ | Pbytes_load_i8 _ | Pbigstring_load_i8 _
+  | Pstring_load_i16 _ | Pbytes_load_i16 _ | Pbigstring_load_i16 _
   | Pstring_load_16 _ | Pbytes_load_16 _ | Pbigstring_load_16 _
   | Pprobe_is_enabled _
     -> layout_int

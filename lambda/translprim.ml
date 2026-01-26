@@ -232,13 +232,17 @@ let indexing_primitives =
   let types_and_widths =
     [
       ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bigstring_get8%s%s" unsafe index_kind),
+          Printf.sprintf "%%caml_bigstring_geti8%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbigstring_load_8 { unsafe; index_kind } );
+          Pbigstring_load_i8 { unsafe; index_kind } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bigstring_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pbigstring_load_16 { unsafe; index_kind } );
+      ( (fun unsafe _boxed index_kind ->
+          Printf.sprintf "%%caml_bigstring_geti16%s%s" unsafe index_kind),
+        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
+          Pbigstring_load_i16 { unsafe; index_kind } );
       ( Printf.sprintf "%%caml_bigstring_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_32 { unsafe; index_kind; mode; boxed } );
@@ -320,13 +324,17 @@ let indexing_primitives =
           Pbigstring_set_vec { size = Boxed_vec512; aligned = true;
                                unsafe; index_kind; boxed } );
       ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bytes_get8%s%s" unsafe index_kind),
+          Printf.sprintf "%%caml_bytes_geti8%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbytes_load_8 { unsafe; index_kind } );
+          Pbytes_load_i8 { unsafe; index_kind } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pbytes_load_16 { unsafe; index_kind } );
+      ( (fun unsafe _boxed index_kind ->
+          Printf.sprintf "%%caml_bytes_geti16%s%s" unsafe index_kind),
+        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
+          Pbytes_load_i16 { unsafe; index_kind } );
       ( Printf.sprintf "%%caml_bytes_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbytes_load_32 { unsafe; index_kind; mode; boxed } );
@@ -375,13 +383,17 @@ let indexing_primitives =
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
       ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_string_get8%s%s" unsafe index_kind),
+          Printf.sprintf "%%caml_string_geti8%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pstring_load_8 { unsafe; index_kind } );
+          Pstring_load_i8 { unsafe; index_kind } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_string_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pstring_load_16 { unsafe; index_kind } );
+      ( (fun unsafe _boxed index_kind ->
+          Printf.sprintf "%%caml_string_geti16%s%s" unsafe index_kind),
+        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
+          Pstring_load_i16 { unsafe; index_kind } );
       ( Printf.sprintf "%%caml_string_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pstring_load_32 { unsafe; index_kind; mode; boxed } );
@@ -2363,14 +2375,15 @@ let lambda_primitive_needs_event_after = function
   | Pmakearray_dynamic (Pgenarray, _, _)
   | Parrayrefu ((Pgenarray_ref _ | Pfloatarray_ref _), _, _)
   | Parrayrefs _ | Parraysets _
-  | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_8 _
-  | Pstring_load_16 _
+  | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
+  | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
   | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
-  | Pstring_load_vec _ | Pbytes_load_8 _ | Pbytes_load_16 _ | Pbytes_load_32 _
+  | Pstring_load_vec _
+  | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _
   | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
   | Pbytes_set_8 _ | Pbytes_set_16 _
   | Pbytes_set_32 _  | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
-  | Pbigstring_load_8 _ | Pbigstring_load_16 _
+  | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
   | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
   | Pbigstring_load_vec _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
