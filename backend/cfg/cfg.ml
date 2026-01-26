@@ -201,7 +201,11 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Call (Probe { name; handler_code_sym; enabled_at_init; returns_to }) ->
         Call
           (Probe
-             { name; handler_code_sym; enabled_at_init; returns_to = f returns_to })
+             { name;
+               handler_code_sym;
+               enabled_at_init;
+               returns_to = f returns_to
+             })
     in
     block.terminator <- { block.terminator with desc }
 
@@ -558,7 +562,8 @@ let is_noop_move instr =
       | Const_vec128 _ | Stackoffset _ | Load _ | Store _ | Intop _
       | Intop_imm _ | Intop_atomic _ | Floatop _ | Opaque | Reinterpret_cast _
       | Static_cast _ | Probe_is_enabled _ | Specific _ | Name_for_debugger _
-      | Begin_region | End_region | Dls_get | Poll | Alloc _ | External _ )
+      | Begin_region | End_region | Dls_get | Poll | Alloc _
+      | External_without_caml_c_call _ )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
     false
 
@@ -649,7 +654,7 @@ let is_poll (instr : basic instruction) =
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Specific _ | Name_for_debugger _ | External _ ) ->
+      | Specific _ | Name_for_debugger _ | External_without_caml_c_call _ ) ->
     false
 
 let is_alloc (instr : basic instruction) =
@@ -666,7 +671,7 @@ let is_alloc (instr : basic instruction) =
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Specific _ | Name_for_debugger _ | External _ ) ->
+      | Specific _ | Name_for_debugger _ | External_without_caml_c_call _ ) ->
     false
 
 let is_end_region (b : basic) =
@@ -683,7 +688,7 @@ let is_end_region (b : basic) =
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Specific _ | Name_for_debugger _ | External _ ) ->
+      | Specific _ | Name_for_debugger _ | External_without_caml_c_call _ ) ->
     false
 
 let basic_block_contains_calls block =
@@ -705,7 +710,7 @@ let basic_block_contains_calls block =
      | Call _ -> true)
   || DLL.exists block.body ~f:(fun (instr : basic instruction) ->
          match instr.desc with
-         | Op (Alloc _ | Poll | External _) -> true
+         | Op (Alloc _ | Poll | External_without_caml_c_call _) -> true
          | Op
              ( Move | Spill | Reload | Const_int _ | Const_float32 _
              | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _

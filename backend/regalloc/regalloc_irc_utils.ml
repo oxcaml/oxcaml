@@ -171,7 +171,7 @@ let is_move_basic : Cfg.basic -> bool =
     | Dls_get -> false
     | Poll -> false
     | Alloc _ -> false
-    | External _ -> false)
+    | External_without_caml_c_call _ -> false)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ -> false
 
 let is_move_instruction : Cfg.basic Cfg.instruction -> bool =

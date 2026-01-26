@@ -510,7 +510,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Name_for_debugger _ | Dls_get)
   | Poptrap _ | Prologue ->
     if fp then [| rbp |] else [||]
-  | Op (External { stack_ofs; _ }) ->
+  | Op (External_without_caml_c_call { stack_ofs; _ }) ->
     assert (stack_ofs >= 0);
     if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
   | Stack_check _ ->

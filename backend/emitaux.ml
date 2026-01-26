@@ -665,7 +665,8 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         | Intop_atomic _
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Specific _ | Name_for_debugger _ | Alloc _ | External _ )
+        | Specific _ | Name_for_debugger _ | Alloc _
+        | External_without_caml_c_call _ )
     | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
     | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
     | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->

@@ -2513,7 +2513,7 @@ end = struct
           transform t ~effect ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
         | Dls_get -> next
-        | External _ ->
+        | External_without_caml_c_call _ ->
           (* This variety of external call operation cannot allocate. *)
           next
 
@@ -2569,7 +2569,8 @@ end = struct
           (* Sound to ignore [exn] because external call marked as noalloc does
              not raise. *)
           next
-        | Call (External { func_symbol; alloc = true; returns_to = Some _; _ }) ->
+        | Call (External { func_symbol; alloc = true; returns_to = Some _; _ })
+          ->
           let w = create_witnesses t (Extcall { callee = func_symbol }) dbg in
           transform_top t ~next ~exn w ("external call to " ^ func_symbol) dbg
         | Call (Probe { name; handler_code_sym; _ }) ->

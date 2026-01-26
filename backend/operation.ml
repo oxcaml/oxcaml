@@ -318,7 +318,7 @@ type t =
         dbginfo : Cmm.alloc_dbginfo;
         mode : Cmm.Alloc_mode.t
       }
-  | External of
+  | External_without_caml_c_call of
       { func_symbol : string;
         effects : Cmm.effects;
         ty_res : Cmm.machtype;
@@ -360,7 +360,7 @@ let is_pure = function
   | Dls_get -> true
   | Poll -> false
   | Alloc _ -> false
-  | External _ ->
+  | External_without_caml_c_call _ ->
     (* CR mshinwell/xclerc: refine this using [effects] *)
     false
 
@@ -442,6 +442,6 @@ let dump ppf op =
     Format.fprintf ppf "alloc %i" bytes
   | Alloc { bytes; dbginfo = _; mode = Local } ->
     Format.fprintf ppf "alloc_local %i" bytes
-  | External
+  | External_without_caml_c_call
       { func_symbol; effects = _; ty_res = _; ty_args = _; stack_ofs = _ } ->
     Format.fprintf ppf "extcall %s" func_symbol

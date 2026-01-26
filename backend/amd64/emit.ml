@@ -1670,7 +1670,7 @@ let emit_instr ~first ~fallthrough i =
           emit_jump func)
   | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
     emit_extcall i ~func ~alloc ~stack_ofs
-  | Lop (External { func_symbol = func; stack_ofs; _ }) ->
+  | Lop (External_without_caml_c_call { func_symbol = func; stack_ofs; _ }) ->
     emit_extcall i ~func ~alloc:false ~stack_ofs
   | Lop (Stackoffset n) -> emit_stack_offset n
   | Lop (Load { memory_chunk; addressing_mode; _ }) -> (

@@ -39,7 +39,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       | Intop_atomic _
       | Floatop (_, _)
       | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Name_for_debugger _ | Alloc _ | External _ )
+      | Name_for_debugger _ | Alloc _ | External_without_caml_c_call _ )
   | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _ ->
     (* no rewrite *)
     May_still_have_spilled_registers
