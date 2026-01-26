@@ -2,9 +2,9 @@
 
 open! Int_replace_polymorphic_compare
 module DLL = Oxcaml_utils.Doubly_linked_list
-module Phys_reg = Numbers.Int
+module Phys_reg = Regs.Phys_reg
 
-type phys_reg = int
+type phys_reg = Phys_reg.t
 
 type affinity =
   { priority : int;

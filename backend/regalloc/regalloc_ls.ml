@@ -122,18 +122,17 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
   let reg = interval.reg in
   match reg.loc with
   | Unknown -> (
-    let reg_class = Reg_class.of_machtype reg.typ in
+    let reg_class = Regs.Reg_class.of_machtype reg.typ in
     let intervals = State.active state ~reg_class in
-    let first_available = Reg_class.first_available_register reg_class in
-    match Reg_class.num_available_registers reg_class with
+    match Regs.num_available_registers reg_class with
     | 0 ->
-      fatal "register class %a has no available registers" Reg_class.print
+      fatal "register class %a has no available registers" Regs.Reg_class.print
         reg_class
     | num_available_registers ->
       let available = Array.make num_available_registers true in
       let num_still_available = ref num_available_registers in
-      let set_not_available (r : int) : unit =
-        let idx = r - first_available in
+      let set_not_available (r : Regs.Phys_reg.t) : unit =
+        let idx = Regs.index_in_class r in
         if available.(idx) then decr num_still_available;
         available.(idx) <- false;
         if !num_still_available = 0 then raise No_free_register
@@ -141,7 +140,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
       let set_not_available_if_valid_phys_reg (interval : Interval.t) : unit =
         match interval.reg.loc with
         | Reg r ->
-          if r - first_available < num_available_registers
+          if Regs.index_in_class r < num_available_registers
           then set_not_available r
         | Stack _ | Unknown -> ()
       in
@@ -149,9 +148,10 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
       let remove_bound_overlapping (itv : Interval.t) : unit =
         match itv.reg.loc with
         | Reg r ->
+          let reg_index_in_class = Regs.index_in_class r in
           if
-            r - first_available < num_available_registers
-            && available.(r - first_available)
+            reg_index_in_class < num_available_registers
+            && available.(reg_index_in_class)
             && Interval.overlap itv interval
           then set_not_available r
         | Stack _ | Unknown -> ()
@@ -165,7 +165,8 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         if debug
         then (
           indent ();
-          log "assigning %d to register %a" phys_reg Printreg.reg reg;
+          log "assigning %a to register %a" Regs.Phys_reg.print phys_reg
+            Printreg.reg reg;
           dedent ());
         Not_spilling
       in
@@ -174,14 +175,14 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         if idx >= num_available_registers
         then Misc.fatal_error "No_free_register should have been raised earlier"
         else if available.(idx)
-        then do_assign ~phys_reg:(first_available + idx)
+        then do_assign ~phys_reg:(Regs.registers reg_class).(idx)
         else assign_first (succ idx)
       in
       (* assigns the available register with the highest affinity *)
       let rec assign_affinity = function
         | [] -> assign_first 0
         | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
-          let idx = phys_reg - first_available in
+          let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < num_available_registers && available.(idx)
           then do_assign ~phys_reg
           else assign_affinity tl
@@ -192,7 +193,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
 let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
  fun state interval ->
   let reg = interval.reg in
-  let reg_class = Reg_class.of_machtype reg.typ in
+  let reg_class = Regs.Reg_class.of_machtype reg.typ in
   let intervals = State.active state ~reg_class in
   match DLL.hd_cell intervals.active_dll with
   | Some hd_cell ->
@@ -290,8 +291,8 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
           (fun (intervals, active) ->
             Format.eprintf "Regalloc_ls.run (on_fatal):";
             Format.eprintf "\n\nactives:\n";
-            Reg_class.Tbl.iter active ~f:(fun reg_class a ->
-                Format.eprintf "class %a:\n %a\n" Reg_class.print reg_class
+            Regs.Reg_class_tbl.iter active ~f:(fun reg_class a ->
+                Format.eprintf "class %a:\n %a\n" Regs.Reg_class.print reg_class
                   ClassIntervals.print a);
             Format.eprintf "\n\nintervals:\n";
             DLL.iter intervals ~f:(fun i ->

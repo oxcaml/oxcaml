@@ -1,8 +1,8 @@
 ; CR-soon gyorsh: format all files under arm64/amd64
 amd64/cfg_selection.ml
 amd64/emit.ml
-amd64/reg_class.ml
-amd64/reg_class.mli
+amd64/regs.ml
+amd64/regs.mli
 amd64/selection.ml
 amd64/selection_utils.ml
 amd64/simd*.ml
@@ -16,8 +16,8 @@ arm64/cfg_selection.ml
 arm64/dsl_helpers.ml
 arm64/dsl_helpers.mli
 arm64/emit.ml
-arm64/reg_class.ml
-arm64/reg_class.mli
+arm64/regs.ml
+arm64/regs.mli
 arm64/selection.ml
 arm64/selection_utils.ml
 arm64/simd*.ml
@@ -86,9 +86,9 @@ probe_emission.ml
 probe_emission.mli
 reg.ml
 reg.mli
-reg_class.mli
-reg_class_utils.ml
-reg_class_utils.mli
+regs.mli
+regs_utils.ml
+regs_utils.mli
 proc.mli
 regalloc/**/*.ml
 regalloc/**/*.mli

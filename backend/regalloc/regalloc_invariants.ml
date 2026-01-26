@@ -128,9 +128,9 @@ let postcondition_layout : Cfg_with_layout.t -> unit =
         ()
       with Invalid_argument _ ->
         fatal
-          "instruction %a assigned %a to register %i, which has an \
+          "instruction %a assigned %a to register %a, which has an \
            incompatible class"
-          InstructionId.format id Printreg.reg reg phys_reg)
+          InstructionId.format id Printreg.reg reg Regs.Phys_reg.print phys_reg)
     | Stack _ | Unknown -> ()
   in
   let register_classes_must_be_consistent (id : InstructionId.t)

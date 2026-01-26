@@ -89,11 +89,11 @@ let rec select_addr exp =
 
 exception Use_default_exn
 
-let rax = phys_reg Int 0
+let rax = phys_reg Int (P RAX)
 
-let rcx = phys_reg Int 5
+let rcx = phys_reg Int (P RCX)
 
-let rdx = phys_reg Int 4
+let rdx = phys_reg Int (P RDX)
 
 let select_locality (l : Cmm.prefetch_temporal_locality_hint) :
     Arch.prefetch_temporal_locality_hint =

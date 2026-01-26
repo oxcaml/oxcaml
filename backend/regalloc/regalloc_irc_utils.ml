@@ -109,7 +109,7 @@ module InstrWorkList = struct
 end
 
 module Color = struct
-  type t = int
+  type t = Regs.Phys_reg.t
 end
 
 module Edge = Regalloc_interf_graph.Edge
@@ -166,7 +166,7 @@ let is_move_instruction : Cfg.basic Cfg.instruction -> bool =
 let all_precolored_regs = Proc.precolored_regs
 
 let k reg =
-  Reg_class.num_available_registers (Reg_class.of_machtype reg.Reg.typ)
+  Regs.num_available_registers (Regs.Reg_class.of_machtype reg.Reg.typ)
 
 module Spilling_heuristics = struct
   type t =

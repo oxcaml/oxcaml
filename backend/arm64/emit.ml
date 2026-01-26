@@ -75,15 +75,15 @@ let fastcode_flag = ref true
 
 (* Names for special regs *)
 
-let reg_domain_state_ptr = phys_reg Int 25 (* x28 *)
+let reg_domain_state_ptr = phys_reg Int X28
 
-let reg_trap_ptr = phys_reg Int 23 (* x26 *)
+let reg_trap_ptr = phys_reg Int X26
 
 let reg_x_trap_ptr = H.reg_x reg_trap_ptr
 
-let reg_alloc_ptr = phys_reg Int 24 (* x27 *)
+let reg_alloc_ptr = phys_reg Int X27
 
-let reg_tmp1 = phys_reg Int 26 (* x16 *)
+let reg_tmp1 = phys_reg Int X16
 
 (* AST register for reg_tmp1, used as memory base *)
 let reg_tmp1_base = R.reg_x 16
@@ -92,13 +92,13 @@ let reg_x_tmp1 = H.reg_x reg_tmp1
 
 let reg_x_alloc_ptr = H.reg_x reg_alloc_ptr
 
-let reg_x8 = phys_reg Int 8 (* x8 *)
+let reg_x8 = phys_reg Int X8
 
 let reg_x_x8 = H.reg_x reg_x8
 
-let reg_stack_arg_begin = H.reg_x (phys_reg Int 17)
+let reg_stack_arg_begin = H.reg_x (phys_reg Int X20)
 
-let reg_stack_arg_end = H.reg_x (phys_reg Int 18)
+let reg_stack_arg_end = H.reg_x (phys_reg Int X21)
 
 (** Turn a Linear label into an assembly label. The section is checked against
     the section tracked by [D] when emitting label definitions. *)
@@ -555,12 +555,13 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
 (* Record live pointers at call points *)
 
 let record_frame_label live dbg =
+  let encode_reg_offset n = (n lsl 1) + 1 in
   let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   Reg.Set.iter
     (function
       | { typ = Val; loc = Reg r; _ } ->
-        live_offset := ((r lsl 1) + 1) :: !live_offset
+        live_offset := encode_reg_offset (Regs.index_in_class r) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := slot_offset s (Stack_class.of_machtype reg.typ) :: !live_offset

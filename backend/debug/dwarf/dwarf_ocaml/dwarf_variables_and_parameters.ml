@@ -72,13 +72,11 @@ type location_description =
 
 let _to_silence_warning x = Composite x
 
-let reg_location_description reg ~offset ~need_rvalue :
-    location_description option =
-  match
+let reg_location_description reg ~offset ~need_rvalue : location_description =
+  let simple_loc_desc =
     Dwarf_reg_locations.reg_location_description reg ~offset ~need_rvalue
-  with
-  | None -> None
-  | Some simple_loc_desc -> Some (Simple simple_loc_desc)
+  in
+  Simple simple_loc_desc
 
 let single_location_description state ~parent ~subrange ~proto_dies_for_vars
     ~need_rvalue =
@@ -89,12 +87,10 @@ let single_location_description state ~parent ~subrange ~proto_dies_for_vars
     reg_location_description reg ~offset ~need_rvalue
   in
   match location_description with
-  | None -> None
-  | Some (Simple simple) ->
-    Some (Single_location_description.of_simple_location_description simple)
-  | Some (Composite composite) ->
-    Some
-      (Single_location_description.of_composite_location_description composite)
+  | Simple simple ->
+    Single_location_description.of_simple_location_description simple
+  | Composite composite ->
+    Single_location_description.of_composite_location_description composite
 
 type location_list_entry =
   | Dwarf_4 of Dwarf_4_location_list_entry.t
@@ -199,23 +195,20 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
             single_location_description state ~parent:(Some function_proto_die)
               ~subrange ~proto_dies_for_vars ~need_rvalue:false
           in
-          match single_location_description with
-          | None -> dwarf_4_location_list_entries, location_list
-          | Some single_location_description -> (
-            let location_list_entry =
-              location_list_entry state ~subrange single_location_description
+          let location_list_entry =
+            location_list_entry state ~subrange single_location_description
+          in
+          match location_list_entry with
+          | Dwarf_4 location_list_entry ->
+            let dwarf_4_location_list_entries =
+              location_list_entry :: dwarf_4_location_list_entries
             in
-            match location_list_entry with
-            | Dwarf_4 location_list_entry ->
-              let dwarf_4_location_list_entries =
-                location_list_entry :: dwarf_4_location_list_entries
-              in
-              dwarf_4_location_list_entries, location_list
-            | Dwarf_5 location_list_entry ->
-              let location_list =
-                Location_list.add location_list location_list_entry
-              in
-              dwarf_4_location_list_entries, location_list))
+            dwarf_4_location_list_entries, location_list
+          | Dwarf_5 location_list_entry ->
+            let location_list =
+              Location_list.add location_list location_list_entry
+            in
+            dwarf_4_location_list_entries, location_list)
     in
     match !Dwarf_flags.gdwarf_version with
     | Four ->
