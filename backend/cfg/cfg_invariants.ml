@@ -120,6 +120,17 @@ let check_tailrec_position t =
            followingsuccessors:@.%a@."
           Label.print tailrec_label Label.Set.print successors
 
+let check_terminator_arity t _label block =
+  match block.Cfg.terminator.desc with
+  | Raise _ ->
+    let len = Array.length block.Cfg.terminator.arg in
+    if len != 1 then report t "Raise with %d arguments" len
+  | Tailcall_self _ | Call _ | Prim _ | Tailcall_func _ | Never | Always _
+  | Parity_test _ | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return
+  | Call_no_return _ | Invalid _ ->
+    (* CR-soon xclerc for xclerc: extend check *)
+    ()
+
 let check_tailrec t _label block =
   (* check all Tailrec Self agree on the successor label *)
   match block.Cfg.terminator.desc with
@@ -262,6 +273,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
   ()
 
 let check_block t label (block : Cfg.basic_block) =
+  check_terminator_arity t label block;
   check_tailrec t label block;
   check_can_raise t label block;
   (* exn and normal successors are disjoint *)

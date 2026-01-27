@@ -883,11 +883,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     (* Populate the distinguished extra args registers, for the current
        exception handler, with the extra args for this particular raise. *)
-    let rd = Array.concat ([| Proc.loc_exn_bucket |] :: extra_args_regs) in
+    let exn_bucket = [| Proc.loc_exn_bucket |] in
+    let rd = Array.concat (exn_bucket :: extra_args_regs) in
     Array.iter2
       (fun r1 rd -> SU.insert env sub_cfg (Op Move) [| r1 |] [| rd |])
       r1 rd;
-    SU.insert_debug' env sub_cfg (Cfg.Raise k) dbg rd [||];
+    SU.insert_debug' env sub_cfg (Cfg.Raise k) dbg exn_bucket [||];
     SU.set_traps_for_raise env;
     Never_returns
 
