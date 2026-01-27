@@ -1944,10 +1944,13 @@ let emit_instr i =
       (H.reg_x i.res.(0))
       (H.addressing (Iindexed offset) reg_domain_state_ptr)
   | Lop Domain_index ->
-    let offset = Domainstate.(idx_of_field Domain_id) * 8 in
-    A.ins2 LDR
-      (H.reg_x i.res.(0))
-      (H.addressing (Iindexed offset) reg_domain_state_ptr)
+    if Config.runtime5
+    then
+      let offset = Domainstate.(idx_of_field Domain_id) * 8 in
+      A.ins2 LDR
+        (H.reg_x i.res.(0))
+        (H.addressing (Iindexed offset) reg_domain_state_ptr)
+    else A.ins3 MOVZ (H.reg_x i.res.(0)) (O.imm_sixteen 0) O.optional_none
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
