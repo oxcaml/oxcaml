@@ -388,14 +388,7 @@ let reorder_rec_bindings bindings =
   let id = Array.of_list (List.map (fun (id,_,_,_) -> id) bindings)
   and loc = Array.of_list (List.map (fun (_,loc,_,_) -> loc) bindings)
   and init = Array.of_list (List.map (fun (_,_,init,_) -> init) bindings)
-  and rhs = Array.of_list
-    (List.map (fun (_,loc,_,rhs) ->
-      (* CR layout poly: The following [free_variables] call means that
-         recursive modules can't contain slambda, we should fix that. *)
-      if Option.is_none (Slambdaeval.trivial_slambda (SLquote rhs)) then
-        Lambda.error ~loc (Slambda_unsupported "recursive modules");
-      rhs)
-    bindings) in
+  and rhs = Array.of_list (List.map (fun (_,_,_,rhs) -> rhs) bindings) in
   let fv = Array.map (fun rhs -> Lambda.free_variables rhs) rhs in
   let num_bindings = Array.length id in
   let status = Array.make num_bindings Undefined in
@@ -1116,7 +1109,7 @@ let transl_implementation compilation_unit impl ~loc =
   { SL.compilation_unit;
     main_module_block_format;
     arg_block_idx;
-    code = SLquote body }
+    code = SLhalves { sval_comptime = SLunit; sval_runtime = body } }
 
 
 (* Compile a toplevel phrase *)
@@ -1406,7 +1399,7 @@ let transl_instance_impl
       ap_probe = None;
     }
   in
-  let code = SLquote code in
+  let code = SLhalves { sval_comptime = SLunit; sval_runtime = code } in
   let main_module_block_format =
     Mb_struct { mb_repr = main_module_block_repr }
   in

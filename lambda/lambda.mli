@@ -857,23 +857,26 @@ and delayed =
     * lambda
 
 and slambda =
-  | SLquote of lambda
   | SLlayout of layout
   | SLvar of Slambdaident.t
-  | SLrecord of slambda Slambdaident.Map.t
-  | SLfield of Slambdaident.t * Slambdaident.t
+  | SLunit
+  | SLrecord of (string * slambda) array
+    (** Used for representing the static part of modules and records, the strings are the
+        field names which are soley for debug printing. *)
+  | SLfield of Slambdaident.t * int * string
+    (** Field access of records, the string is the field name for debug printing *)
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
+    (** Project out the compiletime half of a [slambda_halves] *)
   | SLproj_runtime of slambda
-  | SLfunction of slambda_function
-  | SLapply of slambda_apply
+    (** Project out the runtime half of a [slambda_halves] *)
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
 
 and slambda_halves =
   { sval_comptime: slambda;
-    sval_runtime: slambda
+    sval_runtime: lambda
   }
 
 and slambda_function =

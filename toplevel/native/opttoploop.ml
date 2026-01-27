@@ -130,7 +130,7 @@ let close_slambda_phrase slam =
   | Some lam -> lam
   | None -> Lambda.error (Slambda_unsupported "the toplevel")
   in
-  Lambda.SLquote (close_phrase lam)
+  Lambda.SLhalves { sval_comptime = SLunit; sval_runtime = (close_phrase lam) }
 
 (* Return the value referred to by a path *)
 

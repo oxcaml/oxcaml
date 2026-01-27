@@ -85,7 +85,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
 (* Check that slambda is trivial (a quote and contains no splices) *)
 let trivial_slambda (slam : Lambda.slambda) =
   match slam with
-  | SLquote lam -> (
+  | SLhalves { sval_comptime = SLunit; sval_runtime = lam } -> (
     try
       assert_no_splices lam;
       Some lam
@@ -134,7 +134,7 @@ let do_eval ({ Slambda.code = slam } as p) =
   | _ -> ());
   let lam =
     match slam with
-    | SLquote lam -> lam
+    | SLhalves { sval_comptime = _; sval_runtime = lam } -> lam
     | _ -> Misc.fatal_error "slambda eval not yet implemented"
   in
   { Lambda.compilation_unit = p.compilation_unit;

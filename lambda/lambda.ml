@@ -884,23 +884,21 @@ and delayed =
     * lambda
 
 and slambda =
-  | SLquote of lambda
   | SLlayout of layout
   | SLvar of Slambdaident.t
-  | SLrecord of slambda Slambdaident.Map.t
-  | SLfield of Slambdaident.t * Slambdaident.t
+  | SLunit
+  | SLrecord of (string * slambda) array
+  | SLfield of Slambdaident.t * int * string
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
   | SLproj_runtime of slambda
-  | SLfunction of slambda_function
-  | SLapply of slambda_apply
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
 
 and slambda_halves =
   { sval_comptime: slambda;
-    sval_runtime: slambda
+    sval_runtime: lambda
   }
 
 and slambda_function =
@@ -1454,11 +1452,7 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  (* CR layout poly: [Ldelayed] should fatal error here once we've moved
-     everything that uses it to after [Simplif.undelay] because it's not obvious
-     how easy it'll be to compute the free variables of a delayed thing and it's
-     probably not a reasonable operation anyway.  *)
+  | Lsplice { splice_loc = _; slambda } -> free_variables_slambda slambda
   | Ldelayed (Dletrec (bindings, body)) ->
       let set =
         free_variables_list (free_variables body)
@@ -1470,6 +1464,34 @@ let rec free_variables = function
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
+
+and free_variables_slambda = function
+  | SLlayout _ | SLvar _ | SLunit | SLfield _ -> Ident.Set.empty
+  | SLrecord fields ->
+      Array.fold_left
+        (fun set (_, field) ->
+          Ident.Set.union (free_variables_slambda field) set)
+        Ident.Set.empty fields
+  | SLhalves { sval_comptime; sval_runtime } ->
+      Ident.Set.union
+        (free_variables_slambda sval_comptime)
+        (free_variables sval_runtime)
+  | SLproj_comptime slambda | SLproj_runtime slambda ->
+      free_variables_slambda slambda
+  | SLtemplate _ ->
+      (* Notably we don't recurse into templates as they would only introduce
+         new free variables into their call site. *)
+      Ident.Set.empty
+  | SLinstantiate { sapp_func; sapp_arguments } ->
+      (* Mechanically the result of instantiation could introduce new free
+         variables, however it's an invariant of slambda that it doesn't. *)
+      Array.fold_left
+        (fun set arg -> Ident.Set.union (free_variables_slambda arg) set)
+        (free_variables_slambda sapp_func) sapp_arguments
+  | SLlet { slet_name = _; slet_value; slet_body } ->
+      Ident.Set.union
+        (free_variables_slambda slet_value)
+        (free_variables_slambda slet_body)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
