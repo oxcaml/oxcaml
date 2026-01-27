@@ -40,9 +40,10 @@ jobs:
             config: --disable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 dev (x86_64-linux)
+          - name: runtime5 dev custom-install-path (x86_64-linux)
             config: --enable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
+            install_path: _custom_install
 
           - name: runtime5 debug stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
@@ -174,12 +175,6 @@ jobs:
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,reaper=1'
-            ocamlparam: '_,reaper=1'
-
-          - name: runtime5 custom-install-path (x86_64-linux)
-            config: --enable-runtime5
-            install_path: _custom_install
-            os: warp-ubuntu-latest-x64-8x
             ocamlparam: '_,reaper=1'
 
     env:
