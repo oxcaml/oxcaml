@@ -56,7 +56,7 @@ open! Stdlib
 [@@@ocaml.flambda_o3]
 
 (* An alias for the type of immutable arrays. *)
-type +'a t = 'a iarray
+type (+'a : any mod separable) t = 'a iarray
 
 (* Array operations *)
 
