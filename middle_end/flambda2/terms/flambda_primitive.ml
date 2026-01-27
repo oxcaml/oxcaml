@@ -1112,7 +1112,7 @@ let compare_nullary_primitive p1 p2 =
   | ( ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
       | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ),
       _ ) ->
-    Stdlib.compare
+    Int.compare
       (nullary_primitive_numbering p1)
       (nullary_primitive_numbering p2)
 
