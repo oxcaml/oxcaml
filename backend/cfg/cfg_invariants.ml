@@ -123,11 +123,9 @@ let check_terminator_arity t _label block =
   match block.Cfg.terminator.desc with
   | Raise _ ->
     let len = Array.length block.Cfg.terminator.arg in
-    if len != 1 then
-report t "Raise with %d arguments" len
-  | Tailcall_self _
-  | Call _ | Prim _ | Tailcall_func _ | Never | Always _ | Parity_test _
-  | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return
+    if len != 1 then report t "Raise with %d arguments" len
+  | Tailcall_self _ | Call _ | Prim _ | Tailcall_func _ | Never | Always _
+  | Parity_test _ | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return
   | Call_no_return _ ->
     (* CR-soon xclerc for xclerc: extend check *)
     ()
