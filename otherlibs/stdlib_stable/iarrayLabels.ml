@@ -104,9 +104,9 @@ external unsafe_set_local :
 (* Really trusting the inliner here; to get maximum performance, it has to
    inline both [unsafe_init_local] *and* [f]. *)
 (** Precondition: [l >= 0]. *)
-let[@inline always] unsafe_init_local (type a : value_or_null mod separable) l
-    (local_ (f : int -> local_ a)) = exclave_
-  if l = 0 then unsafe_of_local_array [||]
+let[@inline always] unsafe_init_local l (local_ f : int -> local_ 'a) = exclave_
+  if l = 0 then
+    unsafe_of_local_array [||]
   else
     (* The design of this function is exceedingly delicate, and is the only way
        we can correctly allocate a local array on the stack via mutation.  We
