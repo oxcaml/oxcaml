@@ -30,3 +30,7 @@ in
 Stdlib.List.iter (let arg = f in function | eta -> exclave_ arg ?x:None eta)
   ([1; 2; 3])
 
+Stdlib.ignore
+  ((fun x -> x) (fun () -> (module Miscs_types.M)) : unit -> (module
+  Miscs_types.S))
+

@@ -2585,24 +2585,6 @@ let assert_no_modes modes =
         Location.print_loc (Location.get_loc mode))
     modes.mode_desc
 
-let rec quote_module_path loc = function
-  (* CR metaprogramming jrickard: I think this should probably use
-     [Env.find_module_address] at least it should do to register the globals
-     that will be needed. *)
-  | Path.Pident s -> (
-    match Ident.to_global s with
-    | Some global ->
-      Identifier.Module.global_module loc global |> Identifier.Module.wrap
-    | None ->
-      fatal_errorf "Translquote [at %a]: non-global module %a"
-        Location.print_loc (to_location loc) Ident.print s)
-  | Path.Pdot (p, s) ->
-    Identifier.Module.dot loc (quote_module_path loc p) s
-    |> Identifier.Module.wrap
-  | _ ->
-    fatal_errorf "Translquote [at %a]: no support for Papply in quoting modules"
-      Location.print_loc (to_location loc)
-
 (* Approximate the [core_type] for type annotation from a given [type_expr].
    Used for annotating polymorphic applications with higher-rank types. *)
 let type_for_annotation ~env ~loc typ =
@@ -3381,6 +3363,10 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
       (Type_constraint.constraint_ loc (quote_core_type ~scopes cty)
       |> Type_constraint.wrap)
     |> Exp_desc.wrap
+  | Texp_inspected_type (Module_pack (p, fl)) ->
+    lambda
+    |> maybe_constrain_exp_desc_with_type loc
+         (type_constraint_of_ambiguity loc ambiguity)
 
 and update_env_with_extra ~loc extra =
   let extra, _, _ = extra in
