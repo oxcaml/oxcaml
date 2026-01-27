@@ -40,6 +40,48 @@ let create_s length =
 
 let create_b length = create_s length |> Bytes.of_string
 
+let int16_in_range ~min ~max =
+  let min = Stdlib_stable.Int16.to_int min in
+  let max = Stdlib_stable.Int16.to_int max in
+  Random.int_in_range ~min ~max |> Stdlib_stable.Int16.of_int
+
+(* CR jrayman:
+   Change [type boxed_data = int] to [int16], duplicate to add [int16#].
+*)
+(* CR jrayman: Add tests for
+   [
+    index, data =
+      nativeint#, int8
+      nativeint#, int8#
+      int32#, int8
+      int32#, int8#
+      int64#, int8
+      int64#, int8#
+
+      int8#, int8
+      int8#, int16
+      int8#, int32
+      int8#, int64
+      int8#, int8#
+      int8#, int16#
+      int8#, int32#
+      int8#, int64#
+      int8#, float32
+      int8#, float32#
+
+      int16#, int8
+      int16#, int16
+      int16#, int32
+      int16#, int64
+      int16#, int8#
+      int16#, int16#
+      int16#, int32#
+      int16#, int64#
+      int16#, float32
+      int16#, float32#
+   ]
+*)
+
 open struct
   open Bigarray
 
@@ -232,21 +274,19 @@ end
 open struct
 
   type boxed_index = nativeint
-  type boxed_data = int
+  type boxed_data = int16
 
   let generate_data = 
     fun i ->
       match i mod 4 with
-      | 0 -> Int.zero
-      | 1 -> (Int.(shift_left one) (16 - 1))
-      | 2 -> 
-        (let shift = 16 - 1 in
-        Int.(lognot (shift_left (shift_right (lognot zero) shift) shift)))
-      | _ -> Random.int_in_range ~min:Int.zero ~max:(Int.(shift_left one) (16 - 1))
+      | 0 -> Stdlib_stable.Int16.zero
+      | 1 -> Stdlib_stable.Int16.min_int
+      | 2 -> Stdlib_stable.Int16.max_int
+      | _ -> int16_in_range ~min:Stdlib_stable.Int16.min_int ~max:Stdlib_stable.Int16.max_int
 
 
   let to_index = Nativeint.of_int
-  let data_equal = Int.equal
+  let data_equal = Stdlib_stable.Int16.equal
   let unbox_index = Stdlib_upstream_compatible.Nativeint_u.of_nativeint
   let unbox_data = fun x -> x
   let box_data = fun x -> x
@@ -267,13 +307,13 @@ open struct
       external get_reference
         : string
         -> int
-        -> int
+        -> int16
         = "%caml_string_get16"
 
       external get_safe
         :  string
         -> nativeint#
-        -> int
+        -> int16
         = "%caml_string_get16_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -281,7 +321,7 @@ open struct
       external get_unsafe
         :  string
         -> nativeint#
-        -> int
+        -> int16
         = "%caml_string_get16u_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -302,13 +342,13 @@ open struct
       external get_reference
         : bytes
         -> int
-        -> int
+        -> int16
         = "%caml_bytes_get16"
 
       external get_safe
         :  bytes
         -> nativeint#
-        -> int
+        -> int16
         = "%caml_bytes_get16_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -316,7 +356,7 @@ open struct
       external get_unsafe
         :  bytes
         -> nativeint#
-        -> int
+        -> int16
         = "%caml_bytes_get16u_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -324,14 +364,14 @@ open struct
       external set_reference
         : bytes
         -> int
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16"
 
       external set_safe
         :  bytes
         -> nativeint#
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16_indexed_by_nativeint#"
 
@@ -340,7 +380,7 @@ open struct
       external set_unsafe
         :  bytes
         -> nativeint#
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16u_indexed_by_nativeint#"
 
@@ -361,13 +401,13 @@ open struct
       external get_reference
         : bigstring
         -> int
-        -> int
+        -> int16
         = "%caml_bigstring_get16"
 
       external get_safe
         :  bigstring
         -> nativeint#
-        -> int
+        -> int16
         = "%caml_bigstring_get16_indexed_by_nativeint#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -375,7 +415,7 @@ open struct
       external get_unsafe
         :  bigstring
         -> nativeint#
-        -> int
+        -> int16
         = "%caml_bigstring_get16u_indexed_by_nativeint#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -383,14 +423,14 @@ open struct
       external set_reference
         : bigstring
         -> int
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16"
 
       external set_safe
         :  bigstring
         -> nativeint#
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16_indexed_by_nativeint#"
 
@@ -399,7 +439,7 @@ open struct
       external set_unsafe
         :  bigstring
         -> nativeint#
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16u_indexed_by_nativeint#"
 
@@ -1478,21 +1518,19 @@ end
 open struct
 
   type boxed_index = int32
-  type boxed_data = int
+  type boxed_data = int16
 
   let generate_data = 
     fun i ->
       match i mod 4 with
-      | 0 -> Int.zero
-      | 1 -> (Int.(shift_left one) (16 - 1))
-      | 2 -> 
-        (let shift = 16 - 1 in
-        Int.(lognot (shift_left (shift_right (lognot zero) shift) shift)))
-      | _ -> Random.int_in_range ~min:Int.zero ~max:(Int.(shift_left one) (16 - 1))
+      | 0 -> Stdlib_stable.Int16.zero
+      | 1 -> Stdlib_stable.Int16.min_int
+      | 2 -> Stdlib_stable.Int16.max_int
+      | _ -> int16_in_range ~min:Stdlib_stable.Int16.min_int ~max:Stdlib_stable.Int16.max_int
 
 
   let to_index = Int32.of_int
-  let data_equal = Int.equal
+  let data_equal = Stdlib_stable.Int16.equal
   let unbox_index = Stdlib_upstream_compatible.Int32_u.of_int32
   let unbox_data = fun x -> x
   let box_data = fun x -> x
@@ -1513,13 +1551,13 @@ open struct
       external get_reference
         : string
         -> int
-        -> int
+        -> int16
         = "%caml_string_get16"
 
       external get_safe
         :  string
         -> int32#
-        -> int
+        -> int16
         = "%caml_string_get16_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -1527,7 +1565,7 @@ open struct
       external get_unsafe
         :  string
         -> int32#
-        -> int
+        -> int16
         = "%caml_string_get16u_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1548,13 +1586,13 @@ open struct
       external get_reference
         : bytes
         -> int
-        -> int
+        -> int16
         = "%caml_bytes_get16"
 
       external get_safe
         :  bytes
         -> int32#
-        -> int
+        -> int16
         = "%caml_bytes_get16_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -1562,7 +1600,7 @@ open struct
       external get_unsafe
         :  bytes
         -> int32#
-        -> int
+        -> int16
         = "%caml_bytes_get16u_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1570,14 +1608,14 @@ open struct
       external set_reference
         : bytes
         -> int
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16"
 
       external set_safe
         :  bytes
         -> int32#
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16_indexed_by_int32#"
 
@@ -1586,7 +1624,7 @@ open struct
       external set_unsafe
         :  bytes
         -> int32#
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16u_indexed_by_int32#"
 
@@ -1607,13 +1645,13 @@ open struct
       external get_reference
         : bigstring
         -> int
-        -> int
+        -> int16
         = "%caml_bigstring_get16"
 
       external get_safe
         :  bigstring
         -> int32#
-        -> int
+        -> int16
         = "%caml_bigstring_get16_indexed_by_int32#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -1621,7 +1659,7 @@ open struct
       external get_unsafe
         :  bigstring
         -> int32#
-        -> int
+        -> int16
         = "%caml_bigstring_get16u_indexed_by_int32#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -1629,14 +1667,14 @@ open struct
       external set_reference
         : bigstring
         -> int
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16"
 
       external set_safe
         :  bigstring
         -> int32#
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16_indexed_by_int32#"
 
@@ -1645,7 +1683,7 @@ open struct
       external set_unsafe
         :  bigstring
         -> int32#
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16u_indexed_by_int32#"
 
@@ -2724,21 +2762,19 @@ end
 open struct
 
   type boxed_index = int64
-  type boxed_data = int
+  type boxed_data = int16
 
   let generate_data = 
     fun i ->
       match i mod 4 with
-      | 0 -> Int.zero
-      | 1 -> (Int.(shift_left one) (16 - 1))
-      | 2 -> 
-        (let shift = 16 - 1 in
-        Int.(lognot (shift_left (shift_right (lognot zero) shift) shift)))
-      | _ -> Random.int_in_range ~min:Int.zero ~max:(Int.(shift_left one) (16 - 1))
+      | 0 -> Stdlib_stable.Int16.zero
+      | 1 -> Stdlib_stable.Int16.min_int
+      | 2 -> Stdlib_stable.Int16.max_int
+      | _ -> int16_in_range ~min:Stdlib_stable.Int16.min_int ~max:Stdlib_stable.Int16.max_int
 
 
   let to_index = Int64.of_int
-  let data_equal = Int.equal
+  let data_equal = Stdlib_stable.Int16.equal
   let unbox_index = Stdlib_upstream_compatible.Int64_u.of_int64
   let unbox_data = fun x -> x
   let box_data = fun x -> x
@@ -2759,13 +2795,13 @@ open struct
       external get_reference
         : string
         -> int
-        -> int
+        -> int16
         = "%caml_string_get16"
 
       external get_safe
         :  string
         -> int64#
-        -> int
+        -> int16
         = "%caml_string_get16_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -2773,7 +2809,7 @@ open struct
       external get_unsafe
         :  string
         -> int64#
-        -> int
+        -> int16
         = "%caml_string_get16u_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -2794,13 +2830,13 @@ open struct
       external get_reference
         : bytes
         -> int
-        -> int
+        -> int16
         = "%caml_bytes_get16"
 
       external get_safe
         :  bytes
         -> int64#
-        -> int
+        -> int16
         = "%caml_bytes_get16_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -2808,7 +2844,7 @@ open struct
       external get_unsafe
         :  bytes
         -> int64#
-        -> int
+        -> int16
         = "%caml_bytes_get16u_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -2816,14 +2852,14 @@ open struct
       external set_reference
         : bytes
         -> int
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16"
 
       external set_safe
         :  bytes
         -> int64#
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16_indexed_by_int64#"
 
@@ -2832,7 +2868,7 @@ open struct
       external set_unsafe
         :  bytes
         -> int64#
-        -> int
+        -> int16
         -> unit
         = "%caml_bytes_set16u_indexed_by_int64#"
 
@@ -2853,13 +2889,13 @@ open struct
       external get_reference
         : bigstring
         -> int
-        -> int
+        -> int16
         = "%caml_bigstring_get16"
 
       external get_safe
         :  bigstring
         -> int64#
-        -> int
+        -> int16
         = "%caml_bigstring_get16_indexed_by_int64#"
 
       let get_safe b i = box_data (get_safe b (unbox_index i))
@@ -2867,7 +2903,7 @@ open struct
       external get_unsafe
         :  bigstring
         -> int64#
-        -> int
+        -> int16
         = "%caml_bigstring_get16u_indexed_by_int64#"
 
       let get_unsafe b i = box_data (get_unsafe b (unbox_index i))
@@ -2875,14 +2911,14 @@ open struct
       external set_reference
         : bigstring
         -> int
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16"
 
       external set_safe
         :  bigstring
         -> int64#
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16_indexed_by_int64#"
 
@@ -2891,7 +2927,7 @@ open struct
       external set_unsafe
         :  bigstring
         -> int64#
-        -> int
+        -> int16
         -> unit
         = "%caml_bigstring_set16u_indexed_by_int64#"
 
