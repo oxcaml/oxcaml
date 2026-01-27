@@ -10,6 +10,7 @@ on:
     tags:
       - '*'
   pull_request:
+  merge_group:
 jobs:
   build:
     name: ${{ matrix.name }}
