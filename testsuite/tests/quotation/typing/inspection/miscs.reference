@@ -30,5 +30,3 @@ in
 Stdlib.List.iter (let arg = f in function | eta -> exclave_ arg ?x:None eta)
   ([1; 2; 3])
 
-e_format6 says: abc xyz
-

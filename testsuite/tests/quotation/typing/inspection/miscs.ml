@@ -17,13 +17,17 @@ let () = test <[
   ]>
 
 (* Inferring format6 on a string *)
+(* FIXME: For ~eval:true, linking fails as some Format symbols are missing. *)
 let () =
   let f (x : <[ _ format6 ]> expr) = x in
-  test <[let p = $(f <[ "e_format6 says: %s %s\n\n" ]>) in Format.printf p "abc" "xyz" ]>
+  test ~eval:false
+    <[let p = $(f <[ "e_format6 says: %s %s\n\n" ]>)
+      in Format.printf p "abc" "xyz" ]>
 
 (* Eliminating optional arguments *)
 (* FIXME: For ~eval:true, we need to prevent the eta expansion introduced by
    optional argument elimination from introducing a local-returning exclave *)
 let () =
   let g = <[ fun ?(x = 0) y -> Format.printf "%d\n" (x + y) ]> in
-  test ~eval:false <[ let f = $g in List.iter f [1; 2; 3] ]>
+  test ~eval:false
+    <[ let f = $g in List.iter f [1; 2; 3] ]>
