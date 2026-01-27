@@ -308,7 +308,7 @@ let pat_extra sub = function
   | Tpat_constraint (ct, ma) ->
     Tpat_constraint (sub.typ sub ct, sub.modes sub ma)
   | Tpat_inspected_type (Label_disambiguation _) as d -> d
-  | Tpat_inspected_type (Polymorphic_parameter (Param _)) as d -> d
+  | Tpat_inspected_type Polymorphic_parameter as d -> d
 
 let pat
   : type k . mapper -> k general_pattern -> k general_pattern
@@ -408,8 +408,7 @@ let extra sub = function
   | Texp_stack as d -> d
   | Texp_mode modes -> Texp_mode (sub.modes sub modes)
   | Texp_inspected_type (Label_disambiguation _) as d -> d
-  | Texp_inspected_type (Polymorphic_parameter (Method _)) as d -> d
-  | Texp_inspected_type (Polymorphic_parameter (Arrow _)) as d -> d
+  | Texp_inspected_type Polymorphic_parameter as d -> d
 
 let function_body sub body =
   match body with

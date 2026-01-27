@@ -1032,7 +1032,7 @@ module Identifier = struct
 
     let lexing_position = TBuiltin "lexing_position" |> mk
 
-    let expr = TBuiltin "expr" |> mk
+    let code = TBuiltin "code" |> mk
 
     let unboxed_float = TBuiltin "float#" |> mk
 
@@ -1431,7 +1431,7 @@ module Ast = struct
     print_tuple_like "," "(" ")" (print_label_tup printer) fmt entries
 
   let print_obj_closed fmt closed_flag =
-    pp fmt "%s" (match closed_flag with OOpen -> "; .." | OClosed -> "")
+    pp fmt "%s" (match closed_flag with OOpen -> ".." | OClosed -> "")
 
   let print_prefix fmt rec_flag =
     match rec_flag with
@@ -1527,15 +1527,7 @@ module Ast = struct
       pp fmt "%a@ |@ %a" (print_pat env) pat1 (print_pat env) pat2
     | PatConstraint (pat, ty) ->
       if with_parens then pp fmt "(";
-      (match pat, ty with
-      | PatUnpack _, TypePackage (ident, wcs) ->
-        (* Package types should not be preceded by "module"
-           inside unpack patterns, so we have a separate case *)
-        pp fmt "%a@ :@ %a"
-          (print_pat env) pat (print_package_type env) (ident, wcs)
-      | _ ->
-        pp fmt "%a@ :@ %a"
-          (print_pat env) pat (print_core_type env) ty);
+      pp fmt "%a@ :@ %a" (print_pat env) pat (print_core_type env) ty;
       if with_parens then pp fmt ")"
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
@@ -1575,7 +1567,9 @@ module Ast = struct
     if with_or then pp fmt "@ |@ ";
     match rf with
     | Vinherit ty -> print_core_type env fmt ty
-    | Vtag (variant, _, []) -> pp fmt "%a" Variant.print variant
+    | Vtag (_, false, []) ->
+      () (* fatal_error "Invalid polymorphic variant type" *)
+    | Vtag (variant, true, []) -> pp fmt "%a" Variant.print variant
     | Vtag (variant, true, tys) ->
       pp fmt "%a@ of" Variant.print variant;
       List.iter
@@ -1595,8 +1589,7 @@ module Ast = struct
 
   and print_core_type_with_arrow env fmt ty =
     match ty with
-    | TypeArrow _ | TypePoly (_::_, _) ->
-      pp fmt "(@[%a@])" (print_core_type env) ty
+    | TypeArrow _ -> pp fmt "(@[%a@])" (print_core_type env) ty
     | _ -> print_core_type env fmt ty
 
   and print_core_type_with_parens env fmt ty =
@@ -1606,7 +1599,7 @@ module Ast = struct
     | _ -> print_core_type env fmt ty
 
   and print_object_field env fmt = function
-    | Oinherit ty -> pp fmt "%a@ " (print_core_type env) ty
+    | Oinherit ty -> pp fmt "<inherit %a TODO>" (print_core_type env) ty
     | Otag (name, ty) ->
       pp fmt "%a@ :@ %a" Name.print name (print_core_type env) ty
 
@@ -1616,21 +1609,6 @@ module Ast = struct
       pp fmt "%a(@[%a@])" (print_module_exp env) module_1 (print_module_exp env)
         module_2
     | ModuleApply_unit module_ -> pp fmt "%a()" (print_module_exp env) module_
-
-  and print_package_type env fmt (ident, wcs) =
-    match wcs with
-    | [] ->
-      pp fmt "%a" (print_module_type env) ident
-    | (modtype_path, core_type) :: wcs ->
-      pp fmt "@[%a@ with@ type@ %a@ =@ %a"
-        (print_module_type env) ident
-        print_modtype_path modtype_path (print_core_type env) core_type;
-      List.iter
-        (fun (modtype_path, core_type) ->
-          pp fmt "@ and@ type@ %a@ =@ %a" print_modtype_path modtype_path
-            (print_core_type env) core_type)
-        wcs;
-      pp fmt "@]"
 
   and print_core_type env fmt = function
     | TypeAny -> pp fmt "_"
@@ -1677,7 +1655,7 @@ module Ast = struct
       pp fmt "< %a >" print_obj_closed closed_flag
     | TypeObject (f :: fs, closed_flag) ->
       pp fmt "<@ @[";
-      print_tuple_like ";" "" "" (print_object_field env) fmt (f :: fs);
+      print_tuple_like "," "" "" (print_object_field env) fmt (f :: fs);
       print_obj_closed fmt closed_flag;
       pp fmt "@]@ >"
     | TypeClass (name, []) -> Name.print fmt name
@@ -1697,13 +1675,20 @@ module Ast = struct
       print_row_field env false fmt rf;
       List.iter (print_row_field env true fmt) row_fields;
       pp fmt " ]"
-    | TypePoly ([], ty) -> print_core_type env fmt ty
-    | TypePoly ((_ :: _) as tvs, ty) ->
-      pp fmt "%a@ %a"
-        (print_tuple_like "" "" "." (Var.Type_var.print env)) tvs
-        (print_core_type env) ty
-    | TypePackage (ident, wcs) ->
-      pp fmt "(module@ %a)" (print_package_type env) (ident, wcs)
+    | TypePoly ([], _) -> () (* fatal_error "Invalid poly-type" *)
+    | TypePoly (tv :: tvs, ty) ->
+      print_tuple_like "" "" "." (Var.Type_var.print env) fmt (tv :: tvs);
+      pp fmt "@ %a" (print_core_type env) ty
+    | TypePackage (ident, []) -> print_module_type env fmt ident
+    | TypePackage (ident, (modtype_path, core_type) :: wcs) ->
+      pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
+        print_modtype_path modtype_path (print_core_type env) core_type;
+      List.iter
+        (fun (modtype_path, core_type) ->
+          pp fmt "@ and@ type@ %a@ =@ %a" print_modtype_path modtype_path
+            (print_core_type env) core_type)
+        wcs;
+      pp fmt "@]"
     | TypeQuote core_type ->
       pp fmt "@[<2><[@,%a@,]>@]" (print_core_type env) core_type
     | TypeCallPos -> pp fmt "call_pos"
@@ -2126,6 +2111,20 @@ module Field = struct
   let of_string s = return (Ast.FBasic s)
 end
 
+module Object_field = struct
+  type t = Ast.object_field With_free_vars.t
+
+  let ( let+ ) m f = With_free_vars.map f m
+
+  let inherit_ ty =
+    let+ ty = ty in
+    Ast.Oinherit ty
+
+  let tag name ty =
+    let+ ty = ty in
+    Ast.Otag (name, ty)
+end
+
 module Pat = struct
   open With_free_and_bound_vars
 
@@ -2258,44 +2257,6 @@ module Exp_attribute = struct
   let tail_mod_cons = Ast.Tail_mod_cons
 end
 
-
-module Object_type = struct
-  module Object_closed_flag = struct
-    type t =
-      | Open
-      | Closed
-
-    let open_ = Open
-
-    let closed = Closed
-
-    let to_ast_object_closed_flag = function
-      | Open -> Ast.OOpen
-      | Closed -> Ast.OClosed
-  end
-
-  module Object_field = struct
-    type t = Ast.object_field With_free_vars.t
-
-    let ( let+ ) m f = With_free_vars.map f m
-
-    let inherit_ ty =
-      let+ ty = ty in
-      Ast.Oinherit ty
-
-    let tag method_ type_ =
-      let+ type_ in
-      Ast.Otag (method_, type_)
-  end
-
-  type t = Ast.object_field list With_free_vars.t * Ast.object_closed_flag
-
-  let of_object_fields_list object_fields object_closed_flag =
-    With_free_vars.all object_fields,
-    Object_closed_flag.to_ast_object_closed_flag object_closed_flag
-end
-
-
 module Variant_type = struct
   module Variant_form = struct
     type t =
@@ -2378,8 +2339,9 @@ module Type = struct
     let+ ts = all typs and+ cons = cons in
     Ast.TypeConstr (cons, ts)
 
-  let object_ (object_fields, closed_flag) =
-    let+ object_fields in
+  let object_ object_fields is_closed =
+    let closed_flag = if is_closed then Ast.OClosed else Ast.OOpen in
+    let+ object_fields = all object_fields in
     Ast.TypeObject (object_fields, closed_flag)
 
   let class_ name tys =

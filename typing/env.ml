@@ -804,8 +804,6 @@ type no_open_quotations_context =
   | Struct_qt
   | Sig_qt
   | Open_qt
-  | Object_field_with_attribute_qt
-  | Variant_tag_with_attribute_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format.fprintf ppf "have any components"
@@ -4833,12 +4831,7 @@ let print_unsupported_quotation ppf =
   | Sig_qt ->
       fprintf ppf "Module type definition using %a"
         (Style.inline_code) "sig..end"
-  | Open_qt ->
-      fprintf ppf "Opening modules"
-  | Object_field_with_attribute_qt ->
-      fprintf ppf "Adding attributes on fields in object types"
-  | Variant_tag_with_attribute_qt ->
-      fprintf ppf "Adding attributes on tags in polymorphic variant types"
+  | Open_qt -> fprintf ppf "Opening modules"
 
 let print_unbound_in_quotation ppf =
   function

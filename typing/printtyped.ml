@@ -146,6 +146,18 @@ let fmt_index_kind f = function
   | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
   | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 
+let fmt_label_ambiguity f = function
+  | Ambiguous { path; arity } ->
+    fprintf f "Ambiguous %a %d" fmt_path path arity
+  | Unambiguous ->
+    fprintf f "Unambiguous"
+
+let fmt_type_inspection f = function
+  | Label_disambiguation amb ->
+    fprintf f "Label_disambiguation %a" fmt_label_ambiguity amb
+  | Polymorphic_parameter ->
+    fprintf f "Polymorphic_parameter"
+
 let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
   fprintf f s (*...*)
@@ -403,34 +415,6 @@ and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident s;
   core_type i ppf t
 
-and label_ambiguity i ppf = function
-  | Ambiguous { path; arity } ->
-    line i ppf "Ambiguous %a %d\n" fmt_path path arity
-  | Unambiguous ->
-    line i ppf "Unambiguous\n"
-
-and poly_param : type a. _ -> _ -> a poly_param -> unit =
-  fun i ppf -> function
-  | Param ty ->
-    line i ppf "Param %a\n" Printtyp.raw_type_expr ty
-  | Arrow args ->
-    line i ppf "Arrow\n";
-    list (i+1) (fun i ppf (label, ty) ->
-        arg_label i ppf label;
-        option i (fun i f -> line i f "%a" Printtyp.raw_type_expr) ppf ty)
-      ppf args
-  | Method ({txt}, ty) ->
-    fprintf ppf "Method %s %a\n" txt Printtyp.raw_type_expr ty
-
-and type_inspection : type a. _ -> _ -> a type_inspection -> unit =
-  fun i ppf -> function
-  | Label_disambiguation amb ->
-    line i ppf "Label_disambiguation\n";
-    label_ambiguity (i+1) ppf amb;
-  | Polymorphic_parameter param ->
-    line i ppf "Polymorphic_parameter\n";
-    poly_param (i+1) ppf param;
-
 and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   line i ppf "pattern %a\n" fmt_location x.pat_loc;
   attributes i ppf x.pat_attributes;
@@ -529,7 +513,7 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
   | Tpat_inspected_type ti ->
      line i ppf "Tpat_inspected_type\n";
      attributes i ppf attrs;
-     type_inspection (i+1) ppf ti
+     line (i+1) ppf "%a\n" fmt_type_inspection ti;
 
 and function_body i ppf (body : function_body) =
   match[@warning "+9"] body with
@@ -579,7 +563,7 @@ and expression_extra i ppf x attrs =
   | Texp_inspected_type ti ->
       line i ppf "Texp_inspected_type\n";
       attributes i ppf attrs;
-      type_inspection (i+1) ppf ti
+      line (i+1) ppf "%a\n" fmt_type_inspection ti;
 
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m

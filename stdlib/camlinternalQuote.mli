@@ -176,7 +176,7 @@ module Identifier : sig
 
     val lexing_position : t
 
-    val expr : t
+    val code : t
 
     val unboxed_float : t
 
@@ -330,29 +330,7 @@ module Module_type : sig
   val of_string : string -> t
 end
 
-module rec Object_type : sig
-  module Object_closed_flag : sig
-    type t
-
-    val open_ : t
-
-    val closed : t
-  end
-
-  module Object_field : sig
-    type t
-
-    val inherit_ : Type.t -> t
-
-    val tag : Method.t -> Type.t -> t
-  end
-
-  type t
-
-  val of_object_fields_list : Object_field.t list -> Object_closed_flag.t -> t
-end
-
-and Variant_type : sig
+module rec Variant_type : sig
   module Variant_form : sig
     type t
 
@@ -376,6 +354,14 @@ and Variant_type : sig
   val of_row_fields_list : Row_field.t list -> Variant_form.t -> t
 end
 
+and Object_field : sig
+  type t
+
+  val inherit_ : Type.t -> t
+
+  val tag : Name.t -> Type.t -> t
+end
+
 and Type : sig
   type t
 
@@ -389,7 +375,7 @@ and Type : sig
 
   val constr : Identifier.Type.t -> t list -> t
 
-  val object_ : Object_type.t -> t
+  val object_ : Object_field.t list -> bool -> t
 
   val class_ : Name.t -> t list -> t
 
