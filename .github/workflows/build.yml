@@ -176,6 +176,12 @@ jobs:
             build_ocamlparam: '_,reaper=1'
             ocamlparam: '_,reaper=1'
 
+          - name: runtime5 custom-install-path (x86_64-linux)
+            config: --enable-runtime5
+            install_path: _custom_install
+            os: warp-ubuntu-latest-x64-8x
+            ocamlparam: '_,reaper=1'
+
     env:
       J: "8"
       run_testsuite: "true"
@@ -237,9 +243,14 @@ jobs:
           if [[ -n "${{matrix.cc}}" ]]; then
             export CC="${{matrix.cc}}"
           fi
+          if [[ -n "${{matrix.install_path}}" ]]; then
+            install_path="_install"
+          else
+            install_path="${{matrix.install_path}}"
+          fi
           autoconf
           ./configure \
-            --prefix=$GITHUB_WORKSPACE/_install \
+            --prefix=$GITHUB_WORKSPACE/$install_path \
             ${{ matrix.config }}
 
       - name: Setup for saving core files (Linux)
