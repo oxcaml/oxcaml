@@ -21,6 +21,7 @@
 
 #ifdef CAML_INTERNALS
 
+#include <stdbool.h>
 #include "misc.h"
 #include "mlvalues.h"
 #include "roots.h"
@@ -343,6 +344,14 @@ value caml_continuation_use (value cont);
    between continuation_use and continuation_replace.
    Used for cloning continuations and continuation backtraces. */
 void caml_continuation_replace(value cont, struct stack_info* stack);
+
+/* Returns 1 if the given continuation has a gc_regs, marking it as a
+   preemption */
+bool caml_continuation_is_preemption(value cont);
+
+/* If the given continuation is a preeempted continuation, returns a pointer to
+   its [gc_regs] struct, or NULL otherwise */
+value* caml_continuation_gc_regs(value cont);
 
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 
