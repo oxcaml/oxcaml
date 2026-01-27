@@ -198,7 +198,7 @@ let prim_table = Hashtbl.create 32
 
 let register_lens id l =
   if not @@ String.starts_with ~prefix:"%" id
-  then Misc.fatal_errorf "Registered primitive '%s' do not start with %%." id;
+  then Misc.fatal_errorf "Registered primitive '%s' does not start with %%." id;
   Hashtbl.add prim_table id l.decode;
   l.encode
 
