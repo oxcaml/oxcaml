@@ -2175,6 +2175,12 @@ let emit_instr i =
       [| DSL.emit_reg i.res.(0);
          DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
       |]
+  | Lop Domain_index ->
+    let offset = Domainstate.(idx_of_field Domain_id) * 8 in
+    DSL.ins I.LDR
+      [| DSL.emit_reg i.res.(0);
+         DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
+      |]
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
