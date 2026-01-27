@@ -390,6 +390,7 @@ test: install_for_test
 	  done > _runtest/flambda2-test-list; \
 	fi
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
+	 export OCAMLLIB=$$(pwd)/_runtest/stdlib; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
@@ -414,6 +415,7 @@ test: install_for_test
 
 promote-failed:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
+	 export OCAMLLIB=$$(pwd)/_runtest/stdlib; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
@@ -436,6 +438,7 @@ locate_test = \
 
 test-one-no-rebuild:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
+	 export OCAMLLIB=$$(pwd)/_runtest/stdlib; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
@@ -447,6 +450,7 @@ promote-one: install_for_test
 
 promote-one-no-rebuild:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
+	 export OCAMLLIB=$$(pwd)/_runtest/stdlib; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
