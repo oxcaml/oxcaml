@@ -215,14 +215,15 @@ module_:
     { { body } }
 ;
 
-exn_extra_arg: s = simple k = kind_with_subkind { s, k }
+exn_extra_arg:
+  | s = simple; k = kind_with_subkind { s, k }
 
 exn_extra_args:
-  | LPAREN ea = separated_nonempty_list(COMMA, exn_extra_arg) RPAREN
+  | LPAREN; ea = separated_nonempty_list(COMMA, exn_extra_arg); RPAREN
     { ea }
 
 exn_continuation:
-  | STAR cont = continuation ea = loption(exn_extra_args) { cont, ea }
+  | STAR; cont = continuation; ea = loption(exn_extra_args) { cont, ea }
 
 exn_continuation_id:
   | STAR cont = continuation_id { cont }
@@ -324,17 +325,18 @@ prim_param_val:
   | i = INT { make_located (fst i) ($startpos, $endpos)}
 
 prim_param:
-  | DOT flag = IDENT { Flag flag }
-  | DOT LBRACK p = prim_param_val RBRACK
+  | DOT; flag = IDENT { Flag flag }
+  | DOT LBRACK; p = prim_param_val; RBRACK
     { Positional p }
-  | DOT label = IDENT LBRACK value = prim_param_val RBRACK
+  | DOT; label = IDENT; LBRACK; value = prim_param_val; RBRACK
     { Labeled { label; value } }
 
-prim_op: prim = PRIM params = prim_param* { { prim; params} }
+prim_op:
+  | prim = PRIM; params = prim_param* { { prim; params} }
 
 named:
   | s = simple { Simple s }
-  | p = prim_op args = simple_args { Prim (p, args) }
+  | p = prim_op; args = simple_args { Prim (p, args) }
   | c = fun_decl { Closure c }
   (* CR lmaurer: This strikes me as a bit ugly, but it's necessary because
      [let x = y] could be assigning either a simple or a rec_info. We could

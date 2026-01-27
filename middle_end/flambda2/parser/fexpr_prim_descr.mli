@@ -2,14 +2,14 @@ type param = Fexpr.prim_param
 
 type t = Fexpr.prim_op
 
-type to_fl_env = Fexpr_to_flambda_commons.env
+type decode_env = Fexpr_to_flambda_commons.env
 
-type of_fl_env = Flambda_to_fexpr_commons.Env.t
+type encode_env = Flambda_to_fexpr_commons.Env.t
 
 (** general 2-way translation between fexpr-related and flambda-related types *)
 type ('p, 't, 'r) lens =
-  { of_fl : of_fl_env -> 'p -> 't;
-    to_fl : to_fl_env -> 't -> 'r
+  { encode : encode_env -> 'p -> 't;
+    decode : decode_env -> 't -> 'r
   }
 
 (** reversible lens *)
@@ -25,7 +25,7 @@ type 'p params_lens = ('p, param list) map_lens
 type 'p prim_lens = ('p, t, Simple.t list -> Flambda_primitive.t) lens
 
 (** reconversion to fexpr *)
-type 'p conv = of_fl_env -> 'p -> t
+type 'p conv = encode_env -> 'p -> t
 
 (** composable lens constructor *)
 type 'p param_cons
@@ -33,20 +33,20 @@ type 'p param_cons
 (** pattern recognition constructor *)
 type 'p case_cons
 
-type 'p cons0 = to_fl_env -> 'p -> Flambda_primitive.nullary_primitive
+type 'p cons0 = decode_env -> 'p -> Flambda_primitive.nullary_primitive
 
-type 'p cons1 = to_fl_env -> 'p -> Flambda_primitive.unary_primitive
+type 'p cons1 = decode_env -> 'p -> Flambda_primitive.unary_primitive
 
-type 'p cons2 = to_fl_env -> 'p -> Flambda_primitive.binary_primitive
+type 'p cons2 = decode_env -> 'p -> Flambda_primitive.binary_primitive
 
-type 'p cons3 = to_fl_env -> 'p -> Flambda_primitive.ternary_primitive
+type 'p cons3 = decode_env -> 'p -> Flambda_primitive.ternary_primitive
 
-type 'p cons4 = to_fl_env -> 'p -> Flambda_primitive.quaternary_primitive
+type 'p cons4 = decode_env -> 'p -> Flambda_primitive.quaternary_primitive
 
 (** Final boxing to primitive from parameters values
 
     The variadic version also provides the actual number of arguments *)
-type 'p consN = to_fl_env -> 'p -> int -> Flambda_primitive.variadic_primitive
+type 'p consN = decode_env -> 'p -> int -> Flambda_primitive.variadic_primitive
 
 val wrap_loc : 'a -> 'a Fexpr.located
 
@@ -56,7 +56,7 @@ val unwrap_loc : 'a Fexpr.located -> 'a
     primitive and its conversion from/to flambda.
 
     A primitive is necessarily described with its arity with the {!val:nullary}
-    to {!val:variadic} constructors. Its given the syntacic name of the
+    to {!val:variadic} constructors. It is given the syntactic name of the
     primitive (with the [%]), and parameters. It returns the conversion function
     from the flambda side, and register internally the reverse conversion that
     can be looked-up with {!val:lookup_prim}.
@@ -128,7 +128,7 @@ module Describe : sig
       matched or not. *)
   val bool_flag : string -> bool param_cons
 
-  (** Takes an associative list of flags and corresponding value. With optionnal
+  (** Takes an associative list of flags and corresponding value. With optional
       handling when encountering an unlisted value.
 
       Caution: Implementing types that way do not ensure exhaustivity
@@ -138,7 +138,7 @@ module Describe : sig
     ?no_match_handler:('p -> unit) -> (string * 'p) list -> 'p param_cons
 
   (** State no parameters are expected. Only useful at toplevel. *)
-  val no_param : unit param_cons
+  val param0 : unit param_cons
 
   (** Couple of constructions. *)
   val param2 : 'a param_cons -> 'b param_cons -> ('a * 'b) param_cons
@@ -150,24 +150,21 @@ module Describe : sig
   (** Specify a default value for the underlying constructor, which will be used
       if there is no match. In conversion to fexpr, if the provided parameter
       equals the default, no parameter will be produced. [~eq] allows the
-      optionnal definition of equality function, defaults to {!val:Stdlib.(=)}.
+      optional definition of equality function, defaults to {!val:Stdlib.(=)}.
   *)
   val default :
     def:'p -> ?eq:('p -> 'p -> bool) -> 'p param_cons -> 'p param_cons
 
-  (** Makes a construction optionnal. Always matches. *)
+  (** Makes a construction optional. Always matches. *)
   val option : 'p param_cons -> 'p option param_cons
-
-  (** Describes repetition of the given construction. *)
-  val list : 'p param_cons list -> 'p list param_cons
 
   (** Custom transformation of parameter value.
 
       Labels inverted to be related to the argument. [maps x ~to_ ~from] read
       "maps [x] to return type" and "maps [x] from return type" *)
   val maps :
-    to_:(of_fl_env -> 'b -> 'a) ->
-    from:(to_fl_env -> 'a -> 'b) ->
+    to_:(encode_env -> 'b -> 'a) ->
+    from:(decode_env -> 'a -> 'b) ->
     'a param_cons ->
     'b param_cons
 
@@ -176,7 +173,7 @@ module Describe : sig
       order.
 
       Caution: exhaustivity is no enforced. And patterns may be fragile, take
-      care to order them properly to avoid mismatch, especially with optionnal
+      care to order them properly to avoid mismatch, especially with optional
       parameters. *)
   val either :
     ?no_match_handler:('p -> unit) -> 'p case_cons list -> 'p param_cons
@@ -184,12 +181,12 @@ module Describe : sig
   (** Describes a constructor pattern. Takes the construction we want to match.
       - [~box] allows mapping of the matched value, usually to wrap it in the
         type of the enclosing {!val:either}.
-      - [~unbox] is the reverse but expect an optionnal return value, to tell if
+      - [~unbox] is the reverse but expect an optional return value, to tell if
         the value corresponds to the described case. This is the only place
         where exhaustivity can be enforced. *)
   val case :
-    box:(to_fl_env -> 'c -> 'p) ->
-    unbox:(of_fl_env -> 'p -> 'c option) ->
+    box:(decode_env -> 'c -> 'p) ->
+    unbox:(encode_env -> 'p -> 'c option) ->
     'c param_cons ->
     'p case_cons
 
@@ -217,4 +214,4 @@ end
 
 (** Fetch primitive conversion function from registered descriptions *)
 val lookup_prim :
-  t -> (to_fl_env -> t -> Simple.t list -> Flambda_primitive.t) option
+  t -> (decode_env -> t -> Simple.t list -> Flambda_primitive.t) option

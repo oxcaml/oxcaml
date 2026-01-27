@@ -40,8 +40,8 @@ let () =
         dump_text file;
         raise Test_utils.Failure
     in
-    (* Changing filename kills function slot matching because of freshly
-       generated computation unit name *)
+    (* CR Keryan: Changing filename kills function slot matching because of
+       freshly generated computation unit name *)
     let temp_file =
       Filename.temp_file ("roundtrip_" ^ Filename.remove_extension file) ".fl"
     in

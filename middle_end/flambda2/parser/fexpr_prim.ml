@@ -1,5 +1,6 @@
 open Fexpr_prim_descr
 module D = Describe
+module P = Flambda_primitive
 
 let todo = D.todo
 
@@ -13,8 +14,8 @@ let or_unknown cons =
         match (ouk : _ Or_unknown.t) with Unknown -> None | Known v -> Some v))
 
 let target_ocaml_int : Target_ocaml_int.t value_lens =
-  { of_fl = (fun _ t -> Target_ocaml_int.to_int t |> string_of_int |> wrap_loc);
-    to_fl =
+  { encode = (fun _ t -> Target_ocaml_int.to_int t |> string_of_int |> wrap_loc);
+    decode =
       (fun _ s ->
         (* CR mshinwell: Should get machine_width from fexpr context when
            available *)
@@ -23,8 +24,8 @@ let target_ocaml_int : Target_ocaml_int.t value_lens =
   }
 
 let scannable_tag : Tag.Scannable.t value_lens =
-  { of_fl = (fun _ t -> Tag.Scannable.to_int t |> string_of_int |> wrap_loc);
-    to_fl =
+  { encode = (fun _ t -> Tag.Scannable.to_int t |> string_of_int |> wrap_loc);
+    decode =
       (fun _ s -> Tag.Scannable.create_exn @@ int_of_string (unwrap_loc s))
   }
 
@@ -34,14 +35,14 @@ let mutability =
     @@ constructor_flag Mutability.["imm_uniq", Immutable_unique; "mut", Mutable])
 
 let mutability_as_value =
-  { to_fl =
+  { decode =
       (fun _ m : Mutability.t ->
         match unwrap_loc m with
         | "immut" -> Immutable
         | "immut_uniq" -> Immutable_unique
         | "mut" -> Mutable
         | _ -> Misc.fatal_error "invalid mutability");
-    of_fl =
+    encode =
       (fun _ m ->
         let s =
           match (m : Mutability.t) with
@@ -80,14 +81,12 @@ let standard_int_or_float =
 let int_shift_op =
   D.(
     constructor_flag
-      (["lsl", Lsl; "lsr", Lsr; "asr", Asr]
-        : (string * Flambda_primitive.int_shift_op) list))
+      (["lsl", Lsl; "lsr", Lsr; "asr", Asr] : (string * P.int_shift_op) list))
 
 let unary_int_arith_op =
   D.(
     constructor_flag
-      (["bswp", Swap_byte_endianness]
-        : (string * Flambda_primitive.unary_int_arith_op) list))
+      (["bswp", Swap_byte_endianness] : (string * P.unary_int_arith_op) list))
 
 let binary_int_arith_op =
   D.(
@@ -100,27 +99,25 @@ let binary_int_arith_op =
          "and", And;
          "or", Or;
          "xor", Xor ]
-        : (string * Flambda_primitive.binary_int_arith_op) list))
+        : (string * P.binary_int_arith_op) list))
 
 let float_bitwidth =
   D.(
-    default ~def:Flambda_primitive.Float64
-    @@ constructor_flag ["float32", (Float32 : Flambda_primitive.float_bitwidth)])
+    default ~def:P.Float64
+    @@ constructor_flag ["float32", (Float32 : P.float_bitwidth)])
 
-let unary_float_arith_op =
-  D.constructor_flag Flambda_primitive.["abs", Abs; "neg", Neg]
+let unary_float_arith_op = D.constructor_flag P.["abs", Abs; "neg", Neg]
 
 let binary_float_arith_op =
   D.(
     constructor_flag
       (["add", Add; "sub", Sub; "mul", Mul; "div", Div]
-        : (string * Flambda_primitive.binary_float_arith_op) list))
+        : (string * P.binary_float_arith_op) list))
 
 let block_access_field_kind =
   D.(
-    default ~def:Flambda_primitive.Block_access_field_kind.Any_value
-    @@ constructor_flag
-         ["imm", Flambda_primitive.Block_access_field_kind.Immediate])
+    default ~def:P.Block_access_field_kind.Any_value
+    @@ constructor_flag ["imm", P.Block_access_field_kind.Immediate])
 
 let block_access_kind =
   let value =
@@ -130,61 +127,52 @@ let block_access_kind =
         (or_unknown @@ labeled "size" target_ocaml_int))
   in
   let naked_float =
-    D.(param2 (flag "floaf") (or_unknown @@ labeled "size" target_ocaml_int))
+    D.(param2 (flag "float") (or_unknown @@ labeled "size" target_ocaml_int))
   in
   D.(
     either
       ~no_match_handler:
-        Flambda_primitive.Block_access_kind.(
+        P.Block_access_kind.(
           function
           | Mixed _ as bak -> Misc.fatal_errorf "Unsupported %a" print bak
           | Values _ | Naked_floats _ -> assert false)
       [ case
-          ~box:(fun _ ((), size) ->
-            Flambda_primitive.Block_access_kind.Naked_floats { size })
+          ~box:(fun _ ((), size) -> P.Block_access_kind.Naked_floats { size })
           ~unbox:(fun _ bak ->
-            match (bak : Flambda_primitive.Block_access_kind.t) with
+            match (bak : P.Block_access_kind.t) with
             | Naked_floats { size } -> Some ((), size)
             | Values _ | Mixed _ -> None)
           naked_float;
         case
           ~box:(fun _ (field_kind, tag, size) ->
-            Flambda_primitive.Block_access_kind.Values { field_kind; tag; size })
+            P.Block_access_kind.Values { field_kind; tag; size })
           ~unbox:(fun _ bak ->
-            match (bak : Flambda_primitive.Block_access_kind.t) with
+            match (bak : P.Block_access_kind.t) with
             | Values { field_kind; tag; size } -> Some (field_kind, tag, size)
             | Naked_floats _ | Mixed _ -> None)
           value ])
 
 let string_accessor_width =
-  { to_fl =
-      (fun _ i : Flambda_primitive.string_accessor_width ->
+  { decode =
+      (fun _ i : P.string_accessor_width ->
         let i = unwrap_loc i in
-        let m =
-          match String.get i (String.length i - 1) with
-          | ('a' | 'u') as m -> Some m
-          | _ -> None
-        in
-        if String.equal i "f32"
-        then Single
-        else
-          match int_of_string i, m with
-          | 8, _ -> Eight
-          | 16, _ -> Sixteen
-          | 32, _ -> Thirty_two
-          | 64, _ -> Sixty_four
-          | 128, Some 'a' -> One_twenty_eight { aligned = true }
-          | 128, Some 'u' -> One_twenty_eight { aligned = false }
-          | 256, Some 'a' -> Two_fifty_six { aligned = true }
-          | 256, Some 'u' -> Two_fifty_six { aligned = false }
-          | 512, Some 'a' -> Five_twelve { aligned = true }
-          | 512, Some 'u' -> Five_twelve { aligned = false }
-          | _ | (exception _) ->
-            Misc.fatal_errorf "invalid string accessor width '%s'" i);
-    of_fl =
+        match i with
+        | "f32" -> Single
+        | "8" -> Eight
+        | "16" -> Sixteen
+        | "32" -> Thirty_two
+        | "64" -> Sixty_four
+        | "128a" -> One_twenty_eight { aligned = true }
+        | "128u" -> One_twenty_eight { aligned = false }
+        | "256a" -> Two_fifty_six { aligned = true }
+        | "256u" -> Two_fifty_six { aligned = false }
+        | "512a" -> Five_twelve { aligned = true }
+        | "512u" -> Five_twelve { aligned = false }
+        | _ -> Misc.fatal_errorf "invalid string accessor width '%s'" i);
+    encode =
       (fun _ saw ->
         let s =
-          match (saw : Flambda_primitive.string_accessor_width) with
+          match (saw : P.string_accessor_width) with
           | Eight -> "8"
           | Sixteen -> "16"
           | Thirty_two -> "32"
@@ -202,12 +190,9 @@ let string_accessor_width =
 
 let init_or_assign =
   D.(
-    default
-      ~def:
-        (Flambda_primitive.Init_or_assign.Assignment
-           Alloc_mode.For_assignments.heap)
+    default ~def:(P.Init_or_assign.Assignment Alloc_mode.For_assignments.heap)
     @@ constructor_flag
-         Flambda_primitive.Init_or_assign.
+         P.Init_or_assign.
            [ "init", Initialization;
              "lassign", Assignment (Alloc_mode.For_assignments.local ()) ])
 
@@ -249,9 +234,9 @@ let boxable_number =
 
 let array_kind =
   D.(
-    default ~def:Flambda_primitive.Array_kind.Values
+    default ~def:P.Array_kind.Values
     @@ constructor_flag
-         ~no_match_handler:(fun (k : Flambda_primitive.Array_kind.t) ->
+         ~no_match_handler:(fun (k : P.Array_kind.t) ->
            match k with
            | Immediates | Values | Naked_floats | Gc_ignorable_values ->
              assert false
@@ -261,7 +246,7 @@ let array_kind =
              Misc.fatal_error
                "fexpr support for arrays of unboxed elements not yet \
                 implemented")
-         Flambda_primitive.Array_kind.
+         P.Array_kind.
            [ "imm", Immediates;
              "float", Naked_floats;
              "gc_ign", Gc_ignorable_values ])
@@ -269,7 +254,7 @@ let array_kind =
 let array_kind_for_length =
   D.(
     either
-      Flambda_primitive.Array_kind_for_length.
+      P.Array_kind_for_length.
         [ id_case @@ constructor_flag ["generic", Float_array_opt_dynamic];
           case array_kind
             ~box:(fun _ k -> Array_kind k)
@@ -283,10 +268,10 @@ let lazy_tag =
 
 let duplicate_array_kind =
   D.(
-    default ~def:Flambda_primitive.Duplicate_array_kind.Values
+    default ~def:P.Duplicate_array_kind.Values
     @@ constructor_flag
          ~no_match_handler:(fun k ->
-           match (k : Flambda_primitive.Duplicate_array_kind.t) with
+           match (k : P.Duplicate_array_kind.t) with
            | Values | Immediates -> assert false
            | Naked_floats _ | Naked_float32s _ | Naked_ints _ | Naked_int8s _
            | Naked_int16s _ | Naked_int32s _ | Naked_int64s _
@@ -295,12 +280,12 @@ let duplicate_array_kind =
              Misc.fatal_error
                "fexpr support for duplication of array of unboxed element not \
                 yet implemented")
-         Flambda_primitive.Duplicate_array_kind.["imm", Immediates])
+         P.Duplicate_array_kind.["imm", Immediates])
 
 let bigarray_kind =
   D.(
     constructor_flag
-      Flambda_primitive.Bigarray_kind.
+      P.Bigarray_kind.
         [ "float16", Float16;
           "float32", Float32;
           "float32_t", Float32_t;
@@ -318,12 +303,12 @@ let bigarray_kind =
 
 let bigarray_layout =
   D.(
-    default ~def:Flambda_primitive.Bigarray_layout.C
-    @@ constructor_flag ["fortran", Flambda_primitive.Bigarray_layout.Fortran])
+    default ~def:P.Bigarray_layout.C
+    @@ constructor_flag ["fortran", P.Bigarray_layout.Fortran])
 
 let reinterp_64bit_word =
   D.constructor_flag
-    Flambda_primitive.Reinterpret_64_bit_word.
+    P.Reinterpret_64_bit_word.
       [ "int63_as_int64", Tagged_int63_as_unboxed_int64;
         "int64_as_int63", Unboxed_int64_as_tagged_int63;
         "int64_as_float64", Unboxed_int64_as_unboxed_float64;
@@ -331,7 +316,7 @@ let reinterp_64bit_word =
 
 let int_atomic_op =
   D.constructor_flag
-    Flambda_primitive.
+    P.
       [ "fetch_add", Fetch_add;
         "add", Add;
         "sub", Sub;
@@ -343,42 +328,33 @@ let int_atomic_op =
 let invalid =
   D.(
     nullary "%invalid" ~params:(todop "Flambda_kind") (fun _env kind ->
-        Flambda_primitive.Invalid kind))
+        P.Invalid kind))
 
 let optimised_out =
   D.(
     nullary "%optimised_out" ~params:(todop "Flambda_kind") (fun _env kind ->
-        Flambda_primitive.Optimised_out kind))
+        P.Optimised_out kind))
 
 let probe_is_enabled =
   D.(
     nullary "%probe_is_enable"
       ~params:(param2 (todop "probe_name") (todop "probe_init"))
       (fun _env (name, enabled_at_init) ->
-        Flambda_primitive.Probe_is_enabled { name; enabled_at_init }))
+        P.Probe_is_enabled { name; enabled_at_init }))
 
 let enter_inlined_apply =
   D.(
     nullary "%inlined_apply" ~params:(todop "dbginfo") (fun _env dbg ->
-        Flambda_primitive.Enter_inlined_apply { dbg }))
+        P.Enter_inlined_apply { dbg }))
 
-let dls_get =
-  D.(
-    nullary "%dls_get" ~params:no_param (fun _env () ->
-        Flambda_primitive.Dls_get))
+let dls_get = D.(nullary "%dls_get" ~params:param0 (fun _env () -> P.Dls_get))
 
-let tls_get =
-  D.(
-    nullary "%tls_get" ~params:no_param (fun _env () ->
-        Flambda_primitive.Tls_get))
+let tls_get = D.(nullary "%tls_get" ~params:param0 (fun _env () -> P.Tls_get))
 
-let poll =
-  D.(nullary "%poll" ~params:no_param (fun _env () -> Flambda_primitive.Poll))
+let poll = D.(nullary "%poll" ~params:param0 (fun _env () -> P.Poll))
 
 let cpu_relax =
-  D.(
-    nullary "%cpu_relax" ~params:no_param (fun _env () ->
-        Flambda_primitive.Cpu_relax))
+  D.(nullary "%cpu_relax" ~params:param0 (fun _env () -> P.Cpu_relax))
 
 (* Unaries *)
 let block_load =
@@ -386,51 +362,47 @@ let block_load =
     unary "%block_load"
       ~params:
         (param3 block_access_kind mutability (positional target_ocaml_int))
-      (fun _env (kind, mut, field) ->
-        Flambda_primitive.Block_load { kind; mut; field }))
+      (fun _env (kind, mut, field) -> P.Block_load { kind; mut; field }))
 
 let bigarray_length =
   D.(
     unary "%bigarray_lenght" ~params:(positional int) (fun _ dimension ->
-        Flambda_primitive.Bigarray_length { dimension }))
+        P.Bigarray_length { dimension }))
 
 let array_length =
   D.(
     unary "%array_length" ~params:array_kind_for_length (fun _ k ->
-        Flambda_primitive.Array_length k))
+        P.Array_length k))
 
 let box_num =
   D.(
     unary "%box_num" ~params:(param2 boxable_number alloc_mode_for_allocation)
-      (fun _ (b, a) -> Flambda_primitive.Box_number (b, a)))
+      (fun _ (b, a) -> P.Box_number (b, a)))
 
 let tag_immediate =
-  D.(
-    unary "%tag_imm" ~params:no_param (fun _ () ->
-        Flambda_primitive.Tag_immediate))
+  D.(unary "%tag_imm" ~params:param0 (fun _ () -> P.Tag_immediate))
 
-let get_tag =
-  D.(unary "%get_tag" ~params:no_param (fun _ () -> Flambda_primitive.Get_tag))
+let get_tag = D.(unary "%get_tag" ~params:param0 (fun _ () -> P.Get_tag))
 
 let end_region =
   D.(
-    unary "%end_region" ~params:no_param (fun _ () ->
-        Flambda_primitive.End_region { ghost = false }))
+    unary "%end_region" ~params:param0 (fun _ () ->
+        P.End_region { ghost = false }))
 
 let end_try_region =
   D.(
-    unary "%end_try_region" ~params:no_param (fun _ () ->
-        Flambda_primitive.End_try_region { ghost = false }))
+    unary "%end_try_region" ~params:param0 (fun _ () ->
+        P.End_try_region { ghost = false }))
 
 let end_ghost_region =
   D.(
-    unary "%end_ghost_region" ~params:no_param (fun _ () ->
-        Flambda_primitive.End_region { ghost = true }))
+    unary "%end_ghost_region" ~params:param0 (fun _ () ->
+        P.End_region { ghost = true }))
 
 let end_try_ghost_region =
   D.(
-    unary "%end_try_ghost_region" ~params:no_param (fun _ () ->
-        Flambda_primitive.End_try_region { ghost = true }))
+    unary "%end_try_ghost_region" ~params:param0 (fun _ () ->
+        P.End_try_region { ghost = true }))
 
 let duplicate_array =
   D.(
@@ -440,37 +412,32 @@ let duplicate_array =
            (positional mutability_as_value)
            (positional mutability_as_value))
       (fun _ (kind, source_mutability, destination_mutability) ->
-        Flambda_primitive.Duplicate_array
-          { kind; source_mutability; destination_mutability }))
+        P.Duplicate_array { kind; source_mutability; destination_mutability }))
 
 let int_as_pointer =
   D.(
     unary "%int_as_pointer" ~params:alloc_mode_for_allocation (fun _ a ->
-        Flambda_primitive.Int_as_pointer a))
+        P.Int_as_pointer a))
 
 let int_uarith =
   D.(
     unary "%int_uarith" ~params:(param2 standard_int unary_int_arith_op)
-      (fun _ (i, o) -> Flambda_primitive.Int_arith (i, o)))
+      (fun _ (i, o) -> P.Int_arith (i, o)))
 
 let is_boxed_float =
-  D.(
-    unary "%is_boxed_float" ~params:no_param (fun _ () ->
-        Flambda_primitive.Is_boxed_float))
+  D.(unary "%is_boxed_float" ~params:param0 (fun _ () -> P.Is_boxed_float))
 
 let is_flat_float_array =
   D.(
-    unary "%is_flat_float_array" ~params:no_param (fun _ () ->
-        Flambda_primitive.Is_flat_float_array))
+    unary "%is_flat_float_array" ~params:param0 (fun _ () ->
+        P.Is_flat_float_array))
 
 let is_int =
   D.(
-    unary "%is_int" ~params:no_param (fun _ () ->
-        Flambda_primitive.Is_int { variant_only = true }
-        (* CR vlaviron: discuss *)))
+    unary "%is_int" ~params:param0 (fun _ () ->
+        P.Is_int { variant_only = true } (* CR vlaviron: discuss *)))
 
-let is_null =
-  D.(unary "%is_null" ~params:no_param (fun _ () -> Flambda_primitive.Is_null))
+let is_null = D.(unary "%is_null" ~params:param0 (fun _ () -> P.Is_null))
 
 let num_conv =
   D.(
@@ -479,22 +446,19 @@ let num_conv =
         (param2
            (positional standard_int_or_float)
            (positional standard_int_or_float))
-      (fun _ (src, dst) -> Flambda_primitive.Num_conv { src; dst }))
+      (fun _ (src, dst) -> P.Num_conv { src; dst }))
 
-let make_lazy =
-  D.(
-    unary "%lazy" ~params:lazy_tag (fun _ lt -> Flambda_primitive.Make_lazy lt))
+let make_lazy = D.(unary "%lazy" ~params:lazy_tag (fun _ lt -> P.Make_lazy lt))
 
 let opaque_identity =
   D.(
-    unary "%opaque" ~params:no_param (fun _ () ->
-        Flambda_primitive.Opaque_identity
-          { middle_end_only = false; kind = Flambda_kind.value }))
+    unary "%opaque" ~params:param0 (fun _ () ->
+        P.Opaque_identity { middle_end_only = false; kind = Flambda_kind.value }))
 
 let reinterpret_64_bit_word =
   D.(
     unary "%reinterpret_64_bit_word" ~params:reinterp_64bit_word (fun _ r ->
-        Flambda_primitive.Reinterpret_64_bit_word r))
+        P.Reinterpret_64_bit_word r))
 
 let ufloat_arith =
   D.(
@@ -502,14 +466,10 @@ let ufloat_arith =
       (fun _ (w, o) -> Float_arith (w, o)))
 
 let unbox_num =
-  D.(
-    unary "%unbox_num" ~params:boxable_number (fun _ b ->
-        Flambda_primitive.Unbox_number b))
+  D.(unary "%unbox_num" ~params:boxable_number (fun _ b -> P.Unbox_number b))
 
 let untag_immediate =
-  D.(
-    unary "%untag_imm" ~params:no_param (fun _ () ->
-        Flambda_primitive.Untag_immediate))
+  D.(unary "%untag_imm" ~params:param0 (fun _ () -> P.Untag_immediate))
 
 let project_value_slot =
   (* CR mshinwell: support non-value kinds *)
@@ -530,7 +490,7 @@ let project_value_slot =
               ~to_:(fun env vs ->
                 Flambda_to_fexpr_commons.Env.translate_value_slot env vs)))
       (fun _ (project_from, value_slot) ->
-        Flambda_primitive.Project_value_slot { project_from; value_slot }))
+        P.Project_value_slot { project_from; value_slot }))
 
 let project_function_slot =
   D.(
@@ -548,36 +508,29 @@ let project_function_slot =
               ~to_:(fun env mt ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mt)))
       (fun _ (move_from, move_to) ->
-        Flambda_primitive.Project_function_slot { move_from; move_to }))
+        P.Project_function_slot { move_from; move_to }))
 
 let string_length =
-  D.(
-    unary "%string_length" ~params:no_param (fun _ () ->
-        Flambda_primitive.String_length String))
+  D.(unary "%string_length" ~params:param0 (fun _ () -> P.String_length String))
 
 let bytes_length =
-  D.(
-    unary "%bytes_length" ~params:no_param (fun _ () ->
-        Flambda_primitive.String_length String))
+  D.(unary "%bytes_length" ~params:param0 (fun _ () -> P.String_length String))
 
 let boolean_not =
-  D.(
-    unary "%boolean_not" ~params:no_param (fun _ () ->
-        Flambda_primitive.Boolean_not))
+  D.(unary "%boolean_not" ~params:param0 (fun _ () -> P.Boolean_not))
 
 (* Binaries *)
 let atomic_load_field =
   D.(
     binary "%atomic_load_field" ~params:block_access_field_kind (fun _ kind ->
-        Flambda_primitive.Atomic_load_field kind))
+        P.Atomic_load_field kind))
 
 let block_set =
   D.(
     binary "%block_set"
       ~params:
         (param3 block_access_kind init_or_assign (positional target_ocaml_int))
-      (fun _ (kind, init, field) ->
-        Flambda_primitive.Block_set { kind; init; field }))
+      (fun _ (kind, init, field) -> P.Block_set { kind; init; field }))
 
 let array_load =
   D.(
@@ -586,8 +539,8 @@ let array_load =
         (maps
            (param2 array_kind mutability)
            ~from:(fun _ (k, m) ->
-             let lk : Flambda_primitive.Array_load_kind.t =
-               match (k : Flambda_primitive.Array_kind.t) with
+             let lk : P.Array_load_kind.t =
+               match (k : P.Array_kind.t) with
                | Immediates -> Immediates
                | Gc_ignorable_values -> Gc_ignorable_values
                | Values -> Values
@@ -607,28 +560,23 @@ let array_load =
              in
              k, lk, m)
            ~to_:(fun _ (k, _, m) -> k, m))
-      (fun _ (k, lk, m) -> Flambda_primitive.Array_load (k, lk, m)))
+      (fun _ (k, lk, m) -> P.Array_load (k, lk, m)))
 
 let bigarray_load =
   D.(
     binary "%bigarray_load"
       ~params:(param3 (positional int) bigarray_kind bigarray_layout)
-      (fun _ (d, k, l) -> Flambda_primitive.Bigarray_load (d, k, l)))
+      (fun _ (d, k, l) -> P.Bigarray_load (d, k, l)))
 
-let phys_eq =
-  D.(
-    binary "%phys_eq" ~params:no_param (fun _ () ->
-        Flambda_primitive.Phys_equal Eq))
+let phys_eq = D.(binary "%phys_eq" ~params:param0 (fun _ () -> P.Phys_equal Eq))
 
 let phys_ne =
-  D.(
-    binary "%phys_ne" ~params:no_param (fun _ () ->
-        Flambda_primitive.Phys_equal Neq))
+  D.(binary "%phys_ne" ~params:param0 (fun _ () -> P.Phys_equal Neq))
 
 let int_barith =
   D.(
     binary "%int_barith" ~params:(param2 standard_int binary_int_arith_op)
-      (fun _ (i, o) -> Flambda_primitive.Int_arith (i, o)))
+      (fun _ (i, o) -> P.Int_arith (i, o)))
 
 let int_comp =
   let open D in
@@ -675,17 +623,17 @@ let int_comp =
       ]
   in
   binary "%int_comp" ~params:(param2 standard_int comp) (fun _ (i, c) ->
-      Flambda_primitive.Int_comp (i, c))
+      P.Int_comp (i, c))
 
 let int_shift =
   D.(
     binary "%int_shift" ~params:(param2 standard_int int_shift_op)
-      (fun _ (i, o) -> Flambda_primitive.Int_shift (i, o)))
+      (fun _ (i, o) -> P.Int_shift (i, o)))
 
 let bfloat_arith =
   D.(
     binary "%bfloat_arith" ~params:(param2 float_bitwidth binary_float_arith_op)
-      (fun _ (w, op) -> Flambda_primitive.Float_arith (w, op)))
+      (fun _ (w, op) -> P.Float_arith (w, op)))
 
 let float_comp =
   let open D in
@@ -701,22 +649,22 @@ let float_comp =
         "lt", Yielding_int_like_compare_functions () ]
   in
   binary "%float_comp" ~params:(param2 float_bitwidth comp) (fun _ (w, c) ->
-      Flambda_primitive.Float_comp (w, c))
+      P.Float_comp (w, c))
 
 let string_load =
   D.(
     binary "%string_load" ~params:(positional string_accessor_width)
-      (fun _ saw -> Flambda_primitive.String_or_bigstring_load (String, saw)))
+      (fun _ saw -> P.String_or_bigstring_load (String, saw)))
 
 let bytes_load =
   D.(
     binary "%bytes_load" ~params:(positional string_accessor_width)
-      (fun _ saw -> Flambda_primitive.String_or_bigstring_load (Bytes, saw)))
+      (fun _ saw -> P.String_or_bigstring_load (Bytes, saw)))
 
 let bigstring_load =
   D.(
     binary "%bigstring_load" ~params:(positional string_accessor_width)
-      (fun _ saw -> Flambda_primitive.String_or_bigstring_load (Bigstring, saw)))
+      (fun _ saw -> P.String_or_bigstring_load (Bigstring, saw)))
 
 let bigarray_get_alignment = todo "%bigarray_get_alignment"
 
@@ -728,8 +676,8 @@ let array_set =
         (maps
            (param2 array_kind init_or_assign)
            ~from:(fun _ (k, ia) ->
-             let sk : Flambda_primitive.Array_set_kind.t =
-               match (k : Flambda_primitive.Array_kind.t) with
+             let sk : P.Array_set_kind.t =
+               match (k : P.Array_kind.t) with
                | Values -> Values ia
                | Immediates -> Immediates
                | Gc_ignorable_values -> Gc_ignorable_values
@@ -748,13 +696,12 @@ let array_set =
                  Misc.fatal_error "Unboxed product array ops not supported"
              in
              k, sk)
-           ~to_:(fun _ (k, sk) : (Flambda_primitive.Array_kind.t * _) ->
+           ~to_:(fun _ (k, sk) : (P.Array_kind.t * _) ->
              let no_ai =
-               Flambda_primitive.Init_or_assign.Assignment
-                 Alloc_mode.For_assignments.heap
+               P.Init_or_assign.Assignment Alloc_mode.For_assignments.heap
              in
              let ai =
-               match (sk : Flambda_primitive.Array_set_kind.t) with
+               match (sk : P.Array_set_kind.t) with
                | Values ai -> ai
                | Immediates | Gc_ignorable_values | Naked_floats
                | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
@@ -763,66 +710,64 @@ let array_set =
                  no_ai
              in
              k, ai))
-      (fun _ (k, sk) -> Flambda_primitive.Array_set (k, sk)))
+      (fun _ (k, sk) -> P.Array_set (k, sk)))
 
 let atomic_exchange_field =
   D.(
     ternary "%atomic_exchange_field" ~params:block_access_field_kind (fun _ a ->
-        Flambda_primitive.Atomic_exchange_field a))
+        P.Atomic_exchange_field a))
 
 let atomic_field_int_arith =
   D.(
     ternary "%atomic_field_int_arith" ~params:int_atomic_op (fun _ o ->
-        Flambda_primitive.Atomic_field_int_arith o))
+        P.Atomic_field_int_arith o))
 
 let atomic_set_field =
   D.(
     ternary "%atomic_set_field" ~params:block_access_field_kind (fun _ a ->
-        Flambda_primitive.Atomic_set_field a))
+        P.Atomic_set_field a))
 
 let bigarray_set =
   D.(
     ternary "%bigarray_set"
       ~params:(param3 (positional int) bigarray_kind bigarray_layout)
-      (fun _ (d, k, l) -> Flambda_primitive.Bigarray_set (d, k, l)))
+      (fun _ (d, k, l) -> P.Bigarray_set (d, k, l)))
 
 let bytes_or_bigstring_set =
   D.(
     ternary "%bytes_or_bigstring_set"
       ~params:
         (param2
-           (constructor_flag
-              [ "bytes", Flambda_primitive.Bytes;
-                "bigstring", Flambda_primitive.Bigstring ])
+           (constructor_flag ["bytes", P.Bytes; "bigstring", P.Bigstring])
            (positional string_accessor_width))
-      (fun _ (blv, saw) -> Flambda_primitive.Bytes_or_bigstring_set (blv, saw)))
+      (fun _ (blv, saw) -> P.Bytes_or_bigstring_set (blv, saw)))
 
 (* Quaternaries *)
 let atomic_compare_and_set_field =
   D.(
     quaternary "%atomic_compare_and_set_field" ~params:block_access_field_kind
-      (fun _ a -> Flambda_primitive.Atomic_compare_and_set_field a))
+      (fun _ a -> P.Atomic_compare_and_set_field a))
 
 (* Variadics *)
 let begin_region =
   D.(
-    variadic "%begin_region" ~params:no_param (fun _ () _ ->
-        Flambda_primitive.Begin_region { ghost = false }))
+    variadic "%begin_region" ~params:param0 (fun _ () _ ->
+        P.Begin_region { ghost = false }))
 
 let begin_try_region =
   D.(
-    variadic "%begin_try_region" ~params:no_param (fun _ () _ ->
-        Flambda_primitive.Begin_try_region { ghost = false }))
+    variadic "%begin_try_region" ~params:param0 (fun _ () _ ->
+        P.Begin_try_region { ghost = false }))
 
 let begin_ghost_region =
   D.(
-    variadic "%begin_ghost_region" ~params:no_param (fun _ () _ ->
-        Flambda_primitive.Begin_region { ghost = true }))
+    variadic "%begin_ghost_region" ~params:param0 (fun _ () _ ->
+        P.Begin_region { ghost = true }))
 
 let begin_try_ghost_region =
   D.(
-    variadic "%begin_try_ghost_region" ~params:no_param (fun _ () _ ->
-        Flambda_primitive.Begin_try_region { ghost = true }))
+    variadic "%begin_try_ghost_region" ~params:param0 (fun _ () _ ->
+        P.Begin_try_region { ghost = true }))
 
 let make_block =
   D.(
@@ -831,19 +776,19 @@ let make_block =
         (param3 mutability (positional scannable_tag) alloc_mode_for_allocation)
       (fun _ (m, t, a) n ->
         let kind =
-          Flambda_primitive.Block_kind.Values
+          P.Block_kind.Values
             (t, List.init n (fun _ -> Flambda_kind.With_subkind.any_value))
         in
-        Flambda_primitive.Make_block (kind, m, a)))
+        P.Make_block (kind, m, a)))
 
 let make_array =
   D.(
     variadic "%array"
       ~params:(param3 array_kind mutability alloc_mode_for_allocation)
-      (fun _ (k, m, a) _ -> Flambda_primitive.Make_array (k, m, a)))
+      (fun _ (k, m, a) _ -> P.Make_array (k, m, a)))
 
 module OfFlambda = struct
-  let nullop env (op : Flambda_primitive.nullary_primitive) =
+  let nullop env (op : P.nullary_primitive) =
     match op with
     | Invalid kind -> invalid env kind
     | Optimised_out kind -> optimised_out env kind
@@ -855,7 +800,7 @@ module OfFlambda = struct
     | Poll -> poll env ()
     | Cpu_relax -> cpu_relax env ()
 
-  let unop env (op : Flambda_primitive.unary_primitive) =
+  let unop env (op : P.unary_primitive) =
     match op with
     | Array_length ak -> array_length env ak
     | Block_load { kind; mut; field } -> block_load env (kind, mut, field)
@@ -891,11 +836,10 @@ module OfFlambda = struct
     | Tag_immediate -> tag_immediate env ()
     | Duplicate_block _ | Obj_dup | Get_header | Peek _ ->
       todo
-        (Format.asprintf "%a" Flambda_primitive.Without_args.print
-           (Flambda_primitive.Without_args.Unary op))
+        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Unary op))
         env ()
 
-  let binop env (op : Flambda_primitive.binary_primitive) =
+  let binop env (op : P.binary_primitive) =
     match op with
     | Atomic_load_field ak -> atomic_load_field env ak
     | Block_set { kind; init; field } -> block_set env (kind, init, field)
@@ -913,11 +857,10 @@ module OfFlambda = struct
     | String_or_bigstring_load (Bigstring, saw) -> bigstring_load env saw
     | Bigarray_get_alignment align -> bigarray_get_alignment env align
     | Poke _ | Read_offset _ ->
-      Misc.fatal_errorf "TODO: Binary primitive: %a"
-        Flambda_primitive.Without_args.print
-        (Flambda_primitive.Without_args.Binary op)
+      Misc.fatal_errorf "TODO: Binary primitive: %a" P.Without_args.print
+        (P.Without_args.Binary op)
 
-  let ternop env (op : Flambda_primitive.ternary_primitive) =
+  let ternop env (op : P.ternary_primitive) =
     match op with
     | Array_set (k, sk) -> array_set env (k, sk)
     | Atomic_exchange_field a -> atomic_exchange_field env a
@@ -927,20 +870,19 @@ module OfFlambda = struct
     | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
     | Write_offset _ ->
       todo
-        (Format.asprintf "%a" Flambda_primitive.Without_args.print
-           (Flambda_primitive.Without_args.Ternary op))
+        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Ternary op))
         env ()
 
-  let quaternop env (op : Flambda_primitive.quaternary_primitive) =
+  let quaternop env (op : P.quaternary_primitive) =
     match op with
     | Atomic_compare_and_set_field a -> atomic_compare_and_set_field env a
     | Atomic_compare_exchange_field _ ->
       todo
-        (Format.asprintf "%a" Flambda_primitive.Without_args.print
-           (Flambda_primitive.Without_args.Quaternary op))
+        (Format.asprintf "%a" P.Without_args.print
+           (P.Without_args.Quaternary op))
         env ()
 
-  let varop env (op : Flambda_primitive.variadic_primitive) =
+  let varop env (op : P.variadic_primitive) =
     match op with
     | Begin_region { ghost = false } -> begin_region env ()
     | Begin_try_region { ghost = false } -> begin_try_region env ()
@@ -952,11 +894,10 @@ module OfFlambda = struct
       make_array env (kind, mutability, alloc)
     | Make_block ((Naked_floats | Mixed (_, _)), _, _) ->
       todo
-        (Format.asprintf "%a" Flambda_primitive.Without_args.print
-           (Flambda_primitive.Without_args.Variadic op))
+        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Variadic op))
         env ()
 
-  let prim env (p : Flambda_primitive.t) : t * Simple.t list =
+  let prim env (p : P.t) : t * Simple.t list =
     match p with
     | Nullary op -> nullop env op, []
     | Unary (op, arg) -> unop env op, [arg]
@@ -969,7 +910,7 @@ end
 
 module ToFlambda = struct
   let prim (env : Fexpr_to_flambda_commons.env) (p : t) (args : Simple.t list) :
-      Flambda_primitive.t =
+      P.t =
     match lookup_prim p with
     | None -> Misc.fatal_errorf "Unregistered primitive: %s" p.prim
     | Some conv -> conv env p args

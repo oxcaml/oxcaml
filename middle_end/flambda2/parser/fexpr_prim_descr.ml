@@ -11,25 +11,25 @@ type t = Fexpr.prim_op =
     params : param list
   }
 
-type to_fl_env = Fexpr_to_flambda_commons.env
+type decode_env = Fexpr_to_flambda_commons.env
 
-type of_fl_env = Flambda_to_fexpr_commons.Env.t
+type encode_env = Flambda_to_fexpr_commons.Env.t
 
-type 'p cons0 = to_fl_env -> 'p -> Flambda_primitive.nullary_primitive
+type 'p cons0 = decode_env -> 'p -> Flambda_primitive.nullary_primitive
 
-type 'p cons1 = to_fl_env -> 'p -> Flambda_primitive.unary_primitive
+type 'p cons1 = decode_env -> 'p -> Flambda_primitive.unary_primitive
 
-type 'p cons2 = to_fl_env -> 'p -> Flambda_primitive.binary_primitive
+type 'p cons2 = decode_env -> 'p -> Flambda_primitive.binary_primitive
 
-type 'p cons3 = to_fl_env -> 'p -> Flambda_primitive.ternary_primitive
+type 'p cons3 = decode_env -> 'p -> Flambda_primitive.ternary_primitive
 
-type 'p cons4 = to_fl_env -> 'p -> Flambda_primitive.quaternary_primitive
+type 'p cons4 = decode_env -> 'p -> Flambda_primitive.quaternary_primitive
 
-type 'p consN = to_fl_env -> 'p -> int -> Flambda_primitive.variadic_primitive
+type 'p consN = decode_env -> 'p -> int -> Flambda_primitive.variadic_primitive
 
 type ('p, 't, 'r) lens =
-  { of_fl : of_fl_env -> 'p -> 't;
-    to_fl : to_fl_env -> 't -> 'r
+  { encode : encode_env -> 'p -> 't;
+    decode : decode_env -> 't -> 'r
   }
 
 type ('a, 'b) map_lens = ('a, 'b, 'a) lens
@@ -40,20 +40,19 @@ type 'p params_lens = ('p, param list) map_lens
 
 type 'p prim_lens = ('p, t, Simple.t list -> Flambda_primitive.t) lens
 
-type 'p conv = of_fl_env -> 'p -> t
+type 'p conv = encode_env -> 'p -> t
 
 type _ param_cons =
-  | Pos : 'p value_lens -> 'p param_cons
-  | Lbl : string * 'p value_lens -> 'p param_cons
-  | Flg : string -> unit param_cons
-  | Opt : 'p param_cons -> 'p option param_cons
-  | Def : 'p param_cons * 'p * ('p -> 'p -> bool) -> 'p param_cons
-  | Lst : 'p param_cons list -> 'p list param_cons
-  | Etr : 'p case_cons list * ('p -> unit) -> 'p param_cons
-  | Map : 'a param_cons * ('b, 'a) map_lens -> 'b param_cons
-  | Pa0 : unit param_cons
-  | Pa2 : 'a param_cons * 'b param_cons -> ('a * 'b) param_cons
-  | Pa3 :
+  | CPositional : 'p value_lens -> 'p param_cons
+  | CLabeled : string * 'p value_lens -> 'p param_cons
+  | CFlag : string -> unit param_cons
+  | COptional : 'p param_cons -> 'p option param_cons
+  | CDefault : 'p param_cons * 'p * ('p -> 'p -> bool) -> 'p param_cons
+  | CEither : 'p case_cons list * ('p -> unit) -> 'p param_cons
+  | CMap : 'a param_cons * ('b, 'a) map_lens -> 'b param_cons
+  | CParam0 : unit param_cons
+  | CParam2 : 'a param_cons * 'b param_cons -> ('a * 'b) param_cons
+  | CParam3 :
       'a param_cons * 'b param_cons * 'c param_cons
       -> ('a * 'b * 'c) param_cons
 
@@ -66,8 +65,8 @@ let unwrap_loc located = located.Fexpr.txt
 
 (* Parsing fexpr parameters. Low-brow iteration through constructors in
    declaration order, consuming the param list on match. *)
-let extract_param (env : to_fl_env) (params : param list) (cons : 'p param_cons)
-    : 'p option * param list =
+let extract_param (env : decode_env) (params : param list)
+    (cons : 'p param_cons) : 'p option * param list =
   let rec pos conv lp params =
     match params with
     | [] -> None, lp
@@ -90,7 +89,7 @@ let extract_param (env : to_fl_env) (params : param list) (cons : 'p param_cons)
       if String.equal f flag then Some (), lp @ rp else flg f (lp @ [p]) rp
     | ((Positional _ | Labeled _) as p) :: rp -> flg f (lp @ [p]) rp
   in
-  let no_param params = Some (), params in
+  let param0 params = Some (), params in
   let rec def : type p. p -> p param_cons -> param list -> p option * param list
       =
    fun d cons params ->
@@ -101,29 +100,17 @@ let extract_param (env : to_fl_env) (params : param list) (cons : 'p param_cons)
    fun cons params ->
     let (found : p option), params = aux cons params in
     Some found, params
-  and lst : type p.
-      p param_cons list -> param list -> p list option * param list =
-   fun consl params ->
-    List.fold_left
-      (fun (pl, ps) cons ->
-        match pl with
-        | None -> None, params
-        | Some pl -> (
-          match aux cons ps with
-          | Some p, ps -> Some (p :: pl), ps
-          | None, _ -> None, params))
-      (Some [], params) consl
   and etr : type p. p case_cons list -> param list -> p option * param list =
    fun cases params ->
     match cases with
     | [] -> None, params
     | Case (conv, param_cons) :: cases -> (
       match aux param_cons params with
-      | Some p, params -> Some (conv.to_fl env (Some p)), params
+      | Some p, params -> Some (conv.decode env (Some p)), params
       | None, _ -> etr cases params)
   and map : type a b.
       a param_cons ->
-      (to_fl_env -> a -> b) ->
+      (decode_env -> a -> b) ->
       param list ->
       b option * param list =
    fun cons f params ->
@@ -152,50 +139,48 @@ let extract_param (env : to_fl_env) (params : param list) (cons : 'p param_cons)
       params )
   and aux : type p. p param_cons -> param list -> p option * param list =
     function
-    | Pos plens -> pos plens.to_fl []
-    | Lbl (l, plens) -> lbl l plens.to_fl []
-    | Flg f -> flg f []
-    | Def (pcons, default, _) -> def default pcons
-    | Opt pcons -> opt pcons
-    | Lst pconsl -> lst pconsl
-    | Etr (cases, _) -> etr cases
-    | Map (pcons, l) -> map pcons l.to_fl
-    | Pa0 -> no_param
-    | Pa2 (pc1, pc2) -> param2 pc1 pc2
-    | Pa3 (pc1, pc2, pc3) -> param3 pc1 pc2 pc3
+    | CPositional plens -> pos plens.decode []
+    | CLabeled (l, plens) -> lbl l plens.decode []
+    | CFlag f -> flg f []
+    | CDefault (pcons, default, _) -> def default pcons
+    | COptional pcons -> opt pcons
+    | CEither (cases, _) -> etr cases
+    | CMap (pcons, l) -> map pcons l.decode
+    | CParam0 -> param0
+    | CParam2 (pc1, pc2) -> param2 pc1 pc2
+    | CParam3 (pc1, pc2, pc3) -> param3 pc1 pc2 pc3
   in
   aux cons params
 
-let rec build_param : type p. of_fl_env -> p -> p param_cons -> param list =
+let rec build_param : type p. encode_env -> p -> p param_cons -> param list =
  fun env p cons ->
   match cons with
-  | Pos vl -> [Positional (vl.of_fl env p)]
-  | Lbl (label, vl) -> [Labeled { label; value = vl.of_fl env p }]
-  | Flg flag -> [Flag flag]
-  | Opt pcons -> (
+  | CPositional vl -> [Positional (vl.encode env p)]
+  | CLabeled (label, vl) -> [Labeled { label; value = vl.encode env p }]
+  | CFlag flag -> [Flag flag]
+  | COptional pcons -> (
     match p with None -> [] | Some p -> build_param env p pcons)
-  | Def (pcons, default, eq) ->
+  | CDefault (pcons, default, eq) ->
     if eq p default then [] else build_param env p pcons
-  | Lst pconsl -> List.flatten @@ List.map2 (build_param env) p pconsl
-  | Etr ([], failure) ->
+  | CEither ([], failure) ->
     failure p;
     []
-  | Etr (Case (conv, param_cons) :: cases, f) -> (
-    match conv.of_fl env p with
-    | None -> build_param env p (Etr (cases, f))
+  | CEither (Case (conv, param_cons) :: cases, f) -> (
+    match conv.encode env p with
+    | None -> build_param env p (CEither (cases, f))
     | Some p -> build_param env p param_cons)
-  | Map (pcons, f) -> build_param env (f.of_fl env p) pcons
-  | Pa0 -> []
-  | Pa2 (pc1, pc2) ->
+  | CMap (pcons, f) -> build_param env (f.encode env p) pcons
+  | CParam0 -> []
+  | CParam2 (pc1, pc2) ->
     let p1, p2 = p in
     build_param env p1 pc1 @ build_param env p2 pc2
-  | Pa3 (pc1, pc2, pc3) ->
+  | CParam3 (pc1, pc2, pc3) ->
     let p1, p2, p3 = p in
     build_param env p1 pc1 @ build_param env p2 pc2 @ build_param env p3 pc3
 
 let lens_of_cons id (cons : 'p param_cons) : 'p params_lens =
-  { of_fl = (fun env p -> build_param env p cons);
-    to_fl =
+  { encode = (fun env p -> build_param env p cons);
+    decode =
       (fun env params ->
         let ps, rem = extract_param env params cons in
         match ps with
@@ -212,29 +197,31 @@ let lens_of_cons id (cons : 'p param_cons) : 'p params_lens =
 let prim_table = Hashtbl.create 32
 
 let register_lens id l =
-  Hashtbl.add prim_table id l.to_fl;
-  l.of_fl
+  if not @@ String.starts_with ~prefix:"%" id
+  then Misc.fatal_errorf "Registered primitive '%s' do not start with %%." id;
+  Hashtbl.add prim_table id l.decode;
+  l.encode
 
 let lookup_prim p = Hashtbl.find_opt prim_table p.prim
 
 module Describe = struct
   let todo0 s =
     let f _ _ = Misc.fatal_errorf "TODO: %s" s in
-    { of_fl = f; to_fl = f }
+    { encode = f; decode = f }
 
   let todops s = todo0 ("parameter " ^ s)
 
-  let todop s = Pos (todops s)
+  let todop s = CPositional (todops s)
 
   let todo s = register_lens s @@ todo0 s
 
   let int : int value_lens =
-    { of_fl = (fun _ i -> wrap_loc @@ string_of_int i);
-      to_fl = (fun _ s -> int_of_string (unwrap_loc s))
+    { encode = (fun _ i -> wrap_loc @@ string_of_int i);
+      decode = (fun _ s -> int_of_string (unwrap_loc s))
     }
 
   let string : string Fexpr.located value_lens =
-    { of_fl = (fun _ s -> s); to_fl = (fun _ s -> s) }
+    { encode = (fun _ s -> s); decode = (fun _ s -> s) }
 
   let diy = string
 
@@ -247,46 +234,46 @@ module Describe = struct
       | [] -> Misc.fatal_error "Undefined constructor"
       | (s', c) :: l -> if String.equal s s' then c else finds s l
     in
-    { of_fl = (fun _ c -> wrap_loc @@ findc c constrs);
-      to_fl = (fun _ s -> finds (unwrap_loc s) constrs)
+    { encode = (fun _ c -> wrap_loc @@ findc c constrs);
+      decode = (fun _ s -> finds (unwrap_loc s) constrs)
     }
 
-  let positional (plens : 'a value_lens) : 'a param_cons = Pos plens
+  let positional (plens : 'a value_lens) : 'a param_cons = CPositional plens
 
-  let labeled label (plens : 'a value_lens) : 'a param_cons = Lbl (label, plens)
+  let labeled label (plens : 'a value_lens) : 'a param_cons =
+    CLabeled (label, plens)
 
-  let flag flag : unit param_cons = Flg flag
+  let flag flag : unit param_cons = CFlag flag
 
   let default ~(def : 'p) ?(eq : 'p -> 'p -> bool = Stdlib.( = ))
       (pcons : 'p param_cons) : 'p param_cons =
-    Def (pcons, def, eq)
+    CDefault (pcons, def, eq)
 
-  let option (pcons : 'p param_cons) : 'p option param_cons = Opt pcons
-
-  let list (pconsl : 'p param_cons list) : 'p list param_cons = Lst pconsl
+  let option (pcons : 'p param_cons) : 'p option param_cons = COptional pcons
 
   let either ?(no_match_handler = fun _ -> ()) (cases : 'p case_cons list) :
       'p param_cons =
-    Etr (cases, no_match_handler)
+    CEither (cases, no_match_handler)
 
   let case ~(box : _ -> 'c -> 'p) ~(unbox : _ -> 'p -> 'c option)
       (param_cons : 'c param_cons) : 'p case_cons =
     Case
-      ( { of_fl = unbox;
-          to_fl = (fun e -> function Some p -> box e p | None -> assert false)
+      ( { encode = unbox;
+          decode =
+            (fun e -> function Some p -> box e p | None -> assert false)
         },
         param_cons )
 
   let id_case (param_cons : 'p param_cons) : 'p case_cons =
     Case
-      ( { of_fl = (fun _ p -> Some p);
-          to_fl = (fun _ -> function Some p -> p | None -> assert false)
+      ( { encode = (fun _ p -> Some p);
+          decode = (fun _ -> function Some p -> p | None -> assert false)
         },
         param_cons )
 
-  let maps ~(to_ : of_fl_env -> 'b -> 'a) ~(from : to_fl_env -> 'a -> 'b)
+  let maps ~(to_ : encode_env -> 'b -> 'a) ~(from : decode_env -> 'a -> 'b)
       (pcons : 'a param_cons) : 'b param_cons =
-    Map (pcons, { to_fl = from; of_fl = to_ })
+    CMap (pcons, { decode = from; encode = to_ })
 
   let opt_presence (pcons : unit option param_cons) : bool param_cons =
     maps pcons
@@ -305,102 +292,102 @@ module Describe = struct
              ~unbox:(fun _ p -> if Stdlib.( = ) p constr then Some () else None))
          flags)
 
-  let no_param = Pa0
+  let param0 = CParam0
 
-  let param2 pc1 pc2 = Pa2 (pc1, pc2)
+  let param2 pc1 pc2 = CParam2 (pc1, pc2)
 
-  let param3 pc1 pc2 pc3 = Pa3 (pc1, pc2, pc3)
+  let param3 pc1 pc2 pc3 = CParam3 (pc1, pc2, pc3)
 
   let nullary : type p. string -> params:p param_cons -> p cons0 -> p conv =
    fun id ~params cons ->
     let params = lens_of_cons id params in
-    let of_fl env p =
-      let params = params.of_fl env p in
+    let encode env p =
+      let params = params.encode env p in
       { prim = id; params }
     in
-    let to_fl env t args =
+    let decode env t args =
       match args with
       | [] ->
-        let params = params.to_fl env t.params in
+        let params = params.decode env t.params in
         Flambda_primitive.Nullary (cons env params)
       | _ -> Misc.fatal_errorf "Primitive %s takes no arguments" id
     in
-    register_lens id { of_fl; to_fl }
+    register_lens id { encode; decode }
 
   let unary : type p. string -> params:p param_cons -> p cons1 -> p conv =
    fun id ~params cons ->
     let params = lens_of_cons id params in
-    let of_fl env p =
-      let params = params.of_fl env p in
+    let encode env p =
+      let params = params.encode env p in
       { prim = id; params }
     in
-    let to_fl env t args =
+    let decode env t args =
       match args with
       | [arg] ->
-        let params = params.to_fl env t.params in
+        let params = params.decode env t.params in
         Flambda_primitive.Unary (cons env params, arg)
       | _ -> Misc.fatal_errorf "Primitive %s takes one argument" id
     in
-    register_lens id { of_fl; to_fl }
+    register_lens id { encode; decode }
 
   let binary : type p. string -> params:p param_cons -> p cons2 -> p conv =
    fun id ~params cons ->
     let params = lens_of_cons id params in
-    let of_fl env p =
-      let params = params.of_fl env p in
+    let encode env p =
+      let params = params.encode env p in
       { prim = id; params }
     in
-    let to_fl env t args =
+    let decode env t args =
       match args with
       | [arg1; arg2] ->
-        let params = params.to_fl env t.params in
+        let params = params.decode env t.params in
         Flambda_primitive.Binary (cons env params, arg1, arg2)
       | _ -> Misc.fatal_errorf "Primitive %s takes two argument" id
     in
-    register_lens id { of_fl; to_fl }
+    register_lens id { encode; decode }
 
   let ternary : type p. string -> params:p param_cons -> p cons3 -> p conv =
    fun id ~params cons ->
     let params = lens_of_cons id params in
-    let of_fl env p =
-      let params = params.of_fl env p in
+    let encode env p =
+      let params = params.encode env p in
       { prim = id; params }
     in
-    let to_fl env t args =
+    let decode env t args =
       match args with
       | [arg1; arg2; arg3] ->
-        let params = params.to_fl env t.params in
+        let params = params.decode env t.params in
         Flambda_primitive.Ternary (cons env params, arg1, arg2, arg3)
       | _ -> Misc.fatal_errorf "Primitive %s takes three argument" id
     in
-    register_lens id { of_fl; to_fl }
+    register_lens id { encode; decode }
 
   let quaternary : type p. string -> params:p param_cons -> p cons4 -> p conv =
    fun id ~params cons ->
     let params = lens_of_cons id params in
-    let of_fl env p =
-      let params = params.of_fl env p in
+    let encode env p =
+      let params = params.encode env p in
       { prim = id; params }
     in
-    let to_fl env t args =
+    let decode env t args =
       match args with
       | [arg1; arg2; arg3; arg4] ->
-        let params = params.to_fl env t.params in
+        let params = params.decode env t.params in
         Flambda_primitive.Quaternary (cons env params, arg1, arg2, arg3, arg4)
       | _ -> Misc.fatal_errorf "Primitive %s takes four argument" id
     in
-    register_lens id { of_fl; to_fl }
+    register_lens id { encode; decode }
 
   let variadic : type p. string -> params:p param_cons -> p consN -> p conv =
    fun id ~params cons ->
     let params = lens_of_cons id params in
-    let of_fl env p =
-      let params = params.of_fl env p in
+    let encode env p =
+      let params = params.encode env p in
       { prim = id; params }
     in
-    let to_fl env t args =
-      let params = params.to_fl env t.params in
+    let decode env t args =
+      let params = params.decode env t.params in
       Flambda_primitive.Variadic (cons env params (List.length args), args)
     in
-    register_lens id { of_fl; to_fl }
+    register_lens id { encode; decode }
 end
