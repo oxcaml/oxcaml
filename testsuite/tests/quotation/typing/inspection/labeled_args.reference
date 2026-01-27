@@ -1,16 +1,21 @@
 let f = (fun f__1 x y -> f__1 ~y:y ~x:x) in
-Stdlib.ignore (f : (_, _, _) C.t1)
+Stdlib.ignore (f : (_, _, _) Labeled_args_types.t1)
+
+let f = (fun f__1 x y -> f__1 ~y:y ~x:x) in
+Stdlib.ignore (f : (_, _, _) Labeled_args_types.t1)
 
 let f = (fun f__1 x -> f__1 ?x:(Some x) ()) in
-Stdlib.ignore (f : (_, _) C.t21)
+Stdlib.ignore (f : (_, _) Labeled_args_types.t21)
 
 let f = (fun f__1 x -> f__1 ?x:(Some x) ()) in
-Stdlib.ignore (f : (_, _) C.t22)
+Stdlib.ignore (f : (_, _) Labeled_args_types.t22)
 
-let f = (fun f__1 -> f__1 ?x:None ()) in Stdlib.ignore (f : (_, _) C.t3)
+let f = (fun f__1 -> f__1 ?x:None ()) in
+Stdlib.ignore (f : (_, _) Labeled_args_types.t3)
 
-let f = (fun f__1 x -> f__1 ~x:x ()) in Stdlib.ignore (f : (_, _) C.t4)
+let f = (fun f__1 x -> f__1 ~x:x ()) in
+Stdlib.ignore (f : (_, _) Labeled_args_types.t4)
 
 let f = (fun t -> match t with | (~y:_, ~x:x) -> x) in
-Stdlib.ignore (f : (_, _) C.tt)
+Stdlib.ignore (f : (_, _) Labeled_args_types.tt)
 

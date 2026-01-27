@@ -1,5 +1,5 @@
 (* TEST
- modules = "c.ml util.ml";
+ modules = "labeled_args_types.ml util.ml";
  flags = "-extension runtime_metaprogramming";
  arch_amd64;
  native;
@@ -11,10 +11,7 @@
 #syntax quotations on
 
 open Util
-
-(* The types are written down in C for convenience - at the moment of writing
-   we cannot use type abbreviations from the same file *)
-open C
+open Labeled_args_types
 
 (* For function applications, there are four cases of inspection,
    with some only applicable to optional/required arguments:
@@ -24,9 +21,11 @@ open C
    4. Re-ordering omission (optional, required) *)
 
 (* Commutativity *)
-let (e1 : <[_ t1]> expr) = <[ fun f x y -> f ~x ~y ]>
-let e1' = <[ let f = $e1 in ignore (f : _ t1) ]>
-let () = test e1'
+let (e1_xy : <[_ t1]> expr) = <[ fun f x y -> f ~x ~y ]>
+let e1_xy' = <[ let f = $e1_xy in ignore (f : _ t1) ]>
+let (e1_yx : <[_ t1]> expr) = <[ fun f x y -> f ~y ~x ]>
+let e1_yx' = <[ let f = $e1_yx in ignore (f : _ t1) ]>
+let () = test e1_xy'; test e1_yx'
 
 (* Always-provided optional *)
 let (e21 : <[_ t21]> expr) = <[ fun f x -> f ~x () ]>
