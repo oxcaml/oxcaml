@@ -42,11 +42,15 @@ let e3' = <[ let f = $e3 in ignore (f : _ t3) ]>
 let () = test e3'
 
 (* Re-ordering omission *)
-let (e4 : <[_ t4]> expr) = <[ fun f x -> f () ~x ]>
-let e4' = <[ let f = $e4 in ignore (f : _ t4) ]>
-let () = test e4'
+let (e4_pre : <[_ t4]> expr) = <[ fun f x -> f ~x () ]>
+let e4_pre' = <[ let f = $e4_pre in ignore (f : _ t4) ]>
+let (e4_post : <[_ t4]> expr) = <[ fun f x -> f () ~x ]>
+let e4_post' = <[ let f = $e4_post in ignore (f : _ t4) ]>
+let () = test e4_pre'; test e4_post'
 
 (* Labeled tuples - only inspected for commutativity *)
-let (et : <[_ tt]> expr) = <[ fun t -> let ~x, .. = t in x]>
-let et' = <[ let f = $et in ignore (f : _ tt) ]>
-let () = test et'
+let (et_x : <[_ tt]> expr) = <[ fun t -> let ~x, .. = t in x]>
+let et_x' = <[ let f = $et_x in ignore (f : _ tt) ]>
+let (et_y : <[_ tt]> expr) = <[ fun t -> let ~x, .. = t in x]>
+let et_y' = <[ let f = $et_y in ignore (f : _ tt) ]>
+let () = test et_x'; test et_y'

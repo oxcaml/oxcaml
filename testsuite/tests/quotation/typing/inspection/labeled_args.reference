@@ -16,6 +16,12 @@ Stdlib.ignore (f : (_, _) Labeled_args_types.t3)
 let f = (fun f__1 x -> f__1 ~x:x ()) in
 Stdlib.ignore (f : (_, _) Labeled_args_types.t4)
 
+let f = (fun f__1 x -> f__1 ~x:x ()) in
+Stdlib.ignore (f : (_, _) Labeled_args_types.t4)
+
+let f = (fun t -> match t with | (~y:_, ~x:x) -> x) in
+Stdlib.ignore (f : (_, _) Labeled_args_types.tt)
+
 let f = (fun t -> match t with | (~y:_, ~x:x) -> x) in
 Stdlib.ignore (f : (_, _) Labeled_args_types.tt)
 
