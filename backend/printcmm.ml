@@ -333,6 +333,7 @@ let operation d = function
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field
   | Cdls_get -> "dls_get"
   | Ctls_get -> "tls_get"
+  | Cdomain_index -> "domain_index"
   | Cpoll -> "poll"
   | Cpause -> "pause"
 

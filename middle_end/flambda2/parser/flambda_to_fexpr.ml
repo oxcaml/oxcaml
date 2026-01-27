@@ -549,7 +549,7 @@ let init_or_assign env (ia : Flambda_primitive.Init_or_assign.t) :
 let nullop _env (op : Flambda_primitive.nullary_primitive) : _ =
   match op with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     Misc.fatal_errorf "TODO: Nullary primitive: %a" Flambda_primitive.print
       (Flambda_primitive.Nullary op)
 
