@@ -22,8 +22,8 @@ let code loopify(never) size(13) newer_version_of(foo_1)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : float boxed =
-  let prim = %block_load.`floaf`.[`1`] (af) in
-  let prim_1 = %block_load.`floaf`.[`0`] (af) in
+  let prim = %block_load.`float`.[`1`] (af) in
+  let prim_1 = %block_load.`float`.[`0`] (af) in
   let prim_2 = %bfloat_arith.`mul` (prim_1, prim) in
   let prim_3 = %unbox_num.`float` (y) in
   let prim_4 = %bfloat_arith.`add` (prim_2, prim_3) in
