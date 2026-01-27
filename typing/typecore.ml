@@ -5524,7 +5524,8 @@ let split_function_ty
     let snap = Btype.snapshot () in
     let really_poly =
       try
-        unify env (newmono (newvar (Jkind.Builtin.any ~why:Dummy_jkind))) ty_arg;
+        unify env
+          (newmono (newvar (Jkind.Builtin.any ~why:Dummy_jkind))) ty_arg;
         false
       with Unify _ -> true
     in
@@ -9113,7 +9114,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
           if wrapped_in_some then begin
             type_option_some env expected_mode sarg ty_arg' ty_arg0'
           end else begin
-            type_argument ~overwrite:No_overwrite env expected_mode sarg ty_arg' ty_arg0'
+            type_argument ~overwrite:No_overwrite
+              env expected_mode sarg ty_arg' ty_arg0'
           end
         end else begin
           if !Clflags.principal
@@ -9121,7 +9123,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
             let snap = Btype.snapshot () in
             let really_poly =
               try
-                unify env (newmono (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
+                unify env
+                  (newmono (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
                   ty_arg;
                 false
               with Unify _ -> true
@@ -9145,7 +9148,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
               let vars0, ty_arg0' = instance_poly_fixed vars0 ty_arg0' in
               List.iter2 (fun ty ty' -> unify_var env ty ty') vars vars0;
               let arg =
-                type_argument ~overwrite:No_overwrite env expected_mode sarg ty_arg' ty_arg0'
+                type_argument ~overwrite:No_overwrite
+                  env expected_mode sarg ty_arg' ty_arg0'
               in
               arg, ty_arg, vars
             end
