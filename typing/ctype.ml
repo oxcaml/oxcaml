@@ -2144,6 +2144,7 @@ let rec try_quote_splice_cancel_once ty =
       | Tsplice t' -> t'
       | _ ->
           let t = try_quote_splice_cancel_once t in
+          (* New types are only constructed whenever we expand the subterm *)
           newty2 ~level:(get_level t) (Tquote t)
     end
   | Tsplice t -> begin
