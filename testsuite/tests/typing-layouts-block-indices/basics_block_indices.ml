@@ -438,30 +438,26 @@ type a = float#
 type b = #(a * a * a * a * a * a * a * a) (* 2^6 bytes *)
 type c = #(b * b * b * b * b * b * b * b) (* 2^9 *)
 type d = #(c * c * c * c * c * c * c * c) (* 2^12 *)
-type e = #(d * d * d * d * d * d * d * d) (* 2^15 *)
-type f = #(e * e)                         (* 2^16 *)
 
 type si = { s : string; i : int64# }
-type r = { f : f; si : si# }
+type r = { d : d; si : si# }
 [%%expect{|
 type a = float#
 type b = #(a * a * a * a * a * a * a * a)
 type c = #(b * b * b * b * b * b * b * b)
 type d = #(c * c * c * c * c * c * c * c)
-type e = #(d * d * d * d * d * d * d * d)
-type f = #(e * e)
 type si = { s : string; i : int64#; }
-type r = { f : f; si : si#; }
+type r = { d : d; si : si#; }
 |}]
 
-(* A gap of 2^16 bytes is not allowed *)
+(* A gap of 2^12 bytes is not allowed *)
 let bad_idx () = (.si)
 [%%expect{|
 Line 1, characters 17-22:
 1 | let bad_idx () = (.si)
                      ^^^^^
 Error: This block index cannot be created because it refers to values
-       and non-values that are separated by 2^16 or more bytes in their
+       and non-values that are separated by 2^12 or more bytes in their
        block, or could be deepened to such an index.
 |}]
 
@@ -480,7 +476,7 @@ Line 2, characters 17-21:
 2 | let bad_idx () = (.r)
                      ^^^^
 Error: This block index cannot be created because it refers to values
-       and non-values that are separated by 2^16 or more bytes in their
+       and non-values that are separated by 2^12 or more bytes in their
        block, or could be deepened to such an index.
 |}]
 

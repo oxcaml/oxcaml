@@ -137,7 +137,7 @@ let drop_last_to_y_axis (s : line Stack.t) =
 3. An index to a `float` in a flattened float record has an element type
    `float#`.
 4. Indices to some records containing both values and non-values, and occupying
-   over 2^16 bytes, cannot be created. See [Representation of block
+   over 2^12 bytes, cannot be created. See [Representation of block
    indices](#representation-of-block-indices) for details.
 5. Indices to structures with non-default modalities are not supported.
    Specifically, the composition of modalities of the accesses of an `idx_imm`
@@ -197,7 +197,7 @@ In-memory representation:
 - In the native compiler, the offset and gap are packed into
   a single `bits64`. There are two subcases:
   * The index is to product containing both values and non-values. In this
-    case, the offset is the lower 48 bits and the gap is the upper 16 bits.
+    case, the offset is the lower 52 bits and the gap is the upper 12 bits.
   * The index is to all values/non-values. In this case, all 64 bits are used
     for the offset.
 - In the bytecode compiler, the field positions are stored as tagged integers

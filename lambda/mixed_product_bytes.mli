@@ -46,6 +46,8 @@ type t =
     flat : Byte_count.t
   }
 
+val block_index_offset_bits : int
+
 val zero : t
 
 val add : t -> t -> t
