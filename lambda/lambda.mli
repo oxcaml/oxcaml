@@ -255,8 +255,13 @@ type primitive =
       mode : locality_mode; boxed : bool }
   | Pbigstring_load_64 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
-  | Pbigstring_load_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
-      index_kind : array_index_kind; mode : locality_mode; boxed : bool }
+  | Pbigstring_load_vec of {
+      size : boxed_vector;
+      safety : (len:int * align:int) option;
+      index_kind : array_index_kind;
+      mode : locality_mode;
+      aligned : bool;
+      boxed : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_set_32 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
@@ -264,8 +269,12 @@ type primitive =
       boxed : bool }
   | Pbigstring_set_64 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
-  | Pbigstring_set_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
-      index_kind : array_index_kind; boxed : bool }
+  | Pbigstring_set_vec of {
+      size : boxed_vector;
+      safety : (len:int * align:int) option;
+      index_kind : array_index_kind;
+      aligned : bool;
+      boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
