@@ -10,10 +10,8 @@ let check_invariants program =
 let parse_flambda filename =
   match Parse_flambda.parse_fexpr filename with
   | Ok unit ->
-    let comp_unit =
-      Parse_flambda.make_compilation_unit ~extension:".fl" ~filename ()
-    in
-    let unit_info = Unit_info.make_dummy ~input_name:filename comp_unit in
+    let unit_info = Parse_flambda.make_unit_info ~filename in
+    let comp_unit = Unit_info.modname unit_info in
     Env.set_unit_name (Some unit_info);
     let fl2 = Fexpr_to_flambda.conv comp_unit unit in
     check_invariants fl2;
@@ -28,7 +26,7 @@ let parse_flambda filename =
 module Options = Oxcaml_args.Make_optcomp_options (Oxcaml_args.Default.Optmain)
 
 let _ =
-  let file_action = ref (fun () -> assert false) in
+  let file_action = ref (fun () -> Misc.fatal_error "Missing a flambda file") in
   let defer_file file =
     let ext = Filename.extension file in
     match ext with
