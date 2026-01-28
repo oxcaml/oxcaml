@@ -347,6 +347,9 @@ let enter_inlined_apply =
     nullary "%inlined_apply" ~params:(todop "dbginfo") (fun _env dbg ->
         P.Enter_inlined_apply { dbg }))
 
+let domain_index =
+  D.(nullary "%domain_index" ~params:param0 (fun _env () -> P.Domain_index))
+
 let dls_get = D.(nullary "%dls_get" ~params:param0 (fun _env () -> P.Dls_get))
 
 let tls_get = D.(nullary "%tls_get" ~params:param0 (fun _env () -> P.Tls_get))
@@ -795,6 +798,7 @@ module OfFlambda = struct
     | Probe_is_enabled { name; enabled_at_init } ->
       probe_is_enabled env (name, enabled_at_init)
     | Enter_inlined_apply { dbg } -> enter_inlined_apply env dbg
+    | Domain_index -> domain_index env ()
     | Dls_get -> dls_get env ()
     | Tls_get -> tls_get env ()
     | Poll -> poll env ()
