@@ -2271,7 +2271,7 @@ let rec try_expand_once_opt env ty =
       let t = try_expand_once_opt env t in
       newty2 ~level:(get_level t) (Tsplice t)
   | Tquote t ->
-      let t = try_expand_once env t in
+      let t = try_expand_once_opt env t in
       newty2 ~level:(get_level t) (Tquote t)
   | _ -> raise Cannot_expand
 
@@ -4270,13 +4270,13 @@ and unify3 uenv t1 t1' t2 t2' =
       let t =
         newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
       in
-      unify uenv s2 t
+      unify uenv t s2
   | (_, Tquote s2) when is_flexible_ty s2 ->
       set_type_desc t1' d1;
       let t =
         newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
       in
-      unify uenv s2 t
+      unify uenv t s2
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -4392,7 +4392,7 @@ and unify3 uenv t1 t1' t2 t2' =
           let t =
             newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
           in
-          unify uenv s2 t
+          unify uenv t s2
       | (_, Tquote s2)
         when is_instantiable_ty (get_env uenv) s2
           && instantiable_scope s2 >= instantiable_scope t1'
@@ -4401,7 +4401,7 @@ and unify3 uenv t1 t1' t2 t2' =
           let t =
             newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
           in
-          unify uenv s2 t
+          unify uenv t s2
       | (Tquote _, _) | (Tsplice _, _)
       | (_, Tquote _) | (_, Tsplice _)
         when in_pattern_mode uenv
