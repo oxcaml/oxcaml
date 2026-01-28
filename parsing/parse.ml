@@ -46,7 +46,10 @@ type 'a parser =
 let wrap (parser : 'a parser) lexbuf : 'a =
   try
     Docstrings.init ();
-    Lexer.init ();
+    let keyword_edition =
+      Clflags.(Option.map parse_keyword_edition !keyword_edition)
+    in
+    Lexer.init ?keyword_edition ();
     let ast = parser token lexbuf in
     Parsing.clear_parser();
     Docstrings.warn_bad_docstrings ();
@@ -116,11 +119,11 @@ let prepare_error err =
   | Unclosed(opening_loc, opening, closing_loc, closing) ->
       Location.errorf
         ~loc:closing_loc
+        "Syntax error: %a expected" Style.inline_code closing
         ~sub:[
           Location.msg ~loc:opening_loc
             "This %a might be unmatched" Style.inline_code opening
         ]
-        "Syntax error: %a expected" Style.inline_code closing
 
   | Expecting (loc, nonterm) ->
       Location.errorf ~loc "Syntax error: %a expected."
@@ -138,7 +141,7 @@ let prepare_error err =
       Location.errorf ~loc
         "In this scoped type, variable %a \
          is reserved for the local type %a."
-        (Style.as_inline_code Pprintast.tyvar) var
+        (Style.as_inline_code Pprintast.Doc.tyvar) var
         Style.inline_code var
   | Other loc ->
       Location.errorf ~loc "Syntax error"
@@ -148,24 +151,25 @@ let prepare_error err =
   | Invalid_package_type (loc, ipt) ->
       let invalid ppf ipt = match ipt with
         | Syntaxerr.Parameterized_types ->
-            Format.fprintf ppf "parametrized types are not supported"
+            Format_doc.fprintf ppf "parametrized types are not supported"
         | Constrained_types ->
-            Format.fprintf ppf "constrained types are not supported"
+            Format_doc.fprintf ppf "constrained types are not supported"
         | Private_types ->
-            Format.fprintf ppf  "private types are not supported"
+            Format_doc.fprintf ppf  "private types are not supported"
         | Not_with_type ->
-            Format.fprintf ppf "only %a constraints are supported"
+            Format_doc.fprintf ppf "only %a constraints are supported"
               Style.inline_code "with type t ="
         | Neither_identifier_nor_with_type ->
-            Format.fprintf ppf
+            Format_doc.fprintf ppf
               "only module type identifier and %a constraints are supported"
               Style.inline_code "with type"
         | Misplaced_attribute ->
             Format.fprintf ppf "an attribute cannot go here"
       in
-      Location.errorf ~loc "invalid package type: %a" invalid ipt
+      Location.errorf ~loc "Syntax error: invalid package type: %a" invalid ipt
   | Removed_string_set loc ->
       Location.errorf ~loc
+<<<<<<< HEAD
         "Syntax error: strings are immutable, there is no assignment \
          syntax for them.\n\
          @{<hint>Hint@}: Mutable sequences of bytes are available in \
@@ -207,6 +211,19 @@ let prepare_error err =
         Style.inline_code ".:" Style.inline_code ".:L" Style.inline_code ".:l"
         Style.inline_code ".:S" Style.inline_code ".:s" Style.inline_code ".:n"
         Style.inline_code ".idx_imm" Style.inline_code ".idx_mut"
+=======
+        "Syntax error: strings are immutable,@ there@ is@ no@ assignment@ \
+         syntax@ for@ them."
+        ~sub:[
+          Location.msg
+            "@{<hint>Hint@}: Mutable sequences of bytes are available in \
+             the %a module."
+            Style.inline_code "Bytes";
+          Location.msg
+            "@{<hint>Hint@}: Did you mean to use %a?"
+            Style.inline_code "Bytes.set"
+        ]
+>>>>>>> upstream/5.4
 
 let () =
   Location.register_error_of_exn

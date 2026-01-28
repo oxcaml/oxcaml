@@ -22,10 +22,11 @@
 #include <pthread.h>
 #include <signal.h>
 #include <time.h>
-#ifdef HAS_UNISTD
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 
+<<<<<<< HEAD
 typedef int st_retcode;
 
 /* OS-specific initialization */
@@ -33,6 +34,8 @@ static int st_initialize(void)
 {
   return 0;
 }
+=======
+>>>>>>> upstream/5.4
 
 typedef pthread_t st_thread_id;
 
@@ -68,11 +71,15 @@ static void st_thread_join(st_thread_id thr)
    threads. */
 
 typedef struct {
-  int init;                       /* have the mutex and the cond been
+  bool init;                      /* have the mutex and the cond been
                                      initialized already? */
   pthread_mutex_t lock;           /* to protect contents */
+<<<<<<< HEAD
   uintnat busy;                   /* 0 = free, 1 = taken */
   pthread_t last_locked_by;       /* for debugging */
+=======
+  bool busy;                      /* false = free, true = taken */
+>>>>>>> upstream/5.4
   atomic_uintnat waiters;         /* number of threads waiting on master lock */
   custom_condvar is_free;         /* signaled when free */
 } st_masterlock;
@@ -86,10 +93,14 @@ static int st_masterlock_init(st_masterlock * m)
     if (rc != 0) goto out_err;
     rc = custom_condvar_init(&m->is_free);
     if (rc != 0) goto out_err2;
-    m->init = 1;
+    m->init = true;
   }
+<<<<<<< HEAD
   m->busy = 0;
   m->last_locked_by = pthread_self(); /* Here "initialized by". */
+=======
+  m->busy = true;
+>>>>>>> upstream/5.4
   atomic_store_release(&m->waiters, 0);
   return 0;
 
@@ -112,8 +123,13 @@ static void st_masterlock_acquire(st_masterlock *m)
     custom_condvar_wait(&m->is_free, &m->lock);
     atomic_fetch_add(&m->waiters, -1);
   }
+<<<<<<< HEAD
   m->busy = 1;
   m->last_locked_by = pthread_self();
+=======
+  m->busy = true;
+  st_bt_lock_acquire();
+>>>>>>> upstream/5.4
   pthread_mutex_unlock(&m->lock);
 
   return;
@@ -122,7 +138,13 @@ static void st_masterlock_acquire(st_masterlock *m)
 static void st_masterlock_release(st_masterlock * m)
 {
   pthread_mutex_lock(&m->lock);
+<<<<<<< HEAD
   m->busy = 0;
+=======
+  m->busy = false;
+  st_bt_lock_release(st_masterlock_waiters(m) == 0);
+  pthread_cond_signal(&m->is_free);
+>>>>>>> upstream/5.4
   pthread_mutex_unlock(&m->lock);
   custom_condvar_signal(&m->is_free);
 
@@ -153,7 +175,7 @@ Caml_inline void st_thread_yield(st_masterlock * m)
     return;
   }
 
-  m->busy = 0;
+  m->busy = false;
   atomic_fetch_add(&m->waiters, +1);
   custom_condvar_signal(&m->is_free);
   /* releasing the domain lock but not triggering bt messaging
@@ -169,8 +191,12 @@ Caml_inline void st_thread_yield(st_masterlock * m)
        custom_condvar_wait(&m->is_free, &m->lock);
   } while (m->busy);
 
+<<<<<<< HEAD
   m->busy = 1;
   m->last_locked_by = pthread_self();
+=======
+  m->busy = true;
+>>>>>>> upstream/5.4
   atomic_fetch_add(&m->waiters, -1);
 
   pthread_mutex_unlock(&m->lock);
@@ -182,8 +208,13 @@ Caml_inline void st_thread_yield(st_masterlock * m)
 
 typedef struct st_event_struct {
   pthread_mutex_t lock;         /* to protect contents */
+<<<<<<< HEAD
   int status;                   /* 0 = not triggered, 1 = triggered */
   custom_condvar triggered;     /* signaled when triggered */
+=======
+  bool status;                  /* false = not triggered, true = triggered */
+  pthread_cond_t triggered;     /* signaled when triggered */
+>>>>>>> upstream/5.4
 } * st_event;
 
 
@@ -197,7 +228,7 @@ static int st_event_create(st_event * res)
   rc = custom_condvar_init(&e->triggered);
   if (rc != 0)
   { pthread_mutex_destroy(&e->lock); caml_stat_free(e); return rc; }
-  e->status = 0;
+  e->status = false;
   *res = e;
   return 0;
 }
@@ -216,7 +247,7 @@ static int st_event_trigger(st_event e)
   int rc;
   rc = pthread_mutex_lock(&e->lock);
   if (rc != 0) return rc;
-  e->status = 1;
+  e->status = true;
   rc = pthread_mutex_unlock(&e->lock);
   if (rc != 0) return rc;
   rc = custom_condvar_broadcast(&e->triggered);
@@ -228,13 +259,19 @@ static int st_event_wait(st_event e)
   int rc;
   rc = pthread_mutex_lock(&e->lock);
   if (rc != 0) return rc;
+<<<<<<< HEAD
   while(e->status == 0) {
     rc = custom_condvar_wait(&e->triggered, &e->lock);
+=======
+  while(!e->status) {
+    rc = pthread_cond_wait(&e->triggered, &e->lock);
+>>>>>>> upstream/5.4
     if (rc != 0) return rc;
   }
   rc = pthread_mutex_unlock(&e->lock);
   return rc;
 }
+<<<<<<< HEAD
 
 struct caml_thread_tick_args {
   int domain_id;
@@ -263,3 +300,5 @@ static void * caml_thread_tick(void * arg)
   }
   return NULL;
 }
+=======
+>>>>>>> upstream/5.4

@@ -1,9 +1,12 @@
+<<<<<<< HEAD
 #define CAML_NAME_SPACE
 #include <caml/config.h>
 #ifdef WITH_ADDRESS_SANITIZER
 #include <dlfcn.h>
 #endif
 #include <caml/memory.h>
+=======
+>>>>>>> upstream/5.4
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
 #include <caml/callback.h>
@@ -75,6 +78,7 @@ static int cmp_callback(const void* p_a, const void* p_b)
   return Long_val(caml_callback2(*cmp_fn, **a, **b));
 }
 
+<<<<<<< HEAD
 #ifdef WITH_ADDRESS_SANITIZER
 /* AddressSanitizer provides its own definition of [qsort], which runs the comparator
    function over the entire array in order to detect memory safety issues [1].
@@ -97,12 +101,21 @@ value sort2(value cmp_clos, value a, value b)
 {
   CAMLparam3(cmp_clos, a, b);
   CAMLlocal1(ret);
+=======
+value sort2(value cmp_clos, value a, value b)
+{
+  CAMLparam3(cmp_clos, a, b);
+>>>>>>> upstream/5.4
   value* vs[2] = {&a, &b};
   cmp_fn = &cmp_clos;
   qsort(vs, 2, sizeof(value*), &cmp_callback);
   cmp_fn = NULL;
+<<<<<<< HEAD
   ret = caml_alloc_small(2,0);
   Field(ret,0) = *vs[0];
   Field(ret,1) = *vs[1];
   CAMLreturn (ret);
+=======
+  CAMLreturn (caml_alloc_2(0, *vs[0], *vs[1]));
+>>>>>>> upstream/5.4
 }

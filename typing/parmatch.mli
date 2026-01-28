@@ -18,6 +18,7 @@
 open Asttypes
 open Typedtree
 open Types
+open Data_types
 
 (** Most checks in this file need not access all information about a case,
     and just need a few pieces of information. [parmatch_case] is those
@@ -55,8 +56,8 @@ module Compat :
   functor
     (_ : sig
       val equal :
-          Types.constructor_description ->
-            Types.constructor_description ->
+          Data_types.constructor_description ->
+            Data_types.constructor_description ->
               bool
      end) -> sig
        val compat : pattern -> pattern -> bool
@@ -75,13 +76,11 @@ val lubs : pattern list -> pattern list -> pattern list
 
 val get_mins : ('a -> 'a -> bool) -> 'a list -> 'a list
 
-(** Those two functions recombine one pattern and its arguments:
+(** This function recombines one pattern and its arguments:
     For instance:
       (_,_)::p1::p2::rem -> (p1, p2)::rem
-    The second one will replace mutable arguments by '_'
 *)
 val set_args : pattern -> pattern list -> pattern list
-val set_args_erase_mutable : pattern -> pattern list -> pattern list
 
 val pat_of_constr : pattern -> constructor_description -> pattern
 val complete_constrs :

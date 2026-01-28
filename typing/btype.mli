@@ -63,6 +63,22 @@ val generic_level: int
         (* level of polymorphic variables; = Ident.highest_scope *)
 val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
+<<<<<<< HEAD
+=======
+
+val with_new_pool: level:int -> (unit -> 'a) -> 'a * transient_expr list
+        (* [with_new_pool ~level f] executes [f] and returns the nodes
+           that were created at level [level] and above *)
+val add_to_pool: level:int -> transient_expr -> unit
+        (* Add a type node to the pool associated to the level (which should
+           be the level of the type node).
+           Do nothing if [level = generic_level] or [level = lowest_level]. *)
+
+val newty3: level:int -> scope:int -> type_desc -> type_expr
+        (* Create a type with a fresh id *)
+val newty2: level:int -> type_desc -> type_expr
+        (* Create a type with a fresh id and no scope *)
+>>>>>>> upstream/5.4
 
 val newgenty: type_desc -> type_expr
         (* Create a generic type *)
@@ -77,11 +93,15 @@ val newgenstub: scope:int -> jkind_lr -> type_expr
 val is_Tvar: type_expr -> bool
 val is_Tunivar: type_expr -> bool
 val is_Tconstr: type_expr -> bool
+<<<<<<< HEAD
 val is_Tpoly: type_expr -> bool
 
+=======
+val is_poly_Tpoly: type_expr -> bool
+>>>>>>> upstream/5.4
 val dummy_method: label
 val type_kind_is_abstract: type_declaration -> bool
-val type_origin : type_declaration -> type_origin
+val type_origin: type_declaration -> type_origin
 
 (**** polymorphic variants ****)
 
@@ -309,6 +329,7 @@ val method_type : label -> class_signature -> type_expr
 (* Return the type of an instance variable.
    @raises [Assert_failure] if the class has no such method. *)
 val instance_variable_type : label -> class_signature -> type_expr
+<<<<<<< HEAD
 
 (**** Forward declarations ****)
 val print_raw: (Format.formatter -> type_expr -> unit) ref
@@ -697,3 +718,5 @@ module Jkind0 : sig
 
   include module type of Jkind
 end
+=======
+>>>>>>> upstream/5.4

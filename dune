@@ -136,6 +136,7 @@
  (library_flags -linkall)
  (libraries flambda2_floats)
  (modules_without_implementation
+<<<<<<< HEAD
   annot
   value_rec_types
   asttypes
@@ -330,11 +331,22 @@
   ; See note below about camlinternalQuote
   (:include
    %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
+=======
+   annot cmo_format outcometree parsetree value_rec_types)
+ (modules
+   ;; UTILS
+   config build_path_prefix_map misc identifiable numbers arg_helper
+   clflags profile terminfo ccomp format_doc warnings consistbl
+   strongly_connected_components targetint load_path
+   int_replace_polymorphic_compare binutils local_store lazy_backtrack diffing
+   diffing_with_keys unit_info compression linkdeps
+>>>>>>> upstream/5.4
 
 ; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
 ; we need to compile it as an additional target, but only for the first
 ; stage build.  See also duneconf/dune.
 
+<<<<<<< HEAD
 (rule
  (targets camlinternalQuote.ml)
  (enabled_if
@@ -352,6 +364,36 @@
   (copy#
    %{project_root}/stdlib/camlinternalQuote.mli
    %{project_root}/camlinternalQuote.mli)))
+=======
+   ;; TYPING
+   ident path primitive shape shape_reduce types btype oprint subst predef
+   datarepr cmi_format persistent_env env type_immediacy errortrace
+   typedtree printtyped ctype printtyp rawprinttyp includeclass mtype envaux
+   includecore tast_iterator tast_mapper signature_group cmt_format untypeast
+   includemod includemod_errorprinter errortrace_report
+   typetexp patterns printpat parmatch stypes typeopt typedecl value_rec_check
+   typecore
+   typeclass typemod typedecl_variance typedecl_properties typedecl_immediacy
+   typedecl_unboxed typedecl_separability cmt2annot out_type data_types
+   ; manual update: mli only files
+   annot outcometree value_rec_types
+
+   ;; lambda/
+   debuginfo lambda matching printlambda runtimedef tmc simplif switch
+   translattribute translclass translcore translmod translobj translprim
+   value_rec_compiler
+
+   ;; bytecomp/
+   meta opcodes bytesections dll symtable
+
+   ;; some of COMP
+   pparse main_args compenv compmisc makedepend compile_common
+   ; manual update: mli only files
+   cmo_format
+   ; manual update: this is required.
+   instruct
+ ))
+>>>>>>> upstream/5.4
 
 (library
  (name ocamlbytecomp)

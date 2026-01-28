@@ -4,7 +4,7 @@
  multidomain;
  include unix;
  hasunix;
- not-windows;
+ not-target-windows;
  {
    bytecode;
  }{

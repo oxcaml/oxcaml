@@ -14,7 +14,9 @@
 
 (library
  (name stdlib)
+ (libraries dune_support)
  (stdlib
+<<<<<<< HEAD
   (exit_module std_exit)
   (internal_modules Camlinternal*)
   (modules_before_stdlib camlinternalFormatBasics camlinternalAtomic))
@@ -30,6 +32,13 @@
    -strict-formats))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+=======
+   (exit_module std_exit)
+   (internal_modules Camlinternal*)
+   (modules_before_stdlib
+     camlinternalFormatBasics))
+ (flags (:standard -w -9 -nolabels -open New_predef_types))
+>>>>>>> upstream/5.4
  (preprocess
   (per_module
    ((action

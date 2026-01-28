@@ -1,4 +1,11 @@
 (* TEST
+<<<<<<< HEAD
+=======
+ include runtime_events;
+ include unix;
+ hasunix;
+ not-target-windows;
+>>>>>>> upstream/5.4
  {
    runtime4;
    skip;

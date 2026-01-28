@@ -39,7 +39,7 @@ struct skiplist {
 struct skipcell {
   uintnat key;
   uintnat data;
-  struct skipcell * forward[];  /* flexible array member */
+  struct skipcell * forward[]; /* flexible array member */
 };
 
 /* Initialize a skip list, statically */
@@ -93,12 +93,15 @@ extern void caml_skiplist_empty(struct skiplist * sk);
    Other operations performed over the skiplist during its traversal have
    unspecified effects on the traversal. */
 
-#define FOREACH_SKIPLIST_ELEMENT(var,sk,action) \
-  { struct skipcell * var, * caml__next; \
-    for (var = (sk)->forward[0]; var != NULL; var = caml__next) \
-    { caml__next = (var)->forward[0]; action; } \
+#define FOREACH_SKIPLIST_ELEMENT(var,sk,action) {               \
+    for (struct skipcell *var = (sk)->forward[0], *caml__next;  \
+         var != NULL;                                           \
+         var = caml__next) {                                    \
+      caml__next = (var)->forward[0];                           \
+      action;                                                   \
+    }                                                           \
   }
 
-#endif
+#endif /* CAML_INTERNALS */
 
-#endif
+#endif /* CAML_SKIPLIST_H */

@@ -36,7 +36,8 @@
 /* Returns the next frame descriptor (or NULL if none is available),
    and updates *pc and *sp to point to the following one.  */
 frame_descr * caml_next_frame_descriptor
-    (caml_frame_descrs fds, uintnat * pc, char ** sp, struct stack_info* stack)
+    (caml_frame_descrs * fds, uintnat * pc, char ** sp,
+     struct stack_info* stack)
 {
   frame_descr * d;
 
@@ -101,10 +102,10 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx);
    TODO: Consider rewriting this to use get_callstack, so we only have
    one body of code capturing callstacks.
 */
-void caml_stash_backtrace(value exn, uintnat pc, char * sp, char* trapsp)
+void caml_stash_backtrace(value exn, uintnat pc, char * sp, const char* trapsp)
 {
   caml_domain_state* domain_state = Caml_state;
-  caml_frame_descrs fds;
+  caml_frame_descrs* fds;
 
   if (exn != domain_state->backtrace_last_exn) {
     domain_state->backtrace_pos = 0;
@@ -177,7 +178,7 @@ static size_t get_callstack(struct stack_info* stack, intnat max_slots,
   size_t slots = 0;
   char *sp;
   uintnat pc;
-  caml_frame_descrs fds = caml_get_frame_descrs();
+  caml_frame_descrs *fds = caml_get_frame_descrs();
   CAMLnoalloc;
 
   caml_get_stack_sp_pc(stack, &sp, &pc);
@@ -244,9 +245,8 @@ static value alloc_callstack(backtrace_slot* trace, size_t slots)
 {
   CAMLparam0();
   CAMLlocal1(callstack);
-  int i;
   callstack = caml_alloc(slots, 0);
-  for (i = 0; i < slots; i++)
+  for (int i = 0; i < slots; i++)
     Store_field(callstack, i, Val_backtrace_slot(trace[i]));
   caml_stat_free(trace);
   CAMLreturn(callstack);
@@ -364,7 +364,7 @@ debuginfo caml_debuginfo_next(debuginfo dbg)
    so it is referenced as an offset instead of stored inline */
 struct name_info {
   int32_t filename_offs;
-  char name[1];
+  char name[]; /* flexible array member */
 };
 
 /* Extended version of name_info including location fields which didn't fit
@@ -374,7 +374,7 @@ struct name_and_loc_info {
   uint16_t start_chr;
   uint16_t end_chr;
   int32_t end_offset; /* End character position relative to start bol */
-  char name[1];
+  char name[]; /* flexible array member */
 };
 
 /* Extract location information for the given frame descriptor */

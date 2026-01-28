@@ -60,6 +60,13 @@ let mk_binannot_occurrences f =
     features such as project-wide occurrences. This flag has\n\
     no effect in the absence of '-bin-annot'."
 
+let mk_binannot_occurrences f =
+  "-bin-annot-occurrences", Arg.Unit f,
+  " Store every occurrence of a bound name in the .cmt file.\n\
+    This information can be used by external tools to provide\n\
+    features such as project-wide occurrences. This flag has\n\
+    no effect in the absence of '-bin-annot'."
+
 let mk_c f =
   "-c", Arg.Unit f, " Compile only (do not link)"
 
@@ -174,6 +181,9 @@ let mk_no_g f =
 
 let mk_i f =
   "-i", Arg.Unit f, " Print inferred interface"
+
+let mk_i_variance f =
+  "-i-variance", Arg.Unit f, " Print inferred variances"
 
 let mk_I f =
   "-I", Arg.String f, "<dir>  Add <dir> to the list of include directories"
@@ -499,6 +509,15 @@ let mk_pp f =
 let mk_ppx f =
   "-ppx", Arg.String f,
   "<command>  Pipe abstract syntax trees through preprocessor <command>"
+
+let mk_keywords f =
+  "-keywords", Arg.String f,
+  "<version+list>  set keywords following the <version+list> spec:\n
+  \                -<version> if present specifies the base set of keywords\n
+  \                  (if absent the current set of keywords is used)
+  \                -<list> is a \"+\"-separated list of keywords to add to\n
+  \                  the base set of keywords.
+  "
 
 let mk_plugin f =
   "-plugin", Arg.String f,
@@ -847,6 +866,9 @@ let mk_dshape f =
   "-dshape", Arg.Unit f, " (undocumented)"
 ;;
 
+let mk_dmatchcomp f =
+  "-dmatchcomp", Arg.Unit f, " (undocumented)"
+
 let mk_drawlambda f =
   "-drawlambda", Arg.Unit f, " (undocumented)"
 
@@ -855,6 +877,12 @@ let mk_dno_unique_ids f =
 
 let mk_dunique_ids f =
   "-dunique-ids", Arg.Unit f, " (undocumented)"
+
+let mk_dno_canonical_ids f =
+  "-dno-canonical-ids", Arg.Unit f, " (undocumented)"
+
+let mk_dcanonical_ids f =
+  "-dcanonical-ids", Arg.Unit f, " (undocumented)"
 
 let mk_dno_locations f =
   "-dno-locations", Arg.Unit f, " (undocumented)"
@@ -936,6 +964,15 @@ let mk_dcse f =
 let mk_dlinear f =
   "-dlinear", Arg.Unit f, " (undocumented)"
 
+<<<<<<< HEAD
+=======
+let mk_dinterval f =
+  "-dinterval", Arg.Unit f, " (undocumented)"
+
+let mk_dparsetree_loc_ghost_invariants f =
+  "-dparsetree-loc-ghost-invariants", Arg.Unit f, " (undocumented)"
+
+>>>>>>> upstream/5.4
 let mk_dstartup f =
   "-dstartup", Arg.Unit f, " (undocumented)"
 
@@ -1074,6 +1111,7 @@ module type Common_options = sig
   val _locs : unit -> unit
   val _no_locs : unit -> unit
   val _alert : string -> unit
+  val _i_variance : unit -> unit
   val _I : string -> unit
   val _H : string -> unit
   val _I_manifest : string -> unit
@@ -1096,6 +1134,7 @@ module type Common_options = sig
   val _nocwd : unit -> unit
   val _open : string -> unit
   val _ppx : string -> unit
+  val _keywords: string -> unit
   val _principal : unit -> unit
   val _no_principal : unit -> unit
   val _rectypes : unit -> unit
@@ -1130,14 +1169,21 @@ module type Core_options = sig
 
   val _dno_unique_ids : unit -> unit
   val _dunique_ids : unit -> unit
+  val _dno_canonical_ids : unit -> unit
+  val _dcanonical_ids : unit -> unit
   val _dno_locations : unit -> unit
   val _dlocations : unit -> unit
 
   val _dsource : unit -> unit
   val _dparsetree : unit -> unit
+  val _dparsetree_loc_ghost_invariants : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
+<<<<<<< HEAD
   val _dslambda : unit -> unit
+=======
+  val _dmatchcomp : unit -> unit
+>>>>>>> upstream/5.4
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
   val _dblambda : unit -> unit
@@ -1151,8 +1197,11 @@ module type Compiler_options = sig
   val _as_argument_for : string -> unit
   val _as_parameter : unit -> unit
   val _binannot : unit -> unit
+<<<<<<< HEAD
   val _binannot_cms : unit -> unit
   val _shape_format : string -> unit
+=======
+>>>>>>> upstream/5.4
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -1166,6 +1215,7 @@ module type Compiler_options = sig
   val _no_g : unit -> unit
   val _stop_after : string -> unit
   val _i : unit -> unit
+  val _i_variance : unit -> unit
   val _impl : string -> unit
   val _instantiate : unit -> unit
   val _intf : string -> unit
@@ -1399,7 +1449,10 @@ struct
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
     mk_binannot F._binannot;
+<<<<<<< HEAD
     mk_binannot_cms F._binannot_cms;
+=======
+>>>>>>> upstream/5.4
     mk_binannot_occurrences F._binannot_occurrences;
     mk_c F._c;
     mk_cc F._cc;
@@ -1425,6 +1478,7 @@ struct
     mk_no_g F._no_g;
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
@@ -1438,6 +1492,7 @@ struct
     mk_no_keep_docs F._no_keep_docs;
     mk_keep_locs F._keep_locs;
     mk_no_keep_locs F._no_keep_locs;
+    mk_keywords F._keywords;
     mk_labels F._labels;
     mk_linkall F._linkall;
     mk_llvm_backend F._llvm_backend;
@@ -1509,12 +1564,16 @@ struct
     mk_shape_format F._shape_format;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
+    mk_dcanonical_ids F._dcanonical_ids;
     mk_dno_locations F._dno_locations;
     mk_dlocations F._dlocations;
     mk_dsource F._dsource;
     mk_dparsetree F._dparsetree;
+    mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+    mk_dmatchcomp F._dmatchcomp;
     mk_drawlambda F._drawlambda;
     mk_dslambda F._dslambda;
     mk_dlambda F._dlambda;
@@ -1546,6 +1605,7 @@ struct
     mk_locs F._locs;
     mk_no_locs F._no_locs;
     mk_alert F._alert;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
@@ -1574,6 +1634,7 @@ struct
     mk_nopervasives F._nopervasives;
     mk_open F._open;
     mk_ppx F._ppx;
+    mk_keywords F._keywords;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
     mk_rectypes F._rectypes;
@@ -1606,13 +1667,20 @@ struct
 
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
+    mk_dcanonical_ids F._dcanonical_ids;
     mk_dno_locations F._dno_locations;
     mk_dlocations F._dlocations;
     mk_dsource F._dsource;
     mk_dparsetree F._dparsetree;
+    mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+<<<<<<< HEAD
     mk_dslambda F._dslambda;
+=======
+    mk_dmatchcomp F._dmatchcomp;
+>>>>>>> upstream/5.4
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -1641,7 +1709,10 @@ struct
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
     mk_binannot F._binannot;
+<<<<<<< HEAD
     mk_binannot_cms F._binannot_cms;
+=======
+>>>>>>> upstream/5.4
     mk_binannot_occurrences F._binannot_occurrences;
     mk_inline_branch_factor F._inline_branch_factor;
     mk_c F._c;
@@ -1674,6 +1745,7 @@ struct
     mk_probes_optimized F._probes_optimized;
     mk_no_probes_optimized F._no_probes_optimized;
     mk_i F._i;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
@@ -1696,6 +1768,7 @@ struct
     mk_no_keep_docs F._no_keep_docs;
     mk_keep_locs F._keep_locs;
     mk_no_keep_locs F._no_keep_locs;
+    mk_keywords F._keywords;
     mk_labels F._labels;
     mk_linkall F._linkall;
     mk_llvm_backend F._llvm_backend;
@@ -1775,13 +1848,20 @@ struct
     mk_match_context_rows F._match_context_rows;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
+    mk_dcanonical_ids F._dcanonical_ids;
     mk_dno_locations F._dno_locations;
     mk_dlocations F._dlocations;
     mk_dsource F._dsource;
     mk_dparsetree F._dparsetree;
+    mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+<<<<<<< HEAD
     mk_dslambda F._dslambda;
+=======
+    mk_dmatchcomp F._dmatchcomp;
+>>>>>>> upstream/5.4
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -1843,6 +1923,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_locs F._no_locs;
     mk_alert F._alert;
     mk_compact F._compact;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
@@ -1861,6 +1942,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_inline_indirect_cost F._inline_indirect_cost;
     mk_inline_lifting_benefit F._inline_lifting_benefit;
     mk_inline_branch_factor F._inline_branch_factor;
+    mk_keywords F._keywords;
     mk_labels F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
@@ -1927,9 +2009,14 @@ module Make_opttop_options (F : Opttop_options) = struct
 
     mk_dsource F._dsource;
     mk_dparsetree F._dparsetree;
+    mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+<<<<<<< HEAD
     mk_dslambda F._dslambda;
+=======
+    mk_dmatchcomp F._dmatchcomp;
+>>>>>>> upstream/5.4
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -2120,6 +2207,7 @@ struct
     mk_locs F._locs;
     mk_no_locs F._no_locs;
     mk_alert F._alert;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
@@ -2128,6 +2216,7 @@ struct
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
     mk_intf_suffix_2 F._intf_suffix;
+    mk_keywords F._keywords;
     mk_labels F._labels;
     mk_modern F._labels;
     mk_alias_deps F._alias_deps;
@@ -2230,12 +2319,17 @@ module Default = struct
     let _absname = set Clflags.absname
     let _locs = set Clflags.locs
     let _alert = Warnings.parse_alert_option
-    let _alias_deps = clear transparent_modules
+    let _alias_deps = clear no_alias_deps
     let _app_funct = set applicative_functors
+    let _i_variance = set print_variance
     let _labels = clear classic
     let _no_absname = clear Clflags.absname
+<<<<<<< HEAD
     let _no_locs = clear Clflags.locs
     let _no_alias_deps = set transparent_modules
+=======
+    let _no_alias_deps = set no_alias_deps
+>>>>>>> upstream/5.4
     let _no_app_funct = clear applicative_functors
     let _directory d = Clflags.directory := Some d
     let _no_principal = clear principal
@@ -2290,19 +2384,27 @@ module Default = struct
     let _dblambda = set dump_blambda
     let _dletreclambda = set dump_letreclambda
     let _dparsetree = set dump_parsetree
+<<<<<<< HEAD
     let _dslambda = set dump_slambda
+=======
+    let _dparsetree_loc_ghost_invariants = set parsetree_ghost_loc_invariant
+>>>>>>> upstream/5.4
     let _drawlambda = set dump_rawlambda
     let _dsource = set dump_source
     let _dtypedtree = set dump_typedtree
     let _dshape = set dump_shape
+    let _dmatchcomp = set dump_matchcomp
     let _dunique_ids = set unique_ids
     let _dno_unique_ids = clear unique_ids
+    let _dcanonical_ids = set canonical_ids
+    let _dno_canonical_ids = clear canonical_ids
     let _dlocations = set locations
     let _dno_locations = clear locations
     let _error_style =
       Misc.set_or_ignore error_style_reader.parse error_style
     let _nopervasives = set nopervasives
     let _ppx s = Compenv.first_ppx := (s :: (!Compenv.first_ppx))
+    let _keywords s = Clflags.keyword_edition := (Some s)
     let _unsafe = set unsafe
     let _warn_error s =
       Warnings.parse_options true s |> Option.iter Location.(prerr_alert none)
@@ -2407,12 +2509,15 @@ module Default = struct
     let _as_argument_for s = as_argument_for := Some s
     let _as_parameter = set as_parameter
     let _binannot = set binary_annotations
+<<<<<<< HEAD
     let _binannot_cms = set binary_annotations_cms
     let _shape_format s =
       match s with
       | "old-merlin" -> shape_format := Old_merlin
       | "debugging-shapes" -> shape_format := Debugging_shapes
       | _ -> ()
+=======
+>>>>>>> upstream/5.4
     let _binannot_occurrences = set store_occurrences
     let _c = set compile_only
     let _cc s = c_compiler := (Some s)
@@ -2609,6 +2714,7 @@ module Default = struct
     let _intf_suffix s = Config.interface_suffix := s
     let _pp s = Clflags.preprocessor := (Some s)
     let _ppx s = Clflags.all_ppx := (s :: (!Clflags.all_ppx))
+    let _keywords s = Clflags.keyword_edition := Some s
     let _thread = set Clflags.use_threads
     let _v () = Compenv.print_version_and_library "documentation generator"
     let _verbose = set Clflags.verbose

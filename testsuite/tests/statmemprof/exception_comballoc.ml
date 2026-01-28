@@ -4,9 +4,15 @@
    combined allocation, causes already-run allocation callbacks to
    be reflected by deallocation callbacks. *)
 
+<<<<<<< HEAD
 module MP = Gc.Memprof
 
 external runtime5 : unit -> bool = "%runtime5"
+=======
+exception MyExc of string
+
+module MP = Gc.Memprof
+>>>>>>> upstream/5.4
 
 (* Similar infrastructure to stop_start_in_callback test *)
 
@@ -69,7 +75,11 @@ let raise_in_alloc () =
        (* stop profile N after N allocations *)
        if a >= p then
        (record excs (p,a,sz);
+<<<<<<< HEAD
         raise Sys.Break);
+=======
+        raise (MyExc "from allocation callback"));
+>>>>>>> upstream/5.4
        Some (p, a, sz)) in
 
   let promote minor = Some minor in
@@ -86,15 +96,24 @@ let raise_in_alloc () =
                   ignore (MP.start ~sampling_rate:1.0 tracker)) in
 
   let arr = ref [] in
+<<<<<<< HEAD
   let clos = Sys.opaque_identity (fun () ->
     arr := (f33 42) :: (!arr)) in
+=======
+>>>>>>> upstream/5.4
 
   for i = 1 to 10 do
     start ();
     (try
+<<<<<<< HEAD
       Sys.with_async_exns clos
     with
       Sys.Break -> (incr n_exc));
+=======
+      arr := (f33 42) :: (!arr);
+    with
+      MyExc s -> (incr n_exc));
+>>>>>>> upstream/5.4
     MP.stop();
     Gc.minor();
   done;
@@ -110,6 +129,7 @@ let raise_in_alloc () =
 
   (* Every allocation callback is either raised or deallocated *)
   assert (AllocSet.disjoint (!deallocs) (!excs));
+<<<<<<< HEAD
   if runtime5 () then
     assert (AllocSet.equal (AllocSet.union (!deallocs) (!excs)) (!allocs))
   else
@@ -117,6 +137,9 @@ let raise_in_alloc () =
        allocation callbacks raise *)
     assert (AllocSet.subset (AllocSet.union (!deallocs) (!excs)) (!allocs));
 
+=======
+  assert (AllocSet.equal (AllocSet.union (!deallocs) (!excs)) (!allocs));
+>>>>>>> upstream/5.4
 
   (* Each call to f33 would allocates 7 blocks of 33 words,
      (sizes 6, 5, 4, 6, 5, 4, 3) plus the 3 words for the cons cell to
@@ -144,7 +167,10 @@ let raise_in_alloc () =
 
    *)
 
+<<<<<<< HEAD
   if runtime5 () then begin
+=======
+>>>>>>> upstream/5.4
   assert (dealloc_count = 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 8);
   assert (alloc_count = dealloc_count + !n_exc);
 
@@ -161,7 +187,10 @@ let raise_in_alloc () =
 
   assert (alloc_size = dealloc_size +
                        (6 + 5 + 4 + 6 + 5 + 4 + 3 + 3));
+<<<<<<< HEAD
   end;
+=======
+>>>>>>> upstream/5.4
   arr
 
 

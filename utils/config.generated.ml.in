@@ -22,30 +22,31 @@ let bindir = {@QS@|@ocaml_bindir@|@QS@}
 
 let standard_library_default = {@QS@|@ocaml_libdir@|@QS@}
 
-let ccomp_type = {@QS@|@ccomptype@|@QS@}
+let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
 let c_output_obj = {@QS@|@outputobj@|@QS@}
 let c_has_debug_prefix_map = @cc_has_debug_prefix_map@
 let as_has_debug_prefix_map = @as_has_debug_prefix_map@
-let ocamlc_cflags = {@QS@|@ocamlc_cflags@|@QS@}
-let ocamlc_cppflags = {@QS@|@ocamlc_cppflags@|@QS@}
-(* #7678: ocamlopt uses these only to compile .c files, and the behaviour for
-          the two drivers should be identical. *)
-let ocamlopt_cflags = {@QS@|@ocamlc_cflags@|@QS@}
-let ocamlopt_cppflags = {@QS@|@ocamlc_cppflags@|@QS@}
-let bytecomp_c_libraries = {@QS@|@cclibs@|@QS@}
+let bytecode_cflags = {@QS@|@bytecode_cflags@|@QS@}
+let bytecode_cppflags = {@QS@|@bytecode_cppflags@|@QS@}
+let native_cflags = {@QS@|@native_cflags@|@QS@}
+let native_cppflags = {@QS@|@native_cppflags@|@QS@}
+
+let bytecomp_c_libraries = {@QS@|@zstd_libs@ @cclibs@|@QS@}
 (* bytecomp_c_compiler and native_c_compiler have been supported for a
    long time and are retained for backwards compatibility.
    For programs that don't need compatibility with older OCaml releases
    the recommended approach is to use the constituent variables
-   c_compiler, ocamlc_cflags, ocamlc_cppflags etc., directly.
+   c_compiler, {bytecode,native}_c[pp]flags etc. directly.
 *)
 let bytecomp_c_compiler =
-  c_compiler ^ " " ^ ocamlc_cflags ^ " " ^ ocamlc_cppflags
+  c_compiler ^ " " ^ bytecode_cflags ^ " " ^ bytecode_cppflags
 let native_c_compiler =
-  c_compiler ^ " " ^ ocamlopt_cflags ^ " " ^ ocamlopt_cppflags
+  c_compiler ^ " " ^ native_cflags ^ " " ^ native_cppflags
 let native_c_libraries = {@QS@|@cclibs@|@QS@}
+let compression_c_libraries = {@QS@|@zstd_libs@|@QS@}
 let native_ldflags = {@QS@|@native_ldflags@|@QS@}
+let with_nonexecstack_note = @with_nonexecstack_note@
 let native_pack_linker = {@QS@|@PACKLD@|@QS@}
 let default_rpath = {@QS@|@rpath@|@QS@}
 let mksharedlibrpath = {@QS@|@mksharedlibrpath@|@QS@}
@@ -60,9 +61,12 @@ let flambda = @flambda@
 let flambda2 = @flambda2@
 let with_flambda_invariants = @flambda_invariants@
 let with_cmm_invariants = @cmm_invariants@
+let with_codegen_invariants = @codegen_invariants@
 let windows_unicode = @windows_unicode@ != 0
 
 let flat_float_array = @flat_float_array@
+let align_double = @align_double@
+let align_int64 = @align_int64@
 
 let function_sections = @function_sections@
 let probes = @probes@
@@ -75,15 +79,17 @@ let native_compiler = @native_compiler@
 let architecture = {@QS@|@arch@|@QS@}
 let model = {@QS@|@model@|@QS@}
 let system = {@QS@|@system@|@QS@}
+let target_os_type = {@QS@|@target_os_type@|@QS@}
 
 let asm = {@QS@|@AS@|@QS@}
 let asm_cfi_supported = @asm_cfi_supported@
+let asm_size_type_directives = @asm_size_type_directives@
 let with_frame_pointers = @frame_pointers@
 let with_address_sanitizer = @address_sanitizer@
 let with_cpp_mangling = @cpp_mangling@
 let custom_ops_struct_size = @custom_ops_struct_size@
 
-let ext_exe = {@QS@|@exeext@|@QS@}
+let ext_exe = {@QS@|@EXEEXT@|@QS@}
 let ext_obj = "." ^ {@QS@|@OBJEXT@|@QS@}
 let ext_asm = "." ^ {@QS@|@S@|@QS@}
 let ext_lib = "." ^ {@QS@|@libext@|@QS@}

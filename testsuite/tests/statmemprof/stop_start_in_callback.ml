@@ -1,8 +1,12 @@
+<<<<<<< HEAD
 (* TEST
    runtime5;
    { bytecode; }
    { native; }
 *)
+=======
+(* TEST *)
+>>>>>>> upstream/5.4
 
 (* Tests the effects of stopping and starting profiles in allocation
    callbacks, particularly in combined allocations.
@@ -31,7 +35,11 @@ module AllocSet = Set.Make(Int3Tuples)
 (* A combined 7-block 33-word allocation *)
 
 let[@inline never] f33 n =
+<<<<<<< HEAD
   ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,0))))
+=======
+  ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,n))))
+>>>>>>> upstream/5.4
 
 (* Repeatedly stop sampling from an allocation callback. If `restart`
    is `true, start a fresh profile in the same callback. Otherwise,

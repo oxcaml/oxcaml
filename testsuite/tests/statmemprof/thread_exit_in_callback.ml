@@ -1,6 +1,9 @@
 (* TEST
+<<<<<<< HEAD
  reason = "Thread.exit from a Memprof callback is a fatal error under oxcaml";
  skip;
+=======
+>>>>>>> upstream/5.4
  include systhreads;
  hassysthreads;
  {

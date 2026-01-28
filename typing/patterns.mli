@@ -17,6 +17,7 @@
 open Asttypes
 open Typedtree
 open Types
+open Data_types
 
 val omega : pattern
 (** aka. "Tpat_any" or "_"  *)
@@ -41,15 +42,22 @@ module Simple : sig
     | `Any
     | `Constant of constant
     | `Tuple of (string option * pattern) list
+<<<<<<< HEAD
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
+=======
+>>>>>>> upstream/5.4
     | `Construct of
         Longident.t loc * constructor_description * pattern list
     | `Variant of label * pattern option * row_desc ref
     | `Record of
         (Longident.t loc * label_description * pattern) list * closed_flag
+<<<<<<< HEAD
     | `Record_unboxed_product of
         (Longident.t loc * unboxed_label_description * pattern) list * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
+=======
+    | `Array of mutable_flag * pattern list
+>>>>>>> upstream/5.4
     | `Lazy of pattern
   ]
   type pattern = view pattern_data
@@ -68,9 +76,14 @@ end
 module General : sig
   type view = [
     | Half_simple.view
+<<<<<<< HEAD
     | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
     | `Alias of pattern * Ident.t * string loc * Uid.t
                 * Jkind.Sort.t * Mode.Value.l * Types.type_expr
+=======
+    | `Var of Ident.t * string loc * Uid.t
+    | `Alias of pattern * Ident.t * string loc * Uid.t * Types.type_expr
+>>>>>>> upstream/5.4
   ]
   type pattern = view pattern_data
 
@@ -86,7 +99,10 @@ module Head : sig
     | Construct of constructor_description
     | Constant of constant
     | Tuple of string option list
+<<<<<<< HEAD
     | Unboxed_tuple of (string option * Jkind.sort) list
+=======
+>>>>>>> upstream/5.4
     | Record of label_description list
     | Record_unboxed_product of unboxed_label_description list
     | Variant of
@@ -95,7 +111,11 @@ module Head : sig
           type_row : unit -> row_desc; }
           (* the row of the type may evolve if [close_variant] is called,
              hence the (unit -> ...) delay *)
+<<<<<<< HEAD
     | Array of mutability * Jkind.sort * int
+=======
+    | Array of mutable_flag * int
+>>>>>>> upstream/5.4
     | Lazy
 
   type t = desc pattern_data

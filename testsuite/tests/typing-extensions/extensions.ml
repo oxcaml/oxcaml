@@ -231,7 +231,7 @@ let a = A 9
 Line 1, characters 10-11:
 1 | let a = A 9
               ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "9" has type "int" but an expression was expected of type
          "[> `Var ]"
 |}]
 
@@ -715,7 +715,7 @@ end
 let x = let open F(Empty) in (A:F(Empty).t) (* A is not printed *)
 [%%expect {|
 module Empty : sig end
-module F : functor (X : sig end) -> sig type t = .. type t += A end
+module F : (X : sig end) -> sig type t = .. type t += A end
 val x : F(Empty).t = <extension>
 |}]
 

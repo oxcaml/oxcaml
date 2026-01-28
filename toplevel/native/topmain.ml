@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+<<<<<<< HEAD
 open Compenv
 
 let usage =
@@ -20,6 +21,8 @@ let usage =
 
 let preload_objects = ref []
 
+=======
+>>>>>>> upstream/5.4
 (* Position of the first non expanded argument *)
 let first_nonexpanded_pos = ref 0
 
@@ -38,6 +41,7 @@ let expand_position pos len =
     (* New last position *)
     first_nonexpanded_pos := pos + len + 2
 
+<<<<<<< HEAD
 
 let prepare ppf =
   Opttoploop.set_paths ();
@@ -59,6 +63,15 @@ let file_argument name =
     || Filename.check_suffix name ".cmx"
     || Filename.check_suffix name ".cmxa"
   then preload_objects := name :: !preload_objects
+=======
+let input_argument name =
+  let filename = Toploop.filename_of_input name in
+  let ppf = Format.err_formatter in
+  if Filename.check_suffix filename ".cmxs"
+    || Filename.check_suffix filename ".cmx"
+    || Filename.check_suffix filename ".cmxa"
+  then Toploop.preload_objects := filename :: !Toploop.preload_objects
+>>>>>>> upstream/5.4
   else if is_expanded !current then begin
     (* Script files are not allowed in expand options because otherwise the
        check in override arguments may fail since the new argv can be larger
@@ -73,9 +86,16 @@ let file_argument name =
                               (Array.length !argv - !Arg.current)
       in
       Compmisc.read_clflags_from_env ();
+<<<<<<< HEAD
       if prepare ppf && Opttoploop.run_script ppf name newargs
       then raise (Exit_with_status 0)
       else raise (Exit_with_status 2)
+=======
+      if Toploop.prepare ppf ~input:name () &&
+         Toploop.run_script ppf name newargs
+      then raise (Compenv.Exit_with_status 0)
+      else raise (Compenv.Exit_with_status 2)
+>>>>>>> upstream/5.4
     end
 
 let wrap_expand f s =
@@ -114,7 +134,11 @@ let main () =
                       raise (Exit_with_status 0)
   end;
   Compmisc.read_clflags_from_env ();
+<<<<<<< HEAD
   if not (prepare Format.err_formatter) then raise (Exit_with_status 2);
+=======
+  if not (Toploop.prepare ppf ()) then raise (Compenv.Exit_with_status 2);
+>>>>>>> upstream/5.4
   Compmisc.init_path ();
   Opttoploop.loop Format.std_formatter
 

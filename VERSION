@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 5.2.0+ox
+=======
+5.4.1+dev0-2025-10-09
+>>>>>>> upstream/5.4
 
 # Starting with OCaml 4.14, although the version string that appears above is
 # still correct and this file can thus still be used to figure it out,

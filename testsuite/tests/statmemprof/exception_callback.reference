@@ -1,2 +1,6 @@
 Run without exception.
+<<<<<<< HEAD
 Exception from memprof.
+=======
+Exception from major allocation callback.
+>>>>>>> upstream/5.4

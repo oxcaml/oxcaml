@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 File "singleton_labeled_tuple_type.ml", line 8, characters 26-27:
 8 | let foo (just_x : (x : int)) = just_x
+=======
+File "singleton_labeled_tuple_type.ml", line 7, characters 26-27:
+7 | let foo (just_x : (x : int)) = just_x
+>>>>>>> upstream/5.4
                               ^
 Error: Syntax error

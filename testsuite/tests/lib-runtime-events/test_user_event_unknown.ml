@@ -1,4 +1,12 @@
 (* TEST
+<<<<<<< HEAD
+=======
+ include runtime_events;
+ include unix;
+ set OCAML_RUNTIME_EVENTS_PRESERVE = "1";
+ hasunix;
+ not-target-windows;
+>>>>>>> upstream/5.4
  {
    runtime4;
    skip;

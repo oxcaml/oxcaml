@@ -13,10 +13,15 @@
 
 let x = function 0. .. 1. -> ()
 [%%expect {|
-Line 8, characters 17-25:
+Line 8, characters 17-19:
 8 | let x = function 0. .. 1. -> ()
+<<<<<<< HEAD
                      ^^^^^^^^
 Error: Only character intervals and untagged character intervals are supported in patterns.
+=======
+                     ^^
+Error: Only character intervals are supported in patterns.
+>>>>>>> upstream/5.4
 |}]
 
 (** Constructor arity mismatch *)

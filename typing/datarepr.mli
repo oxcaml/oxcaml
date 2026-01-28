@@ -17,9 +17,14 @@
    determining their representation. *)
 
 open Types
+open Data_types
 
 val extension_descr:
+<<<<<<< HEAD
   current_unit:Unit_info.t option -> Path.t -> extension_constructor ->
+=======
+  current_unit:(Unit_info.t option) -> Path.t -> extension_constructor ->
+>>>>>>> upstream/5.4
   constructor_description
 
 val labels_of_type:
@@ -29,7 +34,11 @@ val unboxed_labels_of_type:
   Path.t -> type_declaration ->
   (Ident.t * unboxed_label_description) list
 val constructors_of_type:
+<<<<<<< HEAD
   current_unit:Unit_info.t option -> Path.t -> type_declaration ->
+=======
+  current_unit:(Unit_info.t option) -> Path.t -> type_declaration ->
+>>>>>>> upstream/5.4
   (Ident.t * constructor_description) list
 
 

@@ -117,6 +117,7 @@ and type_desc =
       Any mix of labeled and unlabeled components also works:
       [Ttuple [Some "l1", t1; None, t2; Some "l3", t3]] ==> [l1:t1 * t2 * l3:t3]
   *)
+<<<<<<< HEAD
 
   | Tunboxed_tuple of (string option * type_expr) list
   (** [Tunboxed_tuple [None, t1; ...; None, tn]] ==> [#(t1 * ... * tn)]
@@ -127,6 +128,8 @@ and type_desc =
       [Tunboxed_tuple [Some "l1", t1; None, t2; Some "l3", t3]]
            ==> [#(l1:t1 * t2 * l3:t3)]
   *)
+=======
+>>>>>>> upstream/5.4
 
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
@@ -187,9 +190,10 @@ and type_desc =
       where 'a1 ... 'an are names given to types in tyl
       and occurrences of those types in ty. *)
 
-  | Tpackage of Path.t * (Longident.t * type_expr) list
+  | Tpackage of package
   (** Type of a first-class module (a.k.a package). *)
 
+<<<<<<< HEAD
   | Tof_kind of jkind_lr
   (** [Tof_kind jkind] ==> [(type : jkind)]
 
@@ -215,6 +219,13 @@ and arrow_desc =
 
 (** See also documentation for [row_more], which enumerates how these
     constructors arise. *)
+=======
+(** [package] corresponds to the type of a first-class module *)
+and package =
+  { pack_path : Path.t;
+    pack_cstrs : (string list * type_expr) list }
+
+>>>>>>> upstream/5.4
 and fixed_explanation =
   | Univar of type_expr (** The row type was bound to an univar *)
   | Fixed_private (** The row type is private *)
@@ -463,11 +474,8 @@ val create_expr: type_desc -> level: int -> scope: int -> id: int -> type_expr
 
 (** Functions and definitions moved from Btype *)
 
-val newty3: level:int -> scope:int -> type_desc -> type_expr
+val proto_newty3: level:int -> scope:int -> type_desc -> transient_expr
         (** Create a type with a fresh id *)
-
-val newty2: level:int -> type_desc -> type_expr
-        (** Create a type with a fresh id and no scope *)
 
 module TransientTypeOps : sig
   (** Comparisons for functors *)
@@ -609,11 +617,14 @@ val rf_either_of: type_expr option -> row_field
 val eq_row_field_ext: row_field -> row_field -> bool
 val changed_row_field_exts: row_field list -> (unit -> unit) -> bool
 
+type row_field_cell
 val match_row_field:
     present:(type_expr option -> 'a) ->
     absent:(unit -> 'a) ->
-    either:(bool -> type_expr list -> bool -> row_field option ->'a) ->
+    either:(bool -> type_expr list -> bool ->
+            row_field_cell * row_field option ->'a) ->
     row_field -> 'a
+
 
 (* *)
 
@@ -670,6 +681,7 @@ module Variance : sig
   val null : t               (* no occurrence *)
   val full : t               (* strictly invariant (all flags) *)
   val covariant : t          (* strictly covariant (May_pos, Pos and Inj) *)
+  val contravariant : t      (* strictly contravariant *)
   val unknown : t            (* allow everything, guarantee nothing *)
   val union  : t -> t -> t
   val inter  : t -> t -> t
@@ -883,8 +895,13 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
+<<<<<<< HEAD
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
+=======
+    ld_mutable: mutable_flag;
+    ld_atomic: atomic_flag;
+>>>>>>> upstream/5.4
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -1095,6 +1112,7 @@ include Wrapped with type 'a wrapped = 'a
 
 val item_visibility : signature_item -> visibility
 
+<<<<<<< HEAD
 (* Constructor and record label descriptions inserted held in typing
    environments *)
 
@@ -1181,6 +1199,8 @@ val record_form_to_string : _ record_form -> string
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
+=======
+>>>>>>> upstream/5.4
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.

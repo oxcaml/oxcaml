@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 (* TEST
    flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
    runtime5;
@@ -5,12 +6,19 @@
    { bytecode; }
    { native; }
 *)
+=======
+(* TEST *)
+>>>>>>> upstream/5.4
 
 let () = Random.self_init ()
 
 let num_domains = 4
 let iters = 1_000_000
+<<<<<<< HEAD
 let len = 10
+=======
+let len = 10_000
+>>>>>>> upstream/5.4
 let table = Weak.create len
 
 let go () =
@@ -19,11 +27,17 @@ let go () =
     let h = String.hash s mod len in
     begin match Weak.get table h with
     | None -> ()
+<<<<<<< HEAD
     | Some (s1, s2) ->
       assert (String.equal s1 s2);
       assert (String.hash s1 mod len = h)
     end;
     Weak.set table h (Some (s,s))
+=======
+    | Some s' -> assert (String.hash s' mod len = h)
+    end;
+    Weak.set table h (Some s)
+>>>>>>> upstream/5.4
   done
 
 let () =

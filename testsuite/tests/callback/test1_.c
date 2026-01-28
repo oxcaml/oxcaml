@@ -13,9 +13,9 @@
 /*                                                                        */
 /**************************************************************************/
 
-#include "caml/mlvalues.h"
-#include "caml/memory.h"
-#include "caml/callback.h"
+#include <caml/mlvalues.h>
+#include <caml/memory.h>
+#include <caml/callback.h>
 
 value mycallback1(value fun, value arg)
 {
@@ -48,6 +48,11 @@ value mycallback4(value fun, value arg1, value arg2, value arg3, value arg4)
   args[3] = arg4;
   res = caml_callbackN(fun, 4, args);
   return res;
+}
+
+value mycallbackN(value fun, value args)
+{
+  return caml_callbackN(fun, Wosize_val(args), (value *) &Field(args, 0));
 }
 
 value mypushroot(value v, value fun, value arg)

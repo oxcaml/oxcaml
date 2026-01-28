@@ -1,6 +1,9 @@
 (* TEST
  include systhreads;
+<<<<<<< HEAD
  flags = "-alert -unsafe_multidomain";
+=======
+>>>>>>> upstream/5.4
  hassysthreads;
  {
    bytecode;
@@ -28,7 +31,11 @@ let set a =
 
 (* no-alloc printing to stdout *)
 let say msg =
+<<<<<<< HEAD
   Unix.write Unix.stdout (Bytes.unsafe_of_string msg) 0 (String.length msg)
+=======
+  Unix.write_substring Unix.stdout msg 0 (String.length msg)
+>>>>>>> upstream/5.4
   |> ignore
 
 (*
@@ -105,9 +112,13 @@ let () =
   let th = Thread.create thread_fn () in
   let _:Gc.Memprof.t = Gc.Memprof.(start ~sampling_rate:1.
     { null_tracker with
+<<<<<<< HEAD
       alloc_minor = (fun info -> if info.size = 1 then
                                      (say "    minor alloc\n"; Some ())
                                  else None);
+=======
+      alloc_minor = (fun info -> say "    minor alloc\n"; Some ());
+>>>>>>> upstream/5.4
       alloc_major = (fun _ -> say "    major alloc\n"; Some "major block\n");
       promote = (fun () ->
         say "    promoting...\n";

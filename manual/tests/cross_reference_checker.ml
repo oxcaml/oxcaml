@@ -27,8 +27,8 @@ type error =
   | No_aux_file
   | Wrong_attribute_payload of Location.t
 
-let pp_ref ppf = Format.pp_print_list ~pp_sep:( fun ppf () ->
-    Format.pp_print_string ppf ".") Format.pp_print_int ppf
+let pp_ref ppf = Format_doc.pp_print_list ~pp_sep:( fun ppf () ->
+    Format_doc.pp_print_string ppf ".") Format_doc.pp_print_int ppf
 
 let print_error error =
   Location.print_report Format.std_formatter @@ match error with
@@ -144,7 +144,8 @@ module OCaml_refs = struct
     then None
     else begin match attr.attr_payload with
       | PStr [{pstr_desc= Pstr_eval
-                 ({ pexp_desc = Pexp_constant Pconst_string (s,_,_) },_) } ] ->
+                 ({ pexp_desc = Pexp_constant
+                        { pconst_desc = Pconst_string (s,_,_); _ } },_) } ] ->
           Some s
       | _ -> print_error (Wrong_attribute_payload attr.attr_loc);
           Some "" (* triggers an error *)
@@ -159,7 +160,8 @@ module OCaml_refs = struct
   let int e =
     let open Parsetree in
     match e.pexp_desc with
-    | Pexp_constant Pconst_integer (s, _ ) -> int_of_string s
+    | Pexp_constant { pconst_desc = Pconst_integer (s, _ ); _ } ->
+        int_of_string s
     | _ -> raise Exit
 
   let int_list l =
@@ -176,7 +178,8 @@ module OCaml_refs = struct
   let rec try_parse_as_list e =
     match e.Parsetree.pexp_desc with
     | Parsetree.Pexp_construct
-        ({ txt = Lident "::"; _ }, Some { pexp_desc = Pexp_tuple [ x; rest]; _ }) ->
+        ({ txt = Lident "::"; _ },
+         Some { pexp_desc = Pexp_tuple [ None, x; None, rest]; _ }) ->
           ((int x) :: try_parse_as_list rest)
     | Parsetree.Pexp_construct ({ txt = Lident "[]"; _}, None) ->
         []
@@ -189,11 +192,11 @@ module OCaml_refs = struct
     let tuple_expected () = print_error (Tuple_or_list_expected loc) in
     match e.Parsetree.pexp_desc with
     | Parsetree.Pexp_tuple l ->
-        begin match int_list l with
+        begin match int_list (List.map snd l) with
         | None -> tuple_expected (); []
         | Some pos -> pos
         end
-    | Parsetree.Pexp_constant Pconst_integer (n,_) ->
+    | Parsetree.Pexp_constant { pconst_desc = Pconst_integer (n,_); _ } ->
         [int_of_string n]
     | _ ->
         begin match list_expression e  with

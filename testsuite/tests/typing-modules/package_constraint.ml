@@ -2,12 +2,15 @@
  expect;
 *)
 
+<<<<<<< HEAD
 (* A type with kind value, used for the below tests *)
 type t_value
 [%%expect {|
 type t_value
 |}]
 
+=======
+>>>>>>> upstream/5.4
 (* You may constrain abstract types in packages. *)
 module type S = sig
   type t
@@ -49,6 +52,7 @@ module type S = sig
 end
 
 type m1 = (module S with type t = int)
+<<<<<<< HEAD
 type m2 = (module S with type t = t_value);;
 [%%expect{|
 module type S = sig type t : immediate end
@@ -66,6 +70,22 @@ Error: In this "with" constraint, the new definition of "t"
          because of the definition of t_value at line 1, characters 0-12.
        But the kind of the first must be a subkind of immediate
          because of the definition of t at line 2, characters 2-22.
+=======
+type m2 = (module S with type t = string);;
+[%%expect{|
+module type S = sig type t [@@immediate] end
+type m1 = (module S with type t = int)
+Line 6, characters 18-40:
+6 | type m2 = (module S with type t = string);;
+                      ^^^^^^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = string
+       is not included in
+         type t [@@immediate]
+       The first is not an immediate type.
+>>>>>>> upstream/5.4
 |}];;
 
 (* You may not constrain types with a manifest in a package *)
@@ -73,12 +93,21 @@ module type S = sig
   type t = int
 end
 
+<<<<<<< HEAD
 type m = (module S with type t = t_value);;
 [%%expect{|
 module type S = sig type t = int end
 Line 5, characters 9-41:
 5 | type m = (module S with type t = t_value);;
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=======
+type m = (module S with type t = string);;
+[%%expect{|
+module type S = sig type t = int end
+Line 5, characters 17-39:
+5 | type m = (module S with type t = string);;
+                     ^^^^^^^^^^^^^^^^^^^^^^
+>>>>>>> upstream/5.4
 Error: In the constrained signature, type "t" is defined to be "int".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -92,9 +121,15 @@ end
 type m = (module S with type t = int);;
 [%%expect{|
 module type S = sig type t = int end
+<<<<<<< HEAD
 Line 5, characters 9-37:
 5 | type m = (module S with type t = int);;
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=======
+Line 5, characters 17-36:
+5 | type m = (module S with type t = int);;
+                     ^^^^^^^^^^^^^^^^^^^
+>>>>>>> upstream/5.4
 Error: In the constrained signature, type "t" is defined to be "int".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -112,16 +147,28 @@ type m = (module S with type P.t = int);;
 [%%expect{|
 module M : sig type t end
 module type S = sig module P = M end
+<<<<<<< HEAD
 Line 9, characters 9-39:
 9 | type m = (module S with type P.t = int);;
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=======
+Line 9, characters 17-38:
+9 | type m = (module S with type P.t = int);;
+                     ^^^^^^^^^^^^^^^^^^^^^
+>>>>>>> upstream/5.4
 Error: In the constrained signature, type "P.t" is defined to be "M.t".
        Package "with" constraints may only be used on abstract types.
 |}];;
 
 (* If writing a package constraint in a mutually recursive group of type decls,
+<<<<<<< HEAD
    checking that the constraint's immediacy may rely on the definitions of other
    elements of the mutually recursive group. *)
+=======
+   checking that the constraint's immediacy may not rely on the definitions of
+   other elements of the mutually recursive group. *)
+(* It would be nice if this worked. *)
+>>>>>>> upstream/5.4
 module type S = sig
   type t [@@immediate]
 end
@@ -129,6 +176,7 @@ end
 type t1 = int
 and t2 = (module S with type t = t1);;
 [%%expect{|
+<<<<<<< HEAD
 module type S = sig type t : immediate end
 type t1 = int
 and t2 = (module S with type t = t1)
@@ -208,6 +256,21 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
 |}];;
 
 
+=======
+module type S = sig type t [@@immediate] end
+Line 6, characters 17-35:
+6 | and t2 = (module S with type t = t1);;
+                     ^^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = t1
+       is not included in
+         type t [@@immediate]
+       The first is not an immediate type.
+|}];;
+
+>>>>>>> upstream/5.4
 (* When using a package with constraint to give an abstract type a definition
    that is immediate, that immediacy information should be usable after
    unpacking. *)
@@ -225,8 +288,13 @@ end;;
 module type S = sig type t end
 type m = (module S with type t = int)
 module F :
+<<<<<<< HEAD
   functor (X : sig val x : m end) ->
     sig module M : sig type t = int end type t = M.t end
+=======
+  (X : sig val x : m end) ->
+    sig module M : sig type t = int end type t = M.t [@@immediate] end
+>>>>>>> upstream/5.4
 |}];;
 
 (* Checking such a constraint may require expanding definitions from the module
@@ -264,9 +332,15 @@ module type Private_row =
   sig type a and t = private [< `A | `B ] and b and d = private [< `C ] end
 module type Test =
   sig type a and t = [ `A ] and b and d = private [< `C ] end
+<<<<<<< HEAD
 Line 13, characters 12-54:
 13 | type fail = (module Private_row with type t = [ `A ] )
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=======
+Line 13, characters 20-52:
+13 | type fail = (module Private_row with type t = [ `A ] )
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>>>>>>> upstream/5.4
 Error: In the constrained signature, type "t" is defined to be "[< `A | `B ]".
        Package "with" constraints may only be used on abstract types.
 |}]
@@ -280,40 +354,65 @@ end
 type t1 = (module Private_row with type t = [ `A ])
 [%%expect{|
 module type Private_row = sig type t = private [< `A ] end
+<<<<<<< HEAD
 Line 5, characters 10-51:
 5 | type t1 = (module Private_row with type t = [ `A ])
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=======
+Line 5, characters 18-50:
+5 | type t1 = (module Private_row with type t = [ `A ])
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>>>>>>> upstream/5.4
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type t2 = (module Private_row with type t = [< `A ])
 [%%expect{|
+<<<<<<< HEAD
 Line 1, characters 10-52:
 1 | type t2 = (module Private_row with type t = [< `A ])
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=======
+Line 1, characters 18-51:
+1 | type t2 = (module Private_row with type t = [< `A ])
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>>>>>>> upstream/5.4
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type 'a t3 = (module Private_row with type t = [< `A ]) as 'a
 [%%expect{|
+<<<<<<< HEAD
 Line 1, characters 13-55:
 1 | type 'a t3 = (module Private_row with type t = [< `A ]) as 'a
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=======
+Line 1, characters 21-54:
+1 | type 'a t3 = (module Private_row with type t = [< `A ]) as 'a
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>>>>>>> upstream/5.4
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type 'a t4 = (module Private_row with type t = [< `A ] as 'a)
 [%%expect{|
+<<<<<<< HEAD
 Line 1, characters 13-61:
 1 | type 'a t4 = (module Private_row with type t = [< `A ] as 'a)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=======
+Line 1, characters 21-60:
+1 | type 'a t4 = (module Private_row with type t = [< `A ] as 'a)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>>>>>>> upstream/5.4
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
+<<<<<<< HEAD
 (* In cases where the package constraint involves a type variable from the
    current ty var env, it can affect inference.  t1 below should check but not
    t2. *)
@@ -338,3 +437,15 @@ Error: This type "t_value" should be an instance of type "('a : immediate)"
        But the kind of t_value must be a subkind of immediate
          because of the definition of t at line 5, characters 0-39.
 |}];;
+=======
+(** Issue 13778: constraining a type should count as using it *)
+module X: sig
+  type t
+end = struct
+  module type S = sig type s end
+  type t = (module S with type s = int)
+end
+[%%expect {|
+module X : sig type t end
+|}]
+>>>>>>> upstream/5.4

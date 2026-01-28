@@ -13,6 +13,7 @@
 /*   special exception on linking described in the file LICENSE.          */
 /*                                                                        */
 /**************************************************************************/
+
 #ifndef CAML_SHARED_HEAP_H
 #define CAML_SHARED_HEAP_H
 
@@ -31,7 +32,15 @@ struct caml_heap_state;
 struct pool;
 
 struct caml_heap_state* caml_init_shared_heap(void);
-void caml_teardown_shared_heap(struct caml_heap_state* heap);
+void caml_adopt_all_orphan_heaps(struct caml_heap_state* heap);
+void caml_assert_shared_heap_is_empty(struct caml_heap_state *heap);
+
+// ensures that the shared heap is empty
+void caml_orphan_shared_heap(struct caml_heap_state* heap);
+
+// requires that the shared heap is empty
+void caml_free_shared_heap(struct caml_heap_state* heap);
+
 
 value* caml_shared_try_alloc(struct caml_heap_state*,
                              mlsize_t, tag_t, reserved_t);
@@ -101,6 +110,7 @@ Caml_inline int is_not_markable(value v) {
   return Has_status_val(v, NOT_MARKABLE);
 }
 
+<<<<<<< HEAD
 Caml_inline status caml_allocation_status(void) {
   return
     caml_marking_started()
@@ -108,6 +118,8 @@ Caml_inline status caml_allocation_status(void) {
     : caml_global_heap_state.UNMARKED;
 }
 
+=======
+>>>>>>> upstream/5.4
 void caml_redarken_pool(struct pool*, scanning_action, void*);
 
 intnat caml_sweep(struct caml_heap_state*, intnat);
@@ -120,6 +132,15 @@ void caml_cycle_heap(struct caml_heap_state*);
 
 /* Heap invariant verification (for debugging) */
 void caml_verify_heap_from_stw(caml_domain_state *domain);
+
+/* Forces finalisation of all heap-allocated values,
+   disregarding both local and global roots.
+
+   Warning: this function should only be used on runtime shutdown.
+*/
+void caml_finalise_heap(void);
+
+void caml_finalise_freelist(void);
 
 #ifdef DEBUG
 /* [is_garbage(v)] returns true if [v] is a garbage value */

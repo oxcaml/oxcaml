@@ -17,13 +17,18 @@
 
 #include "caml/config.h"
 #include <string.h>
-#ifdef HAS_UNISTD
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <errno.h>
 #include "caml/osdeps.h"
 #include "caml/platform.h"
 #include "caml/fail.h"
+<<<<<<< HEAD
+=======
+#include "caml/lf_skiplist.h"
+#include "caml/misc.h"
+>>>>>>> upstream/5.4
 #include "caml/signals.h"
 #ifdef HAS_SYS_MMAN_H
 #include <sys/mman.h>
@@ -99,7 +104,13 @@ void caml_plat_assert_locked(caml_plat_mutex* m)
 #endif
 }
 
+<<<<<<< HEAD
 CAMLexport CAMLthread_local int caml_lockdepth = 0;
+=======
+#ifdef DEBUG
+CAMLexport CAMLthread_local int caml_lockdepth = 0;
+#endif
+>>>>>>> upstream/5.4
 
 void caml_plat_assert_all_locks_unlocked(void)
 {
@@ -123,12 +134,43 @@ void caml_plat_mutex_free(caml_plat_mutex* m)
   check_err("mutex_free", pthread_mutex_destroy(m));
 }
 
+CAMLexport void caml_plat_mutex_reinit(caml_plat_mutex *m)
+{
+#ifdef DEBUG
+  /* The following logic is needed to let caml_plat_assert_all_locks_unlocked()
+     behave correctly in child processes after a fork operation. */
+  if (caml_plat_try_lock(m)) {
+    /* lock was not held at fork time */
+    caml_plat_unlock(m);
+  } else {
+    /* lock was held at fork time, parent process still holds it, but we
+       don't and need to fix lock count */
+    DEBUG_UNLOCK(m);
+  }
+#endif
+  caml_plat_mutex_init(m);
+}
+
+/* Condition variables */
 static void caml_plat_cond_init_aux(caml_plat_cond *cond)
 {
+<<<<<<< HEAD
   custom_condvar_init(cond);
 }
 
 /* Condition variables */
+=======
+  pthread_condattr_t attr;
+  pthread_condattr_init(&attr);
+#if defined(_POSIX_TIMERS) && \
+    defined(_POSIX_MONOTONIC_CLOCK) && \
+    _POSIX_MONOTONIC_CLOCK != (-1)
+  pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
+#endif
+  pthread_cond_init(cond, &attr);
+}
+
+>>>>>>> upstream/5.4
 void caml_plat_cond_init(caml_plat_cond* cond)
 {
   caml_plat_cond_init_aux(cond);
@@ -137,22 +179,38 @@ void caml_plat_cond_init(caml_plat_cond* cond)
 void caml_plat_wait(caml_plat_cond* cond, caml_plat_mutex* mut)
 {
   caml_plat_assert_locked(mut);
+<<<<<<< HEAD
   check_err("wait", custom_condvar_wait(cond, mut));
+=======
+  check_err("wait", pthread_cond_wait(cond, mut));
+>>>>>>> upstream/5.4
 }
 
 void caml_plat_broadcast(caml_plat_cond* cond)
 {
+<<<<<<< HEAD
   check_err("cond_broadcast", custom_condvar_broadcast(cond));
+=======
+  check_err("cond_broadcast", pthread_cond_broadcast(cond));
+>>>>>>> upstream/5.4
 }
 
 void caml_plat_signal(caml_plat_cond* cond)
 {
+<<<<<<< HEAD
   check_err("cond_signal", custom_condvar_signal(cond));
+=======
+  check_err("cond_signal", pthread_cond_signal(cond));
+>>>>>>> upstream/5.4
 }
 
 void caml_plat_cond_free(caml_plat_cond* cond)
 {
+<<<<<<< HEAD
   check_err("cond_free", custom_condvar_destroy(cond));
+=======
+  check_err("cond_free", pthread_cond_destroy(cond));
+>>>>>>> upstream/5.4
 }
 
 /* Futexes */
@@ -186,7 +244,11 @@ void caml_plat_futex_init(caml_plat_futex* ftx, caml_plat_futex_value value) {
 
 void caml_plat_futex_free(caml_plat_futex* ftx) {
   caml_plat_mutex_free(&ftx->mutex);
+<<<<<<< HEAD
   caml_plat_cond_free(&ftx->cond);
+=======
+  check_err("cond_destroy", pthread_cond_destroy(&ftx->cond));
+>>>>>>> upstream/5.4
 }
 
 #else /* ! CAML_PLAT_FUTEX_FALLBACK */
@@ -285,7 +347,11 @@ void caml_plat_futex_free(caml_plat_futex* ftx) {
 
 #  elif 0 /* defined(__DragonFly__)
    TODO The following code for DragonFly is untested,
+<<<<<<< HEAD
    we currently use the fallback instead. */ */
+=======
+   we currently use the fallback instead. */
+>>>>>>> upstream/5.4
 #    define CAML_PLAT_FUTEX_WAIT(ftx, undesired)        \
   umtx_sleep((volatile const int*)ftx, undesired, 0)
 #    define CAML_PLAT_FUTEX_WAKE(ftx)               \
@@ -380,40 +446,63 @@ void caml_plat_barrier_wait_sense(caml_plat_barrier* barrier,
 
 /* Memory management */
 
-static uintnat round_up(uintnat size, uintnat align) {
-  CAMLassert(Is_power_of_2(align));
-  return (size + align - 1) & ~(align - 1);
-}
-
 intnat caml_plat_pagesize = 0;
 intnat caml_plat_hugepagesize = 0;
 intnat caml_plat_mmap_alignment = 0;
 
 uintnat caml_mem_round_up_mapping_size(uintnat size)
 {
+<<<<<<< HEAD
   if (caml_plat_hugepagesize > caml_plat_pagesize &&
       size > caml_plat_hugepagesize/2)
     return round_up(size, caml_plat_hugepagesize);
   else
     return round_up(size, caml_plat_pagesize);
+=======
+  return caml_round_up(size, caml_plat_pagesize);
+>>>>>>> upstream/5.4
 }
 
 #define Is_page_aligned(size) ((size & (caml_plat_pagesize - 1)) == 0)
 
+<<<<<<< HEAD
 void* caml_mem_map(uintnat size, uintnat flags, const char* name)
+=======
+#ifdef DEBUG
+static struct lf_skiplist mmap_blocks;
+#endif
+
+#ifndef _WIN32
+#endif
+
+void* caml_mem_map(uintnat size, int reserve_only)
+>>>>>>> upstream/5.4
 {
   void* mem = caml_plat_mem_map(size, flags, name);
 
   if (mem == 0) {
     CAML_GC_MESSAGE(ADDRSPACE,
+<<<<<<< HEAD
                     "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d bytes (%s) failed",
                     size, name);
+=======
+                    "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d bytes failed",
+                    size);
+>>>>>>> upstream/5.4
     return 0;
   }
 
   CAML_GC_MESSAGE(ADDRSPACE,
                   "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
+<<<<<<< HEAD
                   " bytes at %p for %s\n", size, mem, name);
+=======
+                  " bytes at %p for heaps\n", size, mem);
+
+#ifdef DEBUG
+  caml_lf_skiplist_insert(&mmap_blocks, (uintnat)mem, size);
+#endif
+>>>>>>> upstream/5.4
 
   return mem;
 }
@@ -423,8 +512,13 @@ void* caml_mem_commit(void* mem, uintnat size, const char* name)
   CAMLassert(Is_page_aligned(size));
   CAML_GC_MESSAGE(ADDRSPACE,
                   "commit %" ARCH_INTNAT_PRINTF_FORMAT "d"
+<<<<<<< HEAD
                   " bytes at %p for %s\n", size, mem, name);
   return caml_plat_mem_commit(mem, size, name);
+=======
+                  " bytes at %p for heaps\n", size, mem);
+  return caml_plat_mem_commit(mem, size);
+>>>>>>> upstream/5.4
 }
 
 void caml_mem_decommit(void* mem, uintnat size, const char* name)
@@ -432,16 +526,32 @@ void caml_mem_decommit(void* mem, uintnat size, const char* name)
   if (size) {
     CAML_GC_MESSAGE(ADDRSPACE,
                     "decommit %" ARCH_INTNAT_PRINTF_FORMAT "d"
+<<<<<<< HEAD
                     " bytes at %p for %s\n", size, mem, name);
     caml_plat_mem_decommit(mem, size, name);
+=======
+                    " bytes at %p for heaps\n", size, mem);
+    caml_plat_mem_decommit(mem, size);
+>>>>>>> upstream/5.4
   }
 }
 
 void caml_mem_unmap(void* mem, uintnat size)
 {
+<<<<<<< HEAD
   CAML_GC_MESSAGE(ADDRSPACE,
                   "munmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
                   " bytes at %p\n", size, mem);
+=======
+#ifdef DEBUG
+  uintnat data;
+  CAMLassert(caml_lf_skiplist_find(&mmap_blocks, (uintnat)mem, &data) != 0);
+  CAMLassert(data == size);
+#endif
+  CAML_GC_MESSAGE(ADDRSPACE,
+                  "munmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
+                  " bytes at %p for heaps\n", size, mem);
+>>>>>>> upstream/5.4
   caml_plat_mem_unmap(mem, size);
 }
 
@@ -459,10 +569,11 @@ void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
     caml_plat_mem_name_map(mem, length, mapping_name);
 }
 
-#define Min_sleep_ns       10000 // 10 us
-#define Slow_sleep_ns    1000000 //  1 ms
-#define Max_sleep_ns  1000000000 //  1 s
+#define Min_sleep_nsec  (10 * NSEC_PER_USEC) /* 10 usec */
+#define Slow_sleep_nsec  (1 * NSEC_PER_MSEC) /*  1 msec */
+#define Max_sleep_nsec   (1 * NSEC_PER_SEC)  /*  1 sec  */
 
+<<<<<<< HEAD
 unsigned caml_plat_spin_back_off(unsigned sleep_ns,
                                  const struct caml_plat_srcloc* loc)
 {
@@ -470,13 +581,33 @@ unsigned caml_plat_spin_back_off(unsigned sleep_ns,
   if (sleep_ns > Max_sleep_ns) sleep_ns = Max_sleep_ns;
   unsigned next_sleep_ns = sleep_ns + sleep_ns / 4;
   if (sleep_ns < Slow_sleep_ns && Slow_sleep_ns <= next_sleep_ns) {
+=======
+unsigned caml_plat_spin_back_off(unsigned sleep_nsec,
+                                 const struct caml_plat_srcloc* loc)
+{
+  if (sleep_nsec < Min_sleep_nsec) sleep_nsec = Min_sleep_nsec;
+  if (sleep_nsec > Max_sleep_nsec) sleep_nsec = Max_sleep_nsec;
+  unsigned next_sleep_nsec = sleep_nsec + sleep_nsec / 4;
+  if (sleep_nsec < Slow_sleep_nsec && Slow_sleep_nsec <= next_sleep_nsec) {
+>>>>>>> upstream/5.4
     caml_gc_log("Slow spin-wait loop in %s at %s:%d",
                 loc->function, loc->file, loc->line);
   }
 #ifdef _WIN32
+<<<<<<< HEAD
   Sleep(sleep_ns/1000000);
 #else
   usleep(sleep_ns/1000);
 #endif
   return next_sleep_ns;
+=======
+  Sleep(sleep_nsec / NSEC_PER_MSEC);
+#elif defined (HAS_NANOSLEEP)
+  const struct timespec req = caml_timespec_of_nsec(sleep_nsec);
+  nanosleep(&req, NULL);
+#else
+  usleep(sleep_nsec / NSEC_PER_USEC);
+#endif
+  return next_sleep_nsec;
+>>>>>>> upstream/5.4
 }

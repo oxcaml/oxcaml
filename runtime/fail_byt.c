@@ -38,7 +38,15 @@ CAMLexport void caml_raise(value v)
 
   caml_channel_cleanup_on_raise();
 
+<<<<<<< HEAD
   v = caml_process_pending_actions_with_root(v);
+=======
+  caml_result result = caml_process_pending_actions_with_root_res(v);
+  /* If the result is a value, we want to assign it to [v].
+     If the result is an exception, we want to raise it instead of [v].
+     The line below does both these things at once. */
+  v = result.data;
+>>>>>>> upstream/5.4
 
   if (Caml_state->external_raise == NULL) {
     caml_terminate_signals();
@@ -51,6 +59,7 @@ CAMLexport void caml_raise(value v)
   siglongjmp(Caml_state->external_raise->jmp->buf, 1);
 }
 
+<<<<<<< HEAD
 CAMLexport void caml_raise_async(value v)
 {
   Caml_check_caml_state();
@@ -131,6 +140,8 @@ CAMLexport void caml_raise_with_string(value tag, char const *msg)
   CAMLnoreturn;
 }
 
+=======
+>>>>>>> upstream/5.4
 /* PR#5115: Built-in exceptions can be triggered by input_value
    while reading the initial value of [caml_global_data].
 
@@ -143,7 +154,7 @@ CAMLexport void caml_raise_with_string(value tag, char const *msg)
 */
 static void check_global_data(char const *exception_name)
 {
-  if (caml_global_data == 0 || !Is_block(caml_global_data)) {
+  if (!Is_block(caml_global_data)) {
     fprintf(stderr, "Fatal error: exception %s during initialisation\n",
             exception_name);
     exit(2);
@@ -152,66 +163,69 @@ static void check_global_data(char const *exception_name)
 
 static void check_global_data_param(char const *exception_name, char const *msg)
 {
-  if (caml_global_data == 0 || !Is_block(caml_global_data)) {
+  if (!Is_block(caml_global_data)) {
     fprintf(stderr, "Fatal error: exception %s(\"%s\")\n", exception_name, msg);
     exit(2);
   }
 }
 
-Caml_inline value caml_get_failwith_tag (char const *msg)
+Caml_inline value caml_get_failwith_tag(char const *msg)
 {
   check_global_data_param("Failure", msg);
   return Field(caml_global_data, FAILURE_EXN);
 }
 
-CAMLexport void caml_failwith (char const *msg)
+CAMLexport value caml_exception_failure(char const *msg)
 {
-  caml_raise_with_string(caml_get_failwith_tag(msg), msg);
+  return caml_exception_with_string(caml_get_failwith_tag(msg), msg);
 }
 
-CAMLexport void caml_failwith_value (value msg)
+CAMLexport value caml_exception_failure_value(value msg)
 {
   CAMLparam1(msg);
   value tag = caml_get_failwith_tag(String_val(msg));
-  caml_raise_with_arg(tag, msg);
-  CAMLnoreturn;
+  CAMLreturn(caml_exception_with_arg(tag, msg));
 }
 
-Caml_inline value caml_get_invalid_argument_tag (char const *msg)
+Caml_inline value caml_get_invalid_argument_tag(char const *msg)
 {
   check_global_data_param("Invalid_argument", msg);
   return Field(caml_global_data, INVALID_EXN);
 }
 
-CAMLexport void caml_invalid_argument (char const *msg)
+CAMLexport value caml_exception_invalid_argument(char const *msg)
 {
-  caml_raise_with_string(caml_get_invalid_argument_tag(msg), msg);
+  return caml_exception_with_string(caml_get_invalid_argument_tag(msg), msg);
 }
 
-CAMLexport void caml_invalid_argument_value (value msg)
+CAMLexport value caml_exception_invalid_argument_value(value msg)
 {
   CAMLparam1(msg);
   value tag = caml_get_invalid_argument_tag(String_val(msg));
-  caml_raise_with_arg(tag, msg);
-  CAMLnoreturn;
+  CAMLreturn(caml_exception_with_arg(tag, msg));
 }
 
-CAMLexport void caml_array_bound_error(void)
+CAMLexport value caml_exception_array_bound_error(void)
 {
-  caml_invalid_argument("index out of bounds");
+  return caml_exception_invalid_argument("index out of bounds");
 }
 
+<<<<<<< HEAD
 CAMLexport void caml_array_align_error(void)
 {
   caml_invalid_argument("address was misaligned");
 }
 
 CAMLexport void caml_raise_out_of_memory(void)
+=======
+CAMLexport value caml_exception_out_of_memory(void)
+>>>>>>> upstream/5.4
 {
   check_global_data("Out_of_memory");
-  caml_raise_constant(Field(caml_global_data, OUT_OF_MEMORY_EXN));
+  return Field(caml_global_data, OUT_OF_MEMORY_EXN);
 }
 
+<<<<<<< HEAD
 CAMLexport void caml_raise_out_of_fibers(void)
 {
   check_global_data("Out_of_fibers");
@@ -222,36 +236,46 @@ CAMLexport void caml_raise_stack_overflow(void)
 {
   check_global_data("Stack_overflow");
   caml_raise_async(Field(caml_global_data, STACK_OVERFLOW_EXN));
+=======
+CAMLexport value caml_exception_stack_overflow(void)
+{
+  check_global_data("Stack_overflow");
+  return Field(caml_global_data, STACK_OVERFLOW_EXN);
+>>>>>>> upstream/5.4
 }
 
-CAMLexport void caml_raise_sys_error(value msg)
+CAMLexport value caml_exception_sys_error(value msg)
 {
   check_global_data_param("Sys_error", String_val(msg));
-  caml_raise_with_arg(Field(caml_global_data, SYS_ERROR_EXN), msg);
+  return caml_exception_with_arg(Field(caml_global_data, SYS_ERROR_EXN), msg);
 }
 
-CAMLexport void caml_raise_end_of_file(void)
+CAMLexport value caml_exception_end_of_file(void)
 {
   check_global_data("End_of_file");
-  caml_raise_constant(Field(caml_global_data, END_OF_FILE_EXN));
+  return Field(caml_global_data, END_OF_FILE_EXN);
 }
 
-CAMLexport void caml_raise_zero_divide(void)
+CAMLexport value caml_exception_zero_divide(void)
 {
   check_global_data("Division_by_zero");
-  caml_raise_constant(Field(caml_global_data, ZERO_DIVIDE_EXN));
+  return Field(caml_global_data, ZERO_DIVIDE_EXN);
 }
 
-CAMLexport void caml_raise_not_found(void)
+CAMLexport value caml_exception_not_found(void)
 {
   check_global_data("Not_found");
-  caml_raise_constant(Field(caml_global_data, NOT_FOUND_EXN));
+  return Field(caml_global_data, NOT_FOUND_EXN);
 }
 
-CAMLexport void caml_raise_sys_blocked_io(void)
+CAMLexport value caml_exception_sys_blocked_io(void)
 {
   check_global_data("Sys_blocked_io");
+<<<<<<< HEAD
   caml_raise_constant(Field(caml_global_data, SYS_BLOCKED_IO));
+=======
+  return Field(caml_global_data, SYS_BLOCKED_IO);
+>>>>>>> upstream/5.4
 }
 
 int caml_is_special_exception(value exn) {
@@ -262,7 +286,7 @@ int caml_is_special_exception(value exn) {
 
   value f;
 
-  if (caml_global_data == 0 || !Is_block(caml_global_data)) {
+  if (!Is_block(caml_global_data)) {
     return 0;
   }
 

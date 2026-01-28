@@ -695,9 +695,15 @@ let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
       linear_gen_implementation ~ppf_dump unix progname)
 
 (* Error report *)
+<<<<<<< HEAD
+=======
+module Style = Misc.Style
+let fprintf, dprintf = Format_doc.fprintf, Format_doc.dprintf
+>>>>>>> upstream/5.4
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Assembler_error file ->
+<<<<<<< HEAD
     fprintf ppf "Assembler error, input left in file %a" Location.print_filename
       file
   | Mismatched_for_pack saved ->
@@ -717,3 +723,28 @@ let () =
   Location.register_error_of_exn (function
     | Error err -> Some (Location.error_of_printer_file report_error err)
     | _ -> None)
+=======
+      fprintf ppf "Assembler error, input left in file %a"
+        Location.Doc.quoted_filename file
+  | Mismatched_for_pack saved ->
+    let msg = function
+       | None -> dprintf "without %a" Style.inline_code "-for-pack"
+       | Some s -> dprintf "with %a" Style.inline_code ("-for-pack " ^ s)
+     in
+     fprintf ppf
+       "This input file cannot be compiled %t: it was generated %t."
+       (msg !Clflags.for_package) (msg saved)
+  | Asm_generation(fn, err) ->
+     fprintf ppf
+       "Error producing assembly code for function %a: %a"
+       Style.inline_code fn Emitaux.report_error_doc err
+
+let () =
+  Location.register_error_of_exn
+    (function
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
+      | _ -> None
+    )
+
+let report_error = Format_doc.compat report_error_doc
+>>>>>>> upstream/5.4

@@ -64,7 +64,10 @@ type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
   | Atomicity of position
+<<<<<<< HEAD
   | Modality of Mode.Modality.equate_error
+=======
+>>>>>>> upstream/5.4
 
 type record_change =
   (Types.label_declaration as 'ld, 'ld, label_mismatch) Diffing_with_keys.change
@@ -184,6 +187,21 @@ val extension_constructors:
   loc:Location.t -> Env.t -> mark:bool -> Ident.t ->
   extension_constructor -> extension_constructor ->
   extension_constructor_mismatch option
+
+(** The functions [value_descriptions_consistency] and
+    [type_declarations_consistency] check if two declaration are consistent.
+    Declarations are consistent when there exists an environment such that the
+    first declaration is a subtype of the second one.
+
+    Notably, if a type declaration [td1] is consistent with [td2] then a type
+    expression [te] which is well-formed with the [td2] declaration in scope
+    is still well-formed with the [td1] declaration: [E, td2 |- te] => [E, td1
+    |- te]. *)
+val value_descriptions_consistency:
+  Env.t -> value_description -> value_description -> module_coercion
+val type_declarations_consistency:
+  Env.t -> type_declaration -> type_declaration -> type_mismatch option
+
 (*
 val class_types:
         Env.t -> class_type -> class_type -> bool
@@ -192,12 +210,12 @@ val class_types:
 val report_value_mismatch :
   string -> string ->
   Env.t ->
-  Format.formatter -> value_mismatch -> unit
+  value_mismatch Format_doc.printer
 
 val report_type_mismatch :
   string -> string -> string ->
   Env.t ->
-  Format.formatter -> type_mismatch -> unit
+  type_mismatch Format_doc.printer
 
 val report_modality_sub_error :
   string -> string -> Format.formatter -> Mode.Modality.error -> unit
@@ -208,4 +226,4 @@ val report_mode_sub_error :
 val report_extension_constructor_mismatch :
   string -> string -> string ->
   Env.t ->
-  Format.formatter -> extension_constructor_mismatch -> unit
+  extension_constructor_mismatch Format_doc.printer

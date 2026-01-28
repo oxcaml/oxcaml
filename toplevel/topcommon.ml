@@ -34,7 +34,7 @@ let print_warning = Location.print_warning
 let input_name = Location.input_name
 
 let parse_mod_use_file name lb =
-  let modname = Unit_info.modname_from_source name in
+  let modname = Unit_info.lax_modname_from_source name in
   let items =
     List.concat
       (List.map
@@ -246,6 +246,19 @@ let preprocess_phrase ppf phr =
   if !Clflags.dump_source then Pprintast.top_phrase ppf phr;
   phr
 
+let typecheck_phrase ppf oldenv sstr =
+  Typecore.reset_delayed_checks ();
+  let (str, sg, sn, shape, newenv) =
+    Typemod.type_toplevel_phrase oldenv sstr
+  in
+  if !Clflags.dump_typedtree then Printtyped.implementation ppf str;
+  let sg' = Typemod.Signature_names.simplify newenv sn sg in
+  Includemod.check_implementation oldenv sg sg';
+  Typecore.force_delayed_checks ();
+  let shape = Shape_reduce.local_reduce Env.empty shape in
+  if !Clflags.dump_shape then Shape.print ppf shape;
+  (str, sg', newenv)
+
 (* Phrase buffer that stores the last toplevel phrase (see
    [Location.input_phrase_buffer]). *)
 let phrase_buffer = Buffer.create 1024
@@ -298,14 +311,14 @@ let refill_lexbuf buffer len =
       len
   end
 
-let set_paths ?(auto_include=Compmisc.auto_include) () =
+let set_paths ?(auto_include=Compmisc.auto_include) ?(dir="") () =
   (* Add whatever -I options have been specified on the command line,
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
   let expand = Misc.expand_directory Config.standard_library in
   let Load_path.{ visible; hidden } = Load_path.get_paths () in
   let visible = List.concat [
-      [ "" ];
+      [ dir ];
       List.map expand (List.rev !Compenv.first_include_dirs);
       List.map expand (List.rev !Clflags.include_dirs);
       List.map expand (List.rev !Compenv.last_include_dirs);
@@ -379,15 +392,19 @@ let all_directive_names () =
   Hashtbl.fold (fun dir _ acc -> dir::acc) directive_table []
 
 module Style = Misc.Style
+let inline_code = Format_doc.compat Style.inline_code
 
 let try_run_directive ppf dir_name pdir_arg =
   begin match get_directive dir_name with
   | None ->
-      fprintf ppf "Unknown directive %a." Style.inline_code dir_name;
-      let directives = all_directive_names () in
-      Misc.did_you_mean ppf
-        (fun () -> Misc.spellcheck directives dir_name);
-      fprintf ppf "@.";
+      let print ppf () =
+        let directives = all_directive_names () in
+        Misc.aligned_hint ~prefix:"" ppf
+          "@{<ralign>Unknown directive @}%a."
+          Style.inline_code dir_name
+          (Misc.did_you_mean (Misc.spellcheck directives dir_name))
+      in
+      fprintf ppf "%a@." (Format_doc.compat print) ();
       false
   | Some d ->
       match d, pdir_arg with
@@ -399,12 +416,12 @@ let try_run_directive ppf dir_name pdir_arg =
          | exception _ ->
            fprintf ppf "Integer literal exceeds the range of \
                         representable integers for directive %a.@."
-                   Style.inline_code dir_name;
+                   inline_code dir_name;
            false
          end
       | Directive_int _, Some {pdira_desc = Pdir_int (_, Some _)} ->
           fprintf ppf "Wrong integer literal for directive %a.@."
-            Style.inline_code dir_name;
+            inline_code dir_name;
           false
       | Directive_ident f, Some {pdira_desc = Pdir_ident lid} -> f lid; true
       | Directive_bool f, Some {pdira_desc = Pdir_bool b} -> f b; true
@@ -426,24 +443,30 @@ let try_run_directive ppf dir_name pdir_arg =
           let pp_type ppf = function
           | `None -> Format.fprintf ppf "no argument"
           | `String ->
-              Format.fprintf ppf "a %a literal" Style.inline_code "string"
+              Format.fprintf ppf "a %a literal" inline_code "string"
           | `Int ->
-              Format.fprintf ppf "an %a literal" Style.inline_code "string"
+              Format.fprintf ppf "an %a literal" inline_code "int"
           | `Ident ->
               Format.fprintf ppf "an identifier"
           | `Bool ->
-              Format.fprintf ppf "a %a literal" Style.inline_code "bool"
+              Format.fprintf ppf "a %a literal" inline_code "bool"
           in
           fprintf ppf "Directive %a expects %a, got %a.@."
-            Style.inline_code dir_name pp_type dir_type pp_type arg_type;
+            inline_code dir_name pp_type dir_type pp_type arg_type;
           false
   end
 
 (* Overriding exception printers with toplevel-specific ones *)
 
 let loading_hint_printer ppf cu =
+<<<<<<< HEAD
   let global = Symtable.Global.Glob_compunit cu in
   Symtable.report_error ppf (Symtable.Undefined_global global);
+=======
+  let open Format_doc in
+  let global = Symtable.Global.Glob_compunit (Cmo_format.Compunit cu) in
+  Symtable.report_error_doc ppf (Symtable.Undefined_global global);
+>>>>>>> upstream/5.4
   let find_with_ext ext =
     let leafname =
       (Compilation_unit.Name.to_string (Compilation_unit.name cu)) ^ ext
@@ -459,7 +482,7 @@ let loading_hint_printer ppf cu =
      But very often they do. *)
   begin match List.find_map find_with_ext [".cma"; ".cmo"] with
   | Some path ->
-    let load ppf path = Format.fprintf ppf "#load \"%s\"" path in
+    let load ppf path = Format_doc.fprintf ppf "#load \"%s\"" path in
     fprintf ppf
       "Found %a @,in the load paths. \
        @,Did you mean to load it using @,%a \

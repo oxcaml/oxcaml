@@ -28,8 +28,12 @@ module Global : sig
     | Glob_compunit of Compilation_unit.t
     | Glob_predef of predef
   val name: t -> string
+<<<<<<< HEAD
   val description: Format.formatter -> t -> unit
   val of_compilation_unit: Compilation_unit.t -> t
+=======
+  val description: t Format_doc.printer
+>>>>>>> upstream/5.4
   val of_ident: Ident.t -> t option
   module Set : Set.S with type elt = t
   module Map : Map.S with type key = t
@@ -89,8 +93,7 @@ type error =
 
 exception Error of error
 
-open Format
-
-val report_error: formatter -> error -> unit
+val report_error: error Format_doc.format_printer
+val report_error_doc: error Format_doc.printer
 
 val reset: unit -> unit

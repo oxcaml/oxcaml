@@ -174,6 +174,7 @@ type error =
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
   | Not_an_object of type_expr
+<<<<<<< HEAD
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param
   | Non_value of
@@ -189,10 +190,11 @@ type error =
        usage_stage : Env.stage}
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
+=======
+  | Repeated_tuple_label of string
+>>>>>>> upstream/5.4
 
 exception Error of Location.t * Env.t * error
-
-val report_error: Env.t -> Format.formatter -> error -> unit
 
 (* Support for first-class modules. *)
 val transl_modtype_longident:  (* from Typemod *)

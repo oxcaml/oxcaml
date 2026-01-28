@@ -21,8 +21,12 @@ type recursive_binding_kind =
 | Static
   (** Bindings for which some kind of pre-allocation scheme is possible.
       The expression is allowed to be recursive, as long as its definition does
+<<<<<<< HEAD
       not inspect recursively defined values.
       See [Value_rec_compiler] for more details on the compilation scheme. *)
+=======
+      not inspect recursively defined values. *)
+>>>>>>> upstream/5.4
 | Dynamic
   (** Bindings for which pre-allocation is not possible.
       The expression is not allowed to refer to any recursive variable. *)

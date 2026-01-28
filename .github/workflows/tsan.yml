@@ -1,0 +1,2 @@
+# Upstream has a workflow for testing with thread sanitization. See
+# https://github.com/ocaml/ocaml/blob/master/.github/workflows/tsan.yml.

@@ -175,7 +175,7 @@ if git diff --diff-filter=d --staged --name-only | grep -qx "$PATHS" ; then
             fi
           else
             echo 'configure.ac does not appear to generate configure'
-            echo 'Try running make -B configure and stage the changes'
+            echo 'Try running tools/autogen and stage the changes'
             echo "$OVERRIDE_MESSAGE"
             git diff --text --no-index a b
             STATUS=1

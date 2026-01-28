@@ -1,4 +1,5 @@
 (* TEST
+<<<<<<< HEAD
 {
    runtime4;
    skip;
@@ -9,6 +10,15 @@
    libunix;
    { bytecode; }
    { native; }
+=======
+ include unix;
+ include runtime_events;
+ hasunix;
+ {
+   bytecode;
+ }{
+   native;
+>>>>>>> upstream/5.4
  }
 *)
 

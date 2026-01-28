@@ -137,9 +137,8 @@ static int paths_same_file(
 
 static void update_environment(array local_env)
 {
-  array envp;
-  for (envp = local_env; *envp != NULL; envp++) {
-    char *pos_eq = strchr(*envp, '=');
+  for (array envp = local_env; *envp != NULL; envp++) {
+    const char *pos_eq = strchr(*envp, '=');
     if (pos_eq != NULL) {
       char *name, *value;
       int name_length = pos_eq - *envp;
@@ -252,7 +251,6 @@ static int handle_process_termination(
   pid_t pid, int status, const char *corefilename_prefix)
 {
   int signal, core = 0;
-  char *corestr;
 
   if (WIFEXITED(status)) return WEXITSTATUS(status);
 
@@ -265,10 +263,9 @@ static int handle_process_termination(
 #ifdef WCOREDUMP
   core = WCOREDUMP(status);
 #endif /* WCOREDUMP */
-  corestr = core ? "" : "no ";
   fprintf(stderr,
     "Process %lld got signal %d(%s), %score dumped\n",
-    (long long) pid, signal, strsignal(signal), corestr
+    (long long) pid, signal, strsignal(signal), core ? "" : "no "
   );
 
   if (core)

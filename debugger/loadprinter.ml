@@ -16,16 +16,14 @@
 (* Loading and installation of user-defined printer functions *)
 
 open Misc
-open Types
 
 (* Error report *)
 
-type error =
-  | Load_failure of Dynlink.error
-  | Unbound_identifier of Longident.t
-  | Unavailable_module of string * Longident.t
-  | Wrong_type of Longident.t
-  | No_active_printer of Longident.t
+type error = [
+    Topprinters.error
+  | `Load_failure of Dynlink.error
+  | `Unavailable_module of string * Longident.t
+]
 
 exception Error of error
 
@@ -61,7 +59,7 @@ let rec loadfiles ppf name =
       fprintf ppf "%s: %s@." name msg;
       false
   | Dynlink.Error e ->
-      raise(Error(Load_failure e))
+      raise(Error(`Load_failure e))
 
 let loadfile ppf name =
   ignore(loadfiles ppf name)
@@ -92,6 +90,7 @@ let eval_value_path env path =
 
 (* Install, remove a printer (as in toplevel/topdirs) *)
 
+<<<<<<< HEAD
 let match_printer_type desc make_printer_type =
   Ctype.with_local_level ~post:Ctype.generalize begin fun () ->
     let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
@@ -129,34 +128,70 @@ let install_printer ppf lid =
     else
       (fun formatter repr -> Obj.obj v formatter (Obj.obj repr)) in
   Printval.install_printer path ty_arg ppf print_function
+=======
+(* Very close to Topdirs.install_printer_by_kind
+   except that we do fetch the (remote) values
+   {b and fallback if it fails} *)
+ let install_printer lid =
+  match Topprinters.find_printer Env.empty lid with
+  | Error error -> raise (Error (error :> error))
+  | Ok (path, kind) ->
+      let v =
+        try
+          eval_value_path Env.empty path
+        with Symtable.Error(Symtable.Undefined_global global) ->
+          let s = Symtable.Global.name global in
+          raise (Error (`Unavailable_module(s, lid))) in
+      let print_with_fallback ppf f remote_val =
+        try
+          f (Debugcom.Remote_value.obj remote_val)
+        with
+          Debugcom.Marshalling_error ->
+            fprintf ppf "<cannot fetch remote object>" in
+      match kind with
+      | Topprinters.Old ty_arg ->
+          let print_function ppf remote_val =
+            print_with_fallback ppf (Obj.obj v) remote_val in
+          Printval.install_printer path ty_arg print_function
+      | Topprinters.Simple ty_arg ->
+          let print_function ppf remote_val =
+            print_with_fallback ppf (Obj.obj v ppf) remote_val in
+          Printval.install_printer path ty_arg print_function
+      | Topprinters.Generic _ ->
+          raise (Error (`Wrong_type lid))
+>>>>>>> upstream/5.4
 
 let remove_printer lid =
-  let (_ty_arg, path, _is_old_style) = find_printer_type lid in
-  try
-    Printval.remove_printer path
-  with Not_found ->
-    raise(Error(No_active_printer lid))
+  match Topprinters.find_printer Env.empty lid with
+  | Error error -> raise (Error (error :> error))
+  | Ok (path, _kind) ->
+      try
+        Printval.remove_printer path
+      with Not_found ->
+        raise(Error(`No_active_printer path))
 
 (* Error report *)
 
 open Format
 module Style = Misc.Style
+let quoted_longident =
+  Format_doc.compat @@ Style.as_inline_code Printtyp.Doc.longident
 
 let report_error ppf = function
-  | Load_failure e ->
+  | `Load_failure e ->
       fprintf ppf "@[Error during code loading: %s@]@."
         (Dynlink.error_message e)
-  | Unbound_identifier lid ->
+  | `Unbound_identifier lid ->
       fprintf ppf "@[Unbound identifier %a@]@."
-      (Style.as_inline_code Printtyp.longident) lid
-  | Unavailable_module(md, lid) ->
+        quoted_longident lid
+  | `Unavailable_module(md, lid) ->
       fprintf ppf
         "@[The debugger does not contain the code for@ %a.@ \
-           Please load an implementation of %s first.@]@."
-        (Style.as_inline_code Printtyp.longident) lid md
-  | Wrong_type lid ->
+         Please load an implementation of %s first.@]@."
+        quoted_longident lid md
+  | `Wrong_type lid ->
       fprintf ppf "@[%a has the wrong type for a printing function.@]@."
-      (Style.as_inline_code Printtyp.longident) lid
-  | No_active_printer lid ->
+        quoted_longident lid
+  | `No_active_printer path ->
       fprintf ppf "@[%a is not currently active as a printing function.@]@."
-      (Style.as_inline_code Printtyp.longident) lid
+        Printtyp.path path

@@ -28,7 +28,13 @@
 
 enum { CAML_MEMPROF_SRC_NORMAL = 0,
        CAML_MEMPROF_SRC_MARSHAL = 1, /* interning */
+<<<<<<< HEAD
        CAML_MEMPROF_SRC_CUSTOM = 2 /* custom memory */ };
+=======
+       CAML_MEMPROF_SRC_CUSTOM = 2, /* custom memory */
+       CAML_MEMPROF_SRC_MAP_FILE = 3, /* mmapped file */
+       CAML_MEMPROF_NUM_SOURCE_KINDS};
+>>>>>>> upstream/5.4
 
 /* Respond to the allocation of any block. Does not call callbacks.
  * `block` is the allocated block, to be tracked by memprof if
@@ -39,8 +45,13 @@ enum { CAML_MEMPROF_SRC_NORMAL = 0,
  * but may not be for out-of-heap memory). `source` is one of the
  * `CAML_MEMPROF_SRC_* constants above. */
 
+<<<<<<< HEAD
 void caml_memprof_sample_block(value block, size_t allocated_words,
                                size_t sampled_words, int source);
+=======
+CAMLextern void caml_memprof_sample_block(value block, size_t allocated_words,
+                                          size_t sampled_words, int source);
+>>>>>>> upstream/5.4
 
 /* Sample a minor heap "Comballoc" (combined allocation). Called when
  * the memprof trigger is hit (before the allocation is actually
@@ -92,7 +103,11 @@ extern void caml_memprof_set_trigger(caml_domain_state *state);
 /* Run any pending callbacks for the current domain (or adopted from a
  * terminated domain). */
 
+<<<<<<< HEAD
 extern value caml_memprof_run_callbacks_exn(void);
+=======
+extern caml_result caml_memprof_run_callbacks_res(void);
+>>>>>>> upstream/5.4
 
 
 /*** Multi-domain support. ***/
@@ -137,6 +152,6 @@ CAMLextern void caml_memprof_enter_thread(memprof_thread_t);
 
 CAMLextern void caml_memprof_delete_thread(memprof_thread_t);
 
-#endif
+#endif /* CAML_INTERNALS */
 
 #endif /* CAML_MEMPROF_H */

@@ -22,7 +22,7 @@ external format_int : string -> int -> string @@ portable = "caml_format_int"
 
 let err_no_pred = "U+0000 has no predecessor"
 let err_no_succ = "U+10FFFF has no successor"
-let err_not_sv i = format_int "%X" i ^ " is not an Unicode scalar value"
+let err_not_sv i = format_int "%X" i ^ " is not a Unicode scalar value"
 let err_not_latin1 u = "U+" ^ format_int "%04X" u ^ " is not a latin1 character"
 
 type t = int
@@ -60,7 +60,11 @@ let unsafe_to_char = Char.unsafe_chr
 
 let equal : int -> int -> bool = ( = )
 let compare : int -> int -> int = Stdlib.compare
-let hash = to_int
+
+external seeded_hash_param :
+  int -> int -> int -> 'a -> int = "caml_hash" [@@noalloc]
+let seeded_hash seed x = seeded_hash_param 10 100 seed x
+let hash x = seeded_hash_param 10 100 0 x
 
 (* UTF codecs tools *)
 
@@ -80,6 +84,16 @@ let[@inline] utf_decode_length d = (d lsr decode_bits) land 0b111
 let[@inline] utf_decode_uchar d = unsafe_of_int (d land 0xFFFFFF)
 let[@inline] utf_decode n u = ((8 lor n) lsl decode_bits) lor (to_int u)
 let[@inline] utf_decode_invalid n = (n lsl decode_bits) lor rep
+
+let utf_8_decode_length_of_byte = function
+  | '\x00' .. '\x7F' -> 1
+  | '\x80' .. '\xC1' -> 0
+  | '\xC2' .. '\xDF' -> 2
+  | '\xE0' .. '\xEF' -> 3
+  | '\xF0' .. '\xF4' -> 4
+  | _ -> 0
+
+let max_utf_8_decode_length = 4
 
 let utf_8_byte_length u = match to_int u with
 | u when u < 0 -> assert false

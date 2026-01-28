@@ -20,9 +20,18 @@ open! Stdlib
 
 type t = bool = false | true
 
+<<<<<<< HEAD
 external not : bool -> bool @@ portable = "%boolnot"
 external ( && ) : bool -> bool -> bool @@ portable = "%sequand"
 external ( || ) : bool -> bool -> bool @@ portable = "%sequor"
+=======
+external not : bool -> bool = "%boolnot"
+external ( && ) : bool -> bool -> bool = "%sequand"
+external ( || ) : bool -> bool -> bool = "%sequor"
+external logand : bool -> bool -> bool = "%andint"
+external logor : bool -> bool -> bool = "%orint"
+external logxor : bool -> bool -> bool = "%xorint"
+>>>>>>> upstream/5.4
 let equal : bool -> bool -> bool = ( = )
 let compare : bool -> bool -> int = Stdlib.compare
 external to_int : bool -> int @@ portable = "%identity"

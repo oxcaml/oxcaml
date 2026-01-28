@@ -2,6 +2,10 @@
  flags = "-dshape";
  expect;
 *)
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/5.4
 module M = struct end (* uid 0 *)
 module F(X : sig end) = M
 module App = F(List)
@@ -13,7 +17,11 @@ module M : sig end
 {
  "F"[module] -> Abs<.2>(X, {<.0>});
  }
+<<<<<<< HEAD
 module F : functor (X : sig end) -> sig end
+=======
+module F : (X : sig end) -> sig end
+>>>>>>> upstream/5.4
 {
  "App"[module] -> {<.3>};
  }
@@ -34,7 +42,11 @@ module M : sig end
                             "t"[type] -> <.6>;
                             });
  }
+<<<<<<< HEAD
 module F : functor (X : sig end) -> sig type t end
+=======
+module F : (X : sig end) -> sig type t end
+>>>>>>> upstream/5.4
 {
  "App"[module] -> {<.8>
                    "t"[type] -> <.6>;
@@ -54,7 +66,11 @@ module M : sig end
 {
  "F"[module] -> Abs<.11>(X, X<.10>);
  }
+<<<<<<< HEAD
 module F : functor (X : sig end) -> sig end
+=======
+module F : (X : sig end) -> sig end
+>>>>>>> upstream/5.4
 {
  "App"[module] -> {<.12>};
  }
@@ -69,7 +85,11 @@ end
 {
  "Id"[module] -> Abs<.14>(X, X<.13>);
  }
+<<<<<<< HEAD
 module Id : functor (X : sig end) -> sig end
+=======
+module Id : (X : sig end) -> sig end
+>>>>>>> upstream/5.4
 {
  "Struct"[module] ->
    {<.16>
@@ -105,7 +125,11 @@ module O = N.M
                              "M"[module] -> X<.19>;
                              });
  }
+<<<<<<< HEAD
 module F : functor (X : sig end) -> sig module M : sig end end
+=======
+module F : (X : sig end) -> sig module M : sig end end
+>>>>>>> upstream/5.4
 {
  "N"[module] -> {<.22>
                  "M"[module] -> {<.19>};

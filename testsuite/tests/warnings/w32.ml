@@ -70,6 +70,7 @@ module type S = sig
   module F:  sig val x : int end -> sig end
 end
 
+<<<<<<< HEAD
 (* Nominal type comparison *)
 
 module Nominal = struct
@@ -83,6 +84,11 @@ end
 
 (* from ocaml/ocaml#13955 no unused warning should be triggered for [test] *)
 
+=======
+(* from ocaml/ocaml#13955 no warning 32 should be triggered for [test] *)
+
+[@@@warning "-60"]
+>>>>>>> upstream/5.4
 module I : sig
   module F (_ : sig val test : int end) : sig end
 end = struct
@@ -98,6 +104,11 @@ end = struct
 end
 and Y: sig end = struct end
 
+<<<<<<< HEAD
+=======
+[@@@warning "+60"]
+
+>>>>>>> upstream/5.4
 (* TEST
  flags = "-w +A";
  setup-ocamlc.byte-build-env;

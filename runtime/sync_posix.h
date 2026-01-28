@@ -25,6 +25,7 @@
 
 #include "caml/sync.h"
 
+<<<<<<< HEAD
 #ifdef __linux__
 #include <features.h>
 #include <unistd.h>
@@ -33,6 +34,8 @@
 #include <limits.h>
 #endif
 
+=======
+>>>>>>> upstream/5.4
 typedef int sync_retcode;
 
 /* Mutexes */
@@ -198,6 +201,7 @@ Caml_inline int sync_condvar_wait(sync_condvar c, sync_mutex m)
   return custom_condvar_wait(c, m);
 }
 
+<<<<<<< HEAD
 /* Reporting errors */
 
 Caml_inline void sync_check_error(int retcode, char * msg)
@@ -219,4 +223,6 @@ Caml_inline void sync_check_error(int retcode, char * msg)
   caml_raise_sys_error(str);
 }
 
+=======
+>>>>>>> upstream/5.4
 #endif /* CAML_SYNC_POSIX_H */

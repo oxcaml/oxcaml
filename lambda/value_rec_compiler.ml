@@ -43,13 +43,39 @@
 
 open Lambda
 
+<<<<<<< HEAD
+=======
+(** Allocation and backpatching primitives *)
+
+let alloc_prim =
+  Primitive.simple ~name:"caml_alloc_dummy" ~arity:1 ~alloc:true
+
+let alloc_float_record_prim =
+  Primitive.simple ~name:"caml_alloc_dummy_float" ~arity:1 ~alloc:true
+
+let alloc_lazy_prim =
+  Primitive.simple ~name:"caml_alloc_dummy_lazy" ~arity:1 ~alloc:true
+
+let update_prim =
+  (* Note: [alloc] could be false, but it probably doesn't matter *)
+  Primitive.simple ~name:"caml_update_dummy" ~arity:2 ~alloc:true
+
+let update_lazy_prim =
+  Primitive.simple ~name:"caml_update_dummy_lazy" ~arity:2 ~alloc:true
+
+
+>>>>>>> upstream/5.4
 (** {1. Sizing} *)
 
 (* Simple blocks *)
 type block_size =
   | Regular_block of int
   | Float_record of int
+<<<<<<< HEAD
   | Mixed_record of Lambda.mixed_block_shape
+=======
+  | Lazy_block
+>>>>>>> upstream/5.4
 
 type size =
   | Unreachable
@@ -73,6 +99,7 @@ type size =
       choose to reuse the [constant] classification to avoid sorting
       through the [Lconst] definitions.
       It also generates slightly better code. *)
+<<<<<<< HEAD
   | Function of Lambda.lfunction
   (** Function definitions.
       This includes more than just obvious, syntactic function definitions;
@@ -80,6 +107,12 @@ type size =
       Note that to be able to eta-expand variables bound to functions,
       we need a bunch of metadata such as the arity so we store the actual
       definition to be sure we can recover all we need. *)
+=======
+  | Function
+  (** Function definitions.
+      This includes more than just obvious, syntactic function definitions;
+      see {!Function Lifting} for details. *)
+>>>>>>> upstream/5.4
   | Block of block_size
   (** Allocated values of a fixed size.
       This corresponds to expressions ending in a single obvious allocation,
@@ -93,9 +126,14 @@ and lambda_with_env = {
   env : binding_size Ident.Map.t;
 }
 
+<<<<<<< HEAD
 let dynamic_size lam =
   Misc.fatal_errorf "letrec: No size found for Static binding:@ %a"
     Printlambda.lambda lam
+=======
+let dynamic_size () =
+  Misc.fatal_error "letrec: No size found for Static binding"
+>>>>>>> upstream/5.4
 
 (* [join_sizes] is used to compute the size of an expression with multiple
    branches. Such expressions are normally classified as [Dynamic] by
@@ -106,10 +144,50 @@ let dynamic_size lam =
    Note that the current compilation scheme would work if we allowed the
    [Constant] and [Block] cases to be joined, but [Function] needs to be
    a single function. *)
+<<<<<<< HEAD
 let join_sizes lam size1 size2 =
   match size1, size2 with
   | Unreachable, size | size, Unreachable -> size
   | _, _ -> dynamic_size lam
+=======
+let join_sizes size1 size2 =
+  match size1, size2 with
+  | Unreachable, size | size, Unreachable -> size
+  | _, _ -> dynamic_size ()
+
+(* We need to recognize the Pmakeblock that we transformed into
+   primitive calls, to support size compilation in nested recursive
+   definitions. Consider this example from Vincent Laviron:
+   {[let f a =
+       let rec x =
+         let rec y = Some a in y
+       in x
+   ]}
+
+   [let rec y = Some a in y] gets compiled to
+   {[let y = caml_alloc_dummy 1 in
+     caml_update_dummy(y, ...);
+     y]}
+   and we need to recognize from this definition that this
+   value has known size [1].
+*)
+let find_size_of_alloc_prim prim args =
+  let same_as other_prim =
+    let open Primitive in
+    String.equal prim.prim_name other_prim.prim_name
+  in
+  let int_arg = match args with
+    | [Lconst (Const_base (Const_int n))] -> Some n
+    | _ ->  None
+  in
+  if same_as alloc_prim then
+    Option.map (fun n -> Regular_block n) int_arg
+  else if same_as alloc_float_record_prim then
+    Option.map (fun n -> Float_record n) int_arg
+  else if same_as alloc_lazy_prim then
+    Some Lazy_block
+  else None
+>>>>>>> upstream/5.4
 
 let compute_static_size lam =
   let rec compute_expression_size env lam =
@@ -117,40 +195,69 @@ let compute_static_size lam =
     | Lvar v ->
       begin match Ident.Map.find_opt v env with
       | None ->
+<<<<<<< HEAD
         dynamic_size lam
+=======
+        dynamic_size ()
+>>>>>>> upstream/5.4
       | Some binding_size ->
         Lazy_backtrack.force
           (fun { lambda; env } -> compute_expression_size env lambda)
           binding_size
       end
+<<<<<<< HEAD
     | Lmutvar _ -> dynamic_size lam
     | Lconst _ -> Constant
     | Lapply _ -> dynamic_size lam
     | Lfunction lfun -> Function lfun
     | Llet (_, _, id, _, def, body) ->
+=======
+    | Lmutvar _ -> dynamic_size ()
+    | Lconst _ -> Constant
+    | Lapply _ -> dynamic_size ()
+    | Lfunction _ -> Function
+    | Llet (_, _, id, def, body) ->
+>>>>>>> upstream/5.4
       let env =
         Ident.Map.add id (Lazy_backtrack.create { lambda = def; env }) env
       in
       compute_expression_size env body
+<<<<<<< HEAD
     | Lmutlet(_, _, _, _, body) ->
       compute_expression_size env body
     | Lletrec (bindings, body) ->
       let env =
         List.fold_left (fun env_acc { id; def } ->
             Ident.Map.add id (Lazy_backtrack.create_forced (Function def)) env_acc)
+=======
+    | Lmutlet(_, _, _, body) ->
+      compute_expression_size env body
+    | Lletrec (bindings, body) ->
+      let env =
+        List.fold_left (fun env_acc { id; def = _ } ->
+            Ident.Map.add id (Lazy_backtrack.create_forced Function) env_acc)
+>>>>>>> upstream/5.4
           env bindings
       in
       compute_expression_size env body
     | Lprim (p, args, _) ->
       size_of_primitive env p args
+<<<<<<< HEAD
     | Lswitch (_, sw, _, _) ->
+=======
+    | Lswitch (_, sw, _) ->
+>>>>>>> upstream/5.4
       let fail_case =
         match sw.sw_failaction with
         | None -> []
         | Some fail -> [0 (* ignored *), fail]
       in
       compute_and_join_sizes_switch env [sw.sw_consts; sw.sw_blocks; fail_case]
+<<<<<<< HEAD
     | Lstringswitch (_, cases, fail, _, _) ->
+=======
+    | Lstringswitch (_, cases, fail, _) ->
+>>>>>>> upstream/5.4
       let fail_case =
         match fail with
         | None -> []
@@ -158,16 +265,24 @@ let compute_static_size lam =
       in
       compute_and_join_sizes_switch env [cases; fail_case]
     | Lstaticraise _ -> Unreachable
+<<<<<<< HEAD
     | Lstaticcatch (body, _, handler, _, _)
     | Ltrywith (body, _, _, handler, _) ->
       compute_and_join_sizes env [body; handler]
     | Lifthenelse (_cond, ifso, ifnot, _) ->
+=======
+    | Lstaticcatch (body, _, handler)
+    | Ltrywith (body, _, handler) ->
+      compute_and_join_sizes env [body; handler]
+    | Lifthenelse (_cond, ifso, ifnot) ->
+>>>>>>> upstream/5.4
       compute_and_join_sizes env [ifso; ifnot]
     | Lsequence (_, e) ->
       compute_expression_size env e
     | Lwhile _
     | Lfor _
     | Lassign _ -> Constant
+<<<<<<< HEAD
     | Lsend _ -> dynamic_size lam
     | Levent (e, _) ->
       compute_expression_size env e
@@ -188,13 +303,26 @@ let compute_static_size lam =
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
+=======
+    | Lsend _ -> dynamic_size ()
+    | Levent (e, _) ->
+      compute_expression_size env e
+    | Lifused _ -> Constant
+  and compute_and_join_sizes env branches =
+    List.fold_left (fun size branch ->
+        join_sizes size (compute_expression_size env branch))
+>>>>>>> upstream/5.4
       Unreachable branches
   and compute_and_join_sizes_switch :
     type a. binding_size Ident.Map.t -> (a * lambda) list list -> size =
     fun env all_cases ->
       List.fold_left (fun size cases ->
           List.fold_left (fun size (_key, action) ->
+<<<<<<< HEAD
               join_sizes action size (compute_expression_size env action))
+=======
+              join_sizes size (compute_expression_size env action))
+>>>>>>> upstream/5.4
             size cases)
         Unreachable all_cases
   and size_of_primitive env p args =
@@ -203,7 +331,11 @@ let compute_static_size lam =
     | Psetfield _
     | Psetfield_computed _
     | Psetfloatfield _
+<<<<<<< HEAD
     | Psetmixedfield _
+=======
+    | Poffsetint _
+>>>>>>> upstream/5.4
     | Poffsetref _
     | Pbytessetu
     | Pbytessets
@@ -212,6 +344,7 @@ let compute_static_size lam =
     | Pbigarrayset _
     | Pbytes_set_16 _
     | Pbytes_set_32 _
+<<<<<<< HEAD
     | Pbytes_set_f32 _
     | Pbytes_set_64 _
     | Pbigstring_set_16 _
@@ -247,10 +380,33 @@ let compute_static_size lam =
             Misc.fatal_error "size_of_primitive"
         end
     | Pmakeblock (_, _, shape, _) ->
+=======
+    | Pbytes_set_64 _
+    | Pbigstring_set_16 _
+    | Pbigstring_set_32 _
+    | Pbigstring_set_64 _
+    | Ppoll ->
+        (* Unit-returning primitives. Most of these are only generated from
+           external declarations and not special-cased by [Value_rec_check],
+           but it doesn't hurt to be consistent. *)
+      Constant
+
+    | Pduprecord (repres, size) ->
+        begin match repres with
+        | Record_regular | Record_inlined _ | Record_extension _ ->
+            Block (Regular_block size)
+        | Record_float ->
+            Block (Float_record size)
+        | Record_unboxed _ ->
+            Misc.fatal_error "size_of_primitive"
+        end
+    | Pmakeblock _ ->
+>>>>>>> upstream/5.4
         (* The block shape is unfortunately an option, so we rely on the
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
+<<<<<<< HEAD
         (match Lambda.mixed_block_of_block_shape shape with
          | None -> Block (Regular_block (List.length args))
          | Some arr -> Block (Mixed_record arr))
@@ -270,6 +426,19 @@ let compute_static_size lam =
         end
     | Pmakearray_dynamic _ -> Misc.fatal_error "size_of_primitive"
     | Parrayblit _ -> Constant
+=======
+        Block (Regular_block (List.length args))
+    | Pmakelazyblock _ ->
+        Block Lazy_block
+    | Pmakearray (kind, _) ->
+        let size = List.length args in
+        begin match kind with
+        | Pgenarray | Paddrarray | Pintarray ->
+            Block (Regular_block size)
+        | Pfloatarray ->
+            Block (Float_record size)
+        end
+>>>>>>> upstream/5.4
     | Pduparray _ ->
         (* The size has to be recovered from the size of the argument *)
         begin match args with
@@ -287,6 +456,7 @@ let compute_static_size lam =
            so we should never end up here; but these are constants anyway. *)
         Constant
 
+<<<<<<< HEAD
     | Pbytes_to_string
     | Pbytes_of_string
     | Pgetglobal _
@@ -301,18 +471,70 @@ let compute_static_size lam =
     | Preperform
     | Pccall _
     | Psequand | Psequor | Pnot
+=======
+    | Pccall prim ->
+        begin match find_size_of_alloc_prim prim args with
+        | Some size -> Block size
+        | None -> dynamic_size ()
+        end
+
+    | Pbytes_to_string
+    | Pbytes_of_string
+    | Pgetglobal _
+    | Psetglobal _
+    | Pfield _
+    | Pfield_computed
+    | Pfloatfield _
+    | Prunstack
+    | Pperform
+    | Presume
+    | Preperform
+    | Psequand | Psequor | Pnot
+    | Pnegint | Paddint | Psubint | Pmulint
+    | Pdivint _ | Pmodint _
+    | Pandint | Porint | Pxorint
+    | Plslint | Plsrint | Pasrint
+    | Pintcomp _
+    | Pcompare_ints | Pcompare_floats | Pcompare_bints _
+    | Pintoffloat | Pfloatofint
+    | Pnegfloat | Pabsfloat
+    | Paddfloat | Psubfloat | Pmulfloat | Pdivfloat
+    | Pfloatcomp _
+>>>>>>> upstream/5.4
     | Pstringlength | Pstringrefu  | Pstringrefs
     | Pbyteslength | Pbytesrefu | Pbytesrefs
     | Parraylength _
     | Parrayrefu _
     | Parrayrefs _
+<<<<<<< HEAD
     | Pisint _
     | Pisnull
     | Pisout
+=======
+    | Pisint
+    | Pisout
+    | Pbintofint _
+    | Pintofbint _
+    | Pcvtbint _
+    | Pnegbint _
+    | Paddbint _
+    | Psubbint _
+    | Pmulbint _
+    | Pdivbint _
+    | Pmodbint _
+    | Pandbint _
+    | Porbint _
+    | Pxorbint _
+    | Plslbint _
+    | Plsrbint _
+    | Pasrbint _
+    | Pbintcomp _
+>>>>>>> upstream/5.4
     | Pbigarrayref _
     | Pbigarraydim _
     | Pstring_load_16 _
     | Pstring_load_32 _
+<<<<<<< HEAD
     | Pstring_load_f32 _
     | Pstring_load_64 _
     | Pbytes_load_16 _
@@ -401,6 +623,27 @@ let compute_static_size lam =
 let lfunction_with_body { kind; params; return; body = _; attr; loc;
                           mode; ret_mode } body =
   lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode
+=======
+    | Pstring_load_64 _
+    | Pbytes_load_16 _
+    | Pbytes_load_32 _
+    | Pbytes_load_64 _
+    | Pbigstring_load_16 _
+    | Pbigstring_load_32 _
+    | Pbigstring_load_64 _
+    | Pbswap16
+    | Pbbswap _
+    | Pint_as_pointer
+    | Patomic_load
+    | Popaque
+    | Pdls_get ->
+        dynamic_size ()
+  in
+  compute_expression_size Ident.Map.empty lam
+
+let lfunction_with_body { kind; params; return; body = _; attr; loc } body =
+  lfunction' ~kind ~params ~return ~body ~attr ~loc
+>>>>>>> upstream/5.4
 
 (** {1. Function Lifting} *)
 
@@ -476,16 +719,25 @@ let ( let+ ) res f =
    (Note: It is usually safe to declare immutable blocks as mutable,
    but in this case the blocks might be empty and declaring them as Mutable
    would cause errors later.) *)
+<<<<<<< HEAD
 let lifted_block_mut : Lambda.mutable_flag = Immutable
 let lifted_block_read_sem : Lambda.field_read_semantics = Reads_agree
 
 let no_loc = Debuginfo.Scoped_location.Loc_unknown
 
 let rec split_static_function lfun block_var local_idents lam :
+=======
+let lifted_block_mut : Asttypes.mutable_flag = Immutable
+
+let no_loc = Debuginfo.Scoped_location.Loc_unknown
+
+let rec split_static_function block_var local_idents lam :
+>>>>>>> upstream/5.4
   Lambda.lambda split_result =
   match lam with
   | Lvar v ->
     (* Eta-expand *)
+<<<<<<< HEAD
     let params =
       List.map (fun (p : Lambda.lparam) ->
           { p with name = Ident.rename p.name })
@@ -493,10 +745,17 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let ap_func =
       Lprim (Pfield (0, Pointer, lifted_block_read_sem), [Lvar block_var], no_loc)
+=======
+    (* Note: knowing the arity might let us generate slightly better code *)
+    let param = Ident.create_local "let_rec_param" in
+    let ap_func =
+      Lprim (Pfield (0, Pointer, lifted_block_mut), [Lvar block_var], no_loc)
+>>>>>>> upstream/5.4
     in
     let body =
       Lapply {
         ap_func;
+<<<<<<< HEAD
         ap_args = List.map (fun p -> Lvar (p.name)) params;
         ap_loc = no_loc;
         ap_tailcall = Default_tailcall;
@@ -506,10 +765,18 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
         ap_probe = None;
+=======
+        ap_args = [Lvar param];
+        ap_loc = no_loc;
+        ap_tailcall = Default_tailcall;
+        ap_inlined = Default_inline;
+        ap_specialised = Default_specialise;
+>>>>>>> upstream/5.4
       }
     in
     let wrapper =
       lfunction'
+<<<<<<< HEAD
         ~kind:lfun.kind
         ~params
         ~return:lfun.return
@@ -524,17 +791,37 @@ let rec split_static_function lfun block_var local_idents lam :
                Lprim (Pmakeblock
                         (0, lifted_block_mut, All_value, Lambda.alloc_heap),
                       [Lvar v], no_loc))
+=======
+        ~kind:Curried
+        ~params:[param, Pgenval]
+        ~return:Pgenval
+        ~body
+        ~attr:default_stub_attribute
+        ~loc:no_loc
+    in
+    let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
+    Reachable (lifted,
+               Lprim (Pmakeblock (0, lifted_block_mut, None), [Lvar v], no_loc))
+>>>>>>> upstream/5.4
   | Lfunction lfun ->
     let free_vars = Lambda.free_variables lfun.body in
     let local_free_vars = Ident.Set.inter free_vars local_idents in
     let free_vars_block_size, subst, block_fields_rev =
       Ident.Set.fold (fun var (i, subst, fields) ->
           let access =
+<<<<<<< HEAD
             Lprim (Pfield (i, Pointer, lifted_block_read_sem),
                    [Lvar block_var],
                    no_loc)
           in
           (Stdlib.succ i, Ident.Map.add var access subst, Lvar var :: fields))
+=======
+            Lprim (Pfield (i, Pointer, lifted_block_mut),
+                   [Lvar block_var],
+                   no_loc)
+          in
+          (succ i, Ident.Map.add var access subst, Lvar var :: fields))
+>>>>>>> upstream/5.4
         local_free_vars (0, Ident.Map.empty, [])
     in
     (* Note: When there are no local free variables, we don't need the
@@ -548,11 +835,16 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = new_fun; free_vars_block_size } in
     let block =
+<<<<<<< HEAD
       Lprim (Pmakeblock (0, lifted_block_mut, All_value, Lambda.alloc_heap),
+=======
+      Lprim (Pmakeblock (0, lifted_block_mut, None),
+>>>>>>> upstream/5.4
              List.rev block_fields_rev,
              no_loc)
     in
     Reachable (lifted, block)
+<<<<<<< HEAD
   | Llet (lkind, vkind, var, debug_uid, def, body) ->
     let+ body =
       split_static_function lfun block_var (Ident.Set.add var local_idents) body
@@ -563,36 +855,70 @@ let rec split_static_function lfun block_var local_idents lam :
       split_static_function lfun block_var (Ident.Set.add var local_idents) body
     in
     Lmutlet (vkind, var, debug_uid, def, body)
+=======
+  | Llet (lkind, vkind, var, def, body) ->
+    let+ body =
+      split_static_function block_var (Ident.Set.add var local_idents) body
+    in
+    Llet (lkind, vkind, var, def, body)
+  | Lmutlet (vkind, var, def, body) ->
+    let+ body =
+      split_static_function block_var (Ident.Set.add var local_idents) body
+    in
+    Lmutlet (vkind, var, def, body)
+>>>>>>> upstream/5.4
   | Lletrec (bindings, body) ->
     let local_idents =
       List.fold_left (fun ids { id } -> Ident.Set.add id ids)
         local_idents bindings
     in
     let+ body =
+<<<<<<< HEAD
       split_static_function lfun block_var local_idents body
+=======
+      split_static_function block_var local_idents body
+>>>>>>> upstream/5.4
     in
     Lletrec (bindings, body)
   | Lprim (Praise _, _, _) -> Unreachable
   | Lstaticraise _ -> Unreachable
+<<<<<<< HEAD
   | Lswitch (arg, sw, loc, layout) ->
     let sw_consts_res = rebuild_arms lfun block_var local_idents sw.sw_consts in
     let sw_blocks_res = rebuild_arms lfun block_var local_idents sw.sw_blocks in
     let sw_failaction_res =
       Option.map (split_static_function lfun block_var local_idents) sw.sw_failaction
+=======
+  | Lswitch (arg, sw, loc) ->
+    let sw_consts_res = rebuild_arms block_var local_idents sw.sw_consts in
+    let sw_blocks_res = rebuild_arms block_var local_idents sw.sw_blocks in
+    let sw_failaction_res =
+      Option.map (split_static_function block_var local_idents) sw.sw_failaction
+>>>>>>> upstream/5.4
     in
     begin match sw_consts_res, sw_blocks_res, sw_failaction_res with
     | Unreachable, Unreachable, (None | Some Unreachable) -> Unreachable
     | Reachable (lfun, sw_consts), Unreachable, (None | Some Unreachable) ->
+<<<<<<< HEAD
       Reachable (lfun, Lswitch (arg, { sw with sw_consts }, loc, layout))
     | Unreachable, Reachable (lfun, sw_blocks), (None | Some Unreachable) ->
       Reachable (lfun, Lswitch (arg, { sw with sw_blocks }, loc, layout))
     | Unreachable, Unreachable, Some (Reachable (lfun, failaction)) ->
       let switch =
         Lswitch (arg, { sw with sw_failaction = Some failaction }, loc, layout)
+=======
+      Reachable (lfun, Lswitch (arg, { sw with sw_consts }, loc))
+    | Unreachable, Reachable (lfun, sw_blocks), (None | Some Unreachable) ->
+      Reachable (lfun, Lswitch (arg, { sw with sw_blocks }, loc))
+    | Unreachable, Unreachable, Some (Reachable (lfun, failaction)) ->
+      let switch =
+        Lswitch (arg, { sw with sw_failaction = Some failaction }, loc)
+>>>>>>> upstream/5.4
       in
       Reachable (lfun, switch)
     | Reachable _, Reachable _, _ | Reachable _, _, Some (Reachable _)
     | _, Reachable _, Some (Reachable _) ->
+<<<<<<< HEAD
       Misc.fatal_errorf "letrec: multiple functions:@ lfun=%a@ lam=%a"
         Printlambda.lfunction lfun
         Printlambda.lambda lam
@@ -601,10 +927,19 @@ let rec split_static_function lfun block_var local_idents lam :
     let arms_res = rebuild_arms lfun block_var local_idents arms in
     let failaction_res =
       Option.map (split_static_function lfun block_var local_idents) failaction
+=======
+      Misc.fatal_error "letrec: multiple functions"
+    end
+  | Lstringswitch (arg, arms, failaction, loc) ->
+    let arms_res = rebuild_arms block_var local_idents arms in
+    let failaction_res =
+      Option.map (split_static_function block_var local_idents) failaction
+>>>>>>> upstream/5.4
     in
     begin match arms_res, failaction_res with
     | Unreachable, (None | Some Unreachable) -> Unreachable
     | Reachable (lfun, arms), (None | Some Unreachable) ->
+<<<<<<< HEAD
       Reachable (lfun, Lstringswitch (arg, arms, failaction, loc, layout))
     | Unreachable, Some (Reachable (lfun, failaction)) ->
       Reachable (lfun, Lstringswitch (arg, arms, Some failaction, loc, layout))
@@ -621,10 +956,27 @@ let rec split_static_function lfun block_var local_idents lam :
           local_idents params
       in
       split_static_function lfun block_var local_idents handler
+=======
+      Reachable (lfun, Lstringswitch (arg, arms, failaction, loc))
+    | Unreachable, Some (Reachable (lfun, failaction)) ->
+      Reachable (lfun, Lstringswitch (arg, arms, Some failaction, loc))
+    | Reachable _, Some (Reachable _) ->
+      Misc.fatal_error "letrec: multiple functions"
+    end
+  | Lstaticcatch (body, (nfail, params), handler) ->
+    let body_res = split_static_function block_var local_idents body in
+    let handler_res =
+      let local_idents =
+        List.fold_left (fun vars (var, _) -> Ident.Set.add var vars)
+          local_idents params
+      in
+      split_static_function block_var local_idents handler
+>>>>>>> upstream/5.4
     in
     begin match body_res, handler_res with
     | Unreachable, Unreachable -> Unreachable
     | Reachable (lfun, body), Unreachable ->
+<<<<<<< HEAD
       Reachable (lfun, Lstaticcatch (body, (nfail, params), handler, r, layout))
     | Unreachable, Reachable (lfun, handler) ->
       Reachable (lfun, Lstaticcatch (body, (nfail, params), handler, r, layout))
@@ -637,11 +989,24 @@ let rec split_static_function lfun block_var local_idents lam :
     let body_res = split_static_function lfun block_var local_idents body in
     let handler_res =
       split_static_function lfun block_var
+=======
+      Reachable (lfun, Lstaticcatch (body, (nfail, params), handler))
+    | Unreachable, Reachable (lfun, handler) ->
+      Reachable (lfun, Lstaticcatch (body, (nfail, params), handler))
+    | Reachable _, Reachable _ ->
+      Misc.fatal_error "letrec: multiple functions"
+    end
+  | Ltrywith (body, exn_var, handler) ->
+    let body_res = split_static_function block_var local_idents body in
+    let handler_res =
+      split_static_function block_var
+>>>>>>> upstream/5.4
         (Ident.Set.add exn_var local_idents) handler
     in
     begin match body_res, handler_res with
     | Unreachable, Unreachable -> Unreachable
     | Reachable (lfun, body), Unreachable ->
+<<<<<<< HEAD
       Reachable (lfun, Ltrywith (body, exn_var, debug_uid, handler, layout))
     | Unreachable, Reachable (lfun, handler) ->
       Reachable (lfun, Ltrywith (body, exn_var, debug_uid, handler, layout))
@@ -679,6 +1044,32 @@ let rec split_static_function lfun block_var local_idents lam :
     (* The new expression returns the closure block instead of the function *)
     ignore layout_fun;
     Lregion (lam, layout_block)
+=======
+      Reachable (lfun, Ltrywith (body, exn_var, handler))
+    | Unreachable, Reachable (lfun, handler) ->
+      Reachable (lfun, Ltrywith (body, exn_var, handler))
+    | Reachable _, Reachable _ ->
+      Misc.fatal_error "letrec: multiple functions"
+    end
+  | Lifthenelse (cond, ifso, ifnot) ->
+    let ifso_res = split_static_function block_var local_idents ifso in
+    let ifnot_res = split_static_function block_var local_idents ifnot in
+    begin match ifso_res, ifnot_res with
+    | Unreachable, Unreachable -> Unreachable
+    | Reachable (lfun, ifso), Unreachable ->
+      Reachable (lfun, Lifthenelse (cond, ifso, ifnot))
+    | Unreachable, Reachable (lfun, ifnot) ->
+      Reachable (lfun, Lifthenelse (cond, ifso, ifnot))
+    | Reachable _, Reachable _ ->
+      Misc.fatal_error "letrec: multiple functions"
+    end
+  | Lsequence (e1, e2) ->
+    let+ e2 = split_static_function block_var local_idents e2 in
+    Lsequence (e1, e2)
+  | Levent (lam, lev) ->
+    let+ lam = split_static_function block_var local_idents lam in
+    Levent (lam, lev)
+>>>>>>> upstream/5.4
   | Lmutvar _
   | Lconst _
   | Lapply _
@@ -687,6 +1078,7 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lfor _
   | Lassign _
   | Lsend _
+<<<<<<< HEAD
   | Lifused _
   | Lexclave _ ->
     Misc.fatal_errorf
@@ -704,6 +1096,18 @@ and rebuild_arms :
   | (i, lam) :: arms ->
     let res = rebuild_arms lfun block_var local_idents arms in
     let lam_res = split_static_function lfun block_var local_idents lam in
+=======
+  | Lifused _ -> Misc.fatal_error "letrec binding is not a static function"
+and rebuild_arms :
+  type a. _ -> _ -> (a * Lambda.lambda) list ->
+  (a * Lambda.lambda) list split_result =
+  fun block_var local_idents arms ->
+  match arms with
+  | [] -> Unreachable
+  | (i, lam) :: arms ->
+    let res = rebuild_arms block_var local_idents arms in
+    let lam_res = split_static_function block_var local_idents lam in
+>>>>>>> upstream/5.4
     match lam_res, res with
     | Unreachable, Unreachable -> Unreachable
     | Reachable (lfun, lam), Unreachable ->
@@ -711,9 +1115,13 @@ and rebuild_arms :
     | Unreachable, Reachable (lfun, arms) ->
       Reachable (lfun, (i, lam) :: arms)
     | Reachable _, Reachable _ ->
+<<<<<<< HEAD
       Misc.fatal_errorf "letrec: multiple functions:@ lfun=%a@ lam=%a"
         Printlambda.lfunction lfun
         Printlambda.lambda lam
+=======
+      Misc.fatal_error "letrec: multiple functions"
+>>>>>>> upstream/5.4
 
 (** {1. Compilation} *)
 
@@ -802,9 +1210,15 @@ and rebuild_arms :
  *)
 
 type rec_bindings =
+<<<<<<< HEAD
   { static : (Ident.t * Lambda.debug_uid * block_size * Lambda.lambda) list;
     functions : (Ident.t * Lambda.debug_uid * Lambda.lfunction) list;
     dynamic : (Ident.t * Lambda.debug_uid * Lambda.lambda) list;
+=======
+  { static : (Ident.t * block_size * Lambda.lambda) list;
+    functions : (Ident.t * Lambda.lfunction) list;
+    dynamic : (Ident.t * Lambda.lambda) list;
+>>>>>>> upstream/5.4
   }
 
 let empty_bindings =
@@ -813,6 +1227,7 @@ let empty_bindings =
     dynamic = [];
   }
 
+<<<<<<< HEAD
 (** Allocation and backpatching primitives *)
 
 let alloc_prim =
@@ -827,10 +1242,79 @@ let alloc_mixed_record_prim =
 let update_prim =
   (* Note: [alloc] could be false, but it probably doesn't matter *)
   Lambda.simple_prim_on_values ~name:"caml_update_dummy" ~arity:2 ~alloc:true
+=======
+(** Allocation and backpatching code *)
+
+let compile_indirect newval =
+  let indirect = Lambda.transl_prim "CamlinternalLazy" "indirect" in
+  Lapply {
+    ap_func = indirect;
+    ap_args = [newval];
+    ap_loc = no_loc;
+    ap_tailcall = Default_tailcall;
+    ap_inlined = Default_inline;
+    ap_specialised = Default_specialise;
+  }
+
+let compile_alloc size =
+  let alloc prim size =
+    Lprim (Pccall prim,
+           [Lconst (Lambda.const_int size)],
+           no_loc)
+  in
+  (* if you add new allocation primitives below,
+     you should update {!find_size_of_alloc_prim} as well. *)
+  match size with
+  | Regular_block size ->
+      alloc alloc_prim size
+  | Float_record size ->
+      alloc alloc_float_record_prim size
+  | Lazy_block ->
+      Lprim(Pccall alloc_lazy_prim,
+            [Lambda.lambda_unit],
+            no_loc)
+
+let compile_update size dummy newval =
+  let prim, newval =
+    match size with
+    | Regular_block _ | Float_record _ ->
+      update_prim, newval
+    | Lazy_block ->
+      (* Consider the following example from Vincent Laviron:
+         {[let rec v =
+             let l = lazy (expensive computation) in
+             let () = maybe_force_in_another_domain l in
+             l
+         ]}
+
+         The naive/simple compilation scheme would do
+         a [caml_update_dummy_lazy(v, l)], and the dummy-update code
+         could run concurrently with another domain forcing [l].
+
+         To avoid this issue, lazy blocks get updated via
+         [caml_update_dummy_lazy(dummy, CamlinternalLazy.indirect newval)],
+         where [CamlinternalLazy.indirect] returns a fresh/local thunk
+         that is not getting forced concurrently (whereas [newval]
+         might be).
+      *)
+      update_lazy_prim,
+      begin match newval with
+        | Lprim(Pmakelazyblock _, _, _) ->
+          (* No need to wrap the thunk if was just constructed.
+             This removes indirections on terms defined as lazy thunks
+             at the toplevel: [let rec x = lazy ...] *)
+          newval
+        | _ -> compile_indirect newval
+      end
+  in
+  Lprim (Pccall prim, [dummy; newval],
+         no_loc)
+>>>>>>> upstream/5.4
 
 (** Compilation function *)
 
 let compile_letrec input_bindings body =
+<<<<<<< HEAD
   if !Clflags.dump_letreclambda then (
     Format.eprintf "Value_rec_compiler input bindings:\n";
     List.iter (fun (id, _, _, def) ->
@@ -840,15 +1324,26 @@ let compile_letrec input_bindings body =
   );
   let subst_for_constants =
     List.fold_left (fun subst (id, _, _, _) ->
+=======
+  let subst_for_constants =
+    List.fold_left (fun subst (id, _, _) ->
+>>>>>>> upstream/5.4
         Ident.Map.add id Lambda.dummy_constant subst)
       Ident.Map.empty input_bindings
   in
   let all_bindings_rev =
+<<<<<<< HEAD
     List.fold_left (fun rev_bindings (id, duid, rkind, def) ->
         match (rkind : Value_rec_types.recursive_binding_kind) with
         | Dynamic ->
           { rev_bindings
             with dynamic = (id, duid, def) :: rev_bindings.dynamic }
+=======
+    List.fold_left (fun rev_bindings (id, rkind, def) ->
+        match (rkind : Value_rec_types.recursive_binding_kind) with
+        | Dynamic ->
+          { rev_bindings with dynamic = (id, def) :: rev_bindings.dynamic }
+>>>>>>> upstream/5.4
         | Static ->
           let size = compute_static_size def in
           begin match size with
@@ -860,6 +1355,7 @@ let compile_letrec input_bindings body =
             let def =
               Lambda.subst (fun _ _ env -> env) subst_for_constants def
             in
+<<<<<<< HEAD
             { rev_bindings
               with dynamic = (id, duid, def) :: rev_bindings.dynamic }
           | Block size ->
@@ -887,6 +1383,28 @@ let compile_letrec input_bindings body =
                   (ctx_id, ctx_id_duid,
                     Regular_block free_vars_block_size, lam)
                   :: rev_bindings.static
+=======
+            { rev_bindings with dynamic = (id, def) :: rev_bindings.dynamic }
+          | Block size ->
+            { rev_bindings with
+              static = (id, size, def) :: rev_bindings.static }
+          | Function ->
+            begin match def with
+            | Lfunction lfun ->
+              { rev_bindings with
+                functions = (id, lfun) :: rev_bindings.functions
+              }
+            | _ ->
+              let ctx_id = Ident.create_local "letrec_function_context" in
+              begin match split_static_function ctx_id Ident.Set.empty def with
+              | Unreachable ->
+                Misc.fatal_error "letrec: no function for binding"
+              | Reachable ({ lfun; free_vars_block_size }, lam) ->
+                let functions = (id, lfun) :: rev_bindings.functions in
+                let static =
+                  (ctx_id, Regular_block free_vars_block_size, lam) ::
+                  rev_bindings.static
+>>>>>>> upstream/5.4
                 in
                 { rev_bindings with functions; static }
               end
@@ -895,25 +1413,37 @@ let compile_letrec input_bindings body =
       empty_bindings input_bindings
   in
   let body_with_patches =
+<<<<<<< HEAD
     List.fold_left (fun body (id, _, _size, lam) ->
         let update =
           Lprim (Pccall update_prim, [Lvar id; lam], no_loc)
         in
         Lsequence (update, body))
       body (all_bindings_rev.static)
+=======
+    List.fold_left (fun body (id, size, lam) ->
+        Lsequence (compile_update size (Lvar id) lam, body)
+    ) body (all_bindings_rev.static)
+>>>>>>> upstream/5.4
   in
   let body_with_functions =
     match all_bindings_rev.functions with
     | [] -> body_with_patches
     | bindings_rev ->
       let function_bindings =
+<<<<<<< HEAD
         List.rev_map (fun (id, debug_uid, lfun) ->
             { id; debug_uid; def = lfun })
+=======
+        List.rev_map (fun (id, lfun) ->
+            { id; def = lfun })
+>>>>>>> upstream/5.4
           bindings_rev
       in
       Lletrec (function_bindings, body_with_patches)
   in
   let body_with_dynamic_values =
+<<<<<<< HEAD
     List.fold_left (fun body (id, duid, lam) ->
         Llet(Strict, Lambda.layout_letrec, id, duid, lam, body))
       body_with_functions all_bindings_rev.dynamic
@@ -941,6 +1471,16 @@ let compile_letrec input_bindings body =
                  no_loc)
         in
         Llet(Strict, Lambda.layout_letrec, id, duid, alloc, body))
+=======
+    List.fold_left (fun body (id, lam) ->
+        Llet(Strict, Pgenval, id, lam, body))
+      body_with_functions all_bindings_rev.dynamic
+  in
+  let body_with_pre_allocations =
+    List.fold_left (fun body (id, size, _lam) ->
+        let alloc = compile_alloc size in
+        Llet(Strict, Pgenval, id, alloc, body))
+>>>>>>> upstream/5.4
       body_with_dynamic_values all_bindings_rev.static
   in
   body_with_pre_allocations

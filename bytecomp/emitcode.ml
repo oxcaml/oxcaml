@@ -37,7 +37,7 @@ let marshal_to_channel_with_possibly_32bit_compat ~filename ~kind outchan obj =
 
 
 let report_error ppf (file, kind) =
-  Format.fprintf ppf "Generated %s %S cannot be used on a 32-bit platform"
+  Format_doc.fprintf ppf "Generated %s %S cannot be used on a 32-bit platform"
                      kind file
 let () =
   Location.register_error_of_exn
@@ -432,6 +432,7 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
           (Filename.dirname (Location.absolute_path filename))
         !debug_dirs;
       let p = pos_out outchan in
+<<<<<<< HEAD
       (* CR ocaml 5 compressed-marshal mshinwell:
          Compression not supported in the OCaml 4 runtime
       Compression.output_value outchan !events;
@@ -442,6 +443,10 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
       Marshal.(to_channel outchan (String.Set.elements !debug_dirs)
                           []);
 (* BACKPORT END *)
+=======
+      Compression.output_value outchan !events;
+      Compression.output_value outchan (String.Set.elements !debug_dirs);
+>>>>>>> upstream/5.4
       (p, pos_out outchan - p)
     end else
       (0, 0) in

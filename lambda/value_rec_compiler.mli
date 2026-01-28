@@ -12,6 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+<<<<<<< HEAD
 (** Overview of the compilation scheme
 
     Given a set of recursive definitions, we sort them into four categories:
@@ -40,5 +41,9 @@ val compile_letrec :
    Lambda.debug_uid *
    Value_rec_types.recursive_binding_kind *
    Lambda.lambda) list ->
+=======
+val compile_letrec :
+  (Ident.t * Value_rec_types.recursive_binding_kind * Lambda.lambda) list ->
+>>>>>>> upstream/5.4
   Lambda.lambda ->
   Lambda.lambda

@@ -26,7 +26,12 @@ type modname = string
 type filename = string
 type file_prefix = string
 
+<<<<<<< HEAD
 (* CR lmaurer: These overlap with functionality in [Compilation_unit] **)
+=======
+type error = Invalid_encoding of filename
+exception Error of error
+>>>>>>> upstream/5.4
 
 (** [modulize s] capitalizes the first letter of [s]. *)
 val modulize: string -> modname
@@ -34,14 +39,18 @@ val modulize: string -> modname
 (** [normalize s] uncapitalizes the first letter of [s]. *)
 val normalize: string -> string
 
-(** [modname_from_source filename] is [modulize stem] where [stem] is the
+(** [lax_modname_from_source filename] is [modulize stem] where [stem] is the
     basename of the filename [filename] stripped from all its extensions.
-    For instance, [modname_from_source "/pa.th/x.ml.pp"] is ["X"]. *)
-val modname_from_source: filename -> modname
+    For instance, [lax_modname_from_source "/pa.th/x.ml.pp"] is ["X"]. *)
+val lax_modname_from_source: filename -> modname
+
+(** Same as {!lax_modname_from_source} but raises an {!error.Invalid_encoding}
+    error on filename with invalid utf8 encoding. *)
+val strict_modname_from_source: filename -> modname
 
 (** {2:module_name_validation Module name validation function}*)
 
-(** [is_unit_name ~strict name] is true only if [name] can be used as a
+(** [is_unit_name name] is true only if [name] can be used as a
     valid module name. *)
 val is_unit_name : modname -> bool
 
@@ -88,20 +97,30 @@ val modname: t -> Compilation_unit.t
 (** [kind u] is the kind (interface or implementation) of the unit. *)
 val kind: t -> intf_or_impl
 
+(** [kind u] is the kind (interface or implementation) of the unit. *)
+val kind: t -> intf_or_impl
+
 (** [check_unit_name u] prints a warning if the derived module name [modname u]
     should not be used as a module name as specified
     by {!is_unit_name}[ ~strict:true]. *)
 val check_unit_name : t -> unit
 
+<<<<<<< HEAD
 (** [make ~check ~source_file ~for_pack_prefix kind prefix] associates both the
     [source_file] and the module name {!modname_from_source}[ target_prefix] to
     the prefix filesystem path [prefix].
+=======
+(** [make ~check ~source_file kind prefix] associates both the
+    [source_file] and the module name {!lax_modname_from_source}[ target_prefix]
+    to the prefix filesystem path [prefix].
+>>>>>>> upstream/5.4
 
    If [check_modname=true], this function emits a warning if the derived module
    name is not valid according to {!check_unit_name}.
 *)
 val make:
     ?check_modname:bool -> source_file:filename ->
+<<<<<<< HEAD
     for_pack_prefix:Compilation_unit.Prefix.t ->
     intf_or_impl -> file_prefix -> t
 
@@ -120,6 +139,9 @@ val make_with_known_compilation_unit:
 val make_dummy: input_name:string -> Compilation_unit.t -> t
 
 val set_original_source_file_name : t -> filename -> t
+=======
+    intf_or_impl -> file_prefix -> t
+>>>>>>> upstream/5.4
 
 (** {1:artifact_function Build artifacts }*)
 module Artifact: sig
@@ -151,10 +173,17 @@ module Artifact: sig
    (** [modname a] is the module name of the compilation artifact.*)
    val modname: t -> Compilation_unit.t
 
+<<<<<<< HEAD
    (** [from_filename ~for_pack_prefix filename] reconstructs the module name
        [modname_from_source filename] associated to the artifact [filename],
        assuming the pack prefix is [for_pack_prefix]. *)
    val from_filename: for_pack_prefix:Compilation_unit.Prefix.t -> filename -> t
+=======
+   (** [from_filename filename] reconstructs the module name
+       [lax_modname_from_source filename] associated to the artifact
+       [filename]. *)
+   val from_filename: filename -> t
+>>>>>>> upstream/5.4
 
 end
 

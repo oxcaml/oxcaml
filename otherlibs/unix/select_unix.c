@@ -13,6 +13,7 @@
 /*                                                                        */
 /**************************************************************************/
 
+#define CAML_INTERNALS
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
 #include <caml/fail.h>
@@ -33,9 +34,8 @@
 
 static int fdlist_to_fdset(value fdlist, fd_set *fdset, int *maxfd)
 {
-  value l;
   FD_ZERO(fdset);
-  for (l = fdlist; l != Val_emptylist; l = Field(l, 1)) {
+  for (value l = fdlist; l != Val_emptylist; l = Field(l, 1)) {
     long fd = Long_val(Field(l, 0));
     /* PR#5563: harden against bad fds */
     if (fd < 0 || fd >= FD_SETSIZE) return -1;
@@ -63,12 +63,12 @@ static value fdset_to_fdlist(value fdlist, fd_set *fdset)
 }
 
 CAMLprim value caml_unix_select(value readfds, value writefds, value exceptfds,
-                           value timeout)
+                                value timeout_sec)
 {
   CAMLparam3(readfds, writefds, exceptfds);
   fd_set read, write, except;
   int maxfd;
-  double tm;
+  double tm_sec;
   struct timeval tv;
   struct timeval * tvp;
   int retcode;
@@ -80,12 +80,11 @@ CAMLprim value caml_unix_select(value readfds, value writefds, value exceptfds,
   retcode += fdlist_to_fdset(exceptfds, &except, &maxfd);
   /* PR#5563: if a bad fd was encountered, report EINVAL error */
   if (retcode != 0) caml_unix_error(EINVAL, "select", Nothing);
-  tm = Double_val(timeout);
-  if (tm < 0.0)
+  tm_sec = Double_val(timeout_sec);
+  if (tm_sec < 0.0) {
     tvp = (struct timeval *) NULL;
-  else {
-    tv.tv_sec = (int) tm;
-    tv.tv_usec = (int) (1e6 * (tm - tv.tv_sec));
+  } else {
+    tv = caml_timeval_of_sec(tm_sec);
     tvp = &tv;
   }
   caml_enter_blocking_section();

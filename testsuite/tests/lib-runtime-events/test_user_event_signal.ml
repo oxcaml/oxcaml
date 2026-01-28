@@ -1,10 +1,17 @@
 (* TEST
+<<<<<<< HEAD
  runtime5;
  flags = "-alert -unsafe_multidomain";
  include runtime_events;
  include unix;
  hasunix;
  not-windows;
+=======
+ include runtime_events;
+ include unix;
+ hasunix;
+ not-target-windows;
+>>>>>>> upstream/5.4
  {
    bytecode;
  }

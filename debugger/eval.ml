@@ -108,8 +108,7 @@ let rec expression event env = function
             | _ ->
                 value_path event env p
           in
-          let typ = Ctype.correct_levels valdesc.val_type in
-          v, typ
+          v, valdesc.val_type
       | exception Not_found ->
           raise(Error(Unbound_long_identifier lid))
     end
@@ -133,8 +132,11 @@ let rec expression event env = function
         Ttuple ty_list ->
           if n < 1 || n > List.length ty_list
           then raise(Error(Tuple_index(ty, List.length ty_list, n)))
+<<<<<<< HEAD
           (* CR labeled tuples: handle labels in debugger (also see "E_field"
              case) *)
+=======
+>>>>>>> upstream/5.4
           else (Debugcom.Remote_value.field v (n-1),
                 snd (List.nth ty_list (n-1)))
       | Tconstr(path, [ty_arg], _) when Path.same path Predef.path_array ->
@@ -193,6 +195,10 @@ and find_label lbl env ty path tydesc pos = function
 
 open Format
 module Style = Misc.Style
+module Printtyp = Printtyp.Doc
+
+let as_inline_code pr = Format_doc.compat @@ Style.as_inline_code pr
+let inline_code = Format_doc.compat Style.inline_code
 
 let report_error ppf = function
   | Unbound_global glob ->
@@ -200,22 +206,22 @@ let report_error ppf = function
         Style.inline_code (Symtable.Global.name glob)
   | Unbound_identifier id ->
       fprintf ppf "@[Unbound identifier %a@]@."
-        Style.inline_code (Ident.name id)
+        inline_code (Ident.name id)
   | Not_initialized_yet path ->
       fprintf ppf
         "@[The module path %a is not yet initialized.@ \
            Please run program forward@ \
            until its initialization code is executed.@]@."
-      (Style.as_inline_code Printtyp.path) path
+      (as_inline_code Printtyp.path) path
   | Unbound_long_identifier lid ->
       fprintf ppf "@[Unbound identifier %a@]@."
-        (Style.as_inline_code Printtyp.longident) lid
+        (as_inline_code Printtyp.longident) lid
   | Unknown_name n ->
       fprintf ppf "@[Unknown value name $%i@]@." n
   | Tuple_index(ty, len, pos) ->
       fprintf ppf
         "@[Cannot extract field number %i from a %i-tuple of type@ %a@]@."
-        pos len (Style.as_inline_code Printtyp.type_expr) ty
+        pos len (as_inline_code Printtyp.type_expr) ty
   | Array_index(len, pos) ->
       fprintf ppf
         "@[Cannot extract element number %i from an array of length %i@]@."
@@ -232,15 +238,15 @@ let report_error ppf = function
   | Wrong_item_type(ty, pos) ->
       fprintf ppf
         "@[Cannot extract item number %i from a value of type@ %a@]@."
-        pos (Style.as_inline_code Printtyp.type_expr) ty
+        pos (as_inline_code Printtyp.type_expr) ty
   | Wrong_label(ty, lbl) ->
       fprintf ppf
         "@[The record type@ %a@ has no label named %a@]@."
-        (Style.as_inline_code Printtyp.type_expr) ty
-        Style.inline_code lbl
+        (as_inline_code Printtyp.type_expr) ty
+        inline_code lbl
   | Not_a_record ty ->
       fprintf ppf
         "@[The type@ %a@ is not a record type@]@."
-        (Style.as_inline_code Printtyp.type_expr) ty
+        (as_inline_code Printtyp.type_expr) ty
   | No_result ->
       fprintf ppf "@[No result available at current program event@]@."

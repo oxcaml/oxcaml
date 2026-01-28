@@ -143,6 +143,36 @@ let primitive_descriptions pd1 pd2 =
   else
     native_repr_args pd1.prim_native_repr_args pd2.prim_native_repr_args
 
+<<<<<<< HEAD
+=======
+type value_mismatch =
+  | Primitive_mismatch of primitive_mismatch
+  | Not_a_primitive
+  | Type of Errortrace.moregen_error
+
+exception Dont_match of value_mismatch
+
+(* A value description [vd1] is consistent with the value description [vd2] if
+   there is a context E such that [E |- vd1 <: vd2] for the ordinary subtyping.
+   For values, this is the case as soon as the kind of [vd1] is a subkind of the
+   [vd2] kind. *)
+let value_descriptions_consistency env vd1 vd2 =
+  match (vd1.val_kind, vd2.val_kind) with
+  | (Val_prim p1, Val_prim p2) -> begin
+      match primitive_descriptions p1 p2 with
+      | None -> Tcoerce_none
+      | Some err -> raise (Dont_match (Primitive_mismatch err))
+    end
+  | (Val_prim p, _) ->
+      let pc =
+        { pc_desc = p; pc_type = vd2.Types.val_type;
+          pc_env = env; pc_loc = vd1.Types.val_loc; }
+      in
+      Tcoerce_primitive pc
+  | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
+  | (_, _) -> Tcoerce_none
+
+>>>>>>> upstream/5.4
 let value_descriptions ~loc env name
     ~mmodes
     (vd1 : Types.value_description)
@@ -153,6 +183,7 @@ let value_descriptions ~loc env name
     loc
     vd1.val_attributes vd2.val_attributes
     name;
+<<<<<<< HEAD
   begin match Zero_alloc.sub vd1.val_zero_alloc vd2.val_zero_alloc with
   | Ok () -> ()
   | Error e -> raise (Dont_match (Zero_alloc e))
@@ -217,6 +248,11 @@ let value_descriptions ~loc env name
          | Val_prim _ -> raise (Dont_match Not_a_primitive)
          | _ -> Tcoerce_none
      end
+=======
+  match Ctype.moregeneral env true vd1.val_type vd2.val_type with
+  | exception Ctype.Moregen err -> raise (Dont_match (Type err))
+  | () -> value_descriptions_consistency env vd1 vd2
+>>>>>>> upstream/5.4
 
 (* Inclusion between manifest types (particularly for private row types) *)
 
@@ -274,7 +310,10 @@ type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
   | Atomicity of position
+<<<<<<< HEAD
   | Modality of Modality.equate_error
+=======
+>>>>>>> upstream/5.4
 
 type record_change =
   (Types.label_declaration, Types.label_declaration, label_mismatch)
@@ -373,9 +412,11 @@ let report_modality_equate_error first second ppf
   | Right_le_left -> report_modality_sub_error second first ppf sub_error
 
 module Style = Misc.Style
+module Fmt = Format_doc
+module Printtyp = Printtyp.Doc
 
 let report_primitive_mismatch first second ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   match (err : primitive_mismatch) with
   | Name ->
       pr "The names of the primitives are not the same"
@@ -404,7 +445,7 @@ let report_primitive_mismatch first second ppf err =
       pr "The two primitives have different [@@layout_poly] attributes"
 
 let report_value_mismatch first second env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   pr "@ ";
   match (err : value_mismatch) with
   | Primitive_mismatch pm ->
@@ -412,6 +453,7 @@ let report_value_mismatch first second env ppf err =
   | Not_a_primitive ->
       pr "The implementation is not a primitive."
   | Type trace ->
+<<<<<<< HEAD
       Printtyp.report_moregen_error ppf Type_scheme env trace
         (fun ppf -> Format.fprintf ppf "The type")
         (fun ppf -> Format.fprintf ppf "is not compatible with the type")
@@ -421,11 +463,18 @@ let report_value_mismatch first second env ppf err =
       let got = first ^ " is" in
       let expected = second ^ " is" in
       report_mode_sub_error got expected ppf e
+=======
+      let msg = Fmt.Doc.msg in
+      Errortrace_report.moregen ppf Type_scheme env trace
+        (msg "The type")
+        (msg "is not compatible with the type")
+>>>>>>> upstream/5.4
 
 let report_type_inequality env ppf err =
-  Printtyp.report_equality_error ppf Type_scheme env err
-    (fun ppf -> Format.fprintf ppf "The type")
-    (fun ppf -> Format.fprintf ppf "is not equal to the type")
+  let msg = Fmt.Doc.msg in
+  Errortrace_report.equality ppf Type_scheme env err
+    (msg "The type")
+    (msg "is not equal to the type")
 
 let report_privacy_mismatch ppf err =
   let singular, item =
@@ -436,7 +485,7 @@ let report_privacy_mismatch ppf err =
     | Private_record_unboxed_product_type -> true, "unboxed record constructor"
     | Private_extensible_variant -> true,  "extensible variant"
     | Private_row_type           -> true,  "row type"
-  in Format.fprintf ppf "%s %s would be revealed."
+  in Format_doc.fprintf ppf "%s %s would be revealed."
        (if singular then "A private" else "Private")
        item
 
@@ -445,7 +494,11 @@ let report_label_mismatch first second env ppf err =
   | Type err ->
       report_type_inequality env ppf err
   | Mutability ord ->
-      Format.fprintf ppf "%s is mutable and %s is not."
+      Format_doc.fprintf ppf "%s is mutable and %s is not."
+        (String.capitalize_ascii (choose ord first second))
+        (choose_other ord first second)
+  | Atomicity ord ->
+      Format_doc.fprintf ppf "%s is atomic and %s is not."
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second)
   | Atomicity ord ->
@@ -457,13 +510,13 @@ let report_label_mismatch first second env ppf err =
 let pp_record_diff first second prefix decl env ppf (x : record_change) =
   match x with
   | Delete cd ->
-      Format.fprintf ppf "%aAn extra field, %a, is provided in %s %s."
+      Fmt.fprintf ppf "%aAn extra field, %a, is provided in %s %s."
         prefix x Style.inline_code (Ident.name cd.delete.ld_id) first decl
   | Insert cd ->
-      Format.fprintf  ppf "%aA field, %a, is missing in %s %s."
+      Fmt.fprintf  ppf "%aA field, %a, is missing in %s %s."
         prefix x Style.inline_code (Ident.name cd.insert.ld_id) first decl
   | Change Type {got=lbl1; expected=lbl2; reason} ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@[<hv>%aFields do not match:@;<1 2>\
          %a@ is not the same as:\
          @;<1 2>%a@ %a@]"
@@ -472,34 +525,34 @@ let pp_record_diff first second prefix decl env ppf (x : record_change) =
         (Style.as_inline_code Printtyp.label) lbl2
         (report_label_mismatch first second env) reason
   | Change Name n ->
-      Format.fprintf ppf "%aFields have different names, %a and %a."
+      Fmt.fprintf ppf "%aFields have different names, %a and %a."
         prefix x
         Style.inline_code n.got
         Style.inline_code n.expected
   | Swap sw ->
-      Format.fprintf ppf "%aFields %a and %a have been swapped."
+      Fmt.fprintf ppf "%aFields %a and %a have been swapped."
         prefix x
         Style.inline_code sw.first
         Style.inline_code sw.last
   | Move {name; got; expected } ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@[<2>%aField %a has been moved@ from@ position %d@ to %d.@]"
         prefix x Style.inline_code name expected got
 
 let report_patch pr_diff first second decl env ppf patch =
-  let nl ppf () = Format.fprintf ppf "@," in
+  let nl ppf () = Fmt.fprintf ppf "@," in
   let no_prefix _ppf _ = () in
   match patch with
   | [ elt ] ->
-      Format.fprintf ppf "@[<hv>%a@]"
+      Fmt.fprintf ppf "@[<hv>%a@]"
         (pr_diff first second no_prefix decl env) elt
   | _ ->
       let pp_diff = pr_diff first second Diffing_with_keys.prefix decl env in
-      Format.fprintf ppf "@[<hv>%a@]"
-        (Format.pp_print_list ~pp_sep:nl pp_diff) patch
+      Fmt.fprintf ppf "@[<hv>%a@]"
+        (Fmt.pp_print_list ~pp_sep:nl pp_diff) patch
 
 let report_record_mismatch first second decl env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   match err with
   | Label_mismatch patch ->
       report_patch pp_record_diff first second decl env ppf patch
@@ -530,7 +583,7 @@ let report_record_mismatch first second decl env ppf err =
         "uses a mixed representation where boxed floats are stored flat"
 
 let report_constructor_mismatch first second decl env ppf err =
-  let pr fmt  = Format.fprintf ppf fmt in
+  let pr fmt  = Fmt.fprintf ppf fmt in
   match (err : constructor_mismatch) with
   | Type err -> report_type_inequality env ppf err
   | Arity -> pr "They have different arities."
@@ -552,13 +605,13 @@ let report_constructor_mismatch first second decl env ppf err =
 let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
   match x with
   | Delete cd ->
-      Format.fprintf ppf  "%aAn extra constructor, %a, is provided in %s %s."
+      Fmt.fprintf ppf  "%aAn extra constructor, %a, is provided in %s %s."
         prefix x Style.inline_code (Ident.name cd.delete.cd_id) first decl
   | Insert cd ->
-      Format.fprintf ppf "%aA constructor, %a, is missing in %s %s."
+      Fmt.fprintf ppf "%aA constructor, %a, is missing in %s %s."
         prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
   | Change Type {got; expected; reason} ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@[<hv>%aConstructors do not match:@;<1 2>\
          %a@ is not the same as:\
          @;<1 2>%a@ %a@]"
@@ -567,24 +620,24 @@ let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
         (Style.as_inline_code Printtyp.constructor) expected
         (report_constructor_mismatch first second decl env) reason
   | Change Name n ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "%aConstructors have different names, %a and %a."
         prefix x
         Style.inline_code n.got
         Style.inline_code n.expected
   | Swap sw ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "%aConstructors %a and %a have been swapped."
         prefix x
         Style.inline_code sw.first
         Style.inline_code sw.last
   | Move {name; got; expected} ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@[<2>%aConstructor %a has been moved@ from@ position %d@ to %d.@]"
         prefix x Style.inline_code name expected got
 
 let report_extension_constructor_mismatch first second decl env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   match (err : extension_constructor_mismatch) with
   | Constructor_privacy ->
       pr "Private extension constructor(s) would be revealed."
@@ -600,8 +653,8 @@ let report_extension_constructor_mismatch first second decl env ppf err =
 
 
 let report_private_variant_mismatch first second decl env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
-  let pp_tag ppf x = Format.fprintf ppf "`%s" x in
+  let pr fmt = Fmt.fprintf ppf fmt in
+  let pp_tag ppf x = Fmt.fprintf ppf "`%s" x in
   match (err : private_variant_mismatch) with
   | Only_outer_closed ->
       (* It's only dangerous in one direction, so we don't have a position *)
@@ -618,14 +671,14 @@ let report_private_variant_mismatch first second decl env ppf err =
       report_type_inequality env ppf err
 
 let report_private_object_mismatch env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   match (err : private_object_mismatch) with
   | Missing s ->
       pr "The implementation is missing the method %a" Style.inline_code s
   | Types err -> report_type_inequality env ppf err
 
 let report_kind_mismatch first second ppf (kind1, kind2) =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   let kind_to_string = function
   | Kind_abstract -> "abstract"
   | Kind_record -> "a record"
@@ -661,8 +714,7 @@ let report_unsafe_mode_crossing_mismatch first second ppf e =
       second print_unsafe_mode_crossing second_umc
 
 let report_type_mismatch first second decl env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
-  pr "@ ";
+  let pr fmt = Fmt.fprintf ppf fmt in
   match err with
   | Arity ->
       pr "They have different arities."
@@ -736,6 +788,7 @@ let compare_unsafe_mode_crossing ~env umc1 umc2 =
 module Record_diffing = struct
 
   let compare_labels env params1 params2
+<<<<<<< HEAD
         (ld1 : Types.label_declaration)
         (ld2 : Types.label_declaration) =
         let err =
@@ -772,6 +825,29 @@ module Record_diffing = struct
             end
           | Error e -> Some (Modality e : label_mismatch)
         end
+=======
+      (ld1 : Types.label_declaration)
+      (ld2 : Types.label_declaration) =
+    if ld1.ld_mutable <> ld2.ld_mutable
+    then
+      let ord = if ld1.ld_mutable = Asttypes.Mutable then First else Second in
+      Some (Mutability  ord)
+    else if ld1.ld_atomic <> ld2.ld_atomic
+    then
+      let ord =
+        match ld1.ld_atomic with
+        | Atomic -> First
+        | Nonatomic -> Second
+      in
+      Some (Atomicity  ord)
+    else
+    let tl1 = params1 @ [ld1.ld_type] in
+    let tl2 = params2 @ [ld2.ld_type] in
+    match Ctype.equal env true tl1 tl2 with
+    | exception Ctype.Equality err ->
+        Some (Type err : label_mismatch)
+    | () -> None
+>>>>>>> upstream/5.4
 
   let rec equal ~loc env params1 params2
       (labels1 : Types.label_declaration list)
@@ -836,14 +912,37 @@ module Record_diffing = struct
       | None -> Ok ()
 
   let weight: Diff.change -> _ = function
-    | Insert _ -> 10
-    | Delete _ -> 10
+    | Insert _ | Delete _ ->
+     (* Insertion and deletion are symmetrical for definitions *)
+        100
     | Keep _ -> 0
-    | Change (_,_,Diffing_with_keys.Name t ) ->
-        if t.types_match then 10 else 15
-    | Change _ -> 10
+     (* [Keep] must have the smallest weight. *)
+    | Change (_,_,c) ->
+        (* Constraints:
+           - [ Change < Insert + Delete ], otherwise [Change] are never optimal
 
+           - [ Swap < Move ] => [ 2 Change < Insert + Delete ] =>
+             [ Change < Delete ], in order to favour consecutive [Swap]s
+             over [Move]s.
 
+           - For some D and a large enough R,
+                 [Delete^D Keep^R Insert^D < Change^(D+R)]
+              => [ Change > (2 D)/(D+R) Delete ].
+             Note that the case [D=1,R=1] is incompatible with the inequation
+             above. If we choose [R = D + 1] for [D<5], we can specialize the
+             inequation to [ Change > 10 / 11 Delete ]. *)
+      match c with
+        (* With [Type<Name with type<Name], we pick constructor with the right
+           name over the one with the right type. *)
+        | Diffing_with_keys.Name t ->
+            if t.types_match then 98 else 99
+        | Diffing_with_keys.Type _ -> 50
+         (* With the uniqueness constraint on keys, the only relevant constraint
+            is [Type-only change < Name change]. Indeed, names can only match at
+            one position. In other words, if a [ Type ] patch is admissible, the
+            only admissible patches at this position are of the form [Delete^D
+            Name_change]. And with the constranit [Type_change < Name_change],
+            we have [Type_change Delete^D < Delete^D Name_change]. *)
 
   let key (x: Defs.left) = Ident.name x.ld_id
   let diffing loc env params1 params2 cstrs_1 cstrs_2 =
@@ -1028,13 +1127,12 @@ module Variant_diffing = struct
   let update _ st = st
 
   let weight: D.change -> _ = function
-    | Insert _ -> 10
-    | Delete _ -> 10
+    | Insert _ | Delete _ -> 100
     | Keep _ -> 0
-    | Change (_,_,Diffing_with_keys.Name t) ->
-        if t.types_match then 10 else 15
-    | Change _ -> 10
-
+    | Change (_,_,Diffing_with_keys.Name c) ->
+        if c.types_match then 98 else 99
+    | Change (_,_,Diffing_with_keys.Type _) -> 50
+    (** See {!Variant_diffing.weight} for an explanation *)
 
   let test loc env (params1,params2)
       ({pos; data=cd1}: D.left)
@@ -1272,6 +1370,7 @@ let type_manifest env ty1 ty2 priv2 kind2 =
       | () -> None
     end
 
+<<<<<<< HEAD
 (* Note [Contravariance of type parameter jkinds]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1358,6 +1457,19 @@ let type_manifest env ty1 ty2 priv2 kind2 =
    *)
 
 (* See Note [Contravariance of type parameter jkinds]. *)
+=======
+(* A type declarations [td1] is consistent with the type declaration [td2] if
+   there is a context E such E |- td1 <: td2 for the ordinary subtyping. For
+   types, this is the case as soon as the two type declarations share the same
+   arity and the privacy of [td1] is less than the privacy of [td2] (consider a
+   context E where all type constructors are equal). *)
+let type_declarations_consistency env decl1 decl2 =
+  if decl1.type_arity <> decl2.type_arity then Some Arity
+  else match privacy_mismatch env decl1 decl2 with
+    | Some err -> Some (Privacy err)
+    | None -> None
+
+>>>>>>> upstream/5.4
 let type_declarations ?(equality = false) ~loc env ~mark name
       decl1 path decl2 =
   Builtin_attributes.check_alerts_inclusion
@@ -1366,6 +1478,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
     loc
     decl1.type_attributes decl2.type_attributes
     name;
+<<<<<<< HEAD
   if decl1.type_arity <> decl2.type_arity then Some Arity else
   (* Step 1 from the Note *)
   let err =
@@ -1408,6 +1521,9 @@ let type_declarations ?(equality = false) ~loc env ~mark name
     | Some err -> Some (Privacy err)
     | None -> None
   in
+=======
+  let err = type_declarations_consistency env decl1 decl2 in
+>>>>>>> upstream/5.4
   if err <> None then err else
   let err = match (decl1.type_manifest, decl2.type_manifest) with
       (_, None) -> None
@@ -1470,6 +1586,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
           mark usage cstrs1;
           if equality then mark Env.Exported cstrs2
         end;
+<<<<<<< HEAD
         Misc.Stdlib.Option.first_some
           (Variant_diffing.compare_with_representation ~loc env
               decl1.type_params
@@ -1491,6 +1608,33 @@ let type_declarations ?(equality = false) ~loc env ~mark name
           (mark_and_compare_records Unboxed_product labels1 rep1 labels2 rep2)
           (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
       end
+=======
+        Variant_diffing.compare_with_representation ~loc env
+          decl1.type_params
+          decl2.type_params
+          cstrs1
+          cstrs2
+          rep1
+          rep2
+    | (Type_record(labels1,rep1), Type_record(labels2,rep2)) ->
+        if mark then begin
+          let mark usage lbls =
+            List.iter (fun lbl ->
+              Env.mark_label_used usage lbl.Types.ld_uid
+            ) lbls
+          in
+          let usage : Env.label_usage =
+            if decl2.type_private = Public then Env.Exported
+            else Env.Exported_private
+          in
+          mark usage labels1;
+          if equality then mark Env.Exported labels2
+        end;
+        Record_diffing.compare_with_representation ~loc env
+          decl1.type_params decl2.type_params
+          labels1 labels2
+          rep1 rep2
+>>>>>>> upstream/5.4
     | (Type_open, Type_open) -> None
     | (_, _) -> Some (Kind (of_kind decl1.type_kind, of_kind decl2.type_kind))
   in
@@ -1513,10 +1657,37 @@ let type_declarations ?(equality = false) ~loc env ~mark name
                                      []))))
   | All_good ->
   let abstr = Btype.type_kind_is_abstract decl2 && decl2.type_manifest = None in
+<<<<<<< HEAD
+=======
+  (* If attempt to assign a non-immediate type (e.g. string) to a type that
+   * must be immediate, then we error *)
+  let err =
+    if not abstr then
+      None
+    else
+      match
+        Type_immediacy.coerce decl1.type_immediate ~as_:decl2.type_immediate
+      with
+      | Ok () -> None
+      | Error violation -> Some (Immediate violation)
+  in
+  if err <> None then err else
+  (* We need to check coherence of internal and exported variance  either
+     * when the export type is abstract, as there is no manifest to get
+       the minimal variance from
+     * when the export type is private, as the private manifest may be
+       result of expansions within Ctype.equal_private, forgetting
+       an explicit variance annotation in the internal type
+     * when the internal type is private, but this is already included
+       in the above two cases (a private type can only be exported as
+       abstract or private)
+     * when the internal type is open, as we do not allow changing the
+       variance in that case  *)
+  let abstr' = abstr || decl2.type_private = Private in
+>>>>>>> upstream/5.4
   let need_variance =
-    abstr || decl1.type_private = Private || decl1.type_kind = Type_open in
+    abstr' || decl1.type_private = Private || decl1.type_kind = Type_open in
   if not need_variance then None else
-  let abstr = abstr || decl2.type_private = Private in
   let opn = decl2.type_kind = Type_open && decl2.type_manifest = None in
   let constrained ty = not (Btype.is_Tvar ty) in
   if List.for_all2
@@ -1524,10 +1695,13 @@ let type_declarations ?(equality = false) ~loc env ~mark name
         let open Variance in
         let imp a b = not a || b in
         let (co1,cn1) = get_upper v1 and (co2,cn2) = get_upper v2 in
-        (if abstr then (imp co1 co2 && imp cn1 cn2)
+        (if abstr' then (imp co1 co2 && imp cn1 cn2)
          else if opn || constrained ty then (co1 = co2 && cn1 = cn2)
          else true) &&
         let (p1,n1,j1) = get_lower v1 and (p2,n2,j2) = get_lower v2 in
+        (* Only check the lower bound for abstract types.
+           For private types, the lower bound can be inferred, and
+           the internal one may be wrong in the result of functors. *)
         imp abstr (imp p2 p1 && imp n2 n1 && imp j2 j1))
       decl2.type_params (List.combine decl1.type_variance decl2.type_variance)
   then None else Some Variance
