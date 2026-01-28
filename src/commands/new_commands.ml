@@ -835,8 +835,8 @@ let all_commands =
       ~doc:
         "Returns a list of kind information for all expressions at given \
          position, sorted by increasing size.\n\
-         `-index` can be used to print only one type information. This is \
-         useful to\n\
+         `-index` can be used to print only the kind information of a entry in \
+         the result list expression. This is useful to\n\
          query the kinds lazily: normally, Merlin would return the kind of all\n\
          enclosing modules, which may be very expensive.\n\n\
          The result is returned as a list of:\n\
