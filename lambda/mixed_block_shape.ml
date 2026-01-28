@@ -186,9 +186,6 @@ let singleton_or_product_of_mixed_block_element
   | Untagged_immediate -> Singleton Untagged_immediate
   | Product sub_elements -> Product sub_elements
   | Splice_variable _ ->
-    (* CR layout poly: This is mostly unreachable, however Value_rec_compiler
-       calls it before slambda eval. Other checks should have caught this first
-       though. *)
     Misc.fatal_error
       "singleton_or_product_of_mixed_block_element: Splice_variable"
 

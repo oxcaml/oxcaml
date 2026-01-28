@@ -786,9 +786,11 @@ let free_methods l =
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
     | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
-    | Lsplice _ ->
+    | Lsplice { splice_loc; _ } ->
       (* CR layout poly: we could definitely do better here. *)
-      Misc.fatal_error "Layout polymorphism is not supported in classes"
+      Lambda.error ~loc:(to_location splice_loc) (Slambda_unsupported "classes")
+    | Ldelayed(Dletrec(bindings, _body)) ->
+        List.iter (fun (id, _, _, _) -> fv := Ident.Set.remove id !fv) bindings
   in free l; !fv
 
 let transl_class ~scopes ids cl_id pub_meths cl vflag =

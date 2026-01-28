@@ -1,5 +1,3 @@
-module SL = Slambda
-
 (* Helpers for asserting that slambda is trivial. *)
 
 exception Found_a_splice
@@ -61,10 +59,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lfunction func -> assert_function_contains_no_splices func
   | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
-  | Lletrec (bindings, _) ->
-    List.iter
-      (fun { Lambda.def; _ } -> assert_function_contains_no_splices def)
-      bindings
+  | Lletrec (_, _) -> ()
   | Lprim (prim, _, _) -> assert_primitive_contains_no_splices prim
   | Lswitch (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lstringswitch (_, _, _, _, layout) ->
@@ -83,17 +78,19 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ -> raise Found_a_splice
+  | Ldelayed (Dletrec (_, _)) -> ());
   Lambda.iter_head_constructor assert_no_splices lam
 
 (* Check that slambda is trivial (a quote and contains no splices) *)
-let assert_slambda_is_trivial slam =
+let trivial_slambda (slam : Lambda.slambda) =
   match slam with
-  | SL.Quote lam -> (
-    try assert_no_splices lam
-    with Found_a_splice ->
-      Misc.fatal_error
-        "Slambda contains splices but layout_poly extension is disabled")
+  | SLhalves { sval_comptime = SLunit; sval_runtime = lam } -> (
+    try
+      assert_no_splices lam;
+      Some lam
+    with Found_a_splice -> None)
+  | _ -> None
 
 (* Introduce dependencies on modules referenced only by "external". *)
 
@@ -130,9 +127,16 @@ let required_globals ~flambda body =
   required
 
 let do_eval ({ Slambda.code = slam } as p) =
-  if not Language_extension.(is_enabled Layout_poly)
-  then assert_slambda_is_trivial slam;
-  let (SL.Quote lam) = slam in
+  (match Language_extension.(is_enabled Layout_poly), trivial_slambda slam with
+  | false, None ->
+    Misc.fatal_error
+      "Encountered non-trivial slambda but layout_poly extension is disabled"
+  | _ -> ());
+  let lam =
+    match slam with
+    | SLhalves { sval_comptime = _; sval_runtime = lam } -> lam
+    | _ -> Misc.fatal_error "slambda eval not yet implemented"
+  in
   { Lambda.compilation_unit = p.compilation_unit;
     main_module_block_format = p.main_module_block_format;
     arg_block_idx = p.arg_block_idx;

@@ -182,9 +182,9 @@ let compute_static_size lam =
          the latter meaning that [Value_rec_check] should have forbidden that case.
       *)
       assert false
-    | Lsplice _ ->
-      (* CR layout poly: Fix this (and split_static_function below). *)
-      Misc.fatal_error "letrec: layout poly not supported"
+    | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+    | Ldelayed (Dletrec _ as delayed) ->
+      Lambda.fail_with_delayed_constructor delayed
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -693,8 +693,9 @@ let rec split_static_function lfun block_var local_idents lam :
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
-  | Lsplice _ ->
-    Misc.fatal_error "letrec: layout poly not supported"
+  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Ldelayed (Dletrec _ as delayed) ->
+    Lambda.fail_with_delayed_constructor delayed
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =

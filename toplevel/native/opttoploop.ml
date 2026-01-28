@@ -126,8 +126,11 @@ let close_phrase lam =
   ) (free_variables lam) lam
 
 let close_slambda_phrase slam =
-  match slam with
-  | SL.Quote lam -> SL.Quote (close_phrase lam)
+  let lam = match (Slambdaeval.trivial_slambda slam) with
+  | Some lam -> lam
+  | None -> Lambda.error (Slambda_unsupported "the toplevel")
+  in
+  Lambda.SLhalves { sval_comptime = SLunit; sval_runtime = (close_phrase lam) }
 
 (* Return the value referred to by a path *)
 

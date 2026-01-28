@@ -16,8 +16,6 @@
 open Misc
 open Asttypes
 
-module SL = Slambda0
-
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -907,8 +905,47 @@ type lambda =
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of lambda_splice
+  | Ldelayed of delayed
 
-and slambda = lambda SL.t0
+and delayed =
+  | Dletrec of
+    (Ident.t * debug_uid * Value_rec_types.recursive_binding_kind * lambda) list
+    * lambda
+
+and slambda =
+  | SLlayout of layout
+  | SLvar of Slambdaident.t
+  | SLunit
+  | SLrecord of (string * slambda) array
+  | SLfield of Slambdaident.t * int * string
+  | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
+  | SLsequence of slambda * slambda
+
+and slambda_halves =
+  { sval_comptime: slambda;
+    sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -976,6 +1013,14 @@ and lambda_event_kind =
 
 and lambda_splice = { splice_loc : scoped_location; slambda : slambda }
 
+let delayed_name = function
+  | Dletrec _ -> "Dletrec"
+
+let fail_with_delayed_constructor delayed =
+  let name = delayed_name delayed in
+  Misc.fatal_errorf
+    "%s in lambda should have been removed by [Simplif.undelay]" name
+
 type runtime_param =
   | Rp_argument_block of Global_module.t
   | Rp_main_module_block of Global_module.t
@@ -1011,6 +1056,12 @@ type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
     arg_block_idx: int;
     main_repr: module_representation; }
+
+type error = Slambda_unsupported of string
+
+exception Error of Location.t option * error
+
+let error ?loc err = raise (Error (loc, err))
 
 let const_int n = Const_base (Const_int n)
 
@@ -1237,7 +1288,7 @@ let make_key e =
     | Levent _
     (* CR layout poly: Anything calling this should probably be moved to after
        slambda eval, we could possibly also make slambda keys. *)
-    | Lsplice _ ->
+    | Lsplice _  | Ldelayed (Dletrec _) ->
         raise Not_simple
 
   and tr_recs env es = List.map (tr_rec env) es
@@ -1340,6 +1391,9 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
+  | Ldelayed (Dletrec (bindings, body)) ->
+      tail body;
+      List.iter (fun (_, _, _, lam) -> f lam) bindings
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1428,12 +1482,50 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice { slambda = (SL.Quote e); _ } ->
-      free_variables e
+  | Lsplice { splice_loc = _; slambda } -> free_variables_slambda slambda
+  | Ldelayed (Dletrec (bindings, body)) ->
+      let set =
+        free_variables_list (free_variables body)
+          (List.map (fun (_, _, _, lam) -> lam) bindings)
+      in
+      Ident.Set.diff set
+        (Ident.Set.of_list (List.map (fun (id, _, _, _) -> id) bindings))
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
+
+and free_variables_slambda = function
+  | SLlayout _ | SLvar _ | SLunit | SLfield _ -> Ident.Set.empty
+  | SLrecord fields ->
+      Array.fold_left
+        (fun set (_, field) ->
+          Ident.Set.union (free_variables_slambda field) set)
+        Ident.Set.empty fields
+  | SLhalves { sval_comptime; sval_runtime } ->
+      Ident.Set.union
+        (free_variables_slambda sval_comptime)
+        (free_variables sval_runtime)
+  | SLproj_comptime slambda | SLproj_runtime slambda ->
+      free_variables_slambda slambda
+  | SLtemplate _ ->
+      (* Notably we don't recurse into templates as they would only introduce
+         new free variables into their call site. *)
+      Ident.Set.empty
+  | SLinstantiate { sapp_func; sapp_arguments } ->
+      (* Mechanically the result of instantiation could introduce new free
+         variables, however it's an invariant of slambda that it doesn't. *)
+      Array.fold_left
+        (fun set arg -> Ident.Set.union (free_variables_slambda arg) set)
+        (free_variables_slambda sapp_func) sapp_arguments
+  | SLlet { slet_name = _; slet_value; slet_body } ->
+      Ident.Set.union
+        (free_variables_slambda slet_value)
+        (free_variables_slambda slet_body)
+  | SLsequence (slambda1, slambda2) ->
+      Ident.Set.union
+        (free_variables_slambda slambda1)
+        (free_variables_slambda slambda2)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
@@ -1593,7 +1685,7 @@ let block_of_module_representation ~loc = function
              layout poly usecases, however it should be easy to move this assert
              to after slambdaeval (or maybe during?). *)
           | Splice_variable _ ->
-            Misc.fatal_error "Layout poly doesn't support mixed modules yet")
+            error ~loc (Slambda_unsupported "mixed modules"))
         0 shape
     in
     Typedecl.assert_mixed_product_support loc Module
@@ -1640,6 +1732,12 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         let name', duid', l = bind p.name p.debug_uid l in
         ({ p with name = name'; debug_uid = duid' } :: params' , l)
       ) params ([], l)
+  in
+  let bind_delayed_rec bindings l =
+    List.fold_right (fun (id, duid, rec_kind, rhs) (bindings', l) ->
+        let id', duid', l = bind id duid l in
+        ((id', duid', rec_kind, rhs) :: bindings' , l)
+      ) bindings ([], l)
   in
   let bind_rec ids l =
     List.fold_right (fun (rb: rec_binding) (ids', l) ->
@@ -1764,9 +1862,15 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice { splice_loc; slambda = (SL.Quote e) } ->
-        Lsplice { splice_loc; slambda = (SL.Quote (subst s l e)) }
+    | Lsplice _ ->
+      Misc.fatal_error "Cannot apply substitutions to lambda before slambdaeval"
+    | Ldelayed Dletrec (bindings, body) ->
+        let bindings, l' = bind_delayed_rec bindings l in
+        Ldelayed
+          (Dletrec (List.map (subst_rec_bind s l') bindings, subst s l' body))
   and subst_list s l li = List.map (subst s l) li
+  and subst_rec_bind s l (id, duid, rec_kind, rhs) =
+    (id, duid, rec_kind, subst s l rhs)
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
     let params, l' = bind_params lf.params l in
@@ -1883,6 +1987,13 @@ let shallow_map ~tail ~non_tail:f = function
       Lregion (f e, layout)
   | Lexclave e ->
       Lexclave (tail e)
+  | Ldelayed (Dletrec (bindings, body)) ->
+      Ldelayed
+        (Dletrec
+          (List.map
+              (fun (id, duid, rec_kind, value) -> id, duid, rec_kind, f value)
+              bindings,
+            tail body))
 
 let map f =
   let rec g lam = f (shallow_map ~tail:g ~non_tail:g lam) in
@@ -2817,7 +2928,7 @@ let may_allocate_in_region lam =
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
       | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
-      | Levent _ | Lifused _) as lam ->
+      | Levent _ | Lifused _ | Ldelayed (Dletrec _)) as lam ->
        iter_head_constructor loop lam
   in
   if not Config.stack_allocation then false
@@ -2867,9 +2978,11 @@ let rec try_to_find_location lam =
   | Lifused (_, lam)
   | Lregion (lam, _)
   | Lexclave lam
-  | Ltrywith (lam, _, _, _, _) ->
+  | Ltrywith (lam, _, _, _, _)
+  | Ldelayed (Dletrec ((_, _, _, lam) :: _, _)) ->
     try_to_find_location lam
-  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
+  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, [])
+  | Ldelayed (Dletrec _)  ->
     Debuginfo.Scoped_location.Loc_unknown
 
 let try_to_find_debuginfo lam =
@@ -2978,3 +3091,16 @@ let icmp cmp size x y ~loc = binary (Icmp (size, cmp)) x y ~loc
 let phys_equal x y ~loc = Lprim (Pphys_equal Eq, [x;y], loc)
 
 let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
+
+let report_error ppf = function
+  | Slambda_unsupported where ->
+    Format.fprintf ppf
+      "Static computation and layout polymorphism are not yet supported in %s."
+      where
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (Some loc, err) ->
+      Some (Location.error_of_printer ~loc report_error err)
+    | Error (None, err) -> Some (Location.error_of_printer report_error err)
+    | _ -> None)
