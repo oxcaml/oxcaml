@@ -166,6 +166,12 @@ val addressing :
     | `Offset_sym ] ]
   Ast.Operand.t
 
+(** Memory operand for accessing a domain state field via x28. *)
+val domainstate_field :
+  Domainstate.t ->
+  [`Mem of [> `Offset_twelve_unsigned_scaled | `Offset_nine_signed_unscaled]]
+  Ast.Operand.t
+
 (** Result type for [stack]. Either [Stack_operand operand] if the offset can be
     encoded directly, or a large offset variant if the offset exceeds the
     immediate range and requires a multi-instruction sequence. *)

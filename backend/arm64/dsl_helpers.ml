@@ -202,6 +202,16 @@ let addressing ~scale:(_ : int) addr r =
       mem_label base ~reloc:(Needs_reloc LOWER_TWELVE) ~offset:ofs lbl
     else mem_symbol_reg base ~reloc:(Needs_reloc LOWER_TWELVE) ~offset:ofs s
 
+(* x28 is the domain state pointer *)
+let domainstate_base = Ast.Reg.reg_x 28
+
+let domainstate_field field =
+  let offset = Domainstate.idx_of_field field * 8 in
+  match Ast.DSL.Validated_mem_offset.create ~scale:8 ~offset with
+  | Some validated ->
+    Ast.DSL.Validated_mem_offset.to_operand ~base:domainstate_base validated
+  | None -> Misc.fatal_errorf "domainstate_field: offset %d out of range" offset
+
 type 'a stack_result =
   | Stack_operand of 'a
   | Stack_large_offset_sp of { bytes : int }

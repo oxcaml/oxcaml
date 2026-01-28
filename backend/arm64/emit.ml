@@ -170,14 +170,6 @@ let local_label lbl = label Same_section_and_unit lbl
 
 module Validated_mem_offset = Ast.DSL.Validated_mem_offset
 
-(* Create a validated Iindexed addressing mode. For domain state accesses and
-   other known-good offsets, these should always succeed. *)
-let iindexed_validated ~scale offset =
-  match Validated_mem_offset.create ~scale ~offset with
-  | Some v -> Iindexed v
-  | None ->
-    Misc.fatal_errorf "emit: offset %d invalid for scale %d" offset scale
-
 (* Create a symbol or label reference depending on whether the symbol is local.
    Local symbols are defined as labels (not linker symbols) to avoid ELF
    visibility issues, so references to them must also use labels. *)
@@ -797,6 +789,8 @@ let emit_cmpimm rs n =
    load/store. x16 (IP0) is safe as it's reserved for linker veneers and not
    allocated by the register allocator. *)
 
+(* XXX need to revalidate that reg_x_tmp1 is safe *)
+
 let emit_load_store_sp_offset instr reg offset =
   match O.mem_offset ~base:R.sp ~scale:8 ~offset with
   | Ok operand -> A.ins2 instr reg operand
@@ -1297,32 +1291,16 @@ let cond_for_cset_for_float_comparison : Cmm.float_comparison -> Cond.t =
 
 let assembly_code_for_local_allocation i ~n =
   let r = H.reg_x i.res.(0) in
-  let module DS = Domainstate in
-  let domain_local_sp = DS.idx_of_field Domain_local_sp * 8 in
-  let domain_local_limit = DS.idx_of_field Domain_local_limit * 8 in
-  let domain_local_top = DS.idx_of_field Domain_local_top * 8 in
-  A.ins2 LDR reg_x_tmp1
-    (H.addressing ~scale:8
-       (iindexed_validated ~scale:8 domain_local_limit)
-       reg_domain_state_ptr);
-  A.ins2 LDR r
-    (H.addressing ~scale:8
-       (iindexed_validated ~scale:8 domain_local_sp)
-       reg_domain_state_ptr);
+  A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_limit);
+  A.ins2 LDR r (H.domainstate_field Domain_local_sp);
   emit_subimm r r n;
-  A.ins2 STR r
-    (H.addressing ~scale:8
-       (iindexed_validated ~scale:8 domain_local_sp)
-       reg_domain_state_ptr);
+  A.ins2 STR r (H.domainstate_field Domain_local_sp);
   A.ins_cmp_reg r reg_x_tmp1 O.optional_none;
   let lr_lbl = L.create Text in
   A.ins1 (B_cond (Branch_cond.Int LT)) (local_label lr_lbl);
   let lr_return_lbl = L.create Text in
   D.define_label lr_return_lbl;
-  A.ins2 LDR reg_x_tmp1
-    (H.addressing ~scale:8
-       (iindexed_validated ~scale:8 domain_local_top)
-       reg_domain_state_ptr);
+  A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_top);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
   A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
   local_realloc_sites
@@ -1335,11 +1313,7 @@ let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
   (* n is at most Max_young_whsize * 8, i.e. currently 0x808, so it is
      reasonable to assume n < 0x1_000. This makes the generated code simpler. *)
   assert (16 <= n && n < 0x1_000 && n land 0x7 = 0);
-  let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
-  A.ins2 LDR reg_x_tmp1
-    (H.addressing ~scale:8
-       (iindexed_validated ~scale:8 offset)
-       reg_domain_state_ptr);
+  A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_young_limit);
   emit_subimm reg_x_alloc_ptr reg_x_alloc_ptr n;
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
@@ -1382,11 +1356,7 @@ let assembly_code_for_poll i ~far ~return_label =
   let gc_return_lbl =
     match return_label with None -> L.create Text | Some lbl -> lbl
   in
-  let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
-  A.ins2 LDR reg_x_tmp1
-    (H.addressing ~scale:8
-       (iindexed_validated ~scale:8 offset)
-       reg_domain_state_ptr);
+  A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_young_limit);
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
    then (
@@ -1680,11 +1650,7 @@ let emit_instr i =
         A.ins_mov_from_sp ~dst:O.fp;
         D.cfi_remember_state ();
         D.cfi_def_cfa_register ~reg:(Int.to_string (R.gp_encoding R.fp));
-        let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
-        A.ins2 LDR reg_x_tmp1
-          (H.addressing ~scale:8
-             (iindexed_validated ~scale:8 offset)
-             reg_domain_state_ptr);
+        A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
         A.ins_mov_to_sp ~src:reg_x_tmp1)
       else D.cfi_remember_state ();
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
@@ -1813,19 +1779,9 @@ let emit_instr i =
   | Lop (Alloc { bytes = n; dbginfo; mode = Local }) ->
     assembly_code_for_allocation i ~n ~local:true ~far:false ~dbginfo
   | Lop Begin_region ->
-    let offset = Domainstate.(idx_of_field Domain_local_sp) * 8 in
-    A.ins2 LDR
-      (H.reg_x i.res.(0))
-      (H.addressing ~scale:8
-         (iindexed_validated ~scale:8 offset)
-         reg_domain_state_ptr)
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_local_sp)
   | Lop End_region ->
-    let offset = Domainstate.(idx_of_field Domain_local_sp) * 8 in
-    A.ins2 STR
-      (H.reg_x i.arg.(0))
-      (H.addressing ~scale:8
-         (iindexed_validated ~scale:8 offset)
-         reg_domain_state_ptr)
+    A.ins2 STR (H.reg_x i.arg.(0)) (H.domainstate_field Domain_local_sp)
   | Lop Poll -> assembly_code_for_poll i ~far:false ~return_label:None
   | Lop Pause -> A.ins0 YIELD
   | Lop (Specific Ifar_poll) ->
@@ -2016,35 +1972,20 @@ let emit_instr i =
     (* Load unsigned 2-byte integer value from offset 2 *)
     A.ins2 LDRH
       (H.reg_w i.res.(0))
-      (H.addressing ~scale:2 (iindexed_validated ~scale:2 2) reg_tmp1);
+      (Validated_mem_offset.to_operand ~base:reg_tmp1_base
+         Validated_mem_offset.probe_semaphore_offset);
     (* Compare with 0 and set result to 1 if non-zero, 0 if zero *)
     A.ins_cmp (H.reg_w i.res.(0)) (O.imm 0) O.optional_none;
     A.ins_cset (H.reg_x i.res.(0)) Cond.NE
   | Lop Dls_get when not Config.runtime5 ->
     Misc.fatal_error "Dls is not supported in runtime4."
   | Lop Dls_get ->
-    let offset = Domainstate.(idx_of_field Domain_dls_state) * 8 in
-    A.ins2 LDR
-      (H.reg_x i.res.(0))
-      (H.addressing ~scale:8
-         (iindexed_validated ~scale:8 offset)
-         reg_domain_state_ptr)
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_dls_state)
   | Lop Tls_get ->
-    let offset = Domainstate.(idx_of_field Domain_tls_state) * 8 in
-    A.ins2 LDR
-      (H.reg_x i.res.(0))
-      (H.addressing ~scale:8
-         (iindexed_validated ~scale:8 offset)
-         reg_domain_state_ptr)
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_tls_state)
   | Lop Domain_index ->
     if Config.runtime5
-    then
-      let offset = Domainstate.(idx_of_field Domain_id) * 8 in
-      A.ins2 LDR
-        (H.reg_x i.res.(0))
-        (H.addressing ~scale:8
-           (iindexed_validated ~scale:8 offset)
-           reg_domain_state_ptr)
+    then A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
     else A.ins3 MOVZ (H.reg_x i.res.(0)) (O.imm_sixteen 0) O.optional_none
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
@@ -2184,11 +2125,7 @@ let emit_instr i =
       (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
     in
     let f = sc_max_frame_size_in_bytes + threshold_offset in
-    let offset = Domainstate.(idx_of_field Domain_current_stack) * 8 in
-    A.ins2 LDR reg_x_tmp1
-      (H.addressing ~scale:8
-         (iindexed_validated ~scale:8 offset)
-         reg_domain_state_ptr);
+    A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_current_stack);
     emit_addimm reg_x_tmp1 reg_x_tmp1 f;
     A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
     A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label);

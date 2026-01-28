@@ -1695,6 +1695,9 @@ module DSL : sig
 
     (** Check if an offset can be encoded for the given scale. *)
     val is_valid : scale:int -> offset:int -> bool
+
+    (** Pre-validated offset for probe semaphore access (2-byte at offset 2). *)
+    val probe_semaphore_offset : t
   end
 
   (** Result type for [mem_offset]. Either [Ok operand] if the offset can be

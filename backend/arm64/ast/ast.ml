@@ -2718,6 +2718,9 @@ module DSL = struct
     let scale t = t.scale
 
     let is_valid ~scale ~offset = Option.is_some (create ~scale ~offset)
+
+    (* Pre-validated offset for probe semaphore access (2-byte at offset 2) *)
+    let probe_semaphore_offset = { scale = 2; offset = 2; kind = Scaled }
   end
 
   type 'a mem_offset_result =
