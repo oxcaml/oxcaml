@@ -1184,9 +1184,10 @@ let gets_unboxed_version decl =
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ -> false
   | Type_record (_, None, _) ->
-    (* As of this writing (2025-11-14), it's not possible to have an [any] field
-       in a record that doesn't get an unboxed version. Please enjoy convincing
-       yourself that this is true. *)
+    (* As of this writing (2025-11-14), it's not possible to have [None] as the
+       representation for a record that doesn't get an unboxed version. Please
+       enjoy convincing yourself that this is true (you'll want to consult
+       [update_record_kind]). *)
     true
   | Type_record (_, Some repr, _) -> record_gets_unboxed_version repr
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
@@ -1930,10 +1931,11 @@ let update_record_kind (type rep) env loc (form : rep record_form)
     let sort = Jkind.sort_option_of_jkind jkind in
     let ld_sort = Option.map Jkind.Sort.default_to_value_and_get sort in
     let rep =
-      match sort with
-      | Some _ -> Ok Record_unboxed
-      | None ->
-        Result.Error (Unrepresentable_field (Ident.name lbl.Types.ld_id))
+      (* Weirdly, we CAN give the record a representation even if its kind is
+         [any]. This works because the representation doesn't include a sort,
+         since it's not actually needed in order to produce code (the
+         in-memory representation is always exactly the underlying value). *)
+      Ok Record_unboxed
     in
     [ld_sort], rep, jkind
   | Legacy, _, (Some (Record_boxed _) | None)

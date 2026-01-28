@@ -934,13 +934,8 @@ module type S_coherence_deep = sig
   type t2 = { t1 : t1 } [@@unboxed]
 end
 [%%expect{|
-Line 3, characters 2-35:
-3 |   type t2 = { t1 : t1 } [@@unboxed]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t2" is any
-         because of the definition of t1 at line 2, characters 2-15.
-       But the layout of type "t2" must be representable
-         because it's an [@@unboxed] type.
+module type S_coherence_deep =
+  sig type t1 : any type t2 = { t1 : t1; } [@@unboxed] end
 |}]
 
 (*************************************************)
