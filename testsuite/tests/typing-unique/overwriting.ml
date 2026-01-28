@@ -56,7 +56,8 @@ let overwrite_shared (r : record_update) =
 Line 3, characters 7-8:
 3 |   x.x, r.x
            ^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 2, characters 21-22:
 2 |   let x = overwrite_ r with { x = "foo" } in
                          ^
@@ -779,7 +780,7 @@ let guards_bad = function
 Line 2, characters 48-49:
 2 |   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
                                                     ^
-Error: This value is used here as unique, but it is also being read from:
+Error: This value is used here as unique, but it is also being read from at:
 Line 2, characters 4-13:
 2 |   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
         ^^^^^^^^^

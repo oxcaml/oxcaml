@@ -34,7 +34,7 @@ let texp_object () =
 Line 5, characters 12-13:
 5 |   val bar = x
                 ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;
                 ^
@@ -70,7 +70,7 @@ let texp_letmodule () =
 Line 5, characters 12-13:
 5 |     let y = x
                 ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;
                 ^
@@ -98,7 +98,7 @@ let texp_open () =
 Line 4, characters 27-28:
 4 |   let open (struct let y = x end) in
                                ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;
                 ^
@@ -129,7 +129,7 @@ let texp_pack () =
 Line 4, characters 33-34:
 4 |   let z = (module struct let y = x end : bar) in
                                      ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;
                 ^
