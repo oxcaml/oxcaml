@@ -151,7 +151,13 @@ type label_ambiguity =
 
 type _ type_inspection =
   | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
+  (** Label (e.g. record field or variant constructor) disambiguation *)
   | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
+  (** Polymorphic parameter uses (e.g. polymorphic object method) *)
+  | Module_pack :
+    (Path.t * (Longident.t * Types.type_expr) list) ->
+    [< `pat | `exp ] type_inspection
+  (** Package types (first-class modules) *)
 
 and _ poly_param =
   | Param : Types.type_expr -> [ `pat ] poly_param
