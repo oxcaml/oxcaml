@@ -619,8 +619,19 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 find (row_fields row)
           | Tobject (_, _) ->
               Oval_stuff "<obj>"
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _
-          | Tquote _ | Tsplice _ | Tof_kind _ ->
+          | Tquote _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                  fatal_error "Ill-staged value of quote type"
+              | ty -> tree_of_val depth obj ty
+              end
+          | Tsplice _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                fatal_error "Ill-staged value of splice type"
+              | ty -> tree_of_val depth obj ty
+              end
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
