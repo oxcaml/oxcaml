@@ -43,5 +43,19 @@ jobs:
         if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
         run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
+      - name: Set up Opam environment
+        # this command adds the opam environment to the PATH.
+        run: |
+          opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
+
+      # We need to configure for formatting, because dune with language version
+      # 3.20 checks whether all files declared with [copy_files] exist. This
+      # matters for Makefile.config, which is generated during configuration.
+      - name: Configure compiler
+        run: |
+          autoconf
+          ./configure \
+            --enable-runtime5 --prefix=$GITHUB_WORKSPACE/_install
+
       - name: Check OCaml Formatting
         run: opam exec -- bash tools/ci/actions/check-fmt.sh

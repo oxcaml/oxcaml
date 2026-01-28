@@ -1,4 +1,4 @@
-(lang dune 3.13)
+(lang dune 3.20)
 (formatting (enabled_for ocaml))
 (wrapped_executables false)
 (using experimental_building_ocaml_compiler_with_dune 0.1)
