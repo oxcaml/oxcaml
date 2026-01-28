@@ -538,6 +538,16 @@ and comp_expr stack_info env exp sz cont =
     assert (nargs = 7);
     check_stack stack_info 3;
     comp_args stack_info env args sz (Kwith_stack_bind :: cont)
+  | Context_switch (With_stack_preemptible, args) ->
+    let nargs = List.length args in
+    assert (nargs = 6);
+    check_stack stack_info 3;
+    comp_args stack_info env args sz (Kwith_stack_preemptible :: cont)
+  | Context_switch (With_stack_bind_preemptible, args) ->
+    let nargs = List.length args in
+    assert (nargs = 8);
+    check_stack stack_info 3;
+    comp_args stack_info env args sz (Kwith_stack_bind_preemptible :: cont)
   | Context_switch (Reperform, args) ->
     let nargs = List.length args - 1 in
     assert (nargs = 2);
