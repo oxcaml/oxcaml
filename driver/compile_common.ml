@@ -30,6 +30,7 @@ type info = {
   backend : backend;
 }
 
+<<<<<<< HEAD
 type compilation_unit_or_inferred =
   | Exactly of Compilation_unit.t
   | Inferred_from_output_prefix
@@ -55,6 +56,16 @@ let with_info ~backend ~tool_name ~source_file ~output_prefix
   k {
     target;
     module_name = compilation_unit;
+=======
+let with_info ~native ~tool_name ~dump_ext unit_info k =
+  Compmisc.init_path ();
+  Env.set_current_unit unit_info ;
+  let env = Compmisc.initial_env() in
+  let dump_file = String.concat "." [Unit_info.prefix unit_info; dump_ext] in
+  Compmisc.with_ppf_dump ~file_prefix:dump_file @@ fun ppf_dump ->
+  k {
+    target = unit_info;
+>>>>>>> upstream/5.4
     env;
     ppf_dump;
     tool_name;
@@ -108,8 +119,12 @@ let typecheck_intf info ast =
           (Printtyp.printed_signature
              (Unit_info.original_source_file info.target))
           sg);
+<<<<<<< HEAD
   ignore (Includemod.signatures info.env ~mark:true
     ~modes:Includemod.modes_unit sg sg);
+=======
+  ignore (Includemod.signatures info.env ~mark:true sg sg);
+>>>>>>> upstream/5.4
   Typecore.force_delayed_checks ();
   Builtin_attributes.warn_unused ();
   Warnings.check_fatal ();
@@ -117,6 +132,7 @@ let typecheck_intf info ast =
 
 let emit_signature info alerts tsg =
   let sg =
+<<<<<<< HEAD
     let kind : Cmi_format.kind =
       if !Clflags.as_parameter then
         Parameter
@@ -128,6 +144,8 @@ let emit_signature info alerts tsg =
         Normal { cmi_impl = info.module_name; cmi_arg_for }
       end
     in
+=======
+>>>>>>> upstream/5.4
     Env.save_signature ~alerts tsg.Typedtree.sig_type
       (Compilation_unit.name info.module_name) kind
       (Unit_info.cmi info.target)
@@ -141,7 +159,10 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
   hook_parse_tree ast;
   if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
     let alerts, tsg = typecheck_intf info ast in
+<<<<<<< HEAD
     hook_typed_tree tsg;
+=======
+>>>>>>> upstream/5.4
     if not !Clflags.print_types then begin
       emit_signature info alerts tsg
     end

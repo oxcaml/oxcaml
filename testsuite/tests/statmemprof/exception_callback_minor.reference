@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 Exception from memprof.
+=======
+Exception from alloc_minor callback.
+>>>>>>> upstream/5.4

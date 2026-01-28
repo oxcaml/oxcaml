@@ -395,6 +395,7 @@ let primitive ppf = function
   | Pbytes_to_string -> fprintf ppf "bytes_to_string"
   | Pbytes_of_string -> fprintf ppf "bytes_of_string"
   | Pignore -> fprintf ppf "ignore"
+<<<<<<< HEAD
   | Pgetglobal cu -> fprintf ppf "global %a!" Compilation_unit.print cu
   | Pgetpredef id -> fprintf ppf "getpredef %a!" Ident.print id
   | Pmakeblock(tag, Immutable, shape, mode) ->
@@ -424,11 +425,23 @@ let primitive ppf = function
   | Pmakeufloatblock (Mutable, mode) ->
      fprintf ppf "make%sufloatblock Mutable"
         (locality_mode_if_local mode)
+=======
+  | Pgetglobal id -> fprintf ppf "global %a" Ident.print id
+  | Psetglobal id -> fprintf ppf "setglobal %a" Ident.print id
+  | Pmakeblock(tag, Immutable, shape) ->
+      fprintf ppf "makeblock %i%a" tag block_shape shape
+  | Pmakeblock(tag, Mutable, shape) ->
+      fprintf ppf "makemutable %i%a" tag block_shape shape
+>>>>>>> upstream/5.4
   | Pmakelazyblock Lazy_tag ->
       fprintf ppf "makelazyblock"
   | Pmakelazyblock Forward_tag ->
       fprintf ppf "makeforwardblock"
+<<<<<<< HEAD
   | Pfield (n, ptr, sem) ->
+=======
+  | Pfield(n, ptr, mut) ->
+>>>>>>> upstream/5.4
       let instr =
         match ptr, sem with
         | Immediate, _ -> "field_int"
@@ -619,6 +632,7 @@ let primitive ppf = function
   | Pbigarrayset(unsafe, _n, kind, layout) ->
       print_bigarray "set" unsafe kind ppf layout
   | Pbigarraydim(n) -> fprintf ppf "Bigarray.dim_%i" n
+<<<<<<< HEAD
   | Pstring_load_16 {unsafe; index_kind} ->
      fprintf ppf "string.%sget16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -861,6 +875,60 @@ let primitive ppf = function
       fprintf ppf "(set_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
+=======
+  | Pstring_load_16(unsafe) ->
+     if unsafe then fprintf ppf "string.unsafe_get16"
+     else fprintf ppf "string.get16"
+  | Pstring_load_32(unsafe) ->
+     if unsafe then fprintf ppf "string.unsafe_get32"
+     else fprintf ppf "string.get32"
+  | Pstring_load_64(unsafe) ->
+     if unsafe then fprintf ppf "string.unsafe_get64"
+     else fprintf ppf "string.get64"
+  | Pbytes_load_16(unsafe) ->
+     if unsafe then fprintf ppf "bytes.unsafe_get16"
+     else fprintf ppf "bytes.get16"
+  | Pbytes_load_32(unsafe) ->
+     if unsafe then fprintf ppf "bytes.unsafe_get32"
+     else fprintf ppf "bytes.get32"
+  | Pbytes_load_64(unsafe) ->
+     if unsafe then fprintf ppf "bytes.unsafe_get64"
+     else fprintf ppf "bytes.get64"
+  | Pbytes_set_16(unsafe) ->
+     if unsafe then fprintf ppf "bytes.unsafe_set16"
+     else fprintf ppf "bytes.set16"
+  | Pbytes_set_32(unsafe) ->
+     if unsafe then fprintf ppf "bytes.unsafe_set32"
+     else fprintf ppf "bytes.set32"
+  | Pbytes_set_64(unsafe) ->
+     if unsafe then fprintf ppf "bytes.unsafe_set64"
+     else fprintf ppf "bytes.set64"
+  | Pbigstring_load_16(unsafe) ->
+     if unsafe then fprintf ppf "bigarray.array1.unsafe_get16"
+     else fprintf ppf "bigarray.array1.get16"
+  | Pbigstring_load_32(unsafe) ->
+     if unsafe then fprintf ppf "bigarray.array1.unsafe_get32"
+     else fprintf ppf "bigarray.array1.get32"
+  | Pbigstring_load_64(unsafe) ->
+     if unsafe then fprintf ppf "bigarray.array1.unsafe_get64"
+     else fprintf ppf "bigarray.array1.get64"
+  | Pbigstring_set_16(unsafe) ->
+     if unsafe then fprintf ppf "bigarray.array1.unsafe_set16"
+     else fprintf ppf "bigarray.array1.set16"
+  | Pbigstring_set_32(unsafe) ->
+     if unsafe then fprintf ppf "bigarray.array1.unsafe_set32"
+     else fprintf ppf "bigarray.array1.set32"
+  | Pbigstring_set_64(unsafe) ->
+     if unsafe then fprintf ppf "bigarray.array1.unsafe_set64"
+     else fprintf ppf "bigarray.array1.set64"
+  | Pbswap16 -> fprintf ppf "bswap16"
+  | Pbbswap(bi) -> print_boxed_integer "bswap" ppf bi
+  | Pint_as_pointer -> fprintf ppf "int_as_pointer"
+  | Patomic_load -> fprintf ppf "atomic_load"
+  | Popaque -> fprintf ppf "opaque"
+  | Pdls_get -> fprintf ppf "dls_get"
+  | Ppoll -> fprintf ppf "poll"
+>>>>>>> upstream/5.4
 
 let name_of_primitive = function
   | Pscalar i ->
@@ -874,8 +942,11 @@ let name_of_primitive = function
   | Pgetglobal _ -> "Pgetglobal"
   | Pgetpredef _ -> "Pgetpredef"
   | Pmakeblock _ -> "Pmakeblock"
+<<<<<<< HEAD
   | Pmakefloatblock _ -> "Pmakefloatblock"
   | Pmakeufloatblock _ -> "Pmakeufloatblock"
+=======
+>>>>>>> upstream/5.4
   | Pmakelazyblock _ -> "Pmakelazyblock"
   | Pfield _ -> "Pfield"
   | Pfield_computed _ -> "Pfield_computed"
@@ -949,6 +1020,7 @@ let name_of_primitive = function
   | Pbigstring_set_32 _ -> "Pbigstring_set_32"
   | Pbigstring_set_f32 _ -> "Pbigstring_set_f32"
   | Pbigstring_set_64 _ -> "Pbigstring_set_64"
+<<<<<<< HEAD
   | Pbigstring_set_vec _ -> "Pbigstring_set_vec"
   | Pfloatarray_load_vec _ -> "Pfloatarray_load_vec"
   | Pfloat_array_load_vec _ -> "Pfloat_array_load_vec"
@@ -997,10 +1069,19 @@ let name_of_primitive = function
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"
   | Pwith_stack_bind -> "Pwith_stack_bind"
+=======
+  | Pbswap16 -> "Pbswap16"
+  | Pbbswap _ -> "Pbbswap"
+  | Pint_as_pointer -> "Pint_as_pointer"
+  | Patomic_load -> "Patomic_load"
+  | Popaque -> "Popaque"
+  | Prunstack -> "Prunstack"
+>>>>>>> upstream/5.4
   | Presume -> "Presume"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"
+<<<<<<< HEAD
   | Ptls_get -> "Ptls_get"
   | Pdomain_index -> "Pdomain_index"
   | Ppoll -> "Ppoll"
@@ -1037,6 +1118,9 @@ let zero_alloc_attribute ppf check =
       (match custom_error_msg with
        | None -> ""
        | Some msg -> Printf.sprintf " customer_error_message %S" msg)
+=======
+  | Ppoll -> "Ppoll"
+>>>>>>> upstream/5.4
 
 let function_attribute ppf t =
   if t.is_a_functor then
@@ -1194,10 +1278,17 @@ let rec lam ppf = function
         apply_tailcall_attribute ap.ap_tailcall
         apply_inlined_attribute ap.ap_inlined
         apply_specialised_attribute ap.ap_specialised
+<<<<<<< HEAD
         apply_probe ap.ap_probe
   | Lfunction lfun ->
       lfunction ppf lfun
   | Llet _ | Lmutlet _ as expr ->
+=======
+  | Lfunction lfun ->
+      lfunction ppf lfun
+  | Llet(_, k, id, arg, body)
+  | Lmutlet(k, id, arg, body) as l ->
+>>>>>>> upstream/5.4
       let let_kind = begin function
         | Llet(str,_,_,_,_,_) ->
            begin match str with
@@ -1223,12 +1314,18 @@ let rec lam ppf = function
       let bindings ppf id_arg_list =
         let spc = ref false in
         List.iter
+<<<<<<< HEAD
           (fun { id; debug_uid=duid; def } ->
             if !spc then fprintf ppf "@ " else spc := true;
             fprintf ppf "@[<2>%a%a@ %a@]"
               Ident.print id
               debug_uid duid
               lfunction def)
+=======
+          (fun { id; def } ->
+            if !spc then fprintf ppf "@ " else spc := true;
+            fprintf ppf "@[<2>%a@ %a@]" Ident.print id lfunction def)
+>>>>>>> upstream/5.4
           id_arg_list in
       fprintf ppf
         "@[<2>(letrec@ (@[<hv 1>%a@])@ %a)@]" bindings id_arg_list lam body
@@ -1363,6 +1460,7 @@ and sequence ppf = function
   | l ->
       lam ppf l
 
+<<<<<<< HEAD
 and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
   let pr_params ppf params =
     match kind with
@@ -1375,10 +1473,19 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
               layout_annotation p.layout
               (if unbox_param then "[@unboxable]" else "")
           ) params
+=======
+and lfunction ppf {kind; params; return; body; attr} =
+  let pr_params ppf params =
+    match kind with
+    | Curried ->
+        List.iter (fun (param, k) ->
+            fprintf ppf "@ %a%a" Ident.print param value_kind k) params
+>>>>>>> upstream/5.4
     | Tupled ->
         fprintf ppf " (";
         let first = ref true in
         List.iter
+<<<<<<< HEAD
           (fun (p : Lambda.lparam) ->
              let { unbox_param } = p.attributes in
              if !first then first := false else fprintf ppf ",@ ";
@@ -1393,6 +1500,16 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
   fprintf ppf "@[<2>(function%s%a@ %a%a%a)@]"
     (locality_kind mode) pr_params params
     function_attribute attr return_kind (ret_mode, return) lam body
+=======
+          (fun (param, k) ->
+             if !first then first := false else fprintf ppf ",@ ";
+             Ident.print ppf param;
+             value_kind ppf k)
+          params;
+            fprintf ppf ")" in
+  fprintf ppf "@[<2>(function%a@ %a%a%a)@]" pr_params params
+    function_attribute attr return_kind return lam body
+>>>>>>> upstream/5.4
 
 
 let structured_constant = struct_const

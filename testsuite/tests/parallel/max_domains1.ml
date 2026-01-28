@@ -1,9 +1,13 @@
 (* TEST
+<<<<<<< HEAD
  flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  ocamlrunparam += ",d=1";
  runtime5;
  multidomain;
  { native; }
+=======
+ ocamlrunparam += ",d=1";
+>>>>>>> upstream/5.4
 *)
 
 let _ =

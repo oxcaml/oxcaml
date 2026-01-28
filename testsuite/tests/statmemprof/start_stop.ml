@@ -1,8 +1,12 @@
+<<<<<<< HEAD
 (* TEST
    runtime5;
    { bytecode; }
    { native; }
 *)
+=======
+(* TEST *)
+>>>>>>> upstream/5.4
 
 (* Tests various valid and invalid orderings of start/stop/discard
 statmemprof calls. Doesn't test any callbacks or count any allocations,

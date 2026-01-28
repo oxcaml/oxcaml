@@ -3,8 +3,19 @@
    not-macos;
    include systhreads;
    hassysthreads;
+<<<<<<< HEAD
    { bytecode; }
    { native; }
+=======
+ }{
+   reason = "off-by-one error on MacOS+Clang (https://github.com/ocaml-multicore/ocaml-multicore/issues/408)";
+   skip;
+   {
+     bytecode;
+   }{
+     native;
+   }
+>>>>>>> upstream/5.4
  }
 *)
 

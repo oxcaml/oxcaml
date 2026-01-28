@@ -2,9 +2,9 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*  Xavier Leroy and Jerome Vouillon, projet Cristal, INRIA Rocquencourt  *)
+(*  Florian Angeletti, projet Cambium, INRIA Paris                        *)
 (*                                                                        *)
-(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*   Copyright 2024 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+<<<<<<< HEAD
 (* Printing functions *)
 
 open Misc
@@ -435,9 +436,21 @@ let reset_naming_context = Naming_context.reset
 
 let ident ppf id = pp_print_string ppf
     (Out_name.print (Naming_context.ident_name_simple None id))
+=======
+open Out_type
+module Fmt = Format_doc
+>>>>>>> upstream/5.4
 
 let namespaced_ident namespace  id =
-  Out_name.print (Naming_context.ident_name (Some namespace) id)
+  Out_name.print (ident_name (Some namespace) id)
+
+module Doc = struct
+  let wrap_printing_env = wrap_printing_env
+
+  let longident = Pprintast.Doc.longident
+
+  let ident ppf id = Fmt.pp_print_string ppf
+      (Out_name.print (ident_name None id))
 
 let instance_name global =
   (* Construct the stopgap syntax and then shove it in a string with the
@@ -461,10 +474,11 @@ let instance_name global =
   { printed_name }
 
 
-(* Print a path *)
 
-let ident_stdlib = Ident.create_persistent "Stdlib"
+  let typexp mode ppf ty =
+    !Oprint.out_type ppf (tree_of_typexp mode ty)
 
+<<<<<<< HEAD
 let non_shadowed_pervasive = function
   | Pdot(Pident id, s) as path ->
       Ident.same id ident_stdlib &&
@@ -472,27 +486,21 @@ let non_shadowed_pervasive = function
        | (path', _) -> Path.same path path'
        | exception Not_found -> true)
   | _ -> false
+=======
+  let type_expansion k ppf e =
+    pp_type_expansion ppf (trees_of_type_expansion k e)
+>>>>>>> upstream/5.4
 
-let find_double_underscore s =
-  let len = String.length s in
-  let rec loop i =
-    if i + 1 >= len then
-      None
-    else if s.[i] = '_' && s.[i + 1] = '_' then
-      Some i
-    else
-      loop (i + 1)
-  in
-  loop 0
+  let type_declaration id ppf decl =
+    !Oprint.out_sig_item ppf (tree_of_type_declaration id decl Trec_first)
 
-let rec module_path_is_an_alias_of env path ~alias_of =
-  match Env.find_module path env with
-  | { md_type = Mty_alias path'; _ } ->
-    Path.same path' alias_of ||
-    module_path_is_an_alias_of env path' ~alias_of
-  | _ -> false
-  | exception Not_found -> false
+  let type_expr ppf ty =
+    (* [type_expr] is used directly by error message printers,
+       we mark eventual loops ourself to avoid any misuse and stack overflow *)
+    prepare_for_printing [ty];
+    prepared_type_expr ppf ty
 
+<<<<<<< HEAD
 let expand_longident_head name =
   match find_double_underscore name with
   | None -> None
@@ -2298,12 +2306,81 @@ let extension_only_constructor id ppf ext =
   Format.fprintf ppf "@[<hv>%a@]"
     !Oprint.out_constr {
       ocstr_name = name;
+=======
+  let shared_type_scheme ppf ty =
+    add_type_to_preparation ty;
+    typexp Type_scheme ppf ty
+
+  let type_scheme ppf ty =
+    prepare_for_printing [ty];
+    prepared_type_scheme ppf ty
+
+  let path ppf p =
+    !Oprint.out_ident ppf (tree_of_path ~disambiguation:false p)
+
+  let () = Env.print_path := path
+
+  let type_path ppf p = !Oprint.out_ident ppf (tree_of_type_path p)
+
+  let value_description id ppf decl =
+    !Oprint.out_sig_item ppf (tree_of_value_description id decl)
+
+  let class_type ppf cty =
+    reset ();
+    prepare_class_type cty;
+    !Oprint.out_class_type ppf (tree_of_class_type Type cty)
+
+  let class_declaration id ppf cl =
+    !Oprint.out_sig_item ppf (tree_of_class_declaration id cl Trec_first)
+
+  let cltype_declaration id ppf cl =
+    !Oprint.out_sig_item ppf (tree_of_cltype_declaration id cl Trec_first)
+
+  let modtype ppf mty = !Oprint.out_module_type ppf (tree_of_modtype mty)
+  let modtype_declaration id ppf decl =
+    !Oprint.out_sig_item ppf (tree_of_modtype_declaration id decl)
+
+  let constructor ppf c =
+    reset_except_conflicts ();
+    add_constructor_to_preparation c;
+    prepared_constructor ppf c
+
+  let constructor_arguments ppf a =
+    let tys = tree_of_constructor_arguments a in
+    !Oprint.out_type ppf (Otyp_tuple (List.map (fun t -> None, t) tys))
+
+  let label ppf l =
+    prepare_for_printing [l.Types.ld_type];
+    !Oprint.out_label ppf (tree_of_label l)
+
+  let extension_constructor id ppf ext =
+    !Oprint.out_sig_item ppf (tree_of_extension_constructor id ext Text_first)
+
+  (* Print an extension declaration *)
+
+
+
+  let extension_only_constructor id ppf (ext:Types.extension_constructor) =
+    reset_except_conflicts ();
+    prepare_type_constructor_arguments ext.ext_args;
+    Option.iter add_type_to_preparation ext.ext_ret_type;
+    let name = Ident.name id in
+    let args, ret =
+      extension_constructor_args_and_ret_type_subtree
+        ext.ext_args
+        ext.ext_ret_type
+    in
+    Fmt.fprintf ppf "@[<hv>%a@]"
+      !Oprint.out_constr {
+      Outcometree.ocstr_name = name;
+>>>>>>> upstream/5.4
       ocstr_args = args;
       ocstr_return_type = ret;
     }
 
-(* Print a value declaration *)
+  (* Print a signature body (used by -i when compiling a .ml) *)
 
+<<<<<<< HEAD
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
@@ -2363,21 +2440,32 @@ let tree_of_value_description id decl =
     | _ -> vd
   in
   Osig_value vd)
+=======
+  let print_signature ppf tree =
+    Fmt.fprintf ppf "@[<v>%a@]" !Oprint.out_signature tree
+>>>>>>> upstream/5.4
 
-let value_description id ppf decl =
-  !Oprint.out_sig_item ppf (tree_of_value_description id decl)
+  let signature ppf sg =
+    Fmt.fprintf ppf "%a" print_signature (tree_of_signature sg)
 
-(* Print a class type *)
+end
+open Doc
+let string_of_path p = Fmt.asprintf "%a" path p
 
-let method_type priv ty =
-  match priv, get_desc ty with
-  | Mpublic, Tpoly(ty, tyl) -> (ty, tyl)
-  | _ , _ -> (ty, [])
+let strings_of_paths namespace p =
+  let trees = List.map (namespaced_tree_of_path namespace) p in
+  List.map (Fmt.asprintf "%a" !Oprint.out_ident) trees
 
-let prepare_method _lab (priv, _virt, ty) =
-  let ty, _ = method_type priv ty in
-  prepare_type ty
+let wrap_printing_env = wrap_printing_env
+let ident = Fmt.compat ident
+let longident = Fmt.compat longident
+let path = Fmt.compat path
+let type_path = Fmt.compat type_path
+let type_expr = Fmt.compat type_expr
+let type_scheme = Fmt.compat type_scheme
+let shared_type_scheme = Fmt.compat shared_type_scheme
 
+<<<<<<< HEAD
 let tree_of_method mode (lab, priv, virt, ty) =
   let (ty, tyl) = method_type priv ty in
   let tty = tree_of_typexp mode ty in
@@ -2868,10 +2956,30 @@ let print_signature ppf tree =
 
 let signature ppf sg =
   fprintf ppf "%a" print_signature (tree_of_signature sg)
+=======
+let type_declaration  = Fmt.compat1 type_declaration
+let type_expansion = Fmt.compat1 type_expansion
+let value_description = Fmt.compat1 value_description
+let label = Fmt.compat label
+let constructor = Fmt.compat constructor
+let constructor_arguments = Fmt.compat constructor_arguments
+let extension_constructor = Fmt.compat1 extension_constructor
+let extension_only_constructor = Fmt.compat1 extension_only_constructor
+
+let modtype = Fmt.compat modtype
+let modtype_declaration = Fmt.compat1 modtype_declaration
+let signature = Fmt.compat signature
+
+let class_declaration = Fmt.compat1 class_declaration
+let class_type = Fmt.compat class_type
+let cltype_declaration = Fmt.compat1 cltype_declaration
+
+>>>>>>> upstream/5.4
 
 (* Print a signature body (used by -i when compiling a .ml) *)
 let printed_signature sourcefile ppf sg =
   (* we are tracking any collision event for warning 63 *)
+<<<<<<< HEAD
   Conflicts.reset ();
   reset_naming_context ();
   let t = tree_of_signature sg in
@@ -3545,3 +3653,17 @@ let type_expansion mode ppf ty_exp =
 let tree_of_type_declaration ident td rs =
   with_hidden_items [{hide=true; ident}]
     (fun () -> tree_of_type_declaration ident td rs)
+=======
+  Ident_conflicts.reset ();
+  let t = tree_of_signature sg in
+  if Warnings.(is_active @@ Erroneous_printed_signature "") then
+    begin match Ident_conflicts.err_msg () with
+    | None -> ()
+    | Some msg ->
+        let conflicts = Fmt.asprintf "%a" Fmt.pp_doc msg in
+        Location.prerr_warning (Location.in_file sourcefile)
+          (Warnings.Erroneous_printed_signature conflicts);
+        Warnings.check_fatal ()
+    end;
+  Fmt.compat print_signature ppf t
+>>>>>>> upstream/5.4

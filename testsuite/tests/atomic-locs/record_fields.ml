@@ -3,6 +3,7 @@
    expect;
 *)
 
+<<<<<<< HEAD
 module Atomic = struct
   module Loc = struct
     type ('a : value_or_null) t = 'a atomic_loc
@@ -32,6 +33,8 @@ module Atomic :
   end
 |}]
 
+=======
+>>>>>>> upstream/5.4
 (* Basic usage: redefine atomics. *)
 
 module Basic = struct
@@ -39,6 +42,7 @@ module Basic = struct
 
   let get (type a) (r : a atomic) : a = r.x
 
+<<<<<<< HEAD
   let get_imm (r : int atomic) : int = r.x
 
   let set (type a) (r : a atomic) (v : a) : unit = r.x <- v
@@ -46,11 +50,17 @@ module Basic = struct
   let set_imm (r : int atomic) (v : int) : unit = r.x <- v
 
   let cas (type a : value mod portable) (r : a atomic) oldv newv =
+=======
+  let set (type a) (r : a atomic) (v : a) : unit = r.x <- v
+
+  let cas (type a) (r : a atomic) oldv newv =
+>>>>>>> upstream/5.4
     Atomic.Loc.compare_and_set [%atomic.loc r.x] oldv newv
 
   let[@inline never] get_loc (type a) (r : a atomic) : a Atomic.Loc.t =
     [%atomic.loc r.x]
 
+<<<<<<< HEAD
   let slow_cas (type a : value mod portable) (r : a atomic) oldv newv =
     Atomic.Loc.compare_and_set (get_loc r) oldv newv
 end
@@ -75,16 +85,41 @@ end
            (atomic_compare_set_field_ptr (field_imm 0 atomic_arg)
              (field_int 1 atomic_arg) oldv newv))))
     (makeblock 0 get get_imm set set_imm cas get_loc slow_cas)))
+=======
+  let slow_cas (type a) (r : a atomic) oldv newv =
+    Atomic.Loc.compare_and_set (get_loc r) oldv newv
+end
+[%%expect{|
+(apply (field_mut 1 (global Toploop!)) "Basic/339"
+  (let
+    (get = (function r (atomic_load r 1))
+     set = (function r v : int (ignore (caml_atomic_exchange_field r 1 v)))
+     cas = (function r oldv newv : int (caml_atomic_cas_field r 1 oldv newv))
+     get_loc = (function r never_inline (makeblock 0 (*,int) r 1))
+     slow_cas =
+       (function r oldv newv : int
+         (let (atomic_arg = (apply get_loc r))
+           (caml_atomic_cas_field (field_imm 0 atomic_arg)
+             (field_int 1 atomic_arg) oldv newv))))
+    (makeblock 0 get set cas get_loc slow_cas)))
+>>>>>>> upstream/5.4
 module Basic :
   sig
     type 'a atomic = { mutable filler : unit; mutable x : 'a [@atomic]; }
     val get : 'a atomic -> 'a
+<<<<<<< HEAD
     val get_imm : int atomic -> int
     val set : 'a atomic -> 'a -> unit
     val set_imm : int atomic -> int -> unit
     val cas : ('a : value mod portable). 'a atomic -> 'a -> 'a -> bool
     val get_loc : 'a atomic -> 'a Atomic.Loc.t
     val slow_cas : ('a : value mod portable). 'a atomic -> 'a -> 'a -> bool
+=======
+    val set : 'a atomic -> 'a -> unit
+    val cas : 'a atomic -> 'a -> 'a -> bool
+    val get_loc : 'a atomic -> 'a Atomic.Loc.t
+    val slow_cas : 'a atomic -> 'a -> 'a -> bool
+>>>>>>> upstream/5.4
   end
 |}];;
 
@@ -190,7 +225,11 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
+<<<<<<< HEAD
 (apply (field_imm 1 (global Toploop!)) "Ok/363" (makeblock 0))
+=======
+(apply (field_mut 1 (global Toploop!)) "Ok/366" (makeblock 0))
+>>>>>>> upstream/5.4
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
@@ -204,10 +243,15 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
+<<<<<<< HEAD
 (apply (field_imm 1 (global Toploop!)) "Inline_record/371"
   (let
     (test =
        (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
+=======
+(apply (field_mut 1 (global Toploop!)) "Inline_record/374"
+  (let (test = (function param : int (atomic_load param 0)))
+>>>>>>> upstream/5.4
     (makeblock 0 test)))
 module Inline_record :
   sig type t = A of { mutable x : int [@atomic]; } val test : t -> int end
@@ -226,6 +270,7 @@ module Extension_with_inline_record = struct
   let () = assert (test (A { x = 42 }) = 42)
 end
 [%%expect{|
+<<<<<<< HEAD
 (apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/379"
   (let
     (A =
@@ -237,6 +282,18 @@ end
      *match* =[value<int>]
        (if (%eq (apply test (makemutable 0 (?,value<int>) A 42)) 42) 0
          (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
+=======
+(apply (field_mut 1 (global Toploop!)) "Extension_with_inline_record/382"
+  (let
+    (A =
+       (makeblock 248 "Extension_with_inline_record.A" (caml_fresh_oo_id 0))
+     test =
+       (function param : int
+         (if (== (field_imm 0 param) A) (atomic_load param 1) 0))
+     *match* =
+       (if (== (apply test (makemutable 0 (*,int) A 42)) 42) 0
+         (raise (makeblock 0 (global Assert_failure!) [0: "" 11 11]))))
+>>>>>>> upstream/5.4
     (makeblock 0 A test)))
 module Extension_with_inline_record :
   sig
@@ -244,6 +301,7 @@ module Extension_with_inline_record :
     type t += A of { mutable x : int [@atomic]; }
     val test : t -> int
   end
+<<<<<<< HEAD
 |}]
 
 (* Marking a field [@atomic] in a float-only record disables the unboxing optimization. *)
@@ -252,10 +310,21 @@ module Float_records = struct
   type t = { x : float; mutable y : float [@atomic] }
 
   let mk_flat x y : flat = { x; y }
+=======
+|}];;
+
+
+(* Marking a field [@atomic] in a float-only record disables the unboxing optimization. *)
+module Float_records = struct
+  type t = { x : float; mutable y : float [@atomic] }
+
+  (* one should see in the -dlambda output below that this creates a block of tag 0. *)
+>>>>>>> upstream/5.4
   let mk_t x y : t = { x; y }
   let get v = v.y
 end
 [%%expect{|
+<<<<<<< HEAD
 Line 3, characters 2-53:
 3 |   type t = { x : float; mutable y : float [@atomic] }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -449,6 +518,21 @@ type suppressed_via_mnemonic = { mutable a : float [@atomic] }
 0
 type suppressed_via_mnemonic = { mutable a : float [@atomic]; }
 |}]
+=======
+(apply (field_mut 1 (global Toploop!)) "Float_records/397"
+  (let
+    (mk_t = (function x[float] y[float] (makemutable 0 (float,float) x y))
+     get = (function v : float (atomic_load v 1)))
+    (makeblock 0 mk_t get)))
+module Float_records :
+  sig
+    type t = { x : float; mutable y : float [@atomic]; }
+    val mk_t : float -> float -> t
+    val get : t -> float
+  end
+|}];;
+
+>>>>>>> upstream/5.4
 
 (* Pattern-matching on atomic record fields is disallowed. *)
 module Pattern_matching = struct
@@ -474,12 +558,16 @@ module Pattern_matching_wildcard = struct
   let warning { x } = x
 
   let allowed { x; y = _ } = x
+<<<<<<< HEAD
   let also_allowed { x; _ } = x
+=======
+>>>>>>> upstream/5.4
 end
 [%%expect{|
 Line 5, characters 14-19:
 5 |   let warning { x } = x
                   ^^^^^
+<<<<<<< HEAD
 Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
 y
 Either bind these labels explicitly or add '; _' to the pattern.
@@ -489,12 +577,23 @@ Either bind these labels explicitly or add '; _' to the pattern.
      allowed = (function {nlocal = 0} param : int (field_int 0 param))
      also_allowed = (function {nlocal = 0} param : int (field_int 0 param)))
     (makeblock 0 warning allowed also_allowed)))
+=======
+Warning 9 [missing-record-field-pattern]: the following labels are not bound
+  in this record pattern: "y".
+  Either bind these labels explicitly or add "; _" to the pattern.
+(apply (field_mut 1 (global Toploop!)) "Pattern_matching_wildcard/417"
+  (let
+    (warning = (function param : int (field_int 0 param))
+     allowed = (function param : int (field_int 0 param)))
+    (makeblock 0 warning allowed)))
+>>>>>>> upstream/5.4
 
 module Pattern_matching_wildcard :
   sig
     type t = { x : int; mutable y : int [@atomic]; }
     val warning : t -> int
     val allowed : t -> int
+<<<<<<< HEAD
     val also_allowed : t -> int
   end
 |}]
@@ -579,3 +678,7 @@ Line 3, characters 4-31:
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields must have layout value.
 |}]
+=======
+  end
+|}]
+>>>>>>> upstream/5.4

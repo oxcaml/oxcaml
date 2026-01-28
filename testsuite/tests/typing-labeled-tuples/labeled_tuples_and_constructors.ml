@@ -1,6 +1,10 @@
 (* TEST
+<<<<<<< HEAD
  flags = "-extension labeled_tuples";
  expect;
+=======
+   expect;
+>>>>>>> upstream/5.4
 *)
 
 (* Constructor with labeled arguments (disallowed) *)
@@ -13,7 +17,12 @@ type ('a, 'b) pair = Pair of 'a * 'b
 Line 2, characters 8-23:
 2 | let x = Pair (~x: 5, 2)
             ^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Error: Constructors cannot have labeled arguments. Consider using an inline record instead.
+=======
+Error: Constructors cannot have labeled arguments.
+       Consider using an inline record instead.
+>>>>>>> upstream/5.4
 |}]
 
 (* Labeled tuple pattern in constructor pattern, with the same arity as the
@@ -25,10 +34,18 @@ let f = function
 Line 2, characters 2-16:
 2 | | Pair (~x:5, 2) -> true
       ^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Error: Constructors cannot have labeled arguments. Consider using an inline record instead.
 |}]
 
 (* Labeled tuple patterns in constructor patterns with that can union with the
+=======
+Error: Constructors cannot have labeled arguments.
+       Consider using an inline record instead.
+|}]
+
+(* Labeled tuple patterns in constructor patterns with that can unify with the
+>>>>>>> upstream/5.4
    constructor pattern type. *)
 let f = function
 | Some (~x:5, 2) -> true
@@ -63,6 +80,10 @@ Line 1, characters 15-20:
                    ^^^^^
 Error: This expression has type "'a * 'b"
        but an expression was expected of type "x:int * int"
+<<<<<<< HEAD
+=======
+       A label "x" was expected
+>>>>>>> upstream/5.4
 |}]
 
 let _ = f (Foo (5,~x:1))
@@ -72,6 +93,10 @@ Line 1, characters 15-23:
                    ^^^^^^^^
 Error: This expression has type "'a * x:'b"
        but an expression was expected of type "x:int * int"
+<<<<<<< HEAD
+=======
+       A label "x" was expected
+>>>>>>> upstream/5.4
 |}]
 
 let _ = f (Foo (5,~y:1))
@@ -81,5 +106,10 @@ Line 1, characters 15-23:
                    ^^^^^^^^
 Error: This expression has type "'a * y:'b"
        but an expression was expected of type "x:int * int"
+<<<<<<< HEAD
 |}]
 
+=======
+       A label "x" was expected
+|}]
+>>>>>>> upstream/5.4

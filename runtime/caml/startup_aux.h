@@ -47,8 +47,11 @@ struct caml_params {
   uintnat init_custom_major_ratio;
   uintnat init_custom_minor_ratio;
   uintnat init_custom_minor_max_bsz;
+<<<<<<< HEAD
   uintnat init_custom_work_clamp;
 
+=======
+>>>>>>> upstream/5.4
   uintnat init_max_stack_wsz;
 
   uintnat backtrace_enabled;
@@ -56,7 +59,10 @@ struct caml_params {
   uintnat cleanup_on_exit;
   uintnat event_trace;
   uintnat max_domains;
+<<<<<<< HEAD
   uintnat use_hugetlb_pages;
+=======
+>>>>>>> upstream/5.4
 };
 
 extern const struct caml_params* const caml_params;

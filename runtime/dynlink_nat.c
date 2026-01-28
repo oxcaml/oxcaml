@@ -39,8 +39,16 @@ CAMLexport void (*caml_natdynlink_hook)(void* handle, const char* unit) = NULL;
 #include <string.h>
 #include <limits.h>
 
+<<<<<<< HEAD
 /* This should match the value of Symbol.separator () */
 #define CAML_SYM_SEPARATOR "__"
+=======
+#if defined (_WIN32) || defined (__CYGWIN__) || defined (__APPLE__)
+ #define CAML_SYM_SEPARATOR "$"
+#else
+ #define CAML_SYM_SEPARATOR "."
+#endif
+>>>>>>> upstream/5.4
 
 #define Handle_val(v) (*((void **) Data_abstract_val(v)))
 static value Val_handle(void* handle) {
@@ -75,7 +83,7 @@ CAMLprim value caml_natdynlink_open(value filename, value global)
 {
   CAMLparam2 (filename, global);
   CAMLlocal3 (res, handle, header);
-  void *sym;
+  const void *sym;
   void *dlhandle;
   char_os *p;
   int global_dup;
@@ -107,15 +115,28 @@ CAMLprim value caml_natdynlink_open(value filename, value global)
 
 CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
   CAMLparam2 (handle_v, symbols);
-  int i;
   int nsymbols = Wosize_val(symbols);
   void* handle = Handle_val(handle_v);
   void** table;
 
   table = caml_stat_alloc(sizeof(void*) * nsymbols);
 
-  for (i = 0; i < nsymbols; i++) {
+  for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));
+<<<<<<< HEAD
+=======
+    table[i] = getsym(handle, unit, "frametable");
+    if (table[i] == NULL) {
+      caml_stat_free(table);
+      caml_invalid_argument_value(
+        caml_alloc_sprintf("Dynlink: Missing frametable for %s", unit));
+    }
+  }
+  caml_register_frametables(table, nsymbols);
+
+  for (int i = 0; i < nsymbols; i++) {
+    const char* unit = String_val(Field(symbols, i));
+>>>>>>> upstream/5.4
     table[i] = getsym(handle, unit, "gc_roots");
     if (table[i] == NULL) {
       caml_stat_free(table);
@@ -138,7 +159,7 @@ CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
   }
   caml_register_frametables(table, nsymbols);
 
-  for (i = 0; i < nsymbols; i++) {
+  for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));
     void* sym = getsym(handle, unit, "code_begin");
     void* sym2 = getsym(handle, unit, "code_end");

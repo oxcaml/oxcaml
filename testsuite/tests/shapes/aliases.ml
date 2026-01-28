@@ -2,6 +2,10 @@
  flags = "-dshape";
  expect;
 *)
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/5.4
 module A = struct type t end
 module B = A
 [%%expect{|
@@ -35,7 +39,11 @@ module F' = F
 {
  "F"[module] -> Abs<.6>(X, X<.5>);
  }
+<<<<<<< HEAD
 module F : functor (X : sig type t end) -> sig type t = X.t end
+=======
+module F : (X : sig type t end) -> sig type t = X.t end
+>>>>>>> upstream/5.4
 {
  "F'"[module] -> Alias(<.7>
                        Abs<.6>(X, X<.5>));
@@ -86,7 +94,11 @@ module G (X : sig type t end) = struct include X end
                              "t"[type] -> X<.12> . "t"[type];
                              });
  }
+<<<<<<< HEAD
 module G : functor (X : sig type t end) -> sig type t = X.t end
+=======
+module G : (X : sig type t end) -> sig type t = X.t end
+>>>>>>> upstream/5.4
 |}]
 
 module E = G(B)

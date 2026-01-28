@@ -60,13 +60,20 @@ module Uid = struct
       | Unit_info.Intf -> Format.pp_print_string fmt "[intf]"
       | Unit_info.Impl -> ()
 
+<<<<<<< HEAD
     let rec print fmt = function
+=======
+    let print fmt = function
+>>>>>>> upstream/5.4
       | Internal -> Format.pp_print_string fmt "<internal>"
       | Predef name -> Format.fprintf fmt "<predef:%s>" name
       | Compilation_unit s -> Format.pp_print_string fmt s
       | Item { comp_unit; id; from } ->
           Format.fprintf fmt "%a%s.%d" pp_intf_or_impl from comp_unit id
+<<<<<<< HEAD
       | Unboxed_version t -> Format.fprintf fmt "%a#" print t
+=======
+>>>>>>> upstream/5.4
 
     let output oc t =
       let fmt = Format.formatter_of_out_channel oc in
@@ -82,8 +89,12 @@ module Uid = struct
         let open Unit_info in
         match current_unit with
         | None -> "", Impl
+<<<<<<< HEAD
         | Some ui ->
           Compilation_unit.full_path_as_string (modname ui), kind ui
+=======
+        | Some ui -> modname ui, kind ui
+>>>>>>> upstream/5.4
       in
       incr id;
       Item { comp_unit; id = !id; from }
@@ -146,7 +157,10 @@ module Sig_component_kind = struct
     | Type
     | Constructor
     | Label
+<<<<<<< HEAD
     | Unboxed_label
+=======
+>>>>>>> upstream/5.4
     | Module
     | Module_type
     | Extension_constructor
@@ -158,7 +172,10 @@ module Sig_component_kind = struct
     | Type -> "type"
     | Constructor -> "constructor"
     | Label -> "label"
+<<<<<<< HEAD
     | Unboxed_label -> "unboxed label"
+=======
+>>>>>>> upstream/5.4
     | Module -> "module"
     | Module_type -> "module type"
     | Extension_constructor -> "extension constructor"
@@ -172,7 +189,10 @@ module Sig_component_kind = struct
     | Type
     | Constructor
     | Label
+<<<<<<< HEAD
     | Unboxed_label
+=======
+>>>>>>> upstream/5.4
     | Module
     | Module_type
     | Class
@@ -209,13 +229,19 @@ module Item = struct
     let name (name, _) = name
     let kind (_, kind) = kind
 
+    let name (name, _) = name
+    let kind (_, kind) = kind
+
     let make str ns = str, ns
 
     let value id = Ident.name id, Sig_component_kind.Value
     let type_ id = Ident.name id, Sig_component_kind.Type
     let constr id = Ident.name id, Sig_component_kind.Constructor
     let label id = Ident.name id, Sig_component_kind.Label
+<<<<<<< HEAD
     let unboxed_label id = Ident.name id, Sig_component_kind.Unboxed_label
+=======
+>>>>>>> upstream/5.4
     let module_ id = Ident.name id, Sig_component_kind.Module
     let module_type id = Ident.name id, Sig_component_kind.Module_type
     let extension_constructor id =
@@ -502,7 +528,11 @@ module Predef = struct
 end
 
 type var = Ident.t
+<<<<<<< HEAD
 type t = { hash:int; uid: Uid.t option; desc: desc; approximated: bool }
+=======
+type t = { uid: Uid.t option; desc: desc; approximated: bool }
+>>>>>>> upstream/5.4
 and desc =
   | Var of var
   | Abs of var * t
@@ -514,6 +544,7 @@ and desc =
   | Comp_unit of string
   | Error of string
 
+<<<<<<< HEAD
   (* constructors for types  *)
   | Constr of Ident.t * t list
   | Tuple of t list
@@ -700,6 +731,9 @@ and equal_poly_variant_constructor
   List.equal equal args1 args2
 
 let rec print fmt t =
+=======
+let print fmt t =
+>>>>>>> upstream/5.4
   let print_uid_opt =
     Format.pp_print_option (fun fmt -> Format.fprintf fmt "<%a>" Uid.print)
   in
@@ -770,6 +804,7 @@ let rec print fmt t =
         Format.fprintf fmt "Alias@[(@[<v>%a@,%a@])@]" print_uid_opt uid aux t
     | Error s ->
         Format.fprintf fmt "Error %s" s
+<<<<<<< HEAD
     | Constr (id, args) ->
         Format.fprintf fmt "@[%a@ %a@]"
           Ident.print id
@@ -848,12 +883,15 @@ let rec print fmt t =
   | At_layout (shape, layout) ->
     Format.fprintf fmt "(%a : %a)" print_nested shape Layout.format layout
 
+=======
+>>>>>>> upstream/5.4
   in
   if t.approximated then
     Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
   else
     Format.fprintf fmt "@[%a@]@;" aux t
 
+<<<<<<< HEAD
 (* We use custom strings as separators instead of pp_print_space, because the
    latter introduces line breaks that can mess up the tables with all shapes. *)
 and print_sep_string str fmt () = Format.pp_print_string fmt str
@@ -932,10 +970,20 @@ let fresh_var ?(name="shape-var") uid =
   var, { uid = Some uid; desc = Var var;
          hash = Hashtbl.hash (hash_var, uid, var);
          approximated = false }
+=======
+let rec strip_head_aliases = function
+  | { desc = Alias t; _ } -> strip_head_aliases t
+  | t -> t
+
+let fresh_var ?(name="shape-var") uid =
+  let var = Ident.create_local name in
+  var, { uid = Some uid; desc = Var var; approximated = false }
+>>>>>>> upstream/5.4
 
 let for_unnamed_functor_param = Ident.create_local "()"
 
 let var uid id =
+<<<<<<< HEAD
   { uid = Some uid; desc = Var id;
     hash = Hashtbl.hash (hash_var, Some uid, id);
     approximated = false }
@@ -977,6 +1025,23 @@ let leaf uid = leaf' (Some uid)
 let approx t = { t with approximated = true}
 
 let set_approximated ~approximated t = { t with approximated}
+=======
+  { uid = Some uid; desc = Var id; approximated = false }
+
+let abs ?uid var body =
+  { uid; desc = Abs (var, body); approximated = false }
+
+let str ?uid map =
+  { uid; desc = Struct map; approximated = false }
+
+let alias ?uid t =
+  { uid; desc = Alias t; approximated = false}
+
+let leaf uid =
+  { uid = Some uid; desc = Leaf; approximated = false }
+
+let approx t = { t with approximated = true}
+>>>>>>> upstream/5.4
 
 let proj ?uid t item =
   match t.desc with
@@ -989,6 +1054,7 @@ let proj ?uid t item =
       with Not_found -> approx t (* ill-typed program *)
       end
   | _ ->
+<<<<<<< HEAD
       { uid; desc = Proj (t, item);
         hash = Hashtbl.hash (hash_proj, t.hash, item); approximated = false }
 
@@ -1097,17 +1163,29 @@ let at_layout ?uid shape layout =
     hash = Hashtbl.hash (hash_at_layout, uid, shape.hash, layout);
     approximated = false }
 
+=======
+     { uid; desc = Proj (t, item); approximated = false }
+
+let app ?uid f ~arg =
+  { uid; desc = App (f, arg); approximated = false }
+>>>>>>> upstream/5.4
 
 let decompose_abs t =
   match t.desc with
   | Abs (x, t) -> Some (x, t)
   | _ -> None
 
+<<<<<<< HEAD
 let dummy_mod = str Item.Map.empty
+=======
+let dummy_mod =
+  { uid = None; desc = Struct Item.Map.empty; approximated = false }
+>>>>>>> upstream/5.4
 
 let of_path ~find_shape ~namespace path =
   (* We need to handle the following cases:
     Path of constructor:
+<<<<<<< HEAD
       M.t.C
     Path of label:
       M.t.lbl
@@ -1116,6 +1194,13 @@ let of_path ~find_shape ~namespace path =
     Path of label of implicit unboxed record:
       M.t#.lbl
   *)
+=======
+      M.t.C [Pextra_ty("M.t", "C")]
+    Path of label:
+      M.t.lbl [Pextra_ty("M.t", "lbl")]
+    Path of label of inline record:
+      M.t.C.lbl [Pextra_ty(Pextra_ty("M.t", "C"), "lbl")] *)
+>>>>>>> upstream/5.4
   let rec aux : Sig_component_kind.t -> Path.t -> t = fun ns -> function
     | Pident id -> find_shape ns id
     | Pdot (Pextra_ty (path, Punboxed_ty), name) ->
@@ -1134,18 +1219,34 @@ let of_path ~find_shape ~namespace path =
       proj (aux namespace path) (name, ns)
     | Papply (p1, p2) -> app (aux Module p1) ~arg:(aux Module p2)
     | Pextra_ty (path, extra) -> begin
+<<<<<<< HEAD
         match extra with
           Pcstr_ty name -> proj (aux Type path) (name, Constructor)
         | Pext_ty -> aux Extension_constructor path
         | Punboxed_ty -> aux ns path
+=======
+        match extra, ns, path with
+        | Pcstr_ty name, Label, Pextra_ty _ ->
+            (* Handle the M.t.C.lbl case *)
+            proj (aux Constructor path) (name, ns)
+        | Pcstr_ty name, _, _ -> proj (aux Type path) (name, ns)
+        | Pext_ty, _, _ -> aux Extension_constructor path
+>>>>>>> upstream/5.4
       end
   in
   aux namespace path
 
 let for_persistent_unit s =
+<<<<<<< HEAD
   comp_unit ~uid:(Compilation_unit s) s
 
 let leaf_for_unpack = leaf' None
+=======
+  { uid = Some (Uid.of_compilation_unit_id (Ident.create_persistent s));
+    desc = Comp_unit s; approximated = false }
+
+let leaf_for_unpack = { uid = None; desc = Leaf; approximated = false }
+>>>>>>> upstream/5.4
 
 let set_uid_if_none t uid =
   (* CR sspies: This function clears the approximated field of the shape.
@@ -1210,12 +1311,15 @@ module Map = struct
     let item = Item.label id in
     Item.Map.add item (proj shape item) t
 
+<<<<<<< HEAD
   let add_unboxed_label t id uid =
     Item.Map.add (Item.unboxed_label id) (leaf uid) t
   let add_unboxed_label_proj t id shape =
     let item = Item.unboxed_label id in
     Item.Map.add item (proj shape item) t
 
+=======
+>>>>>>> upstream/5.4
   let add_module t id shape = Item.Map.add (Item.module_ id) shape t
   let add_module_proj t id shape =
     let item = Item.module_ id in

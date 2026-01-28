@@ -86,7 +86,11 @@ end);;
 Line 2, characters 0-9:
 2 | open List
     ^^^^^^^^^
+<<<<<<< HEAD
 Error (warning 33 [unused-open]): unused open List.
+=======
+Error (warning 33 [unused-open]): unused open "Stdlib.List".
+>>>>>>> upstream/5.4
 |}];;
 
 type unknown += Foo;;

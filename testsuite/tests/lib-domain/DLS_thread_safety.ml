@@ -1,10 +1,14 @@
 (* TEST
    include systhreads;
+<<<<<<< HEAD
    flags = "-alert -unsafe_multidomain";
    hassysthreads;
    runtime5;
    { bytecode; }
    { native; }
+=======
+   hassysthreads;
+>>>>>>> upstream/5.4
 *)
 
 (* This test creates [nb_keys] DLS keys, each storing an atomic integer.

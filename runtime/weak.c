@@ -69,7 +69,7 @@ struct caml_ephe_info* caml_alloc_ephe_info (void)
 /* [len] is a value that represents a number of words (fields) */
 CAMLprim value caml_ephe_create (value len)
 {
-  mlsize_t size, i;
+  mlsize_t size;
   value res;
   caml_domain_state* domain_state = Caml_state;
 
@@ -82,7 +82,7 @@ CAMLprim value caml_ephe_create (value len)
 
   Ephe_link(res) = domain_state->ephe_info->live;
   domain_state->ephe_info->live = res;
-  for (i = CAML_EPHE_DATA_OFFSET; i < size; i++)
+  for (mlsize_t i = CAML_EPHE_DATA_OFFSET; i < size; i++)
     Field(res, i) = caml_ephe_none;
   /* run memprof callbacks */
   return caml_process_pending_actions_with_root(res);
@@ -97,7 +97,7 @@ CAMLprim value caml_weak_create (value len)
    Specificity of the cleaning phase (Phase_clean):
 
    The dead keys must be removed from the ephemerons and data removed
-   when one the keys is dead. Here we call it cleaning the ephemerons.
+   when one of the keys is dead. Here we call it cleaning the ephemerons.
    A specific phase of the GC is dedicated to this, Phase_clean. This
    phase is just after the mark phase, so the white values are dead
    values. It iterates the function caml_ephe_clean through all the
@@ -147,15 +147,20 @@ static void do_check_key_clean(value e, mlsize_t offset)
 void caml_ephe_clean (value v) {
   value child;
   int release_data = 0;
-  mlsize_t size, i;
+  mlsize_t size;
   header_t hd;
 
   if (caml_gc_phase != Phase_sweep_ephe) return;
 
   hd = Hd_val(v);
   size = Wosize_hd (hd);
+<<<<<<< HEAD
   for (i = CAML_EPHE_FIRST_KEY; i < size; i++) {
     child = ephe_key(v, i);
+=======
+  for (mlsize_t i = CAML_EPHE_FIRST_KEY; i < size; i++) {
+    child = Ephe_key(v, i);
+>>>>>>> upstream/5.4
   ephemeron_again:
     if (child != caml_ephe_none && Is_block(child)) {
       if (Tag_val (child) == Forward_tag) {
@@ -205,6 +210,7 @@ static void clean_field (value e, mlsize_t offset)
     do_check_key_clean(e, offset);
 }
 
+<<<<<<< HEAD
 static void do_set (value e, mlsize_t offset, value v)
 {
   if (Is_block(v) && Is_young(v)) {
@@ -212,6 +218,16 @@ static void do_set (value e, mlsize_t offset, value v)
     if (!(Is_block(old) && Is_young(old)))
       add_to_ephe_ref_table (&Caml_state->minor_tables->ephe_ref,
                              e, offset);
+=======
+Caml_inline void ephe_write_barrier (value e, mlsize_t offset, value v)
+{
+  if (Is_block (v) && Is_young (v)){
+    value old = Field (e, offset);
+    if (!(Is_block (old) && Is_young (old))){
+      add_to_ephe_ref_table (&Caml_state->minor_tables->ephe_ref,
+                             e, offset);
+    }
+>>>>>>> upstream/5.4
   }
 
   /* See Note [MM] in memory.c */
@@ -219,12 +235,35 @@ static void do_set (value e, mlsize_t offset, value v)
   atomic_store_release(Op_atomic_val(e) + offset, v);
 }
 
+CAMLno_tsan /* See caml_modify in memory.c for the tsan annotations on this
+               function. */
+static void ephe_modify (value e, mlsize_t offset, value val)
+{
+  volatile value *fp = &Field(e, offset);
+
+#if defined(WITH_THREAD_SANITIZER) && defined(NATIVE_CODE)
+  __tsan_func_entry(__builtin_return_address(0));
+#endif
+
+  ephe_write_barrier(e, offset, val);
+
+  /* See Note [MM] in memory.c */
+  atomic_thread_fence(memory_order_acquire);
+
+#if defined(WITH_THREAD_SANITIZER) && defined(NATIVE_CODE)
+  __tsan_write8((void *)fp);
+  __tsan_func_exit(NULL);
+#endif
+
+  atomic_store_release(&Op_atomic_val((value)fp)[0], val);
+}
+
 static value ephe_set_field (value e, mlsize_t offset, value el)
 {
   CAMLparam2(e,el);
 
   clean_field(e, offset);
-  do_set(e, offset, el);
+  ephe_modify(e, offset, el);
   CAMLreturn(Val_unit);
 }
 
@@ -367,8 +406,15 @@ static value ephe_get_field_copy (value e, mlsize_t offset)
     }
     infix_offs = 0;
 
-    /* Don't copy immediates or custom blocks #7279 */
-    if (!Is_block(val) || Tag_val(val) == Custom_tag) {
+    /* Don't copy immediates */
+    if (!Is_block(val)) {
+      copy = val;
+      goto some;
+    }
+
+    /* Don't copy, but do darken, custom blocks #7279 */
+    if (Tag_val(val) == Custom_tag) {
+      caml_darken (Caml_state, val, 0);
       copy = val;
       goto some;
     }
@@ -462,7 +508,10 @@ static value ephe_blit_keys (value es, mlsize_t offset_s,
                              value ed, mlsize_t offset_d, mlsize_t length)
 {
   CAMLparam2(es,ed);
+<<<<<<< HEAD
   long i;
+=======
+>>>>>>> upstream/5.4
 
   if (length == 0) CAMLreturn(Val_unit);
 
@@ -473,6 +522,7 @@ static value ephe_blit_keys (value es, mlsize_t offset_s,
   caml_ephe_clean(ed);
 
   if (offset_d < offset_s) {
+<<<<<<< HEAD
     for (i = 0; i < length; i++) {
       caml_ephe_await_key(ed, offset_d + i);
       do_set(ed, offset_d + i, ephe_key(es, offset_s + i));
@@ -481,6 +531,16 @@ static value ephe_blit_keys (value es, mlsize_t offset_s,
     for (i = length - 1; i >= 0; i--) {
       caml_ephe_await_key(ed, offset_d + i);
       do_set(ed, offset_d + i, ephe_key(es, offset_s + i));
+=======
+    for (long i = 0; i < length; i++) {
+      caml_ephe_await_key(ed, offset_d + i);
+      ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
+    }
+  } else {
+    for (long i = length - 1; i >= 0; i--) {
+      caml_ephe_await_key(ed, offset_d + i);
+      ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
+>>>>>>> upstream/5.4
     }
   }
   CAMLreturn(Val_unit);
@@ -511,9 +571,14 @@ CAMLprim value caml_ephe_blit_data (value es, value ed)
   caml_ephe_clean(ed);
 
   value v = Ephe_data(es);
+<<<<<<< HEAD
   do_set(ed, CAML_EPHE_DATA_OFFSET, v);
   if (caml_marking_started())
     caml_darken(Caml_state, v, 0);
+=======
+  ephe_modify(ed, CAML_EPHE_DATA_OFFSET, v);
+  caml_darken(Caml_state, v, 0);
+>>>>>>> upstream/5.4
   /* [ed] may be in [Caml_state->ephe_info->live] list. The data value may be
      unmarked. The ephemerons on the live list are not scanned during ephemeron
      marking. Hence, unconditionally darken the data value. */

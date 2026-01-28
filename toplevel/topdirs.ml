@@ -18,6 +18,7 @@
 open Format
 open Misc
 open Types
+open Data_types
 open Toploop
 
 let error_fmt () =
@@ -183,6 +184,7 @@ let _ = add_directive "mod_use" (Directive_string (with_error_fmt dir_mod_use))
 
 (* Install, remove a printer *)
 
+<<<<<<< HEAD
 module Printer = struct
   type kind =
     | Old of Types.type_expr
@@ -310,16 +312,18 @@ let find_printer lid =
       in Error report
     | Some kind -> Ok (path, kind)
 
+=======
+>>>>>>> upstream/5.4
 let install_printer_by_kind path kind =
   let v = eval_value_path !toplevel_env path in
   match kind with
-  | Printer.Old ty_arg ->
+  | Topprinters.Old ty_arg ->
     install_printer path ty_arg
       (fun _formatter repr -> Obj.obj v (Obj.obj repr))
-  | Printer.Simple ty_arg ->
+  | Topprinters.Simple ty_arg ->
     install_printer path ty_arg
       (fun formatter repr -> Obj.obj v formatter (Obj.obj repr))
-  | Printer.Generic { ty_path; arity } ->
+  | Topprinters.Generic { ty_path; arity } ->
      let rec build v = function
        | 0 ->
           Zero
@@ -332,27 +336,23 @@ let install_printer_by_kind path kind =
 let remove_installed_printer path =
   match remove_printer path with
   | () -> Ok ()
-  | exception Not_found ->
-    let report ppf =
-      fprintf ppf "The printer named %a is not installed.@."
-        Printtyp.path path
-    in Error report
+  | exception Not_found -> Error (`No_active_printer path)
 
 let dir_install_printer ppf lid =
-  match find_printer lid with
-  | Error report ->
-    report ppf
+  match Topprinters.find_printer !toplevel_env lid with
+  | Error error ->
+    Topprinters.report_error ppf error
   | Ok (path, kind) ->
     install_printer_by_kind path kind
 
 let dir_remove_printer ppf lid =
-  match find_printer lid with
-  | Error report ->
-    report ppf
+  match Topprinters.find_printer !toplevel_env lid with
+  | Error error ->
+    Topprinters.report_error ppf error
   | Ok (path, _kind) ->
     match remove_installed_printer path with
     | Ok () -> ()
-    | Error report -> report ppf
+    | Error error -> Topprinters.report_error ppf error
 
 let _ = add_directive "install_printer"
     (Directive_ident (with_error_fmt dir_install_printer))
@@ -401,7 +401,7 @@ let show_prim to_sig ppf lid =
     let s =
       match lid with
       | Longident.Lident s -> s
-      | Longident.Ldot (_,s) -> s
+      | Longident.Ldot (_,{ txt = s; _ }) -> s
       | Longident.Lapply _ ->
           fprintf ppf "Invalid path %a@." Printtyp.longident lid;
           raise Exit
@@ -493,7 +493,7 @@ let () =
        let desc, _ = Env.lookup_constructor ~loc Env.Positive lid env in
        if is_exception_constructor env desc.cstr_res then
          raise Not_found;
-       let path = Btype.cstr_type_path desc in
+       let path = Data_types.cstr_res_type_path desc in
        let type_decl = Env.find_type path env in
        if is_extension_constructor desc.cstr_tag then
          let ret_type =
@@ -565,7 +565,7 @@ let is_rec_module id md =
   end
 
 let secretly_the_same_path env path1 path2 =
-  let norm path = Printtyp.rewrite_double_underscore_paths env path in
+  let norm path = Out_type.rewrite_double_underscore_paths env path in
   Path.same (norm path1) (norm path2)
 
 let () =

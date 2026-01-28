@@ -48,8 +48,12 @@ val type_implementation:
   Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
+<<<<<<< HEAD
   sourcefile:string -> Compilation_unit.t -> Env.t ->
   Parsetree.signature -> Typedtree.signature
+=======
+        Env.t -> Parsetree.signature -> Typedtree.signature
+>>>>>>> upstream/5.4
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
         (*
@@ -59,8 +63,7 @@ val type_open_:
         Env.t -> Location.t -> Longident.t Asttypes.loc -> Path.t * Env.t
         *)
 val modtype_of_package:
-        Env.t -> Location.t ->
-        Path.t -> (Longident.t * type_expr) list -> module_type
+        Env.t -> Location.t -> package -> module_type
 
 val path_of_module : Typedtree.module_expr -> Path.t option
 
@@ -84,7 +87,10 @@ module Sig_component_kind : sig
     | Type
     | Constructor
     | Label
+<<<<<<< HEAD
     | Unboxed_label
+=======
+>>>>>>> upstream/5.4
     | Module
     | Module_type
     | Extension_constructor
@@ -159,6 +165,7 @@ type error =
   | Invalid_type_subst_rhs
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
+<<<<<<< HEAD
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
@@ -175,6 +182,9 @@ type error =
   | Submode_failed of Mode.Value.error
   | Item_weaker_than_structure of Mode.Value.error
   | Legacy_module of legacy_module * Mode.Value.error
+=======
+  | Cannot_alias of Path.t
+>>>>>>> upstream/5.4
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

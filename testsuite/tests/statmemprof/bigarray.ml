@@ -23,6 +23,7 @@ let keep = ref []
 
 let test () =
   let custom_words = ref 0 in
+<<<<<<< HEAD
   let tmp_filename = Filename.temp_file "custom_test" ".dat" in
   let alloc (info : MP.allocation) =
     match info.source with
@@ -34,6 +35,29 @@ let test () =
   in
   let dealloc size =
     custom_words := !custom_words - size * Sys.word_size/8
+=======
+  let mmapped_words = ref 0 in
+  let tmp_filename = Filename.temp_file "custom_test" ".dat" in
+  let update words_ref size =
+    words_ref := !words_ref + size * Sys.word_size/8
+  in
+  let alloc (info : MP.allocation) =
+    match info.source with
+    | Custom ->
+      update custom_words info.size;
+      Some (info.source, info.size)
+    | Map_file ->
+      update mmapped_words info.size;
+      Some (info.source, info.size)
+    | Normal | Marshal ->
+      None
+  in
+  let dealloc (source, size) =
+    match (source : MP.allocation_source) with
+    | Custom -> update custom_words (-size)
+    | Map_file -> update mmapped_words (-size)
+    | Normal | Marshal -> ()
+>>>>>>> upstream/5.4
   in
   let tracker : _ MP.tracker =
     { alloc_minor = alloc;
@@ -43,7 +67,16 @@ let test () =
       dealloc_major = dealloc }
   in
   let _:MP.t = MP.start ~sampling_rate:1. tracker in
+<<<<<<< HEAD
   let log s = Printf.printf "%20s: %d bytes\n%!" s !custom_words in
+=======
+  let log s =
+    Printf.printf "%20s: %d custom bytes, %d mmapped bytes\n%!"
+      s
+      !custom_words
+      !mmapped_words
+  in
+>>>>>>> upstream/5.4
   let[@inline never] test_tail () =
     (* This is a separate tail-called function, to ensure
        that [str] is out of scope even on bytecode builds *)

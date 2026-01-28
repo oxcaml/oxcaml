@@ -1,4 +1,5 @@
 # resumed...
+<<<<<<< HEAD
 camlReperform__foo_0_8_code
 camlReperform__foo_0_8_code
 camlReperform__foo_0_8_code
@@ -14,4 +15,21 @@ camlReperform__bar_1_9_code
 camlReperform__bar_1_9_code
 caml_runstack
 camlReperform__entry
+=======
+camlReperform$foo
+camlReperform$foo
+camlReperform$foo
+camlReperform$foo
+camlReperform$foo
+camlReperform$foo
+caml_runstack
+camlReperform$bar
+camlReperform$bar
+camlReperform$bar
+camlReperform$bar
+camlReperform$bar
+camlReperform$bar
+caml_runstack
+camlReperform$entry
+>>>>>>> upstream/5.4
 caml_program

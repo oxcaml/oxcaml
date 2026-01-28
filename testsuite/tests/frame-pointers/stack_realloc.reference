@@ -1,9 +1,19 @@
+<<<<<<< HEAD
 camlStack_realloc__callback_3_14_code
+=======
+camlStack_realloc$callback
+>>>>>>> upstream/5.4
 caml_start_program
 caml_callback
 c_fun
 caml_c_call
+<<<<<<< HEAD
 camlStack_realloc__f_comp_5_16_code
 caml_runstack
 camlStack_realloc__entry
+=======
+camlStack_realloc$f_comp
+caml_runstack
+camlStack_realloc$entry
+>>>>>>> upstream/5.4
 caml_program

@@ -136,6 +136,14 @@ type lazy_block_tag =
   | Lazy_tag
   | Forward_tag
 
+type lazy_block_tag =
+  | Lazy_tag
+  | Forward_tag
+
+let tag_of_lazy_tag = function
+  | Lazy_tag -> Config.lazy_tag
+  | Forward_tag -> Obj.forward_tag
+
 type primitive =
   | Pbytes_to_string
   | Pbytes_of_string
@@ -144,12 +152,19 @@ type primitive =
   | Pgetglobal of Compilation_unit.t
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
+<<<<<<< HEAD
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
   | Pfield of int * immediate_or_pointer * field_read_semantics
   | Pfield_computed of field_read_semantics
+=======
+  | Pmakeblock of int * mutable_flag * block_shape
+  | Pmakelazyblock of lazy_block_tag
+  | Pfield of int * immediate_or_pointer * mutable_flag
+  | Pfield_computed
+>>>>>>> upstream/5.4
   | Psetfield of int * immediate_or_pointer * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
@@ -319,6 +334,7 @@ type primitive =
   (* Integer to external pointer *)
   | Pint_as_pointer of locality_mode
   (* Atomic operations *)
+<<<<<<< HEAD
   | Patomic_load_field of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_set_field of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_exchange_field of {immediate_or_pointer : immediate_or_pointer}
@@ -331,6 +347,9 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+=======
+  | Patomic_load
+>>>>>>> upstream/5.4
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -351,6 +370,7 @@ type primitive =
   | Ppoke of peek_or_poke
   (* Fetching domain-local state *)
   | Pdls_get
+<<<<<<< HEAD
   | Ptls_get
   | Pdomain_index
   (* Poll for runtime actions *)
@@ -360,6 +380,10 @@ type primitive =
   | Pset_idx of layout * modify_mode
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
+=======
+  (* Poll for runtime actions *)
+  | Ppoll
+>>>>>>> upstream/5.4
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -908,7 +932,10 @@ and slambda = lambda SL.t0
 
 and rec_binding = {
   id : Ident.t;
+<<<<<<< HEAD
   debug_uid : debug_uid;
+=======
+>>>>>>> upstream/5.4
   def : lfunction;
 }
 
@@ -1016,13 +1043,18 @@ let int = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
 
 let const_unit = const_int 0
 
+<<<<<<< HEAD
 let dummy_constant = tagged_immediate (0xBBBB / 2)
+=======
+let dummy_constant = Lconst (const_int (0xBBBB / 2))
+>>>>>>> upstream/5.4
 
 let max_arity () =
   if !Clflags.native_code then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
+<<<<<<< HEAD
 let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
   assert (List.length params > 0);
   assert (List.length params <= max_arity ());
@@ -1051,6 +1083,14 @@ let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
 
 let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
   Lfunction (lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode)
+=======
+let lfunction' ~kind ~params ~return ~body ~attr ~loc =
+  assert (List.length params <= max_arity ());
+  { kind; params; return; body; attr; loc }
+
+let lfunction ~kind ~params ~return ~body ~attr ~loc =
+  Lfunction (lfunction' ~kind ~params ~return ~body ~attr ~loc)
+>>>>>>> upstream/5.4
 
 let lambda_unit = Lconst const_unit
 
@@ -1340,6 +1380,10 @@ let shallow_iter ~tail ~non_tail:f = function
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
 
+let is_evaluated = function
+  | Lconst _ | Lvar _ | Lfunction _ -> true
+  | _ -> false
+
 let rec free_variables = function
   | Lvar id
   | Lmutvar id -> Ident.Set.singleton id
@@ -1565,6 +1609,7 @@ let transl_extension_path loc env path =
 let transl_class_path loc env path =
   transl_path Env.find_class_address loc env path
 
+<<<<<<< HEAD
 let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
@@ -1573,6 +1618,20 @@ let transl_prim mod_name name =
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
+=======
+let transl_prim modname field =
+  let mod_ident = Ident.create_persistent modname in
+  let env = Env.add_persistent_structure mod_ident Env.initial in
+  match Env.open_pers_signature modname env with
+  | Error `Not_found ->
+      fatal_errorf "Module %s unavailable." modname
+  | Ok env -> (
+      match Env.find_value_by_name (Longident.Lident field) env with
+      | exception Not_found ->
+          fatal_errorf "Primitive %s.%s not found." modname field
+      | path, _ -> transl_value_path Loc_unknown env path
+    )
+>>>>>>> upstream/5.4
 
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
@@ -1668,12 +1727,21 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                       ap_args = subst_list s l ap.ap_args}
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
+<<<<<<< HEAD
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
     | Lmutlet(k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Lmutlet(k, id, duid, subst s l arg, subst s l' body)
+=======
+    | Llet(str, k, id, arg, body) ->
+        let id, l' = bind id l in
+        Llet(str, k, id, subst s l arg, subst s l' body)
+    | Lmutlet(k, id, arg, body) ->
+        let id, l' = bind id l in
+        Lmutlet(k, id, subst s l arg, subst s l' body)
+>>>>>>> upstream/5.4
     | Lletrec(decl, body) ->
         let decl, l' = bind_rec decl l in
         Lletrec(List.map (subst_decl s l') decl, subst s l' body)
@@ -1765,7 +1833,11 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
+<<<<<<< HEAD
     let params, l' = bind_params lf.params l in
+=======
+    let params, l' = bind_many lf.params l in
+>>>>>>> upstream/5.4
     { lf with params; body = subst s l' lf.body }
   and subst_case s l (key, case) = (key, subst s l case)
   and subst_strcase s l (key, case) = (key, subst s l case)
@@ -1793,6 +1865,13 @@ let duplicate_function =
      (fun _ _ env -> env)
      ~freshen_bound_variables:true
      Ident.Map.empty).subst_lfunction
+<<<<<<< HEAD
+=======
+
+let map_lfunction f { kind; params; return; body; attr; loc } =
+  let body = f body in
+  { kind; params; return; body; attr; loc }
+>>>>>>> upstream/5.4
 
 let map_lfunction f { kind; params; return; body; attr; loc;
                       mode; ret_mode } =
@@ -1820,19 +1899,30 @@ let shallow_map ~tail ~non_tail:f = function
       }
   | Lfunction lfun ->
       Lfunction (map_lfunction f lfun)
+<<<<<<< HEAD
   | Llet (str, layout, v, v_duid, e1, e2) ->
       Llet (str, layout, v, v_duid, f e1, tail e2)
   | Lmutlet (layout, v, v_duid, e1, e2) ->
       Lmutlet (layout, v, v_duid, f e1, tail e2)
+=======
+  | Llet (str, k, v, e1, e2) ->
+      Llet (str, k, v, f e1, f e2)
+  | Lmutlet (k, v, e1, e2) ->
+      Lmutlet (k, v, f e1, f e2)
+>>>>>>> upstream/5.4
   | Lletrec (idel, e2) ->
       Lletrec
         (List.map (fun rb ->
              { rb with def = map_lfunction f rb.def })
             idel,
+<<<<<<< HEAD
          tail e2)
   | Lprim (Psequand as p, [l1; l2], loc)
   | Lprim (Psequor as p, [l1; l2], loc) ->
       Lprim(p, [f l1; tail l2], loc)
+=======
+         f e2)
+>>>>>>> upstream/5.4
   | Lprim (p, el, loc) ->
       Lprim (p, List.map f el, loc)
   | Lswitch (e, sw, loc, layout) ->

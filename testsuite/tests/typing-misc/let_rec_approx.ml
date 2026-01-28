@@ -16,11 +16,19 @@ Error: Unbound constructor "A"
 let rec f () = g 42
 and g (x : string) = f ()
 [%%expect{|
+<<<<<<< HEAD
 Line 2, characters 6-18:
 2 | and g (x : string) = f ()
           ^^^^^^^^^^^^
 Error: This pattern matches values of type "string"
        but a pattern was expected which matches values of type "int"
+=======
+Line 1, characters 17-19:
+1 | let rec f () = g 42
+                     ^^
+Error: The constant "42" has type "int" but an expression was expected of type
+         "string"
+>>>>>>> upstream/5.4
 |}]
 
 let rec opt_error ?(opt : string) () = f ?opt ()

@@ -41,10 +41,6 @@
 #include <wtypes.h>
 #else
 #include <sys/mman.h>
-#endif
-
-
-#if defined(HAS_UNISTD)
 #include <unistd.h>
 #endif
 
@@ -107,13 +103,20 @@ static int format_runtime_ring_file(
     }
   } else {
     /* Attaching to a process by directory and PID */
+<<<<<<< HEAD
+=======
+    int err;
+>>>>>>> upstream/5.4
     ring_file = caml_stat_alloc_noexc(RING_FILE_NAME_MAX_LEN);
     if (ring_file == NULL) {
       ret = E_ALLOC_FAIL;
       goto fail_alloc_file;
     }
 
+<<<<<<< HEAD
     int err;
+=======
+>>>>>>> upstream/5.4
     if (input_path) {
       err = snprintf_os(ring_file, RING_FILE_NAME_MAX_LEN,
                         T("%s/%d.events"), input_path, input_pid);
@@ -465,7 +468,7 @@ caml_runtime_events_read_poll(struct caml_runtime_events_cursor *cursor,
         return E_CORRUPT_STREAM;
     }
 
-    struct runtime_events_buffer_header *runtime_events_buffer_header =
+    const struct runtime_events_buffer_header *runtime_events_buffer_header =
         (struct runtime_events_buffer_header *)(
           get_map_offset(cursor, cursor->metadata.headers_offset,
                          domain_num,
@@ -814,12 +817,10 @@ static int ml_alloc(int domain_id, void *callback_data, uint64_t timestamp,
 
   tmp_callback = Field(callbacks_root, 3); /* ev_alloc */
   if (Is_some(tmp_callback)) {
-    int i;
-
     ts_val = caml_copy_int64(timestamp);
     misc_val = caml_alloc(RUNTIME_EVENTS_NUM_ALLOC_BUCKETS, 0);
 
-    for (i = 0; i < RUNTIME_EVENTS_NUM_ALLOC_BUCKETS; i++) {
+    for (int i = 0; i < RUNTIME_EVENTS_NUM_ALLOC_BUCKETS; i++) {
       Store_field(misc_val, i, Val_long(sz[i]));
     }
 
@@ -1340,3 +1341,14 @@ CAMLprim value caml_ml_runtime_events_read_poll(value wrapper,
 
   CAMLreturn(Val_int(events_consumed));
 }
+<<<<<<< HEAD
+=======
+
+CAMLprim uint64_t caml_ml_runtime_current_timestamp_unboxed(value unit) {
+  return caml_time_counter();
+}
+
+CAMLprim value caml_ml_runtime_current_timestamp(value unit) {
+  return caml_copy_int64(caml_time_counter());
+}
+>>>>>>> upstream/5.4

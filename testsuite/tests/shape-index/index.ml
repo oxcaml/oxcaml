@@ -39,7 +39,11 @@ open A
 
 let y = A.x + Auxiliaire.z
 
+<<<<<<< HEAD
 let () = print_int y
+=======
+let () = print_int (Stdlib.(+) y 0)
+>>>>>>> upstream/5.4
 
 let a = (module A : AS)
 module _ = (val a)
@@ -67,3 +71,12 @@ module type MSB = sig
   include AS with type t := u
   module G := A
 end
+<<<<<<< HEAD
+=======
+
+module Out = struct module In = struct let x = () end end
+
+let () = Out.
+  In
+  .x
+>>>>>>> upstream/5.4

@@ -1,6 +1,7 @@
 fp_backtrace_many_args
 caml_c_call_copy_stack_args
 caml_c_call_stack_args
+<<<<<<< HEAD
 camlC_call__f_0_1_code
 camlC_call__entry
 caml_program
@@ -10,4 +11,15 @@ camlC_call__entry
 caml_program
 camlC_call__f_0_1_code
 camlC_call__entry
+=======
+camlC_call$f
+camlC_call$entry
+caml_program
+caml_c_call
+camlC_call$f
+camlC_call$entry
+caml_program
+camlC_call$f
+camlC_call$entry
+>>>>>>> upstream/5.4
 caml_program

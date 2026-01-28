@@ -53,16 +53,22 @@ type out_value =
   | Oval_int64 of int64
   | Oval_nativeint of nativeint
   | Oval_list of out_value list
-  | Oval_printer of (Format.formatter -> unit)
+  | Oval_printer of (Format_doc.formatter -> unit)
   | Oval_record of (out_ident * out_value) list
   | Oval_record_unboxed_product of (out_ident * out_value) list
   | Oval_string of string * int * out_string (* string, size-to-print, kind *)
   | Oval_stuff of string
   | Oval_tuple of (string option * out_value) list
+<<<<<<< HEAD
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
   | Oval_code of CamlinternalQuote.Code.t
+=======
+  | Oval_variant of string * out_value option
+  | Oval_lazy of out_value
+  | Oval_floatarray of floatarray
+>>>>>>> upstream/5.4
 
 type out_modality = string
 
@@ -131,6 +137,7 @@ and out_type =
   | Otyp_constr of out_ident * out_type list
   | Otyp_manifest of out_type * out_type
   | Otyp_object of { fields: (string * out_type) list; open_row:bool}
+<<<<<<< HEAD
   | Otyp_record of (string * out_mutability * out_type * out_modality list) list
   | Otyp_record_unboxed_product of
       (string * out_mutability * out_type * out_modality list) list
@@ -146,6 +153,16 @@ and out_type =
   | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
   | Otyp_module of out_ident * (string * out_type) list
+=======
+  | Otyp_record of out_label list
+  | Otyp_stuff of string
+  | Otyp_sum of out_constructor list
+  | Otyp_tuple of (string option * out_type) list
+  | Otyp_var of bool * string
+  | Otyp_variant of out_variant * bool * (string list) option
+  | Otyp_poly of string list * out_type
+  | Otyp_module of out_package
+>>>>>>> upstream/5.4
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
@@ -154,10 +171,22 @@ and out_type =
   | Otyp_ret of out_ret_mode * out_type
   (** INVARIANT: See [out_ret_mode]. *)
 
+and out_label = {
+  olab_name: string;
+  olab_mut: Asttypes.mutable_flag;
+  olab_atomic: Asttypes.atomic_flag;
+  olab_type: out_type;
+}
+
 and out_constructor = {
   ocstr_name: string;
   ocstr_args: (out_type * out_modality list) list;
   ocstr_return_type: (out_vars_jkinds * out_type) option;
+}
+
+and out_package = {
+  opack_path: out_ident;
+  opack_cstrs: (string * out_type) list;
 }
 
 and out_variant =

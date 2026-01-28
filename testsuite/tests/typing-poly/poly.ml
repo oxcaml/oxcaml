@@ -53,8 +53,7 @@ Lines 1-4, characters 0-24:
 3 | | {pv=5::_} -> "int"
 4 | | {pv=true::_} -> "bool"
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-{pv=false::_}
+  Here is an example of a case that is not matched: "{pv=false::_}"
 
 - : string = "OK"
 |}];;
@@ -71,8 +70,7 @@ Lines 1-4, characters 0-20:
 3 | | {pv=true::_} -> "bool"
 4 | | {pv=5::_} -> "int"
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-{pv=0::_}
+  Here is an example of a case that is not matched: "{pv=0::_}"
 
 - : string = "OK"
 |}];;
@@ -306,7 +304,8 @@ class ['a] ostream1 :
 Line 8, characters 4-16:
 8 |     self#tl#fold ~f ~init:(f self#hd init)
         ^^^^^^^^^^^^
-Warning 18 [not-principal]: this use of a polymorphic method is not principal.
+Warning 18 [not-principal]: this use of a polymorphic method is not
+  principal.
 
 class ['a] ostream1 :
   hd:'a ->
@@ -466,7 +465,7 @@ val f : < m : 'a. 'a -> 'a > -> < m : 'b. 'b -> 'b > = <fun>
 Line 9, characters 41-42:
 9 | let f (x : < m : 'a. 'a -> 'a list >) = (x : < m : 'b. 'b -> 'c >)
                                              ^
-Error: This expression has type "< m : 'b. 'b -> 'b list >"
+Error: The value "x" has type "< m : 'b. 'b -> 'b list >"
        but an expression was expected of type "< m : 'b. 'b -> 'c >"
        The method "m" has type "'b. 'b -> 'b list",
        but the expected method type was "'b. 'b -> 'c"
@@ -590,8 +589,8 @@ val f2 : id -> int * bool = <fun>
 Line 5, characters 24-28:
 5 | let f3 f = f#id 1, f#id true
                             ^^^^
-Error: This expression has type "bool" but an expression was expected of type
-         "int"
+Error: The constructor "true" has type "bool"
+       but an expression was expected of type "int"
 |}];;
 
 class c = object
@@ -640,7 +639,7 @@ let f x = (x : < m : 'a. 'b * (< n : 'a; .. > as 'a) > as 'b)#m;;
 fun (x : < p : 'a. < m : 'a ; n : 'b ; .. > as 'a > as 'b) -> x#p;;
 fun (x : <m:'a. 'a * <p:'b. 'b * 'c * 'd> as 'c> as 'd) -> x#m;;
 (* printer is wrong on the next (no official syntax) *)
-fun (x : <m:'a.<p:'a;..> >) -> x#m;;
+fun (x : <m:'a. <p:'a;..> >) -> x#m;;
 [%%expect {|
 - : (< m : 'a. 'a * 'b > as 'b) -> 'c * 'b = <fun>
 - : (< m : 'a. 'b * 'a list > as 'b) -> 'b * 'c list = <fun>
@@ -838,7 +837,7 @@ Error: This field value has type "'b option ref" which is less general than
 
 (* Type variable scope *)
 
-let f (x: <m:'a.<p: 'a * 'b> as 'b>) (y : 'b) = ();;
+let f (x: <m:'a. <p: 'a * 'b> as 'b>) (y : 'b) = ();;
 let f (x: <m:'a. 'a * (<p:int*'b> as 'b)>) (y : 'b) = ();;
 [%%expect {|
 val f : < m : 'a. < p : 'a * 'c > as 'c > -> 'b -> unit = <fun>
@@ -1112,8 +1111,8 @@ val f : unit -> c = <fun>
 Line 4, characters 11-60:
 4 | let f () = object method private n = 1 method m = {<>}#n end;;
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 15 [implicit-public-methods]: the following private methods were made public implicitly:
- n.
+Warning 15 [implicit-public-methods]: the following private methods were made
+  public implicitly: "n".
 
 val f : unit -> < m : int; n : int > = <fun>
 Line 5, characters 27-39:
@@ -1136,7 +1135,7 @@ let f (x : foo') = (x : bar');;
 Line 2, characters 3-4:
 2 |   (x : <m : 'a. 'a * (<m:'b. 'a * <m:'c. 'c * 'bar> > as 'bar) >);;
        ^
-Error: This expression has type "< m : 'a. 'a * < m : 'a * 'b > > as 'b"
+Error: The value "x" has type "< m : 'a. 'a * < m : 'a * 'b > > as 'b"
        but an expression was expected of type
          "< m : 'a. 'a * (< m : 'a * < m : 'c. 'c * 'd > > as 'd) >"
        The method "m" has type
@@ -1159,8 +1158,7 @@ let f x =
 Line 2, characters 3-4:
 2 |   (x : <m : 'b. 'b * ('b * <m : 'c. 'c * ('c * 'bar)>)> as 'bar);;
        ^
-Error: This expression has type
-         "< m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) >"
+Error: The value "x" has type "< m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) >"
        but an expression was expected of type
          "< m : 'b. 'b * ('b * < m : 'c. 'c * ('c * 'd) >) > as 'd"
        The method "m" has type "'c. 'c * ('b * < m : 'c. 'e >) as 'e",
@@ -1289,21 +1287,24 @@ val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > = <fun>
 Line 2, characters 9-16:
 2 | fun x -> (f x)#m;; (* Warning 18 *)
              ^^^^^^^
-Warning 18 [not-principal]: this use of a polymorphic method is not principal.
+Warning 18 [not-principal]: this use of a polymorphic method is not
+  principal.
 
 - : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
 val f : < m : 'a. 'a -> 'a > * 'b -> < m : 'a. 'a -> 'a > = <fun>
 Line 4, characters 9-20:
 4 | fun x -> (f (x,x))#m;; (* Warning 18 *)
              ^^^^^^^^^^^
-Warning 18 [not-principal]: this use of a polymorphic method is not principal.
+Warning 18 [not-principal]: this use of a polymorphic method is not
+  principal.
 
 - : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
 val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > array = <fun>
 Line 6, characters 9-20:
 6 | fun x -> (f x).(0)#m;; (* Warning 18 *)
              ^^^^^^^^^^^
-Warning 18 [not-principal]: this use of a polymorphic method is not principal.
+Warning 18 [not-principal]: this use of a polymorphic method is not
+  principal.
 
 - : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
 |}];;
@@ -1333,13 +1334,15 @@ val just : 'a option -> 'a = <fun>
 Line 4, characters 42-62:
 4 | let f x = let l = [Some x; (None : u)] in (just(List.hd l))#id;;
                                               ^^^^^^^^^^^^^^^^^^^^
-Warning 18 [not-principal]: this use of a polymorphic method is not principal.
+Warning 18 [not-principal]: this use of a polymorphic method is not
+  principal.
 
 val f : c -> 'a -> 'a = <fun>
 Line 7, characters 36-47:
 7 |   let x = List.hd [Some x; none] in (just x)#id;;
                                         ^^^^^^^^^^^
-Warning 18 [not-principal]: this use of a polymorphic method is not principal.
+Warning 18 [not-principal]: this use of a polymorphic method is not
+  principal.
 
 val g : c -> 'a -> 'a = <fun>
 val h : < id : 'a; .. > -> 'a = <fun>
@@ -1401,7 +1404,7 @@ type t = { f : 'a. [< `Int of int ] as 'a; }
 Line 4, characters 16-22:
 4 | let zero = {f = `Int 0} ;; (* fails *)
                     ^^^^^^
-Error: This expression has type "[> `Int of int ]"
+Error: This constructor has type "[> `Int of int ]"
        but an expression was expected of type "[< `Int of int ]"
        The second variant type is bound to the universal type variable "'a",
        it may not allow the tag(s) "`Int"
@@ -1574,8 +1577,7 @@ let f (n : < m : 'a 'r. [< `Foo of 'a & int | `Bar] as 'r >) =
 Line 2, characters 3-4:
 2 |   (n : < m : 'b 'r. [< `Foo of int & 'b | `Bar] as 'r >)
        ^
-Error: This expression has type
-         "< m : 'a 'c. [< `Bar | `Foo of 'a & int ] as 'c >"
+Error: The value "n" has type "< m : 'a 'c. [< `Bar | `Foo of 'a & int ] as 'c >"
        but an expression was expected of type
          "< m : 'b 'd. [< `Bar | `Foo of int & 'b ] as 'd >"
        Types for tag "`Foo" are incompatible
@@ -1598,7 +1600,8 @@ let f b (x: 'x) =
 Line 3, characters 19-22:
 3 |   if b then x else M.A;;
                        ^^^
-Error: This expression has type "M.t" but an expression was expected of type "'x"
+Error: The constructor "M.A" has type "M.t"
+       but an expression was expected of type "'x"
        The type constructor "M.t" would escape its scope
 |}];;
 
@@ -1796,7 +1799,7 @@ end
 [%%expect{|
 external reraise : exn -> 'a = "%reraise"
 module M :
-  functor () ->
+  () ->
     sig
       val f : ('a : any). 'a -> 'a
       val g : ('a : any). 'a -> 'a
@@ -1894,7 +1897,7 @@ let f (x : u) = (x : v)
 Line 1, characters 17-18:
 1 | let f (x : u) = (x : v)
                      ^
-Error: This expression has type "u" but an expression was expected of type "v"
+Error: The value "x" has type "u" but an expression was expected of type "v"
        The method "m" has type "'a s list * < m : 'b > as 'b",
        but the expected method type was "'a. 'a s list * < m : 'a. 'c > as 'c"
        The universal variable "'a" would escape its scope

@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Format
+open Format_doc
 
 type error =
   | CannotRun of string
@@ -182,11 +182,29 @@ let set_input_lexbuf ic =
   Location.input_lexbuf := Some lexbuf;
   lexbuf
 
+<<<<<<< HEAD
 type 'a ast_result = { ast : 'a; source_file : string }
 
 let file_aux ~tool_name ~source_file inputfile (type a) parse_fun invariant_fun
              (kind : a ast_kind) : a ast_result =
   let { ast; source_file } =
+=======
+let check_loc_ghost (type a) (kind : a ast_kind) (ast : a) ~inputfile =
+  if !Clflags.parsetree_ghost_loc_invariant then
+    let meth : (Ast_iterator.iterator -> Ast_iterator.iterator -> a -> unit) =
+      match kind with
+      | Structure -> (fun i -> i.structure)
+      | Signature -> (fun i -> i.signature)
+    in
+    let source_contents =
+      In_channel.with_open_bin inputfile In_channel.input_all
+    in
+    Ast_invariants.check_loc_ghost meth ast ~source_contents
+
+let file_aux ~tool_name ~sourcefile inputfile (type a) parse_fun invariant_fun
+             (kind : a ast_kind) : a =
+  let ast =
+>>>>>>> upstream/5.4
     let ast_magic = magic_of_kind kind in
     let (ic, is_ast_file) = open_and_check_magic inputfile ast_magic in
     let close_ic () = close_in ic in
@@ -220,6 +238,7 @@ let file_aux ~tool_name ~source_file inputfile (type a) parse_fun invariant_fun
         { ast = parse_fun lexbuf ; source_file })
     end
   in
+  check_loc_ghost kind ast ~inputfile;
   Profile.record_call "-ppx" (fun () ->
       { ast = apply_rewriters ~restore:false ~tool_name kind ast; source_file }
     )
@@ -236,7 +255,7 @@ let file ~tool_name inputfile parse_fun ast_kind =
   in
   ast
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | CannotRun cmd ->
       fprintf ppf "Error while running external preprocessor@.\
                    Command line: %s@." cmd
@@ -247,13 +266,21 @@ let report_error ppf = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
 
+<<<<<<< HEAD
 let parse_file ~tool_name invariant_fun parse kind source_file =
   Location.input_name := source_file;
   let inputfile = preprocess source_file in
+=======
+let report_error = Format_doc.compat report_error_doc
+
+let parse_file ~tool_name invariant_fun parse kind sourcefile =
+  Location.input_name := sourcefile;
+  let inputfile = preprocess sourcefile in
+>>>>>>> upstream/5.4
   Misc.try_finally
     (fun () ->
        Profile.record_call "parsing" @@ fun () ->

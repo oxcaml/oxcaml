@@ -154,6 +154,7 @@ let print_cma_infos (lib : Cmo_format.library) =
   printf "\n";
   List.iter print_cmo_infos lib.lib_units
 
+<<<<<<< HEAD
 let print_cmi_infos name crcs kind params global_name_bindings =
   if not !quiet then begin
     let open Cmi_format in
@@ -178,14 +179,27 @@ let print_cmi_infos name crcs kind params global_name_bindings =
     Array.iter print_intf_import crcs;
     printf "Globals in scope:\n";
     Array.iter print_global_name_binding global_name_bindings
+=======
+let print_cmi_infos name crcs =
+  if not !quiet then begin
+    printf "Unit name: %s\n" name;
+    printf "Interfaces imported:\n";
+    List.iter print_name_crc crcs
+>>>>>>> upstream/5.4
   end
 
 let print_cmt_infos cmt =
   let open Cmt_format in
   if not !quiet then begin
+<<<<<<< HEAD
     printf "Cmt unit name: %a\n" Compilation_unit.output cmt.cmt_modname;
     print_string "Cmt interfaces imported:\n";
     Array.iter print_intf_import cmt.cmt_imports;
+=======
+    printf "Cmt unit name: %s\n" cmt.cmt_modname;
+    print_string "Cmt interfaces imported:\n";
+    List.iter print_name_crc cmt.cmt_imports;
+>>>>>>> upstream/5.4
     printf "Source file: %s\n"
           (match cmt.cmt_sourcefile with None -> "(none)" | Some f -> f);
     printf "Compilation flags:";
@@ -208,7 +222,11 @@ let print_cmt_infos cmt =
   end;
   if !index then begin
     printf "Indexed shapes:\n";
+<<<<<<< HEAD
     Array.iter (fun (loc, item) ->
+=======
+    List.iter (fun (loc, item) ->
+>>>>>>> upstream/5.4
       let pp_loc fmt { Location.txt; loc } =
         Format.fprintf fmt "%a (%a)"
           Pprintast.longident txt Location.print_loc loc
@@ -247,7 +265,11 @@ let print_cmt_infos cmt =
       let loc = match (item : Typedtree.item_declaration) with
         | Value vd -> vd.val_name
         | Value_binding vb ->
+<<<<<<< HEAD
           let (_, name, _, _, _) =
+=======
+          let (_, name, _, _) =
+>>>>>>> upstream/5.4
             List.hd (Typedtree.let_bound_idents_full [vb])
           in
           name
@@ -302,7 +324,15 @@ let print_general_infos print_name name crc defines arg_descr mbf
 
 let print_global_table table =
   printf "Globals defined:\n";
+<<<<<<< HEAD
   Symtable.iter_global_map (fun id _ -> print_line (Symtable.Global.name id))
+=======
+  Symtable.iter_global_map
+    (fun global _ ->
+       let desc = Format_doc.compat Symtable.Global.description in
+       print_line (Format.asprintf "%a" desc global)
+    )
+>>>>>>> upstream/5.4
     table
 
 open Cmx_format
@@ -592,9 +622,21 @@ let dump_obj filename =
   then dump_cmxs ic
   else exit_magic_error ~expected_kind:None (Parse_error head_error)
 
+let print_version () =
+  Format.printf "ocamlobjinfo, version %s@." Sys.ocaml_version;
+  exit 0
+
+let print_version_num () =
+  Format.printf "%s@." Sys.ocaml_version;
+  exit 0
+
 let arg_list = [
   "-quiet", Arg.Set quiet,
+<<<<<<< HEAD
     " Only print explicitely required information";
+=======
+    " Only print explicitly required information";
+>>>>>>> upstream/5.4
   "-no-approx", Arg.Set no_approx,
     " Do not print module approximation information";
   "-no-code", Arg.Set no_code,
@@ -608,6 +650,8 @@ let arg_list = [
   "-uid-deps", Arg.Set uid_deps,
     " Print the declarations' uids dependencies of the module";
   "-null-crc", Arg.Set no_crc, " Print a null CRC for imported interfaces";
+  "-version", Arg.Unit print_version, " Print version and exit";
+  "-vnum", Arg.Unit print_version_num, " Print version number and exit";
   "-args", Arg.Expand Arg.read_arg,
      "<file> Read additional newline separated command line arguments \n\
      \      from <file>";

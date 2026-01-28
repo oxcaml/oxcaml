@@ -18,6 +18,10 @@
 
 #include "mlvalues.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* [caml_record_backtraces] controls backtrace recording.
  * This function can be called at runtime by user-code, or during
  * initialization if backtraces were requested.
@@ -26,6 +30,10 @@
  * allocation.
  */
 CAMLextern void caml_record_backtraces(int);
+
+#ifdef __cplusplus
+}
+#endif
 
 #ifdef CAML_INTERNALS
 

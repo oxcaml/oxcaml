@@ -22,7 +22,12 @@
 
 open Asttypes
 
-type constant =
+type constant = {
+  pconst_desc : constant_desc;
+  pconst_loc : Location.t;
+}
+
+and constant_desc =
   | Pconst_integer of string * char option
       (** Integer constants such as [3] [3l] [3L] [3n].
 
@@ -121,6 +126,7 @@ and core_type_desc =
          *)
   | Ptyp_tuple of (string option * core_type) list
       (** [Ptyp_tuple(tl)] represents a product type:
+<<<<<<< HEAD
           - [T1 * ... * Tn]       when [tl] is [(None,T1);...;(None,Tn)]
           - [L1:T1 * ... * Ln:Tn] when [tl] is [(Some L1,T1);...;(Some Ln,Tn)]
           - A mix, e.g. [L1:T1 * T2] when [tl] is [(Some L1,T1);(None,T2)]
@@ -131,6 +137,14 @@ and core_type_desc =
       (** Unboxed tuple types: [Ptyp_unboxed_tuple([(Some l1,P1);...;(Some l2,Pn)]]
           represents a product type [#(l1:T1 * ... * l2:Tn)], and the labels
           are optional.
+=======
+          - [T1 * ... * Tn]
+              when [tl] is [(None, T1); ...; (None, Tn)]
+          - [L1:T1 * ... * Ln:Tn]
+              when [tl] is [(Some L1, T1); ...; (Some Ln, Tn)]
+          - A mix, e.g., [L1:T1 * T2]
+              when [tl] is [(Some L1, T1); (None, T2)]
+>>>>>>> upstream/5.4
 
            Invariant: [n >= 2].
         *)
@@ -212,15 +226,25 @@ and core_type_desc =
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_extension of extension  (** [[%id]]. *)
 
+<<<<<<< HEAD
 and arg_label = Asttypes.arg_label =
     Nolabel
   | Labelled of string
   | Optional of string
 
 and package_type = Longident.t loc * (Longident.t loc * core_type) list
+=======
+and package_type =
+    {
+     ppt_path: Longident.t loc;
+     ppt_cstrs: (Longident.t loc * core_type) list;
+     ppt_loc: Location.t;
+     ppt_attrs: attributes;
+    }
+>>>>>>> upstream/5.4
 (** As {!package_type} typed values:
-         - [(S, [])] represents [(module S)],
-         - [(S, [(t1, T1) ; ... ; (tn, Tn)])]
+         - [{ppt_path: S; ppt_cstrs: []}] represents [(module S)],
+         - [{ppt_path: S; ppt_cstrs: [(t1, T1) ; ... ; (tn, Tn)]}]
           represents [(module S with type t1 = T1 and ... and tn = Tn)].
        *)
 
@@ -279,6 +303,7 @@ and pattern_desc =
            but rejected by the type-checker. *)
   | Ppat_tuple of (string option * pattern) list * Asttypes.closed_flag
       (** [Ppat_tuple(pl, Closed)] represents
+<<<<<<< HEAD
           - [(P1, ..., Pn)]       when [pl] is [(None, P1);...;(None, Pn)]
           - [(~L1:P1, ..., ~Ln:Pn)] when [pl] is
             [(Some L1, P1);...;(Some Ln, Pn)]
@@ -301,6 +326,23 @@ and pattern_desc =
   | Ppat_construct of
       Longident.t loc
       * ((string loc * jkind_annotation option) list * pattern) option
+=======
+          - [(P1, ..., Pn)]
+              when [pl] is [(None, P1); ...; (None, Pn)]
+          - [(~L1:P1, ..., ~Ln:Pn)]
+              when [pl] is [(Some L1, P1); ...; (Some Ln, Pn)]
+          - A mix, e.g. [(~L1:P1, P2)]
+              when [pl] is [(Some L1, P1); (None, P2)]
+
+          [Ppat_tuple(pl, Open)] is similar, but indicates the pattern
+          additionally ends in a [..].
+
+          Invariant:
+          - If Closed, [n >= 2].
+          - If Open, [n >= 1].
+      *)
+  | Ppat_construct of Longident.t loc * (string loc list * pattern) option
+>>>>>>> upstream/5.4
       (** [Ppat_construct(C, args)] represents:
             - [C]               when [args] is [None],
             - [C P]             when [args] is [Some ([], P)]
@@ -352,6 +394,7 @@ and pattern_desc =
            [Ppat_constraint(Ppat_unpack(Some "P"), Ptyp_package S)]
          *)
   | Ppat_exception of pattern  (** Pattern [exception P] *)
+  | Ppat_effect of pattern * pattern (* Pattern [effect P P] *)
   | Ppat_extension of extension  (** Pattern [[%id]] *)
   | Ppat_open of Longident.t loc * pattern  (** Pattern [M.(P)] *)
 
@@ -395,8 +438,9 @@ and expression_desc =
       [C] represents a type constraint or coercion placed immediately before the
       arrow, e.g. [fun P1 ... Pn : ty -> ...] when [C = Some (Pconstraint ty)].
 
-      A function must have parameters. [Pexp_function (params, _, body)] must
-      have non-empty [params] or a [Pfunction_cases _] body.
+      A function must have parameters: in [Pexp_function (params, _, body)],
+      if [params] does not contain a [Pparam_val _], [body] must be
+      [Pfunction_cases _].
   *)
   | Pexp_apply of expression * (arg_label * expression) list
       (** [Pexp_apply(E0, [(l1, E1) ; ... ; (ln, En)])]
@@ -416,11 +460,19 @@ and expression_desc =
   | Pexp_tuple of (string option * expression) list
       (** [Pexp_tuple(el)] represents
           - [(E1, ..., En)]
+<<<<<<< HEAD
             when [el] is [(None, E1);...;(None, En)]
           - [(~L1:E1, ..., ~Ln:En)]
             when [el] is [(Some L1, E1);...;(Some Ln, En)]
           - A mix, e.g.:
             [(~L1:E1, E2)] when [el] is [(Some L1, E1); (None, E2)]
+=======
+              when [el] is [(None, E1); ...; (None, En)]
+          - [(~L1:E1, ..., ~Ln:En)]
+              when [el] is [(Some L1, E1); ...; (Some Ln, En)]
+          - A mix, e.g., [(~L1:E1, E2)]
+              when [el] is [(Some L1, E1); (None, E2)]
+>>>>>>> upstream/5.4
 
            Invariant: [n >= 2]
         *)
@@ -508,6 +560,7 @@ and expression_desc =
            {{!class_field_kind.Cfk_concrete}[Cfk_concrete]} for methods (not
            values). *)
   | Pexp_object of class_structure  (** [object ... end] *)
+<<<<<<< HEAD
   | Pexp_newtype of string loc * jkind_annotation option * expression
       (** [fun (type t) -> E] or [fun (type t : k) -> E] *)
   | Pexp_pack of module_expr
@@ -515,6 +568,11 @@ and expression_desc =
 
            [(module ME : S)] is represented as
            [Pexp_constraint(Pexp_pack ME, Ptyp_package S)] *)
+=======
+  | Pexp_newtype of string loc * expression  (** [fun (type t) -> E] *)
+  | Pexp_pack of module_expr * package_type option
+      (** [(module ME)] or [(module ME : S)]. *)
+>>>>>>> upstream/5.4
   | Pexp_open of open_declaration * expression
       (** - [M.(E)]
             - [let open M in E]

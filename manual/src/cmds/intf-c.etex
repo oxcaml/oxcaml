@@ -658,7 +658,7 @@ Since public method tags are hashed in the same way as variant tags,
 and methods are functions taking self as first argument, if you want
 to do the method call "foo#bar" from the C side, you should call:
 \begin{verbatim}
-  callback(caml_get_public_method(foo, hash_variant("bar")), foo);
+  callback(caml_get_public_method(foo, caml_hash_variant("bar")), foo);
 \end{verbatim}
 
 \subsection{ss:c-polyvar}{Polymorphic variants}
@@ -668,14 +668,14 @@ as integers (for polymorphic variants without argument), or as blocks
 (for polymorphic variants with an argument).  Unlike constructed
 terms, variant constructors are not numbered starting from 0, but
 identified by a hash value (an OCaml integer), as computed by the C function
-"hash_variant" (declared in "<caml/mlvalues.h>"):
+"caml_hash_variant" (declared in "<caml/mlvalues.h>"):
 the hash value for a variant constructor named, say, "VConstr"
-is "hash_variant(\"VConstr\")".
+is "caml_hash_variant(\"VConstr\")".
 
 The variant value "`VConstr" is represented by
-"hash_variant(\"VConstr\")".  The variant value "`VConstr("\var{v}")" is
+"caml_hash_variant(\"VConstr\")".  The variant value "`VConstr("\var{v}")" is
 represented by a block of size 2 and tag 0, with field number 0
-containing "hash_variant(\"VConstr\")" and field number 1 containing
+containing "caml_hash_variant(\"VConstr\")" and field number 1 containing
 \var{v}.
 
 Unlike constructed values, polymorphic variant values taking several
@@ -701,17 +701,24 @@ type) corresponds to the "Some" constructor.
 
 \subsection{ss:c-int-ops}{Operations on integers}
 
+The header "<caml/config.h>" defines a C integer type "intnat" of signed 64-bit
+integers (32-bit integers on 32-bit architectures). This type is used to
+represent the integer encoded by a "value" corresponding to an unboxed integer
+without truncation.
+
 \begin{itemize}
-\item "Val_long("\var{l}")" returns the value encoding the "long int" \var{l}.
-\item "Long_val("\var{v}")" returns the "long int" encoded in value \var{v}.
+\item "Val_long("\var{n}")" returns the value encoding the "intnat" \var{n}.
+\item "Long_val("\var{v}")" returns the "intnat" encoded in value \var{v}.
 \item "Val_int("\var{i}")" returns the value encoding the "int" \var{i}.
-\item "Int_val("\var{v}")" returns the "int" encoded in value \var{v}.
+\item "Int_val("\var{v}")" returns the "int" encoded in value \var{v}. Note that
+this operation may result in a truncated value since "int" is 32-bit wide on
+64-bit architectures.
 \item "Val_bool("\var{x}")" returns the OCaml boolean representing the
 truth value of the C integer \var{x}.
 \item "Bool_val("\var{v}")" returns 0 if \var{v} is the OCaml boolean
 "false", 1 if \var{v} is "true".
 \item "Val_true", "Val_false" represent the OCaml booleans "true" and "false".
-\item "Val_emptylist", "Val_emptylist" represents the empty list.
+\item "Val_emptylist" represents the empty list.
 \item "Val_none" represents the OCaml value "None".
 \end{itemize}
 
@@ -740,7 +747,9 @@ numbered from 0 to $\hbox{"string_length"}(v)-1$.
 \var{v}, with type "const char *".
 This pointer is a valid C string: there is a null byte after the last
 byte in the string. However, OCaml strings can contain embedded null bytes,
-which will confuse the usual C functions over strings.
+which will confuse the usual C functions over strings. The function
+"caml_string_is_c_safe("\var{v}")" returns "true" if the OCaml string \var{v}
+does not contain any embedded null bytes.
 \item "Bytes_val("\var{v}")" returns a pointer to the first byte of the
 byte sequence \var{v}, with type "unsigned char *".
 \item "Double_val("\var{v}")" returns the floating-point number contained in
@@ -772,7 +781,7 @@ of a value \var{v} of any boxed type (record or concrete data type).
 \item "caml_field_unboxable("\var{v}")" calls either
 "caml_field_unboxed" or "caml_field_boxed" according to the default
 representation of unboxable types in the current version of OCaml.
-\item "Some_val("\var{v}")" returns the argument "\var{x}" of a value \var{v} of
+\item "Some_val("\var{v}")" returns the argument \var{x} of a value \var{v} of
 the form "Some("\var{x}")".
 \end{itemize}
 The expressions "Field("\var{v}", "\var{n}")",
@@ -893,10 +902,10 @@ with argument \var{s}.
 \end{itemize}
 
 Raising arbitrary exceptions from C is more delicate: the
-exception identifier is dynamically allocated by the OCaml program, and
+exception constructor is dynamically allocated by the OCaml program, and
 therefore must be communicated to the C function using the
 registration facility described below in section~\ref{ss:c-register-exn}.
-Once the exception identifier is recovered in C, the following
+Once the exception constructor is recovered in C, the following
 functions actually raise the exception:
 \begin{itemize}
 \item "caml_raise_constant("\var{id}")" raises the exception \var{id} with
@@ -910,6 +919,13 @@ raises the exception \var{id} with the OCaml values
 null-terminated C string, raises the exception \var{id} with a copy of
 the C string \var{s} as argument.
 \end{itemize}
+
+Sometimes, it is necessary to clean-up state and release resources
+before actually raising the exception back into OCaml. To this end,
+alternative functions that return the exception instead of raising it
+directly ("caml_exception_failure", "caml_exception_invalid_argument",
+etc.) are provided. The type "caml_result" represents either an OCaml
+value or an exception; see section~\ref{ss:c-result}.
 
 \section{s:c-gc-harmony}{Living in harmony with the garbage collector}
 
@@ -935,6 +951,10 @@ with these parameters as arguments.  If your function has more than 5
 parameters of type "value", use "CAMLparam5" with five of these
 parameters, and use one or more calls to the "CAMLxparam" macros for
 the remaining parameters ("CAMLxparam1" to "CAMLxparam5").
+If the function has an argument "x" which is an array of "value"s
+of length "n", use "CAMLparamN (x, n)" to declare it (or
+"CAMLxparamN (x, n)" if you already have a call to "CAMLparam"
+for some other arguments).
 
 The macros "CAMLreturn", "CAMLreturn0", and "CAMLreturnT" are used to
 replace the C keyword "return"; any function using a "CAMLparam" macro
@@ -990,7 +1010,10 @@ Primitives (C functions that can be called from OCaml) should never return void.
 Local variables of type "value" must be declared with one of the
 "CAMLlocal" macros.  Arrays of "value"s are declared with
 "CAMLlocalN".  These macros must be used at the beginning of the
-function, not in a nested block.
+function, not in a nested block.  Temporaries are equivalent to
+local variables, but they cannot be registered with the garbage
+collector, so a temporary of type "value" must not be live when
+a garbage collection may occur.
 \end{gcrule}
 
 The macros "CAMLlocal1" to "CAMLlocal5" declare and initialize one to
@@ -1281,25 +1304,25 @@ raise asynchronous exceptions and cause mutations on the OCaml heap
 from the same domain. It is recommended to call it regularly at safe
 points inside long-running non-blocking C code.
 
-The variant \verb"caml_process_pending_actions_exn" is provided, that
-returns the exception instead of raising it directly into OCaml code.
-Its result must be tested using {\tt Is_exception_result}, and
-followed by {\tt Extract_exception} if appropriate. It is typically
-used for clean up before re-raising:
+The function \verb"caml_process_pending_actions_res"
+returns the exception instead of raising it directly into OCaml
+code. This is represented by a different C type, "caml_result" rather
+than "value". The result can be tested using
+"caml_result_is_exception", followed by some cleanup logic, and
+finally "caml_get_value_or_raise" which returns the value (here just
+a unit value, ignored) or raises the exception.
 
 \begin{verbatim}
-    CAMLlocal1(exn);
+    CAMLlocalresult(res);
     ...
-    exn = caml_process_pending_actions_exn();
-    if(Is_exception_result(exn)) {
-      exn = Extract_exception(exn);
+    res = caml_process_pending_actions_res();
+    if(caml_result_is_exception(res)) {
       ...cleanup...
-      caml_raise(exn);
+      (void)caml_get_value_or_raise(res);
     }
 \end{verbatim}
 
-Correct use of exceptional return, in particular in the presence of
-garbage collection, is further detailed in Section~\ref{ss:c-callbacks}.
+For more details on "caml_result", see section~\ref{ss:c-result}.
 
 \section{s:c-intf-example}{A complete example}
 
@@ -1497,39 +1520,126 @@ calls back an OCaml function \var{h} that raises a stray exception, then the
 execution of \var{g} is interrupted and the exception is propagated back
 into \var{f}.
 
-If the C code wishes to catch exceptions escaping the OCaml function,
-it can use the functions "caml_callback_exn", "caml_callback2_exn",
-"caml_callback3_exn", "caml_callbackN_exn".  These functions take the same
-arguments as their non-"_exn" counterparts, but catch escaping
-exceptions and return them to the C code.  The return value \var{v} of the
-"caml_callback*_exn" functions must be tested with the macro
-"Is_exception_result("\var{v}")".  If the macro returns ``false'', no
-exception occurred, and \var{v} is the value returned by the OCaml
-function.  If "Is_exception_result("\var{v}")" returns ``true'',
-an exception escaped, and its value (the exception descriptor) can be
-recovered using "Extract_exception("\var{v}")".
+\subsection{ss:c-result}{"caml_result": resource cleanup on OCaml exceptions}
 
-\paragraph{Warning:} If the OCaml function returned with an exception,
-"Extract_exception" should be applied to the exception result prior
-to calling a function that may trigger garbage collection.
-Otherwise, if \var{v} is reachable during garbage collection, the runtime
-can crash since \var{v} does not contain a valid value.
+If the OCaml function called with "caml_callback"
+(or "caml_process_pending_actions" as mentioned in
+Section~\ref{ss:c-process-pending-actions}) raises an exception, the
+C caller will be interrupted immediately to return to the closest
+OCaml exception handler. This is often the wrong behavior if the
+C caller needs to run some resource cleanup logic to terminate safely.
 
-Example:
+The OCaml FFI provides an alternative API to call OCaml code from
+C that returns a value of type "caml_result" instead of
+"value". A C value of type "caml_result" is either an OCaml value
+returned correctly by the OCaml function, or an OCaml exception raised
+by the OCaml function. The C caller can run any cleanup logic before
+re-raising the exception (if any) or continuing the computation.
+
+"caml_result" values can be manipulated using the following functions
+and macros:
+\begin{itemize}
+\item "value caml_get_value_or_raise(caml_result "\var{res}")"
+  (in "fail.h") returns the value contained in \var{res} or reraises
+  the exception it contains. In particular,
+  "(void)caml_get_value_or_raise(res)" can be used to ignore an OCaml
+  result of type "unit", yet propagate exceptions to the caller.
+
+\item "Result_value(value "\var{v}")" (in "mlvalues.h") is the result
+  that represents returning the value \var{v}.
+
+\item "Result_exception(value "\var{exn}")" (in "mlvalues.h") is the
+  result that represents raising the exception \var{exn}.
+
+\item "int caml_result_is_exception(caml_result "\var{res}")"
+  (in "mlvalues.h") is true if \var{res} represents an exception.
+
+\item The macro "CAMLlocalresult(foo)" (in "memory.h") is the
+  "caml_result" counterpart of "CAMLlocal1": it declares a local
+  variable of type "caml_result", whose content is tracked by the
+  OCaml GC. Just like "CAMLlocal1", it can only be used between
+  a "CAMLparam" macro and "CAMLreturn" or "CAMLreturnT" macros. There
+  is no equivalent of "CAMLlocal2", "CAMLlocal3", etc., but the macro
+  can be used several times.
+\end{itemize}
+
+For convenience, "Result_unit" is defined as "Result_value(Val_unit)".
+
+By convention, result-returning C functions have their name suffixed
+with "_res", for example "caml_callback2_res" and
+"caml_process_pending_actions_res".
+
+Some examples:
 \begin{verbatim}
-    CAMLprim value call_caml_f_ex(value closure, value arg)
-    {
-      CAMLparam2(closure, arg);
-      CAMLlocal2(res, tmp);
-      res = caml_callback_exn(closure, arg);
-      if(Is_exception_result(res)) {
-        res = Extract_exception(res);
-        tmp = caml_alloc(3, 0); /* Safe to allocate: res contains valid value. */
-        ...
-      }
-      CAMLreturn (res);
-    }
+#include <caml/mlvalues.h> // for the caml_result type, caml_result_is_exception
+#include <caml/memory.h>   // CAMLlocalresult
+#include <caml/callback.h> // caml_callback_res
+#include <caml/fail.h>     // caml_get_value_or_raise
+#include <caml/alloc.h>    // caml_alloc_2
+
+/* This function calls an OCaml callback,
+   and returns the value or reraises the exception. */
+value logging_callback(value f, value arg) {
+  CAMLparam2(f, arg);
+  CAMLlocalresult(res);
+  printf("Start callback.\n");
+  res = caml_callback_res(f, arg);
+  printf("End callback.\n");
+  CAMLreturn (caml_get_value_or_raise(res));
+}
+
+/* This function assumes that the callback returns
+   a 'unit' value and ignores it -- or reraises
+   its exception. It must be called by C, as it
+   does not return a value, but the caller cannot
+   handle exceptions as they are raised directly. */
+void logging_unit_callback(value f, value arg) {
+  CAMLparam2(f, arg);
+  CAMLlocalresult(res);
+  printf("Start unit callback.\n");
+  res = caml_callback_res(f, arg);
+  printf("End callback.\n");
+  (void)caml_get_value_or_raise(res);
+  CAMLreturn0;
+}
+
+/* This function calls a callback on two arguments in turn,
+   and returns the pair of values;
+   it does not reraise exceptions, but returns a caml_result instead, letting
+   its own C caller perform its own cleanup. */
+caml_result two_callbacks_res(value f, value arg1, value arg2) {
+  CAMLparam3(f, arg1, arg2);
+  CAMLlocalresult(res);
+  CAMLlocal3(v1, v2, pair);
+
+  res = caml_callback_res(f, arg1);
+  // early exit on exception
+  if (caml_result_is_exception(res))
+    CAMLreturnT(caml_result, res);
+  v1 = caml_get_value_or_raise(res);
+
+  res = caml_callback_res(f, arg2);
+  if (caml_result_is_exception(res))
+    CAMLreturnT(caml_result, res);
+  v2 = caml_get_value_or_raise(res);
+
+  // build the pair of values, and
+  // wrap it in a caml_result
+  pair = caml_alloc_2(0, v1, v2);
+  res = Result_value(pair);
+  CAMLreturnT(caml_result, res);
+}
 \end{verbatim}
+
+\paragraph{Compatibility:} The "caml_result" type is available since
+OCaml 5.3. Older versions of OCaml use an unsafe concept of "encoded
+exceptions" (suffix "_exn", operations "Is_exception_result" and
+"Extract_exception") which are of type "value" but are not valid
+OCaml values and can crash the GC if they are not extracted
+immediately by the caller. We strongly recommend using "caml_result"
+instead, to have a clear separation between valid values and reified
+exceptions at distinct C types, but the older approach remains
+available for backwards-compatibility.
 
 \subsection{ss:c-closures}{Obtaining or registering OCaml closures for use in C functions}
 
@@ -1598,16 +1708,16 @@ calls "caml_named_value" only once:
 \subsection{ss:c-register-exn}{Registering OCaml exceptions for use in C functions}
 
 The registration mechanism described above can also be used to
-communicate exception identifiers from OCaml to C. The OCaml code
-registers the exception by evaluating
+communicate exception constructors from OCaml to C. The OCaml code
+registers the exception constructor by evaluating
 "Callback.register_exception" \var{n} \var{exn}, where \var{n} is an
-arbitrary name and \var{exn} is an exception value of the
-exception to register. For example:
+arbitrary name and \var{exn} is an exception value with the
+exception constructor to register. For example:
 \begin{verbatim}
     exception Error of string
     let _ = Callback.register_exception "test exception" (Error "any string")
 \end{verbatim}
-The C code can then recover the exception identifier using
+The C code can then recover the exception constructor using
 "caml_named_value" and pass it as first argument to the functions
 "raise_constant", "raise_with_arg", and "raise_with_string" (described
 in section~\ref{ss:c-exceptions}) to actually raise the exception. For
@@ -1835,7 +1945,7 @@ following "mod.ml" OCaml source:
 \begin{verbatim}
 (* File mod.ml -- some "useful" OCaml functions *)
 
-let rec fib n = if n < 2 then 1 else fib(n-1) + fib(n-2)
+let rec fib n = if n < 2 then n else fib(n-1) + fib(n-2)
 
 let format_result n = Printf.sprintf "Result is: %d\n" n
 
@@ -1920,10 +2030,16 @@ To build the whole program, just invoke the C compiler as follows:
 
 \section{s:c-custom}{Advanced topic: custom blocks}
 
-Blocks with tag "Custom_tag" contain both arbitrary user data and a
-pointer to a C struct, with type "struct custom_operations", that
-associates user-provided finalization, comparison, hashing,
-serialization and deserialization functions to this block.
+Blocks with tag "Custom_tag" start with a pointer to a C "struct" with
+type "struct custom_operations" that associates user-provided
+finalization, comparison, hashing, serialization and deserialization
+functions for this block.
+
+After this pointer to custom operations, there can be arbitrary data of
+zero, one or more words whose semantics is defined by the user (for
+example this can be just a pointer to a C "struct" or a C "struct"
+itself). Use "Data_custom_val" on the block value to get a pointer on
+the start of this arbitrary data.
 
 \subsection{ss:c-custom-ops}{The "struct custom_operations"}
 
@@ -1940,6 +2056,9 @@ when the block becomes unreachable and is about to be reclaimed.
 The block is passed as first argument to the function.
 The "finalize" field can also be "custom_finalize_default" to indicate that no
 finalization function is associated with the block.
+Note the caution below: there are many restrictions on the
+behaviour of these custom block finalizers. For more powerful and
+flexible finalization, use "Gc.finalise" (see \stdmoduleref{Gc}).
 
 \item "int (*compare)(value v1, value v2)" \\
 The "compare" field contains a pointer to a C function that is
@@ -2009,8 +2128,8 @@ reading back the data written by the "serialize" operation, using the
 in section~\ref{ss:c-custom-serialization}. It must then rebuild the data part
 of the custom block and store it at the pointer given as the "dst" argument.
 Finally, it returns the size in bytes of the data part of the custom block.
-This size must be identical to the "wsize_32" result of the "serialize"
-operation if the architecture is 32 bits, or "wsize_64" if the architecture is
+This size must be identical to the "bsize_32" result of the "serialize"
+operation if the architecture is 32 bits, or "bsize_64" if the architecture is
 64 bits.
 
 The "deserialize" field can be set to "custom_deserialize_default"
@@ -2029,16 +2148,25 @@ specified in the "fixed_length" structure, and do not consume space in
 the serialized output.
 \end{itemize}
 
-Note: the "finalize", "compare", "hash", "serialize", and "deserialize"
-functions attached to custom blocks descriptors are only allowed limited
-interactions with the OCaml runtime. Within these functions, do not call any of
-the OCaml allocation functions, and do not perform any callback into OCaml
-code. Do not use "CAMLparam" to register the parameters to these functions, and
-do not use "CAMLreturn" to return the result. Do not raise exceptions (to
-signal an error during deserialization, use "caml_deserialize_error"). Do not
-remove global roots. When in doubt, err on the side of caution. Within
-"serialize" and "deserialize" functions, use of the corresponding functions
-from section~\ref{ss:c-custom-serialization} is allowed (and even recommended).
+\emph{Caution}: the "finalize", "compare", "hash", "serialize", and
+"deserialize" functions attached to custom block descriptors are allowed
+only limited interactions with the OCaml runtime. Within these functions, do
+not call any of the OCaml allocation functions, and do not perform any
+callback into OCaml code or allow it to be called (for example, do not call
+"caml_release_runtime_system()"). Do not use "CAMLparam" to register the
+parameters to these functions, do not use "CAMLlocal" to register their
+local variables, and do not use "CAMLreturn" to return the result. Do not
+raise exceptions. To signal an error during deserialization, use
+"caml_deserialize_error", and "serialize" and "deserialize" functions may
+freely use the functions from section~\ref{ss:c-custom-serialization}.
+There are especially stringent restrictions on the behavior of custom block
+finalizers. In addition to the restrictions above, finalizers must not
+access the OCaml heap, or mutate the OCaml heap or any memory reachable from
+OCaml GC roots. However, note that "finalize" functions may freely use
+"caml_remove_global_root" and "caml_remove_generational_global_root". In
+short, if a custom block finalizer does anything with the "value" it
+receives other than call "Data_custom_val" on it, then it is probably
+unsafe. When in doubt, err on the side of caution.
 
 \subsection{ss:c-custom-alloc}{Allocating custom blocks}
 
@@ -2418,7 +2546,7 @@ The corresponding C type must be "intnat".
 It is possible to annotate with "[\@untagged]" any immediate type, i.e. types
 that are represented like "int". This includes "bool", "char", any variant
 type with only constant constructors. Note: this does not include
-"Unix.file_descr" which is not represented as an interger on all platforms.
+"Unix.file_descr" which is not represented as an integer on all platforms.
 
 \subsection{ss:c-direct-call}{Direct C call}
 
@@ -2539,34 +2667,46 @@ C primitive must be copied into C data structures before calling
 must be encoded as OCaml values after "caml_acquire_runtime_system()"
 returns.
 
-Example: the following C primitive invokes "gethostbyname" to find the
-IP address of a host name.  The "gethostbyname" function can block for
-a long time, so we choose to release the OCaml run-time system while it
-is running.
+Example: the following C primitive invokes "rmdir" to delete a
+directory.  The "rmdir" function can block for some time, so we choose
+to release the OCaml run-time system while it is running.
 \begin{verbatim}
-CAMLprim stub_gethostbyname(value vname)
+#include <caml/memory.h>
+#include <caml/threads.h>
+#include <caml/unixsupport.h>
+
+CAMLprim value stub_rmdir(value vpath)
 {
-  CAMLparam1 (vname);
-  CAMLlocal1 (vres);
-  struct hostent * h;
-  char * name;
+  CAMLparam1(vpath);
+
+  /* Raise Unix.Unix_error(Unix.ENOENT, ...) if the OCaml string
+     contains embedded null bytes */
+  caml_unix_check_path(vpath, "rmdir");
 
   /* Copy the string argument to a C string, allocated outside the
      OCaml heap. */
-  name = caml_stat_strdup(String_val(vname));
+  char_os *path = caml_stat_strdup_to_os(String_val(vpath));
   /* Release the OCaml run-time system */
   caml_release_runtime_system();
-  /* Resolve the name */
-  h = gethostbyname(name);
+
+  /* Delete the directory */
+#ifdef _WIN32
+  int ret = _wrmdir(path);
+#else
+  int ret = rmdir(path);
+#endif
+
   /* Free the copy of the string, which we might as well do before
      acquiring the runtime system to benefit from parallelism. */
-  caml_stat_free(name);
+  caml_stat_free(path);
   /* Re-acquire the OCaml run-time system */
   caml_acquire_runtime_system();
-  /* Encode the relevant fields of h as the OCaml value vres */
-  ... /* Omitted */
+
+  /* Raise Unix.Unix_error(...) if rmdir failed */
+  if (ret == -1) caml_uerror("rmdir", vpath);
+
   /* Return to OCaml */
-  CAMLreturn (vres);
+  CAMLreturn(Val_unit);
 }
 \end{verbatim}
 

@@ -2,8 +2,12 @@
 flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
 hassysthreads;
 include systhreads;
+<<<<<<< HEAD
 not-windows;
 poll-insertion;
+=======
+not-target-windows;
+>>>>>>> upstream/5.4
 no-tsan;
 runtime5;
 multidomain;

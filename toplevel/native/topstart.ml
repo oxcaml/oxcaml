@@ -13,4 +13,30 @@
 (*                                                                        *)
 (**************************************************************************)
 
+<<<<<<< HEAD:toplevel/native/topstart.ml
 let _ = Stdlib.exit (Topmain.main())
+=======
+(* "Package" a set of .cmx/.o files into one .cmx/.o file having the
+   original compilation units as sub-modules. *)
+
+val package_files
+   : ppf_dump:Format.formatter
+  -> Env.t
+  -> string list
+  -> string
+  -> backend:(module Backend_intf.S)
+  -> unit
+
+type error =
+    Illegal_renaming of string * string * string
+  | Forward_reference of string * string
+  | Wrong_for_pack of string * string
+  | Linking_error
+  | Assembler_error of string
+  | File_not_found of string
+
+exception Error of error
+
+val report_error: error Format_doc.format_printer
+val report_error_doc: error Format_doc.printer
+>>>>>>> upstream/5.4:asmcomp/asmpackager.mli

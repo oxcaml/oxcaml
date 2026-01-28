@@ -1,9 +1,26 @@
 (* TEST
+<<<<<<< HEAD
    runtime5;
    frame_pointers;
    readonly_files = "fp_backtrace.c stack_realloc_.c";
    all_modules = "${readonly_files} stack_realloc.ml";
    native;
+=======
+ frame_pointers;
+ readonly_files = "fp_backtrace.c stack_realloc_.c";
+ all_modules = "${readonly_files} stack_realloc.ml";
+ {
+ (* NOTE clang on macOS and gcc on Linux are less eager to inline
+         certain C functions in the runtime. *)
+   reference = "${test_source_directory}/stack_realloc.arm64.reference";
+   arch_arm64;
+   native;
+ } {
+   reference = "${test_source_directory}/stack_realloc.reference";
+   arch_amd64;
+   native;
+ }
+>>>>>>> upstream/5.4
 *)
 
 open Effect
@@ -25,7 +42,7 @@ let[@inline never] consume_stack () =
    * and Stack_threshold_words = 32 *)
   (* in words *)
   let size = 128 in
-  let allocated = 2 * 2 (* 2 spilled registers *) + 1 (* saved rbp *) in
+  let allocated = 2 * 2 (* 2 spilled registers *) + 1 (* saved frame pointer *) in
   let count = size / allocated in
   let[@inline never] rec gobbler i =
     (* Force spilling of x0 and x1 *)

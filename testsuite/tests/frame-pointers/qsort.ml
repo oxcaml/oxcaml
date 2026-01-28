@@ -1,4 +1,5 @@
 (* TEST
+<<<<<<< HEAD
  modules = "qsort_.c";
  (* [-D_GNU_SOURCE] is needed when AddressSanitizer support is enabled in order
     for the [dlsym] workaround in [qsort_.c] to work. *)
@@ -9,6 +10,10 @@
  }{
    native;
  }
+=======
+ frame_pointers;
+ modules = "qsort_.c";
+>>>>>>> upstream/5.4
 *)
 
 external with_frame : (unit -> 'a) -> 'a = "with_frame"

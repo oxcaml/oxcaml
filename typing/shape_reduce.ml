@@ -17,8 +17,11 @@
 
 open Shape
 
+<<<<<<< HEAD
 module MB = Misc.Maybe_bounded
 
+=======
+>>>>>>> upstream/5.4
 type result =
   | Resolved of Uid.t
   | Resolved_alias of Uid.t * result
@@ -29,6 +32,7 @@ type result =
 let rec print_result fmt result =
   match result with
   | Resolved uid ->
+<<<<<<< HEAD
       Format.fprintf fmt "@[Resolved: %a@]@;" Uid.print uid
   | Resolved_alias (uid, r) ->
       Format.fprintf fmt "@[Alias: %a -> %a@]@;"
@@ -113,12 +117,28 @@ module Diagnostics = struct
   let cms_files_unreadable d =
     match d with None -> [] | Some d -> List.rev d.cms_files_unreadable
 end
+=======
+      Format.fprintf fmt "@[Resolved:@ %a@]" Uid.print uid
+  | Resolved_alias (uid, r) ->
+      Format.fprintf fmt "@[Alias:@ %a@] ->@ %a"
+        Uid.print uid print_result r
+  | Unresolved shape ->
+      Format.fprintf fmt "@[Unresolved:@ %a@]" print shape
+  | Approximated (Some uid) ->
+      Format.fprintf fmt "@[Approximated:@ %a@]" Uid.print uid
+  | Approximated None ->
+      Format.fprintf fmt "Approximated: No uid"
+  | Internal_error_missing_uid ->
+      Format.fprintf fmt "Missing uid"
+
+>>>>>>> upstream/5.4
 
 let find_shape env id =
   let namespace = Shape.Sig_component_kind.Module in
   Env.shape_of_path ~namespace env (Pident id)
 
 module Make(Params : sig
+<<<<<<< HEAD
   val fuel : unit -> MB.t
   val projection_rules_for_merlin_enabled : bool
   val fuel_for_compilation_units : unit -> MB.t
@@ -126,6 +146,10 @@ module Make(Params : sig
   val max_compilation_unit_depth : unit -> MB.t
   val read_unit_shape :
     diagnostics:Diagnostics.t -> unit_name:string -> t option
+=======
+  val fuel : int
+  val read_unit_shape : unit_name:string -> t option
+>>>>>>> upstream/5.4
 end) = struct
   (* We implement a strong call-by-need reduction, following an
      evaluator from Nathanaelle Courant. *)
@@ -141,6 +165,7 @@ end) = struct
     | NLeaf
     | NComp_unit of string
     | NError of string
+<<<<<<< HEAD
     | NMu of nf
     | NRec_var of Shape.DeBruijn_index.t
     | NMutrec of nf Ident.Map.t
@@ -166,6 +191,8 @@ end) = struct
         }
     | NUnknown_type
     | NAt_layout of nf * Layout.t
+=======
+>>>>>>> upstream/5.4
 
   (* A type of normal forms for strong call-by-need evaluation.
      The normal form of an abstraction
@@ -187,9 +214,13 @@ end) = struct
    *)
   and delayed_nf = Thunk of local_env * t
 
+<<<<<<< HEAD
   and local_env =
     { subst: delayed_nf option Ident.Map.t;
       depth: int }
+=======
+  and local_env = delayed_nf option Ident.Map.t
+>>>>>>> upstream/5.4
   (* When reducing in the body of an abstraction [Abs(x, body)], we
      bind [x] to [None] in the environment. [Some v] is used for
      actual substitutions, for example in [App(Abs(x, body), t)], when
@@ -197,6 +228,7 @@ end) = struct
 
   let approx_nf nf = { nf with approximated = true }
 
+<<<<<<< HEAD
   let rec equal_local_env t1 t2 =
     t1.depth = t2.depth &&
     Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst
@@ -345,6 +377,31 @@ end) = struct
     let local_env = env.local_env in
     let memo_key = (local_env, t) in
     in_reduce_memo_table env.reduce_memo_table memo_key (reduce__ env) t
+=======
+  let in_memo_table memo_table memo_key f arg =
+    match Hashtbl.find memo_table memo_key with
+    | res -> res
+    | exception Not_found ->
+        let res = f arg in
+        Hashtbl.replace memo_table memo_key res;
+        res
+
+  type env = {
+    fuel: int ref;
+    global_env: Env.t;
+    local_env: local_env;
+    reduce_memo_table: (local_env * t, nf) Hashtbl.t;
+    read_back_memo_table: (nf, t) Hashtbl.t;
+  }
+
+  let bind env var shape =
+    { env with local_env = Ident.Map.add var shape env.local_env }
+
+  let rec reduce_ env t =
+    let local_env = env.local_env in
+    let memo_key = (local_env, t) in
+    in_memo_table env.reduce_memo_table memo_key (reduce__ env) t
+>>>>>>> upstream/5.4
   (* Memoization is absolutely essential for performance on this
      problem, because the normal forms we build can in some real-world
      cases contain an exponential amount of redundancy. Memoization
@@ -376,7 +433,11 @@ end) = struct
      in fact bind *distinct* identifiers x (with different stamps) and
      different identifiers y, so the environments are distinct. If two
      environments are structurally the same, they must correspond to
+<<<<<<< HEAD
      the evaluation environments of two sub-terms that are under
+=======
+     the evaluation evnrionments of two sub-terms that are under
+>>>>>>> upstream/5.4
      exactly the same scope of binders. So the two environments were
      obtained by the same term traversal, adding binders in the same
      order, giving the same balanced trees: the environments have the
@@ -387,6 +448,7 @@ end) = struct
     reduce_ { env with local_env } t
 
   and reduce__
+<<<<<<< HEAD
     ({fuel; fuel_for_compilation_units; max_steps_per_variable;
       global_env; local_env; _} as env) (t : t) =
     let reduce env t = reduce_ env t in
@@ -394,6 +456,10 @@ end) = struct
       let local_env = { env.local_env with depth = env.local_env.depth + 1 } in
       reduce_ { env with local_env } t
     in
+=======
+    ({fuel; global_env; local_env; _} as env) (t : t) =
+    let reduce env t = reduce_ env t in
+>>>>>>> upstream/5.4
     let delay_reduce env t = Thunk (env.local_env, t) in
     let return desc = { uid = t.uid; desc; approximated = t.approximated } in
     let rec force_aliases nf = match nf.desc with
@@ -407,6 +473,7 @@ end) = struct
       | None -> t'
       | Some _ as uid -> { t' with uid }
     in
+<<<<<<< HEAD
     let set_uid_if_none uid t =
       match t.uid with
       | None -> { t with uid = uid }
@@ -440,6 +507,16 @@ end) = struct
               reduce_with_increased_depth env t
             | None -> return (NComp_unit unit_name)
             end)
+=======
+    if !fuel < 0 then approx_nf (return (NError "NoFuelLeft"))
+    else
+      match t.desc with
+      | Comp_unit unit_name ->
+          begin match Params.read_unit_shape ~unit_name with
+          | Some t -> reduce env t
+          | None -> return (NComp_unit unit_name)
+          end
+>>>>>>> upstream/5.4
       | App(f, arg) ->
           let f = reduce env f |> force_aliases in
           begin match f.desc with
@@ -460,6 +537,7 @@ end) = struct
               | exception Not_found -> nored ()
               | nf -> force env nf |> reset_uid_if_new_binding
               end
+<<<<<<< HEAD
           (* Merlin Reductions: The following reductions are not correct from a
              a runtime perspective (e.g., we cannot project out the tuple or
              record from a constructor, because these contents are not
@@ -521,6 +599,8 @@ end) = struct
             | Some (_, field_uid, field_shape, _) ->
               force env field_shape |> set_uid_if_none field_uid
             | None -> nored())
+=======
+>>>>>>> upstream/5.4
           | _ ->
               nored ()
           end
@@ -528,7 +608,11 @@ end) = struct
           let body_nf = delay_reduce (bind env var None) body in
           return (NAbs(local_env, var, body, body_nf))
       | Var id ->
+<<<<<<< HEAD
           begin match Ident.Map.find id local_env.subst with
+=======
+          begin match Ident.Map.find id local_env with
+>>>>>>> upstream/5.4
           (* Note: instead of binding abstraction-bound variables to
              [None], we could unify it with the [Some v] case by
              binding the bound variable [x] to [NVar x].
@@ -551,17 +635,25 @@ end) = struct
           | exception Not_found -> return (NVar id)
           | res when res = t -> return (NVar id)
           | res ->
+<<<<<<< HEAD
               MB.decr fuel;
               reduce env res
           end
       | Leaf -> return NLeaf
       | Mu t_body -> return (NMu (reduce env t_body))
       | Rec_var n -> return (NRec_var n)
+=======
+              decr fuel;
+              reduce env res
+          end
+      | Leaf -> return NLeaf
+>>>>>>> upstream/5.4
       | Struct m ->
           let mnf = Item.Map.map (delay_reduce env) m in
           return (NStruct mnf)
       | Alias t -> return (NAlias (delay_reduce env t))
       | Error s -> approx_nf (return (NError s))
+<<<<<<< HEAD
       | Mutrec defs ->
           let dnfs = Ident.Map.map (reduce env) defs in
           return (NMutrec dnfs)
@@ -613,19 +705,33 @@ end) = struct
 
   and read_back env (nf : nf) : t =
   in_read_back_memo_table env.read_back_memo_table nf (read_back_ env) nf
+=======
+
+  and read_back env (nf : nf) : t =
+    in_memo_table env.read_back_memo_table nf (read_back_ env) nf
+>>>>>>> upstream/5.4
   (* The [nf] normal form we receive may contain a lot of internal
      sharing due to the use of memoization in the evaluator. We have
      to memoize here again, otherwise the sharing is lost by mapping
      over the term as a tree. *)
 
   and read_back_ env (nf : nf) : t =
+<<<<<<< HEAD
     read_back_desc ~uid:nf.uid env nf.desc
 
   and read_back_desc ~uid env desc =
+=======
+    { uid = nf.uid ;
+      desc = read_back_desc env nf.desc;
+      approximated = nf.approximated }
+
+  and read_back_desc env desc =
+>>>>>>> upstream/5.4
     let read_back nf = read_back env nf in
     let read_back_force dnf = read_back (force env dnf) in
     match desc with
     | NVar v ->
+<<<<<<< HEAD
       var' uid v
     | NApp (nft, nfu) ->
         let f = read_back nft in
@@ -718,6 +824,33 @@ end) = struct
       max_steps_per_variable;
       global_env;
       diagnostics;
+=======
+        Var v
+    | NApp (nft, nfu) ->
+        App(read_back nft, read_back nfu)
+    | NAbs (_env, x, _t, nf) ->
+        Abs(x, read_back_force nf)
+    | NStruct nstr ->
+        Struct (Item.Map.map read_back_force nstr)
+    | NAlias nf -> Alias (read_back_force nf)
+    | NProj (nf, item) ->
+        Proj (read_back nf, item)
+    | NLeaf -> Leaf
+    | NComp_unit s -> Comp_unit s
+    | NError s -> Error s
+
+  (* Sharing the memo tables is safe at the level of a compilation unit since
+    idents should be unique *)
+  let reduce_memo_table = Local_store.s_table Hashtbl.create 42
+  let read_back_memo_table = Local_store.s_table Hashtbl.create 42
+
+  let reduce global_env t =
+    let fuel = ref Params.fuel in
+    let local_env = Ident.Map.empty in
+    let env = {
+      fuel;
+      global_env;
+>>>>>>> upstream/5.4
       reduce_memo_table = !reduce_memo_table;
       read_back_memo_table = !read_back_memo_table;
       local_env;
@@ -735,11 +868,14 @@ end) = struct
     | NComp_unit _ -> true
     | NError _ -> false
     | NLeaf -> false
+<<<<<<< HEAD
     | NMu _ -> false
     | NRec_var _ -> false
     | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
     | NPredef _ | NArrow | NPoly_variant _ | NVariant _ | NVariant_unboxed _
     | NRecord _ | NUnknown_type | NAt_layout _ -> false
+=======
+>>>>>>> upstream/5.4
 
   let rec reduce_aliases_for_uid env (nf : nf) =
     match nf with
@@ -757,6 +893,7 @@ end) = struct
       Internal_error_missing_uid
 
   let reduce_for_uid global_env t =
+<<<<<<< HEAD
     let fuel = Params.fuel () in
     MB.incr fuel; (* See the comment about [fuel] in [reduce]. *)
     let local_env = { subst = Ident.Map.empty; depth = 0 } in
@@ -766,6 +903,13 @@ end) = struct
       max_steps_per_variable = Params.max_shape_reduce_steps_per_variable ();
       global_env;
       diagnostics = Diagnostics.no_diagnostics;
+=======
+    let fuel = ref Params.fuel in
+    let local_env = Ident.Map.empty in
+    let env = {
+      fuel;
+      global_env;
+>>>>>>> upstream/5.4
       reduce_memo_table = !reduce_memo_table;
       read_back_memo_table = !read_back_memo_table;
       local_env;
@@ -779,6 +923,7 @@ end
 
 module Local_reduce =
   Make(struct
+<<<<<<< HEAD
     let fuel () = MB.of_int 10
 
     let fuel_for_compilation_units () = MB.Unbounded
@@ -790,6 +935,10 @@ module Local_reduce =
     let projection_rules_for_merlin_enabled = true
 
     let read_unit_shape ~diagnostics:_ ~unit_name:_ = None
+=======
+    let fuel = 10
+    let read_unit_shape ~unit_name:_ = None
+>>>>>>> upstream/5.4
   end)
 
 let local_reduce = Local_reduce.reduce

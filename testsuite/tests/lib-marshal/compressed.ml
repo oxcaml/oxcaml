@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 (* CR ocaml 5 compressed-marshal: re-enable this test
 
+=======
+>>>>>>> upstream/5.4
 (* TEST
    include ocamlcommon;
 *)
@@ -168,5 +171,8 @@ let main () =
   Sys.remove "intext.data"
 
 let _ = main ()
+<<<<<<< HEAD
 
 *)
+=======
+>>>>>>> upstream/5.4

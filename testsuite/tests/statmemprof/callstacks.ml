@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 (* TEST_BELOW
    Blank lines added to preserve locations
 
@@ -11,6 +12,17 @@
 
 
 
+=======
+(* TEST
+ flags = "-g";
+ {
+   reference = "${test_source_directory}/callstacks.flat-float-array.reference";
+   flat-float-array;
+ }{
+   reference = "${test_source_directory}/callstacks.no-flat-float-array.reference";
+   no-flat-float-array;
+ }
+>>>>>>> upstream/5.4
 *)
 
 module MP = Gc.Memprof

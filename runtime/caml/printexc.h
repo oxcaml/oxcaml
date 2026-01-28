@@ -16,7 +16,6 @@
 #ifndef CAML_PRINTEXC_H
 #define CAML_PRINTEXC_H
 
-
 #include "misc.h"
 #include "mlvalues.h"
 
@@ -24,15 +23,21 @@
 extern "C" {
 #endif
 
-
 CAMLextern char * caml_format_exception (value);
+<<<<<<< HEAD
 #ifdef CAML_INTERNALS
 CAMLnoret void caml_fatal_uncaught_exception (value);
 CAMLnoret void caml_fatal_uncaught_exception_with_message (value, const char *);
 #endif /* CAML_INTERNALS */
+=======
+>>>>>>> upstream/5.4
 
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef CAML_INTERNALS
+CAMLnoret void caml_fatal_uncaught_exception (value);
+#endif /* CAML_INTERNALS */
 
 #endif /* CAML_PRINTEXC_H */

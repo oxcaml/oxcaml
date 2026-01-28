@@ -11,8 +11,8 @@ type 'a t = 'a
 Line 2, characters 42-43:
 2 | let f (g : 'a list -> 'a t -> 'a) s = g s s;;
                                               ^
-Error: This expression has type "'a list"
-       but an expression was expected of type "'a t" = "'a"
+Error: The value "s" has type "'a list" but an expression was expected of type
+         "'a t" = "'a"
        The type variable "'a" occurs inside "'a list"
 |}];;
 
@@ -21,8 +21,8 @@ let f (g : 'a * 'b -> 'a t -> 'a) s = g s s;;
 Line 1, characters 42-43:
 1 | let f (g : 'a * 'b -> 'a t -> 'a) s = g s s;;
                                               ^
-Error: This expression has type "'a * 'b"
-       but an expression was expected of type "'a t" = "'a"
+Error: The value "s" has type "'a * 'b" but an expression was expected of type
+         "'a t" = "'a"
        The type variable "'a" occurs inside "'a * 'b"
 |}];;
 
@@ -62,6 +62,7 @@ let wrong_to_seq (xt : 'a t) : 'a Seq.t =
    with the Ctype.Escape exception, as it did from 4.13 to 5.1. *)
 [%%expect{|
 type 'a t = T of 'a
+<<<<<<< HEAD
 Line 4, characters 2-22:
 4 |   Seq.cons Seq.empty x
       ^^^^^^^^^^^^^^^^^^^^
@@ -73,10 +74,14 @@ Error: This expression has type "'a Seq.t Seq.t" = "unit -> 'a Seq.t Seq.node"
          "unit -> 'a Seq.t Seq.node"
        Type "'a" is not compatible with type "'a Seq.t" = "unit -> 'a Seq.node"
        The type variable "'a" occurs inside "'a Seq.t"
+=======
+val wrong_to_seq : ('a Seq.t as 'a) Seq.t t -> 'a Seq.t Seq.t = <fun>
+>>>>>>> upstream/5.4
 |}];;
 
 let strange x = Seq.[cons x empty; cons empty x];;
 [%%expect{|
+<<<<<<< HEAD
 Line 1, characters 35-47:
 1 | let strange x = Seq.[cons x empty; cons empty x];;
                                        ^^^^^^^^^^^^
@@ -173,3 +178,12 @@ type 'a t30 = ('a * 'a) t29
 type 'a t = 'a t30
 val foo : int t -> int t = <fun>
 |}]
+=======
+Line 1, characters 12-48:
+1 | let strange x = Seq.[cons x empty; cons empty x];;
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a Seq.t as 'a) Seq.t -> 'a Seq.t Seq.t list"
+       but an expression was expected of type
+         "('a Seq.t as 'a) Seq.t -> 'a Seq.t Seq.t list"
+|}];;
+>>>>>>> upstream/5.4

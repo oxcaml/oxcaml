@@ -80,11 +80,35 @@ module Runtime_4 = struct
 
     type 'a key = int * (unit -> 'a) Modes.Portable.t
 
+<<<<<<< HEAD
     let key_counter = Atomic.make 0
 
     let new_key ?split_from_parent:_ init_orphan =
       let idx = Atomic.fetch_and_add key_counter 1 in
       (idx, { portable = init_orphan })
+=======
+  module Obj_opt : sig
+    type t
+    val none : t
+    val some : 'a -> t
+    val is_some : t -> bool
+
+    (** [unsafe_get obj] may only be called safely
+        if [is_some] is true.
+
+        [unsafe_get (some v)] is equivalent to
+        [Obj.obj (Obj.repr v)]. *)
+    val unsafe_get : t -> 'a
+  end = struct
+    type t = Obj.t
+    let none = Obj.repr (ref 0)
+    let some v = Obj.repr v
+    let is_some obj = (obj != none)
+    let unsafe_get obj = Obj.obj obj
+  end
+
+  type dls_state = Obj_opt.t array
+>>>>>>> upstream/5.4
 
     (* If necessary, grow the current domain's local state array such that [idx]
     * is a valid index in the array. *)
@@ -112,11 +136,20 @@ module Runtime_4 = struct
       let st = maybe_grow idx in
       Array.unsafe_set st idx (Obj_opt.some x)
 
+<<<<<<< HEAD
     let[@inline never] init_idx (type a) idx old_obj (init : _ -> a) =
       let v : a = init () in
       let new_obj = Obj_opt.some v in
       (* At this point, [st] or [st.(idx)] may have been changed
         by another thread on the same domain.
+=======
+  external compare_and_set_dls_state : dls_state -> dls_state -> bool =
+    "caml_domain_dls_compare_and_set" [@@noalloc]
+
+  let create_dls () =
+    let st = Array.make 8 Obj_opt.none in
+    set_dls_state st
+>>>>>>> upstream/5.4
 
         If [st] changed, it was resized into a larger value,
         we can just reuse the new value.
@@ -539,6 +572,7 @@ module TLS0 = struct
     k
 
   (* If necessary, grow the current domain's local state array such that [idx]
+<<<<<<< HEAD
     * is a valid index in the array. *)
   let[@inline] maybe_grow idx =
     let st = get_tls_state () in
@@ -592,6 +626,87 @@ module TLS0 = struct
     let set_initial_keys (l : key_value list) =
       List.iter (fun (KV (k, v)) -> set k (v ())) l
   end
+=======
+   * is a valid index in the array. *)
+  let rec maybe_grow idx =
+    let st = get_dls_state () in
+    let sz = Array.length st in
+    if idx < sz then st
+    else begin
+      let rec compute_new_size s =
+        if idx < s then s else compute_new_size (2 * s)
+      in
+      let new_sz = compute_new_size sz in
+      let new_st = Array.make new_sz Obj_opt.none in
+      Array.blit st 0 new_st 0 sz;
+      (* We want a implementation that is safe with respect to
+         single-domain multi-threading: retry if the DLS state has
+         changed under our feet.
+         Note that the number of retries will be very small in
+         contended scenarios, as the array only grows, with
+         exponential resizing. *)
+      if compare_and_set_dls_state st new_st
+      then new_st
+      else maybe_grow idx
+    end
+
+  let set (type a) (idx, _init) (x : a) =
+    let st = maybe_grow idx in
+    (* [Sys.opaque_identity] ensures that flambda does not look at the type of
+     * [x], which may be a [float] and conclude that the [st] is a float array.
+     * We do not want OCaml's float array optimisation kicking in here. *)
+    st.(idx) <- Obj_opt.some (Sys.opaque_identity x)
+
+
+  let[@inline never] array_compare_and_set a i oldval newval =
+    (* Note: we cannot use [@poll error] due to the
+       allocations on a.(i) in the Double_array case. *)
+    let curval = a.(i) in
+    if curval == oldval then (
+      Array.unsafe_set a i newval;
+      true
+    ) else false
+
+  let get (type a) ((idx, init) : a key) : a =
+    let st = maybe_grow idx in
+    let obj = st.(idx) in
+    if Obj_opt.is_some obj
+    then (Obj_opt.unsafe_get obj : a)
+    else begin
+      let v : a = init () in
+      let new_obj = Obj_opt.some (Sys.opaque_identity v) in
+      (* At this point, [st] or [st.(idx)] may have been changed
+         by another thread on the same domain.
+
+         If [st] changed, it was resized into a larger value,
+         we can just reuse the new value.
+
+         If [st.(idx)] changed, we drop the current value to avoid
+         letting other threads observe a 'revert' that forgets
+         previous modifications. *)
+      let st = get_dls_state () in
+      if array_compare_and_set st idx obj new_obj
+      then v
+      else begin
+        (* if st.(idx) changed, someone must have initialized
+           the key in the meantime. *)
+        let updated_obj = st.(idx) in
+        if Obj_opt.is_some updated_obj
+        then (Obj_opt.unsafe_get updated_obj : a)
+        else assert false
+      end
+    end
+
+  type key_value = KV : 'a key * 'a -> key_value
+
+  let get_initial_keys () : key_value list =
+    List.map
+      (fun (KI (k, split)) -> KV (k, (split (get k))))
+      (Atomic.get parent_keys)
+
+  let set_initial_keys (l: key_value list) =
+    List.iter (fun (KV (k, v)) -> set k v) l
+>>>>>>> upstream/5.4
 end
 
 module Safe = struct
@@ -612,7 +727,14 @@ end
 module TLS = struct
   module Private = TLS0.Private
 
+<<<<<<< HEAD
   type 'a key = 'a TLS0.key
+=======
+external self_index : unit -> int
+  = "caml_ml_domain_index" [@@noalloc]
+
+(******** Callbacks **********)
+>>>>>>> upstream/5.4
 
   let new_key ?split_from_parent f =
     let split_from_parent =

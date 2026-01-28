@@ -28,6 +28,7 @@ open Types
    Indeed, non-variable node of a type are duplicated, with their
    levels set to generic level.  That way, the resulting type is
    well-formed (decreasing levels), even if the original one was not.
+<<<<<<< HEAD
 
    In the presence of local substitutions for module types, a substitution for a
    type expression may fail to produce a well-formed type. In order to confine
@@ -75,6 +76,33 @@ val with_additional_action: additional_action_config -> t -> t
 *)
 val reset_additional_action_type_id: unit -> unit
 
+=======
+
+   In the presence of local substitutions for module types, a substitution for a
+   type expression may fail to produce a well-formed type. In order to confine
+   this issue to local substitutions, the type of substitutions is split into a
+   safe and unsafe variant. Only unsafe substitutions may expand a module type
+   path into a generic module type. *)
+
+(** Type familly for substitutions *)
+type +'k subst
+
+type safe = [`Safe]
+type unsafe = [`Unsafe]
+
+type t = safe subst
+(** Standard substitution*)
+
+val identity: 'a subst
+val unsafe: t -> unsafe subst
+
+val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst
+val add_module: Ident.t -> Path.t -> 'k subst -> 'k subst
+val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
+
+val for_saving: t -> t
+val reset_for_saving: unit -> unit
+>>>>>>> upstream/5.4
 val change_locs: 'k subst -> Location.t -> 'k subst
 
 val module_path: t -> Path.t -> Path.t

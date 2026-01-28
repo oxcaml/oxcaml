@@ -100,10 +100,14 @@ endif
 .INTERMEDIATE: tmpheader.exe
 tmpheader.exe: $(HEADERPROGRAM).$(O)
 	$(V_MKEXE)$(call MKEXE_VIA_CC,$@,$^)
+<<<<<<< HEAD
 # FIXME This is wrong - mingw could invoke strip; MSVC equivalent?
 ifneq "$(UNIX_OR_WIN32)" "win32"
 	strip $@
 endif
+=======
+	$(STRIP) $@
+>>>>>>> upstream/5.4
 
 stdlib.cma: $(OBJS)
 	$(V_LINKC)$(CAMLC) -a -o $@ $^

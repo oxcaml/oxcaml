@@ -214,8 +214,9 @@ let print_getglobal_name ic =
     if n >= Array.length !globals || n < 0
     then print_string "<global table overflow>"
     else match !globals.(n) with
-         | Glob glob -> print_string
-                       (Format.asprintf "%a" Symtable.Global.description glob)
+         | Glob glob ->
+             let desc = Format_doc.compat Symtable.Global.description in
+             print_string (Format.asprintf "%a" desc glob)
          | Constant obj -> print_obj obj
   end
 
@@ -244,8 +245,8 @@ let print_setglobal_name ic =
     then print_string "<global table overflow>"
     else match !globals.(n) with
          | Glob glob ->
-             print_string
-               (Format.asprintf "%a" Symtable.Global.description glob)
+             let desc = Format_doc.compat Symtable.Global.description in
+             print_string (Format.asprintf "%a" desc glob)
          | Constant _ -> print_string "<unexpected constant>"
   end
 
@@ -562,12 +563,17 @@ let dump_obj ic =
     List.iter print_reloc cu.cu_reloc;
   if cu.cu_debug > 0 then begin
     seek_in ic cu.cu_debug;
+<<<<<<< HEAD
     (* CR ocaml 5 compressed-marshal:
     let evl = (Compression.input_value ic : debug_event list) in
     ignore (Compression.input_value ic);
     *)
     let evl = (Marshal.from_channel ic : debug_event list) in
     ignore (Marshal.from_channel ic);
+=======
+    let evl = (Compression.input_value ic : debug_event list) in
+    ignore (Compression.input_value ic);
+>>>>>>> upstream/5.4
                 (* Skip the list of absolute directory names *)
     record_events 0 evl
   end;
@@ -595,6 +601,7 @@ let dump_exe ic =
         let num_eventlists = input_binary_int ic in
         for _i = 1 to num_eventlists do
           let orig = input_binary_int ic in
+<<<<<<< HEAD
           (* CR ocaml 5 compressed-marshal:
           let evl = (Compression.input_value ic : debug_event list) in
           (* Skip the list of absolute directory names *)
@@ -603,6 +610,11 @@ let dump_exe ic =
           let evl = (Marshal.from_channel ic : debug_event list) in
           (* Skip the list of absolute directory names *)
           ignore (Marshal.from_channel ic);
+=======
+          let evl = (Compression.input_value ic : debug_event list) in
+          (* Skip the list of absolute directory names *)
+          ignore (Compression.input_value ic);
+>>>>>>> upstream/5.4
           record_events orig evl
         done
   end;

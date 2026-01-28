@@ -17,6 +17,10 @@
 
 #include <math.h>
 #include <stdbool.h>
+<<<<<<< HEAD
+=======
+#include <assert.h>
+>>>>>>> upstream/5.4
 #include "caml/alloc.h"
 #include "caml/backtrace.h"
 #include "caml/backtrace_prim.h"
@@ -331,12 +335,20 @@
  * Some callbacks are run at allocation time, for allocations from
  * Caml (see under "Sampling" above). Other allocation callbacks, and
  * all post-allocation callbacks, are run during
+<<<<<<< HEAD
  * `caml_memprof_run_callbacks_exn()`, which is called by the
+=======
+ * `caml_memprof_run_callbacks_res()`, which is called by the
+>>>>>>> upstream/5.4
  * runtime's general pending-action mechanism at poll points.
  *
  * We set the domain's action-pending flag when we notice we have
  * pending callbacks. Caml drops into the runtime at a poll point, and
+<<<<<<< HEAD
  * calls `caml_memprof_run_callbacks_exn()`, whenever the
+=======
+ * calls `caml_memprof_run_callbacks_res()`, whenever the
+>>>>>>> upstream/5.4
  * action-pending flag is set, whether or not memprof set it. So
  * memprof maintains its own per-domain `pending` flag, to avoid
  * suspending/unsuspending sampling, and checking all the entries
@@ -447,6 +459,13 @@ typedef struct memprof_orphan_table_s memprof_orphan_table_s,
 /* the mask for a given callback index */
 #define CB_MASK(cb) (1 << ((cb) - 1))
 
+<<<<<<< HEAD
+=======
+/* How many bits required for an allocation source */
+#define SRC_TYPE_BITS    2
+static_assert((1 << SRC_TYPE_BITS) >= CAML_MEMPROF_NUM_SOURCE_KINDS, "");
+
+>>>>>>> upstream/5.4
 /* Structure for each tracked allocation. Six words (with many spare
  * bits in the final word). */
 
@@ -474,7 +493,11 @@ struct entry_s {
 
   /* The source of the allocation: normal allocations, interning,
    * or custom_mem (CAML_MEMPROF_SRC_*). */
+<<<<<<< HEAD
   unsigned int source : 2;
+=======
+  unsigned int source : SRC_TYPE_BITS;
+>>>>>>> upstream/5.4
 
   /* Is `block` actually an offset? */
   bool offset : 1;
@@ -618,6 +641,388 @@ struct memprof_domain_s {
 struct memprof_orphan_table_s {
   /* An orphaned entries table */
   entries_s entries;
+<<<<<<< HEAD
+
+  /* next orphaned table in a linked list. */
+  memprof_orphan_table_t next;
+};
+
+/* List of orphaned entry tables not yet adopted by any domain. */
+static memprof_orphan_table_t orphans = NULL;
+
+/* lock controlling access to `orphans` and writes to `orphans_present` */
+static caml_plat_mutex orphans_lock = CAML_PLAT_MUTEX_INITIALIZER;
+
+/* Flag indicating non-NULL orphans. Only modified when holding orphans_lock. */
+static atomic_uintnat orphans_present;
+
+/**** Initializing and clearing entries tables ****/
+
+static void entries_init(entries_t es, size_t min_capacity, value config)
+{
+  es->t = NULL;
+  es->min_capacity = min_capacity;
+  es->capacity = es->size = es->young = es->evict = es->active = 0;
+  es->config = config;
+}
+
+static void entries_clear(entries_t es)
+{
+  if (es->t) {
+    caml_stat_free(es->t);
+    es->t = NULL;
+  }
+  es->capacity = es->size = es->young = es->evict = es->active = 0;
+  es->config = CONFIG_NONE;
+}
+
+/**** Managing entries. ****/
+
+/* When an entries table needs to grow, grow it by this factor */
+#define ENTRIES_GROWTH_FACTOR 2
+
+/* Do not shrink an entries table until it is this much too large */
+#define ENTRIES_SHRINK_FACTOR 4
+
+/* Reallocate the [es] entries table if it is either too small or too
+ * large. [grow] is the number of free cells needed.
+ * Returns false if reallocation was necessary but failed, and truer
+ * otherwise. */
+
+static bool entries_ensure(entries_t es, size_t grow)
+{
+  if (es->capacity == 0 && grow == 0) {
+    /* Don't want min_capacity for an unused table. */
+    return true;
+  }
+  size_t new_size = es->size + grow;
+  if (new_size <= es->capacity &&
+     (ENTRIES_SHRINK_FACTOR * new_size >= es->capacity ||
+      es->capacity == es->min_capacity)) {
+    /* No need to grow or shrink */
+    return true;
+  }
+  size_t new_capacity = new_size * ENTRIES_GROWTH_FACTOR;
+  if (new_capacity < es->min_capacity)
+    new_capacity = es->min_capacity;
+  entry_t new_t = caml_stat_resize_noexc(es->t, new_capacity * sizeof(entry_s));
+  if (new_t == NULL) return false;
+  es->t = new_t;
+  es->capacity = new_capacity;
+  return true;
+}
+
+#define Invalid_index (~(size_t)0)
+
+/* Create and initialize a new entry in an entries table, and return
+ * its index (or Invalid_index if allocation fails). */
+
+Caml_inline size_t new_entry(entries_t es,
+                             value block, value user_data,
+                             size_t wosize, size_t samples,
+                             int source, bool is_young,
+                             bool offset)
+{
+  if (!entries_ensure(es, 1))
+    return Invalid_index;
+  size_t i = es->size ++;
+  entry_t e = es->t + i;
+  e->block = block;
+  e->user_data = user_data;
+  e->samples = samples;
+  e->wosize = wosize;
+  e->runner = NULL;
+  e->source = source;
+  e->offset = offset;
+  e->alloc_young = is_young;
+  e->promoted = false;
+  e->deallocated = false;
+  e->deleted = false;
+  e->callback = CB_NONE;
+  e->callbacks = 0;
+  return i;
+}
+
+/* Mark a given entry in an entries table as "deleted". Do not call on
+ * an entry with a currently-running callback. */
+
+static void entry_delete(entries_t es, size_t i)
+{
+  entry_t e = &es->t[i];
+
+  CAMLassert(!e->runner);
+
+  e->deleted = true;
+  e->offset = false;
+  e->user_data = Val_unit;
+  e->block = Val_unit;
+  if (i < es->evict) es->evict = i;
+}
+
+/* Remove any deleted entries from [es], updating [es->young] and
+ * [es->active] if necessary. */
+
+static void entries_evict(entries_t es)
+{
+  size_t i, j;
+
+  /* The obvious linear compaction algorithm */
+  j = i = es->evict;
+
+  while (i < es->size) {
+    if (!es->t[i].deleted) { /* keep this entry */
+      if (i != j) {
+        es->t[j] = es->t[i];
+        if (es->t[i].runner) {
+          memprof_thread_t runner = es->t[i].runner;
+          CAMLassert(runner->running_table == es);
+          CAMLassert(runner->running_index == i);
+          runner->running_index = j;
+        }
+      }
+      ++ j;
+    }
+    ++ i;
+    if (es->young == i) es->young = j;
+    if (es->active == i) es->active = j;
+  }
+  es->evict = es->size = j;
+  CAMLassert(es->active <= es->size);
+  CAMLassert(es->young <= es->size);
+
+  entries_ensure(es, 0);
+}
+
+/* Remove any offset entries from [es]. Ones which have completed an
+ * allocation callback but not a deallocation callback are marked as
+ * deallocated. Others are marked as deleted.
+ *
+ * This is called before moving entries from a thread's entries table
+ * to that of the domain, when we're about to orphan all the domain's
+ * entries. This can occur if we stop a profile and start another one
+ * during an allocation callback (either directly in the callback or
+ * on another thread while the callback is running). We'll never be
+ * able to connect an offset entry to its allocated block (the block
+ * will not be actually allocated until the callback completes, if at
+ * all), but some callbacks may already have been run for it. If no
+ * callbacks have been run, we simply mark the entry as deleted. If
+ * the allocation callback has been run, the best we can do is
+ * probably to fake deallocating the block, so that alloc/dealloc
+ * callback counts correspond.
+ *
+ * Note: no callbacks apart from the allocation callback can run on an
+ * offset entry (as the block has not yet been allocated, it cannot be
+ * promoted or deallocated). */
+
+static void entries_clear_offsets(entries_t es)
+{
+  for (size_t i = 0; i < es->size; ++i) {
+    entry_t e = &es->t[i];
+    if (e->offset) {
+      if (e->callbacks & CB_MASK(CB_ALLOC)) {
+        /* Have called just the allocation callback */
+        CAMLassert(e->callbacks == CB_MASK(CB_ALLOC));
+        e->block = Val_unit;
+        e->offset = false;
+        e->deallocated = true;
+        if (i < es->active) es->active = i;
+      } else {
+        /* Haven't yet called any callbacks */
+        CAMLassert(e->runner == NULL);
+        CAMLassert(e->callbacks == 0);
+        entry_delete(es, i);
+      }
+    }
+  }
+  entries_evict(es);
+}
+
+/* Remove any entries from [es] which are not currently running a
+ * callback. */
+
+static void entries_clear_inactive(entries_t es)
+{
+  CAMLassert (es->config == CONFIG_NONE);
+  for (size_t i = 0; i < es->size; ++i) {
+    if (es->t[i].runner == NULL) {
+      entry_delete(es, i);
+    }
+  }
+  entries_evict(es);
+}
+
+static value validated_config(entries_t es);
+
+/* Transfer all entries from one entries table to another, excluding
+ * ones which have not run any callbacks (these are deleted).
+ * Return `false` if allocation fails. */
+
+static bool entries_transfer(entries_t from, entries_t to)
+{
+  if (from->size == 0)
+    return true;
+
+  (void)validated_config(from); /* For side-effect, so we can check ... */
+  (void)validated_config(to);   /* ... that the configs are equal. */
+  CAMLassert(from->config == to->config);
+
+  if (!entries_ensure(to, from->size))
+    return false;
+
+  size_t delta = to->size;
+  to->size += from->size;
+
+  for (size_t i = 0; i < from->size; ++i) {
+    if (from->t[i].callbacks == 0) {
+      /* Very rare: transferring an entry which hasn't called its
+       * allocation callback. We just delete it. */
+      entry_delete(from, i);
+    }
+    to->t[i + delta] = from->t[i];
+    memprof_thread_t runner = from->t[i].runner;
+    if (runner) { /* unusual */
+      CAMLassert(runner->running_table == from);
+      CAMLassert(runner->running_index == i);
+      runner->running_table = to;
+      runner->running_index = i + delta;
+    }
+  }
+
+  if (to->young == delta) {
+    to->young = from->young + delta;
+  }
+  if (to->evict == delta) {
+    to->evict = from->evict + delta;
+  }
+  if (to->active == delta) {
+    to->active = from->active + delta;
+  }
+  /* Reset `from` to empty, and allow it to shrink */
+  from->young = from->evict = from->active = from->size = 0;
+  entries_ensure(from, 0);
+  return true;
+}
+
+/* If es->config points to a DISCARDED configuration, update
+ * es->config to CONFIG_NONE. Return es->config. */
+
+static value validated_config(entries_t es)
+{
+  if ((es->config != CONFIG_NONE) &&
+      (Status(es->config) == CONFIG_STATUS_DISCARDED)) {
+    es->config = CONFIG_NONE;
+    entries_clear_inactive(es);
+  }
+  return es->config;
+}
+
+/* Return current sampling configuration for a thread. If it's been
+ * discarded, then reset it to CONFIG_NONE and return that. */
+
+static value thread_config(memprof_thread_t thread)
+{
+  return validated_config(&thread->entries);
+}
+
+/*** Create and destroy orphan tables ***/
+
+/* Orphan any surviving entries from a domain or its threads (after
+ * first discarding any deleted and offset entries), onto the domain's
+ * orphans list. This copies the domain's table itself, to avoid
+ * copying the potentially live array.
+ *
+ * Returns false if allocation fails, true otherwise. */
+
+static bool orphans_create(memprof_domain_t domain)
+{
+  /* Clear offset entries and count survivors in threads tables. */
+  size_t total_size = 0;
+  memprof_thread_t thread = domain->threads;
+  while (thread) {
+    entries_clear_offsets(&thread->entries);
+    total_size += thread->entries.size;
+    thread = thread->next;
+  }
+  entries_t es = &domain->entries;
+  entries_evict(es); /* remove deleted entries */
+  total_size += es->size;
+
+  if (!total_size) /* No entries to orphan */
+    return true;
+
+  memprof_orphan_table_t ot = caml_stat_alloc(sizeof(memprof_orphan_table_s));
+  if (!ot)
+    return false;
+
+  entries_init(&ot->entries, MIN_ENTRIES_ORPHAN_CAPACITY,
+               domain->entries.config);
+  if (!entries_ensure(&ot->entries, total_size)) {
+    /* Couldn't allocate entries table - failure */
+    caml_stat_free(ot);
+    return false;
+  }
+
+  /* Orphan surviving entries; these transfers will succeed
+   * because we pre-sized the table. */
+  (void)entries_transfer(&domain->entries, &ot->entries);
+  thread = domain->threads;
+  while(thread) {
+    /* May discard entries which haven't run allocation callbacks */
+    (void)entries_transfer(&thread->entries, &ot->entries);
+    thread = thread->next;
+  }
+  ot->next = domain->orphans;
+  domain->orphans = ot;
+  return true;
+}
+
+/* Abandon all a domain's orphans to the global list. */
+
+static void orphans_abandon(memprof_domain_t domain)
+{
+  /* Find the end of the domain's orphans list */
+  memprof_orphan_table_t ot = domain->orphans;
+  if (!ot)
+    return;
+
+  while(ot->next) {
+    ot = ot->next;
+  }
+
+  caml_plat_lock_blocking(&orphans_lock);
+  ot->next = orphans;
+  orphans = domain->orphans;
+  atomic_store_release(&orphans_present, 1);
+  caml_plat_unlock(&orphans_lock);
+  domain->orphans = NULL;
+}
+
+/* Adopt all global orphans to the given domain. */
+
+static void orphans_adopt(memprof_domain_t domain)
+{
+  if (!atomic_load_acquire(&orphans_present))
+    return; /* No orphans to adopt */
+
+  /* Find the end of the domain's orphans list */
+  memprof_orphan_table_t *p = &domain->orphans;
+  while(*p) {
+    p = &(*p)->next;
+  }
+
+  caml_plat_lock_blocking(&orphans_lock);
+  if (orphans) {
+    *p = orphans;
+    orphans = NULL;
+    atomic_store_release(&orphans_present, 0);
+  }
+  caml_plat_unlock(&orphans_lock);
+}
+
+/* Destroy an orphan table. */
+
+static void orphans_destroy(memprof_orphan_table_t ot)
+=======
 
   /* next orphaned table in a linked list. */
   memprof_orphan_table_t next;
@@ -1055,6 +1460,314 @@ Caml_inline uint64_t splitmix64_next(uint64_t* x)
 
 static void xoshiro_init(memprof_domain_t domain, uint64_t seed)
 {
+  uint64_t splitmix64_state = seed;
+  for (int i = 0; i < RAND_BLOCK_SIZE; i++) {
+    uint64_t t = splitmix64_next(&splitmix64_state);
+    domain->xoshiro_state[0][i] = t & 0xFFFFFFFF;
+    domain->xoshiro_state[1][i] = t >> 32;
+    t = splitmix64_next(&splitmix64_state);
+    domain->xoshiro_state[2][i] = t & 0xFFFFFFFF;
+    domain->xoshiro_state[3][i] = t >> 32;
+  }
+}
+
+/* xoshiro128+ PRNG. See Blackman & Vigna; "Scrambled linear
+ * pseudorandom number generators"; ACM Trans. Math. Softw., 47:1-32,
+ * 2021:
+ * "xoshiro128+ is our choice for 32-bit floating-point generation." */
+
+Caml_inline uint32_t xoshiro_next(memprof_domain_t domain, int i)
+{
+  uint32_t res = domain->xoshiro_state[0][i] + domain->xoshiro_state[3][i];
+  uint32_t t = domain->xoshiro_state[1][i] << 9;
+  domain->xoshiro_state[2][i] ^= domain->xoshiro_state[0][i];
+  domain->xoshiro_state[3][i] ^= domain->xoshiro_state[1][i];
+  domain->xoshiro_state[1][i] ^= domain->xoshiro_state[2][i];
+  domain->xoshiro_state[0][i] ^= domain->xoshiro_state[3][i];
+  domain->xoshiro_state[2][i] ^= t;
+  t = domain->xoshiro_state[3][i];
+  domain->xoshiro_state[3][i] = (t << 11) | (t >> 21);
+  return res;
+}
+
+/* Computes [log((y+0.5)/2^32)], up to a relatively good precision,
+ * and guarantee that the result is negative, in such a way that SIMD
+ * can parallelize it. The average absolute error is very close to
+ * 0.
+ *
+ * Uses a type pun to break y+0.5 into biased exponent `exp` (an
+ * integer-valued float in the range [126, 159]) and mantissa `x` (a
+ * float in [1,2)). This may discard up to eight low bits of y.
+ *
+ * Then y+0.5 = x * 2^(exp-127), so if f(x) ~= log(x) - 159*log(2),
+ * log((y+0.5)/2^32) ~= f(x) + exp * log(2).
+ *
+ * We use sollya to find the unique degree-3 polynomial f such that :
+ *
+ *    - Its average value is that of log(x) - 159*log(2) for x in [1, 2)
+ *          (so the sampling has the right mean when lambda is small).
+ *    - f(1) = f(2) - log(2), so the approximation is continuous.
+ *    - The error at x=1 is -1e-5, so the approximation is always negative.
+ *    - The maximum absolute error is minimized in [1, 2) (the actual
+ *      maximum absolute error is around 7e-4). */
+
+Caml_inline float log_approx(uint32_t y)
+{
+  union { float f; int32_t i; } u;
+  u.f = y + 0.5f;
+  float exp = (float)(u.i >> 23);
+  u.i = (u.i & 0x7FFFFF) | 0x3F800000;
+  float x = u.f;
+  return (-111.70172433407f +
+          x * (2.104659476859f +
+               x * (-0.720478916626f +
+                    x * 0.107132064797f)) +
+          0.6931471805f * exp);
+}
+
+/* This function regenerates [RAND_BLOCK_SIZE] geometric random
+ * variables at once. Doing this by batches help us gain performances:
+ * many compilers (e.g., GCC, CLang, ICC) will be able to use SIMD
+ * instructions to get a performance boost. */
+
+#ifdef SUPPORTS_TREE_VECTORIZE
+__attribute__((optimize("tree-vectorize")))
+#endif
+
+static void rand_batch(memprof_domain_t domain)
+{
+  float one_log1m_lambda = One_log1m_lambda(domain->entries.config);
+
+  /* Instead of using temporary buffers, we could use one big loop,
+     but it turns out SIMD optimizations of compilers are more fragile
+     when using larger loops.  */
+  uint32_t A[RAND_BLOCK_SIZE];
+  float B[RAND_BLOCK_SIZE];
+
+  /* Generate uniform variables in A using the xoshiro128+ PRNG. */
+  for (int i = 0; i < RAND_BLOCK_SIZE; i++)
+    A[i] = xoshiro_next(domain, i);
+
+  /* Generate exponential random variables by computing logarithms. */
+  for (int i = 0; i < RAND_BLOCK_SIZE; i++)
+    B[i] = 1 + log_approx(A[i]) * one_log1m_lambda;
+
+  /* We do the final flooring for generating geometric
+     variables. Compilers are unlikely to use SIMD instructions for
+     this loop, because it involves a conditional and variables of
+     different sizes (32 and 64 bits). */
+  for (int i = 0; i < RAND_BLOCK_SIZE; i++) {
+    double f = B[i];
+    CAMLassert (f >= 1);
+    /* [Max_long+1] is a power of two => no rounding in the test. */
+    if (f >= Max_long+1)
+      domain->rand_geom_buff[i] = Max_long;
+    else domain->rand_geom_buff[i] = (uintnat)f;
+  }
+
+  domain->rand_pos = 0;
+}
+
+/* Simulate a geometric random variable of parameter [lambda].
+ * The result is clipped in [1..Max_long] */
+
+static uintnat rand_geom(memprof_domain_t domain)
+{
+  uintnat res;
+  CAMLassert(One_log1m_lambda(domain->entries.config) <= 0.);
+  if (domain->rand_pos == RAND_BLOCK_SIZE)
+    rand_batch(domain);
+  res = domain->rand_geom_buff[domain->rand_pos++];
+  CAMLassert(1 <= res);
+  CAMLassert(res <= Max_long);
+  return res;
+}
+
+/* Initialize per-domain PRNG, so we're ready to sample. */
+
+static void rand_init(memprof_domain_t domain)
+{
+  domain->rand_pos = RAND_BLOCK_SIZE;
+  if (domain->entries.config != CONFIG_NONE
+      && !Min_lambda(domain->entries.config)) {
+    /* next_rand_geom can be zero if the next word is to be sampled,
+     * but rand_geom always returns a value >= 1. Subtract 1 to correct. */
+    domain->next_rand_geom = rand_geom(domain) - 1;
+  }
+}
+
+/* Simulate a binomial random variable of parameters [len] and
+ * [lambda]. This tells us how many times a single block allocation is
+ * sampled.  This sampling algorithm has running time linear with [len
+ * * lambda].  We could use a more involved algorithm, but this should
+ * be good enough since, in the typical use case, [lambda] << 0.01 and
+ * therefore the generation of the binomial variable is amortized by
+ * the initialialization of the corresponding block.
+ *
+ * If needed, we could use algorithm BTRS from the paper:
+ *  Hormann, Wolfgang. "The generation of binomial random variates."
+ *  Journal of statistical computation and simulation 46.1-2 (1993), pp101-110.
+ */
+
+static uintnat rand_binom(memprof_domain_t domain, uintnat len)
+{
+  uintnat res;
+  CAMLassert(len < Max_long);
+  for (res = 0; domain->next_rand_geom < len; res++)
+    domain->next_rand_geom += rand_geom(domain);
+  domain->next_rand_geom -= len;
+  return res;
+}
+
+/**** Create and destroy thread state structures ****/
+
+/* Create a thread state structure attached to `domain`. */
+
+static memprof_thread_t thread_create(memprof_domain_t domain)
+{
+  memprof_thread_t thread = caml_stat_alloc(sizeof(memprof_thread_s));
+  if (!thread) {
+    return NULL;
+  }
+  thread->suspended = false;
+  thread->running_index = 0;
+  thread->running_table = NULL;
+  entries_init(&thread->entries, MIN_ENTRIES_THREAD_CAPACITY,
+               domain->entries.config);
+
+  /* attach to domain record */
+  thread->domain = domain;
+  thread->next = domain->threads;
+  domain->threads = thread;
+
+  return thread;
+}
+
+/* Destroy a thread state structure.  If the thread's entries table is
+ * not empty (because allocation failed when transferring it to the
+ * domain) then its entries will be lost. */
+
+static void thread_destroy(memprof_thread_t thread)
+{
+  memprof_domain_t domain = thread->domain;
+
+  /* A thread cannot be destroyed while inside a callback, as
+   * Thread.exit works by raising an exception, taking us out of the
+   * callback, and a domain won't terminate while any thread is
+   * alive. */
+  CAMLassert (!thread->running_table);
+  /* We would like to assert (thread->entries.size == 0), but this may
+   * not be true if allocation failed when transferring the thread's
+   * entries to its domain (in which case we are about to lose those
+   * entries. */
+  entries_clear(&thread->entries);
+
+  if (domain->current == thread) {
+    domain->current = NULL;
+  }
+  /* remove thread from the per-domain list. Could go faster if we
+   * used a doubly-linked list, but that's premature optimisation
+   * at this point. */
+  memprof_thread_t *p = &domain->threads;
+  while (*p != thread) {
+    CAMLassert(*p); /* checks that thread is on the list */
+    p = &(*p)->next;
+  }
+  *p = thread->next;
+
+  caml_stat_free(thread);
+}
+
+/**** Create and destroy domain state structures ****/
+
+/* Destroy a domain state structure. In the usual case, this will
+ * orphan any entries belonging to the domain or its threads onto the
+ * global orphans list. However, if there is an allocation failure,
+ * some or all of those entries may be lost. */
+
+static void domain_destroy(memprof_domain_t domain)
+{
+  /* Orphan any entries from the domain or its threads, then abandon
+   * all orphans to the global table. If creating the orphans table
+   * fails due to allocation failure, we lose the entries. */
+  (void)orphans_create(domain);
+  orphans_abandon(domain);
+
+  /* Destroy thread structures */
+  memprof_thread_t thread = domain->threads;
+  while (thread) {
+    memprof_thread_t next = thread->next;
+    thread_destroy(thread);
+    thread = next;
+  }
+
+  entries_clear(&domain->entries); /* In case allocation failed */
+  caml_stat_free(domain->callstack_buffer);
+  caml_stat_free(domain);
+}
+
+/* Create a domain state structure */
+
+static memprof_domain_t domain_create(caml_domain_state *caml_state)
+>>>>>>> upstream/5.4
+{
+  entries_clear(&ot->entries);
+  caml_stat_free(ot);
+}
+
+/* Traverse a domain's orphans list, clearing inactive entries from
+ * discarded tables and removing any table which is empty, and update
+ * the orphans_pending flag. */
+
+static void orphans_update_pending(memprof_domain_t domain)
+{
+  memprof_orphan_table_t *p = &domain->orphans;
+  bool pending = false;
+
+  while(*p) {
+    memprof_orphan_table_t ot = *p;
+    memprof_orphan_table_t next = ot->next;
+    value config = validated_config(&ot->entries);
+    if (config == CONFIG_NONE) { /* remove inactive entries */
+      entries_clear_inactive(&ot->entries);
+    }
+    if (ot->entries.size == 0) {
+      orphans_destroy(ot);
+      *p = next;
+    } else { /* any pending entries in this table? */
+      pending |= (ot->entries.active < ot->entries.size);
+      p = &ot->next;
+    }
+  }
+<<<<<<< HEAD
+  domain->orphans_pending = pending;
+}
+
+/**** Statistical sampling ****/
+
+/* We use a low-quality SplitMix64 PRNG to initialize state vectors
+ * for a high-quality high-performance 32-bit PRNG (xoshiro128+). That
+ * PRNG generates uniform random 32-bit numbers, which we use in turn
+ * to generate geometric random numbers parameterized by [lambda].
+ * This is all coded in such a way that compilers can readily use SIMD
+ * optimisations. */
+
+/* splitmix64 PRNG, used to initialize the xoshiro+128 state
+ * vectors. Closely based on the public-domain implementation
+ * by Sebastiano Vigna https://xorshift.di.unimi.it/splitmix64.c */
+
+Caml_inline uint64_t splitmix64_next(uint64_t* x)
+{
+  uint64_t z = (*x += 0x9E3779B97F4A7C15ull);
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return z ^ (z >> 31);
+}
+
+/* Initialize all the xoshiro+128 state vectors. */
+
+static void xoshiro_init(memprof_domain_t domain, uint64_t seed)
+{
   int i;
   uint64_t splitmix64_state = seed;
   for (i = 0; i < RAND_BLOCK_SIZE; i++) {
@@ -1332,6 +2045,30 @@ static memprof_domain_t domain_create(caml_domain_state *caml_state)
   return domain;
 }
 
+=======
+
+  domain->caml_state = caml_state;
+  entries_init(&domain->entries, MIN_ENTRIES_DOMAIN_CAPACITY, CONFIG_NONE);
+  domain->orphans = NULL;
+  domain->orphans_pending = false;
+  domain->pending = false;
+  domain->threads = NULL;
+  domain->current = NULL;
+  domain->callstack_buffer = NULL;
+  domain->callstack_buffer_len = 0;
+
+  /* create initial thread for domain */
+  memprof_thread_t thread = thread_create(domain);
+  if (thread) {
+    domain->current = thread;
+  } else {
+    domain_destroy(domain);
+    domain = NULL;
+  }
+  return domain;
+}
+
+>>>>>>> upstream/5.4
 /**** Interface with domain action-pending flag ****/
 
 /* If a domain has some callbacks pending, and isn't currently
@@ -1499,7 +2236,11 @@ static bool entry_update_after_minor_gc(entry_t e, void *data)
   CAMLassert(Is_block(e->block)
              || e->deleted || e->deallocated || e->offset);
   if (!e->offset && Is_block(e->block) && Is_young(e->block)) {
+<<<<<<< HEAD
     if (Is_promoted_hd(Hd_val(e->block))) {
+=======
+    if (Hd_val(e->block) == 0) {
+>>>>>>> upstream/5.4
       /* Block has been promoted */
       e->block = Field(e->block, 0);
       e->promoted = true;
@@ -1706,17 +2447,31 @@ static value capture_callstack_GC(memprof_domain_t domain, int alloc_idx)
 /* Runs a single callback, in thread `thread`, for entry number `i` in
  * table `es`. The callback closure is `cb`, the parameter is `param`,
  * and the "callback index" is `cb_index`.
+<<<<<<< HEAD
  * Returns Val_unit or an exception result. */
 
 static value run_callback_exn(memprof_thread_t thread,
                               entries_t es, size_t i,
                               value cb, value param,
                               uintnat cb_index)
+=======
+ * Returns unit or an exception result. */
+
+static caml_result run_callback_res(
+  memprof_thread_t thread,
+  entries_t es, size_t i,
+  value cb, value param,
+  uintnat cb_index)
+>>>>>>> upstream/5.4
 {
   entry_t e = &es->t[i];
 
   if (e->runner) { /* some other thread has got to this callback first */
+<<<<<<< HEAD
     return Val_unit;
+=======
+    return Result_unit;
+>>>>>>> upstream/5.4
   }
 
   thread->running_table = es;
@@ -1727,7 +2482,11 @@ static value run_callback_exn(memprof_thread_t thread,
   e->callbacks |= CB_MASK(cb_index);
   e->user_data = Val_unit;      /* Release root. */
 
+<<<<<<< HEAD
   value res = caml_callback_exn(cb, param);
+=======
+  caml_result res = caml_callback_res(cb, param);
+>>>>>>> upstream/5.4
 
   /* The entry may have been moved to another table under our feet,
    * due to the callback or to other threads from this domain. For
@@ -1746,6 +2505,7 @@ static value run_callback_exn(memprof_thread_t thread,
   if (validated_config(es) == CONFIG_NONE) {
     /* The profile was discarded during the callback.
      * no entries to update etc. */
+<<<<<<< HEAD
     if (!Is_exception_result(res))
       return Val_unit;
   }
@@ -1758,6 +2518,24 @@ static value run_callback_exn(memprof_thread_t thread,
     /* Callback returned [Some _]. Store the value in [user_data]. */
     CAMLassert(Is_block(res) && Tag_val(res) == 0 && Wosize_val(res) == 1);
     e->user_data = Field(res, 0);
+=======
+    if (!caml_result_is_exception(res))
+      return Result_unit;
+  }
+
+  if (caml_result_is_exception(res) || res.data == Val_unit) {
+    /* Callback raised an exception or returned None or (), discard
+       this entry. */
+    entry_delete(es, i);
+    return res;
+  } else {
+    value v = res.data;
+    /* Callback returned [Some _]. Store the value in [user_data]. */
+    CAMLassert(Is_block(v));
+    CAMLassert(Tag_val(v) == 0);
+    CAMLassert(Wosize_val(v) == 1);
+    e->user_data = Some_val(v);
+>>>>>>> upstream/5.4
     if (Is_block(e->user_data) && Is_young(e->user_data) &&
         i < es->young)
       es->young = i;
@@ -1771,16 +2549,26 @@ static value run_callback_exn(memprof_thread_t thread,
          (e->promoted && (cb_index != CB_PROMOTE))))
       es->active = i;
 
+<<<<<<< HEAD
     res = Val_unit;
   }
   return res;
+=======
+    return Result_unit;
+  }
+>>>>>>> upstream/5.4
 }
 
 /* Run the allocation callback for a given entry of an entries array.
  * Returns Val_unit or an exception result. */
 
+<<<<<<< HEAD
 static value run_alloc_callback_exn(memprof_thread_t thread,
                                     entries_t es, size_t i)
+=======
+static caml_result run_alloc_callback_res(
+  memprof_thread_t thread, entries_t es, size_t i)
+>>>>>>> upstream/5.4
 {
   entry_t e = &es->t[i];
   CAMLassert(e->deallocated || e->offset || Is_block(e->block));
@@ -1807,17 +2595,28 @@ static value run_alloc_callback_exn(memprof_thread_t thread,
 
   value callback =
     e->alloc_young ? Alloc_minor(es->config) : Alloc_major(es->config);
+<<<<<<< HEAD
   return run_callback_exn(thread, es, i, callback, sample_info, CB_ALLOC);
+=======
+  return run_callback_res(thread, es, i, callback, sample_info, CB_ALLOC);
+>>>>>>> upstream/5.4
 }
 
 /* Run any pending callbacks from entries table `es` in thread
  * `thread`. Returns either (a) when a callback raises an exception,
  * or (b) when all pending callbacks have been run. */
 
+<<<<<<< HEAD
 static value entries_run_callbacks_exn(memprof_thread_t thread,
                                        entries_t es)
 {
   value res = Val_unit;
+=======
+static caml_result entries_run_callbacks_res(
+  memprof_thread_t thread, entries_t es)
+{
+  caml_result res = Result_unit;
+>>>>>>> upstream/5.4
 
   /* Note: several callbacks may be called for a single entry. */
   while (es->active < es->size) {
@@ -1835,26 +2634,45 @@ static value entries_run_callbacks_exn(memprof_thread_t thread,
     } else if (!(e->callbacks & CB_MASK(CB_ALLOC))) {
       /* allocation callback hasn't been run */
       if (Status(config) == CONFIG_STATUS_SAMPLING) {
+<<<<<<< HEAD
         res = run_alloc_callback_exn(thread, es, i);
         if (Is_exception_result(res)) break;
+=======
+        res = run_alloc_callback_res(thread, es, i);
+        if (caml_result_is_exception(res)) break;
+>>>>>>> upstream/5.4
       } else {
         /* sampling stopped, e.g. by a previous callback; drop this entry */
         entry_delete(es, i);
       }
     } else if (e->promoted && !(e->callbacks & CB_MASK(CB_PROMOTE))) {
       /* promoted entry; call promote callback */
+<<<<<<< HEAD
       res = run_callback_exn(thread, es, i,
                              Promote(config), e->user_data,
                              CB_PROMOTE);
       if (Is_exception_result(res)) break;
+=======
+      res = run_callback_res(thread, es, i,
+                             Promote(config), e->user_data,
+                             CB_PROMOTE);
+      if (caml_result_is_exception(res)) break;
+>>>>>>> upstream/5.4
     } else if (e->deallocated && !(e->callbacks & CB_MASK(CB_DEALLOC))) {
       /* deallocated entry; call dealloc callback */
       value cb = (e->promoted || !e->alloc_young) ?
         Dealloc_major(config) : Dealloc_minor(config);
+<<<<<<< HEAD
       res = run_callback_exn(thread, es, i,
                              cb, e->user_data,
                              CB_DEALLOC);
       if (Is_exception_result(res)) break;
+=======
+      res = run_callback_res(thread, es, i,
+                             cb, e->user_data,
+                             CB_DEALLOC);
+      if (caml_result_is_exception(res)) break;
+>>>>>>> upstream/5.4
     } else {
       /* There is nothing to do with this entry. */
       ++ es->active;
@@ -1871,19 +2689,28 @@ static value entries_run_callbacks_exn(memprof_thread_t thread,
  * change the various indexes into an entries table while iterating
  * over it, whereas domain_apply_actions assumes that can't happen. */
 
+<<<<<<< HEAD
 value caml_memprof_run_callbacks_exn(void)
+=======
+caml_result caml_memprof_run_callbacks_res(void)
+>>>>>>> upstream/5.4
 {
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
   memprof_thread_t thread = domain->current;
   CAMLassert(thread);
+<<<<<<< HEAD
   value res = Val_unit;
+=======
+  caml_result res = Result_unit;
+>>>>>>> upstream/5.4
   if (thread->suspended || !domain->pending) return res;
 
   orphans_adopt(domain);
   update_suspended(domain, true);
 
   /* run per-domain callbacks first */
+<<<<<<< HEAD
   res = entries_run_callbacks_exn(thread, &domain->entries);
   if (Is_exception_result(res)) goto end;
 
@@ -1893,6 +2720,17 @@ value caml_memprof_run_callbacks_exn(void)
   /* Move any surviving entries from allocating thread to owning
    * domain, so their subsequent callbacks may be run by any thread in
    * the domain. entries_run_callbacks_exn didn't return an exception,
+=======
+  res = entries_run_callbacks_res(thread, &domain->entries);
+  if (caml_result_is_exception(res)) goto end;
+
+  /* run per-thread callbacks for current thread */
+  res = entries_run_callbacks_res(thread, &thread->entries);
+  if (caml_result_is_exception(res)) goto end;
+  /* Move any surviving entries from allocating thread to owning
+   * domain, so their subsequent callbacks may be run by any thread in
+   * the domain. entries_run_callbacks_res didn't return an exception,
+>>>>>>> upstream/5.4
    * so all these entries have had their allocation callbacks run. If
    * this fails due to allocation failure, the entries remain with the
    * thread, which is OK. */
@@ -1904,8 +2742,13 @@ value caml_memprof_run_callbacks_exn(void)
     entries_t es = &ot->entries;
     if ((validated_config(es) != CONFIG_NONE) && (es->active < es->size)) {
       /* An orphan table with something to run. */
+<<<<<<< HEAD
       res = entries_run_callbacks_exn(thread, es);
       if (Is_exception_result(res)) goto end;
+=======
+      res = entries_run_callbacks_res(thread, es);
+      if (caml_result_is_exception(res)) goto end;
+>>>>>>> upstream/5.4
       /* Orphan tables may be deallocated during callbacks (if a
        * callback discards the profile and then orphans_update_pending
        * runs due to a GC) but a callback from an orphan table can
@@ -1974,8 +2817,13 @@ void caml_memprof_set_trigger(caml_domain_state *state)
     }
   }
 
+<<<<<<< HEAD
   CAMLassert((trigger >= state->young_start) &&
              (trigger <= state->young_ptr));
+=======
+  CAMLassert(trigger >= state->young_start);
+  CAMLassert(trigger <= state->young_ptr);
+>>>>>>> upstream/5.4
   state->memprof_young_trigger = trigger;
 }
 
@@ -2009,7 +2857,11 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
   CAMLassert(thread);
   entries_t entries = &thread->entries;
   uintnat whsize = Whsize_wosize(wosize);
+<<<<<<< HEAD
   value res = Val_unit;
+=======
+  CAMLlocalresult(res);
+>>>>>>> upstream/5.4
   CAMLlocal1(config);
   config = entries->config;
 
@@ -2032,9 +2884,15 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
   }
 
   /* The memprof trigger lies in (young_ptr, young_ptr + whsize] */
+<<<<<<< HEAD
   CAMLassert(Caml_state->young_ptr < Caml_state->memprof_young_trigger &&
              Caml_state->memprof_young_trigger <=
                Caml_state->young_ptr + whsize);
+=======
+  CAMLassert(Caml_state->young_ptr < Caml_state->memprof_young_trigger);
+  CAMLassert(Caml_state->memprof_young_trigger <=
+             Caml_state->young_ptr + whsize);
+>>>>>>> upstream/5.4
 
   /* Trigger offset from the base of the combined allocation. We
    * reduce this for each sample in this comballoc. Signed so it can
@@ -2094,7 +2952,11 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
    * includes these recent allocation callbacks. If one of the
    * callbacks stops the profile, the other callbacks will still
    * run. */
+<<<<<<< HEAD
   res = entries_run_callbacks_exn(thread, entries);
+=======
+  res = entries_run_callbacks_res(thread, entries);
+>>>>>>> upstream/5.4
 
   /* A callback, or another thread of this domain, may have stopped
    * the profile and then started another one. This will result in the
@@ -2107,7 +2969,11 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
   /* A callback may have raised an exception. In this case, we are
    * going to cancel this whole combined allocation and should delete
    * the newly-created entries (if they are still in our table). */
+<<<<<<< HEAD
   bool cancelled = Is_exception_result(res);
+=======
+  bool cancelled = caml_result_is_exception(res);
+>>>>>>> upstream/5.4
 
   if (!cancelled) {
     /* No exceptions were raised, so the allocations will
@@ -2159,8 +3025,12 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
   /* Unsuspend profiling. Resets trigger. */
   update_suspended(domain, false);
 
+<<<<<<< HEAD
   if (cancelled)
     caml_raise_async(Extract_exception(res));
+=======
+  (void) caml_get_value_or_raise(res);
+>>>>>>> upstream/5.4
 
   CAMLreturn0;
 }
@@ -2197,16 +3067,22 @@ CAMLexport void caml_memprof_delete_thread(memprof_thread_t thread)
 CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 {
   CAMLassert(thread);
+<<<<<<< HEAD
   memprof_domain_t domain = thread->domain;
   bool old_suspended = domain->current && domain->current->suspended;
   domain->current = thread;
   if (old_suspended != thread->suspended) {
     update_suspended(thread->domain, thread->suspended);
   }
+=======
+  thread->domain->current = thread;
+  update_suspended(thread->domain, thread->suspended);
+>>>>>>> upstream/5.4
 }
 
 /**** Interface to OCaml ****/
 
+<<<<<<< HEAD
 /* Set config of the domain and all its threads */
 static void set_config(memprof_domain_t domain, value config)
 {
@@ -2220,6 +3096,8 @@ static void set_config(memprof_domain_t domain, value config)
   }
 }
 
+=======
+>>>>>>> upstream/5.4
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
   CAMLparam3(lv, szv, tracker);
@@ -2269,9 +3147,22 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
     caml_initialize(&Field(config, i), Field(tracker,
                                              i - CONFIG_FIELD_FIRST_CALLBACK));
   }
+<<<<<<< HEAD
 
 
   set_config(domain, config);
+=======
+  CAMLassert(domain->entries.size == 0);
+
+  /* Set config pointers of the domain and all its threads */
+  domain->entries.config = config;
+  memprof_thread_t thread = domain->threads;
+  while (thread) {
+    CAMLassert(thread->entries.size == 0);
+    thread->entries.config = config;
+    thread = thread->next;
+  }
+>>>>>>> upstream/5.4
 
   /* reset PRNG, generate first batch of random numbers. */
   rand_init(domain);
@@ -2284,6 +3175,7 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   CAMLreturn(config);
 }
 
+<<<<<<< HEAD
 CAMLprim value caml_memprof_participate(value config)
 {
   CAMLparam1(config);
@@ -2321,6 +3213,8 @@ CAMLprim value caml_memprof_participate(value config)
   CAMLreturn(Val_unit);
 }
 
+=======
+>>>>>>> upstream/5.4
 CAMLprim value caml_memprof_stop(value unit)
 {
   memprof_domain_t domain = Caml_state->memprof;
@@ -2329,6 +3223,7 @@ CAMLprim value caml_memprof_stop(value unit)
   CAMLassert(thread);
 
   /* Final attempt to run allocation callbacks; don't use
+<<<<<<< HEAD
    * caml_memprof_run_callbacks_exn as we only really need allocation
    * callbacks now. */
   if (!thread->suspended) {
@@ -2336,6 +3231,15 @@ CAMLprim value caml_memprof_stop(value unit)
     value res = entries_run_callbacks_exn(thread, &thread->entries);
     update_suspended(domain, false);
     (void) caml_raise_async_if_exception(res, "memprof callback");
+=======
+   * caml_memprof_run_callbacks_res as we only really need allocation
+   * callbacks now. */
+  if (!thread->suspended) {
+    update_suspended(domain, true);
+    caml_result res = entries_run_callbacks_res(thread, &thread->entries);
+    update_suspended(domain, false);
+    (void) caml_get_value_or_raise(res);
+>>>>>>> upstream/5.4
   }
 
   value config = thread_config(thread);
@@ -2352,7 +3256,10 @@ CAMLprim value caml_memprof_stop(value unit)
 
 CAMLprim value caml_memprof_discard(value config)
 {
+<<<<<<< HEAD
   CAMLparam1(config);
+=======
+>>>>>>> upstream/5.4
   uintnat status = Status(config);
   CAMLassert((status == CONFIG_STATUS_STOPPED) ||
              (status == CONFIG_STATUS_SAMPLING) ||
@@ -2369,5 +3276,9 @@ CAMLprim value caml_memprof_discard(value config)
 
   Set_status(config, CONFIG_STATUS_DISCARDED);
 
+<<<<<<< HEAD
   CAMLreturn(Val_unit);
+=======
+  return Val_unit;
+>>>>>>> upstream/5.4
 }

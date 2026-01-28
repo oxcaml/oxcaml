@@ -25,7 +25,11 @@ exception Real_reference
 
 let check_function_escape id lfun =
   (* Check that the identifier is not one of the parameters *)
+<<<<<<< HEAD
   let param_is_id { name; _ } = Ident.same id name in
+=======
+  let param_is_id (param, _) = Ident.same id param in
+>>>>>>> upstream/5.4
   assert (not (List.exists param_is_id lfun.params));
   if Ident.Set.mem id (Lambda.free_variables lfun.body) then
     raise Real_reference
@@ -40,10 +44,17 @@ let rec eliminate_ref id = function
   | Lfunction lfun as lam ->
       check_function_escape id lfun;
       lam
+<<<<<<< HEAD
   | Llet(str, kind, v, duid, e1, e2) ->
       Llet(str, kind, v, duid, eliminate_ref id e1, eliminate_ref id e2)
   | Lmutlet(kind, v, duid, e1, e2) ->
       Lmutlet(kind, v, duid, eliminate_ref id e1, eliminate_ref id e2)
+=======
+  | Llet(str, kind, v, e1, e2) ->
+      Llet(str, kind, v, eliminate_ref id e1, eliminate_ref id e2)
+  | Lmutlet(kind, v, e1, e2) ->
+      Lmutlet(kind, v, eliminate_ref id e1, eliminate_ref id e2)
+>>>>>>> upstream/5.4
   | Lletrec(idel, e2) ->
       List.iter (fun rb -> check_function_escape id rb.def) idel;
       Lletrec(idel, eliminate_ref id e2)
@@ -244,6 +255,7 @@ let simplify_exits lam =
     match l with
   | Lvar _| Lmutvar _ | Lconst _ -> l
   | Lapply ap ->
+<<<<<<< HEAD
       Lapply{ap with ap_func = simplif ~layout:None ~try_depth ap.ap_func;
                      ap_args = List.map (simplif ~layout:None ~try_depth) ap.ap_args}
   | Lfunction lfun ->
@@ -262,6 +274,23 @@ let simplify_exits lam =
                    let def =
                      lfunction' ~kind ~params ~return ~mode ~ret_mode
                        ~body:(simplif ~layout:None ~try_depth l) ~attr ~loc
+=======
+      Lapply{ap with ap_func = simplif ~try_depth ap.ap_func;
+                     ap_args = List.map (simplif ~try_depth) ap.ap_args}
+  | Lfunction lfun ->
+      Lfunction (map_lfunction (simplif ~try_depth) lfun)
+  | Llet(str, kind, v, l1, l2) ->
+      Llet(str, kind, v, simplif ~try_depth l1, simplif ~try_depth l2)
+  | Lmutlet(kind, v, l1, l2) ->
+      Lmutlet(kind, v, simplif ~try_depth l1, simplif ~try_depth l2)
+  | Lletrec(bindings, body) ->
+      let bindings =
+        List.map (fun ({ def = {kind; params; return; body = l; attr; loc} }
+                       as rb) ->
+                   let def =
+                     lfunction' ~kind ~params ~return
+                       ~body:(simplif ~try_depth l) ~attr ~loc
+>>>>>>> upstream/5.4
                    in
                    { rb with def })
           bindings
@@ -504,7 +533,11 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
      count bv l1;
      count bv l2
   | Lletrec(bindings, body) ->
+<<<<<<< HEAD
       List.iter (fun { def } -> count_lfunction def) bindings;
+=======
+      List.iter (fun { def } -> count bv def.body) bindings;
+>>>>>>> upstream/5.4
       count bv body
   | Lprim(_p, ll, _) -> List.iter (count bv) ll
   | Lswitch(l, sw, _loc, _kind) ->
@@ -753,8 +786,13 @@ let rec emit_tail_infos is_tail lambda =
       list_emit_tail_infos false ap.ap_args
   | Lfunction lfun ->
       emit_tail_infos_lfunction is_tail lfun
+<<<<<<< HEAD
   | Llet (_, _k, _, _, lam, body)
   | Lmutlet (_k, _, _, lam, body) ->
+=======
+  | Llet (_, _k, _, lam, body)
+  | Lmutlet (_k, _, lam, body) ->
+>>>>>>> upstream/5.4
       emit_tail_infos false lam;
       emit_tail_infos is_tail body
   | Lletrec (bindings, body) ->
@@ -917,6 +955,7 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
         let body = Lambda.rename subst body in
         let body = if add_region then Lregion (body, return) else body in
         let inner_fun =
+<<<<<<< HEAD
           lfunction' ~kind:(Curried {nlocal=0})
             ~params:new_ids
             ~return ~body ~attr ~loc ~mode ~ret_mode
@@ -945,6 +984,24 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
        debug_uid = fun_duid;
        def = lfunction' ~kind ~params ~return ~body ~attr ~loc
            ~mode ~ret_mode  }]
+=======
+          lfunction' ~kind:Curried
+            ~params:(List.map (fun id -> id, Pgenval) new_ids)
+            ~return ~body ~attr ~loc
+        in
+        (wrapper_body, { id = inner_id;
+                         def = inner_fun })
+  in
+  try
+    let body, inner = aux [] body in
+    let attr = default_stub_attribute in
+    [{ id = fun_id;
+       def = lfunction' ~kind ~params ~return ~body ~attr ~loc };
+     inner]
+  with Exit ->
+    [{ id = fun_id;
+       def = lfunction' ~kind ~params ~return ~body ~attr ~loc }]
+>>>>>>> upstream/5.4
 
 (* Simplify local let-bound functions: if all occurrences are
    fully-applied function calls in the same "tail scope", replace the

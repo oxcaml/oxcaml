@@ -187,7 +187,7 @@ let ill_typed_1 =
 Line 3, characters 13-14:
 3 |     let+ x = 1 in
                  ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "1" has type "int" but an expression was expected of type
          "bool"
 |}];;
 
@@ -215,9 +215,9 @@ let ill_typed_2 =
 Line 3, characters 13-14:
 3 |     let+ x = 1
                  ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "1" has type "int" but an expression was expected of type
          "float"
-  Hint: Did you mean "1."?
+Hint: Did you mean "1."?
 |}];;
 
 module Ill_typed_3 = struct
@@ -587,7 +587,8 @@ val let_not_principal : unit = ()
 Line 3, characters 9-10:
 3 |     let+ A = A.A in
              ^
-Warning 18 [not-principal]: this type-based constructor disambiguation is not principal.
+Warning 18 [not-principal]: this type-based constructor disambiguation is not
+  principal.
 
 val let_not_principal : unit = ()
 |}];;
@@ -617,7 +618,8 @@ val and_not_principal : A.t -> A.t -> unit = <fun>
 Line 5, characters 11-12:
 5 |       and+ A = y in
                ^
-Warning 18 [not-principal]: this type-based constructor disambiguation is not principal.
+Warning 18 [not-principal]: this type-based constructor disambiguation is not
+  principal.
 
 val and_not_principal : A.t -> A.t -> unit = <fun>
 |}];;
@@ -720,8 +722,9 @@ val bad_location : 'a GADT_ordering.is_point -> 'a -> int = <fun>
 Line 4, characters 11-19:
 4 |       let+ Is_point = is_point
                ^^^^^^^^
-Warning 18 [not-principal]: typing this pattern requires considering GADT_ordering.point and a as equal.
-But the knowledge of these types is not principal.
+Warning 18 [not-principal]: typing this pattern requires considering
+  "GADT_ordering.point" and "a" as equal. But the knowledge of these types is not
+  principal.
 
 Line 5, characters 11-19:
 5 |       and+ { x; y } = a in

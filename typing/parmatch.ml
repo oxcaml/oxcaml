@@ -18,6 +18,7 @@
 open Misc
 open Asttypes
 open Types
+open Data_types
 open Typedtree
 
 type error = Float32_match
@@ -62,9 +63,13 @@ let omega_list = Patterns.omega_list
 let extra_pat =
   make_pat
     (Tpat_var (Ident.create_local "+", mknoloc "+",
+<<<<<<< HEAD
       Uid.internal_not_actually_unique,
       Jkind.Sort.(of_const Const.for_boxed_variant),
       Mode.Value.disallow_right Mode.Value.max))
+=======
+      Uid.internal_not_actually_unique))
+>>>>>>> upstream/5.4
     Ctype.none Env.empty
 
 
@@ -198,9 +203,13 @@ let all_coherent column =
         (fun (lbl1, _) (lbl2, _) -> Option.equal String.equal lbl1 lbl2) l1 l2
     | Record (lbl1 :: _), Record (lbl2 :: _) ->
       Array.length lbl1.lbl_all = Array.length lbl2.lbl_all
+<<<<<<< HEAD
     | Record_unboxed_product (lbl1 :: _), Record_unboxed_product (lbl2 :: _) ->
       Array.length lbl1.lbl_all = Array.length lbl2.lbl_all
     | Array (am1, _, _), Array (am2, _, _) -> am1 = am2
+=======
+    | Array (am1, _), Array (am2, _) -> am1 = am2
+>>>>>>> upstream/5.4
     | Any, _
     | _, Any
     | Record [], Record []
@@ -345,8 +354,8 @@ let records_args l1 l2 =
 module Compat
     (Constr:sig
       val equal :
-          Types.constructor_description ->
-            Types.constructor_description ->
+          Data_types.constructor_description ->
+            Data_types.constructor_description ->
               bool
     end) = struct
 
@@ -355,8 +364,13 @@ module Compat
   | ((Tpat_any|Tpat_var _),_)
   | (_,(Tpat_any|Tpat_var _)) -> true
 (* Structural induction *)
+<<<<<<< HEAD
   | Tpat_alias (p,_,_,_,_,_,_),_      -> compat p q
   | _,Tpat_alias (q,_,_,_,_,_,_)      -> compat p q
+=======
+  | Tpat_alias (p,_,_,_,_),_      -> compat p q
+  | _,Tpat_alias (q,_,_,_,_)      -> compat p q
+>>>>>>> upstream/5.4
   | Tpat_or (p1,p2,_),_ ->
       (compat p1 q || compat p2 q)
   | _,Tpat_or (q1,q2,_) ->
@@ -371,13 +385,20 @@ module Compat
       const_compare c1 c2 = 0
   | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs ->
       tuple_compat labeled_ps labeled_qs
+<<<<<<< HEAD
   | Tpat_unboxed_tuple labeled_ps, Tpat_unboxed_tuple labeled_qs ->
       unboxed_tuple_compat labeled_ps labeled_qs
+=======
+>>>>>>> upstream/5.4
   | Tpat_lazy p, Tpat_lazy q -> compat p q
   | Tpat_record (l1,_),Tpat_record (l2,_) ->
       let ps,qs = records_args l1 l2 in
       compats ps qs
+<<<<<<< HEAD
   | Tpat_array (am1, _, ps), Tpat_array (am2, _, qs) ->
+=======
+  | Tpat_array (am1, ps), Tpat_array (am2, qs) ->
+>>>>>>> upstream/5.4
       am1 = am2 &&
       List.length ps = List.length qs &&
       compats ps qs
@@ -400,6 +421,7 @@ module Compat
       && compat p q && tuple_compat labeled_ps labeled_qs
   | _,_    -> false
 
+<<<<<<< HEAD
   and unboxed_tuple_compat labeled_ps labeled_qs =
     match labeled_ps,labeled_qs with
     | [], [] -> true
@@ -407,12 +429,14 @@ module Compat
         Option.equal String.equal p_label q_label
         && compat p q && unboxed_tuple_compat labeled_ps labeled_qs
     | _,_    -> false
+=======
+>>>>>>> upstream/5.4
 end
 
 module SyntacticCompat =
   Compat
     (struct
-      let equal c1 c2 =  Types.equal_tag c1.cstr_tag c2.cstr_tag
+      let equal = Data_types.equal_constr
     end)
 
 let compat =  SyntacticCompat.compat
@@ -447,12 +471,13 @@ let simple_match d h =
   let open Patterns.Head in
   match d.pat_desc, h.pat_desc with
   | Construct c1, Construct c2 ->
-      Types.equal_tag c1.cstr_tag c2.cstr_tag
+      Data_types.equal_constr c1 c2
   | Variant { tag = t1; _ }, Variant { tag = t2 } ->
       t1 = t2
   | Constant c1, Constant c2 -> const_compare c1 c2 = 0
   | Lazy, Lazy -> true
   | Record _, Record _ -> true
+<<<<<<< HEAD
   | Record_unboxed_product _, Record_unboxed_product _ -> true
   | Tuple lbls1, Tuple lbls2 ->
     List.equal (Option.equal String.equal) lbls1 lbls2
@@ -460,6 +485,10 @@ let simple_match d h =
     List.equal (fun (l1, _) (l2, _) -> Option.equal String.equal l1 l2)
       lbls1 lbls2
   | Array (am1, _, len1), Array (am2, _, len2) -> am1 = am2 && len1 = len2
+=======
+  | Tuple lbls1, Tuple lbls2 -> lbls1 = lbls2
+  | Array (am1, len1), Array (am2, len2) -> am1 = am2 && len1 = len2
+>>>>>>> upstream/5.4
   | _, Any -> true
   | ( Construct _ | Variant _ | Constant _ | Lazy | Record _
     | Record_unboxed_product _ | Tuple _ | Unboxed_tuple _ | Array _ | Any),
@@ -511,11 +540,17 @@ let simple_match_args discr head args =
       | Construct cstr -> Patterns.omegas cstr.cstr_arity
       | Variant { has_arg = true }
       | Lazy -> [Patterns.omega]
+<<<<<<< HEAD
       | Record lbls -> omega_list lbls
       | Record_unboxed_product lbls ->  omega_list lbls
       | Array (_, _, len) -> Patterns.omegas len
       | Tuple lbls -> omega_list lbls
       | Unboxed_tuple lbls -> omega_list lbls
+=======
+      | Record lbls ->  omega_list lbls
+      | Array (_, len) -> Patterns.omegas len
+      | Tuple lbls -> omega_list lbls
+>>>>>>> upstream/5.4
       | Variant { has_arg = false }
       | Any
       | Constant _ -> []
@@ -602,6 +637,7 @@ let rec read_args xs r = match xs,r with
 | _,_ ->
     fatal_error "Parmatch.read_args"
 
+<<<<<<< HEAD
 let do_set_args ~erase_mutable q r = match q with
 | {pat_desc = Tpat_tuple omegas} ->
     let args,rest = read_args (List.map snd omegas) r in
@@ -643,6 +679,18 @@ let do_set_args ~erase_mutable q r = match q with
             omegas args, closed))
       q.pat_type q.pat_env::
     rest
+=======
+let set_args q r = match q with
+| {pat_desc = Tpat_tuple lbls_omegas} ->
+    let lbls, omegas = List.split lbls_omegas in
+    let args, rest = read_args omegas r in
+    make_pat (Tpat_tuple (List.combine lbls args)) q.pat_type q.pat_env :: rest
+| {pat_desc = Tpat_record (omegas,closed)} ->
+    let args,rest = read_args omegas r in
+    let args =
+      List.map2 (fun (lid, lbl, _) arg -> (lid, lbl, arg)) omegas args in
+    make_pat (Tpat_record (args, closed)) q.pat_type q.pat_env :: rest
+>>>>>>> upstream/5.4
 | {pat_desc = Tpat_construct (lid, c, omegas, _)} ->
     let args,rest = read_args omegas r in
     make_pat
@@ -665,19 +713,23 @@ let do_set_args ~erase_mutable q r = match q with
         make_pat (Tpat_lazy arg) q.pat_type q.pat_env::rest
     | _ -> fatal_error "Parmatch.do_set_args (lazy)"
     end
+<<<<<<< HEAD
 | {pat_desc = Tpat_array (am, arg_sort, omegas)} ->
+=======
+| {pat_desc = Tpat_array (am, omegas)} ->
+>>>>>>> upstream/5.4
     let args,rest = read_args omegas r in
-    let args = if erase_mutable then omegas else args in
     make_pat
+<<<<<<< HEAD
       (Tpat_array (am, arg_sort, args)) q.pat_type q.pat_env::
+=======
+      (Tpat_array (am, args)) q.pat_type q.pat_env::
+>>>>>>> upstream/5.4
     rest
 | {pat_desc=Tpat_constant _|Tpat_any} ->
     q::r (* case any is used in matching.ml *)
 | {pat_desc = (Tpat_var _ | Tpat_alias _ | Tpat_or _); _} ->
     fatal_error "Parmatch.set_args"
-
-let set_args q r = do_set_args ~erase_mutable:false q r
-and set_args_erase_mutable q r = do_set_args ~erase_mutable:true q r
 
 (* Given a matrix of non-empty rows
    p1 :: r1...
@@ -1095,9 +1147,13 @@ let build_other ext env =
           make_pat
             (Tpat_var (Ident.create_local "*extension*",
                        {txt="*extension*"; loc = d.pat_loc},
+<<<<<<< HEAD
                        Uid.internal_not_actually_unique,
                        Jkind.Sort.(of_const Const.for_constructor),
                        Mode.Value.disallow_right Mode.Value.max))
+=======
+                       Uid.internal_not_actually_unique))
+>>>>>>> upstream/5.4
             Ctype.none Env.empty
       | Construct _ ->
           begin match ext with
@@ -1246,6 +1302,7 @@ let build_other ext env =
                     | _ -> assert false)
             (function f -> Tpat_constant(Const_float (string_of_float f)))
             0.0 (fun f -> f +. 1.0) d env
+<<<<<<< HEAD
       | Constant Const_unboxed_float _ ->
           build_other_constant
             (function Constant(Const_unboxed_float f) -> float_of_string f
@@ -1259,19 +1316,31 @@ let build_other ext env =
             List.map
               (fun (p,_) -> match p.pat_desc with
               | Array (am', _, len) when am = am' -> len
+=======
+      | Array (am, _) ->
+          let all_lengths =
+            List.map
+              (fun (p,_) -> match p.pat_desc with
+              | Array (am', len) when am = am' -> len
+>>>>>>> upstream/5.4
               | _ -> assert false)
               env in
           let rec try_arrays l =
             if List.mem l all_lengths then try_arrays (l+1)
             else
+<<<<<<< HEAD
               make_pat (Tpat_array (am, arg_sort, omegas l))
                 d.pat_type d.pat_env in
+=======
+              make_pat (Tpat_array (am, omegas l)) d.pat_type d.pat_env in
+>>>>>>> upstream/5.4
           try_arrays 0
       | _ -> Patterns.omega
 
 let rec has_instance p = match p.pat_desc with
   | Tpat_variant (l,_,r) when is_absent l r -> false
   | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_variant (_,None,_) -> true
+<<<<<<< HEAD
   | Tpat_alias (p,_,_,_,_,_,_) | Tpat_variant (_,Some p,_) -> has_instance p
   | Tpat_or (p1,p2,_) -> has_instance p1 || has_instance p2
   | Tpat_construct (_,_,ps, _) | Tpat_array (_, _, ps) ->
@@ -1279,6 +1348,13 @@ let rec has_instance p = match p.pat_desc with
   | Tpat_tuple labeled_ps -> has_instances (List.map snd labeled_ps)
   | Tpat_unboxed_tuple labeled_ps ->
       has_instances (List.map (fun (_, p, _) -> p) labeled_ps)
+=======
+  | Tpat_alias (p,_,_,_,_) | Tpat_variant (_,Some p,_) -> has_instance p
+  | Tpat_or (p1,p2,_) -> has_instance p1 || has_instance p2
+  | Tpat_construct (_,_,ps,_) | Tpat_array (_, ps) ->
+      has_instances ps
+  | Tpat_tuple labeled_ps -> has_instances (List.map snd labeled_ps)
+>>>>>>> upstream/5.4
   | Tpat_record (lps,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_record_unboxed_product (lps,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
@@ -1482,8 +1558,13 @@ let print_pat pat =
         Printf.sprintf "(%s)" (String.concat "," (List.map string_of_pat list))
       | Tpat_variant (_, _, _) -> "variant"
       | Tpat_record (_, _) -> "record"
+<<<<<<< HEAD
       | Tpat_array _ -> "array"
       | Tpat_immutable_array _ -> "immutable array"
+=======
+      | Tpat_array (Mutable, _) -> "array"
+      | Tpat_array (Immutable, _) -> "immutable array"
+>>>>>>> upstream/5.4
   in
   Printf.fprintf stderr "PAT[%s]\n%!" (string_of_pat pat)
 *)
@@ -1732,7 +1813,11 @@ let is_var_column rs =
 (* Standard or-args for left-to-right matching *)
 let rec or_args p = match p.pat_desc with
 | Tpat_or (p1,p2,_) -> p1,p2
+<<<<<<< HEAD
 | Tpat_alias (p,_,_,_,_,_,_)  -> or_args p
+=======
+| Tpat_alias (p,_,_,_,_)  -> or_args p
+>>>>>>> upstream/5.4
 | _                 -> assert false
 
 (* Just remove current column *)
@@ -1912,11 +1997,16 @@ and every_both pss qs q1 q2 =
 let rec le_pat p q =
   match (p.pat_desc, q.pat_desc) with
   | (Tpat_var _|Tpat_any),_ -> true
+<<<<<<< HEAD
   | Tpat_alias(p,_,_,_,_,_,_), _ -> le_pat p q
   | _, Tpat_alias(q,_,_,_,_,_,_) -> le_pat p q
+=======
+  | Tpat_alias(p,_,_,_,_), _ -> le_pat p q
+  | _, Tpat_alias(q,_,_,_,_) -> le_pat p q
+>>>>>>> upstream/5.4
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
   | Tpat_construct(_,c1,ps,_), Tpat_construct(_,c2,qs,_) ->
-      Types.equal_tag c1.cstr_tag c2.cstr_tag && le_pats ps qs
+      Data_types.equal_constr c1 c2 && le_pats ps qs
   | Tpat_variant(l1,Some p1,_), Tpat_variant(l2,Some p2,_) ->
       (l1 = l2 && le_pat p1 p2)
   | Tpat_variant(l1,None,_r1), Tpat_variant(l2,None,_) ->
@@ -1924,13 +2014,20 @@ let rec le_pat p q =
   | Tpat_variant(_,_,_), Tpat_variant(_,_,_) -> false
   | Tpat_tuple(labeled_ps), Tpat_tuple(labeled_qs) ->
       le_tuple_pats labeled_ps labeled_qs
+<<<<<<< HEAD
   | Tpat_unboxed_tuple(labeled_ps), Tpat_unboxed_tuple(labeled_qs) ->
       le_unboxed_tuple_pats labeled_ps labeled_qs
+=======
+>>>>>>> upstream/5.4
   | Tpat_lazy p, Tpat_lazy q -> le_pat p q
   | Tpat_record (l1,_), Tpat_record (l2,_) ->
       let ps,qs = records_args l1 l2 in
       le_pats ps qs
+<<<<<<< HEAD
   | Tpat_array(am1, _, ps), Tpat_array(am2, _, qs) ->
+=======
+  | Tpat_array(am1, ps), Tpat_array(am2, qs) ->
+>>>>>>> upstream/5.4
       am1 = am2 && List.length ps = List.length qs && le_pats ps qs
 (* In all other cases, enumeration is performed *)
   | _,_  -> not (satisfiable [[p]] [q])
@@ -1947,6 +2044,7 @@ and le_tuple_pats labeled_ps labeled_qs =
       && le_pat p q && le_tuple_pats labeled_ps labeled_qs
   | _, _ -> true
 
+<<<<<<< HEAD
 and le_unboxed_tuple_pats labeled_ps labeled_qs =
   match labeled_ps, labeled_qs with
     (p_label, p, _)::labeled_ps, (q_label, q, _)::labeled_qs ->
@@ -1954,6 +2052,8 @@ and le_unboxed_tuple_pats labeled_ps labeled_qs =
       && le_pat p q && le_unboxed_tuple_pats labeled_ps labeled_qs
   | _, _ -> true
 
+=======
+>>>>>>> upstream/5.4
 let get_mins le ps =
   let rec select_rec r = function
       [] -> r
@@ -1973,8 +2073,13 @@ let get_mins le ps =
 *)
 
 let rec lub p q = match p.pat_desc,q.pat_desc with
+<<<<<<< HEAD
 | Tpat_alias (p,_,_,_,_,_,_),_      -> lub p q
 | _,Tpat_alias (q,_,_,_,_,_,_)      -> lub p q
+=======
+| Tpat_alias (p,_,_,_,_),_      -> lub p q
+| _,Tpat_alias (q,_,_,_,_)      -> lub p q
+>>>>>>> upstream/5.4
 | (Tpat_any|Tpat_var _),_ -> q
 | _,(Tpat_any|Tpat_var _) -> p
 | Tpat_or (p1,p2,_),_     -> orlub p1 p2 q
@@ -1990,7 +2095,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
     let r = lub p q in
     make_pat (Tpat_lazy r) p.pat_type p.pat_env
 | Tpat_construct (lid,c1,ps1,_), Tpat_construct (_,c2,ps2,_)
-      when  Types.equal_tag c1.cstr_tag c2.cstr_tag  ->
+      when Data_types.equal_constr c1 c2 ->
         let rs = lubs ps1 ps2 in
         make_pat (Tpat_construct (lid, c1, rs, None))
           p.pat_type p.pat_env
@@ -2003,6 +2108,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
               when l1 = l2 -> p
 | Tpat_record (l1,closed),Tpat_record (l2,_) ->
     let rs = record_lubs l1 l2 in
+<<<<<<< HEAD
     make_pat (Tpat_record (rs, closed))
       p.pat_type p.pat_env
 | Tpat_array (am1, arg_sort, ps), Tpat_array (am2, _, qs)
@@ -2010,6 +2116,13 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
         let rs = lubs ps qs in
         make_pat (Tpat_array (am1, arg_sort, rs))
           p.pat_type p.pat_env
+=======
+    make_pat (Tpat_record (rs, closed)) p.pat_type p.pat_env
+| Tpat_array (am1, ps), Tpat_array (am2, qs)
+      when am1 = am2 && List.length ps = List.length qs ->
+        let rs = lubs ps qs in
+        make_pat (Tpat_array (am1, rs)) p.pat_type p.pat_env
+>>>>>>> upstream/5.4
 | _,_  ->
     raise Empty
 
@@ -2043,6 +2156,7 @@ and tuple_lubs ps qs = match ps,qs with
     (p_label, lub p q) :: tuple_lubs ps qs
 | _,_ -> raise Empty
 
+<<<<<<< HEAD
 and unboxed_tuple_lubs ps qs = match ps,qs with
 | [], [] -> []
 | (p_label, p, sort)::ps, (q_label, q, _)::qs
@@ -2050,6 +2164,8 @@ and unboxed_tuple_lubs ps qs = match ps,qs with
     (p_label, lub p q, sort) :: unboxed_tuple_lubs ps qs
 | _,_ -> raise Empty
 
+=======
+>>>>>>> upstream/5.4
 and lubs ps qs = match ps,qs with
 | p::ps, q::qs -> lub p q :: lubs ps qs
 | _,_ -> []
@@ -2115,7 +2231,11 @@ let rec initial_only_guarded = function
 let contains_extension pat =
   exists_pattern
     (function
+<<<<<<< HEAD
      | {pat_desc=Tpat_var (_, {txt="*extension*"}, _, _, _)} -> true
+=======
+     | {pat_desc=Tpat_var (_, {txt="*extension*"}, _)} -> true
+>>>>>>> upstream/5.4
      | _ -> false)
     pat
 
@@ -2142,27 +2262,27 @@ let do_check_partial ~pred loc casel pss = match pss with
     match counter_examples () with
     | Seq.Nil -> Total
     | Seq.Cons (v, _rest) ->
-      if Warnings.is_active (Warnings.Partial_match "") then begin
-        let errmsg =
-          try
-            let buf = Buffer.create 16 in
-            let fmt = Format.formatter_of_buffer buf in
-            Format.fprintf fmt "%a@?" Printpat.pretty_pat v;
+      if Warnings.is_active (Warnings.Partial_match Format_doc.Doc.empty) then
+        begin
+          let errmsg =
+            let doc = ref Format_doc.Doc.empty in
+            let fmt = Format_doc.formatter doc in
+            Format_doc.fprintf fmt "@[<v>%a"
+              (Misc.Style.as_inline_code Printpat.top_pretty) v;
             if do_match (initial_only_guarded casel) [v] then
-              Buffer.add_string buf
-                "\n(However, some guarded clause may match this value.)";
+              Format_doc.fprintf fmt
+                "@,(However, some guarded clause may match this value.)";
             if contains_extension v then
-              Buffer.add_string buf
-                "\nMatching over values of extensible variant types \
-                   (the *extension* above)\n\
-              must include a wild card pattern in order to be exhaustive."
+              Format_doc.fprintf fmt
+                "@,@[Matching over values of extensible variant types \
+                 (the *extension* above)@,\
+                 must include a wild card pattern@ in order to be exhaustive.@]"
             ;
-            Buffer.contents buf
-          with _ ->
-            ""
-        in
-        Location.prerr_warning loc (Warnings.Partial_match errmsg)
-      end;
+            Format_doc.fprintf fmt "@]";
+            !doc
+          in
+          Location.prerr_warning loc (Warnings.Partial_match errmsg)
+        end;
       Partial
 
 (*****************)
@@ -2194,19 +2314,27 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
 | Tpat_any|Tpat_var _|Tpat_constant _| Tpat_variant (_,None,_) -> r
 | Tpat_tuple ps ->
     List.fold_left (fun r (_, p) -> collect_paths_from_pat r p) r ps
+<<<<<<< HEAD
 | Tpat_unboxed_tuple ps ->
     List.fold_left (fun r (_, p, _) -> collect_paths_from_pat r p) r ps
 | Tpat_array (_, _, ps) | Tpat_construct (_, {cstr_tag=Extension _}, ps, _)->
+=======
+| Tpat_array (_, ps) | Tpat_construct (_, {cstr_tag=Cstr_extension _}, ps, _)->
+>>>>>>> upstream/5.4
     List.fold_left collect_paths_from_pat r ps
 | Tpat_record (lps,_) ->
     List.fold_left
       (fun r (_, _, p) -> collect_paths_from_pat r p)
       r lps
+<<<<<<< HEAD
 | Tpat_record_unboxed_product (lps,_) ->
     List.fold_left
       (fun r (_, _, p) -> collect_paths_from_pat r p)
       r lps
 | Tpat_variant (_, Some p, _) | Tpat_alias (p,_,_,_,_,_,_) ->
+=======
+| Tpat_variant (_, Some p, _) | Tpat_alias (p,_,_,_,_) ->
+>>>>>>> upstream/5.4
     collect_paths_from_pat r p
 | Tpat_or (p1,p2,_) ->
     collect_paths_from_pat (collect_paths_from_pat r p1) p2
@@ -2328,7 +2456,11 @@ let inactive ~partial pat =
   | Total -> begin
       let rec loop pat =
         match pat.pat_desc with
+<<<<<<< HEAD
         | Tpat_lazy _ | Tpat_array (Mutable _, _, _) ->
+=======
+        | Tpat_lazy _ | Tpat_array (Mutable, _) ->
+>>>>>>> upstream/5.4
           false
         | Tpat_any | Tpat_var _ | Tpat_variant (_, None, _) ->
             true
@@ -2346,11 +2478,17 @@ let inactive ~partial pat =
           end
         | Tpat_tuple ps ->
             List.for_all (fun (_,p) -> loop p) ps
+<<<<<<< HEAD
         | Tpat_unboxed_tuple ps ->
             List.for_all (fun (_,p,_) -> loop p) ps
         | Tpat_construct (_, _, ps, _) | Tpat_array (Immutable, _, ps) ->
             List.for_all (fun p -> loop p) ps
         | Tpat_alias (p,_,_,_,_,_,_) | Tpat_variant (_, Some p, _) ->
+=======
+        | Tpat_construct (_, _, ps, _) | Tpat_array (Immutable, ps) ->
+            List.for_all (fun p -> loop p) ps
+        | Tpat_alias (p,_,_,_,_) | Tpat_variant (_, Some p, _) ->
+>>>>>>> upstream/5.4
             loop p
         | Tpat_record (ldps,_) ->
             List.for_all
@@ -2479,9 +2617,15 @@ type amb_row = { row : pattern list ; varsets : Ident.Set.t list; }
 let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
   let rec simpl head_bound_variables varsets p ps k =
     match (Patterns.General.view p).pat_desc with
+<<<<<<< HEAD
     | `Alias (p,x,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
     | `Var (x, _, _, _, _) ->
+=======
+    | `Alias (p,x,_,_,_) ->
+      simpl (Ident.Set.add x head_bound_variables) varsets p ps k
+    | `Var (x,_,_) ->
+>>>>>>> upstream/5.4
       simpl (Ident.Set.add x head_bound_variables) varsets Patterns.omega ps k
     | `Or (p1,p2,_) ->
       simpl head_bound_variables varsets p1 ps

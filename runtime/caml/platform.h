@@ -14,9 +14,10 @@
 /*                                                                        */
 /**************************************************************************/
 
+/* Platform-specific concurrency and memory primitives */
+
 #ifndef CAML_PLAT_THREADS_H
 #define CAML_PLAT_THREADS_H
-/* Platform-specific concurrency and memory primitives */
 
 #ifdef CAML_INTERNALS
 
@@ -26,6 +27,9 @@
 #include "config.h"
 #include "mlvalues.h"
 #include "sys.h"
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 #if defined(MAP_ANON) && !defined(MAP_ANONYMOUS)
 #define MAP_ANONYMOUS MAP_ANON
@@ -50,10 +54,19 @@ Caml_inline void cpu_relax(void) {
   /* Just a compiler barrier */
   __asm__ volatile ("" ::: "memory");
 #endif
+#elif defined(_MSC_VER)
+/* It would be better to use YieldProcessor to have a portable implementation
+   but this would require windows.h which we can't include here (it would
+   conflict with caml/instruct.h on ATOM, for instance)
+*/
+#if defined(_M_IX86) || defined(_M_X64)
+  _mm_pause();
+#endif
 #endif
 }
 
 
+<<<<<<< HEAD
 /* If we're using glibc, use a custom condition variable implementation to
    avoid this bug: https://sourceware.org/bugzilla/show_bug.cgi?id=25847
 
@@ -93,6 +106,32 @@ typedef pthread_cond_t custom_condvar;
    The domain lock must be held in order to call
    [caml_plat_lock_non_blocking].
 
+=======
+/* Warning: blocking functions.
+
+   Blocking functions are for use in the runtime outside of the
+   mutator, or when the domain lock is not held.
+
+   In order to use them inside the mutator and while holding the
+   domain lock, one must make sure that the wait is very short, and
+   that no deadlock can arise from the interaction with the domain
+   locks and the stop-the-world sections.
+
+   In particular one must not call [caml_plat_lock_blocking] on a
+   mutex while the domain lock is held:
+    - if any critical section of the mutex crosses an allocation, a
+      blocking section releasing the domain lock, or any other
+      potential STW section, nor
+    - if the same lock is acquired at any point using [Mutex.lock] or
+      [caml_plat_lock_non_blocking] on the same domain (circular
+      deadlock with the domain lock).
+
+   Hence, as a general rule, prefer [caml_plat_lock_non_blocking] to
+   lock a mutex when inside the mutator and holding the domain lock.
+   The domain lock must be held in order to call
+   [caml_plat_lock_non_blocking].
+
+>>>>>>> upstream/5.4
    It is possible to combine calls to [caml_plat_lock_non_blocking] on
    a mutex from the mutator holding the domain lock with calls to
    [caml_plat_lock_blocking] on another mutator that has released
@@ -114,8 +153,14 @@ void caml_plat_assert_locked(caml_plat_mutex*);
 void caml_plat_assert_all_locks_unlocked(void);
 Caml_inline void caml_plat_unlock(caml_plat_mutex*);
 void caml_plat_mutex_free(caml_plat_mutex*);
+<<<<<<< HEAD
 typedef custom_condvar caml_plat_cond;
 #define CAML_PLAT_COND_INITIALIZER CUSTOM_COND_INITIALIZER
+=======
+CAMLextern void caml_plat_mutex_reinit(caml_plat_mutex*);
+typedef pthread_cond_t caml_plat_cond;
+#define CAML_PLAT_COND_INITIALIZER PTHREAD_COND_INITIALIZER
+>>>>>>> upstream/5.4
 void caml_plat_cond_init(caml_plat_cond*);
 void caml_plat_wait(caml_plat_cond*, caml_plat_mutex*); /* blocking */
 void caml_plat_broadcast(caml_plat_cond*);
@@ -300,7 +345,11 @@ typedef uintnat barrier_status;
    the last arrival. */
 Caml_inline barrier_status caml_plat_barrier_arrive(caml_plat_barrier* barrier)
 {
+<<<<<<< HEAD
   return caml_atomic_counter_incr(&barrier->arrived);
+=======
+  return 1 + atomic_fetch_add(&barrier->arrived, 1);
+>>>>>>> upstream/5.4
 }
 
 /* -- Single-sense --

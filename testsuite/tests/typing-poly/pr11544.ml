@@ -1,5 +1,9 @@
 (* TEST
+<<<<<<< HEAD
  expect;
+=======
+  expect;
+>>>>>>> upstream/5.4
 *)
 
 module M = struct type t = T end
