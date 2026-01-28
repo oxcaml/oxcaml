@@ -1052,6 +1052,12 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%with_stack_bind" ->
       if runtime5 then Primitive (Pwith_stack_bind, 7)
       else Unsupported Pwith_stack_bind
+    | "%with_stack_preemptible" ->
+      if runtime5 then Primitive (Pwith_stack_preemptible, 6)
+      else Unsupported Pwith_stack_preemptible
+    | "%with_stack_bind_preemptible" ->
+      if runtime5 then Primitive (Pwith_stack_bind_preemptible, 8)
+      else Unsupported Pwith_stack_bind_preemptible
     | "%reperform" ->
       if runtime5 then Primitive (Preperform, 3) else Unsupported Preperform
     | "%perform" ->
@@ -2346,7 +2352,8 @@ let lambda_primitive_needs_event_after = function
   | Punboxed_nativeint_array_set_vec _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
-  | Pwith_stack | Pwith_stack_bind | Pperform | Preperform | Presume
+  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
+  | Pwith_stack_bind_preemptible | Pperform | Preperform | Presume
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)

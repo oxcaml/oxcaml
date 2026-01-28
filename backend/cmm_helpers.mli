@@ -1240,6 +1240,28 @@ val with_stack_bind :
   arg:expression ->
   expression
 
+val with_stack_preemptible :
+  dbg:Debuginfo.t ->
+  valuec:expression ->
+  exnc:expression ->
+  effc:expression ->
+  handle_tick:expression ->
+  f:expression ->
+  arg:expression ->
+  expression
+
+val with_stack_bind_preemptible :
+  dbg:Debuginfo.t ->
+  valuec:expression ->
+  exnc:expression ->
+  effc:expression ->
+  handle_tick:expression ->
+  dyn:expression ->
+  bind:expression ->
+  f:expression ->
+  arg:expression ->
+  expression
+
 val resume :
   dbg:Debuginfo.t ->
   cont:expression ->

@@ -474,6 +474,76 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all )
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+      let { env; res; expr = { cmm = valuec; free_vars = fv0; effs = _ } } =
+        simple env res valuec
+      in
+      let { env; res; expr = { cmm = exnc; free_vars = fv1; effs = _ } } =
+        simple env res exnc
+      in
+      let { env; res; expr = { cmm = effc; free_vars = fv2; effs = _ } } =
+        simple env res effc
+      in
+      let { env; res; expr = { cmm = handle_tick; free_vars = fv3; effs = _ } }
+          =
+        simple env res handle_tick
+      in
+      let { env; res; expr = { cmm = f; free_vars = fv4; effs = _ } } =
+        simple env res f
+      in
+      let { env; res; expr = { cmm = arg; free_vars = fv5; effs = _ } } =
+        simple env res arg
+      in
+      let free_vars =
+        BV.Set.union
+          (BV.Set.union fv0 (BV.Set.union fv1 fv2))
+          (BV.Set.union fv3 (BV.Set.union fv4 fv5))
+      in
+      ( C.with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg,
+        free_vars,
+        env,
+        res,
+        Ece.all )
+    | With_stack_bind_preemptible
+        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+      let { env; res; expr = { cmm = valuec; free_vars = fv0; effs = _ } } =
+        simple env res valuec
+      in
+      let { env; res; expr = { cmm = exnc; free_vars = fv1; effs = _ } } =
+        simple env res exnc
+      in
+      let { env; res; expr = { cmm = effc; free_vars = fv2; effs = _ } } =
+        simple env res effc
+      in
+      let { env; res; expr = { cmm = handle_tick; free_vars = fv3; effs = _ } }
+          =
+        simple env res handle_tick
+      in
+      let { env; res; expr = { cmm = dyn; free_vars = fv4; effs = _ } } =
+        simple env res dyn
+      in
+      let { env; res; expr = { cmm = bind; free_vars = fv5; effs = _ } } =
+        simple env res bind
+      in
+      let { env; res; expr = { cmm = f; free_vars = fv6; effs = _ } } =
+        simple env res f
+      in
+      let { env; res; expr = { cmm = arg; free_vars = fv7; effs = _ } } =
+        simple env res arg
+      in
+      let free_vars =
+        BV.Set.union
+          (BV.Set.union
+             (BV.Set.union fv0 (BV.Set.union fv1 fv2))
+             (BV.Set.union fv3 fv4))
+          (BV.Set.union fv5 (BV.Set.union fv6 fv7))
+      in
+      ( C.with_stack_bind_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~dyn
+          ~bind ~f ~arg,
+        free_vars,
+        env,
+        res,
+        Ece.all )
     | Resume { cont; f; arg } ->
       let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
         simple env res cont

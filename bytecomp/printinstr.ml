@@ -109,6 +109,8 @@ let instruction ppf = function
   | Kreperformterm n -> fprintf ppf "\treperformterm %i" n
   | Kwith_stack -> fprintf ppf "\twith_stack"
   | Kwith_stack_bind -> fprintf ppf "\twith_stack_bind"
+  | Kwith_stack_preemptible -> fprintf ppf "\twith_stack_preemptible"
+  | Kwith_stack_bind_preemptible -> fprintf ppf "\twith_stack_bind_preemptible"
   | Kstop -> fprintf ppf "\tstop"
   | Kevent ev -> fprintf ppf "\tevent \"%s\" %i-%i"
                          ev.ev_loc.Location.loc_start.Lexing.pos_fname
