@@ -96,14 +96,15 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
 let hard_int_reg =
   let v = Array.make 13 Reg.dummy in
   for i = 0 to 12 do
-    v.(i) <- Reg.create_at_location Int (Reg (Reg.Index.of_int i))
+    v.(i) <- Reg.create_at_location Int (Reg (Reg_class.Reg_id.of_int i))
   done;
   v
 
 let hard_float_reg =
   let v = Array.make 16 Reg.dummy in
   for i = 0 to 15 do
-    v.(i) <- Reg.create_at_location Float (Reg (Reg.Index.of_int (100 + i)))
+    let reg = Reg.Reg (Reg_class.Reg_id.of_int (100 + i)) in
+    v.(i) <- Reg.create_at_location Float reg
   done;
   v
 

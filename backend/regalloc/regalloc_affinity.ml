@@ -2,9 +2,9 @@
 
 open! Int_replace_polymorphic_compare
 module DLL = Oxcaml_utils.Doubly_linked_list
-module Phys_reg = Numbers.Int
+module Phys_reg = Reg_class.Reg_id
 
-type phys_reg = int
+type phys_reg = Phys_reg.t
 
 type affinity =
   { priority : int;
@@ -46,8 +46,8 @@ let temp_and_phys_reg_of_instr :
     let src = instr.arg.(0) in
     let dst = instr.res.(0) in
     match src.loc, dst.loc with
-    | Reg phys_reg, Unknown -> Some (dst, (phys_reg :> int))
-    | Unknown, Reg phys_reg -> Some (src, (phys_reg :> int))
+    | Reg phys_reg, Unknown -> Some (dst, phys_reg)
+    | Unknown, Reg phys_reg -> Some (src, phys_reg)
     | _ -> None)
   | _ -> None
 

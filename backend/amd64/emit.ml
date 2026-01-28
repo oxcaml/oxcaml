@@ -2402,7 +2402,9 @@ let emit_instr ~first ~fallthrough i =
        argument to Lswitch can still be assigned to one of these two registers,
        so we must be careful not to clobber it before use. *)
     let tmp1, tmp2 =
-      if Reg.equal_location i.arg.(0).loc (Reg (Reg.Index.of_int 0)) (* rax *)
+      if
+        Reg.equal_location i.arg.(0).loc (Reg (Reg_class.Reg_id.of_int 0))
+        (* rax *)
       then phys_rdx, phys_rax
       else phys_rax, phys_rdx
     in

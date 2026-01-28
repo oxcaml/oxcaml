@@ -107,7 +107,7 @@ end = struct
   end
 
   type t =
-    | Reg of Reg.Index.t
+    | Reg of Reg_class.Reg_id.t
     | Stack of Stack.t
 
   let of_reg reg =

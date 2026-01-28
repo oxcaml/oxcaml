@@ -25,7 +25,6 @@ let loc ?(wrap_out = fun ppf f -> f ppf) ~unknown ppf loc typ =
   match loc with
   | Unknown -> unknown ppf
   | Reg r ->
-    let r = (r :> int) in
     wrap_out ppf (fun ppf -> fprintf ppf "%s" (Reg_class.register_name typ r))
   | Stack (Local s) ->
     wrap_out ppf (fun ppf ->

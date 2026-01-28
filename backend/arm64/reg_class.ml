@@ -8,9 +8,19 @@ module T = struct
   let all =
     [Int64; (* general purpose registers *) Float128 (* neon registers *)]
 
-  let first_available_register : t -> int = function
-    | Int64 -> 0
-    | Float128 -> 100
+  module Reg_id = struct
+    include Numbers.Int
+
+    let of_int = Fun.id
+  end
+
+  let reg_class_base = function Int64 -> 0 | Float128 -> 100
+
+  let reg_index_in_class : t -> Reg_id.t -> int =
+   fun t rid -> rid - reg_class_base t
+
+  let reg_id : t -> reg_index_in_class:int -> Reg_id.t =
+   fun t ~reg_index_in_class -> reg_class_base t + reg_index_in_class
 
   let num_available_registers : t -> int = function
     | Int64 -> 23
@@ -68,10 +78,10 @@ module T = struct
 
   let register_name ty r =
     match (ty : Cmm.machtype_component) with
-    | Val | Int | Addr -> int_reg_name.(r - first_available_register Int64)
-    | Float -> float_reg_name.(r - first_available_register Float128)
-    | Float32 -> float32_reg_name.(r - first_available_register Float128)
-    | Vec128 | Valx2 -> vec128_reg_name.(r - first_available_register Float128)
+    | Val | Int | Addr -> int_reg_name.(reg_index_in_class Int64 r)
+    | Float -> float_reg_name.(reg_index_in_class Float128 r)
+    | Float32 -> float32_reg_name.(reg_index_in_class Float128 r)
+    | Vec128 | Valx2 -> vec128_reg_name.(reg_index_in_class Float128 r)
     | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
   let of_machtype typ =

@@ -32,12 +32,6 @@ end
    that it remembers adjacency between machine registers aliased at multiple types.
 *)
 
-module Index : sig
-  type t = private int
-
-  val of_int : int -> t
-end
-
 type t = private
   { name : Name.t; (* Name *)
     stamp : int; (* Unique stamp *)
@@ -49,7 +43,7 @@ type t = private
 
 and location =
   | Unknown
-  | Reg of Index.t
+  | Reg of Reg_class.Reg_id.t
   | Stack of stack_location
 
 and stack_location =
@@ -181,7 +175,7 @@ module For_testing : sig
 end
 
 module For_printing : sig
-  (** The result of [create] will not be aded to the internal lists of
+  (** The result of [create] will not be added to the internal lists of
       registers, and therefore should not be kept around after printing. *)
   val create :
     name:Name.t ->

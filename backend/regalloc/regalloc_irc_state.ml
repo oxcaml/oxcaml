@@ -51,7 +51,7 @@ type t =
     mutable inst_temporaries : Reg.Set.t;
     mutable block_temporaries : Reg.Set.t;
     reg_work_list : RegWorkList.t Reg.Tbl.t;
-    reg_color : Reg.Index.t option Reg.Tbl.t;
+    reg_color : Reg_class.Reg_id.t option Reg.Tbl.t;
     reg_alias : Reg.t option Reg.Tbl.t;
     reg_interf : Reg.t list Reg.Tbl.t;
     reg_degree : int Reg.Tbl.t;
