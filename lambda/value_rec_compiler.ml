@@ -333,6 +333,7 @@ let compute_static_size lam =
     | Popaque _
     | Pdls_get
     | Ptls_get
+    | Pdomain_index
     | Ppeek _
     | Ppoke _
     | Pscalar _

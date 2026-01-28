@@ -5199,6 +5199,8 @@ let dls_get ~dbg = Cop (Cdls_get, [], dbg)
 
 let tls_get ~dbg = Cop (Ctls_get, [], dbg)
 
+let domain_index ~dbg = Cop (Cdomain_index, [], dbg)
+
 let perform ~dbg eff =
   let cont =
     make_alloc dbg ~tag:Runtimetags.cont_tag

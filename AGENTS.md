@@ -6,8 +6,8 @@ This file provides guidance to AI agents when working with code in this reposito
 
 Do not stage or commit your changes unless prompted to.
 Always check that your changes build with both (after configuration, see below):
-1. `make -s boot-compiler` - Quick build check
-2. `make -s test` - Full test suite (required before declaring success)
+1. `make boot-compiler` - Quick build check
+2. `make test` - Full test suite (required before declaring success)
 
 You are working on the OxCaml compiler, a performance-focused fork of OCaml with Jane Street extensions, including the Flambda 2 optimizer and CFG backend.
 
@@ -28,18 +28,18 @@ You are working on the OxCaml compiler, a performance-focused fork of OCaml with
 
 ## Build Commands
 ```bash
-make -s boot-compiler         # Quick build (recommended for development)
-make -s                       # Full build
-make -s install               # Install the compiler to $(pwd)/_install
-make -s fmt                   # Auto-format code (always run before committing)
+make boot-compiler         # Quick build (recommended for development)
+make                       # Full build
+make install               # Install the compiler to $(pwd)/_install
+make fmt                   # Auto-format code (always run before committing)
 ```
 
 ## Test Commands
 ```bash
-make -s test-one TEST=test-dir/path.ml      # Run a single test testsuite/tests/test-dir/path.ml
-make -s test-one DIR=test-dir               # Run all tests in testsuite/tests/test-dir
-make -s promote-one TEST=test-dir/path.ml   # Update expected test output
-make -s test                                # Run all tests
+make test-one TEST=test-dir/path.ml      # Run a single test testsuite/tests/test-dir/path.ml
+make test-one DIR=test-dir               # Run all tests in testsuite/tests/test-dir
+make promote-one TEST=test-dir/path.ml   # Update expected test output
+make test                                # Run all tests
 ```
 
 ## Configuration Commands
@@ -53,14 +53,14 @@ If the execution of `autoconf` fails because the version is too old, try with `a
 Configuration is needed after changing `.in` files or the autoconf script.
 
 ## Development Guidelines
-- Always verify changes build with `make -s boot-compiler`
-- Run `make -s fmt` to ensure code formatting
+- Always verify changes build with `make boot-compiler`
+- Run `make fmt` to ensure code formatting
 - Keep lines under 80 characters
 - Don't add excessive comments unless prompted
 - Don't disable warnings or tests unless prompted
 - Use pattern-matching and functional programming idioms
 - Avoid `assert false` and other unreachable code
-- Rebuild the project often while using the LSP using `make -s boot-compiler`. When
+- Rebuild the project often while using the LSP using `make boot-compiler`. When
   you don't rebuild, the LSP may give you stale information from a previous
   build.
 

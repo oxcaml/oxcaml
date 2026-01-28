@@ -1,7 +1,8 @@
 (* TEST
    flags = "-extension let_mutable";
    include stdlib_upstream_compatible;
-   expect; *)
+   expect;
+   expect.opt; *)
 
 (* Test 1.1: basic usage in a for loop *)
 let foo1 y =
@@ -644,7 +645,7 @@ Error: This value is "local" because it is "stack_"-allocated.
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* Test 21: Unboxed products not supported yet *)
+(* Test 21: Unboxed products *)
 let [@warning "-26"] foo_21 =
   let mutable bar = #(123, 456) in
   bar <- #(789, 101);

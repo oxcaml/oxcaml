@@ -289,7 +289,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
       let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
       { params = self_param :: method_.params;
         body = method_.body;
-        return_mode = transl_alloc_mode_l method_.ret_mode;
+        return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
         return_sort;
         region = true;
       }
@@ -338,7 +338,7 @@ let zero_alloc_of_application
   | Some assume, _ ->
     (* The user wrote a zero_alloc attribute on the application - keep it. *)
     Builtin_attributes.assume_zero_alloc ~inferred:false assume
-  | None, Texp_ident (_, _, { val_zero_alloc; _ }, _, _) ->
+  | None, Texp_ident (_, _, { val_zero_alloc; _ }, _, _, _) ->
     (* We assume the call is zero_alloc if the function is known to be
        zero_alloc. If the function is zero_alloc opt, then we need to be sure
        that the opt checks were run to license this assumption. We judge
@@ -386,7 +386,7 @@ and transl_exp1 ~scopes ~in_new_scope sort e =
 
 and transl_exp0 ~in_new_scope ~scopes sort e =
   match e.exp_desc with
-  | Texp_ident(path, _, desc, kind, _) ->
+  | Texp_ident(path, _, desc, kind, _, _) ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
   | Texp_constant cst -> Lconst (Const_base cst)
@@ -404,7 +404,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
   | Texp_apply({ exp_desc = Texp_ident(path, _, {val_kind = Val_prim p},
-                                       Id_prim (pmode, psort), _);
+                                       Id_prim (pmode, psort), _, _);
                  exp_type = prim_type; } as funct,
                oargs, pos, ap_mode, zero_alloc)
     when can_apply_primitive p pmode pos oargs ->
@@ -437,7 +437,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       in
       let lam =
         let loc =
-          map_scopes (update_assume_zero_alloc ~assume_zero_alloc)
+          map_scopes
+            (fun ~scopes ~loc:_ ->
+              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             (of_location ~scopes e.exp_loc)
         in
         Translprim.transl_primitive_application
@@ -1454,7 +1456,10 @@ and transl_apply ~scopes
          It's fine for [Lsend] cases because [assume_zero_alloc] is
          always false currently for them. *)
         let loc =
-          map_scopes (update_assume_zero_alloc ~assume_zero_alloc) loc
+          map_scopes
+            (fun ~scopes ~loc:_ ->
+              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            loc
         in
         Lapply {
           ap_loc=loc;
@@ -1606,7 +1611,7 @@ and transl_tupled_function
       Tfunction_body body ->
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let case = { c_lhs = pat; c_guard = None; c_rhs = body } in
-        Some ([ case ], fp_partial, pat, fp_mode, fp_sort)
+        Some ([ case ], fp_partial, pat, fp_mode.mode_modes, fp_sort)
     | _ -> None
   in
   (* Cases can be eligible for flattening if they belong to the only param
@@ -1724,7 +1729,9 @@ and transl_curried_function ~scopes loc repr params body
     ~return_sort ~return_layout ~return_mode ~region ~mode
   =
   let { nlocal } =
-    let param_curries = List.map (fun fp -> fp.fp_curry, fp.fp_mode) params in
+    let param_curries =
+      List.map (fun fp -> fp.fp_curry, fp.fp_mode.mode_modes) params
+    in
     curried_function_kind
       ~return_mode
       ~mode
@@ -1788,7 +1795,7 @@ and transl_curried_function ~scopes loc repr params body
         in
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let arg_layout = layout arg_env fp_loc fp_sort arg_type in
-        let arg_mode = transl_alloc_mode_l fp_mode in
+        let arg_mode = transl_alloc_mode_l fp_mode.mode_modes in
         let param =
           { name = fp_param;
             debug_uid = fp_param_debug_uid;
@@ -1916,7 +1923,7 @@ and transl_function ~in_new_scope ~scopes e params body
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
     else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
   in
-  let sreturn_mode = transl_alloc_mode_l sreturn_mode in
+  let sreturn_mode = transl_alloc_mode_l sreturn_mode.mode_modes in
   let { params; body; return_sort; return_mode; region } =
     fuse_method_arity
       { params; body;
@@ -2653,7 +2660,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
              (Tfunction_cases
                 { fc_cases = [case]; fc_param = param;
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
-                  fc_loc = ghost_loc; fc_exp_extra = None; fc_attributes = [];
+                  fc_loc = ghost_loc; fc_exp_extra = []; fc_attributes = [];
                   fc_arg_mode = Mode.Alloc.disallow_right Mode.Alloc.legacy;
                   fc_arg_sort = param_sort; fc_env = env;
                   fc_ret_type = case.c_rhs.exp_type;

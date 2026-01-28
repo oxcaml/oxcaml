@@ -905,7 +905,7 @@ let rec choice ctx t =
 
     (* we don't handle effect or DLS primitives *)
     | Pwith_stack | Pwith_stack_bind | Pperform | Presume | Preperform
-    | Pdls_get | Ptls_get
+    | Pdls_get | Ptls_get | Pdomain_index
 
     (* we don't handle atomic primitives *)
     | Patomic_exchange_field _ | Patomic_compare_exchange_field _

@@ -1009,13 +1009,12 @@ end
 module type T = sig module type T = sig val foo : 'a -> 'a end end
 |}]
 
-(* default modalities is overridden as a whole, not per-axis *)
-(* CR zqian: make overriding per-axis *)
+(* explicit modalities on val compose with default modalities per-axis *)
 module type T = sig @@ portable
   val foo : 'a -> 'a @@ contended
 end
 [%%expect{|
-module type T = sig val foo : 'a -> 'a @@ contended end
+module type T = sig val foo : 'a -> 'a @@ portable contended end
 |}]
 
 (* default modalities is a syntax sugar that doesn't constitute the meaning of

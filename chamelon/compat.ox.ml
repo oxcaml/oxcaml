@@ -43,7 +43,8 @@ type texp_ident_identifier = ident_kind * unique_use
 
 let mkTexp_ident ?id:(ident_kind, uu = (Id_value, aliased_many_use))
     (path, longident, vd) =
-  Texp_ident (path, longident, vd, ident_kind, uu)
+  Texp_ident
+    (path, longident, vd, ident_kind, uu, Mode.Value.(disallow_right legacy))
 
 type nonrec apply_arg = apply_arg
 
@@ -95,7 +96,7 @@ type texp_function_param = {
 type texp_function_cases_identifier = {
   last_arg_mode : Alloc.l;
   last_arg_sort : Jkind.Sort.t;
-  last_arg_exp_extra : exp_extra option;
+  last_arg_exp_extra : exp_extra list;
   last_arg_attributes : attributes;
   env : Env.t;
   ret_type : Types.type_expr;
@@ -126,7 +127,7 @@ let texp_function_cases_identifier_defaults =
   {
     last_arg_mode = Alloc.disallow_right Alloc.legacy;
     last_arg_sort = Jkind.Sort.value;
-    last_arg_exp_extra = None;
+    last_arg_exp_extra = [];
     last_arg_attributes = [];
     env = Env.empty;
     ret_type = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind);
@@ -174,7 +175,7 @@ let mkTexp_function ?(id = texp_function_defaults)
               fp_param_debug_uid = Lambda.debug_uid_none;
               fp_partial = partial;
               fp_sort = id.param_sort;
-              fp_mode = id.param_mode;
+              fp_mode = { mode_modes = id.param_mode; mode_desc = [] };
               fp_curry = id.param_curry;
               fp_newtypes = id.param_newtypes;
               fp_loc = Location.none;
@@ -201,7 +202,7 @@ let mkTexp_function ?(id = texp_function_defaults)
               });
       alloc_mode = id.alloc_mode;
       ret_sort = id.ret_sort;
-      ret_mode = id.ret_mode;
+      ret_mode = { mode_modes = id.ret_mode; mode_desc = [] };
       zero_alloc = id.zero_alloc;
     }
 
@@ -244,7 +245,7 @@ let untype_label = function
 
 let view_texp (e : expression_desc) =
   match e with
-  | Texp_ident (path, longident, vd, ident_kind, uu) ->
+  | Texp_ident (path, longident, vd, ident_kind, uu, _mode) ->
       Texp_ident (path, longident, vd, (ident_kind, uu))
   | Texp_apply (exp, args, pos, mode, za) ->
       let args = List.map (fun (label, x) -> (untype_label label, x)) args in
@@ -274,7 +275,7 @@ let view_texp (e : expression_desc) =
               param_identifier =
                 {
                   param_sort = param.fp_sort;
-                  param_mode = param.fp_mode;
+                  param_mode = param.fp_mode.mode_modes;
                   param_curry = param.fp_curry;
                   param_newtypes = param.fp_newtypes;
                 };
@@ -302,7 +303,9 @@ let view_texp (e : expression_desc) =
               }
       in
       Texp_function
-        ({ params; body }, { alloc_mode; ret_sort; ret_mode; zero_alloc })
+        ( { params; body },
+          { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc }
+        )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
   | _ -> O e

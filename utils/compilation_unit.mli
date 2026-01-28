@@ -235,6 +235,12 @@ val full_path : t -> Name.t list
     conventions. *)
 val full_path_as_string : t -> string
 
+(** Returns the full path of the compilation unit including its arguments in the
+    mangled form suitable to create its linkage name and using the given
+    [pack_separator] when relevant. (See at the finishing steps in
+    {!Symbol.linkage_name_for_compilation_unit}). *)
+val mangle_for_linkage_name : pack_separator:(unit -> string) -> t -> string
+
 (** Returns the string that should form the base of the .cmx/o file for this
     unit. Usually just [name_as_string t] uncapitalized, but if there are
     instance arguments, they're encoded in a Bash-friendly but otherwise

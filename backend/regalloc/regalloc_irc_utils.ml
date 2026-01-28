@@ -203,6 +203,7 @@ let is_move_basic : Cfg.basic -> bool =
     | Name_for_debugger _ -> false
     | Dls_get -> false
     | Tls_get -> false
+    | Domain_index -> false
     | Poll -> false
     | Pause -> false
     | Alloc _ -> false)

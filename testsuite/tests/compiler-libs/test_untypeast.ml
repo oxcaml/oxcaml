@@ -107,7 +107,8 @@ let (foo : 'a -> 'a) = ((fun x -> x : 'a -> 'a) : _ @ portable) in foo
 run {| let foo : 'a . ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let foo : ('a : value) . 'a -> 'a = fun x -> x in foo
+let foo : ('a : value) . ('a -> 'a) @ portable = (fun x -> x : _ @ portable) in
+foo
 - : unit = ()
 |}];;
 
@@ -120,5 +121,12 @@ run {|
 let module M = struct type t = {
                         x: int } end in
   fun x -> let M.{ x }  = let open M in { x } in x
+- : unit = ()
+|}];;
+
+run {| let foo : 'a -> 'a = fun x -> x in foo |}
+
+[%%expect{|
+let (foo : 'a -> 'a) = ( (fun x -> x : 'a -> 'a)) in foo
 - : unit = ()
 |}];;
