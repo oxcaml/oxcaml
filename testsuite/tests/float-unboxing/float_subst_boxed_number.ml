@@ -89,7 +89,7 @@ let unbox_classify_float () =
   ignore (Sys.opaque_identity !x)
 
 let unbox_compare_float () =
-  let module M = struct type sf = { mutable x: float; y: float; } end in
+  let module M = struct type sf = { mutable x: float; y: float; } [@@flatten_floats] end in
   let x = { M.x=100. ; y=1. } in
   for i = 1 to 1000 do
     assert (compare x.M.x x.M.y >= 0);

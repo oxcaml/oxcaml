@@ -10,7 +10,7 @@ open Lib;;
 type t = {
   mutable a : float;
   mutable b : float;
-};;
+} [@@flatten_floats];;
 
 let x = { a = 0.1; b = 0.2 } in
 x.a <- 0.3;

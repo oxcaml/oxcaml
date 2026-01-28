@@ -1612,6 +1612,19 @@ let triangle_10 = let mutable x = 0 in
 val triangle_10 : int = 55
 |}]
 
+(**********************************************)
+(* [@@unboxed] and [@@flatten_floats] records *)
+
+type t = { i : int } [@@unboxed]
+[%%expect{|
+type t = { i : int; } [@@unboxed]
+|}]
+
+type t = { f : float } [@@flatten_floats]
+[%%expect{|
+type t = { f : float; } [@@flatten_floats]
+|}]
+
 (*********************)
 (* quotations syntax *)
 

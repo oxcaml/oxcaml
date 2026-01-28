@@ -7,7 +7,7 @@
 *)
 
 open Lib;;
-type t = { a : float; b : float };;
+type t = { a : float; b : float } [@@flatten_floats];;
 
 if { a = 0.1; b = 0.2 }.a <> 0.1 then raise Not_found;;
 

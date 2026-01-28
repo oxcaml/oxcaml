@@ -1,7 +1,7 @@
 (* TEST
  native;
 *)
-type alloc_count = { mutable total: float }
+type alloc_count = { mutable total: float } [@@flatten_floats]
 let allocs = Sys.opaque_identity { total = 0. }
 let[@inline never] set_allocs () =
   allocs.total <- Gc.minor_words ()

@@ -14,20 +14,20 @@
 type t =
   { a : float;
     b : float#;
-  }
+  } [@@flatten_floats]
 
 [%%expect{|
-type t = { a : float; b : float#; }
+type t = { a : float; b : float#; } [@@flatten_floats]
 |}];;
 
 (* Mixed float-float# blocks are always OK. *)
 type t =
   { a : float#;
     b : float;
-  }
+  } [@@flatten_floats]
 
 [%%expect{|
-type t = { a : float#; b : float; }
+type t = { a : float#; b : float; } [@@flatten_floats]
 |}];;
 
 (* When a non-float/float# field appears, [float]
@@ -82,10 +82,10 @@ type t =
   { f1 : float#;
     f2 : float#;
     f3 : float;
-  }
+  } [@@flatten_floats]
 
 [%%expect{|
-type t = { f1 : float#; f2 : float#; f3 : float; }
+type t = { f1 : float#; f2 : float#; f3 : float; } [@@flatten_floats]
 |}];;
 
 (* The string [f3] can't appear in the flat suffix, thus it will be moved
@@ -227,23 +227,27 @@ module _ : sig
   val t : t
 end = struct
   type u = float
-  type t = { u : float; f : float# }
+  type t = { u : float; f : float# } [@@flatten_floats]
   let t = { u = 3.0; f = #4.0 }
 end
 [%%expect {|
 Lines 5-9, characters 6-3:
 5 | ......struct
 6 |   type u = float
-7 |   type t = { u : float; f : float# }
+7 |   type t = { u : float; f : float# } [@@flatten_floats]
 8 |   let t = { u = 3.0; f = #4.0 }
 9 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type u = float type t = { u : float; f : float#; } val t : t end
+         sig
+           type u = float
+           type t = { u : float; f : float#; } [@@flatten_floats]
+           val t : t
+         end
        is not included in
          sig type u type t = { u : u; f : float#; } val t : t end
        Type declarations do not match:
-         type t = { u : float; f : float#; }
+         type t = { u : float; f : float#; } [@@flatten_floats]
        is not included in
          type t = { u : u; f : float#; }
        Their internal representations differ:

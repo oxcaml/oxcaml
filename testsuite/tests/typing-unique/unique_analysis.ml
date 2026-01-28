@@ -742,7 +742,7 @@ Line 4, characters 20-21:
 
 |}]
 
-type r = {x : float; y : float}
+type r = {x : float; y : float} [@@flatten_floats]
 
 (* CR zqian: The following should pass but doesn't, because the uniqueness
    analysis doesn't support mode crossing. The following involves sequencing the
@@ -758,7 +758,7 @@ let foo () =
   (* [x] is allocated fresh, unrelated to [r]. *)
   ignore (unique_id x)
 [%%expect{|
-type r = { x : float; y : float; }
+type r = { x : float; y : float; } [@@flatten_floats]
 Line 13, characters 20-21:
 13 |   ignore (unique_id r);
                          ^

@@ -492,7 +492,7 @@ let _ =
 type ex = Ex : 'a -> ex
 
 type t11_u = { xu : float#; yu : float# }
-type t11_b = { xb : float; yb : float }
+type t11_b = { xb : float; yb : float } [@@flatten_floats]
 
 let ru = { xu = #3.14; yu = #42.0 }
 let rb = { xb = 3.14; yb = 42.0 }

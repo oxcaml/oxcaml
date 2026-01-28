@@ -25,7 +25,7 @@ open! Stdlib
     (cartesian representation).  Each part is represented by a
     double-precision floating-point number (type [float]).   *)
 
-type t = { re: float; im: float }
+type t = { re: float; im: float } [@@flatten_floats]
 (** The type of complex numbers.  [re] is the real part and [im] the
     imaginary part. *)
 

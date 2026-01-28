@@ -248,7 +248,7 @@ module Extension_with_inline_record :
 
 (* Marking a field [@atomic] in a float-only record disables the unboxing optimization. *)
 module Float_records = struct
-  type flat = { x : float; mutable y : float }
+  type flat = { x : float; mutable y : float } [@@flatten_floats]
   type t = { x : float; mutable y : float [@atomic] }
 
   let mk_flat x y : flat = { x; y }
@@ -276,7 +276,7 @@ represented as a flat float array.
 
 module Float_records :
   sig
-    type flat = { x : float; mutable y : float; }
+    type flat = { x : float; mutable y : float; } [@@flatten_floats]
     type t = { x : float; mutable y : float [@atomic]; }
     val mk_flat : float -> float -> flat
     val mk_t : float -> float -> t
@@ -361,14 +361,14 @@ type regular_float_record = {
   mutable p : float;
   mutable q : float;
   mutable r : float;
-}
+} [@@flatten_floats]
 [%%expect{|
 0
 type regular_float_record = {
   mutable p : float;
   mutable q : float;
   mutable r : float;
-}
+} [@@flatten_floats]
 |}]
 
 (* This should NOT trigger warning 214 - immutable float fields (can't be atomic) *)
@@ -376,10 +376,10 @@ type immutable_float_record = {
   x : float;
   y : float;
   z : float;
-}
+} [@@flatten_floats]
 [%%expect{|
 0
-type immutable_float_record = { x : float; y : float; z : float; }
+type immutable_float_record = { x : float; y : float; z : float; } [@@flatten_floats]
 |}]
 
 (* This should trigger warning 214 - single atomic float field *)

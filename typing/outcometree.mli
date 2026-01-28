@@ -206,6 +206,7 @@ and out_type_decl =
     otype_jkind: out_jkind option;
 
     otype_unboxed: bool;
+    otype_flatten_floats: bool;
     otype_or_null_reexport: bool;
     otype_cstrs: (out_type * out_type) list;
     otype_attributes: out_attribute list }

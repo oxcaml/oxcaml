@@ -1224,7 +1224,7 @@ type process_times = Unix.process_times =
     tms_stime : float;  (** System time for the process *)
     tms_cutime : float; (** User time for the children processes *)
     tms_cstime : float; (** System time for the children processes *)
-  }
+  } [@@flatten_floats]
 (** The execution times (CPU times) of a process. *)
 
 type tm = Unix.tm =
@@ -1312,7 +1312,7 @@ type interval_timer = Unix.interval_timer =
 type interval_timer_status = Unix.interval_timer_status =
   { it_interval : float;         (** Period *)
     it_value : float;            (** Current value of the timer *)
-  }
+  } [@@flatten_floats]
 (** The type describing the status of an interval timer *)
 
 val getitimer : interval_timer -> interval_timer_status

@@ -168,20 +168,20 @@ type u = r#
 |}]
 
 (* But not float, mixed float/float#, or [@@unboxed] records *)
-type r = { f : float ; f2 : float }
+type r = { f : float ; f2 : float } [@@flatten_floats]
 type bad = r#
 [%%expect{|
-type r = { f : float; f2 : float; }
+type r = { f : float; f2 : float; } [@@flatten_floats]
 Line 2, characters 11-13:
 2 | type bad = r#
                ^^
 Error: The type "r" has no unboxed version.
 Hint: Float records don't get unboxed versions.
 |}]
-type r = { f : float ; f2 : float# }
+type r = { f : float ; f2 : float# } [@@flatten_floats]
 type bad = r#
 [%%expect{|
-type r = { f : float; f2 : float#; }
+type r = { f : float; f2 : float#; } [@@flatten_floats]
 Line 2, characters 11-13:
 2 | type bad = r#
                ^^
@@ -480,13 +480,13 @@ end = struct
   type t = M2.t
 end
 and M2 : sig
-  type t = { f : float }
+  type t = { f : float } [@@flatten_floats]
 end = struct
-  type t = { f : float }
+  type t = { f : float } [@@flatten_floats]
 end
 [%%expect{|
 module rec M : sig type t = M2.t end
-and M2 : sig type t = { f : float; } end
+and M2 : sig type t = { f : float; } [@@flatten_floats] end
 |}]
 
 type bad = M.t#

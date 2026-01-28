@@ -586,7 +586,7 @@ type process_times =
   { tms_utime : float;
     tms_stime : float;
     tms_cutime : float;
-    tms_cstime : float }
+    tms_cstime : float } [@@flatten_floats]
 
 type tm =
   { tm_sec : int;
@@ -619,7 +619,7 @@ type interval_timer =
 
 type interval_timer_status =
   { it_interval: float;                 (* Period *)
-    it_value: float }                   (* Current value of the timer *)
+    it_value: float } [@@flatten_floats] (* Current value of the timer *)
 
 let getitimer _it = invalid_arg "Unix.getitimer not implemented"
 let setitimer _it _tm = invalid_arg "Unix.setitimer not implemented"

@@ -94,6 +94,7 @@ let builtin_attrs =
   ; "immediate64"
   ; "boxed"
   ; "unboxed"
+  ; "flatten_floats"
   ; "principal"
   ; "noprincipal"
   ; "nolabels"
@@ -512,6 +513,8 @@ let explicit_arity attrs = has_attribute "explicit_arity" attrs
 let has_unboxed attrs = has_attribute "unboxed" attrs
 
 let has_boxed attrs = has_attribute "boxed" attrs
+
+let has_flatten_floats attrs = has_attribute "flatten_floats" attrs
 
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs
