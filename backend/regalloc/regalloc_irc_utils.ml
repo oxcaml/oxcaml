@@ -109,7 +109,7 @@ module InstrWorkList = struct
 end
 
 module Color = struct
-  type t = int
+  type t = Reg_class.Reg_id.t
 end
 
 module RegisterStamp = struct

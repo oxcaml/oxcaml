@@ -27,7 +27,19 @@ module T = struct
   let all =
     [GPR; (* general-purpose registers *) SIMD (* xmm/ymm/zmm registers *)]
 
-  let first_available_register : t -> int = function GPR -> 0 | SIMD -> 100
+  module Reg_id = struct
+    include Numbers.Int
+
+    let of_int = Fun.id
+  end
+
+  let reg_class_base = function GPR -> 0 | SIMD -> 100
+
+  let reg_index_in_class : t -> Reg_id.t -> int =
+   fun t rid -> rid - reg_class_base t
+
+  let reg_id : t -> reg_index_in_class:int -> Reg_id.t =
+   fun t ~reg_index_in_class -> reg_class_base t + reg_index_in_class
 
   let num_available_registers : t -> int = function
     | GPR -> if Config.with_frame_pointers then 12 else 13
@@ -69,24 +81,23 @@ module T = struct
   let register_name ty r =
     (* If the ID doesn't match the type, the array access will raise. *)
     match (ty : Cmm.machtype_component) with
-    | Int | Addr | Val -> gpr_name.(r - first_available_register GPR)
-    | Float | Float32 | Vec128 | Valx2 ->
-      xmm_name.(r - first_available_register SIMD)
-    | Vec256 -> ymm_name.(r - first_available_register SIMD)
-    | Vec512 -> zmm_name.(r - first_available_register SIMD)
+    | Int | Addr | Val -> gpr_name.(reg_index_in_class GPR r)
+    | Float | Float32 | Vec128 | Valx2 -> xmm_name.(reg_index_in_class SIMD r)
+    | Vec256 -> ymm_name.(reg_index_in_class SIMD r)
+    | Vec512 -> zmm_name.(reg_index_in_class SIMD r)
 
   let of_machtype : Cmm.machtype_component -> t = function
     | Val | Int | Addr -> GPR
     | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2 -> SIMD
 
   let gc_regs_offset ~(simd : Save_simd_regs.t) (typ : Cmm.machtype_component)
-      (reg_index : int) =
+      (reg_id : Reg_id.t) =
     (* Given register with type [typ] and index [reg_index], return the offset
        (the number of [value] slots, not their size in bytes) of the register
        from the [gc_regs] pointer during GC at runtime. Keep in sync with
        [amd64.S]. *)
     let reg_class = of_machtype typ in
-    let index = reg_index - first_available_register reg_class in
+    let index = reg_index_in_class reg_class reg_id in
     match reg_class with
     | GPR -> index
     | SIMD ->

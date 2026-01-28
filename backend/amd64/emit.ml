@@ -393,7 +393,7 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
 let reg : Reg.t -> X86_ast.arg =
  fun reg ->
   match reg with
-  | { loc = Reg.Reg r; typ = ty; _ } -> register_name ty r
+  | { loc = Reg.Reg r; typ = ty; _ } -> register_name ty (r :> int)
   | { loc = Stack (Domainstate n); typ = ty; _ } ->
     let ofs = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
     mem64 (x86_data_type_for_stack_slot ty) ofs (Scalar R14)
@@ -404,7 +404,7 @@ let reg : Reg.t -> X86_ast.arg =
   | { loc = Unknown; _ } -> assert false
 
 let reg64 = function
-  | { loc = Reg.Reg r; _ } -> int_reg_name.(r)
+  | { loc = Reg.Reg r; _ } -> int_reg_name.((r :> int))
   | { loc = Stack _ | Unknown; _ } -> assert false
 
 let res i n = reg i.res.(n)
@@ -421,7 +421,7 @@ let reg_low_32_name = Array.map (fun r -> X86_ast.Reg32 r) int_reg_name
 
 let emit_subreg tbl typ r =
   match r.loc with
-  | Reg.Reg r when r < 13 -> tbl.(r)
+  | Reg.Reg r when (r :> int) < 13 -> tbl.((r :> int))
   | Stack s ->
     mem64 typ (slot_offset s (Stack_class.of_machtype r.Reg.typ)) (Scalar RSP)
   | Reg _ | Unknown -> assert false
@@ -519,13 +519,13 @@ let record_frame_label live dbg =
     (fun (r : Reg.t) ->
       match r with
       | { typ = Val; loc = Reg r; _ } ->
-        assert (Reg_class.gc_regs_offset ~simd Val r = r);
-        live_offset := ((r lsl 1) + 1) :: !live_offset
+        assert (Reg_class.gc_regs_offset ~simd Val (r :> int) = (r :> int));
+        live_offset := (((r :> int) lsl 1) + 1) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := slot_offset s (Stack_class.of_machtype reg.typ) :: !live_offset
       | { typ = Valx2; loc = Reg r; _ } ->
-        let n = Reg_class.gc_regs_offset ~simd Valx2 r in
+        let n = Reg_class.gc_regs_offset ~simd Valx2 (r :> int) in
         let encode n = (n lsl 1) + 1 in
         live_offset := encode n :: encode (n + 1) :: !live_offset
       | { typ = Valx2; loc = Stack s; _ } as reg ->
@@ -2402,7 +2402,9 @@ let emit_instr ~first ~fallthrough i =
        argument to Lswitch can still be assigned to one of these two registers,
        so we must be careful not to clobber it before use. *)
     let tmp1, tmp2 =
-      if Reg.equal_location i.arg.(0).loc (Reg 0) (* rax *)
+      if
+        Reg.equal_location i.arg.(0).loc (Reg (Reg_class.Reg_id.of_int 0))
+        (* rax *)
       then phys_rdx, phys_rax
       else phys_rax, phys_rdx
     in

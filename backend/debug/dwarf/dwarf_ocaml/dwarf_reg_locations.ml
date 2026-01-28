@@ -25,19 +25,18 @@ let reg_location_description (reg : Reg.t) ~(offset : Stack_reg_offset.t option)
   match reg.loc with
   | Unknown ->
     Misc.fatal_errorf "Register without location: %a" Printreg.reg reg
-  | Reg n -> (
+  | Reg reg_id -> (
     let dwarf_reg_number =
       let reg_class = Reg_class.of_machtype reg.typ in
-      let first_available_reg = Reg_class.first_available_register reg_class in
+      let reg_index = Reg_class.reg_index_in_class reg_class reg_id in
       let num_hard_regs = Reg_class.num_available_registers reg_class in
-      let n = n - first_available_reg in
       (* This [None] case isn't an error to cover situations such as used to be
          found in the i386 backend where [num_available_registers] does not
          extend to the end of the register arrays (in that case for the x87 top
          of stack register). *)
-      if n < 0 || n >= num_hard_regs
+      if reg_index < 0 || reg_index >= num_hard_regs
       then None
-      else Some (Reg_class.dwarf_register_numbers reg_class).(n)
+      else Some (Reg_class.dwarf_register_numbers reg_class).(reg_index)
     in
     match dwarf_reg_number with
     | None -> None

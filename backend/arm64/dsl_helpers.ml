@@ -82,8 +82,8 @@ let reg_index reg =
   match reg with
   | { loc = Reg r; typ; _ } ->
     let reg_class = Reg_class.of_machtype typ in
-    let name_index = r - Reg_class.first_available_register reg_class in
-    reg_name_to_arch_index reg_class name_index
+    let reg_index_in_class = Reg_class.reg_index_in_class reg_class r in
+    reg_name_to_arch_index reg_class reg_index_in_class
   | { loc = Stack _ | Unknown; _ } -> fatal_error "Dsl_helpers.reg_index"
 
 (* 128-bit vector types require Vec128 machtype *)

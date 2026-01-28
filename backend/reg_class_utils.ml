@@ -5,9 +5,19 @@ module List = ListLabels
 module type T = sig
   type t
 
+  module Reg_id : sig
+    type t = private int
+
+    include Identifiable.S with type t := t
+
+    val of_int : int -> t
+  end
+
   val all : t list
 
-  val first_available_register : t -> int
+  val reg_index_in_class : t -> Reg_id.t -> int
+
+  val reg_id : t -> reg_index_in_class:int -> Reg_id.t
 
   val num_available_registers : t -> int
 
@@ -15,7 +25,7 @@ module type T = sig
 
   val dwarf_register_numbers : t -> int array
 
-  val register_name : Cmm.machtype_component -> int -> string
+  val register_name : Cmm.machtype_component -> Reg_id.t -> string
 
   val equal : t -> t -> bool
 
