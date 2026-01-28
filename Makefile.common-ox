@@ -263,7 +263,7 @@ boot_build = _build/default
 # The following horror will be removed when work to allow the testsuite to
 # run on an installed tree (led by David Allsopp) is completed.
 .PHONY: runtest-upstream test install_for_test
-install_for_test: _install
+install_for_test: install
 	rm -rf _runtest
 	mkdir _runtest
 	ln -s ../_install _runtest/_install

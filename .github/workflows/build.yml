@@ -41,9 +41,10 @@ jobs:
             config: --disable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 dev (x86_64-linux)
+          - name: runtime5 dev custom-install-path (x86_64-linux)
             config: --enable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
+            install_path: _custom_install
 
           - name: runtime5 debug stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
@@ -238,9 +239,14 @@ jobs:
           if [[ -n "${{matrix.cc}}" ]]; then
             export CC="${{matrix.cc}}"
           fi
+          if [[ -n "${{matrix.install_path}}" ]]; then
+            install_path="_install"
+          else
+            install_path="${{matrix.install_path}}"
+          fi
           autoconf
           ./configure \
-            --prefix=$GITHUB_WORKSPACE/_install \
+            --prefix=$GITHUB_WORKSPACE/$install_path \
             ${{ matrix.config }}
 
       - name: Setup for saving core files (Linux)
