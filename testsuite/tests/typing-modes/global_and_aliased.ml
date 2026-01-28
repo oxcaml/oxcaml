@@ -51,8 +51,9 @@ let fail1 (x1 : 'a @ local) : 'a t1 = { x1 }
 Line 1, characters 40-42:
 1 | let fail1 (x1 : 'a @ local) : 'a t1 = { x1 }
                                             ^^
-Error: This value is "local" to the parent region but is expected to be "global"
-       because it is the field "x1" (with some modality) of the record at Line 1, characters 38-44.
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "x1" (with some modality) of the record at Line 1, characters 38-44.
 |}]
 
 let fail3 (x3 : 'a @ local) : 'a t3 = { x3 }
@@ -61,8 +62,9 @@ let fail3 (x3 : 'a @ local) : 'a t3 = { x3 }
 Line 1, characters 40-42:
 1 | let fail3 (x3 : 'a @ local) : 'a t3 = { x3 }
                                             ^^
-Error: This value is "local" to the parent region but is expected to be "global"
-       because it is the field "x3" (with some modality) of the record at Line 1, characters 38-44.
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "x3" (with some modality) of the record at Line 1, characters 38-44.
 |}]
 
 
@@ -85,7 +87,7 @@ Line 1, characters 58-60:
 1 | let fail1 ({ x1 } : 'a t1 @ local unique) : 'a @ unique = x1
                                                               ^^
 Error: This value is "aliased"
-       because it is the field "x1" (with some modality) of the record at Line 1, characters 11-17.
+         because it is the field "x1" (with some modality) of the record at Line 1, characters 11-17.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -96,7 +98,7 @@ Line 1, characters 58-60:
 1 | let fail2 ({ x2 } : 'a t2 @ local unique) : 'a @ unique = x2
                                                               ^^
 Error: This value is "aliased"
-       because it is the field "x2" (with some modality) of the record at Line 1, characters 11-17.
+         because it is the field "x2" (with some modality) of the record at Line 1, characters 11-17.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -107,7 +109,7 @@ Line 1, characters 58-60:
 1 | let fail3 ({ x3 } : 'a t3 @ local unique) : 'a @ unique = x3
                                                               ^^
 Error: This value is "aliased"
-       because it is the field "x3" (with some modality) of the record at Line 1, characters 11-17.
+         because it is the field "x3" (with some modality) of the record at Line 1, characters 11-17.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -184,4 +186,37 @@ type _z4 = w_global u_aliased
 
 [%%expect{|
 type _z4 = w_global u_aliased
+|}]
+
+(* val with @@ global unique errors *)
+module type S = sig
+    val foo : 'a -> 'a @@ global unique
+end
+[%%expect{|
+Line 2, characters 26-39:
+2 |     val foo : 'a -> 'a @@ global unique
+                              ^^^^^^^^^^^^^
+Error: The modality "global" can't be used together with "unique"
+|}]
+
+(* default @@ global, val @@ unique errors *)
+module type S = sig @@ global
+    val foo : 'a -> 'a @@ unique
+end
+[%%expect{|
+Line 2, characters 26-32:
+2 |     val foo : 'a -> 'a @@ unique
+                              ^^^^^^
+Error: The modality "global" can't be used together with "unique"
+|}]
+
+(* default @@ global unique errors *)
+module type S = sig @@ global unique
+    val foo : 'a -> 'a
+end
+[%%expect{|
+Line 1, characters 23-36:
+1 | module type S = sig @@ global unique
+                           ^^^^^^^^^^^^^
+Error: The modality "global" can't be used together with "unique"
 |}]

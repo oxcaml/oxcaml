@@ -495,6 +495,9 @@ module Jkind0 : sig
       (** The jkind of unboxed 64-bit floats with mode crossing. *)
       val kind_of_unboxed_float : t
 
+      (** The jkind of unboxed units with mode crossing. *)
+      val kind_of_unboxed_unit : t
+
       (** The jkind of unboxed 32-bit floats with no mode crossing. *)
       val float32 : t
 

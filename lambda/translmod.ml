@@ -313,7 +313,7 @@ let init_shape id modl =
             Tarrow(_,ty_arg,_,_) -> begin
               (* CR layouts: We should allow any representable layout here. It
                  will require reworking [camlinternalMod.init_mod]. *)
-              let jkind = Jkind.Builtin.value ~why:Recmod_fun_arg in
+              let jkind = Jkind.Builtin.value_or_null ~why:Recmod_fun_arg in
               let ty_arg = Ctype.correct_levels ty_arg in
               match Ctype.check_type_jkind env ty_arg jkind with
               | Ok _ -> const_int 0 (* camlinternalMod.Function *)
@@ -1050,7 +1050,7 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
     add_arg_block_to_module_block ~loc lam repr cc2
 
 let wrap_toplevel_functor_in_struct code =
-  Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
+  Lprim(Pmakeblock(0, Immutable, All_value, Lambda.alloc_heap),
         [ code ],
         Loc_unknown)
 

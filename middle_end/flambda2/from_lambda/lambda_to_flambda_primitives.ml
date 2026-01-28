@@ -120,16 +120,28 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
 
 let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   match shape with
-  | None -> List.init num_fields (fun _field -> K.With_subkind.any_value)
-  | Some shape ->
-    let shape_length = List.length shape in
+  | All_value -> List.init num_fields (fun _field -> K.With_subkind.any_value)
+  | Shape shape ->
+    let shape_length = Array.length shape in
     if num_fields <> shape_length
     then
       Misc.fatal_errorf
         "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
          fields"
         num_fields shape_length;
-    List.map (K.With_subkind.from_lambda_value_kind ~machine_width) shape
+    (* This function is only called for uniform block shapes *)
+    Array.to_list
+      (Array.map
+         (fun (elem : unit L.mixed_block_element) ->
+           match elem with
+           | L.Value vk ->
+             K.With_subkind.from_lambda_value_kind ~machine_width vk
+           | Float_boxed ()
+           | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+           | Vec256 | Vec512 | Word | Untagged_immediate | Product _
+           | Splice_variable _ ->
+             Misc.fatal_error "convert_block_shape: non-uniform shape")
+         shape)
 
 let check_float_array_optimisation_enabled name =
   if not (Flambda_features.flat_float_array ())
@@ -1771,15 +1783,55 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ ->
+  | Pmakeblock (tag, mutability, shape, mode), _ -> (
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let tag = Tag.Scannable.create_exn tag in
-    let shape =
-      convert_block_shape ~machine_width shape ~num_fields:(List.length args)
-    in
     let mutability = Mutability.from_lambda mutability in
-    [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
+    match L.mixed_block_of_block_shape shape with
+    | None ->
+      let shape =
+        convert_block_shape ~machine_width shape ~num_fields:(List.length args)
+      in
+      [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
+    | Some shape ->
+      (* Mixed block *)
+      let shape =
+        Mixed_block_shape.of_mixed_block_elements
+          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+          shape
+      in
+      let args =
+        let new_indexes_to_old_indexes =
+          Mixed_block_shape.new_indexes_to_old_indexes shape
+        in
+        let args = Array.of_list args in
+        Array.init (Array.length args) (fun new_index ->
+            args.(new_indexes_to_old_indexes.(new_index)))
+        |> Array.to_list
+      in
+      let flattened_reordered_shape =
+        Mixed_block_shape.flattened_reordered_shape shape
+      in
+      if List.length args <> Array.length flattened_reordered_shape
+      then
+        Misc.fatal_errorf
+          "Pmakeblock (mixed): number of arguments (%d) is not consistent with \
+           shape length (%d)"
+          (List.length args)
+          (Array.length flattened_reordered_shape);
+      let args =
+        List.mapi
+          (fun new_index arg ->
+            match flattened_reordered_shape.(new_index) with
+            | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+            | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+              arg
+            | Float_boxed _ -> unbox_float arg)
+          args
+      in
+      let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
     (* CR mshinwell: this should check the unarized lengths of [layouts] and
@@ -1969,46 +2021,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let mutability = Mutability.from_lambda mutability in
     [Variadic (Make_block (Naked_floats, mutability, mode), args)]
-  | Pmakemixedblock (tag, mutability, shape, mode), _ ->
-    let shape =
-      Mixed_block_shape.of_mixed_block_elements
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-        shape
-    in
-    let args =
-      let new_indexes_to_old_indexes =
-        Mixed_block_shape.new_indexes_to_old_indexes shape
-      in
-      let args = List.flatten args |> Array.of_list in
-      Array.init (Array.length args) (fun new_index ->
-          args.(new_indexes_to_old_indexes.(new_index)))
-      |> Array.to_list
-    in
-    let flattened_reordered_shape =
-      Mixed_block_shape.flattened_reordered_shape shape
-    in
-    if List.length args <> Array.length flattened_reordered_shape
-    then
-      Misc.fatal_errorf
-        "Pmakemixedblock: number of arguments (%d) is not consistent with \
-         shape length (%d)"
-        (List.length args)
-        (Array.length flattened_reordered_shape);
-    let args =
-      List.mapi
-        (fun new_index arg ->
-          match flattened_reordered_shape.(new_index) with
-          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
-            arg
-          | Float_boxed _ -> unbox_float arg)
-        args
-    in
-    let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
-    let mutability = Mutability.from_lambda mutability in
-    let tag = Tag.Scannable.create_exn tag in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
-    [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
   | Pmakearray (lambda_array_kind, mutability, mode), _ -> (
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
@@ -3010,6 +3022,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pcpu_relax, _ -> [Nullary Cpu_relax]
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ptls_get, _ -> [Nullary Tls_get]
+  | Pdomain_index, _ -> [Nullary Domain_index]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
     if not (Target_system.is_64_bit ())
@@ -3180,8 +3193,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Pignore | Psequand | Psequor | Pbytes_of_string | Pbytes_to_string
-      | Parray_of_iarray | Parray_to_iarray | Prunstack | Pperform | Presume
-      | Preperform ),
+      | Parray_of_iarray | Parray_to_iarray | Pwith_stack | Pwith_stack_bind
+      | Pperform | Presume | Preperform ),
       _ ) ->
     Misc.fatal_errorf
       "[%a] should have been removed by [Lambda_to_flambda.transform_primitive]"

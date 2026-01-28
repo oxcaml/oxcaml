@@ -105,14 +105,15 @@ let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
 
 let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   let callee = Apply.callee apply in
-  let region_inlined_into =
+  let () =
     match Apply.call_kind apply with
-    | Function { alloc_mode; _ } -> alloc_mode
+    | Function _ -> ()
     | Method _ | C_call _ | Effect _ ->
       Misc.fatal_error
         "Trying to call [Inlining_transforms.inline] on something other than \
          an OCaml function call."
   in
+  let region_inlined_into = Apply.alloc_mode apply in
   let args = Apply.args apply in
   let apply_return_continuation = Apply.continuation apply in
   let apply_exn_continuation = Apply.exn_continuation apply in

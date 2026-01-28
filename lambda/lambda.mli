@@ -129,7 +129,6 @@ type primitive =
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
-  | Pmakemixedblock of int * mutable_flag * mixed_block_shape * locality_mode
   | Pmakelazyblock of lazy_block_tag
   | Pfield of int * immediate_or_pointer * field_read_semantics
   | Pfield_computed of field_read_semantics
@@ -163,7 +162,8 @@ type primitive =
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
-  | Prunstack
+  | Pwith_stack
+  | Pwith_stack_bind
   | Pperform
   | Presume
   | Preperform
@@ -366,6 +366,7 @@ type primitive =
   (* Fetching domain-local state *)
   | Pdls_get
   | Ptls_get
+  | Pdomain_index
   (* Poll for runtime actions. May run pending actions such as signal
      handlers, finalizers, memprof callbacks, etc, as well as GCs and
      GC slices, so should not be moved or optimised away. *)
@@ -484,7 +485,11 @@ and layout =
   | Psplicevar of Ident.t
 
 and block_shape =
-  value_kind list option
+  | All_value
+    (** The block shape is a uniform block of [generic_value]s, the length can
+        be determined from the application site. *)
+  | Shape of mixed_block_shape
+    (** A specific block shape, this may be a uniform block or a mixed block. *)
 
 and 'a mixed_block_element =
   | Value of value_kind
@@ -1206,6 +1211,17 @@ val transl_class_path: scoped_location -> Env.t -> Path.t -> lambda
 val transl_address : scoped_location -> Persistent_env.address -> lambda
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
+
+val block_shape_of_value_kinds : value_kind list option -> block_shape
+
+(* Returns whether the block shape represents a block containing only values.
+   Errors if there's a splice variable *)
+val is_uniform_block_shape : block_shape -> bool
+
+(* Returns [None] if contains all values,
+   returns the [mixed_block_shape] if it has at least one non-value.
+   Errors if there's a splice variable *)
+val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)

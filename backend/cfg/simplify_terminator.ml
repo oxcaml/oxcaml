@@ -122,7 +122,7 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
           | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
           | Begin_region | End_region | Specific _ | Name_for_debugger _
-          | Dls_get | Poll | Pause | Alloc _ | Tls_get )
+          | Dls_get | Poll | Pause | Alloc _ | Tls_get | Domain_index )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
@@ -260,7 +260,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
         else None)
   | Never -> assert false
   | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ ->
+  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     None
 
 let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool)
@@ -343,7 +343,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
                  };
             true
           | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
-          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
             false)
     else false
   | Never ->
@@ -370,7 +370,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       simplify_switch block labels;
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ ->
+  | Call _ | Prim _ | Invalid _ ->
     false
 
 let run cfg =

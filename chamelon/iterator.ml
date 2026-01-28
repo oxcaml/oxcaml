@@ -102,10 +102,14 @@ let step_minimizer c minimize cur_file map ~pos ~len =
     (not !test), only once otherwise *)
 let dicho = true
 
-let apply_minimizer test map cur_file minimize (c : string) =
+let test_minimizer ~pos map cur_file minimize =
+  let result, _has_changed = minimize_at minimize cur_file map ~pos ~len:1 in
+  update_output result;
+  (result, false)
+
+let apply_minimizer map cur_file minimize (c : string) =
   let result, has_changed =
-    if test then minimize_at minimize cur_file map ~pos:0 ~len:1
-    else if dicho then minimize_ranged map (step_minimizer c minimize cur_file)
+    if dicho then minimize_ranged map (step_minimizer c minimize cur_file)
     else minimize_basic map (step_minimizer c minimize cur_file ~len:1)
   in
   update_output result;

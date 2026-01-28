@@ -120,6 +120,17 @@ let check_tailrec_position t =
            followingsuccessors:@.%a@."
           Label.print tailrec_label Label.Set.print successors
 
+let check_terminator_arity t _label block =
+  match block.Cfg.terminator.desc with
+  | Raise _ ->
+    let len = Array.length block.Cfg.terminator.arg in
+    if len != 1 then report t "Raise with %d arguments" len
+  | Tailcall_self _ | Call _ | Prim _ | Tailcall_func _ | Never | Always _
+  | Parity_test _ | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return
+  | Call_no_return _ | Invalid _ ->
+    (* CR-soon xclerc for xclerc: extend check *)
+    ()
+
 let check_tailrec t _label block =
   (* check all Tailrec Self agree on the successor label *)
   match block.Cfg.terminator.desc with
@@ -133,7 +144,7 @@ let check_tailrec t _label block =
           Label.print l Label.print destination)
   | Call _ | Prim _ | Tailcall_func _ | Never | Always _ | Parity_test _
   | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-  | Call_no_return _ ->
+  | Call_no_return _ | Invalid _ ->
     ()
 
 let check_can_raise t label (block : Cfg.basic_block) =
@@ -249,7 +260,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
             | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
             | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
             | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-            | Poll | Pause | Alloc _ )
+            | Domain_index | Poll | Pause | Alloc _ )
         | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
           cur_stack_offset)
   in
@@ -262,6 +273,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
   ()
 
 let check_block t label (block : Cfg.basic_block) =
+  check_terminator_arity t label block;
   check_tailrec t label block;
   check_can_raise t label block;
   (* exn and normal successors are disjoint *)

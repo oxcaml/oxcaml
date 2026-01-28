@@ -31,13 +31,13 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Llabel { label = lbl; _ } ->
         Hashtbl.add map lbl pc;
         fill_map pc instr.next
-      | ( Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
-        | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
-        | Lcondbranch (_, _)
-        | Lcondbranch3 (_, _, _)
-        | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-        | Lstackcheck _ ) as op ->
-        fill_map (pc + T.instr_size op) instr.next
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
+      | Lcondbranch (_, _)
+      | Lcondbranch3 (_, _, _)
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
+        fill_map (pc + T.instr_size instr) instr.next
     in
     fill_map 0 code
 
@@ -74,9 +74,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
         || opt_branch_overflows map pc lbl2 max_branch_offset
       | Lop
           ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-          | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
-          | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-          | Stackoffset _ | Load _
+          | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+          | Const_vec512 _ | Stackoffset _ | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)
@@ -113,15 +113,15 @@ module Make (T : Branch_relaxation_intf.S) = struct
           instr_overflows ~code_size ~max_out_of_line_code_offset instr map pc
         in
         if not overflows
-        then fixup did_fix (pc + T.instr_size instr.desc) instr.next
+        then fixup did_fix (pc + T.instr_size instr) instr.next
         else
           match instr.desc with
           | Lop Poll ->
             instr.desc <- T.relax_poll ();
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr) instr.next
           | Lop (Alloc { bytes = num_bytes; dbginfo; _ }) ->
             instr.desc <- T.relax_allocation ~num_bytes ~dbginfo;
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr) instr.next
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label () in
             let llabel = Llabel { label = lbl2; section_name = None } in
@@ -135,7 +135,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
             in
             instr.desc <- Lcondbranch (Operation.invert_test test, lbl2);
             instr.next <- cont;
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr) instr.next
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
             let cont =
               expand_optbranch lbl0 0 instr.arg
@@ -151,9 +151,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Lraise _ | Lstackcheck _
           | Lop
               ( Move | Spill | Reload | Opaque | Pause | Begin_region
-              | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
-              | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-              | Const_vec512 _ | Stackoffset _ | Load _
+              | End_region | Dls_get | Tls_get | Domain_index | Const_int _
+              | Const_float32 _ | Const_float _ | Const_symbol _
+              | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+              | Load _
               | Store (_, _, _)
               | Intop _ | Int128op _
               | Intop_imm (_, _)

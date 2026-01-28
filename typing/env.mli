@@ -221,6 +221,8 @@ type no_open_quotations_context =
   | Struct_qt
   | Sig_qt
   | Open_qt
+  | Object_field_with_attribute_qt
+  | Variant_tag_with_attribute_qt
 
 type none_in_quotations_context =
   | Constructor

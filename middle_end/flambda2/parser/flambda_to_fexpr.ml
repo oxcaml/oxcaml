@@ -549,7 +549,7 @@ let init_or_assign env (ia : Flambda_primitive.Init_or_assign.t) :
 let nullop _env (op : Flambda_primitive.nullary_primitive) : _ =
   match op with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     Misc.fatal_errorf "TODO: Nullary primitive: %a" Flambda_primitive.print
       (Flambda_primitive.Nullary op)
 
@@ -1120,20 +1120,19 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
     Env.find_continuation_exn env c
   in
   let args = List.map (simple env) (Apply_expr.args app) in
+  let alloc_mode =
+    alloc_mode_for_applications env (Apply_expr.alloc_mode app)
+  in
   let call_kind : Fexpr.call_kind =
     match Apply_expr.call_kind app with
-    | Function { function_call = Direct code_id; alloc_mode } ->
+    | Function { function_call = Direct code_id } ->
       let code_id = Env.find_code_id_exn env code_id in
       let function_slot = None in
       (* CR mshinwell: remove [function_slot] *)
-      let alloc = alloc_mode_for_applications env alloc_mode in
-      Function (Direct { code_id; function_slot; alloc })
+      Function (Direct { code_id; function_slot })
     | Function
-        { function_call = Indirect_unknown_arity | Indirect_known_arity _;
-          alloc_mode
-        } ->
-      let alloc = alloc_mode_for_applications env alloc_mode in
-      Function (Indirect alloc)
+        { function_call = Indirect_unknown_arity | Indirect_known_arity _ } ->
+      Function Indirect
     | C_call { needs_caml_c_call; _ } -> C_call { alloc = needs_caml_c_call }
     | Method _ -> Misc.fatal_error "TODO: Method call kind"
     | Effect _ -> Misc.fatal_error "TODO: Effect call kind"
@@ -1142,11 +1141,11 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   let return_arity = Apply_expr.return_arity app in
   let arities : Fexpr.function_arities option =
     match Apply_expr.call_kind app with
-    | Function { function_call = Indirect_known_arity _; alloc_mode = _ } ->
+    | Function { function_call = Indirect_known_arity _ } ->
       let params_arity = Some (complex_arity param_arity) in
       let ret_arity = arity return_arity in
       Some { params_arity; ret_arity }
-    | Function { function_call = Direct _; alloc_mode = _ } ->
+    | Function { function_call = Direct _ } ->
       if is_default_arity return_arity
       then None
       else
@@ -1160,8 +1159,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       let params_arity = Some (complex_arity param_arity) in
       let ret_arity = arity return_arity in
       Some { params_arity; ret_arity }
-    | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
-      None
+    | Function { function_call = Indirect_unknown_arity } -> None
     | Method _ | Effect _ -> assert false
   in
   let inlined : Fexpr.inlined_attribute option =
@@ -1182,6 +1180,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       exn_continuation;
       args;
       call_kind;
+      alloc_mode;
       inlined;
       inlining_state;
       arities

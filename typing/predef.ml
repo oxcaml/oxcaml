@@ -138,6 +138,7 @@ and path_float32x16 = Pident ident_float32x16
 and path_float64x8 = Pident ident_float64x8
 
 let path_unboxed_float = Path.unboxed_version path_float
+and path_unboxed_unit = Path.unboxed_version path_unit
 and path_unboxed_float32 = Path.unboxed_version path_float32
 and path_unboxed_nativeint = Path.unboxed_version path_nativeint
 and path_unboxed_char = Path.unboxed_version path_char
@@ -195,6 +196,7 @@ and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil)
 and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
 and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
 
+and type_unboxed_unit = newgenty (Tconstr(path_unboxed_unit, [], ref Mnil))
 and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
 and type_unboxed_nativeint =
@@ -359,12 +361,10 @@ let mk_add_type add_type =
         let type_jkind =
           Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
         in
-        let type_kind =
-          match kind with
-            | Type_abstract Definition -> Type_abstract Definition
-            | _ ->
-              Misc.fatal_error "Predef.mk_add_type: non-abstract unboxed kind"
-        in
+        (* All unboxed versions of types explicitly added in the predef are
+           abstract, as they are special cased. Other unboxed versions are
+           automatically derived. *)
+        let type_kind = Type_abstract Definition in
         let type_manifest =
           match manifest with
           | None -> None
@@ -701,6 +701,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type ident_unit
        ~kind:(variant [cstr ident_void []])
        ~jkind:Jkind.Const.Builtin.immediate
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_unit
   (* Predefined exceptions - alphabetical order *)
   |> add_extension ident_assert_failure
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),

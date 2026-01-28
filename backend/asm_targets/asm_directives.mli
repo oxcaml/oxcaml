@@ -337,10 +337,7 @@ val offset_into_dwarf_section_symbol :
   unit
 
 val reloc_x86_64_plt32 :
-  offset_from_this:int64 ->
-  target_symbol:Asm_symbol.t ->
-  rel_offset_from_next:int64 ->
-  unit
+  offset_from_this:int64 -> target_symbol:Asm_symbol.t -> addend:int64 -> unit
 
 module Directive : sig
   module Constant : sig
@@ -348,9 +345,9 @@ module Directive : sig
       | Signed_int of Int64.t
       | Unsigned_int of Numbers.Uint64.t
       | This
-      | Named_thing of string
-          (** [Named_thing] covers symbols, labels and variables. (Name mangling
-              conventions have by now been applied to these entities.) *)
+      | Label of Asm_label.t
+      | Symbol of Asm_symbol.t
+      | Variable of string  (** For .set assignments (macOS only) *)
       | Add of t * t
       | Sub of t * t
   end
@@ -359,24 +356,32 @@ module Directive : sig
     (** A constant together with a width indicating the number of bytes in the
         object file within which the constant is to fit. Some validation is
         performed on values of type [t] to try to ensure that this is the case,
-        but it cannot be exhaustive, as the values of [This] and [Named_thing]
-        constructions are not known. *)
+        but it cannot be exhaustive, as the values of [This], [Label], [Symbol],
+        and [Variable] constructions are not known. *)
     type t
 
     val constant : t -> Constant.t
 
-    type width_in_bytes = private
-      | Eight
-      | Sixteen
-      | Thirty_two
-      | Sixty_four
+    module Width_in_bytes : sig
+      type t = private
+        | Eight
+        | Sixteen
+        | Thirty_two
+        | Sixty_four
 
-    val width_in_bytes : t -> width_in_bytes
+      val to_int : t -> int
+    end
+
+    val width_in_bytes : t -> Width_in_bytes.t
   end
 
   type thing_after_label = private
     | Code
     | Machine_width_data
+
+  type label_or_symbol = private
+    | Label of Asm_label.t
+    | Symbol of Asm_symbol.t
 
   type comment = private string
 
@@ -394,8 +399,8 @@ module Directive : sig
               (** The number of bytes to align to. This will be taken log2 by
                   the emitter on Arm and macOS platforms.*)
           fill_x86_bin_emitter : align_padding
-              (** The [fill_x86_bin_emitter] flag controls whether the x86
-                  binary emitter emits NOP instructions or null bytes. *)
+              (** The [fill_x86_bin_emitter] flag controls whether the binary
+                  emitter emits NOP instructions or null bytes. *)
         }
     | Bytes of
         { str : string;
@@ -422,42 +427,38 @@ module Directive : sig
         { file_num : int option;
           filename : string
         }
-    | Global of string
-    | Indirect_symbol of string
+    | Global of Asm_symbol.t
+    | Indirect_symbol of Asm_symbol.t
     | Loc of
         { file_num : int;
           line : int;
           col : int;
           discriminator : int option
         }
-    | New_label of string * thing_after_label
+    | New_label of label_or_symbol * thing_after_label
     | New_line
-    | Private_extern of string
-    | Section of
-        { names : string list;
-          flags : string option;
-          args : string list;
-          is_delayed : bool
-        }
-    | Size of string * Constant.t
+    | Private_extern of Asm_symbol.t
+    | Section of Asm_section.t * [`First_occurrence | `Not_first_occurrence]
+    | Size of Asm_symbol.t * Constant.t
     | Sleb128 of
         { constant : Constant.t;
           comment : string option
         }
     | Space of { bytes : int }
-    | Type of string * symbol_type
+    | Type of label_or_symbol * symbol_type
     | Uleb128 of
         { constant : Constant.t;
           comment : string option
         }
-    | Protected of string
-    | Hidden of string
-    | Weak of string
-    | External of string
+    | Protected of Asm_symbol.t
+    | Hidden of Asm_symbol.t
+    | Weak of Asm_symbol.t
+    | External of Asm_symbol.t
     | Reloc of
         { offset : Constant.t;
           name : reloc_type;
-          expr : Constant.t
+          target_symbol : Asm_symbol.t;
+          addend : int64
         }
 
   (** Translate the given directive to textual form. This produces output

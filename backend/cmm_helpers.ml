@@ -477,7 +477,7 @@ let rec map_tail1 e ~f =
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _ | Ccatch _ | Cswitch _
-    ->
+  | Cinvalid _ ->
     f e
 
 let map_tail2 x y ~f = map_tail1 y ~f:(fun y -> map_tail1 x ~f:(fun x -> f x y))
@@ -3018,11 +3018,10 @@ let make_switch arg cases actions dbg =
   let extract_uconstant = function
     (* Constant integers loaded from a table should end in 1, so that Cload
        never produces untagged integers *)
-    | Cconst_int (n, _), _dbg when n land 1 = 1 ->
-      Some (Cint (Nativeint.of_int n))
-    | Cconst_natint (n, _), _dbg when Nativeint.(to_int (logand n one) = 1) ->
+    | Cconst_int (n, _) when n land 1 = 1 -> Some (Cint (Nativeint.of_int n))
+    | Cconst_natint (n, _) when Nativeint.(to_int (logand n one) = 1) ->
       Some (Cint n)
-    | Cconst_symbol (s, _), _dbg -> Some (Csymbol_address s)
+    | Cconst_symbol (s, _) -> Some (Csymbol_address s)
     | _ -> None
   in
   let extract_affine ~cases ~const_actions =
@@ -3062,12 +3061,58 @@ let make_switch arg cases actions dbg =
       (natint_const_untagged dbg offset)
       dbg
   in
-  match Misc.Stdlib.Array.all_somes (Array.map extract_uconstant actions) with
-  | None -> Cswitch (arg, cases, actions, dbg)
-  | Some const_actions -> (
+  let module Classify = struct
+    type elt =
+      | Not_constant
+      | Constant of Cmm.data_item
+      | Jump of Cmm.exit_label * Cmm.data_item
+
+    type array =
+      | Init
+      | Not_constant
+      | Constant_rev of Cmm.data_item list
+      | Jump_rev of Cmm.exit_label * Cmm.data_item list
+  end in
+  let classify (action, _dbg) : Classify.elt =
+    match action with
+    | Cexit (lbl, [arg], []) -> (
+      match extract_uconstant arg with
+      | None -> Not_constant
+      | Some uconst -> Jump (lbl, uconst))
+    | _ -> (
+      match extract_uconstant action with
+      | None -> Not_constant
+      | Some uconst -> Constant uconst)
+  in
+  let join (prev : Classify.array) (elt : Classify.elt) : Classify.array =
+    match prev, elt with
+    | Init, Not_constant -> Not_constant
+    | Init, Constant item -> Constant_rev [item]
+    | Init, Jump (lbl, item) -> Jump_rev (lbl, [item])
+    | Not_constant, _ | _, Not_constant -> Not_constant
+    | Constant_rev items, Constant item -> Constant_rev (item :: items)
+    | Jump_rev (lbl, items), Jump (lbl', item) ->
+      if Cmm.equal_exit_label lbl lbl'
+      then Jump_rev (lbl, item :: items)
+      else Not_constant
+    | Constant_rev _, Jump _ | Jump_rev _, Constant _ -> Not_constant
+  in
+  let transl_constant_switch ~items_rev =
+    let const_actions = Array.of_list (List.rev items_rev) in
     match extract_affine ~cases ~const_actions with
     | Some (offset, slope) -> make_affine_computation ~offset ~slope arg dbg
-    | None -> make_table_lookup ~cases ~const_actions arg dbg)
+    | None -> make_table_lookup ~cases ~const_actions arg dbg
+  in
+  match
+    Array.fold_left
+      (fun acc elt -> join acc (classify elt))
+      Classify.Init actions
+  with
+  | Init -> Misc.fatal_error "Empty switch"
+  | Not_constant -> Cswitch (arg, cases, actions, dbg)
+  | Constant_rev items_rev -> transl_constant_switch ~items_rev
+  | Jump_rev (lbl, items_rev) ->
+    Cexit (lbl, [transl_constant_switch ~items_rev], [])
 
 module SArgBlocks = struct
   type primitive = operation
@@ -4209,21 +4254,7 @@ let fail_if_called_indirectly_function () =
     { sym_name = "caml_fail_if_called_indirectly_message"; sym_global = Local }
   in
   let string_data = emit_string_constant message_symbol message [] in
-  let fun_body =
-    Cop
-      ( Cextcall
-          { func = Cmm.caml_flambda2_invalid;
-            ty = Cmm.typ_void;
-            alloc = false;
-            ty_args = [XInt];
-            returns = false;
-            builtin = false;
-            effects = Arbitrary_effects;
-            coeffects = Has_coeffects
-          },
-        [Cconst_symbol (message_symbol, Debuginfo.none)],
-        Debuginfo.none )
-  in
+  let fun_body = Cinvalid { message; symbol = message_symbol } in
   let fn : Cmm.fundecl =
     { fun_name = fail_if_called_indirectly_sym;
       fun_args = [];
@@ -4464,7 +4495,7 @@ let letin v ~defining_expr ~body =
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
   | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ ->
+  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -4821,7 +4852,7 @@ let cmm_arith_size (e : Cmm.expression) =
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
   | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _
-  | Ccatch _ | Cexit _ ->
+  | Ccatch _ | Cexit _ | Cinvalid _ ->
     None
 
 (* Atomics *)
@@ -5168,6 +5199,8 @@ let dls_get ~dbg = Cop (Cdls_get, [], dbg)
 
 let tls_get ~dbg = Cop (Ctls_get, [], dbg)
 
+let domain_index ~dbg = Cop (Cdomain_index, [], dbg)
+
 let perform ~dbg eff =
   let cont =
     make_alloc dbg ~tag:Runtimetags.cont_tag
@@ -5182,24 +5215,58 @@ let perform ~dbg eff =
       [Cconst_symbol (sym, dbg); eff; cont],
       dbg )
 
-let run_stack ~dbg ~stack ~f ~arg =
-  (* Rc_normal would be fine here, but this is unlikely to ever be a tail call
-     (usages of this primitive shouldn't be generated in tail position), so we
-     use Rc_nontail for clarity. *)
+let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_nontail; callees = Some [sym] },
-      [Cconst_symbol (sym, dbg); stack; f; arg],
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+        Cop
+          ( Cextcall
+              { func = "caml_alloc_stack";
+                ty = typ_val;
+                alloc = true;
+                builtin = false;
+                returns = true;
+                effects = Arbitrary_effects;
+                coeffects = Has_coeffects;
+                ty_args = [XInt; XInt; XInt]
+              },
+            [valuec; exnc; effc],
+            dbg );
+        f;
+        arg ],
       dbg )
 
-let resume ~dbg ~stack ~f ~arg ~last_fiber =
+let with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg =
+  let sym = Cmm.global_symbol "caml_runstack" in
+  Cop
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+        Cop
+          ( Cextcall
+              { func = "caml_alloc_stack_bind";
+                ty = typ_val;
+                alloc = true;
+                builtin = false;
+                returns = true;
+                effects = Arbitrary_effects;
+                coeffects = Has_coeffects;
+                ty_args = [XInt; XInt; XInt; XInt; XInt]
+              },
+            [valuec; exnc; effc; dyn; bind],
+            dbg );
+        f;
+        arg ],
+      dbg )
+
+let resume ~dbg ~cont ~f ~arg =
   (* Rc_normal is required here, because there are some uses of effects with
      repeated resumes, and these should consume O(1) stack space by tail-calling
      caml_resume. *)
   let sym = Cmm.global_symbol "caml_resume" in
   Cop
     ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [Cconst_symbol (sym, dbg); stack; f; arg; last_fiber],
+      [Cconst_symbol (sym, dbg); cont; f; arg],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber =

@@ -472,7 +472,7 @@ let is_cmm_simple cmm =
   | Cvar _ ->
     true
   | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ ->
+  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     false
 
 (* Helper function to create bindings *)

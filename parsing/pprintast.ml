@@ -2016,12 +2016,17 @@ and structure_item ctxt f x =
 
 (* Don't just use [core_type] because we do not want parens around params
    with jkind annotations *)
-and core_type_param f ct = match ct.ptyp_desc with
-  | Ptyp_any None -> pp f "_"
-  | Ptyp_any (Some jk) -> pp f "_ : %a" (jkind_annotation reset_ctxt) jk
-  | Ptyp_var (s, None) -> tyvar f s
+and core_type_param f ct =
+  let attrs = attributes reset_ctxt in
+  match ct.ptyp_desc with
+  | Ptyp_any None -> pp f "_%a" attrs ct.ptyp_attributes
+  | Ptyp_any (Some jk) ->
+    pp f "_%a : %a" attrs ct.ptyp_attributes (jkind_annotation reset_ctxt) jk
+  | Ptyp_var (s, None) ->
+    pp f "%a%a" tyvar s attrs ct.ptyp_attributes
   | Ptyp_var (s, Some jk) ->
-    pp f "%a : %a" tyvar s (jkind_annotation reset_ctxt) jk
+    pp f "%a%a : %a" tyvar s attrs ct.ptyp_attributes
+      (jkind_annotation reset_ctxt) jk
   | _ -> Misc.fatal_error "unexpected type in core_type_param"
 
 and type_param f (ct, (a,b)) =

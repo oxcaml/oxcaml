@@ -130,7 +130,7 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
   | Switch _ ->
     false
   | Raise _ -> false
-  | Tailcall_self _ | Tailcall_func _ | Return -> true
+  | Tailcall_self _ | Tailcall_func _ | Return | Invalid _ -> true
   | Call_no_return _ | Call _ | Prim _ -> false
 
 let is_safe_block : Cfg.basic_block -> bool =
@@ -190,9 +190,9 @@ module Polls_before_prtc_transfer = struct
     | Op (Alloc _) -> Ok Always_polls
     | Op
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
-        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Stackoffset _ | Load _
+        | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
+        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+        | Const_vec512 _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -226,7 +226,7 @@ module Polls_before_prtc_transfer = struct
       then Ok Might_not_poll
       else Ok Always_polls
     | Return -> Ok Always_polls
-    | Call_no_return _ | Call _ | Prim _ ->
+    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
       if Cfg.can_raise_terminator term.desc
       then Ok (Polls_before_prtc_domain.join dom exn)
       else Ok dom
@@ -361,7 +361,7 @@ let add_poll_or_alloc_basic :
     | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
     | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
     | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-    | Name_for_debugger _ | Dls_get | Tls_get | Pause ->
+    | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause ->
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
@@ -426,6 +426,7 @@ let add_calls_terminator :
       } ->
     (External_call, term.dbg) :: points
   | Prim { op = Probe _; label_after = _ } -> points
+  | Invalid _ -> points
 
 let find_poll_alloc_or_calls : Cfg.t -> polling_points =
  fun cfg ->

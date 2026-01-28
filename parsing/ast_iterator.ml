@@ -167,6 +167,7 @@ module T = struct
        ptype_private = _;
        ptype_manifest;
        ptype_attributes;
+       ptype_jkind_annotation;
        ptype_loc} =
     iter_loc sub ptype_name;
     List.iter (iter_fst (sub.typ sub)) ptype_params;
@@ -176,7 +177,8 @@ module T = struct
     sub.type_kind sub ptype_kind;
     iter_opt (sub.typ sub) ptype_manifest;
     sub.location sub ptype_loc;
-    sub.attributes sub ptype_attributes
+    sub.attributes sub ptype_attributes;
+    Option.iter (sub.jkind_annotation sub) ptype_jkind_annotation
 
   let iter_type_kind sub = function
     | Ptype_abstract -> ()

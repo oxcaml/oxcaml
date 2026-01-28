@@ -47,7 +47,7 @@ let command = ref ""
 let typing_command = ref ""
 let cmt_files = ref []
 let output_file = ref ""
-let test = ref false
+let test = ref (-1)
 let anon_fun filename = input_files := filename :: !input_files
 let list_minimizers = ref false
 let inplace = ref false
@@ -62,7 +62,7 @@ let spec_list =
       Arg.Set_string typing_command,
       "Set command to use to generate cmt file" );
     ("-o", Arg.Set_string output_file, "Set output file/folder");
-    ("--test", Arg.Set test, "Run only first iteration of minimizer");
+    ("--test", Arg.Set_int test, "Run provided iteration of minimizer");
     ("-l", Arg.Set list_minimizers, "List available minimizers");
     ( "--cmt",
       Arg.String (fun s -> cmt_files := s :: !cmt_files),
@@ -100,14 +100,18 @@ let all_minimizers =
       Simplifymatch.minimizer;
       Simplifysequences.minimizer;
       Simplifytypes.minimizer;
+      Reducepat.minimizer;
+      Stub.minimizer;
     ]
 
 let default_iteration =
   [
+    "stub";
     "delete-lines";
     "reduce-expr";
     "reduce-expr-2";
     "remove-dead-code";
+    "reduce-pat";
     "inline-never";
     "remove-unit";
     "reduce-def";
@@ -153,16 +157,16 @@ let minimizers_to_run =
     regarding to the command [c] *)
 let one_file_minimize c (map : structure Smap.t) file : structure Smap.t * bool
     =
-  if !test then (
+  if !test >= 0 then (
     if List.compare_length_with minimizers_to_run 1 <> 0 then (
       Format.eprintf "Please provide exactly one minimizer in test mode@.";
       exit 1);
-    apply_minimizer true map file (List.hd minimizers_to_run) c)
+    test_minimizer ~pos:!test map file (List.hd minimizers_to_run))
   else (
     Format.eprintf "Starting to minimize %s @." file;
     List.fold_left
       (fun (nmap, b) minimizer ->
-        let nmap, has_changed = apply_minimizer false nmap file minimizer c in
+        let nmap, has_changed = apply_minimizer nmap file minimizer c in
         (nmap, b || has_changed))
       (map, false) minimizers_to_run)
 
@@ -200,10 +204,42 @@ let main () =
     if !inplace then !command
     else List.fold_left (fun c output -> c ^ " " ^ output) !command file_names
   in
-  if not (raise_error c) then (
+  if !test < 0 && not (raise_error c) then (
     Format.eprintf "This command does not raise the error %S. @."
       !Utils.error_str;
     exit 1);
+
+  (* CHECKING ERROR PRESENCE AFTER PRINTING *)
+  let () =
+    let cmd =
+      if !inplace then (
+        List.iter2 update_single file_names file_strs;
+        !command)
+      else
+        let file_names_min =
+          List.map
+            (fun path -> Filename.chop_extension path ^ "_min.ml")
+            file_names
+        in
+        List.iter2 update_single file_names_min file_strs;
+        List.fold_left
+          (fun c output -> c ^ " " ^ output)
+          !command file_names_min
+    in
+    if !test < 0 && not (raise_error cmd) then (
+      Format.eprintf "@[<v 2>*** Printing error ***";
+      Format.eprintf "@ @[%a@ %S;@ %a@]@ " Format.pp_print_text
+        "This command raises the error" !Utils.error_str Format.pp_print_text
+        "however, printing the contents from the cmt file does not raise that \
+         same error.";
+      Format.eprintf "@ @[%a@]@ @;<1 2>%s@ " Format.pp_print_text
+        "The following command does *NOT* raise the error:" cmd;
+      Format.eprintf "@ @[%a@]" Format.pp_print_text
+        "Hint: This is likely due to a missing feature in either untypeast.ml \
+         or pprintast.ml.";
+      Format.eprintf "@]@.";
+      exit 1)
+  in
 
   if List.length file_names = 1 then (
     (* MONOFILE MINIMIZATION*)
@@ -229,7 +265,7 @@ let main () =
       has_changed := b
     done;
     let a, _ =
-      apply_minimizer false
+      apply_minimizer
         (Smap.singleton output_file !input_str)
         output_file Remdef.minimizer c
     in

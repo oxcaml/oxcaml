@@ -222,7 +222,7 @@ let pseudoregs_for_operation op arg res =
   | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-  | Begin_region | End_region | Poll | Dls_get | Tls_get ->
+  | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
@@ -298,7 +298,8 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cifthenelse (_, _, _, _, _, _)
   | Cswitch (_, _, _, _)
   | Ccatch (_, _, _)
-  | Cexit (_, _, _) ->
+  | Cexit (_, _, _)
+  | Cinvalid _ ->
     Use_default
 
 let select_store ~is_assign addr (exp : Cmm.expression) :

@@ -75,9 +75,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Caddv | Cadda | Cnegf _ | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _
       | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
       | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
-      | Cdls_get | Ctls_get ->
+      | Cdls_get | Ctls_get | Cdomain_index ->
         List.for_all is_simple_expr args)
-    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ -> false
+    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> false
 
   and is_simple_expr expr =
     match Target.is_simple_expr expr with
@@ -123,7 +123,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Catomic _ -> EC.arbitrary
         | Craise _ -> EC.effect_only Raise
         | Cload { mutability = Immutable } -> EC.none
-        | Cload { mutability = Mutable } | Cdls_get | Ctls_get ->
+        | Cload { mutability = Mutable } | Cdls_get | Ctls_get | Cdomain_index
+          ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -134,7 +135,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
-    | Cswitch _ | Ccatch _ | Cexit _ -> EC.arbitrary
+    | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> EC.arbitrary
 
   and effects_of (expr : Cmm.expression) =
     match Target.effects_of expr with
@@ -329,6 +330,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       (* Inversion addr/datum in Istore *))
     | Cdls_get -> SU.basic_op Dls_get, args
     | Ctls_get -> SU.basic_op Tls_get, args
+    | Cdomain_index -> SU.basic_op Domain_index, args
     | Calloc (mode, alloc_block_kind) ->
       let placeholder_for_alloc_block_kind : Cmm.alloc_dbginfo_item =
         { alloc_words = 0; alloc_block_kind; alloc_dbg = Debuginfo.none }
@@ -804,6 +806,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccatch (rec_flag, handlers, body) ->
       emit_expr_catch env sub_cfg bound_name rec_flag handlers body
     | Cexit (lbl, args, traps) -> emit_expr_exit env sub_cfg lbl args traps
+    | Cinvalid { message; symbol } -> emit_invalid env sub_cfg message symbol
 
   (* Emit an expression in tail position of a function. *)
   and emit_tail env sub_cfg (exp : Cmm.expression) =
@@ -827,10 +830,46 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccatch (_, [], e1) -> emit_tail env sub_cfg e1
     | Ccatch (rec_flag, handlers, e1) ->
       emit_tail_catch env sub_cfg rec_flag handlers e1
+    | Cinvalid { message; symbol } ->
+      let ok = emit_invalid env sub_cfg message symbol in
+      insert_return env sub_cfg ok (SU.pop_all_traps env)
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
+
+  and emit_invalid env sub_cfg message symbol =
+    let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
+    let* loc_arg, stack_ofs, stack_align =
+      (* Set up the argument for the call to caml_flambda2_invalid *)
+      emit_extcall_args env sub_cfg [Cmm.XInt] [arg_expr] Debuginfo.none
+    in
+    if !SU.current_function_is_check_enabled
+    then (
+      (* For zero alloc checking we need to treat [Invalid] as returning. *)
+      let label = Cmm.new_label () in
+      let label_after = Some label in
+      let ty = Cmm.typ_int in
+      let rd = Reg.createv ty in
+      let term = Cfg.Invalid { message; stack_ofs; stack_align; label_after } in
+      let loc_res =
+        SU.insert_op_debug' env sub_cfg term Debuginfo.none loc_arg
+          (Proc.loc_external_results (Reg.typv rd))
+      in
+      Sub_cfg.add_never_block sub_cfg ~label;
+      SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+      SU.set_traps_for_raise env;
+      Ok rd)
+    else
+      (* When not zero alloc checking we treat [Invalid] as non-returning. *)
+      let term =
+        Cfg.Invalid { message; stack_ofs; stack_align; label_after = None }
+      in
+      let (_ : Reg.t array) =
+        SU.insert_op_debug' env sub_cfg term Debuginfo.none loc_arg [||]
+      in
+      SU.set_traps_for_raise env;
+      Never_returns
 
   and emit_expr_raise (env : SU.environment) sub_cfg k
       (args : Cmm.expression list) dbg : _ Or_never_returns.t =
@@ -846,11 +885,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     (* Populate the distinguished extra args registers, for the current
        exception handler, with the extra args for this particular raise. *)
-    let rd = Array.concat ([| Proc.loc_exn_bucket |] :: extra_args_regs) in
+    let exn_bucket = [| Proc.loc_exn_bucket |] in
+    let rd = Array.concat (exn_bucket :: extra_args_regs) in
     Array.iter2
       (fun r1 rd -> SU.insert env sub_cfg (Op Move) [| r1 |] [| rd |])
       r1 rd;
-    SU.insert_debug' env sub_cfg (Cfg.Raise k) dbg rd [||];
+    SU.insert_debug' env sub_cfg (Cfg.Raise k) dbg exn_bucket [||];
     SU.set_traps_for_raise env;
     Never_returns
 
@@ -935,35 +975,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.set_traps_for_raise env;
         Sub_cfg.add_never_block sub_cfg ~label:label_after;
         Ok rd
-      | Terminator (Call_no_return ({ func_symbol; ty_args; _ } as r)) ->
+      | Terminator (Call_no_return ({ ty_args; _ } as r)) ->
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
-        let keep_for_checking =
-          !SU.current_function_is_check_enabled
-          && String.equal func_symbol Cmm.caml_flambda2_invalid
-        in
-        let returns, ty =
-          if keep_for_checking then true, Cmm.typ_int else false, ty
-        in
         let rd = Reg.createv ty in
-        let label = Cmm.new_label () in
         let r = { r with stack_ofs; stack_align } in
-        let term : Cfg.terminator =
-          if keep_for_checking
-          then Prim { op = External r; label_after = label }
-          else Call_no_return r
-        in
+        let term : Cfg.terminator = Call_no_return r in
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg term dbg loc_arg
             (Proc.loc_external_results (Reg.typv rd))
         in
         SU.set_traps_for_raise env;
-        if returns
-        then (
-          Sub_cfg.add_never_block sub_cfg ~label;
-          Ok rd)
-        else Never_returns
+        Never_returns
       | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
         let rd = Reg.createv Cmm.typ_val in
         let bytes = SU.size_expr env (Ctuple new_args) in

@@ -808,6 +808,10 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
     | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
       extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
       br_label t label_after)
+  | Invalid { message = _; stack_ofs; stack_align; label_after = _ } ->
+    extcall t i ~func_symbol:Cmm.caml_flambda2_invalid ~alloc:false ~stack_ofs
+      ~stack_align;
+    emit_ins_no_res t I.unreachable
 
 (* Basic instructions *)
 
@@ -1293,6 +1297,10 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     let tls_state_ptr = load_domainstate_addr t Domain_tls_state in
     let tls_state = emit_ins t (I.load ~ptr:tls_state_ptr ~typ:T.i64) in
     store_into_reg t i.res.(0) tls_state
+  | Domain_index ->
+    let domain_id_ptr = load_domainstate_addr t Domain_id in
+    let domain_id = emit_ins t (I.load ~ptr:domain_id_ptr ~typ:T.i64) in
+    store_into_reg t i.res.(0) domain_id
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i

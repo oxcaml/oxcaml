@@ -159,6 +159,8 @@ type instruction =
   | Kresume
   | Kresumeterm of int
   | Kreperformterm of int
+  | Kwith_stack
+  | Kwith_stack_bind
   | Kstop
 
 val immed_min: int

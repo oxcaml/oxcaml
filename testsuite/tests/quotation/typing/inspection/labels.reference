@@ -1,44 +1,68 @@
 Stdlib.ignore
-  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : A.rcd) : A.rcd)
-
-Stdlib.ignore ((fun x -> x) (fun r -> (r : A.rcd).A.foo) : A.rcd -> int)
-
-Stdlib.ignore
-  ((fun x -> x) (fun r -> (r : A.rcd).A.bar <- "xyz") : A.rcd -> unit)
+  ((fun x -> x)
+     ({ Labels_types.foo = 123; Labels_types.bar = "abc"; } :
+     Labels_types.rcd)
+  : Labels_types.rcd)
 
 Stdlib.ignore
-  ((fun x -> x) (function | ({A.foo=foo; _} : A.rcd) -> foo) : A.rcd -> int)
-
-Stdlib.ignore ((fun x -> x) (A.Foo : A.vrt) : A.vrt)
-
-Stdlib.ignore
-  ((fun x -> x) (function | (A.Foo : A.vrt) -> 0 | (A.Bar : A.vrt) -> 1) :
-  A.vrt -> int)
+  ((fun x -> x) (fun r -> (r : Labels_types.rcd).Labels_types.foo) :
+  Labels_types.rcd -> int)
 
 Stdlib.ignore
-  ((fun x -> x) { A.box = (#{ A.foo = 0; A.bar = 0; } : A.urcd); } : (
-  A.urcd) A.box_imm_imm)
+  ((fun x -> x) (fun r -> (r : Labels_types.rcd).Labels_types.bar <- "xyz") :
+  Labels_types.rcd -> unit)
 
 Stdlib.ignore
-  ((fun x -> x) (fun r -> let _ = ((r : A.urcd).#A.foo) in ()) : A.urcd ->
-  unit)
+  ((fun x -> x)
+     (function | ({Labels_types.foo=foo; _} : Labels_types.rcd) -> foo)
+  : Labels_types.rcd -> int)
 
 Stdlib.ignore
-  ((fun x -> x) (function | (#{A.foo = foo; _} : A.urcd) -> foo) : A.urcd ->
-  int)
+  ((fun x -> x) (Labels_types.Foo : Labels_types.vrt) : Labels_types.vrt)
 
 Stdlib.ignore
-  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : _ A.rcd1) : _ A.rcd1)
+  ((fun x -> x)
+     (function | (Labels_types.Foo : Labels_types.vrt) -> 0 |
+              (Labels_types.Bar : Labels_types.vrt) -> 1)
+  : Labels_types.vrt -> int)
 
 Stdlib.ignore
-  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _) A.rcd2) : (
-  _, _) A.rcd2)
+  ((fun x -> x)
+     { Labels_types.box = (#{ Labels_types.foo = 0; Labels_types.bar = 0; } :
+       Labels_types.urcd); }
+  : (Labels_types.urcd) Labels_types.box_imm_imm)
 
 Stdlib.ignore
-  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _) A.rcd2) : (
-  _, _) A.rcd2)
+  ((fun x -> x)
+     (fun r -> let _ = ((r : Labels_types.urcd).#Labels_types.foo) in ())
+  : Labels_types.urcd -> unit)
 
 Stdlib.ignore
-  ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : (_, _, _) A.rcd3) :
-  (_, _, _) A.rcd3)
+  ((fun x -> x)
+     (function | (#{Labels_types.foo = foo; _} : Labels_types.urcd) -> foo)
+  : Labels_types.urcd -> int)
+
+Stdlib.ignore
+  ((fun x -> x)
+     ({ Labels_types.foo = 123; Labels_types.bar = "abc"; } : _
+     Labels_types.rcd1)
+  : _ Labels_types.rcd1)
+
+Stdlib.ignore
+  ((fun x -> x)
+     ({ Labels_types.foo = 123; Labels_types.bar = "abc"; } : (_, _)
+     Labels_types.rcd2)
+  : (_, _) Labels_types.rcd2)
+
+Stdlib.ignore
+  ((fun x -> x)
+     ({ Labels_types.foo = 123; Labels_types.bar = "abc"; } : (_, _)
+     Labels_types.rcd2)
+  : (_, _) Labels_types.rcd2)
+
+Stdlib.ignore
+  ((fun x -> x)
+     ({ Labels_types.foo = 123; Labels_types.bar = "abc"; } : (_, _, _)
+     Labels_types.rcd3)
+  : (_, _, _) Labels_types.rcd3)
 

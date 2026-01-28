@@ -21,8 +21,9 @@ let foo (r @ contended) = r.a <- 42
 Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a <- 42
                               ^
-Error: This value is "contended" but is expected to be "uncontended"
-       because its mutable field "a" is being written.
+Error: This value is "contended"
+       but is expected to be "uncontended"
+         because its mutable field "a" is being written.
 |}]
 
 let foo (r @ contended) = r.a
@@ -30,8 +31,9 @@ let foo (r @ contended) = r.a
 Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a
                               ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because its mutable field "a" is being read.
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
 |}]
 
 let foo (r @ contended) = {r with a = best_bytes ()}
@@ -44,8 +46,9 @@ let foo (r @ contended) = {r with b = best_bytes ()}
 Line 1, characters 27-28:
 1 | let foo (r @ contended) = {r with b = best_bytes ()}
                                ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because its mutable field "a" is being read.
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
 |}]
 
 (* Writing to a mutable field in a shared record is rejected *)
@@ -54,8 +57,9 @@ let foo (r @ shared) = r.a <- 42
 Line 1, characters 23-24:
 1 | let foo (r @ shared) = r.a <- 42
                            ^
-Error: This value is "shared" but is expected to be "uncontended"
-       because its mutable field "a" is being written.
+Error: This value is "shared"
+       but is expected to be "uncontended"
+         because its mutable field "a" is being written.
 |}]
 
 (* reading mutable field from shared record is fine *)
@@ -125,8 +129,8 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over the value "best_bytes" at Line 3, characters 24-34
-       which is "nonportable".
+         because it closes over the value "best_bytes" at Line 3, characters 24-34
+         which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -141,9 +145,9 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "shareable"
-       because it contains a usage (of the value "r" at Line 3, characters 25-26)
-       which is expected to be "shared" or "uncontended"
-       because its mutable field "a" is being read.
+         because it contains a usage (of the value "r" at Line 3, characters 25-26)
+         which is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -157,9 +161,9 @@ Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "shareable"
-       because it contains a usage (of the value "r" at Line 2, characters 25-26)
-       which is expected to be "shared" or "uncontended"
-       because its mutable field "a" is being read.
+         because it contains a usage (of the value "r" at Line 2, characters 25-26)
+         which is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -197,8 +201,9 @@ let foo (r @ contended) =
 Line 3, characters 6-16:
 3 |     | [| x; y |] -> ()
           ^^^^^^^^^^
-Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because its array elements is being read.
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its array elements is being read.
 |}]
 (* CR modes: Error message should mention array, not record. *)
 
@@ -243,8 +248,8 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it contains a usage (of the value "r" at Line 3, characters 27-28)
-       which is expected to be "uncontended".
+         because it contains a usage (of the value "r" at Line 3, characters 27-28)
+         which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -259,8 +264,8 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it contains a usage (of the value "r" at Line 3, characters 27-28)
-       which is expected to be "uncontended".
+         because it contains a usage (of the value "r" at Line 3, characters 27-28)
+         which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -300,8 +305,8 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over the value "r" at Line 3, characters 25-26
-       which is "nonportable".
+         because it closes over the value "r" at Line 3, characters 25-26
+         which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -351,9 +356,10 @@ let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontend
 Line 1, characters 105-115:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontended portable = fun a b -> best_bytes ()
                                                                                                              ^^^^^^^^^^
-Error: The value "best_bytes" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Line 1, characters 94-118
-       which is expected to be "portable".
+Error: The value "best_bytes" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Line 1, characters 94-118
+         which is expected to be "portable".
 |}]
 
 (* immediates crosses portability and contention *)

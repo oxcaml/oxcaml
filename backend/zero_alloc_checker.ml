@@ -2655,7 +2655,7 @@ end = struct
           in
           transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
-        | Dls_get | Tls_get -> next
+        | Dls_get | Tls_get | Domain_index -> next
 
       let basic next (i : Cfg.basic Cfg.instruction) t : (domain, error) result
           =
@@ -2737,6 +2737,7 @@ end = struct
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
+        | Invalid _ -> next
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
         Ok (terminator next ~exn i t)
@@ -2782,7 +2783,7 @@ let unit_info = Unit_info.create ()
 
 let unresolved_deps = Unresolved_dependencies.create ()
 
-let update_caml_flambda_invalid_cfg cfg_with_layout =
+let drop_invalid_successors cfg_with_layout =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (* This condition matches the one in [Selectgen] to avoid copying [fd]
      unnecessarily. *)
@@ -2796,28 +2797,25 @@ let update_caml_flambda_invalid_cfg cfg_with_layout =
     let modified = ref false in
     Cfg.iter_blocks cfg ~f:(fun label block ->
         match block.terminator.desc with
-        | Prim { op = External ({ func_symbol; _ } as ext); label_after = _ } ->
-          if String.equal func_symbol Cmm.caml_flambda2_invalid
-          then (
-            let successors =
-              Cfg.successor_labels ~normal:true ~exn:true block
-            in
-            block.terminator
-              <- { block.terminator with desc = Call_no_return ext };
-            block.exn <- None;
-            block.can_raise <- false;
-            (* update predecessors for successors of [block]. *)
-            Label.Set.iter
-              (fun successor_label ->
-                let successor_block = Cfg.get_block_exn cfg successor_label in
-                successor_block.predecessors
-                  <- Label.Set.remove label successor_block.predecessors)
-              successors;
-            modified := true)
-        | Prim { op = Probe _; _ }
-        | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-        | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-        | Tailcall_func _ | Call_no_return _ | Call _ ->
+        | Invalid ({ label_after = Some _; _ } as r) ->
+          let successors = Cfg.successor_labels ~normal:true ~exn:true block in
+          block.terminator
+            <- { block.terminator with
+                 desc = Invalid { r with label_after = None }
+               };
+          block.exn <- None;
+          block.can_raise <- false;
+          Label.Set.iter
+            (fun successor_label ->
+              let successor_block = Cfg.get_block_exn cfg successor_label in
+              successor_block.predecessors
+                <- Label.Set.remove label successor_block.predecessors)
+            successors;
+          modified := true
+        | Invalid { label_after = None; _ }
+        | Prim _ | Never | Always _ | Parity_test _ | Truth_test _
+        | Float_test _ | Int_test _ | Switch _ | Return | Raise _
+        | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _ ->
           ());
     if not !modified
     then cfg_with_layout
@@ -2827,7 +2825,7 @@ let update_caml_flambda_invalid_cfg cfg_with_layout =
 let cfg ppf_dump ~future_funcnames cl =
   let cfg = Cfg_with_layout.cfg cl in
   Analysis.cfg cfg ~future_funcnames unit_info unresolved_deps ppf_dump;
-  update_caml_flambda_invalid_cfg cl
+  drop_invalid_successors cl
 
 let reset_unit_info () =
   Unit_info.reset unit_info;

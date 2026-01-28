@@ -38,6 +38,7 @@ type cpu_type = [
   | `X86
   | `X86_64
   | `ARM
+  | `ARM64
   | `POWERPC
   | `POWERPC64
   | unknown
@@ -47,6 +48,7 @@ let cpu_type = function
   | 0x00000007 -> `X86
   | 0x01000007 -> `X86_64
   | 0x0000000c -> `ARM
+  | 0x0100000c -> `ARM64
   | 0x00000012 -> `POWERPC
   | 0x01000012 -> `POWERPC64
   | n          -> `Unknown n
@@ -305,6 +307,17 @@ type reloc_type = [
   | `PPC_RELOC_HA16_SECTDIFF
   | `PPC_RELOC_JBSR
   | `PPC_RELOC_LO14_SECTDIFF
+  | `ARM64_RELOC_UNSIGNED
+  | `ARM64_RELOC_SUBTRACTOR
+  | `ARM64_RELOC_BRANCH26
+  | `ARM64_RELOC_PAGE21
+  | `ARM64_RELOC_PAGEOFF12
+  | `ARM64_RELOC_GOT_LOAD_PAGE21
+  | `ARM64_RELOC_GOT_LOAD_PAGEOFF12
+  | `ARM64_RELOC_POINTER_TO_GOT
+  | `ARM64_RELOC_TLVP_LOAD_PAGE21
+  | `ARM64_RELOC_TLVP_LOAD_PAGEOFF12
+  | `ARM64_RELOC_ADDEND
   | unknown
 ]
 
@@ -355,6 +368,17 @@ let reloc_type cpu_type n = match cpu_type, n with
   | `POWERPC64 , 13   -> `PPC_RELOC_JBSR
   | `POWERPC64 , 14   -> `PPC_RELOC_LO14_SECTDIFF
   | `POWERPC64 , 15   -> `PPC_RELOC_LOCAL_SECTDIFF
+  | `ARM64     , 00   -> `ARM64_RELOC_UNSIGNED
+  | `ARM64     , 01   -> `ARM64_RELOC_SUBTRACTOR
+  | `ARM64     , 02   -> `ARM64_RELOC_BRANCH26
+  | `ARM64     , 03   -> `ARM64_RELOC_PAGE21
+  | `ARM64     , 04   -> `ARM64_RELOC_PAGEOFF12
+  | `ARM64     , 05   -> `ARM64_RELOC_GOT_LOAD_PAGE21
+  | `ARM64     , 06   -> `ARM64_RELOC_GOT_LOAD_PAGEOFF12
+  | `ARM64     , 07   -> `ARM64_RELOC_POINTER_TO_GOT
+  | `ARM64     , 08   -> `ARM64_RELOC_TLVP_LOAD_PAGE21
+  | `ARM64     , 09   -> `ARM64_RELOC_TLVP_LOAD_PAGEOFF12
+  | `ARM64     , 10   -> `ARM64_RELOC_ADDEND
   | _         , n     -> `Unknown n
 
 type relocation_info = {
@@ -372,7 +396,8 @@ type relocation_info = {
   ri_type      : reloc_type;
 }
 
-let bits ofs sz n = (n lsl (32 - ofs - sz)) lsr (32 - sz)
+(* Extract sz bits starting at bit position ofs from n *)
+let bits ofs sz n = (n lsr ofs) land ((1 lsl sz) - 1)
 
 let read_relocation_info _t header ri_address value = {
   ri_address;
@@ -1178,10 +1203,6 @@ let read_symbol_table header buf t =
   let nsyms   = Read.u32 t in
   let stroff  = Read.u32 t in
   let strsize = Read.u32 t in
-  Printf.eprintf "symoff: %d, nsyms: %d, stroff: %d, strsize: %d\n"
-    symoff nsyms stroff strsize;
-  Printf.eprintf "buffer size: %d\n%!"
-    (Bigarray.Array1.dim buf);
   let strsect = sub (cursor buf ~at:stroff) strsize in
   let f =
     if is64bit header then Read.u64
@@ -1238,3 +1259,126 @@ let read buf =
 let section_body buffer seg sec =
   let addr = Int64.add seg.seg_fileoff sec.sec_addr in
   Bigarray.Array1.sub buffer  (Int64.to_int addr) (Int64.to_int sec.sec_size)
+
+(* Find a segment by name in the load commands *)
+let find_segment commands seg_name =
+  List.find_map
+    (function
+      | LC_SEGMENT_64 seg ->
+        let seg = Lazy.force seg in
+        if String.equal seg.seg_segname seg_name then Some seg else None
+      | _ -> None)
+    commands
+
+(* Find a section by name within a segment *)
+let find_section segment sect_name =
+  Array.find_opt
+    (fun sec -> String.equal sec.sec_sectname sect_name)
+    segment.seg_sections
+
+(* Find a section by name in any segment (useful for object files with unnamed segments) *)
+let find_section_any_segment commands sect_name =
+  List.find_map
+    (function
+      | LC_SEGMENT_64 seg ->
+        let seg = Lazy.force seg in
+        (match find_section seg sect_name with
+         | Some sec -> Some (seg, sec)
+         | None -> None)
+      | _ -> None)
+    commands
+
+(* Extract section body as a string *)
+let section_body_string buf seg sec =
+  let body = section_body buf seg sec in
+  let cursor = Owee_buf.cursor body in
+  let size = Owee_buf.size body in
+  Owee_buf.Read.fixed_string cursor size
+
+(* Get symbol table from load commands *)
+let get_symbol_table commands =
+  List.find_map
+    (function
+      | LC_SYMTAB syms -> Some (Lazy.force syms)
+      | _ -> None)
+    commands
+
+(* A resolved relocation with offset, symbol name, and addend.
+   Addend is typically 0 for Mach-O (which uses REL format), but can be
+   non-zero when ARM64_RELOC_ADDEND relocations are present. *)
+type resolved_relocation = {
+  r_offset : int;
+  r_symbol : string;
+  r_addend : int64;
+}
+
+(* Extract relocations from a section, resolving symbol names.
+   [section_names] is an array mapping section ordinal (1-based) to section name,
+   used for non-extern relocations. Pass [||] if section ordinal resolution is
+   not needed. *)
+let extract_section_relocations ?(section_names = [||]) symbols section =
+  let relocs = section.sec_relocs in
+  let n = Array.length relocs in
+  let result = ref [] in
+  let i = ref 0 in
+  while !i < n do
+    match relocs.(!i) with
+    | `Relocation_info ri -> (
+      (* Check for ARM64_RELOC_ADDEND which carries an addend for the next reloc *)
+      match ri.ri_type with
+      | `ARM64_RELOC_ADDEND ->
+        (* ri_symbolnum contains the signed 24-bit addend *)
+        let addend =
+          let v = ri.ri_symbolnum in
+          (* Sign-extend from 24 bits *)
+          if v land 0x800000 <> 0 then Int64.of_int (v lor 0xFF000000)
+          else Int64.of_int v
+        in
+        (* The next relocation is the actual one that uses this addend *)
+        incr i;
+        if !i < n then (
+          match relocs.(!i) with
+          | `Relocation_info ri2 ->
+            let symbol_name =
+              if ri2.ri_extern then
+                let sym_idx = ri2.ri_symbolnum in
+                if sym_idx < Array.length symbols then symbols.(sym_idx).sym_name
+                else ""
+              else
+                (* Non-extern: ri_symbolnum is 1-based section ordinal *)
+                let ordinal = ri2.ri_symbolnum in
+                if ordinal > 0 && ordinal <= Array.length section_names then
+                  section_names.(ordinal - 1)
+                else ""
+            in
+            if symbol_name <> "" then
+              result :=
+                { r_offset = ri2.ri_address; r_symbol = symbol_name;
+                  r_addend = addend }
+                :: !result
+          | `Scattered_relocation_info _ -> ())
+      | _ ->
+        (* Regular relocation *)
+        let symbol_name =
+          if ri.ri_extern then
+            let sym_idx = ri.ri_symbolnum in
+            if sym_idx < Array.length symbols then symbols.(sym_idx).sym_name
+            else ""
+          else
+            (* Non-extern: ri_symbolnum is 1-based section ordinal *)
+            let ordinal = ri.ri_symbolnum in
+            if ordinal > 0 && ordinal <= Array.length section_names then
+              section_names.(ordinal - 1)
+            else ""
+        in
+        if symbol_name <> "" then
+          result :=
+            { r_offset = ri.ri_address; r_symbol = symbol_name; r_addend = 0L }
+            :: !result)
+    | `Scattered_relocation_info _ ->
+      (* Scattered relocations are not used on ARM64 *)
+      ()
+    ;
+    incr i
+  done;
+  List.rev !result

@@ -271,8 +271,7 @@ let array_kind_of_elt ~elt_sort env loc ty =
   match classify ~classify_product env ty elt_sort with
   | Any ->
     if Config.flat_float_array
-      && not (Language_extension.is_at_least Separability ()
-          && Ctype.check_type_separability env ty Non_float)
+      && not (Ctype.check_type_separability env ty Non_float)
     then Pgenarray
     else Paddrarray
   | Float -> if Config.flat_float_array then Pfloatarray else Paddrarray

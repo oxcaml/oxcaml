@@ -139,8 +139,11 @@ let successor_labels_normal ti =
     |> Label.Set.add uo
   | Int_test { lt; gt; eq; imm = _; is_signed = _ } ->
     Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
-  | Call { op = _; label_after } | Prim { op = _; label_after } ->
+  | Call { op = _; label_after }
+  | Prim { op = _; label_after }
+  | Invalid { label_after = Some label_after; _ } ->
     Label.Set.singleton label_after
+  | Invalid { label_after = None; _ } -> Label.Set.empty
 
 let successor_labels ~normal ~exn block =
   match normal, exn with
@@ -189,10 +192,13 @@ let replace_successor_labels t ~normal ~exn block ~f =
         Tailcall_self { destination = f destination }
       | Tailcall_func (Indirect _)
       | Tailcall_func (Direct _)
-      | Return | Raise _ | Call_no_return _ ->
+      | Return | Raise _ | Call_no_return _
+      | Invalid { label_after = None; _ } ->
         block.terminator.desc
       | Call { op; label_after } -> Call { op; label_after = f label_after }
       | Prim { op; label_after } -> Prim { op; label_after = f label_after }
+      | Invalid ({ label_after = Some label_after; _ } as r) ->
+        Invalid { r with label_after = Some (f label_after) }
     in
     block.terminator <- { block.terminator with desc }
 
@@ -402,6 +408,9 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
       | Probe { name; handler_code_sym; enabled_at_init } ->
         Linear.Lprobe { name; handler_code_sym; enabled_at_init });
     Format.fprintf ppf "%sgoto %a" sep Label.format label_after
+  | Invalid { message; label_after; _ } ->
+    Format.fprintf ppf "Invalid %S" message;
+    Option.iter (Format.fprintf ppf "%sgoto %a" sep Label.format) label_after
 
 let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator
 
@@ -437,10 +446,8 @@ let print_instruction ppf i = print_instruction' ppf i
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Call_no_return { func_symbol; _ } ->
-    not (String.equal func_symbol Cmm.caml_flambda2_invalid)
-  | Raise _ | Tailcall_func _ | Call _ | Prim { op = Probe _; label_after = _ }
-    ->
+  | Call_no_return _ | Raise _ | Tailcall_func _ | Call _
+  | Prim { op = Probe _; label_after = _ } ->
     true
   | Prim { op = External { alloc; effects; _ }; label_after = _ } -> (
     if not alloc
@@ -452,7 +459,7 @@ let can_raise_terminator (i : terminator) =
       | No_effects -> false
       | Arbitrary_effects -> true)
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Return | Tailcall_self _ ->
+  | Switch _ | Return | Tailcall_self _ | Invalid _ ->
     false
 
 (* CR gyorsh: [is_pure_terminator] is not the same as [can_raise_terminator]
@@ -463,7 +470,7 @@ let can_raise_terminator (i : terminator) =
 let is_pure_terminator desc =
   match (desc : terminator) with
   | Return | Raise _ | Call_no_return _ | Tailcall_func _ | Tailcall_self _
-  | Call _ | Prim _ ->
+  | Call _ | Prim _ | Invalid _ ->
     false
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
@@ -475,7 +482,7 @@ let is_never_terminator desc =
   | Never -> true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ ->
+  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let is_return_terminator desc =
@@ -483,7 +490,7 @@ let is_return_terminator desc =
   | Return -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ ->
+  | Call _ | Prim _ | Invalid _ ->
     false
 
 let is_pure_basic : basic -> bool = function
@@ -529,7 +536,8 @@ let is_noop_move instr =
       | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
       | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
       | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Begin_region
-      | End_region | Dls_get | Tls_get | Poll | Alloc _ | Pause )
+      | End_region | Dls_get | Tls_get | Domain_index | Poll | Alloc _ | Pause
+        )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false
@@ -604,9 +612,9 @@ let is_poll (instr : basic instruction) =
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
-      | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
-      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _
+      | End_region | Dls_get | Tls_get | Domain_index | Const_int _
+      | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -622,7 +630,7 @@ let is_alloc (instr : basic instruction) =
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
-      | Dls_get | Tls_get | Pause | Const_int _ | Const_float32 _
+      | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
@@ -640,9 +648,9 @@ let is_end_region (b : basic) =
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
-      | Tls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
-      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-      | Stackoffset _ | Load _
+      | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -672,7 +680,7 @@ let basic_block_contains_calls block =
     | Tailcall_func _ -> false
     | Call_no_return _ -> true
     | Call _ -> true
-    | Prim { op = External _; _ } -> true
+    | Prim { op = External _; _ } | Invalid _ -> true
     | Prim { op = Probe _; _ } -> true)
   || DLL.exists block.body ~f:is_alloc_or_poll
 
@@ -715,7 +723,8 @@ let remove_trap_instructions t removed_trap_handlers =
         | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
         | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
         | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Alloc _ | Pause )
+        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+        | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
@@ -727,7 +736,7 @@ let remove_trap_instructions t removed_trap_handlers =
     | Tailcall_self _ -> assert (Int.equal stack_offset 0)
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ ->
+    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
       ());
     update_instruction terminator ~stack_offset
   and update_block label ~stack_offset =

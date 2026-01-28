@@ -10,6 +10,7 @@ on:
     tags:
       - '*'
   pull_request:
+  merge_group:
 jobs:
   build:
     name: ${{ matrix.name }}
@@ -100,6 +101,13 @@ jobs:
 
           - name: runtime5 regalloc (aarch64-linux)
             config: --enable-runtime5 --disable-warn-error
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            run_regalloc_tool: true
+
+          - name: runtime5 regalloc multidomain (aarch64-linux)
+            config: --enable-runtime5 --enable-poll-insertion --enable-multidomain --disable-warn-error
             os: warp-ubuntu-latest-arm64-8x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'

@@ -42,7 +42,8 @@ let is_offset chunk n =
      | Fivetwelve_unaligned ->
        Misc.fatal_error "arm64: got 256/512 bit vector"
 
-let is_logical_immediate_int n = Arch.is_logical_immediate (Nativeint.of_int n)
+let is_logical_immediate_int n =
+  Arm64_ast.Logical_immediates.is_logical_immediate (Nativeint.of_int n)
 
 (* Signed immediates are simpler *)
 
@@ -95,12 +96,18 @@ let effects_of (expr : Cmm.expression) :
     Effects_of_all_expressions args
   | _ -> Use_default
 
+let asm_symbol_of_cmm (s : Cmm.symbol) =
+  let visibility : Asm_targets.Asm_symbol.visibility =
+    match s.sym_global with Cmm.Global -> Global | Cmm.Local -> Local
+  in
+  Asm_targets.Asm_symbol.create ~visibility s.sym_name
+
 let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match expr with
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
     when use_direct_addressing s ->
-    Ibased (s.sym_name, n), Ctuple []
+    Ibased (asm_symbol_of_cmm s, n), Ctuple []
   | Cop ((Caddv | Cadda), [arg; Cconst_int (n, _)], _) when is_offset chunk n ->
     Iindexed n, arg
   | Cop
@@ -110,7 +117,7 @@ let select_addressing' chunk (expr : Cmm.expression) :
     when is_offset chunk n ->
     Iindexed n, Cop (op, [arg1; arg2], dbg)
   | Cconst_symbol (s, _) when use_direct_addressing s ->
-    Ibased (s.sym_name, 0), Ctuple []
+    Ibased (asm_symbol_of_cmm s, 0), Ctuple []
   | arg -> Iindexed 0, arg
 
 let select_addressing chunk exp : addressing_mode * Cmm.expression =
@@ -258,9 +265,9 @@ let pseudoregs_for_operation op arg res =
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
   | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
-  | Tls_get | Poll | Const_int _ | Const_float32 _ | Const_float _
-  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-  | Stackoffset _ | Load _
+  | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
+  | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+  | Const_vec512 _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Intop _ | Int128op _
   | Intop_imm (_, _)

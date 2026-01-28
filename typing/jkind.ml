@@ -1058,18 +1058,26 @@ let outcometree_of_modalities = ref (fun _ _ -> assert false)
 
 let set_outcometree_of_modalities p = outcometree_of_modalities := p
 
+module Format_verbosity = struct
+  type t =
+    | Not_verbose
+    | Expanded
+    | Expanded_with_all_mod_bounds
+end
+
 module Const = struct
   include Jkind0.Const
 
   module To_out_jkind_const : sig
-    (** Convert a [t] into a [Outcometree.out_jkind_const]. If [expanded] is
-        [false], the jkind is written in terms of the built-in jkind that
+    (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
+        [Not_verbose], the jkind is written in terms of the built-in jkind that
         requires the least amount of modes after the mod. For example,
         [value mod global many unique portable uncontended external_ non_null]
         could be written in terms of [value] (as it appears above), or in terms
         of [immediate] (which would just be [immediate]). Since the latter
         requires less modes to be printed, it is chosen. *)
-    val convert : expanded:bool -> 'd t -> Outcometree.out_jkind_const
+    val convert :
+      verbosity:Format_verbosity.t -> 'd t -> Outcometree.out_jkind_const
   end = struct
     type printable_jkind =
       { base : string;
@@ -1131,15 +1139,23 @@ module Const = struct
           (Mod_bounds.create crossing_diff ~externality ~nullability
              ~separability)
 
-    let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
-      match diff base actual with
-      | None -> None
-      | Some diff ->
-        let modes =
-          Typemode.untransl_mod_bounds diff
-          |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
-        in
-        Some modes
+    let get_modal_bounds ~verbosity ~(base : Mod_bounds.t)
+        (actual : Mod_bounds.t) =
+      let show_all_bounds =
+        match (verbosity : Format_verbosity.t) with
+        | Not_verbose | Expanded -> false
+        | Expanded_with_all_mod_bounds -> true
+      in
+      let bounds_to_print =
+        match show_all_bounds with
+        | false -> diff base actual
+        | true -> Some actual
+      in
+      Option.map
+        (fun bounds_to_print ->
+          Typemode.untransl_mod_bounds ~verbose:show_all_bounds bounds_to_print
+          |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s))
+        bounds_to_print
 
     let modality_to_ignore_axes axes_to_ignore =
       (* The modality is constant along axes to ignore and id along others *)
@@ -1158,12 +1174,13 @@ module Const = struct
         (Axis_set.to_list axes_to_ignore)
 
     (** Write [actual] in terms of [base] *)
-    let convert_with_base ~(base : Builtin.t) (actual : _ t) =
+    let convert_with_base ~verbosity ~(base : Builtin.t) (actual : _ t) =
       let matching_layouts =
         Layout.Const.equal base.jkind.layout actual.layout
       in
       let modal_bounds =
-        get_modal_bounds ~base:base.jkind.mod_bounds actual.mod_bounds
+        get_modal_bounds ~verbosity ~base:base.jkind.mod_bounds
+          actual.mod_bounds
       in
       let printable_with_bounds =
         (* This match statement is a bit of a hack. One usage of this function
@@ -1209,18 +1226,19 @@ module Const = struct
       | [out] -> Some out
       | [] -> None
 
-    let convert ~expanded jkind =
+    let convert ~(verbosity : Format_verbosity.t) jkind =
       (* For each primitive jkind, we try to print the jkind in terms of it
          (this is possible if the primitive is a subjkind of it). We then choose
          the "simplest". The "simplest" is taken to mean the one with the least
          number of modes that need to follow the [mod]. *)
       let simplest =
-        match expanded with
-        | false ->
+        match verbosity with
+        | Not_verbose ->
           Builtin.all
-          |> List.filter_map (fun base -> convert_with_base ~base jkind)
+          |> List.filter_map (fun base ->
+              convert_with_base ~verbosity ~base jkind)
           |> select_simplest
-        | true -> None
+        | Expanded | Expanded_with_all_mod_bounds -> None
       in
       let printable_jkind =
         match simplest with
@@ -1231,7 +1249,7 @@ module Const = struct
              layout name is a valid jkind abbreviation whose modal bounds are
              all max, even though this is a lie. Internal ticket 3284. *)
           let out_jkind_verbose =
-            convert_with_base
+            convert_with_base ~verbosity
               ~base:
                 { jkind =
                     { layout = jkind.layout;
@@ -1249,15 +1267,24 @@ module Const = struct
           | Some out_jkind -> out_jkind
           | None ->
             (* If we fail, try again with nullable/maybe-separable jkinds. *)
+            let layout_str =
+              match (jkind.layout : Layout.Const.t) with
+              | Base Value ->
+                (* As a special case, we'd still like to print in terms of the
+                   value_or_null alias, even if we're printing an expanded
+                   jkind. *)
+                "value_or_null"
+              | _ -> Layout.Const.to_string jkind.layout
+            in
             let out_jkind_verbose =
-              convert_with_base
+              convert_with_base ~verbosity
                 ~base:
                   { jkind =
                       { layout = jkind.layout;
                         mod_bounds = Mod_bounds.max;
                         with_bounds = No_with_bounds
                       };
-                    name = Layout.Const.to_string jkind.layout
+                    name = layout_str
                   }
                 jkind
             in
@@ -1283,10 +1310,10 @@ module Const = struct
   end
 
   let to_out_jkind_const jkind =
-    To_out_jkind_const.convert ~expanded:false jkind
+    To_out_jkind_const.convert ~verbosity:Not_verbose jkind
 
-  let format ~expanded ppf jkind =
-    To_out_jkind_const.convert ~expanded jkind |> !Oprint.out_jkind_const ppf
+  let format ~verbosity ppf jkind =
+    To_out_jkind_const.convert ~verbosity jkind |> !Oprint.out_jkind_const ppf
 
   (*******************************)
   (* converting user annotations *)
@@ -1356,7 +1383,8 @@ module Const = struct
       | Left_jkind (transl_type, _) ->
         let type_ = transl_type type_ in
         let modality =
-          Typemode.transl_modalities ~maturity:Stable Immutable modalities
+          (Typemode.transl_modalities ~maturity:Stable Immutable modalities)
+            .moda_modalities
         in
         { layout = base.layout;
           mod_bounds = base.mod_bounds;
@@ -1411,7 +1439,7 @@ module Desc = struct
   (* CR layouts v2.8: This will probably need to be overhauled with
      [with]-types. See also [Printtyp.out_jkind_of_desc], which uses the same
      algorithm. Internal ticket 5096. *)
-  let format_maybe_expanded ~expanded ppf t =
+  let format_verbose ~verbosity ppf t =
     let open Format in
     let rec format_desc ~nested ppf (desc : _ t) =
       match desc.layout with
@@ -1424,12 +1452,12 @@ module Desc = struct
           (List.map (fun layout -> { desc with layout }) lays)
       | _ -> (
         match get_const desc with
-        | Some c -> Const.format ~expanded ppf c
+        | Some c -> Const.format ~verbosity ppf c
         | None -> assert false (* handled above *))
     in
     format_desc ppf ~nested:false t
 
-  let format ppf t = format_maybe_expanded ~expanded:false ppf t
+  let format ppf t = format_verbose ~verbosity:Not_verbose ppf t
 end
 
 module Jkind_desc = struct
@@ -1920,12 +1948,10 @@ let decompose_product ({ jkind; _ } as jk) =
    doing so, because it teaches the user that e.g. [value mod local] is better
    off spelled [value]. Possibly remove [jkind.annotation], but only after
    we have a proper printing story. Internal ticket 5096. *)
-let format_maybe_expanded ~expanded ppf jkind =
-  Desc.format_maybe_expanded ~expanded ppf (Jkind_desc.get jkind.jkind)
+let format_verbose ~verbosity ppf jkind =
+  Desc.format_verbose ~verbosity ppf (Jkind_desc.get jkind.jkind)
 
-let format ppf jkind = format_maybe_expanded ~expanded:false ppf jkind
-
-let format_expanded ppf jkind = format_maybe_expanded ~expanded:true ppf jkind
+let format ppf jkind = format_verbose ~verbosity:Not_verbose ppf jkind
 
 let printtyp_path = ref (fun _ _ -> assert false)
 
@@ -2145,6 +2171,16 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value_or_null"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Recmod_fun_arg ->
+      fprintf ppf
+        "it's the type of the first argument to a function in a recursive \
+         module"
+    | Array_comprehension_element ->
+      fprintf ppf "it's the element type of array comprehension"
+    | Array_comprehension_iterator_element ->
+      fprintf ppf
+        "it's the element type of an array that is iterated over in a \
+         comprehension"
 
   let format_value_creation_reason ppf ~layout_or_kind :
       History.value_creation_reason -> _ = function
@@ -2188,15 +2224,9 @@ module Format_history = struct
       fprintf ppf
         "it's the base type (the first type parameter) for a@ block index (idx \
          or mut_idx)"
-    | Array_comprehension_element ->
-      fprintf ppf "it's the element type of array comprehension"
     | List_comprehension_iterator_element ->
       fprintf ppf
         "it's the element type of a list that is iterated over in a \
-         comprehension"
-    | Array_comprehension_iterator_element ->
-      fprintf ppf
-        "it's the element type of an array that is iterated over in a \
          comprehension"
     | Lazy_expression -> fprintf ppf "it's the type of a lazy expression"
     | Class_type_argument ->
@@ -2207,10 +2237,6 @@ module Format_history = struct
     | Debug_printer_argument ->
       format_with_notify_js ppf
         "it's the type of an argument to a debugger printer function"
-    | Recmod_fun_arg ->
-      fprintf ppf
-        "it's the type of the first argument to a function in a recursive \
-         module"
     | Quotation_result -> fprintf ppf "it's the result type of a quotation"
     | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
     | Tquote -> fprintf ppf "it's a staged type"
@@ -2940,6 +2966,10 @@ module Debug_printers = struct
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         !printtyp_path parent_path
+    | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
+    | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
+    | Array_comprehension_iterator_element ->
+      fprintf ppf "Array_comprehension_iterator_element"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
     | Class_let_binding -> fprintf ppf "Class_let_binding"
@@ -2966,16 +2996,12 @@ module Debug_printers = struct
     | Default_type_jkind -> fprintf ppf "Default_type_jkind"
     | Existential_type_variable -> fprintf ppf "Existential_type_variable"
     | Idx_base -> fprintf ppf "Idx_base"
-    | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | List_comprehension_iterator_element ->
       fprintf ppf "List_comprehension_iterator_element"
-    | Array_comprehension_iterator_element ->
-      fprintf ppf "Array_comprehension_iterator_element"
     | Lazy_expression -> fprintf ppf "Lazy_expression"
     | Class_type_argument -> fprintf ppf "Class_type_argument"
     | Class_term_argument -> fprintf ppf "Class_term_argument"
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
-    | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Quotation_result -> fprintf ppf "Quotation_result"
     | Antiquotation_result -> fprintf ppf "Antiquotation_result"
     | Tquote -> fprintf ppf "Tquote"

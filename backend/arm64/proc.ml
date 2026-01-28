@@ -345,7 +345,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-        | Begin_region | End_region | Dls_get | Tls_get)
+        | Begin_region | End_region | Dls_get | Tls_get | Domain_index)
   | Poptrap _ | Prologue | Epilogue
   | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
@@ -383,6 +383,8 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }; _} ->
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
+  | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
+    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -404,6 +406,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
       true
     else
     if alloc then true else false
+  | Invalid _ -> more_destruction_points
 
 (* Layout of the stack *)
 
@@ -497,6 +500,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
   | Ctls_get
+  | Cdomain_index
   | Cpoll
   | Creinterpret_cast (Int_of_value | Value_of_int |
                        Int64_of_float | Float_of_int64 |
@@ -513,7 +517,7 @@ let expression_supported : Cmm.expression -> bool = function
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
-  | Cexit _ -> true
+  | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ | Cconst_vec512 _ -> false
 
 

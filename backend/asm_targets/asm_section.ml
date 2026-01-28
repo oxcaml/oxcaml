@@ -50,10 +50,18 @@ type t =
   | Sixtyfour_byte_literals
   | Jump_tables
   | Text
+  | Function_text of string
   | Stapsdt_base
   | Stapsdt_note
   | Probes
   | Note_ocaml_eh
+  | Note_gnu_stack
+  | Custom of
+      { names : string list;
+        flags : string option;
+        args : string list;
+        is_delayed : bool
+      }
 
 let dwarf_sections_in_order () =
   let sections =
@@ -79,8 +87,10 @@ let is_delayed = function
       | Debug_rnglists | Debug_addr | Debug_loc | Debug_ranges )
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
-  | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh ->
+  | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
+  | Note_gnu_stack ->
     false
+  | Custom { is_delayed; _ } -> is_delayed
 
 let print ppf t =
   let str =
@@ -103,10 +113,14 @@ let print ppf t =
     | Sixtyfour_byte_literals -> "Sixtyfour_byte_literals"
     | Jump_tables -> "Jump_tables"
     | Text -> "Text"
+    | Function_text name -> Printf.sprintf "(Function_text %s)" name
     | Stapsdt_base -> "Stapsdt_base"
     | Stapsdt_note -> "Stapsdt_note"
     | Probes -> "Probes"
     | Note_ocaml_eh -> "Note_ocaml_eh"
+    | Note_gnu_stack -> "Note_gnu_stack"
+    | Custom { names; _ } ->
+      Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
   Format.pp_print_string ppf str
 
@@ -114,12 +128,27 @@ let compare t1 t2 = Stdlib.compare t1 t2
 
 let equal t1 t2 = Stdlib.compare t1 t2 = 0
 
+let hash t = Hashtbl.hash t
+
+module Tbl = Hashtbl.Make (struct
+  type nonrec t = t
+
+  let equal = equal
+
+  let hash = hash
+end)
+
 let section_is_text = function
-  | Text -> true
+  | Text | Function_text _ -> true
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
-  | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh ->
+  | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack ->
     false
+  | Custom { flags; _ } -> (
+    (* Check if the section is executable based on flags *)
+    match flags with
+    | Some f -> String.contains f 'x'
+    | None -> false)
 
 type section_details =
   { names : string list;
@@ -128,7 +157,12 @@ type section_details =
     is_delayed : bool
   }
 
-let details t ~first_occurrence =
+let details t first_occurrence =
+  let first_occurrence =
+    match first_occurrence with
+    | `First_occurrence -> true
+    | `Not_first_occurrence -> false
+  in
   let text () = [".text"], None, [] in
   let data () = [".data"], None, [] in
   let rodata () = [".rodata"], None, [] in
@@ -136,6 +170,7 @@ let details t ~first_occurrence =
   let names, flags, args =
     match t, Target_system.architecture (), system with
     | Text, _, _ -> text ()
+    | Function_text name, _, _ -> [name], Some "ax", ["@progbits"]
     | Data, _, _ -> data ()
     | DWARF dwarf, _, MacOS_like ->
       let name =
@@ -174,8 +209,8 @@ let details t ~first_occurrence =
       in
       let args =
         match first_occurrence, dwarf with
-        | true, Debug_str -> ["%progbits,1"] (* #3078 *)
-        | true, _ -> ["%progbits"]
+        | true, Debug_str -> ["@progbits,1"] (* #3078 *)
+        | true, _ -> ["@progbits"]
         | false, _ -> []
       in
       [name], flags, args
@@ -225,12 +260,65 @@ let details t ~first_occurrence =
     | Probes, _, MacOS_like -> ["__TEXT"; "__probes"], None, ["regular"]
     | Probes, _, _ -> [".probes"], Some "wa", ["\"progbits\""]
     | Note_ocaml_eh, _, _ -> [".note.ocaml_eh"], Some "?", ["\"note\""]
+    | Note_gnu_stack, _, _ -> [".note.GNU-stack"], Some "", ["@progbits"]
+    | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in
   { names; flags; args; is_delayed }
 
+let of_names names =
+  match names with
+  | [".text"] -> Some Text
+  | [".data"] -> Some Data
+  | [".rodata"] -> Some Read_only_data
+  | [".rodata.cst8"] -> Some Eight_byte_literals
+  | [".rodata.cst16"] -> Some Sixteen_byte_literals
+  | [".rodata.cst32"] -> Some Thirtytwo_byte_literals
+  | [".rodata.cst64"] -> Some Sixtyfour_byte_literals
+  | [".debug_info"] -> Some (DWARF Debug_info)
+  | [".debug_abbrev"] -> Some (DWARF Debug_abbrev)
+  | [".debug_aranges"] -> Some (DWARF Debug_aranges)
+  | [".debug_addr"] -> Some (DWARF Debug_addr)
+  | [".debug_loc"] -> Some (DWARF Debug_loc)
+  | [".debug_ranges"] -> Some (DWARF Debug_ranges)
+  | [".debug_loclists"] -> Some (DWARF Debug_loclists)
+  | [".debug_rnglists"] -> Some (DWARF Debug_rnglists)
+  | [".debug_str"] -> Some (DWARF Debug_str)
+  | [".debug_line"] -> Some (DWARF Debug_line)
+  | [".stapsdt.base"] -> Some Stapsdt_base
+  | [".note.stapsdt"] -> Some Stapsdt_note
+  | [".probes"] -> Some Probes
+  | [".note.ocaml_eh"] -> Some Note_ocaml_eh
+  | [".note.GNU-stack"] -> Some Note_gnu_stack
+  (* macOS *)
+  | ["__TEXT"; "__text"] -> Some Text
+  | ["__DATA"; "__data"] -> Some Data
+  | ["__TEXT"; "__literal8"] -> Some Eight_byte_literals
+  | ["__TEXT"; "__literal16"] -> Some Sixteen_byte_literals
+  | ["__TEXT"; "__probes"] -> Some Probes
+  | ["__DWARF"; "__debug_info"] -> Some (DWARF Debug_info)
+  | ["__DWARF"; "__debug_abbrev"] -> Some (DWARF Debug_abbrev)
+  | ["__DWARF"; "__debug_aranges"] -> Some (DWARF Debug_aranges)
+  | ["__DWARF"; "__debug_addr"] -> Some (DWARF Debug_addr)
+  | ["__DWARF"; "__debug_loc"] -> Some (DWARF Debug_loc)
+  | ["__DWARF"; "__debug_ranges"] -> Some (DWARF Debug_ranges)
+  | ["__DWARF"; "__debug_loclists"] -> Some (DWARF Debug_loclists)
+  | ["__DWARF"; "__debug_rnglists"] -> Some (DWARF Debug_rnglists)
+  | ["__DWARF"; "__debug_str"] -> Some (DWARF Debug_str)
+  | ["__DWARF"; "__debug_line"] -> Some (DWARF Debug_line)
+  | ["__DATA"; "__note_stapsdt"] -> Some Stapsdt_note
+  (* Windows *)
+  | [".rdata"] -> Some Read_only_data
+  (* Function sections - .text.caml.funcname etc. *)
+  | [name]
+    when String.length name > 5
+         && String.equal (String.sub name 0 5) ".text"
+         && Char.equal name.[5] '.' ->
+    Some (Function_text name)
+  | _ -> None
+
 let to_string t =
   let { names; flags = _; args = _; is_delayed = _ } =
-    details t ~first_occurrence:true
+    details t `First_occurrence
   in
   String.concat " " names

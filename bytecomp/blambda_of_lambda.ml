@@ -396,14 +396,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       (* In bytecode, float# is boxed, so we can treat these two primitives the
          same. *)
       pseudo_event (variadic Makefloatblock)
-    | Pmakemixedblock (tag, _, shape, _) ->
-      (* There is no notion of a mixed block at runtime in bytecode. Further,
-         source-level unboxed types are represented as boxed in bytecode, so
-         no ceremony is needed to box values before inserting them into
-         the (normal, unmixed) block.
-      *)
-      let total_len = Array.length shape in
-      pseudo_event (variadic (Make_faux_mixedblock { total_len; tag }))
     | Pmakearray (kind, _, _) ->
       pseudo_event
         (match kind with
@@ -424,8 +416,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | _ :: _ ->
             (* for the floatarray hack *)
             Prim (Ccall "caml_make_array", [block])))
-    | Presume -> context_switch Resume ~arity:4
-    | Prunstack -> context_switch Runstack ~arity:3
+    | Presume -> context_switch Resume ~arity:3
+    | Pwith_stack -> context_switch With_stack ~arity:5
+    | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
       (* Use a dummy initializer to implement the "uninitialized" primitive *)
@@ -479,7 +472,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim
-                  ( Pmakeblock (0, Immutable, None, Lambda.alloc_heap),
+                  ( Pmakeblock (0, Immutable, All_value, Lambda.alloc_heap),
                     fields,
                     loc )
             in
@@ -501,8 +494,16 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         assert (kind = kind');
         comp_expr (Lambda.Lprim (Pmakearray (kind, mutability, m), args, loc))
       | _ -> unary (Ccall "caml_obj_dup"))
-    | Pmakeblock (tag, _mut, _, _) ->
-      pseudo_event (variadic (Makeblock { tag }))
+    | Pmakeblock (tag, _mut, shape, _) -> (
+      match Lambda.mixed_block_of_block_shape shape with
+      | None -> pseudo_event (variadic (Makeblock { tag }))
+      | Some shape ->
+        (* There is no notion of a mixed block at runtime in bytecode.
+              Further, source-level unboxed types are represented as boxed in
+              bytecode, so no ceremony is needed to box values before inserting
+              them into the (normal, unmixed) block. *)
+        let total_len = Array.length shape in
+        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal cu -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
@@ -798,6 +799,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ptls_get -> unary (Ccall "caml_domain_tls_get")
+    | Pdomain_index -> unary (Ccall "caml_ml_domain_index")
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")

@@ -145,7 +145,6 @@ type primitive =
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
-  | Pmakemixedblock of int * mutable_flag * mixed_block_shape * locality_mode
   | Pmakelazyblock of lazy_block_tag
   | Pfield of int * immediate_or_pointer * field_read_semantics
   | Pfield_computed of field_read_semantics
@@ -175,7 +174,8 @@ type primitive =
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
-  | Prunstack
+  | Pwith_stack
+  | Pwith_stack_bind
   | Pperform
   | Presume
   | Preperform
@@ -350,6 +350,7 @@ type primitive =
   (* Fetching domain-local state *)
   | Pdls_get
   | Ptls_get
+  | Pdomain_index
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
@@ -399,7 +400,8 @@ and layout =
   | Psplicevar of Ident.t
 
 and block_shape =
-  value_kind list option
+  | All_value
+  | Shape of mixed_block_shape
 
 and 'a mixed_block_element =
   | Value of value_kind
@@ -622,6 +624,29 @@ and equal_constructor_shape x y =
   | Constructor_mixed shape1, Constructor_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
   | (Constructor_uniform _ | Constructor_mixed _), _ -> false
+
+let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
+  match vks with
+  | None -> All_value
+  | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
+
+let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
+    =
+  match shape with
+  | All_value -> None
+  | Shape shape ->
+    let is_uniform =
+      Array.for_all
+        (function
+          | Value _ -> true
+          | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+          | _ -> false)
+        shape
+    in
+    if is_uniform then None else Some shape
+
+let is_uniform_block_shape (shape : block_shape) : bool =
+  Option.is_none (mixed_block_of_block_shape shape)
 
 let equal_layout x y =
   match x, y with
@@ -1637,7 +1662,7 @@ let transl_prim mod_name name =
       fatal_error ("Primitive " ^ name ^ " not found.")
 
 let block_of_module_representation ~loc = function
-  | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
+  | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
   | Module_mixed (shape, _) ->
     let rec count_values shape =
       Array.fold_left
@@ -1656,7 +1681,7 @@ let block_of_module_representation ~loc = function
     in
     Typedecl.assert_mixed_product_support loc Module
       ~value_prefix_len:(count_values shape);
-    Pmakemixedblock(0, Immutable, shape, alloc_heap)
+    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
@@ -2115,7 +2140,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmakeblock (_, _, _, m) -> Some m
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m
-  | Pmakemixedblock (_, _, _, m) -> Some m
   | Pmakelazyblock _ -> Some alloc_heap
   | Pfield _ | Pfield_computed _ | Psetfield _ | Psetfield_computed _ -> None
   | Pfloatfield (_, _, m) -> Some m
@@ -2216,7 +2240,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Punbox_vector _ -> None
   | Pbox_vector (_, m) -> Some m
   | Punbox_unit -> None
-  | Prunstack | Presume | Pperform | Preperform
+  | Pwith_stack | Pwith_stack_bind | Presume | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
@@ -2234,6 +2258,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_lxor_field
   | Pdls_get
   | Ptls_get
+  | Pdomain_index
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
@@ -2316,7 +2341,7 @@ let primitive_can_raise prim =
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
   | Pmakeufloatblock _ | Pufloatfield _ | Psetufloatfield _ | Psequand | Psequor
   | Pmakelazyblock _
-  | Pmixedfield _ | Psetmixedfield _ | Pmakemixedblock _ | Pnot
+  | Pmixedfield _ | Psetmixedfield _ | Pnot
   | Poffsetref _
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu | Pbytessetu
   | Pmakearray _ | Pduparray _ | Parraylength _ | Parrayrefu _ | Parraysetu _
@@ -2391,8 +2416,9 @@ let primitive_can_raise prim =
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
-  | Prunstack | Pperform | Presume | Preperform -> true (* XXX! *)
-  | Pdls_get | Ptls_get | Ppoll | Pcpu_relax
+  | Pwith_stack | Pwith_stack_bind | Pperform | Presume
+  | Preperform -> true (* XXX! *)
+  | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
@@ -2658,7 +2684,7 @@ let primitive_result_layout (p : primitive) =
     (* Note the assumption that predefs are always values *)
   | Pgetpredef _ -> layout_predef_value
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
-  | Pduprecord _ | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
+  | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
   | Pfield _ | Pfield_computed _ -> layout_value_field
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
@@ -2765,7 +2791,8 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | (Parray_to_iarray | Parray_of_iarray) -> layout_any_value
   | Pget_header _ -> layout_boxed_int Boxed_nativeint
-  | Prunstack | Presume | Pperform | Preperform -> layout_any_value
+  | Pwith_stack | Pwith_stack_bind | Presume | Pperform | Preperform ->
+    layout_any_value
   | Patomic_load_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null
   | Patomic_load_field { immediate_or_pointer = Pointer } ->
@@ -2782,6 +2809,7 @@ let primitive_result_layout (p : primitive) =
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
+  | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field

@@ -145,8 +145,12 @@ module S = struct
     | Tailcall_func of func_call_operation
     | Call_no_return of external_call_operation
     (* CR mshinwell: [Call_no_return] should have "external" in the name *)
-    (* CR mshinwell: [Invalid] from flambda2 should have its own terminator, to
-       avoid the hack in [can_raise_terminator] *)
+    | Invalid of
+        { message : string;
+          stack_ofs : int;
+          stack_align : Cmm.stack_align;
+          label_after : Label.t Option.t
+        }
     | Call of func_call_operation with_label_after
     | Prim of prim_call_operation with_label_after
 

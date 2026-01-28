@@ -72,7 +72,7 @@
    -safe-string
    -strict-formats))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (modules
   binutils
   local_store
