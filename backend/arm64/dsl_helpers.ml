@@ -182,7 +182,7 @@ let gp_reg_of_reg r : [`GP of [`X]] Ast.Reg.t =
     Misc.fatal_errorf "gp_reg_of_reg: expected integer register, got %a"
       Printreg.reg r
 
-let addressing ~scale:(_ : int) addr r =
+let addressing addr r =
   match addr with
   | Iindexed validated ->
     (* The offset is already validated; just convert to operand *)

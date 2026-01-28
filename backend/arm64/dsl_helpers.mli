@@ -157,7 +157,6 @@ val mem :
   [`GP of [< `X | `SP]] Ast.Reg.t -> [`Mem of [> `Base_reg]] Ast.Operand.t
 
 val addressing :
-  scale:int ->
   Arch.addressing_mode ->
   Reg.t ->
   [ `Mem of

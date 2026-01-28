@@ -156,16 +156,6 @@ let label ?offset reloc lbl =
 
 let runtime_function sym = symbol (Needs_reloc CALL26) sym
 
-let scale_of_chunk (chunk : Cmm.memory_chunk) =
-  match chunk with
-  | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-  | Fivetwelve_aligned ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
-  | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
-    | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned ) as chunk ->
-    Cmm.size_of_memory_chunk chunk
-
 let local_label lbl = label Same_section_and_unit lbl
 
 module Validated_mem_offset = Ast.DSL.Validated_mem_offset
@@ -1676,9 +1666,7 @@ let emit_instr i =
           (symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
         reg_tmp1
     in
-    let addressing =
-      H.addressing ~scale:(scale_of_chunk memory_chunk) addressing_mode base
-    in
+    let addressing = H.addressing addressing_mode base in
     match memory_chunk with
     | Byte_unsigned -> A.ins2 LDRB (H.reg_w dst) addressing
     | Byte_signed -> A.ins2 LDRSB (H.reg_x dst) addressing
@@ -1735,7 +1723,7 @@ let emit_instr i =
           (symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
         reg_tmp1
     in
-    let addressing = H.addressing ~scale:(scale_of_chunk size) addr base in
+    let addressing = H.addressing addr base in
     match size with
     | Byte_unsigned | Byte_signed -> A.ins2 STRB (H.reg_w src) addressing
     | Sixteen_unsigned | Sixteen_signed -> A.ins2 STRH (H.reg_w src) addressing
