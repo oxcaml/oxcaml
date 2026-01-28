@@ -866,10 +866,11 @@ and slambda =
   | SLvar of Slambdaident.t
   | SLunit
   | SLrecord of (string * slambda) array
-    (** Used for representing the static part of modules and records, the strings are the
-        field names which are soley for debug printing. *)
+    (** Used for representing the static part of modules and records, the
+        strings are the field names which are soley for debug printing. *)
   | SLfield of Slambdaident.t * int * string
-    (** Field access of records, the string is the field name for debug printing *)
+    (** Field access of records, the string is the field name for debug
+        printing. *)
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
     (** Project out the compiletime half of a [slambda_halves] *)
