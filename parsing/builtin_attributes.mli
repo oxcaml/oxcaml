@@ -35,6 +35,7 @@
     - ocaml.tailcall
     - ocaml.tail_mod_cons
     - ocaml.unboxed
+    - ocaml.flatten_floats
     - ocaml.unsafe_allow_any_mode_crossing
     - ocaml.untagged
     - ocaml.unrolled
@@ -197,6 +198,7 @@ val explicit_arity: Parsetree.attributes -> bool
 
 val has_unboxed: Parsetree.attributes -> bool
 val has_boxed: Parsetree.attributes -> bool
+val has_flatten_floats: Parsetree.attributes -> bool
 
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 

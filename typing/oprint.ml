@@ -1018,6 +1018,9 @@ and print_out_type_decl kwd ppf td =
   let print_unboxed ppf =
     if td.otype_unboxed then fprintf ppf " [%@%@unboxed]" else ()
   in
+  let print_flatten_floats ppf =
+    if td.otype_flatten_floats then fprintf ppf " [%@%@flatten_floats]" else ()
+  in
   let print_or_null_reexport ppf =
     if td.otype_or_null_reexport then
       fprintf ppf " [%@%@or_null_reexport]"
@@ -1051,11 +1054,12 @@ and print_out_type_decl kwd ppf td =
   let print_out_attrs ppf =
     List.iter (fun a -> fprintf ppf "@ [@@@@%s]" a.oattr_name)
   in
-  fprintf ppf "@[<2>@[<hv 2>%t%a@]%t%t%t@]%a"
+  fprintf ppf "@[<2>@[<hv 2>%t%a@]%t%t%t%t@]%a"
     print_name_params
     print_out_tkind ty
     print_constraints
     print_unboxed
+    print_flatten_floats
     print_or_null_reexport
     print_out_attrs td.otype_attributes
 

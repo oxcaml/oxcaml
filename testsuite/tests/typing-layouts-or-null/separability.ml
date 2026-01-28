@@ -408,14 +408,14 @@ type succeeds = float array accepts_nonfloat
 (* Records and variants are all non-float: *)
 
 type t1 = { f1 : string; f2: int }
-type t2 = { f1 : float; f2 : float }
-type t3 = { f1 : float }
+type t2 = { f1 : float; f2 : float } [@@flatten_floats]
+type t3 = { f1 : float } [@@flatten_floats]
 type t4 = { f1 : string; f2 : string; f3 : int }
 type t5 = { f1 : string; f2 : float; f3: int64#; f4: int32# }
 [%%expect{|
 type t1 = { f1 : string; f2 : int; }
-type t2 = { f1 : float; f2 : float; }
-type t3 = { f1 : float; }
+type t2 = { f1 : float; f2 : float; } [@@flatten_floats]
+type t3 = { f1 : float; } [@@flatten_floats]
 type t4 = { f1 : string; f2 : string; f3 : int; }
 type t5 = { f1 : string; f2 : float; f3 : int64#; f4 : int32#; }
 |}]

@@ -54,7 +54,7 @@ let () =
   Obj.set_raw_field obj 2 raw0;
   Printf.printf "after swap: p=%d q=%d r=%d\n" r.p r.q r.r
 
-type float_t = { mutable f1 : float; mutable f2 : float; mutable f3 : float }
+type float_t = { mutable f1 : float; mutable f2 : float; mutable f3 : float } [@@flatten_floats]
 
 let () =
   print_endline "\nAll-float record";

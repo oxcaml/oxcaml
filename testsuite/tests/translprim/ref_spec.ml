@@ -14,7 +14,7 @@
 *)
 
 type 'a custom_rec = { x : unit; mutable y : 'a }
-type float_rec = { w : float; mutable z : float }
+type float_rec = { w : float; mutable z : float } [@@flatten_floats]
 
 type cst = A | B
 type gen = C | D of string

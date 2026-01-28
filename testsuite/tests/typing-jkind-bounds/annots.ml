@@ -1123,8 +1123,9 @@ Error: The kind of type "t" is immutable_data
 |}]
 
 type t : any mod portable = { x : float }
+[@@flatten_floats]
 [%%expect {|
-type t = { x : float; }
+type t = { x : float; } [@@flatten_floats]
 |}]
 
 type t = { x : int } [@@unboxed]

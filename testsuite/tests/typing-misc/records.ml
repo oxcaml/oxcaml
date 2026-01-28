@@ -237,10 +237,11 @@ Error: This variant or record definition does not match that of type "d"
 |}]
 
 type wrong_type = d = {x:float}
+[@@flatten_floats]
 [%%expect{|
-Line 1, characters 0-31:
+Lines 1-2, characters 0-18:
 1 | type wrong_type = d = {x:float}
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 | [@@flatten_floats]
 Error: This variant or record definition does not match that of type "d"
        1. Fields do not match:
          "x : int;"

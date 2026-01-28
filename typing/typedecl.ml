@@ -147,6 +147,7 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
+  | Missing_flatten_floats_attribute
 
 open Typedtree
 
@@ -2279,6 +2280,27 @@ let check_unboxed_paths decls ~unboxed_version_banned =
     in
     List.iter (fun (_, d) -> check_decl d) decls)
 
+let check_flatten_floats_attribute decls =
+  let has_float_boxed shape =
+    Array.exists (function Types.Float_boxed -> true | _ -> false) shape
+  in
+  List.iter
+    (fun (_, decl) ->
+      match decl.type_kind with
+      | Type_record (_, rep, _) ->
+        let needs_attribute = match rep with
+          | Record_float -> true
+          | Record_mixed shape -> has_float_boxed shape
+          | Record_ufloat | Record_boxed _ | Record_unboxed
+          | Record_inlined _ -> false
+        in
+        if needs_attribute &&
+           not (Builtin_attributes.has_flatten_floats decl.type_attributes)
+        then
+          raise (Error (decl.type_loc, Missing_flatten_floats_attribute))
+      | _ -> ())
+    decls
+
 (* Note: Well-foundedness for OCaml types
 
    We want to guarantee that all cycles within OCaml types are
@@ -3101,6 +3123,7 @@ let transl_type_decl env rec_flag sdecl_list =
       if not (Path.Set.is_empty removed) then
         check_unboxed_paths decls
           ~unboxed_version_banned:(fun p -> Path.Set.mem p removed);
+      check_flatten_floats_attribute decls;
       new_env, update_decls_jkind_reason new_env decls
     with
     | Typedecl_variance.Error (loc, err) ->
@@ -4954,6 +4977,11 @@ let report_error ppf = function
   | Non_value_atomic_field ->
     fprintf ppf
       "@[Atomic record fields must have layout value.@]"
+  | Missing_flatten_floats_attribute ->
+    fprintf ppf
+      "@[This record type has fields stored with a flattened float representation.@ \
+       You must add the %a attribute.@]"
+      Style.inline_code "[@@flatten_floats]"
 
 
 let () =

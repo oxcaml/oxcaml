@@ -318,7 +318,7 @@ Error: Record element types must have a representable layout.
 (**************************************************************************)
 (* Test 6: fields in all-float records get jkind value.  may change in the
    future, but record fields must at least be representable. *)
-type t6 = { fld6 : float }
+type t6 = { fld6 : float } [@@flatten_floats]
 type ('a : immediate) s6 = S6 of 'a
 
 let f6 x =
@@ -327,7 +327,7 @@ let f6 x =
 let f6' x =
   let { fld6 = fld6 } = x in S6 fld6;;
 [%%expect {|
-type t6 = { fld6 : float; }
+type t6 = { fld6 : float; } [@@flatten_floats]
 type ('a : immediate) s6 = S6 of 'a
 val f6 : t6 -> float = <fun>
 Line 8, characters 32-36:
