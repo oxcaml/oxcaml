@@ -55,7 +55,7 @@ let default_heap_reduction_threshold = 500_000_000 / (Sys.word_size / 8)
 let heap_reduction_threshold = ref default_heap_reduction_threshold (* -heap-reduction-threshold *)
 let dump_zero_alloc = ref false          (* -dzero-alloc *)
 let disable_zero_alloc_checker = ref false       (* -disable-zero-alloc-checker *)
-let disable_precise_zero_alloc_checker = ref false  (* -disable-precise-zero_alloc_checker *)
+let disable_precise_zero_alloc_checker = ref false  (* -disable-precise-zero-alloc-checker *)
 
 type zero_alloc_checker_details_cutoff =
   | Keep_all
