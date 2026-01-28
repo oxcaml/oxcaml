@@ -12,10 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* This forces ikinds globally on. *)
-let () = Clflags.ikinds := true
-(* CR jujacobs: set this to false before merging. *)
-
 (* Global feature toggles for the ikinds experiment.
    These are intended to be easy to flip while iterating on
    performance or correctness. *)
@@ -54,7 +50,7 @@ module Solver = struct
     | Round_up
 
   (* Hash tables avoiding polymorphic structural comparison on deep values.
-     [Btype.TypeHash] keys by the representative of a [type_expr], so 
+     [Btype.TypeHash] keys by the representative of a [type_expr], so
      union-find aliases map to a single entry. This table is used to cache
      repeated kind computations, as well as to make circular types work. *)
   module TyTbl = Btype.TypeHash
@@ -66,8 +62,8 @@ module Solver = struct
   module ConstrTbl = Path.Tbl
 
   (** Kind function for constructors: computes a kind from a context.
-      This is used because many kinds don't make sense outside of a 
-      context, e.g., the kind of a type containing a constructor 
+      This is used because many kinds don't make sense outside of a
+      context, e.g., the kind of a type containing a constructor
       depends on the context telling us what its kind is. *)
   type ckind = ctx -> Ldd.node
 
@@ -125,7 +121,7 @@ module Solver = struct
     (not !Clflags.principal)
     || Types.get_level ty = Btype.generic_level
 
-  (* CR jujacobs: we could optimize the join with masks you see below 
+  (* CR jujacobs: we could optimize the join with masks you see below
      using a combined [Ldd.join_with_mask left mask right] operation. *)
 
   (** Fetch or compute the polynomial for constructor [c]. *)
@@ -183,7 +179,7 @@ module Solver = struct
             (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
             params
         in
-        (* We add the parameters to the TyTbl so that they will refer to 
+        (* We add the parameters to the TyTbl so that they will refer to
            rigid variables that represent them in the solver. *)
         List.iter2
           (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.node_of_var var))
@@ -209,8 +205,8 @@ module Solver = struct
                (Array.length coeffs_rhs));
         if abstract
         then (
-          (* For abstract types we solve the solver variables using 
-             greatest fixpoints. This ensures that abstract types' 
+          (* For abstract types we solve the solver variables using
+             greatest fixpoints. This ensures that abstract types'
              bounds are incorporated into all kind polynomials that
              mention the abstract type. This way, we can check kind
              subsumption without having to consider hypotheses for the
@@ -307,7 +303,7 @@ module Solver = struct
     let kind_poly =
       (* [ty] is expected to be representative: no links/substs/fields/nil. *)
       match Types.get_desc ty with
-      | Types.Tvar { name = _name; jkind } 
+      | Types.Tvar { name = _name; jkind }
       | Types.Tunivar { name = _name; jkind } ->
         (* Keep a rigid param, but cap it by its annotated jkind. *)
         Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
@@ -340,7 +336,7 @@ module Solver = struct
         Ldd.const Axis_lattice.arrow
       | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
       | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
-      | Types.Tpoly (ty, _) -> 
+      | Types.Tpoly (ty, _) ->
         (* CR ikinds: this is sound but not fully precise.
           Internal ticket 5746. *)
         kind ctx ty
@@ -694,7 +690,7 @@ let type_declaration_ikind ~(context : Jkind.jkind_context) ~(path : Path.t) :
 
 let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.type_ikind =
-  (* This function gets called separately for each 
+  (* This function gets called separately for each
     type definition of a mutually recursive group. This is
     safe but computationally wasteful. In the future we might
     want to give this function a list of paths and compute the

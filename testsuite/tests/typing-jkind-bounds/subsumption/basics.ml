@@ -261,7 +261,13 @@ type v : immutable_data with u = { value : t }
 [%%expect {|
 type u
 type t = private u
-type v = { value : t; }
+Line 3, characters 0-46:
+3 | type v : immutable_data with u = { value : t }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "v" is immutable_data with t
+         because it's a boxed record type.
+       But the kind of type "v" must be a subkind of immutable_data with u
+         because of the annotation on the declaration of the type v.
 |}]
 
 type t : value = private int
@@ -436,7 +442,26 @@ module type S =
     type 'a t2
     type 'a t : immutable_data with 'a t1 t2 with unit t1
   end
-module M : S
+Lines 7-11, characters 15-3:
+ 7 | ...............struct
+ 8 |   type 'a t1
+ 9 |   type 'a t2
+10 |   type 'a t = 'a t2 t1 * unit t2
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t1 type 'a t2 type 'a t = 'a t2 t1 * unit t2 end
+       is not included in
+         S
+       Type declarations do not match:
+         type 'a t = 'a t2 t1 * unit t2
+       is not included in
+         type 'a t : immutable_data with 'a t1 t2 with unit t1
+       The kind of the first is immutable_data with 'a t2 t1 with unit t2
+         because it's a tuple type.
+       But the kind of the first must be a subkind of
+           immutable_data with 'a t1 t2 with unit t1
+         because of the definition of t at line 4, characters 2-52.
 |}]
 
 
@@ -538,7 +563,31 @@ module type S =
     type 'a lily : immutable_data with 'a
     type 'a tulip : immutable_data
   end
-module M : S
+Lines 7-11, characters 15-3:
+ 7 | ...............struct
+ 8 |   type 'a rose = Leaf of 'a | Node of ('a * 'a) rose
+ 9 |   type 'a lily = Node of ('a * ('a list) lily) list
+10 |   type 'a tulip = Node of ('a list) tulip list
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type 'a rose = Leaf of 'a | Node of ('a * 'a) rose
+           type 'a lily = Node of ('a * 'a list lily) list
+           type 'a tulip = Node of 'a list tulip list
+         end
+       is not included in
+         S
+       Type declarations do not match:
+         type 'a rose = Leaf of 'a | Node of ('a * 'a) rose
+       is not included in
+         type 'a rose : immutable_data with 'a
+       The kind of the first is immutable_data with 'a with ('a * 'a) rose
+         because of the definition of rose at line 8, characters 2-52.
+       But the kind of the first must be a subkind of immutable_data with 'a
+         because of the definition of rose at line 2, characters 2-39.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
 
 
@@ -664,5 +713,14 @@ type 'a t3 : value mod portable =
   | A
   | B of unit t3
 [%%expect{|
-type 'a t3 = A | B of unit t3
+Lines 1-3, characters 0-16:
+1 | type 'a t3 : value mod portable =
+2 |   | A
+3 |   | B of unit t3
+Error: The kind of type "t3" is immutable_data with unit t3
+         because it's a boxed variant type.
+       But the kind of type "t3" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t3.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
