@@ -53,6 +53,7 @@ module Simple = struct
   type view = [
     | `Any
     | `Constant of constant
+    | `Unboxed_unit
     | `Tuple of (string option * pattern) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
@@ -99,6 +100,8 @@ module General = struct
        `Alias (p, id, str, uid, sort, mode, ty)
     | Tpat_constant cst ->
        `Constant cst
+    | Tpat_unboxed_unit ->
+       `Unboxed_unit
     | Tpat_tuple ps ->
        `Tuple ps
     | Tpat_unboxed_tuple ps ->
@@ -124,6 +127,7 @@ module General = struct
     | `Alias (p, id, str, uid, sort, mode, ty) ->
        Tpat_alias (p, id, str, uid, sort, mode, ty)
     | `Constant cst -> Tpat_constant cst
+    | `Unboxed_unit -> Tpat_unboxed_unit
     | `Tuple ps -> Tpat_tuple ps
     | `Unboxed_tuple ps -> Tpat_unboxed_tuple ps
     | `Construct (cstr, cst_descr, args) ->
@@ -155,6 +159,7 @@ module Head : sig
     | Any
     | Construct of constructor_description
     | Constant of constant
+    | Unboxed_unit
     | Tuple of string option list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of label_description list
@@ -182,6 +187,7 @@ end = struct
     | Any
     | Construct of constructor_description
     | Constant of constant
+    | Unboxed_unit
     | Tuple of string option list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of label_description list
@@ -201,6 +207,7 @@ end = struct
     let deconstruct_desc = function
       | `Any -> Any, []
       | `Constant c -> Constant c, []
+      | `Unboxed_unit -> Unboxed_unit, []
       | `Tuple args ->
           Tuple (List.map fst args), (List.map snd args)
       | `Unboxed_tuple args ->
@@ -242,6 +249,7 @@ end = struct
       | Any -> 0
       | Constant _ -> 0
       | Construct c -> c.cstr_arity
+      | Unboxed_unit -> 0
       | Tuple l -> List.length l
       | Unboxed_tuple l -> List.length l
       | Array (_, _, n) -> n
@@ -257,6 +265,7 @@ end = struct
       | Any -> Tpat_any
       | Lazy -> Tpat_lazy omega
       | Constant c -> Tpat_constant c
+      | Unboxed_unit -> Tpat_unboxed_unit
       | Tuple lbls ->
           Tpat_tuple (List.map (fun lbl -> lbl, omega) lbls)
       | Unboxed_tuple lbls_and_sorts ->

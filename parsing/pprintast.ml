@@ -763,6 +763,7 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         record_pattern ctxt f ~unboxed:false l closed
     | Ppat_record_unboxed_product (l, closed) ->
         record_pattern ctxt f ~unboxed:true l closed
+    | Ppat_unboxed_unit -> pp f "#()"
     | Ppat_tuple (l, closed) ->
         labeled_tuple_pattern ctxt f ~unboxed:false l closed
     | Ppat_unboxed_tuple (l, closed) ->
@@ -1179,6 +1180,7 @@ and simple_expr ctxt f x =
     | Pexp_constant c -> constant f c;
     | Pexp_pack me ->
         pp f "(module@;%a)" (module_expr ctxt) me
+    | Pexp_unboxed_unit -> pp f "#()"
     | Pexp_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:false l
     | Pexp_unboxed_tuple l ->

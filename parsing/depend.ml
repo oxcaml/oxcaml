@@ -206,6 +206,7 @@ let rec add_pattern bv pat =
   | Ppat_alias(p, _) -> add_pattern bv p
   | Ppat_interval _
   | Ppat_constant _ -> ()
+  | Ppat_unboxed_unit -> ()
   | Ppat_tuple (pl, _) -> add_pattern_labeled_tuple bv pl
   | Ppat_unboxed_tuple (pl, _)-> add_pattern_labeled_tuple bv pl
   | Ppat_construct(c, opt) ->
@@ -252,6 +253,7 @@ let rec add_expr bv exp =
       add_expr bv e; List.iter (fun (_,e) -> add_expr bv e) el
   | Pexp_match(e, pel) -> add_expr bv e; add_cases bv pel
   | Pexp_try(e, pel) -> add_expr bv e; add_cases bv pel
+  | Pexp_unboxed_unit -> ()
   | Pexp_tuple el -> add_labeled_tuple_expr bv el
   | Pexp_unboxed_tuple el -> add_labeled_tuple_expr bv el
   | Pexp_construct(c, opte) -> add bv c; add_opt add_expr bv opte
