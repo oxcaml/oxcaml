@@ -296,6 +296,7 @@ ocaml/primitives.new
 /parsing/camlinternalMenhirLib.ml
 /parsing/camlinternalMenhirLib.mli
 
+<<<<<<< HEAD
 /runtime4/caml/jumptbl.h
 /runtime4/caml/m.h
 /runtime4/caml/s.h
@@ -316,6 +317,10 @@ ocaml/primitives.new
 /runtime4/domain_state32.inc
 /runtime4/domain_state64.inc
 
+||||||| parent of cc480ff7c0 (Merge pull request #14498 from dra27/header-testing)
+=======
+/runtime/api-testing
+>>>>>>> cc480ff7c0 (Merge pull request #14498 from dra27/header-testing)
 /runtime/domain_state.inc
 /runtime/caml/m.h
 /runtime/caml/s.h

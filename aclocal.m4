@@ -657,6 +657,7 @@ AC_DEFUN([OCAML_CHECK_WINDOWS_TRIPLET], [
       [AC_MSG_ERROR([unknown MSVC variant])])
 ])
 
+<<<<<<< HEAD
 AC_DEFUN([OCAML_AS_COMPRESSION_SUPPORT], [
   AC_MSG_CHECKING([whether the assembler supports --compress-debug-sections=zlib])
 
@@ -759,3 +760,29 @@ AC_DEFUN([OCAML_OBJCOPY_COMPRESSION_SUPPORT], [
   fi
   rm -f conftest.s
 ])
+||||||| upstream
+=======
+# It's difficult to use AC_PROG_CXX or AX_CXX_COMPILE_STDCXX conditionally.
+# This macro is only used for ocamltest to call the C++11 compiler if the
+# default C compiler also can build C++.
+AC_DEFUN([OCAML_CXX_COMPILE_STDCXX_11], [
+  AC_CACHE_CHECK([for a C++11 compiler],
+    [ocaml_cv_prog_cxx], [
+    AS_CASE(["$ccomp_type"],
+      [cc], [
+        saved_CC="$CC"
+        CC="$CC -xc++"
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#if !defined(__cplusplus) || __cplusplus < 201103L
+#error "No C++11 support"
+#endif
+          ]])],
+          [ocaml_cv_prog_cxx="$CC"],
+          [ocaml_cv_prog_cxx=""])
+        CC="$saved_CC"],
+      [msvc], [
+        # cl.exe selects between C and C++ based on the file extension
+        ocaml_cv_prog_cxx="$CC"],
+      [ocaml_cv_prog_cxx=""])])
+  ocamltest_CXX="$ocaml_cv_prog_cxx"])
+>>>>>>> ocaml/ocaml#14498

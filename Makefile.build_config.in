@@ -73,6 +73,31 @@ INSTALL_OCAMLNAT = @install_ocamlnat@
 DEP_CC=@DEP_CC@ -MM
 COMPUTE_DEPS=@compute_deps@
 
+<<<<<<< HEAD
+||||||| upstream
+BUILD_PATH_LOGICAL = @srcdir_abs@
+BUILD_PATH_PHYSICAL = @srcdir_abs_real@
+BUILD_MAP_FLAGS = @build_map_flags@
+BUILD_MAP_CFLAGS = $(foreach flag, $(BUILD_MAP_FLAGS), \
+  $(call QUOTE_SINGLE,$(flag)$(BUILD_PATH_LOGICAL)=+build) \
+  $(if $(BUILD_PATH_PHYSICAL), \
+    $(call $(QUOTE_SINGLE),$(flag)$(BUILD_PATH_PHYSICAL)=+build)))
+
+=======
+TEST_CXX = @ocamltest_CXX@
+TEST_CXX_CXXFLAGS = @common_cflags@
+TEST_CXX_CPPFLAGS = @common_cppflags@
+CXXFLAGS ?=
+
+BUILD_PATH_LOGICAL = @srcdir_abs@
+BUILD_PATH_PHYSICAL = @srcdir_abs_real@
+BUILD_MAP_FLAGS = @build_map_flags@
+BUILD_MAP_CFLAGS = $(foreach flag, $(BUILD_MAP_FLAGS), \
+  $(call QUOTE_SINGLE,$(flag)$(BUILD_PATH_LOGICAL)=+build) \
+  $(if $(BUILD_PATH_PHYSICAL), \
+    $(call $(QUOTE_SINGLE),$(flag)$(BUILD_PATH_PHYSICAL)=+build)))
+
+>>>>>>> ocaml/ocaml#14498
 # Default flags to use to compile C files
 OC_CFLAGS = @oc_cflags@
 
@@ -90,6 +115,9 @@ OC_CPPFLAGS = $(OC_INCLUDES) @oc_cppflags@
 OC_BYTECODE_CPPFLAGS = $(OC_INCLUDES) @oc_bytecode_cppflags@
 
 OC_NATIVE_CPPFLAGS = $(OC_INCLUDES) @oc_native_cppflags@
+
+EXTRA_WARNINGS_CFLAGS = @cc_extra_warnings@
+EXTRA_WARNINGS_CXXFLAGS = @cxx_extra_warnings@
 
 # Additional link-time options
 # To support dynamic loading of shared libraries (they need to look at
