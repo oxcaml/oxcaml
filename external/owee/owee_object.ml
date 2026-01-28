@@ -59,12 +59,19 @@ let extract_elf_rodata_section buf =
   | Some sec -> Some (Owee_elf.section_body_string buf sec)
   | None -> None
 
-let find_macho_section_body buf commands ~seg_name:_ ~sect_name =
-  (* In Mach-O object files (.o), the segment's segname field is empty,
-     so we use find_section_any_segment which searches by section name only. *)
-  match Owee_macho.find_section_any_segment commands sect_name with
-  | Some (seg, sec) -> Some (Owee_macho.section_body_string buf seg sec)
-  | None -> None
+let find_macho_section_body buf commands ~seg_name ~sect_name =
+  (* Try to find segment by name first (works for linked binaries).
+     For object files (.o), segment names are empty, so fall back to
+     searching all segments for the section by name. *)
+  match Owee_macho.find_segment commands seg_name with
+  | Some seg -> (
+    match Owee_macho.find_section seg sect_name with
+    | Some sec -> Some (Owee_macho.section_body_string buf seg sec)
+    | None -> None)
+  | None -> (
+    match Owee_macho.find_section_any_segment commands sect_name with
+    | Some (seg, sec) -> Some (Owee_macho.section_body_string buf seg sec)
+    | None -> None)
 
 let extract_macho_text_section buf =
   let _header, commands = Owee_macho.read buf in
