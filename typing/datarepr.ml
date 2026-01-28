@@ -128,7 +128,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         true
       | Cstr_tuple [{ ca_sort = None }]
       | Cstr_record [{ ld_sort = None }] ->
-        Misc.fatal_error "Type with kind any in [@@unboxed] variant"
+        [| None |], true
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end

@@ -976,8 +976,7 @@ let transl_declaration env sdecl (id, uid) =
         let rep, jkind =
           if unbox then
             Variant_unboxed,
-            Jkind.of_new_sort ~why:Old_style_unboxed_type
-              ~level:(Ctype.get_current_level ())
+            Jkind.Builtin.any ~why:Old_style_unboxed_type
           else
             (* We mark all arg sorts "void" here.  They are updated later,
                after the circular type checks make it safe to check sorts.
@@ -1007,8 +1006,7 @@ let transl_declaration env sdecl (id, uid) =
           let rep, jkind =
             if unbox then
               Record_unboxed,
-              Jkind.of_new_sort ~why:Old_style_unboxed_type
-                ~level:(Ctype.get_current_level ())
+              Jkind.Builtin.any ~why:Old_style_unboxed_type
             else
             (* Note this is inaccurate, using `Record_boxed` in cases where the
                correct representation is [Record_float], [Record_ufloat], or

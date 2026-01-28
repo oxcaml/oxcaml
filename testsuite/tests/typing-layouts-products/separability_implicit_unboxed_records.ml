@@ -81,24 +81,16 @@ type t_void : void
 and 'a r = { a : 'a ; v : t_void }
 and ok = F : 'a r# -> ok [@@unboxed]
 [%%expect{|
-Line 3, characters 0-36:
-3 | and ok = F : 'a r# -> ok [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "ok" is any & any
-         because it is an unboxed record.
-       But the layout of type "ok" must be representable
-         because it's an [@@unboxed] type.
+type t_void : void
+and 'a r = { a : 'a; v : t_void; }
+and ok = F : 'a r# -> ok [@@unboxed]
 |}]
 
 type t_void : void
 and 'a r = { a : 'a ; v : t_void }
 and ok = F : { x : 'a r# } -> ok [@@unboxed]
 [%%expect{|
-Line 3, characters 0-44:
-3 | and ok = F : { x : 'a r# } -> ok [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "ok" is any & any
-         because it is an unboxed record.
-       But the layout of type "ok" must be representable
-         because it's an [@@unboxed] type.
+type t_void : void
+and 'a r = { a : 'a; v : t_void; }
+and ok = F : { x : 'a r#; } -> ok [@@unboxed]
 |}]

@@ -81,39 +81,27 @@ type t_void : void
 and 'a r = #{ a : 'a ; v : t_void }
 and ok = F : 'a r -> ok [@@unboxed]
 [%%expect{|
-Line 3, characters 0-35:
-3 | and ok = F : 'a r -> ok [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "ok" is any & any
-         because it is an unboxed record.
-       But the layout of type "ok" must be representable
-         because it's an [@@unboxed] type.
+type t_void : void
+and 'a r = #{ a : 'a; v : t_void; }
+and ok = F : 'a r -> ok [@@unboxed]
 |}]
 
 type t_void : void
 and 'a r = #{ a : 'a ; v : t_void }
 and ok = F : { x : 'a r } -> ok [@@unboxed]
 [%%expect{|
-Line 3, characters 0-43:
-3 | and ok = F : { x : 'a r } -> ok [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "ok" is any & any
-         because it is an unboxed record.
-       But the layout of type "ok" must be representable
-         because it's an [@@unboxed] type.
+type t_void : void
+and 'a r = #{ a : 'a; v : t_void; }
+and ok = F : { x : 'a r; } -> ok [@@unboxed]
 |}]
 
 type t_void : void
 and ('a : value) r = #{ a : 'a ; v : t_void }
 and ok = F : 'a r -> ok [@@unboxed]
 [%%expect{|
-Line 3, characters 0-35:
-3 | and ok = F : 'a r -> ok [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "ok" is any & any
-         because it is an unboxed record.
-       But the layout of type "ok" must be representable
-         because it's an [@@unboxed] type.
+type t_void : void
+and 'a r = #{ a : 'a; v : t_void; }
+and ok = F : 'a r -> ok [@@unboxed]
 |}]
 
 (* CR layouts v12: Double-check this is safe when we add [void]. *)
@@ -126,13 +114,9 @@ Error: The layout of type "ok" is any & any
    it, so we should discuss. *)
 type t_void : void
 and 'a r : value & any = #{ a : 'a ; v : t_void }
-and bad = F : { x : 'a r } -> bad [@@unboxed]
+and ok = F : { x : 'a r } -> ok [@@unboxed]
 [%%expect{|
-Line 3, characters 0-45:
-3 | and bad = F : { x : 'a r } -> bad [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "bad" is value & any
-         because of the annotation on the declaration of the type r.
-       But the layout of type "bad" must be representable
-         because it's an [@@unboxed] type.
+type t_void : void
+and 'a r = #{ a : 'a; v : t_void; }
+and ok = F : { x : 'a r; } -> ok [@@unboxed]
 |}]

@@ -245,7 +245,6 @@ module History = struct
     | Unboxed_tuple_element
     | Peek_or_poke
     | Mutable_var_assignment
-    | Old_style_unboxed_type
     | Array_element
     | Idx_element
 
@@ -371,6 +370,7 @@ module History = struct
           position : int;
           arity : int
         }
+    | Old_style_unboxed_type
 
   type product_creation_reason =
     | Unboxed_tuple

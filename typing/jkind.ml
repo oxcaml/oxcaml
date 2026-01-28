@@ -3188,7 +3188,6 @@ module Format_history = struct
       fprintf ppf "it's the type being used for a peek or poke primitive"
     | Mutable_var_assignment ->
       fprintf ppf "it's the type of a mutable variable used in an assignment"
-    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
       fprintf ppf
@@ -3252,6 +3251,7 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s any"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -4024,7 +4024,6 @@ module Debug_printers = struct
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Mutable_var_assignment -> fprintf ppf "Mutable_var_assignment"
-    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
 
@@ -4068,6 +4067,7 @@ module Debug_printers = struct
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         !printtyp_path parent_path
+    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
