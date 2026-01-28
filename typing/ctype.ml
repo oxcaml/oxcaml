@@ -4209,13 +4209,13 @@ and unify3 uenv t1 t1' t2 t2' =
       let t =
         newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
       in
-      unify uenv s2 t
+      unify uenv t s2
   | (_, Tquote s2) when is_flexible_ty s2 ->
       set_type_desc t1' d1;
       let t =
         newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
       in
-      unify uenv s2 t
+      unify uenv t s2
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
