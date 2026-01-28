@@ -34,7 +34,7 @@ end = struct
     'd ->
     ('e -> 'a) ->
     'e ->
-    'b = "%with_stack_bind" "%with_stack_bind"
+    'b = "%with_stack_bind"
 
   external make : 'a -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a = "caml_dynamic_get"

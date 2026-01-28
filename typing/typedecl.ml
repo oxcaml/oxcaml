@@ -3985,6 +3985,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       if !Clflags.native_code
       && prim.prim_arity > 5
       && prim.prim_native_name = ""
+      && not (String.starts_with ~prefix:"%" prim.prim_name)
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
       { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
