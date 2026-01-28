@@ -66,6 +66,12 @@ module Result : sig
 
   (** Returns the path to the generated linker script. *)
   val linker_script : t -> string
+
+  (** Returns the path to the EH frame registration object file, if generated.
+      This object is generated when using the dissector with
+      -dissector-assume-lld-without-64-bit-eh-frames and contains .init/.fini
+      constructors to register the .eh_frame section at runtime. *)
+  val eh_frame_registration_obj : t -> string option
 end
 
 (** Run the dissector pass.

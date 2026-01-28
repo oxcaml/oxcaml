@@ -416,6 +416,16 @@ let mk_ddissector_inputs f =
     Arg.String f,
     "<file>  Write dissector input analysis to <file>" )
 
+let mk_dissector_assume_lld_without_64_bit_eh_frames f =
+  ( "-dissector-assume-lld-without-64-bit-eh-frames",
+    Arg.Unit f,
+    " Assume LLD linker without 64-bit EH frame support (default)" )
+
+let mk_no_dissector_assume_lld_without_64_bit_eh_frames f =
+  ( "-no-dissector-assume-lld-without-64-bit-eh-frames",
+    Arg.Unit f,
+    " Do not assume LLD linker limitation" )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -1176,6 +1186,8 @@ module type Oxcaml_options = sig
   val ddissector_verbose : unit -> unit
   val ddissector_partitions : unit -> unit
   val ddissector_inputs : string -> unit
+  val dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val no_dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -1335,6 +1347,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ddissector_verbose F.ddissector_verbose;
       mk_ddissector_partitions F.ddissector_partitions;
       mk_ddissector_inputs F.ddissector_inputs;
+      mk_dissector_assume_lld_without_64_bit_eh_frames
+        F.dissector_assume_lld_without_64_bit_eh_frames;
+      mk_no_dissector_assume_lld_without_64_bit_eh_frames
+        F.no_dissector_assume_lld_without_64_bit_eh_frames;
       mk_gc_timings F.gc_timings;
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
@@ -1579,12 +1595,35 @@ module Oxcaml_options_impl = struct
 
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let dissector = set' Clflags.dissector
-  let dissector_partition_size f = Clflags.dissector_partition_size := Some f
+
+  let dissector_partition_size f =
+    if f <= 0.0 || f >= 2.0 then
+      raise
+        (Arg.Bad
+           "-dissector-partition-size must be greater than 0 and less than 2 \
+            GiB");
+    Clflags.dissector_partition_size := Some f
+
   let ddissector = set' Clflags.ddissector
   let ddissector_sizes = set' Clflags.ddissector_sizes
   let ddissector_verbose = set' Clflags.ddissector_verbose
   let ddissector_partitions = set' Clflags.ddissector_partitions
   let ddissector_inputs f = Clflags.ddissector_inputs := Some f
+
+  let dissector_assume_lld_without_64_bit_eh_frames () =
+    match Target_system.system () with
+    | Linux ->
+        Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames := true
+    | Windows _ | MacOS_like | FreeBSD | NetBSD | OpenBSD | Generic_BSD
+    | Solaris | Dragonfly | GNU | BeOS | Unknown ->
+        raise
+          (Arg.Bad
+             "-dissector-assume-lld-without-64-bit-eh-frames is only supported \
+              on Linux targets")
+
+  let no_dissector_assume_lld_without_64_bit_eh_frames =
+    clear' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
+
   let gc_timings = set' Oxcaml_flags.gc_timings
   let no_mach_ir () = ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
@@ -2250,6 +2289,11 @@ module Extra_params = struct
     | "dissector-partition-size" -> (
         match float_of_string_opt v with
         | Some f ->
+            if f <= 0.0 || f >= 2.0 then
+              raise
+                (Arg.Bad
+                   "-dissector-partition-size must be greater than 0 and less \
+                    than 2 GiB");
             Clflags.dissector_partition_size := Some f;
             true
         | None ->
@@ -2261,6 +2305,11 @@ module Extra_params = struct
     | "ddissector-partitions" -> set' Clflags.ddissector_partitions
     | "ddissector-inputs" ->
         Clflags.ddissector_inputs := Some v;
+        true
+    | "dissector-assume-lld-without-64-bit-eh-frames" ->
+        set' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
+    | "no-dissector-assume-lld-without-64-bit-eh-frames" ->
+        Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames := false;
         true
     | _ -> false
 end

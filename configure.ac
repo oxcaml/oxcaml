@@ -726,6 +726,11 @@ AC_ARG_ENABLE([multidomain],
   [AS_HELP_STRING([--enable-multidomain],
     [allow the creation of multiple domains])])
 
+AC_ARG_ENABLE([assembler-suitable-for-dissector],
+  [AS_HELP_STRING([--enable-assembler-suitable-for-dissector@<:@=PATH@:>@],
+    [Use LLVM assembler with large code mode for dissector. If PATH is not
+     specified, llvm-mc must be on PATH])])
+
 AC_ARG_WITH([flexdll],
   [AS_HELP_STRING([--with-flexdll],
     [bootstrap FlexDLL from the given sources])],
@@ -1763,6 +1768,25 @@ AS_IF([test "$with_pic"],
   internal_cflags="$internal_cflags $sharedlib_cflags"
   default_aspp="$default_aspp $sharedlib_cflags"],
   [fpic=false])
+
+# Handle --enable-assembler-suitable-for-dissector
+AS_IF([test x"$enable_assembler_suitable_for_dissector" != "x" && \
+       test x"$enable_assembler_suitable_for_dissector" != "xno"],
+  [AS_IF([test -n "$AS"],
+    [AC_MSG_ERROR(m4_normalize([Cannot use
+      --enable-assembler-suitable-for-dissector when AS is already set]))])
+  AS_IF([test x"$enable_assembler_suitable_for_dissector" = "xyes"],
+    [AC_PATH_PROG([llvm_mc], [llvm-mc], [])
+    AS_IF([test -z "$llvm_mc"],
+      [AC_MSG_ERROR([llvm-mc not found on PATH])])
+    AS_IF([test ! -x "$llvm_mc"],
+      [AC_MSG_ERROR([llvm-mc is not executable])])
+    AS="$llvm_mc -large-code-model -filetype=obj"],
+    [AS_IF([test ! -x "$enable_assembler_suitable_for_dissector"],
+      [AC_MSG_ERROR(m4_normalize([Assembler
+        $enable_assembler_suitable_for_dissector is not executable]))])
+    AS="$enable_assembler_suitable_for_dissector -large-code-model -filetype=obj"])
+  AC_MSG_NOTICE([Using LLVM assembler for dissector: $AS])])
 
 AS_IF([test -z "$AS"], [AS="$default_as"])
 
