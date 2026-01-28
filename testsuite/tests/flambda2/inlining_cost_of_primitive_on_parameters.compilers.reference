@@ -7,8 +7,8 @@ let code loopify(never) size(8) newer_version_of(f_0)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %string_length x in
-  let Pstringlength = %Tag_imm prim in
+  let prim = %string_length (x) in
+  let Pstringlength = %tag_imm (prim) in
   cont k (Pstringlength)
 in
 let $camlInlining_cost_of_primitive_on_parameters__f_2 = closure f_0_1 @f in

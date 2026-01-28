@@ -5,8 +5,8 @@ let code rec loopify(never) size(26) newer_version_of(even_1)
       even_1_1 (n : imm tagged)
         my_closure my_region my_ghost_region my_depth
         -> k * k1 =
-  let k = %project_value_slot even.k my_closure in
-  let odd = %project_function_slot (even -> odd) my_closure in
+  let k = %project_value_slot.[`even`].[`k`] (my_closure) in
+  let odd = %project_function_slot.[`even`].[`odd`] (my_closure) in
   let prim = %phys_eq (n, 0) in
   switch prim
     | 0 -> k2
@@ -14,15 +14,15 @@ let code rec loopify(never) size(26) newer_version_of(even_1)
     where k3 =
       apply inlined(hint) k (1) -> k * k1
     where k2 =
-      let Psubint = n - 1 in
+      let Psubint = %int_barith.`sub` (n, 1) in
       apply direct(odd_2_1)
         odd ~ depth my_depth -> succ my_depth (Psubint) -> k * k1
 and code rec loopify(never) size(26) newer_version_of(odd_2)
       odd_2_1 (n : imm tagged)
         my_closure my_region my_ghost_region my_depth
         -> k * k1 =
-  let k = %project_value_slot odd.k my_closure in
-  let even = %project_function_slot (odd -> even) my_closure in
+  let k = %project_value_slot.[`odd`].[`k`] (my_closure) in
+  let even = %project_function_slot.[`odd`].[`even`] (my_closure) in
   let prim = %phys_eq (n, 0) in
   switch prim
     | 0 -> k2
@@ -30,7 +30,7 @@ and code rec loopify(never) size(26) newer_version_of(odd_2)
     where k3 =
       apply inlined(hint) k (0) -> k * k1
     where k2 =
-      let Psubint = n - 1 in
+      let Psubint = %int_barith.`sub` (n, 1) in
       apply direct(even_1_1)
         even ~ depth my_depth -> succ my_depth (Psubint) -> k * k1
 in
@@ -42,7 +42,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
   and odd = closure odd_2_1 @odd
   with { k = k }
   in
-  (let untagged = %untag_imm p in
+  (let untagged = %untag_imm (p) in
    switch untagged
      | 0 -> k2
      | 1 -> k3)
@@ -54,7 +54,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
          where k4 =
            apply inlined(hint) inlining_state(depth(10)) k (0) -> k * k1
          where k3 =
-           let Psubint = n - 1 in
+           let Psubint = %int_barith.`sub` (n, 1) in
            let prim_1 = %phys_eq (Psubint, 0) in
            (switch prim_1
               | 0 -> k3
@@ -62,7 +62,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
               where k4 =
                 apply inlined(hint) inlining_state(depth(20)) k (1) -> k * k1
               where k3 =
-                let Psubint_1 = Psubint - 1 in
+                let Psubint_1 = %int_barith.`sub` (Psubint, 1) in
                 let prim_2 = %phys_eq (Psubint_1, 0) in
                 (switch prim_2
                    | 0 -> k3
@@ -71,7 +71,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
                      apply inlined(hint) inlining_state(depth(30))
                        k (0) -> k * k1
                    where k3 =
-                     let Psubint_2 = Psubint_1 - 1 in
+                     let Psubint_2 = %int_barith.`sub` (Psubint_1, 1) in
                      let prim_3 = %phys_eq (Psubint_2, 0) in
                      (switch prim_3
                         | 0 -> k3
@@ -80,7 +80,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
                           apply inlined(hint) inlining_state(depth(40))
                             k (1) -> k * k1
                         where k3 =
-                          let Psubint_3 = Psubint_2 - 1 in
+                          let Psubint_3 = %int_barith.`sub` (Psubint_2, 1) in
                           apply direct(odd_2_1) inlining_state(depth(40))
                             odd ~ depth 0 -> unroll 0 4 (Psubint_3) -> k * k1))))
     where k2 =
@@ -91,7 +91,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
          where k3 =
            apply inlined(hint) inlining_state(depth(10)) k (1) -> k * k1
          where k2 =
-           let Psubint = n - 1 in
+           let Psubint = %int_barith.`sub` (n, 1) in
            let prim_1 = %phys_eq (Psubint, 0) in
            (switch prim_1
               | 0 -> k2
@@ -99,7 +99,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
               where k3 =
                 apply inlined(hint) inlining_state(depth(20)) k (0) -> k * k1
               where k2 =
-                let Psubint_1 = Psubint - 1 in
+                let Psubint_1 = %int_barith.`sub` (Psubint, 1) in
                 let prim_2 = %phys_eq (Psubint_1, 0) in
                 (switch prim_2
                    | 0 -> k2
@@ -108,7 +108,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
                      apply inlined(hint) inlining_state(depth(30))
                        k (1) -> k * k1
                    where k2 =
-                     let Psubint_2 = Psubint_1 - 1 in
+                     let Psubint_2 = %int_barith.`sub` (Psubint_1, 1) in
                      apply direct(odd_2_1) inlining_state(depth(30))
                        odd ~ depth 0 -> unroll 0 3 (Psubint_2) -> k * k1)))
 in
@@ -130,7 +130,7 @@ apply direct(k_3_1) inlined(hint) inlining_state(depth(21))
           | 0 -> k3
           | 1 -> k1 (1)
           where k3 =
-            let Psubint = n - 1 in
+            let Psubint = %int_barith.`sub` (n, 1) in
             apply direct(odd_2_2) inlining_state(depth(1))
               $camlUnroll4__odd_9 ~ depth my_depth -> succ my_depth
                 (Psubint)
@@ -144,7 +144,7 @@ apply direct(k_3_1) inlined(hint) inlining_state(depth(21))
           | 0 -> k3
           | 1 -> k1 (0)
           where k3 =
-            let Psubint = n - 1 in
+            let Psubint = %int_barith.`sub` (n, 1) in
             apply direct(even_1_2) inlining_state(depth(1))
               $camlUnroll4__even_8 ~ depth my_depth -> succ my_depth
                 (Psubint)

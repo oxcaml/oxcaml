@@ -6,19 +6,19 @@ let code rec size(26)
         : imm tagged =
   let next_depth = rec_info (succ my_depth) in
   let prim = %phys_eq (n, 0) in
-  let Pintcomp = %Tag_imm prim in
-  (let untagged = %untag_imm Pintcomp in
+  let Pintcomp = %tag_imm (prim) in
+  (let untagged = %untag_imm (Pintcomp) in
    switch untagged
      | 0 -> k2
      | 1 -> k (1))
     where k2 =
-      ((let Psubint = n - 1 in
+      ((let Psubint = %int_barith.`sub` (n, 1) in
         apply direct(fact_0)
           (my_closure ~ depth my_depth -> next_depth : _ -> imm tagged)
             (Psubint)
             -> k2 * k1)
          where k2 (apply_result : imm tagged) =
-           let Pmulint = n * apply_result in
+           let Pmulint = %int_barith.`mul` (n, apply_result) in
            cont k (Pmulint))
 in
 (let fact = closure fact_0 @fact in
@@ -27,11 +27,11 @@ in
      (apply direct(fact_0) unroll(7)
         (fact : _ -> imm tagged) (6) -> k1 * error
         where k1 (j : imm tagged) =
-          let Pmakeblock = %Block 0 (fact, i, j) in
+          let Pmakeblock = %block.[`0`] (fact, i, j) in
           cont k (Pmakeblock)))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load tag(0) size(3) (0) module_block in
-    let field_1 = %block_load tag(0) size(3) (1) module_block in
-    let field_2 = %block_load tag(0) size(3) (2) module_block in
+    let field_0 = %block_load.`tag`[`0`].`size`[`3`].[`0`] (module_block) in
+    let field_1 = %block_load.`tag`[`0`].`size`[`3`].[`1`] (module_block) in
+    let field_2 = %block_load.`tag`[`0`].`size`[`3`].[`2`] (module_block) in
     let $camlUnroll = Block 0 (field_0, field_1, field_2) in
     cont done ($camlUnroll)
