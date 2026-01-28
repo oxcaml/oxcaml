@@ -878,6 +878,7 @@ and slambda =
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
+  | SLsequence of slambda * slambda
 
 and slambda_halves =
   { sval_comptime: slambda;

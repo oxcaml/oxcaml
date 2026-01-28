@@ -920,6 +920,7 @@ and slambda =
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
+  | SLsequence of slambda * slambda
 
 and slambda_halves =
   { sval_comptime: slambda;
@@ -1517,6 +1518,10 @@ and free_variables_slambda = function
       Ident.Set.union
         (free_variables_slambda slet_value)
         (free_variables_slambda slet_body)
+  | SLsequence (slambda1, slambda2) ->
+      Ident.Set.union
+        (free_variables_slambda slambda1)
+        (free_variables_slambda slambda2)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()

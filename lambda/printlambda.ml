@@ -1405,6 +1405,8 @@ and slam ppf = function
   | SLlet { slet_name; slet_value; slet_body } ->
     fprintf ppf "@[<hv 2>(let %a =@;<1 2>%a in@ %a)@]"
       Slambdaident.print slet_name slam slet_value slam slet_body
+  | SLsequence(l1, l2) ->
+    fprintf ppf "@[<2>(seq@ %a@ %a)@]" slam l1 slam l2
 
 and slambda_function ppf { sfun_params; sfun_body } =
   let print_params ppf =
