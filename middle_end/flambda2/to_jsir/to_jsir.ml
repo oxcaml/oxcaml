@@ -394,6 +394,39 @@ and apply_expr ~env ~res e =
           ( "%with_stack_bind",
             [Pv valuec; Pv exnc; Pv effc; Pv dyn; Pv bind; Pv f; Pv arg; unit],
             res )
+        | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+          let effc, res = To_jsir_shared.simple ~env ~res effc in
+          let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
+          let f, res = To_jsir_shared.simple ~env ~res f in
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          let unit = Pc (Int Targetint.zero) in
+          ( "%with_stack_preemptible",
+            [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg; unit],
+            res )
+        | With_stack_bind_preemptible
+            { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+          let effc, res = To_jsir_shared.simple ~env ~res effc in
+          let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
+          let dyn, res = To_jsir_shared.simple ~env ~res dyn in
+          let bind, res = To_jsir_shared.simple ~env ~res bind in
+          let f, res = To_jsir_shared.simple ~env ~res f in
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          let unit = Pc (Int Targetint.zero) in
+          ( "%with_stack_bind_preemptible",
+            [ Pv valuec;
+              Pv exnc;
+              Pv effc;
+              Pv handle_tick;
+              Pv dyn;
+              Pv bind;
+              Pv f;
+              Pv arg;
+              unit ],
+            res )
         | Resume { cont; f; arg } ->
           let cont, res = To_jsir_shared.simple ~env ~res cont in
           let f, res = To_jsir_shared.simple ~env ~res f in

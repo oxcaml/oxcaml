@@ -69,6 +69,24 @@ module Effect : sig
           f : Simple.t;
           arg : Simple.t
         }
+    | With_stack_preemptible of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          handle_tick : Simple.t;
+          f : Simple.t;
+          arg : Simple.t
+        }
+    | With_stack_bind_preemptible of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          handle_tick : Simple.t;
+          dyn : Simple.t;
+          bind : Simple.t;
+          f : Simple.t;
+          arg : Simple.t
+        }
     | Resume of
         { cont : Simple.t;
           f : Simple.t;
@@ -93,6 +111,26 @@ module Effect : sig
     valuec:Simple.t ->
     exnc:Simple.t ->
     effc:Simple.t ->
+    dyn:Simple.t ->
+    bind:Simple.t ->
+    f:Simple.t ->
+    arg:Simple.t ->
+    t
+
+  val with_stack_preemptible :
+    valuec:Simple.t ->
+    exnc:Simple.t ->
+    effc:Simple.t ->
+    handle_tick:Simple.t ->
+    f:Simple.t ->
+    arg:Simple.t ->
+    t
+
+  val with_stack_bind_preemptible :
+    valuec:Simple.t ->
+    exnc:Simple.t ->
+    effc:Simple.t ->
+    handle_tick:Simple.t ->
     dyn:Simple.t ->
     bind:Simple.t ->
     f:Simple.t ->

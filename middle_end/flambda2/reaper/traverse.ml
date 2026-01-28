@@ -581,6 +581,25 @@ and traverse_apply denv acc apply : rev_expr =
       Acc.add_cond_any_usage acc ~denv bind;
       Acc.add_cond_any_usage acc ~denv f;
       Acc.add_cond_any_usage acc ~denv arg
+    | Effect
+        (With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg }) ->
+      Acc.add_cond_any_usage acc ~denv valuec;
+      Acc.add_cond_any_usage acc ~denv exnc;
+      Acc.add_cond_any_usage acc ~denv effc;
+      Acc.add_cond_any_usage acc ~denv handle_tick;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg
+    | Effect
+        (With_stack_bind_preemptible
+           { valuec; exnc; effc; handle_tick; dyn; bind; f; arg }) ->
+      Acc.add_cond_any_usage acc ~denv valuec;
+      Acc.add_cond_any_usage acc ~denv exnc;
+      Acc.add_cond_any_usage acc ~denv effc;
+      Acc.add_cond_any_usage acc ~denv handle_tick;
+      Acc.add_cond_any_usage acc ~denv dyn;
+      Acc.add_cond_any_usage acc ~denv bind;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg
     | Effect (Resume { cont; f; arg }) ->
       Acc.add_cond_any_usage acc ~denv cont;
       Acc.add_cond_any_usage acc ~denv f;

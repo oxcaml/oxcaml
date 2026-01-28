@@ -513,6 +513,8 @@ let primitive ppf = function
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
   | Pwith_stack -> fprintf ppf "with_stack"
   | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
+  | Pwith_stack_preemptible -> fprintf ppf "with_stack_preemptible"
+  | Pwith_stack_bind_preemptible -> fprintf ppf "with_stack_bind_preemptible"
   | Pperform -> fprintf ppf "perform"
   | Presume -> fprintf ppf "resume"
   | Preperform -> fprintf ppf "reperform"
@@ -998,6 +1000,8 @@ let name_of_primitive = function
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"
   | Pwith_stack_bind -> "Pwith_stack_bind"
+  | Pwith_stack_preemptible -> "Pwith_stack_preemptible"
+  | Pwith_stack_bind_preemptible -> "Pwith_stack_bind_preemptible"
   | Presume -> "Presume"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"

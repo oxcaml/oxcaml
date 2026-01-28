@@ -1355,6 +1355,18 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
         ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
         ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
         ~f:(simplify_simple f) ~arg:(simplify_simple arg)
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+      E.with_stack_preemptible ~valuec:(simplify_simple valuec)
+        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~handle_tick:(simplify_simple handle_tick)
+        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
+    | With_stack_bind_preemptible
+        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+      E.with_stack_bind_preemptible ~valuec:(simplify_simple valuec)
+        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~handle_tick:(simplify_simple handle_tick)
+        ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
+        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
     | Resume { cont; f; arg } ->
       E.resume ~cont:(simplify_simple cont) ~f:(simplify_simple f)
         ~arg:(simplify_simple arg)

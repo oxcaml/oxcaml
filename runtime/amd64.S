@@ -152,7 +152,8 @@
 #define Handler_value(REG)       0(REG)
 #define Handler_exception(REG)   8(REG)
 #define Handler_effect(REG)     16(REG)
-#define Handler_parent          24
+#define Handler_tick(REG)       24(REG)
+#define Handler_parent          32
 
 /* struct dynamic_thread_s */
 
