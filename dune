@@ -432,7 +432,7 @@
    (progn
     (chdir
      yacc
-     (run make -s OCAMLYACC_INCLUDE_PATH=%{ocaml_where}))
+     (run gmake -s OCAMLYACC_INCLUDE_PATH=%{ocaml_where}))
     (copy yacc/ocamlyacc ocamlyacc)))))
 
 ; Regular OCaml Rule (first phase of bootstrapping)

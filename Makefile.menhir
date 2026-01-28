@@ -283,9 +283,9 @@ generate-parse-errors:
 	read -p "Re-generate the expected output for this test? " -n 1 -r && \
 	echo && \
 	if [[ $$REPLY =~ ^[Yy]$$ ]] ; then \
-	  make -C testsuite promote DIR=$(GPE_DIR) >/dev/null 2>&1 && \
+	  ${MAKE} -C testsuite promote DIR=$(GPE_DIR) >/dev/null 2>&1 && \
 	  echo "Done." ; \
-	  make classify-parse-errors ; \
+	  ${MAKE} classify-parse-errors ; \
 	else \
 	  echo "OK, stop." ; \
 	fi

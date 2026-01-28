@@ -17,6 +17,9 @@
 #define _GNU_SOURCE
 #ifdef __APPLE__
 #include <xlocale.h>
+#elif defined(__DragonFly__)
+#include <stdlib.h>
+#include <xlocale.h>
 #endif
 
 #include <stdbool.h>

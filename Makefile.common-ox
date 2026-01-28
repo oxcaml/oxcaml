@@ -399,16 +399,16 @@ test: install_for_test
              then \
 	       echo "Running testsuite in parallel (nproc=$$(nproc))"; \
                if [ "$(middle_end)" = "flambda2" ]; then \
-                 make --no-print-directory list-parallel FILE=$$(pwd)/../flambda2-test-list; \
+                 ${MAKE} --no-print-directory list-parallel FILE=$$(pwd)/../flambda2-test-list; \
 	       else \
-                 make --no-print-directory parallel; \
+                 ${MAKE} --no-print-directory parallel; \
                fi \
              else \
 	       echo "Running testsuite sequentially"; \
                if [ "$(middle_end)" = "flambda2" ]; then \
-                 make --no-print-directory list FILE=$$(pwd)/../flambda2-test-list; \
+                 ${MAKE} --no-print-directory list FILE=$$(pwd)/../flambda2-test-list; \
 	       else \
-                 make --no-print-directory all; \
+                 ${MAKE} --no-print-directory all; \
                fi \
              fi)
 
@@ -418,7 +418,7 @@ promote-failed:
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	 fi; \
-	 cd _runtest/testsuite && make promote-failed)
+	 cd _runtest/testsuite && ${MAKE} promote-failed)
 
 runtest-upstream: test
 
@@ -440,7 +440,7 @@ test-one-no-rebuild:
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	 fi; \
-	 cd _runtest/testsuite && make one $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
+	 cd _runtest/testsuite && ${MAKE} one $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
 
 promote-one: install_for_test
 	$(MAKE) promote-one-no-rebuild
@@ -451,7 +451,7 @@ promote-one-no-rebuild:
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	 fi; \
-	 cd _runtest/testsuite && make promote $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
+	 cd _runtest/testsuite && ${MAKE} promote $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
 
 # This target is like a polling version of upstream "make ocamlopt"
 .PHONY: hacking

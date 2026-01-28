@@ -267,10 +267,10 @@ build_and_test_upstream: build_upstream
 	 && if $$(which parallel > /dev/null 2>&1); \
             then \
 	      echo "Running testsuite in parallel (nproc=$$(nproc))"; \
-	      make --no-print-directory parallel; \
+	      ${MAKE} --no-print-directory parallel; \
             else \
 	      echo "Running testsuite sequentially"; \
-              make --no-print-directory all; \
+              ${MAKE} --no-print-directory all; \
             fi
 	cd _build_upstream && $(MAKE) check_all_arches
 

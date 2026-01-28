@@ -48,7 +48,7 @@
   ../Makefile.config
   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/sak)
  (action
-  (run make COMPUTE_DEPS=false %{targets})))
+  (run gmake COMPUTE_DEPS=false %{targets})))
 
 (copy_files ../Makefile.config)
 
