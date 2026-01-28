@@ -59,12 +59,11 @@ let extract_elf_rodata_section buf =
   | Some sec -> Some (Owee_elf.section_body_string buf sec)
   | None -> None
 
-let find_macho_section_body buf commands ~seg_name ~sect_name =
-  match Owee_macho.find_segment commands seg_name with
-  | Some seg -> (
-    match Owee_macho.find_section seg sect_name with
-    | Some sec -> Some (Owee_macho.section_body_string buf seg sec)
-    | None -> None)
+let find_macho_section_body buf commands ~seg_name:_ ~sect_name =
+  (* In Mach-O object files (.o), the segment's segname field is empty,
+     so we use find_section_any_segment which searches by section name only. *)
+  match Owee_macho.find_section_any_segment commands sect_name with
+  | Some (seg, sec) -> Some (Owee_macho.section_body_string buf seg sec)
   | None -> None
 
 let extract_macho_text_section buf =
@@ -138,24 +137,38 @@ let extract_macho_relocations buf ~seg_name ~sect_name =
   let _header, commands = Owee_macho.read buf in
   match Owee_macho.get_symbol_table commands with
   | None -> []
-  | Some (symbols, _strtab) -> (
-    match Owee_macho.find_segment commands seg_name with
-    | None -> []
-    | Some seg ->
-      let section_names = build_macho_section_names commands in
-      let relocs =
-        Array.fold_left
-          (fun acc section ->
-            if String.equal section.Owee_macho.sec_sectname sect_name
-            then
-              Owee_macho.extract_section_relocations ~section_names symbols
-                section
-              @ acc
-            else acc)
-          [] seg.Owee_macho.seg_sections
-      in
-      List.map convert_macho_reloc relocs
-      |> List.sort (fun a b -> compare a.r_offset b.r_offset))
+  | Some (symbols, _strtab) ->
+    let section_names = build_macho_section_names commands in
+    (* Try to find segment by name first (works for linked binaries).
+       For object files (.o), segment names are empty, so fall back to
+       searching all segments for the section by name. *)
+    let segments =
+      match Owee_macho.find_segment commands seg_name with
+      | Some seg -> [seg]
+      | None ->
+        (* Object file: collect all segments *)
+        List.filter_map
+          (function
+            | Owee_macho.LC_SEGMENT_64 seg -> Some (Lazy.force seg)
+            | _ -> None)
+          commands
+    in
+    let relocs =
+      List.fold_left
+        (fun acc seg ->
+          Array.fold_left
+            (fun acc section ->
+              if String.equal section.Owee_macho.sec_sectname sect_name
+              then
+                Owee_macho.extract_section_relocations ~section_names symbols
+                  section
+                @ acc
+              else acc)
+            acc seg.Owee_macho.seg_sections)
+        [] segments
+    in
+    List.map convert_macho_reloc relocs
+    |> List.sort (fun a b -> compare a.r_offset b.r_offset)
 
 let extract_text_relocations buf =
   match detect_format buf with
