@@ -164,11 +164,15 @@ CAMLdeprecated_typedef(addr, char *);
 /* Prefetching */
 
 #ifdef CAML_INTERNALS
-#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
-#define caml_prefetch(p) __builtin_prefetch((p), 1, 3)
+#if (defined(__GNUC__) || defined(__clang__)) \
+     && __has_builtin(__builtin_prefetch)
+#define caml_prefetchr(p) __builtin_prefetch((p), 0, 3)
+/* 0 = intent to read; 3 = all cache levels */
+#define caml_prefetchw(p) __builtin_prefetch((p), 1, 3)
 /* 1 = intent to write; 3 = all cache levels */
 #else
-#define caml_prefetch(p)
+#define caml_prefetchr(p)
+#define caml_prefetchw(p)
 #endif
 #endif /* CAML_INTERNALS */
 
