@@ -1323,6 +1323,85 @@ runtime-all: \
   $(runtime_BYTECODE_STATIC_LIBRARIES) $(runtime_BYTECODE_SHARED_LIBRARIES) \
   $(runtime_PROGRAMS) $(SAK)
 
+# If the compiler is configured with --enable-warn-error (which is the default
+# for development builds), then all the installed header files are tested with
+# more warnings enabled. The test also ensures that each header can be included
+# without any other headers.
+ifneq "$(EXTRA_WARNINGS_CFLAGS)" ""
+runtime-all: runtime-header-tests
+do-header-tests: runtime-header-tests
+endif
+
+# As with the runtime-header-tests, if a C++ compiler is available, then we also
+# verify that the headers can be included in a C++ program without error.
+ifneq "$(EXTRA_WARNINGS_CXXFLAGS)" ""
+ifneq "$(TEST_CXX)" ""
+runtime-all: runtime-header-cxx-tests
+do-header-tests: runtime-header-cxx-tests
+endif
+endif
+
+.PHONY: do-header-tests
+do-header-tests:
+
+# Unlike in COMPILE_C_FILE, this is just a convenience test, so we don't do any
+# effort with the dependency computations worrying about DEP_CC and so forth,
+# because most _development_ is done with feature-rich C compilers!
+API_TESTING_DEP_FILES := $(wildcard runtime/api-testing/*.$(D))
+.PHONY: $(API_TESTING_DEP_FILES)
+include $(API_TESTING_DEP_FILES)
+
+ALL_PUBLIC_HEADER_FILES := $(notdir $(sort $(wildcard \
+  $(addsuffix /caml/*.h, $(addprefix otherlibs/, $(OTHERLIBS))) \
+  runtime/caml/*.h \
+  $(filter runtime/caml/%, $(runtime_BUILT_HEADERS)))))
+
+runtime-header-tests: \
+  $(addprefix runtime/api-testing/,$(ALL_PUBLIC_HEADER_FILES:.h=.t))
+
+runtime-header-cxx-tests: \
+  $(addprefix runtime/api-testing/,$(ALL_PUBLIC_HEADER_FILES:.h=.tpp))
+
+.PRECIOUS: runtime/api-testing
+runtime/api-testing:
+	$(MKDIR) $@
+
+runtime/api-testing/%.t: runtime/api-testing/%.c.$(O)
+	@touch $@
+
+runtime/api-testing/%.tpp: runtime/api-testing/%.cpp.$(O)
+	@touch $@
+
+runtime/api-testing/%.c.$(O): runtime/api-testing/%.c
+	$(V_CC)$(CC) \
+	  $(OC_CFLAGS) $(EXTRA_WARNINGS_CFLAGS) $(CFLAGS) \
+	  $(OC_CPPFLAGS) \
+	  $(call DEP_FLAGS,$@,$(@:.$(O)=.$(D))) \
+	  $(addprefix -I otherlibs/, $(OTHERLIBS)) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ -c $<
+
+runtime/api-testing/%.c: | runtime/api-testing
+	$(V_GEN){ \
+	  echo '#include <caml/$*.h>'; \
+	  echo '#include <caml/$*.h>'; \
+	  echo 'int answer = 42;'; \
+	} > $@
+
+runtime/api-testing/%.cpp.$(O): runtime/api-testing/%.cpp
+	$(V_CXX)$(TEST_CXX) \
+	  $(TEST_CXX_CXXFLAGS) $(EXTRA_WARNINGS_CXXFLAGS) $(CXXFLAGS) \
+	  $(TEST_CXX_CPPFLAGS) \
+	  $(call DEP_FLAGS,$@,$(@:.$(O)=.$(D))) \
+	  -I runtime $(addprefix -I otherlibs/, $(OTHERLIBS)) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ -c $<
+
+runtime/api-testing/%.cpp: | runtime/api-testing
+	$(V_GEN){ \
+	  echo '#include <caml/$*.h>'; \
+	  echo '#include <caml/$*.h>'; \
+	  echo 'int answer = 42;'; \
+	} > $@
+
 .PHONY: runtime-allopt
 ifeq "$(NATIVE_COMPILER)" "true"
 runtime-allopt: \
@@ -2502,6 +2581,7 @@ distclean: clean
 	rm -f $(addprefix ocamltest/,ocamltest_config.ml ocamltest_unix.ml)
 	$(MAKE) -C otherlibs distclean
 	rm -f $(runtime_CONFIGURED_HEADERS)
+	rm -rf runtime/api-testing
 	$(MAKE) -C stdlib distclean
 	$(MAKE) -C testsuite distclean
 	rm -f tools/eventlog_metadata tools/*.bak

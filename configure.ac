@@ -476,35 +476,9 @@ AC_SUBST([ocaml_libdir])
 AC_SUBST([TARGET_LIBDIR])
 AC_SUBST([QS])
 AC_SUBST([ar_supports_response_files])
-<<<<<<< HEAD
 AC_SUBST([target_bindir])
-||||||| upstream
-AC_SUBST([target_libdir_is_relative])
-AC_SUBST([srcdir_abs])
-AC_SUBST([srcdir_abs_real])
-AC_SUBST([build_map_flags])
-AC_SUBST([zinc_runtime_id_lo])
-AC_SUBST([zinc_runtime_id_hi])
-AC_SUBST([bytecode_runtime_id])
-AC_SUBST([native_runtime_id])
-AC_SUBST([suffixing])
-AC_SUBST([runtime_search])
-AC_SUBST([runtime_search_target])
-=======
-AC_SUBST([target_libdir_is_relative])
-AC_SUBST([srcdir_abs])
-AC_SUBST([srcdir_abs_real])
-AC_SUBST([build_map_flags])
-AC_SUBST([zinc_runtime_id_lo])
-AC_SUBST([zinc_runtime_id_hi])
-AC_SUBST([bytecode_runtime_id])
-AC_SUBST([native_runtime_id])
-AC_SUBST([suffixing])
-AC_SUBST([runtime_search])
-AC_SUBST([runtime_search_target])
 AC_SUBST([cc_extra_warnings])
 AC_SUBST([cxx_extra_warnings])
->>>>>>> ocaml/ocaml#14498
 
 ## Generated files
 
@@ -1246,15 +1220,9 @@ AS_CASE([$ocaml_cc_vendor],
        warn_error_flag='-WX -options:strict'
        cxx_extra_warnings="$cc_extra_warnings $warn_error_flag"])],
   [warn_error_flag='-Werror'
-<<<<<<< HEAD
-  cc_warnings="-Wall -Wno-pragmas -Wint-conversion -Wstrict-prototypes \
-||||||| upstream
-  cc_warnings="-Wall -Wint-conversion -Wstrict-prototypes \
-=======
   cc_extra_warnings='-Wextra -Wpedantic -pedantic -std=c11'
   cxx_extra_warnings='-Werror -Wextra -Wpedantic -pedantic'
-  cc_warnings="-Wall -Wint-conversion -Wstrict-prototypes \
->>>>>>> ocaml/ocaml#14498
+  cc_warnings="-Wall -Wno-pragmas -Wint-conversion -Wstrict-prototypes \
 -Wold-style-definition -Wundef"])
 
 AS_CASE([$ocaml_cc_vendor],
@@ -1274,22 +1242,12 @@ for flag in '-Wimplicit-fallthrough=5' '-Wimplicit-fallthrough'; do
     [cc_warnings="$cc_warnings $flag"; break], [], [$warn_error_flag])
 done
 
-<<<<<<< HEAD
 AS_CASE([$enable_warn_error],
   [no], [],
   [*],
-    [cc_warnings="$cc_warnings $warn_error_flag"])
-||||||| upstream
-AS_CASE([$enable_warn_error,OCAML__DEVELOPMENT_VERSION],
-  [yes,*|,true],
-    [cc_warnings="$cc_warnings $warn_error_flag"])
-=======
-AS_CASE([$enable_warn_error,OCAML__DEVELOPMENT_VERSION],
-  [yes,*|,true],
     [cc_warnings="$cc_warnings $warn_error_flag"],
     [cc_extra_warnings=''
     cxx_extra_warnings=''])
->>>>>>> ocaml/ocaml#14498
 
 AS_CASE([$target],
   [*-w64-mingw32*|*-pc-windows],
