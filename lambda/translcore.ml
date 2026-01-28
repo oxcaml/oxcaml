@@ -2752,8 +2752,9 @@ let report_error ppf = function
          enforce, see [Lambda.Mixed_product_bytes_wrt_path] *)
       fprintf ppf
         "This block index cannot be created because it refers to values@ \
-         and non-values that are separated by 2^16 or more bytes in their@ \
+         and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
+        (64 - Mixed_product_bytes.block_index_offset_bits)
   | Element_would_be_reordered_in_record ->
       fprintf ppf
         "Block indices into arrays whose element layout contains a@ \

@@ -43,6 +43,8 @@ type t =
     flat : int
   }
 
+let block_index_offset_bits = 52
+
 let zero = { value = 0; flat = 0 }
 
 let add { value; flat } { value = value'; flat = flat' } =
@@ -114,7 +116,7 @@ module Wrt_path = struct
     let flat = Byte_count.(add (add here.flat left.flat) right.flat) in
     { value; flat }
 
-  let lowest_invalid_gap_on_64_bit_arch = 1 lsl 16
+  let lowest_invalid_gap_on_64_bit_arch = 1 lsl (64 - block_index_offset_bits)
 
   type offset_and_gap_bytes =
     { offset_bytes : Byte_count.t;

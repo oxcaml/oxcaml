@@ -1689,11 +1689,10 @@ let floating_scalar : P.float_bitwidth -> _ Scalar.t = function
 
 (* Compilation of block indices *)
 
+module MPB = Mixed_product_bytes
 module BC = Mixed_product_bytes.Byte_count
 
-let block_index_mask_size = 48
-
-let block_index_mask = Int64.of_int ((1 lsl block_index_mask_size) - 1)
+let block_index_mask = Int64.of_int ((1 lsl MPB.block_index_offset_bits) - 1)
 
 let extract_block_index_offset idx =
   H.Binary (Int_arith (Naked_int64, And), idx, H.simple_i64 block_index_mask)
@@ -1702,14 +1701,15 @@ let extract_block_index_offset idx =
    offsets needed to access each element *)
 let block_index_access_offsets ~machine_width layout idx =
   assert (Target_system.is_64_bit ());
-  let module MPB = Mixed_product_bytes in
   let mbe = L.mixed_block_element_of_layout layout in
   let cts = MPB.count mbe in
   if MPB.has_value_and_flat cts
   then
     let offset = extract_block_index_offset idx in
     let gap =
-      let shift = H.simple_untagged_int ~machine_width block_index_mask_size in
+      let shift =
+        H.simple_untagged_int ~machine_width MPB.block_index_offset_bits
+      in
       H.Binary (Int_shift (Naked_int64, Lsr), idx, shift)
     in
     let f (to_left : MPB.t) (mbe : unit L.mixed_block_element) =
@@ -1896,7 +1896,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Int64.add
         (Int64.shift_left
            (Int64.of_int (BC.on_64_bit_arch gap_bytes))
-           block_index_mask_size)
+           MPB.block_index_offset_bits)
         (Int64.of_int (BC.on_64_bit_arch offset_bytes))
     in
     [H.simple_i64_expr idx_raw_value]
@@ -1977,7 +1977,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
              (Int64.of_int
                 (BC.on_64_bit_arch cts.right.value
                 + BC.on_64_bit_arch cts.left.flat))
-             block_index_mask_size)
+             MPB.block_index_offset_bits)
           (Int64.of_int (BC.on_64_bit_arch cts.left.value))
       in
       [Binary (Int_arith (Naked_int64, Add), idx, H.simple_i64 to_add)]
@@ -1992,7 +1992,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       (* offset += gap + left value + right value + left flat; gap = 0 *)
       let offset = extract_block_index_offset idx in
       let shifter =
-        H.simple_untagged_int block_index_mask_size ~machine_width
+        H.simple_untagged_int MPB.block_index_offset_bits ~machine_width
       in
       let gap = H.Binary (Int_shift (Naked_int64, Lsr), idx, shifter) in
       let to_add =
