@@ -47,6 +47,9 @@ end
 
 let int64_elem = Number { ops = (module Int64_elem) }
 
+module Int64x2_elem : Element_intf with type t = int64x2 = Vector_elem.Int64x2
+let int64x2_elem = Number { ops = (module Int64x2_elem) }
+
 module Nativeint_elem : Element_intf with type t = nativeint =
 struct
   include Nativeint

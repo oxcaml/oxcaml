@@ -5015,7 +5015,9 @@ let generalize_and_check_univars env kind exp ty_expected vars =
 let check_statement exp =
   let ty = get_desc (expand_head exp.exp_env exp.exp_type) in
   match ty with
-  | Tconstr (p, _, _)  when Path.same p Predef.path_unit -> ()
+  | Tconstr (p, _, _) when Path.same p Predef.path_unit
+                        || Path.same p Predef.path_unboxed_unit ->
+    ()
   (* CR layouts v5: when we have unboxed unit, add a case here for it *)
   | Tvar _ -> ()
   | _ ->

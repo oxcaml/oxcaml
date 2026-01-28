@@ -468,6 +468,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                 Lconst (Const_base (Const_int64 0L))
               | Punboxedoruntaggedint_ignorable Unboxed_nativeint ->
                 Lconst (Const_base (Const_nativeint 0n))
+              | Punboxedvector_ignorable _ -> raise Not_found
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim

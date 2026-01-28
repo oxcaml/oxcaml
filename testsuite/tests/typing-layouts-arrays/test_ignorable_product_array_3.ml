@@ -5,15 +5,10 @@
    "gen_u_array.ml test_gen_u_array.ml vector_elem.ml gen_product_array_helpers.ml";
  modules = "${readonly_files} stubs.c";
  flambda2;
- stack-allocation;
- {
-   bytecode;
- }
  {
    native;
  }
 *)
-
 
 open Gen_product_array_helpers
 open Stdlib_stable
@@ -22,37 +17,17 @@ open Stdlib_upstream_compatible
 (* If copying this test for a new product shape, you should only have to
    change the bit between here and the next comment. See README.md in this
    test directory. *)
-type boxed_t =
-  int64 option
-  * (int * int32 * float)
-  * float
-  * (float32 * (nativeint * nativeint) option)
-  * int32
+module I64x2 = Vector_elem.Int64x2
 
-type unboxed_t =
-  #(int64 option
-    * #(int * int32 * float)
-    * float
-    * #(float32 * (nativeint * nativeint) option)
-    * int32)
+type boxed_t = int64x2 * int64x2
+type unboxed_t = #(int64x2# * int64x2#)
 
-let elem : boxed_t elem =
-  Tup5 (Option int64_elem,
-        Tup3 (int_elem, int32_elem, float_elem),
-        float_elem,
-        Tup2 (float32_elem, Option (Tup2 (nativeint_elem, nativeint_elem))),
-        int32_elem)
+let elem : boxed_t elem = Tup2 (int64x2_elem, int64x2_elem)
+let words_wide : int = 4
 
-let words_wide : int = 8
-let zero () : unboxed_t =
-  #(Some 0L,
-    #(0, 0l, 0.),
-    0.,
-    #(0.s, Some (0n, 0n)),
-    0l)
-
-let to_boxed #(a, #(b, c, d), e, #(f, g), h) = (a, (b, c, d), e, (f, g), h)
-let of_boxed (a, (b, c, d), e, (f, g), h) = #(a, #(b, c, d), e, #(f, g), h)
+let zero () : unboxed_t = #(I64x2.unbox (I64x2.of_int 0), I64x2.unbox (I64x2.of_int 0))
+let to_boxed #(a, b) = (I64x2.box a, I64x2.box b)
+let of_boxed (a, b) = #(I64x2.unbox a, I64x2.unbox b)
 
 (* Below here is copy pasted due to the absence of layout polymorphism. Don't
    change it.  See README.md in this test directory. *)

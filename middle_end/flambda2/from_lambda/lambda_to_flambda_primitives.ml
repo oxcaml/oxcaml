@@ -190,6 +190,9 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
       | Pint_ignorable -> Immediates
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
+      | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
+      | Punboxedvector_ignorable (Unboxed_vec256 | Unboxed_vec512) ->
+        Misc.fatal_error "Arrays of products of wide vectors is not implemented"
       | Punboxedoruntaggedint_ignorable Untagged_int -> Naked_ints
       | Punboxedoruntaggedint_ignorable Untagged_int8 -> Naked_int8s
       | Punboxedoruntaggedint_ignorable Untagged_int16 -> Naked_int16s
@@ -292,6 +295,9 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
       | Pint_ignorable -> Immediates
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
+      | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
+      | Punboxedvector_ignorable (Unboxed_vec256 | Unboxed_vec512) ->
+        Misc.fatal_error "Arrays of products of wide vectors is not implemented"
       | Punboxedoruntaggedint_ignorable Untagged_int -> Naked_ints
       | Punboxedoruntaggedint_ignorable Untagged_int8 -> Naked_int8s
       | Punboxedoruntaggedint_ignorable Untagged_int16 -> Naked_int16s
@@ -319,8 +325,8 @@ let rec convert_unboxed_product_array_ref_kind
   | Naked_int64s -> Naked_int64s
   | Naked_nativeints -> Naked_nativeints
   | Naked_vec128s -> Naked_vec128s
-  | Naked_vec256s -> Naked_vec256s
-  | Naked_vec512s -> Naked_vec512s
+  | Naked_vec256s | Naked_vec512s ->
+    Misc.fatal_error "Arrays of products of wide vectors is not implemented"
   | Unboxed_product kinds ->
     Unboxed_product (List.map convert_unboxed_product_array_ref_kind kinds)
 
@@ -459,6 +465,9 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
       | Pint_ignorable -> Immediates
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
+      | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
+      | Punboxedvector_ignorable (Unboxed_vec256 | Unboxed_vec512) ->
+        Misc.fatal_error "Arrays of products of wide vectors is not implemented"
       | Punboxedoruntaggedint_ignorable Untagged_int -> Naked_ints
       | Punboxedoruntaggedint_ignorable Untagged_int8 -> Naked_int8s
       | Punboxedoruntaggedint_ignorable Untagged_int16 -> Naked_int16s
@@ -486,8 +495,8 @@ let rec convert_unboxed_product_array_set_kind
   | Naked_int64s -> Naked_int64s
   | Naked_nativeints -> Naked_nativeints
   | Naked_vec128s -> Naked_vec128s
-  | Naked_vec256s -> Naked_vec256s
-  | Naked_vec512s -> Naked_vec512s
+  | Naked_vec256s | Naked_vec512s ->
+    Misc.fatal_error "Arrays of products of wide vectors is not implemented"
   | Unboxed_product kinds ->
     Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds)
 

@@ -79,6 +79,7 @@ let rec ignorable_product_element_kinds kinds =
 and ignorable_product_element_kind = function
   | Pint_ignorable -> "int"
   | Punboxedfloat_ignorable f -> unboxed_float f
+  | Punboxedvector_ignorable v -> unboxed_vector v
   | Punboxedoruntaggedint_ignorable i -> unboxed_integer i
   | Pproduct_ignorable kinds -> ignorable_product_element_kinds kinds
 

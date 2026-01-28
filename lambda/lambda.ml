@@ -467,6 +467,7 @@ and array_set_kind =
 and ignorable_product_element_kind =
   | Pint_ignorable
   | Punboxedfloat_ignorable of unboxed_float
+  | Punboxedvector_ignorable of unboxed_vector
   | Punboxedoruntaggedint_ignorable of unboxed_or_untagged_integer
   | Pproduct_ignorable of ignorable_product_element_kind list
 
@@ -662,12 +663,15 @@ let rec equal_ignorable_product_element_kind k1 k2 =
   | Pint_ignorable, Pint_ignorable -> true
   | Punboxedfloat_ignorable f1, Punboxedfloat_ignorable f2 ->
     Primitive.equal_unboxed_float f1 f2
+  | Punboxedvector_ignorable v1, Punboxedvector_ignorable v2 ->
+    Primitive.equal_unboxed_vector v1 v2
   | Punboxedoruntaggedint_ignorable i1, Punboxedoruntaggedint_ignorable i2 ->
     Primitive.equal_unboxed_or_untagged_integer i1 i2
   | Pproduct_ignorable p1, Pproduct_ignorable p2 ->
     List.equal equal_ignorable_product_element_kind p1 p2
   | ( Pint_ignorable | Punboxedfloat_ignorable _
-    | Punboxedoruntaggedint_ignorable _ | Pproduct_ignorable _), _ -> false
+    | Punboxedoruntaggedint_ignorable _ | Pproduct_ignorable _
+    | Punboxedvector_ignorable _), _ -> false
 
 let must_be_value layout =
   match layout with
@@ -2404,6 +2408,7 @@ let rec layout_of_ignorable_kinds kinds =
 and layout_of_ignorable_kind = function
   | Pint_ignorable -> layout_int
   | Punboxedfloat_ignorable f -> layout_unboxed_float f
+  | Punboxedvector_ignorable v -> layout_unboxed_vector v
   | Punboxedoruntaggedint_ignorable i -> layout_unboxed_int i
   | Pproduct_ignorable kinds -> layout_of_ignorable_kinds kinds
 
@@ -2887,8 +2892,12 @@ let rec count_initializers_scannable
 let rec count_initializers_ignorable
     (ignorable : ignorable_product_element_kind) =
   match ignorable with
-  | Pint_ignorable | Punboxedfloat_ignorable _ |
-    Punboxedoruntaggedint_ignorable _ -> 1
+  | Pint_ignorable
+  | Punboxedfloat_ignorable _
+  | Punboxedoruntaggedint_ignorable _ -> 1
+  | Punboxedvector_ignorable Unboxed_vec128 -> 2
+  | Punboxedvector_ignorable Unboxed_vec256 -> 4
+  | Punboxedvector_ignorable Unboxed_vec512 -> 8
   | Pproduct_ignorable ignorables ->
     List.fold_left
       (fun acc ignorable -> acc + count_initializers_ignorable ignorable)
@@ -2898,7 +2907,10 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
   match lambda_array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray _
-  | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ -> 1
+  | Punboxedoruntaggedintarray _  -> 1
+  | Punboxedvectorarray Unboxed_vec128 -> 2
+  | Punboxedvectorarray Unboxed_vec256 -> 4
+  | Punboxedvectorarray Unboxed_vec512 -> 8
   | Pgcscannableproductarray scannables ->
     List.fold_left
       (fun acc scannable -> acc + count_initializers_scannable scannable)
@@ -2940,7 +2952,9 @@ let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with
   | Pint_ignorable -> true
-  | Punboxedfloat_ignorable _ | Punboxedoruntaggedint_ignorable _ -> false
+  | Punboxedfloat_ignorable _
+  | Punboxedvector_ignorable _
+  | Punboxedoruntaggedint_ignorable _ -> false
   | Pproduct_ignorable kinds ->
     List.exists ignorable_product_element_kind_involves_int kinds
 

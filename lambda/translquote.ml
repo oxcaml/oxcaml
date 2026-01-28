@@ -2581,7 +2581,7 @@ let maybe_constrain_pat_with_type loc typ exp =
 let assert_no_modes modes =
   List.iter
     (fun mode ->
-      fatal_errorf "Translquote [at %a]: no support for open patterns."
+      fatal_errorf "Translquote [at %a]: no support for mode annotations."
         Location.print_loc (Location.get_loc mode))
     modes.mode_desc
 
