@@ -437,7 +437,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       in
       let lam =
         let loc =
-          map_scopes (update_assume_zero_alloc ~assume_zero_alloc)
+          map_scopes
+            (fun ~scopes ~loc:_ ->
+              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             (of_location ~scopes e.exp_loc)
         in
         Translprim.transl_primitive_application
@@ -1454,7 +1456,10 @@ and transl_apply ~scopes
          It's fine for [Lsend] cases because [assume_zero_alloc] is
          always false currently for them. *)
         let loc =
-          map_scopes (update_assume_zero_alloc ~assume_zero_alloc) loc
+          map_scopes
+            (fun ~scopes ~loc:_ ->
+              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            loc
         in
         Lapply {
           ap_loc=loc;

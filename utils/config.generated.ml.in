@@ -81,6 +81,7 @@ let asm_cfi_supported = @asm_cfi_supported@
 let with_frame_pointers = @frame_pointers@
 let with_address_sanitizer = @address_sanitizer@
 let with_cpp_mangling = @cpp_mangling@
+let name_mangling_version_string = {@QS@|@name_mangling_version@|@QS@}
 let custom_ops_struct_size = @custom_ops_struct_size@
 
 let ext_exe = {@QS@|@exeext@|@QS@}

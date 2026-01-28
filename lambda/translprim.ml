@@ -2241,8 +2241,8 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
   | [] -> lambda_of_prim p.prim_name prim loc args None
   | _ ->
      let loc =
-       Debuginfo.Scoped_location.map_scopes (fun ~scopes ->
-         Debuginfo.Scoped_location.enter_partial_or_eta_wrapper ~scopes)
+       Debuginfo.Scoped_location.map_scopes
+         Debuginfo.Scoped_location.enter_partial_or_eta_wrapper
          loc
      in
      let body = lambda_of_prim p.prim_name prim loc args None in
