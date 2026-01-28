@@ -294,6 +294,9 @@ type memory_chunk =
   | Fivetwelve_unaligned (* word-aligned 512-bit vector *)
   | Fivetwelve_aligned (* 64-byte-aligned 512-bit vector *)
 
+(** Size in bytes of a memory access for the given chunk type. *)
+val size_of_memory_chunk : memory_chunk -> int
+
 (* These casts compile to a single move instruction. If the operands are
    assigned the same physical register, the move will be omitted entirely. *)
 type reinterpret_cast =

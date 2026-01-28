@@ -26,16 +26,13 @@ open Arch
 module Validated_mem_offset = Arm64_ast.Ast.DSL.Validated_mem_offset
 
 let scale_of_chunk : Cmm.memory_chunk -> int = function
-  | Byte_unsigned | Byte_signed -> 1
-  | Sixteen_unsigned | Sixteen_signed -> 2
-  | Thirtytwo_unsigned | Thirtytwo_signed | Single { reg = Float64 | Float32 }
-    ->
-    4
-  | Word_int | Word_val | Double -> 8
-  | Onetwentyeight_aligned | Onetwentyeight_unaligned -> 16
-  | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-  | Fivetwelve_unaligned ->
+  | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+  | Fivetwelve_aligned ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
+  | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+    | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
+    | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned ) as chunk ->
+    Cmm.size_of_memory_chunk chunk
 
 let is_offset chunk n =
   Validated_mem_offset.is_valid ~scale:(scale_of_chunk chunk) ~offset:n

@@ -156,17 +156,15 @@ let label ?offset reloc lbl =
 
 let runtime_function sym = symbol (Needs_reloc CALL26) sym
 
-(* Scale factor (access size in bytes) for memory chunk types. Used for
-   immediate offset encoding in load/store instructions. *)
-let scale_of_chunk : Cmm.memory_chunk -> int = function
-  | Byte_unsigned | Byte_signed -> 1
-  | Sixteen_unsigned | Sixteen_signed -> 2
-  | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> 4
-  | Word_int | Word_val | Double -> 8
-  | Onetwentyeight_aligned | Onetwentyeight_unaligned -> 16
-  | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-  | Fivetwelve_unaligned ->
+let scale_of_chunk (chunk : Cmm.memory_chunk) =
+  match chunk with
+  | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+  | Fivetwelve_aligned ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
+  | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+    | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
+    | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned ) as chunk ->
+    Cmm.size_of_memory_chunk chunk
 
 let local_label lbl = label Same_section_and_unit lbl
 
@@ -830,6 +828,12 @@ let emit_stack_ldr reg r = emit_stack_load_store LDR reg r
 
 let emit_stack_str reg r = emit_stack_load_store STR reg r
 
+let emit_stack_ldr_simd_and_fp reg r =
+  emit_stack_load_store LDR_simd_and_fp reg r
+
+let emit_stack_str_simd_and_fp reg r =
+  emit_stack_load_store STR_simd_and_fp reg r
+
 (* Name of current function *)
 let function_name = ref ""
 
@@ -1454,20 +1458,18 @@ let move_between_distinct_locs (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_error "arm64: got 256/512 bit vector"
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
-  | Float, Reg _, Float, Stack _ ->
-    emit_stack_load_store STR_simd_and_fp (H.reg_d src) dst
+  | Float, Reg _, Float, Stack _ -> emit_stack_str_simd_and_fp (H.reg_d src) dst
   | Float32, Reg _, Float32, Stack _ ->
-    emit_stack_load_store STR_simd_and_fp (H.reg_s src) dst
+    emit_stack_str_simd_and_fp (H.reg_s src) dst
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
-    emit_stack_load_store STR_simd_and_fp (H.reg_q src) dst
+    emit_stack_str_simd_and_fp (H.reg_q src) dst
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
     emit_stack_str (H.reg_x src) dst
-  | Float, Stack _, Float, Reg _ ->
-    emit_stack_load_store LDR_simd_and_fp (H.reg_d dst) src
+  | Float, Stack _, Float, Reg _ -> emit_stack_ldr_simd_and_fp (H.reg_d dst) src
   | Float32, Stack _, Float32, Reg _ ->
-    emit_stack_load_store LDR_simd_and_fp (H.reg_s dst) src
+    emit_stack_ldr_simd_and_fp (H.reg_s dst) src
   | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
-    emit_stack_load_store LDR_simd_and_fp (H.reg_q dst) src
+    emit_stack_ldr_simd_and_fp (H.reg_q dst) src
   | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
     emit_stack_ldr (H.reg_x dst) src
   | _, Stack _, _, Stack _ ->
