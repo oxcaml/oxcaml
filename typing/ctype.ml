@@ -2249,7 +2249,7 @@ let rec try_expand_once_opt env ty =
       let t = try_expand_once_opt env t in
       newty2 ~level:(get_level t) (Tsplice t)
   | Tquote t ->
-      let t = try_expand_once env t in
+      let t = try_expand_once_opt env t in
       newty2 ~level:(get_level t) (Tquote t)
   | _ -> raise Cannot_expand
 
