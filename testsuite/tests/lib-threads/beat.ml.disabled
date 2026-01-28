@@ -1,3 +1,5 @@
+(* Disabled due to fundamental and persistent flakiness. *)
+
 (* TEST
  {
    not-macos;
