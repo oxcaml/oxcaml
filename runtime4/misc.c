@@ -391,7 +391,7 @@ CAMLprim value caml_atomic_lxor(value ref, value incr) {
   return caml_atomic_lxor_field(ref, Val_long(0), incr);
 }
 
-// Dummy implementations so effect.ml can compile
+// Dummy implementations so effect.ml + dynamic.ml can compile
 
 CAMLprim value caml_continuation_use_noexc(void)
 {
@@ -421,4 +421,14 @@ CAMLprim value caml_domain_dls_compare_and_set(void)
 CAMLprim value caml_no_bytecode_impl(void)
 {
   caml_failwith("No bytecode implementation provided for this external");
+}
+
+CAMLprim value caml_dynamic_make(void)
+{
+  caml_fatal_error("Effects not implemented in runtime4");
+}
+
+CAMLprim value caml_dynamic_get(void)
+{
+  caml_fatal_error("Effects not implemented in runtime4");
 }
