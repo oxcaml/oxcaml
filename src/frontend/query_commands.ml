@@ -370,6 +370,31 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
             let printed_type = Type_enclosing.print_type ~verbosity type_info in
             ret (`String printed_type)
           else ret (`Index i))
+  | Kind_enclosing { position; index; override_verbosity } ->
+    let typer = Mpipeline.typer_result pipeline in
+    let cursor = Mpipeline.get_lexing_pos pipeline position in
+    let verbosity =
+      match override_verbosity with
+      | Some verbosity -> verbosity
+      | None -> verbosity pipeline
+    in
+    let mbrowse_at_cursor =
+      Mbrowse.enclosing cursor
+        [ Mbrowse.of_typedtree (Mtyper.get_typedtree typer) ]
+    in
+    let enclosings = Kind_enclosing.from_mbrowse mbrowse_at_cursor ~cursor in
+    List.mapi enclosings ~f:(fun i (loc, kind) ->
+        let should_print =
+          match index with
+          | Some index -> index = i
+          | None -> true
+        in
+        let kind_info =
+          match should_print with
+          | true -> `Kind (Kind_enclosing.Kind_info.to_string ~verbosity kind)
+          | false -> `Index i
+        in
+        (loc, kind_info))
   | Enclosing pos ->
     let typer = Mpipeline.typer_result pipeline in
     let structures = Mbrowse.of_typedtree (Mtyper.get_typedtree typer) in

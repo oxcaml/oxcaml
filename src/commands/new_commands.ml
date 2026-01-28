@@ -831,6 +831,41 @@ let all_commands =
             in
             run buffer (Query_protocol.Type_enclosing (expr, pos, index))
       end;
+    command "kind-enclosing"
+      ~doc:
+        "Returns a list of kind information for all expressions at given \
+         position, sorted by increasing size.\n\
+         `-index` can be used to print only the kind information of a entry in \
+         the result list expression. This is useful to\n\
+         query the kinds lazily: normally, Merlin would return the kind of all\n\
+         enclosing modules, which may be very expensive.\n\n\
+         The result is returned as a list of:\n\
+         ```javascript\n\
+         {\n\
+        \  'start': position,\n\
+        \  'end': position,\n\
+        \  'kind': (string | int),\n\
+         }\n\
+         ```"
+      ~spec:
+        [ arg "-position" "<position> Position to inspect the kind of"
+            (marg_position (fun pos (_pos, index) -> (pos, index)));
+          optional "-index" "<int> Only print type of <index>'th result"
+            (Marg.param "int" (fun index (pos, _index) ->
+                 match int_of_string index with
+                 | index -> (pos, Some index)
+                 | exception _ -> failwith "index should be an integer"))
+        ]
+      ~default:(`None, None)
+      begin
+        fun buffer (pos, index) ->
+          match pos with
+          | `None -> failwith "-position <pos> is mandatory"
+          | #Msource.position as position ->
+            run buffer
+              (Query_protocol.Kind_enclosing
+                 { position; index; override_verbosity = None })
+      end;
     command "type-expression"
       ~doc:
         "Returns the type of the expression when typechecked in the \
