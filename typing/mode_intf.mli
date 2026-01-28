@@ -663,6 +663,9 @@ module type S = sig
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
+    (** Existentially holds a mode together with its axis. *)
+    type atom = Atom : 'a Axis.t * 'a -> atom
+
     type error =
       | Monadic of Monadic.error
       | Comonadic of Comonadic.error
@@ -831,6 +834,8 @@ module type S = sig
 
       (** Test if the given modality is a constant modality. *)
       val is_constant : 'a Axis.t -> 'a -> bool
+
+      val print : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
     type error = Error : 'a Axis.t * 'a simple_error -> error

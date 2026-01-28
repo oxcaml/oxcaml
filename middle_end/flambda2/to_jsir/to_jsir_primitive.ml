@@ -105,6 +105,7 @@ let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
     no_op ~env ~res
   | Dls_get -> use_prim' (Extern "caml_domain_dls_get")
   | Tls_get -> use_prim' (Extern "caml_domain_tls_get")
+  | Domain_index -> use_prim' (Extern "caml_ml_domain_index")
   | Poll ->
     (* See [parse_bytecode.ml] in jsoo - treated as a noop *)
     no_op ~env ~res

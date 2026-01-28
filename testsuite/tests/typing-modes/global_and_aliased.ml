@@ -187,3 +187,36 @@ type _z4 = w_global u_aliased
 [%%expect{|
 type _z4 = w_global u_aliased
 |}]
+
+(* val with @@ global unique errors *)
+module type S = sig
+    val foo : 'a -> 'a @@ global unique
+end
+[%%expect{|
+Line 2, characters 26-39:
+2 |     val foo : 'a -> 'a @@ global unique
+                              ^^^^^^^^^^^^^
+Error: The modality "global" can't be used together with "unique"
+|}]
+
+(* default @@ global, val @@ unique errors *)
+module type S = sig @@ global
+    val foo : 'a -> 'a @@ unique
+end
+[%%expect{|
+Line 2, characters 26-32:
+2 |     val foo : 'a -> 'a @@ unique
+                              ^^^^^^
+Error: The modality "global" can't be used together with "unique"
+|}]
+
+(* default @@ global unique errors *)
+module type S = sig @@ global unique
+    val foo : 'a -> 'a
+end
+[%%expect{|
+Line 1, characters 23-36:
+1 | module type S = sig @@ global unique
+                           ^^^^^^^^^^^^^
+Error: The modality "global" can't be used together with "unique"
+|}]

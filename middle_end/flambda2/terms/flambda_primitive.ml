@@ -648,6 +648,30 @@ module Block_access_kind = struct
     | Naked_floats _ -> Float_record
     | Mixed { shape; _ } -> Scannable (Mixed_record shape)
 
+  let from_block_shape (block_shape : K.Block_shape.t)
+      ~(index : Target_ocaml_int.t) ~(result_kind : K.With_subkind.t) : t =
+    let field_kind_of_value_subkind () : Block_access_field_kind.t =
+      if K.With_subkind.equal result_kind K.With_subkind.tagged_immediate
+      then Immediate
+      else Any_value
+    in
+    match block_shape with
+    | Scannable Value_only ->
+      let field_kind = field_kind_of_value_subkind () in
+      Values { tag = Unknown; size = Unknown; field_kind }
+    | Float_record -> Naked_floats { size = Unknown }
+    | Scannable (Mixed_record shape) ->
+      let value_prefix_size = K.Mixed_block_shape.value_prefix_size shape in
+      let index_int = Target_ocaml_int.to_int_exn index in
+      let field_kind : Mixed_block_access_field_kind.t =
+        if index_int < value_prefix_size
+        then Value_prefix (field_kind_of_value_subkind ())
+        else
+          let flat_suffix = K.Mixed_block_shape.flat_suffix shape in
+          Flat_suffix flat_suffix.(index_int - value_prefix_size)
+      in
+      Mixed { tag = Unknown; size = Unknown; field_kind; shape }
+
   let element_kind_for_set = element_kind_for_load
 
   let compare t1 t2 =
@@ -1047,15 +1071,28 @@ type nullary_primitive =
   | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
   | Dls_get
   | Tls_get
+  | Domain_index
   | Poll
   | Cpu_relax
 
 let nullary_primitive_eligible_for_cse = function
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     false
 
 let compare_nullary_primitive p1 p2 =
+  let nullary_primitive_numbering p =
+    match p with
+    | Invalid _ -> 0
+    | Optimised_out _ -> 1
+    | Probe_is_enabled _ -> 2
+    | Enter_inlined_apply _ -> 3
+    | Dls_get -> 4
+    | Tls_get -> 5
+    | Domain_index -> 6
+    | Poll -> 7
+    | Cpu_relax -> 8
+  in
   match p1, p2 with
   | Invalid k1, Invalid k2 -> K.compare k1 k2
   | Optimised_out k1, Optimised_out k2 -> K.compare k1 k2
@@ -1069,39 +1106,15 @@ let compare_nullary_primitive p1 p2 =
     Inlined_debuginfo.compare dbg1 dbg2
   | Dls_get, Dls_get -> 0
   | Tls_get, Tls_get -> 0
+  | Domain_index, Domain_index -> 0
   | Poll, Poll -> 0
   | Cpu_relax, Cpu_relax -> 0
-  | ( Invalid _,
-      ( Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get
-      | Tls_get | Poll | Cpu_relax ) ) ->
-    -1
-  | ( Optimised_out _,
-      ( Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get | Tls_get | Poll
-      | Cpu_relax ) ) ->
-    -1
-  | Optimised_out _, Invalid _ -> 1
-  | ( Probe_is_enabled _,
-      (Enter_inlined_apply _ | Dls_get | Tls_get | Poll | Cpu_relax) ) ->
-    -1
-  | Probe_is_enabled _, (Invalid _ | Optimised_out _) -> 1
-  | Enter_inlined_apply _, (Invalid _ | Optimised_out _ | Probe_is_enabled _) ->
-    1
-  | Enter_inlined_apply _, (Dls_get | Tls_get | Poll | Cpu_relax) -> -1
-  | ( Dls_get,
-      (Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _)
-    ) ->
-    1
-  | Dls_get, (Tls_get | Poll | Cpu_relax) -> -1
-  | ( Tls_get,
-      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get ) ) ->
-    1
-  | Tls_get, (Poll | Cpu_relax) -> -1
-  | ( (Poll | Cpu_relax),
-      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Cpu_relax ) ) ->
-    1
-  | Cpu_relax, Poll -> -1
+  | ( ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ),
+      _ ) ->
+    Int.compare
+      (nullary_primitive_numbering p1)
+      (nullary_primitive_numbering p2)
 
 let equal_nullary_primitive p1 p2 = compare_nullary_primitive p1 p2 = 0
 
@@ -1123,6 +1136,7 @@ let print_nullary_primitive ppf p =
       Inlined_debuginfo.print dbg
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
   | Tls_get -> Format.pp_print_string ppf "Tls_get"
+  | Domain_index -> Format.pp_print_string ppf "Domain_index"
   | Poll -> Format.pp_print_string ppf "Poll"
   | Cpu_relax -> Format.pp_print_string ppf "Cpu_relax"
 
@@ -1133,6 +1147,7 @@ let result_kind_of_nullary_primitive p : result_kind =
   | Probe_is_enabled _ -> Singleton K.naked_immediate
   | Enter_inlined_apply _ -> Unit
   | Dls_get | Tls_get -> Singleton K.value
+  | Domain_index -> Singleton K.naked_immediate
   | Poll | Cpu_relax -> Unit
 
 let coeffects_of_mode : Alloc_mode.For_allocations.t -> Coeffects.t = function
@@ -1153,7 +1168,7 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
     (* This doesn't really have effects, but without effects, these primitives
        get deleted during lambda_to_flambda. *)
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
-  | Dls_get | Tls_get ->
+  | Dls_get | Tls_get | Domain_index ->
     No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Poll | Cpu_relax ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
@@ -1161,7 +1176,7 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
 let nullary_classify_for_printing p =
   match p with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     Neither
 
 module Reinterpret_64_bit_word = struct
@@ -2683,7 +2698,7 @@ let free_names t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
     Name_occurrences.empty
   | Unary (prim, x0) ->
     Name_occurrences.union
@@ -2717,7 +2732,7 @@ let apply_renaming t renaming =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
     t
   | Unary (prim, x0) ->
     let prim' = apply_renaming_unary_primitive prim renaming in
@@ -2756,7 +2771,7 @@ let ids_for_export t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
     Ids_for_export.empty
   | Unary (prim, x0) ->
     Ids_for_export.union

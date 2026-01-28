@@ -416,6 +416,12 @@ let mk_ddissector_inputs f =
     Arg.String f,
     "<file>  Write dissector input analysis to <file>" )
 
+let mk_verify_binary_emitter f =
+  ( "-verify-binary-emitter",
+    Arg.Unit f,
+    " Verify binary emitter output matches system assembler output. Exits with \
+     error on mismatch." )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -1169,6 +1175,7 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
+  val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
   val ddissector : unit -> unit
@@ -1328,6 +1335,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_debug_long_frames_threshold F.long_frames_threshold;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_internal_assembler F.internal_assembler;
+      mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
       mk_dissector_partition_size F.dissector_partition_size;
       mk_ddissector F.ddissector;
@@ -1578,6 +1586,7 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
   let internal_assembler = set' Oxcaml_flags.internal_assembler
+  let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
   let dissector_partition_size f = Clflags.dissector_partition_size := Some f
   let ddissector = set' Clflags.ddissector
@@ -1959,6 +1968,7 @@ module Extra_params = struct
     in
     match name with
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
+    | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings
     | "no-mach-ir" ->
         Oxcaml_options_impl.no_mach_ir ();

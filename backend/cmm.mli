@@ -484,6 +484,7 @@ type operation =
     (* the [machtype array] refers to the whole tuple *)
   | Cdls_get
   | Ctls_get
+  | Cdomain_index
   | Cpoll
   | Cpause
 

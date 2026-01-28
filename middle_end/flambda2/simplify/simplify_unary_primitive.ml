@@ -938,8 +938,14 @@ let simplify_immutable_block_load access_kind ~field ~min_name_mode dacc
   in
   SPR.map_dacc result (fun dacc ->
       let kind = P.Block_access_kind.element_subkind_for_load access_kind in
+      let block_shape : Flambda_kind.Block_shape.t =
+        match (access_kind : P.Block_access_kind.t) with
+        | Values _ -> Scannable Value_only
+        | Naked_floats _ -> Float_record
+        | Mixed { shape; _ } -> Scannable (Mixed_record shape)
+      in
       Simplify_common.add_symbol_projection dacc ~projected_from:arg
-        (Symbol_projection.Projection.block_load ~index:field)
+        (Symbol_projection.Projection.block_load ~index:field ~block_shape)
         ~projection_bound_to:result_var ~kind)
 
 let simplify_mutable_block_load _access_kind ~field:_ ~original_prim dacc

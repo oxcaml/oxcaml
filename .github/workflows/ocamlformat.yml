@@ -8,6 +8,7 @@ on:
       - main
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  merge_group:
 jobs:
   check:
     name: check (${{ matrix.system }})

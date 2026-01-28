@@ -14,30 +14,35 @@
 
 module Projection = struct
   type t =
-    | Block_load of { index : Target_ocaml_int.t }
+    | Block_load of
+        { index : Target_ocaml_int.t;
+          block_shape : Flambda_kind.Block_shape.t
+        }
     | Project_value_slot of
         { project_from : Function_slot.t;
           value_slot : Value_slot.t
         }
 
-  let block_load ~index = Block_load { index }
+  let block_load ~index ~block_shape = Block_load { index; block_shape }
 
   let project_value_slot project_from value_slot =
     Project_value_slot { project_from; value_slot }
 
   let hash t =
     match t with
-    | Block_load { index } -> Target_ocaml_int.hash index
+    | Block_load { index; block_shape = _ } -> Target_ocaml_int.hash index
     | Project_value_slot { project_from; value_slot } ->
       Hashtbl.hash (Function_slot.hash project_from, Value_slot.hash value_slot)
 
   let [@ocamlformat "disable"] print ppf t =
     match t with
-    | Block_load { index; } ->
+    | Block_load { index; block_shape } ->
       Format.fprintf ppf "@[<hov 1>(Block_load@ \
-          @[<hov 1>(index@ %a)@]\
+          @[<hov 1>(index@ %a)@]@ \
+          @[<hov 1>(block_shape@ %a)@]\
           )@]"
         Target_ocaml_int.print index
+        Flambda_kind.Block_shape.print block_shape
     | Project_value_slot { project_from; value_slot; } ->
       Format.fprintf ppf "@[<hov 1>(Project_value_slot@ \
           @[<hov 1>(project_from@ %a)@]@ \
@@ -48,8 +53,10 @@ module Projection = struct
 
   let compare t1 t2 =
     match t1, t2 with
-    | Block_load { index = index1 }, Block_load { index = index2 } ->
-      Target_ocaml_int.compare index1 index2
+    | ( Block_load { index = index1; block_shape = shape1 },
+        Block_load { index = index2; block_shape = shape2 } ) ->
+      let c = Target_ocaml_int.compare index1 index2 in
+      if c <> 0 then c else Flambda_kind.Block_shape.compare shape1 shape2
     | ( Project_value_slot
           { project_from = project_from1; value_slot = value_slot1 },
         Project_value_slot

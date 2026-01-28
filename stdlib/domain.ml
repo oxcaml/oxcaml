@@ -354,8 +354,12 @@ module Runtime_5 = struct
 
   let is_main_domain () = (self () :> int) = 0
 
-  external self_index : unit -> int @@ portable
-    = "caml_ml_domain_index" [@@noalloc]
+  external self_index : unit -> int# @@ portable
+    = "%domain_index" [@@noalloc]
+
+  external tag_int : int# -> int @@ portable = "%tag_int"
+
+  let[@inline] self_index () = tag_int (self_index ())
 
   (******** Callbacks **********)
 

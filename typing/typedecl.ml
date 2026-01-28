@@ -526,7 +526,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
            env ld.ld_loc kloc ty;
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
-          ld_modalities = ld.ld_modalities;
+          ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = Jkind.Sort.Const.void;
             (* Updated by [update_label_sorts] *)
           ld_type = ty;
@@ -554,7 +554,7 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
     check_representable ~why:(Constructor_declaration idx)
       env loc kloc ca.ca_type.ctyp_type;
     {
-      Types.ca_modalities = ca.ca_modalities;
+      Types.ca_modalities = ca.ca_modalities.moda_modalities;
       ca_loc = ca.ca_loc;
       ca_type = ca.ca_type.ctyp_type;
       ca_sort = Jkind.Sort.Const.void;
@@ -3865,28 +3865,29 @@ type transl_value_decl_modal =
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
-  let mode, val_modalities =
+  let mode, val_modalities, val_modal_info =
     match modal with
     | Str_primitive ->
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
+        let modes = Typemode.transl_mode_annots modes in
         let mode =
-          modes
-          |> Typemode.transl_mode_annots
+          modes.mode_modes
           |> Mode.Alloc.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
-        mode, Mode.Modality.undefined
+        mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
-        let modalities =
-          match valdecl.pval_modalities with
-          | [] -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
+        let raw_modalities =
+          Typemode.transl_modalities_with_default
+            ~maturity:Stable ~default:sig_modalities valdecl.pval_modalities
         in
-        let modalities = Mode.Modality.of_const modalities in
-        md_mode, modalities
+        let modalities =
+          Mode.Modality.of_const raw_modalities.moda_modalities
+        in
+        md_mode, modalities, Valmi_sig_value raw_modalities
   in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
@@ -3984,6 +3985,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       if !Clflags.native_code
       && prim.prim_arity > 5
       && prim.prim_native_name = ""
+      && not (String.starts_with ~prefix:"%" prim.prim_name)
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
       { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
@@ -4002,6 +4004,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
      val_id = id;
      val_name = valdecl.pval_name;
      val_desc = cty; val_val = v;
+     val_modal_info;
      val_prim = valdecl.pval_prim;
      val_loc = valdecl.pval_loc;
      val_attributes = valdecl.pval_attributes;

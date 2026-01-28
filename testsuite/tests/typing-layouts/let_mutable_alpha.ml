@@ -1,31 +1,34 @@
 (* TEST
- reference = "${test_source_directory}/let_mutable_alpha.reference";
  include stdlib_upstream_compatible;
  flambda2;
  {
    flags = "-extension layouts_alpha -extension let_mutable";
-   native;
- }{
-   flags = "-extension layouts_alpha -extension let_mutable";
-   bytecode;
+   { expect; expect.opt; }
  }*)
 
 type void : void
 external unbox_unit : unit -> void = "%unbox_unit"
 
-let () =
+let _ =
   let mutable u = unbox_unit () in
   let mutable v = unbox_unit () in
   u <- v;
   v <- u;
-  print_endline "Hello, world!"
+  "Hello, world!"
+[%%expect{|
+type void : void
+external unbox_unit : unit -> void = "%unbox_unit"
+- : string = "Hello, world!"
+|}]
 
 type t = #{ x: int; v: void; y: int32# }
 
-let () =
+let _ =
   let mutable r = #{ x = 10; v = unbox_unit (); y = #20l } in
   r <- #{ x = 50; v = unbox_unit (); y = #60l };
-  print_int r.#x;
-  print_string " ";
-  print_int (Stdlib_upstream_compatible.Int32_u.to_int r.#y);
-  print_endline ""
+  r.#x, Stdlib_upstream_compatible.Int32_u.to_int r.#y
+
+[%%expect{|
+type t = #{ x : int; v : void; y : int32#; }
+- : int * int = (50, 60)
+|}]

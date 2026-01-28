@@ -2372,6 +2372,10 @@ let emit_instr ~first ~fallthrough i =
     then I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
     else Misc.fatal_error "Dls is not supported in runtime4."
   | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
+  | Lop Domain_index ->
+    if Config.runtime5
+    then I.mov (domain_field Domainstate.Domain_id) (res i 0)
+    else I.xor (res32 i 0) (res32 i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
   | Llabel { label = lbl; section_name } ->

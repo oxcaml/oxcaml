@@ -3739,6 +3739,8 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
+  type atom = Atom : 'a Axis.t * 'a -> atom
+
   type error =
     | Monadic of Monadic.error
     | Comonadic of Comonadic.error
@@ -4431,6 +4433,12 @@ module Modality = struct
     let is_constant : type a. a Axis.t -> a -> bool = function
       | Monadic ax -> Monadic.is_constant ax
       | Comonadic ax -> Comonadic.is_constant ax
+
+    let print (type a) (ax : a Axis.t) ppf (t : a) =
+      match ax, t with
+      | Comonadic ax, Meet_with t ->
+        Value.Comonadic.Const.Per_axis.print ax ppf t
+      | Monadic ax, Join_with t -> Value.Monadic.Const.Per_axis.print ax ppf t
   end
 
   type error = Error : 'a Axis.t * 'a simple_error -> error

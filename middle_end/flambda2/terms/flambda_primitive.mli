@@ -242,6 +242,12 @@ module Block_access_kind : sig
   val element_subkind_for_load : t -> Flambda_kind.With_subkind.t
 
   val to_block_shape : t -> Flambda_kind.Block_shape.t
+
+  val from_block_shape :
+    Flambda_kind.Block_shape.t ->
+    index:Target_ocaml_int.t ->
+    result_kind:Flambda_kind.With_subkind.t ->
+    t
 end
 
 (* CR-someday mshinwell: We should have unboxed arrays of int32, int64 and
@@ -365,6 +371,7 @@ type nullary_primitive =
           This is then used in to_cmm to correctly add inlined debuginfo. *)
   | Dls_get  (** Obtain the domain-local state block. *)
   | Tls_get  (** Obtain the thread-local state block. *)
+  | Domain_index  (** Obtain the current domain's index. *)
   | Poll
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and GC

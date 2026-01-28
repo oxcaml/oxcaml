@@ -23,6 +23,8 @@ val ocamlrun_ocaml : string
 
 val expect : string
 
+val expectnat : string
+
 val ocamlrun_ocamllex : string
 
 val ocamlrun_ocamldoc : string

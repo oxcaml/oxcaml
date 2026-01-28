@@ -819,6 +819,7 @@ let primitive ppf = function
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ptls_get -> fprintf ppf "tls_get"
+  | Pdomain_index -> fprintf ppf "domain_index"
   | Ppoll -> fprintf ppf "poll"
   | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
@@ -1008,6 +1009,7 @@ let name_of_primitive = function
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"
   | Ptls_get -> "Ptls_get"
+  | Pdomain_index -> "Pdomain_index"
   | Ppoll -> "Ppoll"
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"

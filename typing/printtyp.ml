@@ -1425,53 +1425,67 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Optional l -> Optional l
   | Position l -> Position l
 
-let tree_of_modality (t: Parsetree.modality loc) =
-  let Modality s = t.txt in s
-
+(** Un-interpret modalities back to outcome tree. Takes the mutability and
+    attributes on the field and removes mutable-implied modalities
+    accordingly. *)
 let tree_of_modalities mut t =
-  let t = Typemode.untransl_modalities mut t in
-  List.map tree_of_modality t
-
-let tree_of_mode (t: Parsetree.mode loc) =
-  let Mode s = t.txt in s
+  t
+  |> Typemode.least_modalities_implying mut
+  |> Typemode.sort_dedup_modalities
+  |> List.map (fun (Atom (ax, m) : Modality.atom) ->
+      Format.asprintf "%a" (Modality.Per_axis.print ax) m)
 
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
-  let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
+  (* Step 1: Compute the modes to print *)
+  let diff =
 
-  (* [forkable] has implied defaults depending on [areality]: *)
-  let forkable =
-    match modes.areality, modes.forkable with
-    | Local, Unforkable | Global, Forkable -> None
-    | _, _ -> Some modes.forkable
+    (* [forkable] has implied defaults depending on [areality]: *)
+    let forkable =
+      match modes.areality, modes.forkable with
+      | Local, Unforkable | Global, Forkable -> None
+      | _, _ -> Some modes.forkable
+    in
+
+    (* [yielding] has implied defaults depending on [areality]: *)
+    let yielding =
+      match modes.areality, modes.yielding with
+      | Local, Yielding | Global, Unyielding -> None
+      | _, _ -> Some modes.yielding
+    in
+
+    (* [contention] has implied defaults based on [visibility]: *)
+    let contention =
+      match modes.visibility, modes.contention with
+      | Immutable, Contended | Read, Shared | Read_write, Uncontended -> None
+      | _, _ -> Some modes.contention
+    in
+
+    (* [portability] has implied defaults based on [statefulness]: *)
+    let portability =
+      match modes.statefulness, modes.portability with
+      | Stateless, Portable
+      | Observing, Shareable
+      | Stateful, Nonportable -> None
+      | _, _ -> Some modes.portability
+    in
+
+    let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
+    { diff with forkable; yielding; contention; portability }
   in
-
-  (* [yielding] has implied defaults depending on [areality]: *)
-  let yielding =
-    match modes.areality, modes.yielding with
-    | Local, Yielding | Global, Unyielding -> None
-    | _, _ -> Some modes.yielding
+  (* Step 2: Print the modes *)
+  let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
+  let modes =
+    [ print_to_string_opt Mode.Locality.Const.print diff.areality
+    ; print_to_string_opt Mode.Uniqueness.Const.print diff.uniqueness
+    ; print_to_string_opt Mode.Linearity.Const.print diff.linearity
+    ; print_to_string_opt Mode.Portability.Const.print diff.portability
+    ; print_to_string_opt Mode.Contention.Const.print diff.contention
+    ; print_to_string_opt Mode.Forkable.Const.print diff.forkable
+    ; print_to_string_opt Mode.Yielding.Const.print diff.yielding
+    ; print_to_string_opt Mode.Statefulness.Const.print diff.statefulness
+    ; print_to_string_opt Mode.Visibility.Const.print diff.visibility ]
   in
-
-  (* [contention] has implied defaults based on [visibility]: *)
-  let contention =
-    match modes.visibility, modes.contention with
-    | Immutable, Contended | Read, Shared | Read_write, Uncontended -> None
-    | _, _ -> Some modes.contention
-  in
-
-  (* [portability] has implied defaults based on [statefulness]: *)
-  let portability =
-    match modes.statefulness, modes.portability with
-    | Stateless, Portable
-    | Observing, Shareable
-    | Stateful, Nonportable -> None
-    | _, _ -> Some modes.portability
-  in
-
-  let diff = {diff with forkable; yielding; contention; portability} in
-  (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
-  let l = Typemode.untransl_mode_annots diff in
-  List.map tree_of_mode l
+  List.filter_map (fun x -> x) modes
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
@@ -1498,6 +1512,17 @@ type modal =
   | Other of Mode.Alloc.Const.t
     (** In other cases, the caller has already printed the modes (as the
         constructor argument) on the type. *)
+
+type typobject_repr = { fields : (string * type_expr) list; open_row : bool }
+
+type typvariant_repr = {
+  fields : (string * bool * type_expr list) list;
+  name : (Path.t * type_expr list) option;
+  closed : bool;
+  present : (string * row_field) list;
+  all_present : bool;
+  tags : string list option
+}
 
 let rec tree_of_modal_typexp mode modal ty =
   let not_arrow tree =
@@ -1560,20 +1585,9 @@ let rec tree_of_modal_typexp mode modal ty =
           Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
         end
     | Tvariant row ->
-        let Row {fields; name; closed; _} = row_repr row in
-        let fields =
-          if closed then
-            List.filter (fun (_, f) -> row_field_repr f <> Rabsent)
-              fields
-          else fields in
-        let present =
-          List.filter
-            (fun (_, f) ->
-               match row_field_repr f with
-               | Rpresent _ -> true
-               | _ -> false)
-            fields in
-        let all_present = List.length present = List.length fields in
+        let { fields; name; closed; present; all_present; tags } =
+          tree_of_typvariant_repr row
+        in
         begin match name with
         | Some(p, tyl) when nameable_row row ->
             let (p', s) = best_type_path p in
@@ -1588,9 +1602,10 @@ let rec tree_of_modal_typexp mode modal ty =
                 if all_present then None else Some (List.map fst present) in
               Otyp_variant (Ovar_typ out_variant, closed, tags)
         | _ ->
-            let fields = List.map (tree_of_row_field mode) fields in
-            let tags =
-              if all_present then None else Some (List.map fst present) in
+            let fields =
+              List.map
+                (fun (l, c, tyl) -> (l, c, tree_of_typlist mode tyl)) fields
+            in
             Otyp_variant (Ovar_fields fields, closed, tags)
         end
     | Tobject (fi, nm) ->
@@ -1677,15 +1692,35 @@ and tree_of_qtvs qtvs =
   in
   List.filter_map tree_of_qtv qtvs
 
-and tree_of_row_field mode (l, f) =
+and tree_of_row_field (l, f) =
   match row_field_repr f with
   | Rpresent None | Reither(true, [], _) -> (l, false, [])
-  | Rpresent(Some ty) -> (l, false, [tree_of_typexp mode Alloc.Const.legacy ty])
+  | Rpresent(Some ty) -> (l, false, [ty])
   | Reither(c, tyl, _) ->
       if c (* contradiction: constant constructor with an argument *)
-      then (l, true, tree_of_typlist mode tyl)
-      else (l, false, tree_of_typlist mode tyl)
+      then (l, true, tyl)
+      else (l, false, tyl)
   | Rabsent -> (l, false, [] (* actually, an error *))
+
+and tree_of_typvariant_repr row =
+  let Row {fields; name; closed; _} = row_repr row in
+  let fields =
+    if closed then
+      List.filter (fun (_, f) -> row_field_repr f <> Rabsent)
+        fields
+    else fields in
+  let present =
+    List.filter
+      (fun (_, f) ->
+          match row_field_repr f with
+          | Rpresent _ -> true
+          | _ -> false)
+      fields in
+  let all_present = List.length present = List.length fields in
+  let fields = List.map tree_of_row_field fields in
+  let tags =
+    if all_present then None else Some (List.map fst present) in
+  { fields; name; closed; present; all_present; tags }
 
 and tree_of_typlist mode tyl =
   List.map (tree_of_typexp mode Alloc.Const.legacy) tyl
@@ -1717,23 +1752,30 @@ and tree_of_ret_typ_mutating acc_mode m ty=
     let m = Alloc.zap_to_legacy m in
     (Orm_any (tree_of_modes m), m)
 
+and tree_of_typobject_repr fi =
+  let (fields, rest) = flatten_fields fi in
+  let present_fields =
+    List.fold_right
+      (fun (n, k, t) l ->
+          match field_kind_repr k with
+          | Fpublic -> (n, t) :: l
+          | _ -> l)
+      fields [] in
+  let sorted_fields =
+    List.sort
+      (fun (n, _) (n', _) -> String.compare n n') present_fields in
+  let fields, open_row = tree_of_typfields rest sorted_fields in
+  { fields; open_row }
+
 and tree_of_typobject mode fi nm =
   begin match nm with
   | None ->
-      let pr_fields fi =
-        let (fields, rest) = flatten_fields fi in
-        let present_fields =
-          List.fold_right
-            (fun (n, k, t) l ->
-               match field_kind_repr k with
-               | Fpublic -> (n, t) :: l
-               | _ -> l)
-            fields [] in
-        let sorted_fields =
-          List.sort
-            (fun (n, _) (n', _) -> String.compare n n') present_fields in
-        tree_of_typfields mode rest sorted_fields in
-      let (fields, open_row) = pr_fields fi in
+      let { fields; open_row } = tree_of_typobject_repr fi in
+      let fields =
+        List.map
+          (fun (s, t) -> (s, tree_of_typexp mode Alloc.Const.legacy t))
+          fields
+      in
       Otyp_object {fields; open_row}
   | Some (p, _ty :: tyl) ->
       let args = tree_of_typlist mode tyl in
@@ -1744,7 +1786,7 @@ and tree_of_typobject mode fi nm =
       fatal_error "Printtyp.tree_of_typobject"
   end
 
-and tree_of_typfields mode rest = function
+and tree_of_typfields rest = function
   | [] ->
       let open_row =
         match get_desc rest with
@@ -1753,9 +1795,8 @@ and tree_of_typfields mode rest = function
         | _ -> fatal_error "typfields (1)"
       in
       ([], open_row)
-  | (s, t) :: l ->
-      let field = (s, tree_of_typexp mode Alloc.Const.legacy t) in
-      let (fields, rest) = tree_of_typfields mode rest l in
+  | field :: l ->
+      let (fields, rest) = tree_of_typfields rest l in
       (field :: fields, rest)
 
 let tree_of_typexp mode ty =
@@ -1769,9 +1810,7 @@ let typexp mode ppf ty =
 let modality ?(id = fun _ppf -> ()) ax ppf modality =
   if Mode.Modality.Per_axis.is_id ax modality then id ppf
   else
-    Atom (ax, modality)
-    |> Typemode.untransl_modality
-    |> tree_of_modality
+    Format.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
     |> !Oprint.out_modality ppf
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
