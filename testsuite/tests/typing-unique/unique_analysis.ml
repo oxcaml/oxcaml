@@ -56,7 +56,7 @@ let sequence (unique_ x) = unique_ let y = x in (x, y)
 Line 1, characters 52-53:
 1 | let sequence (unique_ x) = unique_ let y = x in (x, y)
                                                         ^
-Error: This value is used here, but it is also being used as unique:
+Error: This value is used here, but it is also being used as unique at:
 Line 1, characters 49-50:
 1 | let sequence (unique_ x) = unique_ let y = x in (x, y)
                                                      ^
@@ -81,7 +81,7 @@ let sequence =
 Line 4, characters 17-18:
 4 |   let t = update r in
                      ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 18-19:
 3 |   let _s = update r in
                       ^
@@ -121,7 +121,7 @@ Line 4, characters 35-37:
 4 |   | x :: xs as gs -> (unique_ gs), xs
                                        ^^
 Error: This value is used here,
-       but it is part of a value that is also being used as unique:
+       but it is part of a value that is also being used as unique at:
 Line 4, characters 21-33:
 4 |   | x :: xs as gs -> (unique_ gs), xs
                          ^^^^^^^^^^^^
@@ -137,7 +137,7 @@ Line 4, characters 25-35:
 4 |   | x :: xs as gs -> gs, unique_ xs
                              ^^^^^^^^^^
 Error: This value is used here as unique,
-       but it is part of a value that is also being used:
+       but it is part of a value that is also being used at:
 Line 4, characters 21-23:
 4 |   | x :: xs as gs -> gs, unique_ xs
                          ^^
@@ -151,7 +151,8 @@ let dup_child (unique_ fs : 'a list) =
 Line 4, characters 35-37:
 4 |   | x :: xs as gs -> (unique_ xs), gs
                                        ^^
-Error: This value is used here, but part of it is also being used as unique:
+Error: This value is used here,
+       but part of it is also being used as unique at:
 Line 4, characters 21-33:
 4 |   | x :: xs as gs -> (unique_ xs), gs
                          ^^^^^^^^^^^^
@@ -165,7 +166,8 @@ let dup_child (unique_ fs : 'a list) =
 Line 4, characters 25-35:
 4 |   | x :: xs as gs -> xs, unique_ gs
                              ^^^^^^^^^^
-Error: This value is used here as unique, but part of it is also being used:
+Error: This value is used here as unique,
+       but part of it is also being used at:
 Line 4, characters 21-23:
 4 |   | x :: xs as gs -> xs, unique_ gs
                          ^^
@@ -210,7 +212,7 @@ let or_patterns3 p =
 Line 4, characters 65-66:
 4 |   | true, z, _ | false, _, z -> let _ = unique_id z in unique_id y
                                                                      ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 4, characters 50-51:
 4 |   | true, z, _ | false, _, z -> let _ = unique_id z in unique_id y
                                                       ^
@@ -233,7 +235,7 @@ let or_patterns5 p =
 Line 4, characters 65-66:
 4 |   | true, z, _ | false, _, z -> let _ = unique_id z in unique_id x
                                                                      ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 4, characters 50-51:
 4 |   | true, z, _ | false, _, z -> let _ = unique_id z in unique_id x
                                                       ^
@@ -252,7 +254,7 @@ Line 6, characters 6-16:
 6 |       unique_ xx
           ^^^^^^^^^^
 Error: This value is used here,
-       but it is part of a value that has already been used as unique:
+       but it is part of a value that has already been used as unique at:
 Line 5, characters 24-26:
 5 |       let _ = unique_id xs in
                             ^^
@@ -269,7 +271,8 @@ let mark_top_aliased =
 Line 5, characters 4-11:
 5 |   | x :: xx -> unique_ xx
         ^^^^^^^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 3, characters 20-22:
 3 |   let _ = unique_id xs in
                         ^^
@@ -316,7 +319,7 @@ Line 3, characters 54-55:
 3 |   | (a, b) as t, c -> let d = unique_id t in unique_ (a, d)
                                                           ^
 Error: This value is used here,
-       but it is part of a value that has already been used as unique:
+       but it is part of a value that has already been used as unique at:
 Line 3, characters 40-41:
 3 |   | (a, b) as t, c -> let d = unique_id t in unique_ (a, d)
                                             ^
@@ -342,7 +345,7 @@ let tuple_parent_marked a b =
 Line 3, characters 28-30:
 3 |   | (true, b') -> unique_id b'
                                 ^^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 2, characters 12-13:
 2 |   match (a, b) with
                 ^
@@ -357,7 +360,7 @@ let tuple_parent_marked a b =
 Line 4, characters 27-28:
 4 |   | (true, b) -> unique_id b
                                ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 2, characters 12-13:
 2 |   match (a, b) with
                 ^
@@ -382,7 +385,8 @@ let match_function : unique_ 'a * 'b -> 'a * ('a * 'b) =
 Line 3, characters 31-32:
 3 |   | (a, b) as t -> unique_ (a, t)
                                    ^
-Error: This value is used here, but part of it is also being used as unique:
+Error: This value is used here,
+       but part of it is also being used as unique at:
 Line 3, characters 28-29:
 3 |   | (a, b) as t -> unique_ (a, t)
                                 ^
@@ -396,7 +400,8 @@ let tuple_parent_marked a b =
 Line 3, characters 36-37:
 3 |   | ((_, a), b) as t -> unique_ (a, t)
                                         ^
-Error: This value is used here, but part of it is also being used as unique:
+Error: This value is used here,
+       but part of it is also being used as unique at:
 Line 3, characters 33-34:
 3 |   | ((_, a), b) as t -> unique_ (a, t)
                                      ^
@@ -411,7 +416,7 @@ let or_patterns6 flag f x y =
 Line 3, characters 66-67:
 3 |   | true, a, (_, b) | false, b, (_, a) -> (unique_id a, unique_id b)
                                                                       ^
-Error: This value is used here, but it is also being used as unique:
+Error: This value is used here, but it is also being used as unique at:
 Line 3, characters 53-54:
 3 |   | true, a, (_, b) | false, b, (_, a) -> (unique_id a, unique_id b)
                                                          ^
@@ -441,7 +446,7 @@ let record_mode_vars (p : point) =
 Line 3, characters 11-14:
 3 |   let y = (p.x, p.y) in
                ^^^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 2, characters 20-23:
 2 |   let x = unique_id p.x in
                         ^^^
@@ -456,7 +461,7 @@ let record_mode_vars (p : point) =
 Line 3, characters 20-23:
 3 |   let x = unique_id p.x in
                         ^^^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 2, characters 11-14:
 2 |   let y = (p.x, p.y) in
                ^^^
@@ -475,7 +480,7 @@ Line 6, characters 12-13:
 6 |   unique_id r
                 ^
 Error: This value is used here as unique,
-       but it has already been read from in a closure that might be called later:
+       but it has already been read from in a closure that might be called later at:
 Line 4, characters 6-20:
 4 |     | {dim; x; y; z} -> ()
           ^^^^^^^^^^^^^^
@@ -502,7 +507,7 @@ Line 4, characters 12-13:
 4 |   unique_id r
                 ^
 Error: This value is used here as unique,
-       but it has already been read from in a closure that might be called later:
+       but it has already been read from in a closure that might be called later at:
 Line 3, characters 17-18:
 3 |   let _l = lazy (r.z) in
                      ^
@@ -527,7 +532,8 @@ type mfoo = { mutable a : string; b : string; }
 Line 12, characters 2-3:
 12 |   x.a <- "olleh"
        ^
-Error: This value is written to here, but it has already been used as unique:
+Error: This value is written to here,
+       but it has already been used as unique at:
 Line 11, characters 20-21:
 11 |   ignore (unique_id x);
                          ^
@@ -599,7 +605,7 @@ Line 4, characters 14-15:
 4 |   ignore_once r;
                   ^
 Error: This value is used here,
-       but part of it is defined as once and has already been used:
+       but part of it is defined as once and has already been used at:
 Line 3, characters 14-17:
 3 |   ignore_once r.x;
                   ^^^
@@ -617,7 +623,7 @@ Line 5, characters 20-21:
 5 |   ignore (unique_id r)
                         ^
 Error: This value is used here as unique,
-       but part of it has already been used:
+       but part of it has already been used at:
 Line 3, characters 21-24:
 3 |   ignore (aliased_id r.x);
                          ^^^
@@ -644,7 +650,7 @@ Line 5, characters 20-21:
 5 |   ignore (unique_id r)
                         ^
 Error: This value is used here,
-       but part of it has already been used as unique:
+       but part of it has already been used as unique at:
 Line 3, characters 19-20:
 3 |   ignore (unique_ {r with y = Value.mk ()});
                        ^
@@ -688,7 +694,7 @@ Line 5, characters 14-15:
 5 |   ignore_once r;
                   ^
 Error: This value is used here,
-       but part of it is defined as once and has already been used:
+       but part of it is defined as once and has already been used at:
 Line 4, characters 14-15:
 4 |   ignore_once x;
                   ^
@@ -707,7 +713,7 @@ Line 6, characters 20-21:
 6 |   ignore (unique_id r)
                         ^
 Error: This value is used here as unique,
-       but part of it has already been used:
+       but part of it has already been used at:
 Line 4, characters 21-22:
 4 |   ignore (aliased_id x);
                          ^
@@ -731,7 +737,8 @@ the 'with' clause is useless.
 Line 5, characters 11-12:
 5 |   ignore ({r with x = "hello again"; y = "world again"})
                ^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 4, characters 20-21:
 4 |   ignore (unique_id r);
                         ^
@@ -759,7 +766,7 @@ Line 13, characters 20-21:
 13 |   ignore (unique_id r);
                          ^
 Error: This value is used here,
-       but part of it has already been used as unique:
+       but part of it has already been used as unique at:
 Line 12, characters 10-13:
 12 |   let x = r.x in
                ^^^
@@ -776,7 +783,8 @@ let foo () =
 Line 5, characters 10-11:
 5 |   let x = r.x in
               ^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 3, characters 20-21:
 3 |   ignore (unique_id r);
                         ^
@@ -802,7 +810,8 @@ let foo () =
 Line 4, characters 6-12:
 4 |   let (_, _) = t in
           ^^^^^^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 3, characters 20-21:
 3 |   ignore (unique_id t);
                         ^
@@ -821,7 +830,8 @@ type 'a r = { mutable x : 'a [@atomic]; y : 'a; }
 Line 6, characters 10-11:
 6 |   let _ = r.y in
               ^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 4, characters 23-24:
 4 |   let x = [%atomic.loc r.x] in
                            ^
@@ -857,7 +867,8 @@ let foo (r : 'a r) =
 Line 3, characters 10-11:
 3 |   let _ = r.y in
               ^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 2, characters 23-24:
 2 |   let x = [%atomic.loc r.x] in
                            ^
@@ -883,7 +894,7 @@ Line 4, characters 10-11:
 4 |   let _ = r.y in
               ^
 Error: This value is read from here,
-       but it is defined as once and has already been used:
+       but it is defined as once and has already been used at:
 Line 2, characters 21-22:
 2 | let x = [%atomic.loc r.x] in
                          ^
@@ -900,7 +911,7 @@ Line 4, characters 10-11:
 4 |   let _ = r.y in
               ^
 Error: This value is read from here,
-       but it is defined as once and has already been used:
+       but it is defined as once and has already been used at:
 Line 2, characters 23-24:
 2 |   let x = [%atomic.loc r.x] in
                            ^
@@ -928,7 +939,7 @@ Line 3, characters 10-11:
 3 |   let _ = r.y in
               ^
 Error: This value is read from here,
-       but it is defined as once and has already been used:
+       but it is defined as once and has already been used at:
 Line 2, characters 23-24:
 2 |   let x = [%atomic.loc r.x] in
                            ^
@@ -945,7 +956,7 @@ Line 3, characters 10-11:
 3 |   let _ = r.y in
               ^
 Error: This value is read from here,
-       but it is defined as once and has already been used:
+       but it is defined as once and has already been used at:
 Line 2, characters 23-24:
 2 |   let x = [%atomic.loc r.x] in
                            ^

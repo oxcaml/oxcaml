@@ -96,7 +96,7 @@ Line 5, characters 9-10:
 5 |     free t
              ^
 Error: This value is used here,
-       but part of it has already been used as unique:
+       but part of it has already been used as unique at:
 Line 4, characters 15-20:
 4 |     free_field field;
                    ^^^^^
@@ -248,7 +248,7 @@ Line 4, characters 26-27:
 4 |   | { field2; _ } -> free r
                               ^
 Error: This value is used here,
-       but part of it has already been used as unique:
+       but part of it has already been used as unique at:
 Line 2, characters 7-15:
 2 |   free r.field1;
            ^^^^^^^^
@@ -278,7 +278,8 @@ let bad r =
 Line 5, characters 4-17:
 5 |   | { field2; _ } -> free field2
         ^^^^^^^^^^^^^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 2, characters 13-14:
 2 |   let x = id r in
                  ^
@@ -294,7 +295,7 @@ let bad r =
 Line 5, characters 26-32:
 5 |   | { field2; _ } -> free field2
                               ^^^^^^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 2, characters 40-48:
 2 |   let x = { field1 = r.field1; field2 = r.field2 } in
                                             ^^^^^^^^
@@ -324,7 +325,8 @@ let bad x y z =
 Line 3, characters 25-26:
 3 |   | p, q, r as t -> free x.field1; free p.field2
                              ^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 2, characters 8-9:
 2 |   match x, y, z with
             ^
