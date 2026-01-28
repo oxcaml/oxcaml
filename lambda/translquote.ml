@@ -2049,7 +2049,8 @@ end = struct
 
   let unboxed_unit = use "Exp_desc" "unboxed_unit"
 
-  let unboxed_bool loc a1 = apply1 "Exp_desc" "unboxed_bool" loc (transl_bool a1)
+  let unboxed_bool loc a1 =
+    apply1 "Exp_desc" "unboxed_bool" loc (transl_bool a1)
 
   let tuple loc a1 =
     apply1 "Exp_desc" "tuple" loc
