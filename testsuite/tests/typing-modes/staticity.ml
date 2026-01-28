@@ -428,7 +428,7 @@ module F : functor (X : sig end) -> sig end
 Line 3, characters 22-35:
 3 | module (Y @ static) = F(struct end)
                           ^^^^^^^^^^^^^
-Error: This is "dynamic", but expected to be "static".
+Error: The module is "dynamic" but is expected to be "static".
 |}]
 
 (* persistent modules are currently dynamic. *)
@@ -438,7 +438,7 @@ module (L @ static) = List
 Line 1, characters 22-26:
 1 | module (L @ static) = List
                           ^^^^
-Error: This is "dynamic", but expected to be "static".
+Error: The module is "dynamic" but is expected to be "static".
 |}]
 
 (* primitives are always static, unless you override *)
