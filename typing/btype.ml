@@ -1566,6 +1566,8 @@ module Jkind0 = struct
           name = "bits8 mod everything"
         }
 
+      let kind_of_unboxed_bool = kind_of_unboxed_int8
+
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let bits16 =
