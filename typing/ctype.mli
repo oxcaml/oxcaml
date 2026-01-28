@@ -813,3 +813,7 @@ val check_constructor_crossing_destruction :
   Env.t -> Longident.t loc
   -> tag -> res:type_expr -> args:constructor_argument list
   -> Env.locks -> (Mode.Value.l, Mode.Value.error) result
+
+val apply_is_contained_by : Mode.Hint.is_contained_by
+  -> ?modalities:Mode.Modality.Const.t
+  -> ('l * 'r) Mode.Value.t -> ('l * 'r) Mode.Value.t

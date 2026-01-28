@@ -34,10 +34,9 @@ by inspecting the returned mode. *)
 (* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
 
 val type_module:
-        Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.module_expr ->
-        Typedtree.module_expr * Shape.t
+  Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
 val type_structure:
-  Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.structure ->
+  Env.t -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *
   Shape.t * Env.t
 val type_toplevel_phrase:
@@ -116,11 +115,6 @@ type functor_dependency_error =
     Functor_applied
   | Functor_included
 
-(** Modules that are required to be legacy mode *)
-type legacy_module =
-  | Compilation_unit
-  | Toplevel
-
 type error =
     Cannot_apply of module_type
   | Not_included of Includemod.explanation
@@ -172,9 +166,6 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-  | Submode_failed of Mode.Value.error
-  | Item_weaker_than_structure of Mode.Value.error
-  | Legacy_module of legacy_module * Mode.Value.error
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
