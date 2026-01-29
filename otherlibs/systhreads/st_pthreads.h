@@ -54,14 +54,6 @@ static int st_thread_create(st_thread_id * res,
 
 #define ST_THREAD_FUNCTION void *
 
-/* Thread termination */
-
-static void st_thread_join(st_thread_id thr)
-{
-  pthread_join(thr, NULL);
-  /* best effort: ignore errors */
-}
-
 /* The master lock.  This is a mutex that is held most of the time,
    so we implement it in a slightly convoluted way to avoid
    all risks of busy-waiting.  Also, we count the number of waiting
@@ -240,26 +232,3 @@ struct caml_thread_tick_args {
   int domain_id;
   atomic_uintnat* stop;
 };
-
-#define ST_INTERRUPT_FLAG   ((uintnat)1)
-
-/* The tick thread: interrupt the domain periodically to force preemption  */
-static void * caml_thread_tick(void * arg)
-{
-  struct caml_thread_tick_args* tick_thread_args =
-    (struct caml_thread_tick_args*) arg;
-  int domain_id = tick_thread_args->domain_id;
-  atomic_uintnat* stop = tick_thread_args->stop;
-  caml_stat_free(tick_thread_args);
-
-  caml_init_domain_self(domain_id);
-  caml_domain_state *domain = Caml_state;
-
-  while(! atomic_load_acquire(stop)) {
-    st_msleep(Thread_timeout);
-
-    atomic_fetch_or(&domain->requested_external_interrupt, ST_INTERRUPT_FLAG);
-    caml_interrupt_self();
-  }
-  return NULL;
-}
