@@ -21,19 +21,7 @@
    in the assembly backends. *)
 type label = Cmm.label
 
-type instruction =
-  { mutable desc : instruction_desc;
-    mutable next : instruction;
-    arg : Reg.t array;
-    res : Reg.t array;
-    dbg : Debuginfo.t;
-    fdo : Fdo_info.t;
-    live : Reg.Set.t;
-    available_before : Reg_availability_set.t;
-    available_across : Reg_availability_set.t
-  }
-
-and instruction_desc =
+type instruction_desc =
   | Lprologue
     (* [Lepilogue_open] and [Lepilogue_close] shrink the stack on exiting a
        function. They are split so that the terminator can be emitted between
@@ -88,23 +76,35 @@ and call_operation =
         enabled_at_init : bool
       }
 
+type instruction_data =
+  { desc : instruction_desc;
+    arg : Reg.t array;
+    res : Reg.t array;
+    dbg : Debuginfo.t;
+    fdo : Fdo_info.t;
+    live : Reg.Set.t;
+    available_before : Reg_availability_set.t;
+    available_across : Reg_availability_set.t
+  }
+
+type instruction = instruction_data Oxcaml_utils.Doubly_linked_list.cell
+
 val has_fallthrough : instruction_desc -> bool
 
-val end_instr : instruction
+val is_end_desc : instruction_desc -> bool
 
-val instr_cons :
+val make_instr_data :
   instruction_desc ->
   Reg.t array ->
   Reg.t array ->
-  instruction ->
   available_before:Reg_availability_set.t ->
   available_across:Reg_availability_set.t ->
-  instruction
+  instruction_data
 
 type fundecl =
   { fun_name : string;
     fun_args : Reg.Set.t;
-    fun_body : instruction;
+    fun_body : instruction_data Oxcaml_utils.Doubly_linked_list.t;
     fun_fast : bool;
     fun_dbg : Debuginfo.t;
     fun_tailrec_entry_point_label : label option;

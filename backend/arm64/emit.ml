@@ -886,13 +886,13 @@ let emit_load_symbol_addr dst s =
    bounds check points emitted out-of-line from the function body. See
    branch_relaxation.mli. *)
 
-let num_call_gc_points instr =
-  let rec loop instr call_gc =
-    match instr.desc with
+let num_call_gc_points (body : Linear.instruction_data Oxcaml_utils.Doubly_linked_list.t) =
+  let module DLL = Oxcaml_utils.Doubly_linked_list in
+  DLL.fold_left body ~init:0 ~f:(fun call_gc data ->
+    match data.Linear.desc with
     | Lend -> call_gc
-    | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag ->
-      loop instr.next (call_gc + 1)
-    | Lop Poll -> loop instr.next (call_gc + 1)
+    | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> call_gc + 1
+    | Lop Poll -> call_gc + 1
     (* The following four should never be seen, since this function is run
        before branch relaxation. *)
     | Lop (Specific (Ifar_alloc _)) | Lop (Specific Ifar_poll) -> assert false
@@ -920,15 +920,12 @@ let num_call_gc_points instr =
     | Lcondbranch (_, _)
     | Lcondbranch3 (_, _, _)
     | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
-      loop instr.next call_gc
+    | Lstackcheck _ -> call_gc
     | Lop (Const_vec256 _ | Const_vec512 _) ->
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Specific (Illvm_intrinsic intr)) ->
       Misc.fatal_errorf
-        "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
-  in
-  loop instr 0
+        "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr)
 
 let max_out_of_line_code_offset ~num_call_gc =
   if num_call_gc < 1
@@ -1034,7 +1031,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Intop_atomic _) ->
       Misc.fatal_errorf
         "emit_instr: builtins are not yet translated to atomics: %a"
-        Printlinear.instr instr
+        Printlinear.instr_data instr
     | Lcall_op Lcall_ind -> 1
     | Lcall_op (Lcall_imm _) -> 1
     | Lcall_op Ltailcall_ind -> epilogue_size ()
@@ -1514,7 +1511,7 @@ let emit_instr i =
   | Lop (Intop_atomic _) ->
     Misc.fatal_errorf
       "emit_instr: builtins are not yet translated to atomics: %a"
-      Printlinear.instr i
+      Printlinear.instr_data i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
@@ -1836,7 +1833,7 @@ let emit_instr i =
       (Intop_imm ((Imul | Idiv | Iclz _ | Ictz _ | Ipopcnt | Imod | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
-      Printlinear.instr i
+      Printlinear.instr_data i
   | Lop (Specific Isqrtf) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(0) with
     | S_regs (rd, rn, _) -> A.ins2 FSQRT rd rn
@@ -2104,18 +2101,17 @@ let emit_instr i =
   try emit_instr i
   with exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
-      Printlinear.instr i;
+      Printlinear.instr_data i;
     raise exn
 
 (* Emission of an instruction sequence *)
 
-let rec emit_all i =
-  (* CR-soon xclerc for xclerc: get rid of polymorphic compare. *)
-  if Stdlib.compare i.desc Lend = 0
-  then ()
-  else (
-    emit_instr i;
-    emit_all i.next)
+let emit_all (body : Linear.instruction_data Oxcaml_utils.Doubly_linked_list.t) =
+  let module DLL = Oxcaml_utils.Doubly_linked_list in
+  DLL.iter body ~f:(fun data ->
+    match data.Linear.desc with
+    | Lend -> ()
+    | _ -> emit_instr data)
 
 (* Emission of a function declaration *)
 

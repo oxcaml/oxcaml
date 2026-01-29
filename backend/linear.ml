@@ -21,19 +21,7 @@ open! Int_replace_polymorphic_compare [@@warning "-66"]
 
 type label = Cmm.label
 
-type instruction =
-  { mutable desc : instruction_desc;
-    mutable next : instruction;
-    arg : Reg.t array;
-    res : Reg.t array;
-    dbg : Debuginfo.t;
-    fdo : Fdo_info.t;
-    live : Reg.Set.t;
-    available_before : Reg_availability_set.t;
-    available_across : Reg_availability_set.t
-  }
-
-and instruction_desc =
+type instruction_desc =
   | Lprologue
   | Lepilogue_open
   | Lepilogue_close
@@ -77,6 +65,19 @@ and call_operation =
         enabled_at_init : bool
       }
 
+type instruction_data =
+  { desc : instruction_desc;
+    arg : Reg.t array;
+    res : Reg.t array;
+    dbg : Debuginfo.t;
+    fdo : Fdo_info.t;
+    live : Reg.Set.t;
+    available_before : Reg_availability_set.t;
+    available_across : Reg_availability_set.t
+  }
+
+type instruction = instruction_data Oxcaml_utils.Doubly_linked_list.cell
+
 let has_fallthrough = function
   | Lreturn | Lbranch _ | Lswitch _ | Lraise _
   | Lcall_op Ltailcall_ind
@@ -91,10 +92,13 @@ let has_fallthrough = function
   | Ladjust_stack_offset _ | Lpushtrap _ | Lstackcheck _ ->
     true
 
+let is_end_desc (desc : instruction_desc) =
+  match[@warning "-4"] desc with Lend -> true | _ -> false
+
 type fundecl =
   { fun_name : string;
     fun_args : Reg.Set.t;
-    fun_body : instruction;
+    fun_body : instruction_data Oxcaml_utils.Doubly_linked_list.t;
     fun_fast : bool;
     fun_dbg : Debuginfo.t;
     fun_tailrec_entry_point_label : label option;
@@ -105,29 +109,10 @@ type fundecl =
     fun_section_name : string option
   }
 
-(* Invert a test *)
-
-(* The "end" instruction *)
-
-let rec end_instr =
-  { desc = Lend;
-    next = end_instr;
-    arg = [||];
-    res = [||];
-    dbg = Debuginfo.none;
-    fdo = Fdo_info.none;
-    live = Reg.Set.empty;
-    available_before = Unreachable;
-    available_across = Unreachable
-  }
-
-(* Cons an instruction (live, debug empty) *)
-
-let instr_cons d a r n ~available_before ~available_across =
-  { desc = d;
-    next = n;
-    arg = a;
-    res = r;
+let make_instr_data desc arg res ~available_before ~available_across =
+  { desc;
+    arg;
+    res;
     dbg = Debuginfo.none;
     fdo = Fdo_info.none;
     live = Reg.Set.empty;

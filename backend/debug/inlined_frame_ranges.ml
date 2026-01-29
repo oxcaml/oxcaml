@@ -160,6 +160,8 @@ module Inlined_frames = struct
   end
 
   let available_before (insn : L.instruction) =
+    let module DLL = Oxcaml_utils.Doubly_linked_list in
+    let data = DLL.value insn in
     let get_parents (dbg : Debuginfo.item list) : Debuginfo.t list =
       match List.rev dbg with
       | [] | [_] -> []
@@ -171,11 +173,11 @@ module Inlined_frames = struct
         in
         loop parents
     in
-    let insn_dbg = Debuginfo.to_items insn.dbg in
+    let insn_dbg = Debuginfo.to_items data.L.dbg in
     match insn_dbg with
     | [] -> None
     | _ :: _ ->
-      Some (Key.Set.Ok (Key.Raw_set.of_list (insn.dbg :: get_parents insn_dbg)))
+      Some (Key.Set.Ok (Key.Raw_set.of_list (data.L.dbg :: get_parents insn_dbg)))
 
   let available_across insn =
     (* A single [Linear] instruction never spans inlined frames. *)
