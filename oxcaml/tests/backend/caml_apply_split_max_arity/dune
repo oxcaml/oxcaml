@@ -13,7 +13,6 @@
  (ocamlopt_flags
   (:standard -linscan -Oclassic)))
 
-
 (rule
  (enabled_if
   (= %{context_name} "main"))
@@ -32,10 +31,8 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and
-   (= %{context_name} "main")
-   (<> %{ocaml-config:flambda} true)))
+  (= %{context_name} "main"))
  (action
- (progn
-  (diff t.expected t.output)
-  (diff stack.expected stack.output))))
+  (progn
+   (diff t.expected t.output)
+   (diff stack.expected stack.output))))
