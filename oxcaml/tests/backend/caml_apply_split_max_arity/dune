@@ -14,13 +14,9 @@
   (:standard -linscan -Oclassic)))
 
 
-;; CR-soon gyorsh: to enable on macos, replace "readelf -sW" in the filter below
-
 (rule
  (enabled_if
-  (and
-   (<> %{system} "macosx")
-   (= %{context_name} "main")))
+  (= %{context_name} "main"))
  (targets t.output stack.output)
  (deps t.exe stack.exe)
  (action
@@ -28,7 +24,7 @@
    (with-outputs-to
     t.output
     (bash
-     "readelf -sW ./t.exe | grep \" caml_apply[0-9]\\{1,3\\}\" | sed \"s/.*caml_apply//\" | sed \"s/L\\$//\" | sort -n | tail -1"))
+     "nm ./t.exe | grep \"caml_apply[0-9]\" | sed \"s/.*caml_apply//\" | sed \"s/L\\$//\" | sort -n | tail -1"))
    (with-outputs-to
     stack.output
     (run ./stack.exe)))))
@@ -37,10 +33,8 @@
  (alias runtest)
  (enabled_if
   (and
-   (<> %{system} "macosx")
-   (and
-    (= %{context_name} "main")
-    (<> %{ocaml-config:flambda} true))))
+   (= %{context_name} "main")
+   (<> %{ocaml-config:flambda} true)))
  (action
  (progn
   (diff t.expected t.output)
