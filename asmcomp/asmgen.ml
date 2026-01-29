@@ -723,31 +723,17 @@ let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
       linear_gen_implementation ~ppf_dump unix progname)
 
 (* Error report *)
-<<<<<<< HEAD
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-module Style = Misc.Style
-=======
-module Style = Misc.Style
-let fprintf, dprintf = Format_doc.fprintf, Format_doc.dprintf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+
+let fprintf = Format_doc.fprintf
 
 let report_error ppf = function
   | Assembler_error file ->
-<<<<<<< HEAD
-    fprintf ppf "Assembler error, input left in file %a" Location.print_filename
-      file
+    fprintf ppf "Assembler error, input left in file %a"
+      Location.Doc.quoted_filename file
   | Binary_emitter_mismatch file ->
     fprintf ppf "Binary emitter verification failed for %a"
-      Location.print_filename file
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      fprintf ppf "Assembler error, input left in file %a"
-        Location.print_filename file
-=======
-      fprintf ppf "Assembler error, input left in file %a"
-        Location.Doc.quoted_filename file
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      Location.Doc.quoted_filename file
   | Mismatched_for_pack saved ->
-<<<<<<< HEAD
     let msg prefix =
       if Compilation_unit.Prefix.is_empty prefix
       then "without -for-pack"
@@ -759,31 +745,6 @@ let report_error ppf = function
   | Asm_generation (fn, err) ->
     fprintf ppf "Error producing assembly code for %s: %a" fn
       Emitaux.report_error err
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    let msg = function
-       | None -> Format.dprintf "without %a" Style.inline_code "-for-pack"
-       | Some s -> Format.dprintf "with %a" Style.inline_code ("-for-pack " ^ s)
-     in
-     fprintf ppf
-       "This input file cannot be compiled %t: it was generated %t."
-       (msg !Clflags.for_package) (msg saved)
-  | Asm_generation(fn, err) ->
-     fprintf ppf
-       "Error producing assembly code for function %a: %a"
-       Style.inline_code fn Emitaux.report_error err
-=======
-    let msg = function
-       | None -> dprintf "without %a" Style.inline_code "-for-pack"
-       | Some s -> dprintf "with %a" Style.inline_code ("-for-pack " ^ s)
-     in
-     fprintf ppf
-       "This input file cannot be compiled %t: it was generated %t."
-       (msg !Clflags.for_package) (msg saved)
-  | Asm_generation(fn, err) ->
-     fprintf ppf
-       "Error producing assembly code for function %a: %a"
-       Style.inline_code fn Emitaux.report_error err
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let () =
   Location.register_error_of_exn (function

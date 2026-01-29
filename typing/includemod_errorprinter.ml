@@ -65,22 +65,10 @@ module Context = struct
   let alt_pp ppf cxt =
     if cxt = [] then () else
     if List.for_all (function Module _ -> true | _ -> false) cxt then
-<<<<<<< HEAD
-      Format.fprintf ppf "in module %a,"
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      Format.fprintf ppf ",@ in module %a"
-=======
-      Fmt.fprintf ppf ",@ in module %a"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      Fmt.fprintf ppf "in module %a,"
         (Style.as_inline_code Printtyp.path) (path_of_context cxt)
     else
-<<<<<<< HEAD
-      Format.fprintf ppf "@[<hv 2>at position@ %a,@]"
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      Format.fprintf ppf ",@ @[<hv 2>at position@ %a@]"
-=======
-      Fmt.fprintf ppf ",@ @[<hv 2>at position@ %a@]"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      Fmt.fprintf ppf "@[<hv 2>at position@ %a,@]"
         (Style.as_inline_code context) cxt
 
   let pp ppf cxt =
@@ -183,17 +171,9 @@ module Illegal_permutation = struct
 
   let pp ctx_printer env ppf (mty,c) =
     try
-<<<<<<< HEAD
       let p, k, l = transposition c in
       let ctx, mt = find env p mty in
-      Format.fprintf ppf
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let ctx, mt = find env path mty in
-      Format.fprintf ppf
-=======
-      let ctx, mt = find env path mty in
       Fmt.fprintf ppf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         "@[<hv 2>Illegal permutation of runtime components in a module type.@ \
          @[For example,@ %a@]@ @[the %a@ and the %a are not in the same order@ \
          in the expected and actual module types.@]@]"
@@ -202,82 +182,6 @@ module Illegal_permutation = struct
       Fmt.fprintf ppf
         "Illegal permutation of runtime components in a module type."
 
-<<<<<<< HEAD
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let in_package_subtype ctx_printer env mty c ppf =
-    match first_change c with
-    | None ->
-        (* The coercion looks like the identity but was not simplified to
-           [Tcoerce_none], this only happens when the two first-class module
-           types differ by runtime size *)
-        Format.fprintf ppf
-          "The two first-class module types differ by their runtime size."
-    | Some (path, c) ->
-  try
-    let ctx, mt = find env path mty in
-    match c with
-    | Primitive_coercion prim_name ->
-        Format.fprintf ppf
-          "@[The two first-class module types differ by a coercion of@ \
-           the primitive %a@ to a value%a.@]"
-          Style.inline_code prim_name
-          ctx_printer ctx
-    | Alias_coercion path ->
-        Format.fprintf ppf
-          "@[The two first-class module types differ by a coercion of@ \
-           a module alias %a@ to a module%a.@]"
-          (Style.as_inline_code Printtyp.path) path
-          ctx_printer ctx
-    | Transposition (k,l) ->
-        Format.fprintf ppf
-          "@[@[The two first-class module types do not share@ \
-           the same positions for runtime components.@]@ \
-           @[For example,%a@ the %a@ occurs at the expected position of@ \
-           the %a.@]@]"
-          ctx_printer ctx pp_item (item mt k) pp_item (item mt l)
-  with Not_found ->
-    Format.fprintf ppf
-      "@[The two packages types do not share@ \
-       the@ same@ positions@ for@ runtime@ components.@]"
-
-=======
-  let in_package_subtype ctx_printer env mty c ppf =
-    match first_change c with
-    | None ->
-        (* The coercion looks like the identity but was not simplified to
-           [Tcoerce_none], this only happens when the two first-class module
-           types differ by runtime size *)
-        Fmt.fprintf ppf
-          "The two first-class module types differ by their runtime size."
-    | Some (path, c) ->
-  try
-    let ctx, mt = find env path mty in
-    match c with
-    | Primitive_coercion prim_name ->
-        Fmt.fprintf ppf
-          "@[The two first-class module types differ by a coercion of@ \
-           the primitive %a@ to a value%a.@]"
-          Style.inline_code prim_name
-          ctx_printer ctx
-    | Alias_coercion path ->
-        Fmt.fprintf ppf
-          "@[The two first-class module types differ by a coercion of@ \
-           a module alias %a@ to a module%a.@]"
-          (Style.as_inline_code Printtyp.path) path
-          ctx_printer ctx
-    | Transposition (k,l) ->
-        Fmt.fprintf ppf
-          "@[@[The two first-class module types do not share@ \
-           the same positions for runtime components.@]@ \
-           @[For example,%a@ the %a@ occurs at the expected position of@ \
-           the %a.@]@]"
-          ctx_printer ctx pp_item (item mt k) pp_item (item mt l)
-  with Not_found ->
-    Fmt.fprintf ppf
-      "@[The two packages types do not share@ \
-       the@ same@ positions@ for@ runtime@ components.@]"
-
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 end
 
 
@@ -299,16 +203,8 @@ let show_locs ppf (loc1, loc2) =
 
 
 let dmodtype mty =
-<<<<<<< HEAD
   let tmty = Printtyp.tree_of_modtype ~abbrev:true mty in
-  Format.dprintf "%a" !Oprint.out_module_type tmty
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let tmty = Printtyp.tree_of_modtype mty in
-  Format.dprintf "%a" !Oprint.out_module_type tmty
-=======
-  let tmty = Printtyp.tree_of_modtype mty in
   Fmt.dprintf "%a" !Oprint.out_module_type tmty
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let space ppf () = Fmt.fprintf ppf "@ "
 
@@ -547,19 +443,9 @@ module With_shorthand = struct
   let pp_orig ppx = function
     | Original x | Synthetic { item=x; _ } -> ppx x
 
-<<<<<<< HEAD
   let definition ~is_modal x = match functor_param x with
-    | Unit -> Format.dprintf "()"
-    | Named(_,short_mty, mm) ->
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let definition x = match functor_param x with
-    | Unit -> Format.dprintf "()"
-    | Named(_,short_mty) ->
-=======
-  let definition x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
-    | Named(_,short_mty) ->
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+    | Named(_,short_mty, mm) ->
         match short_mty with
         | Original mty -> dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
         | Synthetic {name; item = mty} ->
@@ -567,73 +453,31 @@ module With_shorthand = struct
               "%s@ =@ %t" name (dmodtype mty)
             |> dthen_alloc_mode_r ~is_modal mm
 
-<<<<<<< HEAD
   let param ~is_modal x = match functor_param x with
-    | Unit -> Format.dprintf "()"
-    | Named (_, short_mty, mm) ->
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let param x = match functor_param x with
-    | Unit -> Format.dprintf "()"
-    | Named (_, short_mty) ->
-=======
-  let param x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
-    | Named (_, short_mty) ->
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+    | Named (_, short_mty, mm) ->
         pp dmodtype short_mty
         |> dthen_alloc_mode_r ~is_modal mm
 
-<<<<<<< HEAD
   let qualified_param ~is_modal x = match functor_param x with
-    | Unit -> Format.dprintf "()"
+    | Unit -> Fmt.dprintf "()"
     | Named (None, Original (Mty_signature []), mm) ->
-        Format.dprintf "(sig end%t)"
+        Fmt.dprintf "(sig end%t)"
           (maybe_print_alloc_mode_r ~is_modal mm)
     | Named (None, short_mty, mm) ->
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let qualified_param x = match functor_param x with
-    | Unit -> Format.dprintf "()"
-    | Named (None, Original (Mty_signature []) ) ->
-        Format.dprintf "(sig end)"
-    | Named (None, short_mty) ->
-=======
-  let qualified_param x = match functor_param x with
-    | Unit -> Fmt.dprintf "()"
-    | Named (None, Original (Mty_signature []) ) ->
-        Fmt.dprintf "(sig end)"
-    | Named (None, short_mty) ->
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         pp dmodtype short_mty
-<<<<<<< HEAD
         |> dthen_alloc_mode_r ~is_modal mm
     | Named (Some p, short_mty, mm) ->
-        Format.dprintf "(%s : %t)"
+        Fmt.dprintf "(%s : %t)"
           (Ident.name p) (pp dmodtype short_mty
           |> dthen_alloc_mode_r ~is_modal mm)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    | Named (Some p, short_mty) ->
-        Format.dprintf "(%s : %t)"
-          (Ident.name p) (pp dmodtype short_mty)
-=======
-    | Named (Some p, short_mty) ->
-        Fmt.dprintf "(%s : %t)"
-          (Ident.name p) (pp dmodtype short_mty)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
   let definition_of_argument ~is_modal ua =
     let arg, mty, (mode, _locks) = ua.item in
     match (arg: Err.functor_arg_descr) with
-<<<<<<< HEAD
-    | Unit -> Format.dprintf "()"
-    | Empty_struct ->
-        Format.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    | Unit -> Format.dprintf "()"
-    | Empty_struct -> Format.dprintf "(struct end)"
-=======
     | Unit -> Fmt.dprintf "()"
-    | Empty_struct -> Fmt.dprintf "(struct end)"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+    | Empty_struct ->
+        Fmt.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
     | Named p ->
         let mty = match mty with
           | Types.Mty_strengthen (mty,q,_) when Path.same p q -> mty
@@ -650,30 +494,16 @@ module With_shorthand = struct
         begin match short_mty with
         | Original mty -> dmodtype mty |> dthen_mode_l ~is_modal mode
         | Synthetic {name; item=mty} ->
-<<<<<<< HEAD
-            Format.dprintf "%s@ :@ %t" name (dmodtype mty)
-            |> dthen_mode_l ~is_modal mode
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-            Format.dprintf "%s@ :@ %t" name (dmodtype mty)
-=======
             Fmt.dprintf "%s@ :@ %t" name (dmodtype mty)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+            |> dthen_mode_l ~is_modal mode
         end
 
   let arg ~is_modal ua =
     let arg, mty, (mode, _locks) = ua.item in
     match (arg: Err.functor_arg_descr) with
-<<<<<<< HEAD
-    | Unit -> Format.dprintf "()"
-    | Empty_struct ->
-        Format.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    | Unit -> Format.dprintf "()"
-    | Empty_struct -> Format.dprintf "(struct end)"
-=======
     | Unit -> Fmt.dprintf "()"
-    | Empty_struct -> Fmt.dprintf "(struct end)"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+    | Empty_struct ->
+        Fmt.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
     | Named p -> fun ppf -> Printtyp.path ppf p
     | Anonymous ->
         let short_mty = modtype { ua with item=mty } in
@@ -750,22 +580,10 @@ module Functor_suberror = struct
           (With_shorthand.param ~is_modal:None x)
           (With_shorthand.param ~is_modal:None y)
 
-<<<<<<< HEAD
       let diff ~is_modal g e more =
         let g = With_shorthand.definition ~is_modal g in
         let e = With_shorthand.definition ~is_modal e in
-        Format.dprintf
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let diff g e more =
-        let g = With_shorthand.definition g in
-        let e = With_shorthand.definition e in
-        Format.dprintf
-=======
-      let diff g e more =
-        let g = With_shorthand.definition g in
-        let e = With_shorthand.definition e in
         Fmt.dprintf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
           "Module types do not match:@ @[%t@]@;<1 -2>does not include@ \
            @[%t@]%t"
           g e (more ())
@@ -809,16 +627,8 @@ module Functor_suberror = struct
 
     let ok x y =
       let pp_orig_name = match With_shorthand.functor_param y with
-<<<<<<< HEAD
         | With_shorthand.Named (_, Original mty, _) ->
-            Format.dprintf " %t" (dmodtype mty)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        | With_shorthand.Named (_, Original mty) ->
-            Format.dprintf " %t" (dmodtype mty)
-=======
-        | With_shorthand.Named (_, Original mty) ->
             Fmt.dprintf " %t" (dmodtype mty)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         | _ -> ignore
       in
       Fmt.dprintf
@@ -826,22 +636,10 @@ module Functor_suberror = struct
         (With_shorthand.arg ~is_modal:None x)
         pp_orig_name
 
-<<<<<<< HEAD
     let diff ~is_modal g e more =
       let g = With_shorthand.definition_of_argument ~is_modal g in
       let e = With_shorthand.definition ~is_modal e in
-      Format.dprintf
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    let diff g e more =
-      let g = With_shorthand.definition_of_argument g in
-      let e = With_shorthand.definition e in
-      Format.dprintf
-=======
-    let diff g e more =
-      let g = With_shorthand.definition_of_argument g in
-      let e = With_shorthand.definition e in
       Fmt.dprintf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         "Modules do not match:@ @[%t@]@;<1 -2>\
          is not included in@ @[%t@]%t"
         g e (more ())
@@ -849,28 +647,14 @@ module Functor_suberror = struct
     (** Specialized to avoid introducing shorthand names
         for single change difference
     *)
-<<<<<<< HEAD
     let single_diff ~is_modal g e more =
       let _arg, mty1, (mode1, _) = g.With_shorthand.item in
       let mty1_with_mode = dmodtype mty1 |> dthen_mode_l ~is_modal mode1 in
       let mty2_with_mode =
         match e.With_shorthand.item with
-        | Types.Unit -> Format.dprintf "()"
+        | Types.Unit -> Fmt.dprintf "()"
         | Types.Named(_, mty, mm) ->
             dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    let single_diff g e more =
-      let _arg, mty = g.With_shorthand.item in
-      let e = match e.With_shorthand.item with
-        | Types.Unit -> Format.dprintf "()"
-        | Types.Named(_, mty) -> dmodtype mty
-=======
-    let single_diff g e more =
-      let _arg, mty = g.With_shorthand.item in
-      let e = match e.With_shorthand.item with
-        | Types.Unit -> Fmt.dprintf "()"
-        | Types.Named(_, mty) -> dmodtype mty
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
       in
       Fmt.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\
@@ -972,17 +756,11 @@ let core env id x =
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Value_descriptions diff ->
-<<<<<<< HEAD
       let is_modal = Is_modal.value_mismatch diff.symptom in
       let mode1, mode2 =
         maybe_print_modes ~in_structure:true ~is_modal diff.modes
       in
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a%t@ %s@;<1 2>%a%t@]%a%a%t@]"
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
-=======
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a%t@ %s@;<1 2>%a%t@]%a%a%t@]"
         "Values do not match"
         !Oprint.out_sig_item
         (Printtyp.tree_of_value_description id diff.got)
@@ -1000,13 +778,7 @@ let core env id x =
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Type_declarations diff ->
-<<<<<<< HEAD
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
-=======
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
         "Type declarations do not match"
         !Oprint.out_sig_item
         (Printtyp.tree_of_type_declaration id diff.got Trec_first)
@@ -1018,13 +790,7 @@ let core env id x =
         show_locs (diff.got.type_loc, diff.expected.type_loc)
         Printtyp.Conflicts.print_explanations
   | Err.Extension_constructors diff ->
-<<<<<<< HEAD
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]@ %a%a%t@]"
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]@ %a%a@]"
-=======
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]@ %a%a@]"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]@ %a%a%t@]"
         "Extension declarations do not match"
         !Oprint.out_sig_item
         (Printtyp.tree_of_extension_constructor id diff.got Text_first)
@@ -1069,18 +835,10 @@ let missing_field ppf item =
     (Style.as_inline_code Printtyp.ident) id
     (show_loc "Expected declaration") loc
 
-<<<<<<< HEAD
 let module_types {Err.got=mty1; expected=mty2; modes; symptom}=
   let is_modal = Is_modal.module_type_symptom symptom in
   let mode1, mode2 = maybe_print_modes ~is_modal modes in
-  Format.dprintf
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let module_types {Err.got=mty1; expected=mty2} =
-  Format.dprintf
-=======
-let module_types {Err.got=mty1; expected=mty2} =
   Fmt.dprintf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
     "@[<hv 2>Modules do not match:@ \
      %a%t@;<1 -2>is not included in@ %a%t@]"
     !Oprint.out_module_type (Printtyp.tree_of_modtype ~abbrev:true mty1)
@@ -1088,16 +846,8 @@ let module_types {Err.got=mty1; expected=mty2} =
     !Oprint.out_module_type (Printtyp.tree_of_modtype ~abbrev:true mty2)
     mode2
 
-<<<<<<< HEAD
 let eq_module_types ({Err.got=mty1; expected=mty2} : _ mdiff) =
-  Format.dprintf
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let eq_module_types {Err.got=mty1; expected=mty2} =
-  Format.dprintf
-=======
-let eq_module_types {Err.got=mty1; expected=mty2} =
   Fmt.dprintf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
     "@[<hv 2>Module types do not match:@ \
      %a@;<1 -2>is not equal to@ %a@]"
     !Oprint.out_module_type (Printtyp.tree_of_modtype ~abbrev:true mty1)
@@ -1340,33 +1090,13 @@ let all env = function
 
 (* General error reporting *)
 
-<<<<<<< HEAD
-let err_msgs (env, err) =
-  Printtyp.Conflicts.reset();
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let err_msgs (env, err) =
-=======
 let err_msgs ppf (env, err) =
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  Printtyp.Conflicts.reset();
   Printtyp.wrap_printing_env ~error:true env
     (fun () -> (coalesce @@ all env err)  ppf)
 
 let report_error err =
-<<<<<<< HEAD
-  let main = err_msgs err in
-  Location.errorf ~loc:Location.(in_file !input_name) "%t" main
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let main = err_msgs err in
-  Location.errorf
-    ~loc:Location.(in_file !input_name)
-    ~footnote:Printtyp.Conflicts.err_msg
-   "%t" main
-=======
-  Location.errorf
-    ~loc:Location.(in_file !input_name)
-    ~footnote:Printtyp.Conflicts.err_msg
-   "%a" err_msgs err
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  Location.errorf ~loc:Location.(in_file !input_name) "%a" err_msgs err
 
 let report_apply_error ~loc env (app_name, mty_f, args) =
   let d = Functor_suberror.App.patch env ~f:mty_f ~args in
@@ -1429,17 +1159,6 @@ let report_apply_error ~loc env (app_name, mty_f, args) =
           intro
           actual expected
 
-<<<<<<< HEAD
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let coercion_in_package_subtype env mty c ppf =
-    Runtime_coercion.in_package_subtype Context.alt_pp env mty c ppf
-
-=======
-let coercion_in_package_subtype env mty c =
-  Format_doc.doc_printf "%t" @@
-  Runtime_coercion.in_package_subtype Context.alt_pp env mty c
-
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 let register () =
   Location.register_error_of_exn
     (function

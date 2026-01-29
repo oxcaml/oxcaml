@@ -28,14 +28,8 @@ module Global : sig
     | Glob_compunit of Compilation_unit.t
     | Glob_predef of predef
   val name: t -> string
-<<<<<<< HEAD
-  val description: Format.formatter -> t -> unit
-  val of_compilation_unit: Compilation_unit.t -> t
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  val description: Format.formatter -> t -> unit
-=======
   val description: t Format_doc.printer
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  val of_compilation_unit: Compilation_unit.t -> t
   val of_ident: Ident.t -> t option
   module Set : Set.S with type elt = t
   module Map : Map.S with type key = t

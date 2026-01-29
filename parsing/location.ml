@@ -298,34 +298,7 @@ let colnum ppf char =
    Some of the information (filename, line number or characters numbers) in the
    location might be invalid; in which case we do not print it.
  *)
-<<<<<<< HEAD
-let print_loc ~capitalize_first ppf loc =
-  setup_tags ();
-  let file_valid = function
-    | "_none_" ->
-        (* This is a dummy placeholder, but we print it anyway to please editors
-           that parse locations in error messages (e.g. Emacs). *)
-        true
-    | "" | "//toplevel//" -> false
-    | _ -> true
-  in
-  let line_valid line = line > 0 in
-  let chars_valid ~startchar ~endchar = startchar <> -1 && endchar <> -1 in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let print_loc ppf loc =
-  setup_tags ();
-  let file_valid = function
-    | "_none_" ->
-        (* This is a dummy placeholder, but we print it anyway to please editors
-           that parse locations in error messages (e.g. Emacs). *)
-        true
-    | "" | "//toplevel//" -> false
-    | _ -> true
-  in
-  let line_valid line = line > 0 in
-  let chars_valid ~startchar ~endchar = startchar <> -1 && endchar <> -1 in
-=======
-  let loc ppf loc =
+  let loc ~capitalize_first ppf loc =
     setup_tags ();
     let file_valid = function
       | "_none_" ->
@@ -337,7 +310,6 @@ let print_loc ppf loc =
     in
     let line_valid line = line > 0 in
     let chars_valid ~startchar ~endchar = startchar <> -1 && endchar <> -1 in
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
     let file =
       (* According to the comment in location.mli, if [pos_fname] is "", we must
@@ -350,123 +322,55 @@ let print_loc ppf loc =
     let startchar = loc.loc_start.pos_cnum - loc.loc_start.pos_bol in
     let endchar = loc.loc_end.pos_cnum - loc.loc_end.pos_bol in
 
-<<<<<<< HEAD
-  let first = ref true in
-  let capitalize s =
-    if !first then (first := false;
-                    if capitalize_first then String.capitalize_ascii s else s)
-    else s in
-  let comma () =
-    if !first then () else Format.fprintf ppf ", " in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let first = ref true in
-  let capitalize s =
-    if !first then (first := false; String.capitalize_ascii s)
-    else s in
-  let comma () =
-    if !first then () else Format.fprintf ppf ", " in
-=======
     let first = ref true in
     let capitalize s =
-      if !first then (first := false; String.capitalize_ascii s)
+      if !first then (first := false;
+                      if capitalize_first then String.capitalize_ascii s else s)
       else s in
     let comma () =
       if !first then () else Fmt.fprintf ppf ", " in
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
     Fmt.fprintf ppf "@{<loc>";
 
     if file_valid file then
       Fmt.fprintf ppf "%s \"%a\"" (capitalize "file") filename file;
 
-<<<<<<< HEAD
-  (* Print "line 1" in the case of a dummy line number. This is to please the
-     existing setup of editors that parse locations in error messages (e.g.
-     Emacs). *)
-  comma ();
-  let startline = if line_valid startline then startline else 1 in
-  let endline = if line_valid endline then endline else startline in
-
-  begin if startline = endline then
-    Format.fprintf ppf "%s %a"
-      (capitalize "line") linenum startline
-  else
-    Format.fprintf ppf "%s %a-%a"
-      (capitalize "lines") linenum startline linenum endline
-  end;
-
-  if chars_valid ~startchar ~endchar then (
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  (* Print "line 1" in the case of a dummy line number. This is to please the
-     existing setup of editors that parse locations in error messages (e.g.
-     Emacs). *)
-  comma ();
-  let startline = if line_valid startline then startline else 1 in
-  let endline = if line_valid endline then endline else startline in
-  begin if startline = endline then
-    Format.fprintf ppf "%s %i" (capitalize "line") startline
-  else
-    Format.fprintf ppf "%s %i-%i" (capitalize "lines") startline endline
-  end;
-
-  if chars_valid ~startchar ~endchar then (
-=======
     (* Print "line 1" in the case of a dummy line number. This is to please the
        existing setup of editors that parse locations in error messages (e.g.
        Emacs). *)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
     comma ();
-<<<<<<< HEAD
-    Format.fprintf ppf "%s %a-%a"
-      (capitalize "characters") colnum startchar colnum endchar
-  );
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    Format.fprintf ppf "%s %i-%i" (capitalize "characters") startchar endchar
-  );
-=======
     let startline = if line_valid startline then startline else 1 in
     let endline = if line_valid endline then endline else startline in
+
     begin if startline = endline then
-        Fmt.fprintf ppf "%s %i" (capitalize "line") startline
+        Fmt.fprintf ppf "%s %a"
+          (capitalize "line") linenum startline
       else
-        Fmt.fprintf ppf "%s %i-%i" (capitalize "lines") startline endline
+        Fmt.fprintf ppf "%s %a-%a"
+          (capitalize "lines") linenum startline linenum endline
     end;
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
     if chars_valid ~startchar ~endchar then (
       comma ();
-      Fmt.fprintf ppf "%s %i-%i" (capitalize "characters") startchar endchar
+      Fmt.fprintf ppf "%s %a-%a"
+        (capitalize "characters") colnum startchar colnum endchar
     );
 
-<<<<<<< HEAD
-let print_loc_in_lowercase = print_loc ~capitalize_first:false
-let print_loc = print_loc ~capitalize_first:true
-
-(* Print a comma-separated list of locations *)
-let print_locs ppf locs =
-  Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-    print_loc ppf locs
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-(* Print a comma-separated list of locations *)
-let print_locs ppf locs =
-  Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-    print_loc ppf locs
-=======
     Fmt.fprintf ppf "@}"
 
   (* Print a comma-separated list of locations *)
   let locs ppf locs =
     Fmt.pp_print_list ~pp_sep:(fun ppf () -> Fmt.fprintf ppf ",@ ")
-      loc ppf locs
+      (loc ~capitalize_first:true) ppf locs
   let quoted_filename ppf f = Misc.Style.as_inline_code filename ppf f
 
 end
 
 let print_filename = Fmt.compat Doc.filename
-let print_loc = Fmt.compat Doc.loc
+let print_loc_in_lowercase = Fmt.compat (Doc.loc ~capitalize_first:false)
+let print_loc = Fmt.compat (Doc.loc ~capitalize_first:true)
 let print_locs = Fmt.compat Doc.locs
 let separate_new_message ppf = Fmt.compat Doc.separate_new_message ppf ()
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 (******************************************************************************)
 (* An interval set structure; additionally, it stores user-provided information
@@ -880,12 +784,6 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
-<<<<<<< HEAD
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  footnote: unit -> (Format.formatter -> unit) option;
-=======
-  footnote: Fmt.t option;
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 }
 
 type report_printer = {
@@ -965,19 +863,7 @@ let batch_mode_printer : report_printer =
     Format.fprintf ppf "@[<v>%a:@ %a@]" print_loc loc
       (Fmt.compat highlight) loc
   in
-<<<<<<< HEAD
-  let pp_txt ppf txt = Format.fprintf ppf "@[%t@]" txt in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let pp_txt ppf txt = Format.fprintf ppf "@[%t@]" txt in
-  let pp_footnote ppf f =
-    Option.iter (Format.fprintf ppf "@,%a" pp_txt) (f ())
-  in
-=======
   let pp_txt ppf txt = Format.fprintf ppf "@[%a@]" Fmt.Doc.format txt in
-  let pp_footnote ppf f =
-    Option.iter (Format.fprintf ppf "@,%a" pp_txt) f
-  in
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   let pp self ppf report =
     setup_tags ();
     separate_new_message ppf;
@@ -1074,59 +960,21 @@ let print_report ppf report =
 (* Reporting errors *)
 
 type error = report
-<<<<<<< HEAD
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-type delayed_msg = unit -> (Format.formatter -> unit) option
-=======
-type delayed_msg = unit -> Fmt.t option
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let report_error ppf err =
   print_report ppf err
 
-<<<<<<< HEAD
 let mkerror loc sub txt =
   { kind = Report_error; main = { loc; txt }; sub }
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let mkerror loc sub footnote txt =
-  { kind = Report_error; main = { loc; txt }; sub; footnote }
-=======
-let mkerror loc sub footnote txt =
-  { kind = Report_error; main = { loc; txt }; sub; footnote=footnote () }
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
-<<<<<<< HEAD
 let errorf ?(loc = none) ?(sub = []) =
   Format.kdprintf (mkerror loc sub)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
-  Format.kdprintf (mkerror loc sub footnote)
-=======
-let errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
-  Fmt.kdoc_printf (mkerror loc sub footnote)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
-<<<<<<< HEAD
 let error ?(loc = none) ?(sub = []) msg_str =
   mkerror loc sub (fun ppf -> Format.pp_print_string ppf msg_str)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let error ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) msg_str =
-  mkerror loc sub footnote (fun ppf -> Format.pp_print_string ppf msg_str)
-=======
-let error ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) msg_str =
-  mkerror loc sub footnote Fmt.Doc.(string msg_str empty)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
-<<<<<<< HEAD
 let error_of_printer ?(loc = none) ?(sub = []) pp x =
   mkerror loc sub (fun ppf -> pp ppf x)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let error_of_printer ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) pp x =
-  mkerror loc sub footnote (fun ppf -> pp ppf x)
-=======
-let error_of_printer ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) pp x =
-  mkerror loc sub footnote (Fmt.doc_printf "%a" pp x)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let error_of_printer_file print x =
   error_of_printer ~loc:(in_file !input_name) print x
@@ -1145,13 +993,7 @@ let default_warning_alert_reporter report mk (loc: t) w : report option =
       let sub = List.map (fun (loc, sub_message) ->
         { loc; txt = msg_of_str sub_message }
       ) sub_locs in
-<<<<<<< HEAD
       Some { kind; main; sub }
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      Some { kind; main; sub; footnote=Fun.const None }
-=======
-      Some { kind; main; sub; footnote=None }
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 
 let default_warning_reporter =
@@ -1286,17 +1128,9 @@ let () =
       | _ -> None
     )
 
-<<<<<<< HEAD
 let raise_errorf ?(loc = none) ?(sub = []) =
   Format.kdprintf (fun txt -> raise (Error (mkerror loc sub txt)))
 
 let todo_overwrite_not_implemented ?(kind = "") t =
   alert ~kind t "Overwrite not implemented.";
   assert false
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let raise_errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
-  Format.kdprintf (fun txt -> raise (Error (mkerror loc sub footnote txt)))
-=======
-let raise_errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
-  Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub footnote txt)))
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)

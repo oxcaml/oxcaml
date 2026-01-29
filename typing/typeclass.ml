@@ -18,13 +18,7 @@ open Asttypes
 open Path
 open Types
 open Typetexp
-<<<<<<< HEAD
-open Format
 open Mode
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-open Format
-=======
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 
 type 'a class_info = {

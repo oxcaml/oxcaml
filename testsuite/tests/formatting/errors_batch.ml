@@ -40,14 +40,6 @@ let () =
       msg "@[<v>This second sub-message does not have \
            a location;@,ghost locations of submessages are \
            not printed.@]";
-<<<<<<< HEAD
     ]
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    ];
-    footnote=Fun.const None;
-=======
-    ];
-    footnote=None;
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   } in
   print_report Format.std_formatter report

@@ -4806,7 +4806,6 @@ let print_lock_item ppf (item, lid) =
 
 module Style = Misc.Style
 
-<<<<<<< HEAD
 let print_stage ppf stage =
   if stage = 0 then fprintf ppf "outside any quotations"
   else if stage = 1 then fprintf ppf "inside a quotation (<[ ... ]>)"
@@ -4847,15 +4846,9 @@ let print_unbound_in_quotation ppf =
   | Label -> fprintf ppf "Label"
   | Constructor -> fprintf ppf "Constructor"
 
-
-let report_lookup_error ~level _loc env ppf = function
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let report_lookup_error _loc env ppf = function
-=======
 let quoted_longident = Style.as_inline_code pp_longident
 
-let report_lookup_error _loc env ppf = function
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+let report_lookup_error ~level _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
       fprintf ppf "Unbound value %a" quoted_longident lid;
       spellcheck ppf extract_values env lid;
@@ -4877,16 +4870,8 @@ let report_lookup_error _loc env ppf = function
       spellcheck ppf extract_types env lid;
   | Unbound_module lid -> begin
       fprintf ppf "Unbound module %a"
-<<<<<<< HEAD
-        (Style.as_inline_code !print_longident) lid;
-       match find_modtype_by_name_lazy lid env with
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code !print_longident) lid;
-       match find_modtype_by_name lid env with
-=======
         quoted_longident lid;
-       match find_modtype_by_name lid env with
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+       match find_modtype_by_name_lazy lid env with
       | exception Not_found -> spellcheck ppf extract_modules env lid;
       | _ ->
          fprintf ppf
@@ -4898,12 +4883,11 @@ let report_lookup_error _loc env ppf = function
       fprintf ppf "Unbound constructor %a"
         quoted_longident lid;
       spellcheck ppf extract_constructors env lid;
-<<<<<<< HEAD
   | Unbound_label (lid, record_form, usage) ->
       let P record_form = record_form in
       fprintf ppf "Unbound %s field %a"
         (record_form_to_string record_form)
-        (Style.as_inline_code !print_longident) lid;
+        quoted_longident lid;
       spellcheck ppf (extract_labels record_form) env lid;
       let label_of_other_form = match record_form with
         | Legacy ->
@@ -4938,17 +4922,6 @@ let report_lookup_error _loc env ppf = function
         | _ -> ());
         Format.fprintf ppf "@]"
       | None -> ());
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  | Unbound_label lid ->
-      fprintf ppf "Unbound record field %a"
-        (Style.as_inline_code !print_longident) lid;
-      spellcheck ppf extract_labels env lid;
-=======
-  | Unbound_label lid ->
-      fprintf ppf "Unbound record field %a"
-        quoted_longident lid;
-      spellcheck ppf extract_labels env lid;
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Unbound_class lid -> begin
       fprintf ppf "Unbound class %a"
         quoted_longident lid;
@@ -4962,16 +4935,8 @@ let report_lookup_error _loc env ppf = function
     end
   | Unbound_modtype lid -> begin
       fprintf ppf "Unbound module type %a"
-<<<<<<< HEAD
-        (Style.as_inline_code !print_longident) lid;
-      match find_module_by_name_lazy lid env with
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code !print_longident) lid;
-      match find_module_by_name lid env with
-=======
         quoted_longident lid;
-      match find_module_by_name lid env with
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      match find_module_by_name_lazy lid env with
       | exception Not_found -> spellcheck ppf extract_modtypes env lid;
       | _ ->
          fprintf ppf
@@ -4981,28 +4946,10 @@ let report_lookup_error _loc env ppf = function
     end
   | Unbound_cltype lid ->
       fprintf ppf "Unbound class type %a"
-<<<<<<< HEAD
-        (Style.as_inline_code !print_longident) lid;
+        quoted_longident lid;
       spellcheck ppf extract_cltypes env lid
   | Unbound_settable_variable s ->
       fprintf ppf "Unbound instance variable or mutable variable %a"
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code !print_longident) lid;
-      spellcheck ppf extract_cltypes env lid;
-  | Unbound_instance_variable s ->
-      fprintf ppf "Unbound instance variable %a" Style.inline_code s;
-      spellcheck_name ppf extract_instance_variables env s;
-  | Not_an_instance_variable s ->
-      fprintf ppf "The value %a is not an instance variable"
-=======
-       quoted_longident lid;
-      spellcheck ppf extract_cltypes env lid;
-  | Unbound_instance_variable s ->
-      fprintf ppf "Unbound instance variable %a" Style.inline_code s;
-      spellcheck_name ppf extract_instance_variables env s;
-  | Not_an_instance_variable s ->
-      fprintf ppf "The value %a is not an instance variable"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         Style.inline_code s;
       spellcheck_name ppf extract_settable_variables env s
   | Not_a_settable_variable s ->
@@ -5023,8 +4970,7 @@ let report_lookup_error _loc env ppf = function
       fprintf ppf
         "The ancestor variable %a@ \
          cannot be accessed from the definition of an instance variable"
-<<<<<<< HEAD
-       (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
   | Illegal_reference_to_recursive_module { container; unbound } ->
       let container = Option.value ~default:"_" container in
       let self_or_definition, self_or_unbound =
@@ -5059,67 +5005,30 @@ let report_lookup_error _loc env ppf = function
          makes the module type of %a@ depend on %t.@ \
          Such recursive definitions of@ class types within recursive modules@ \
          are not allowed.@]"
-        (Style.as_inline_code !print_longident) unbound_class_type
+        quoted_longident unbound_class_type
         Style.inline_code unbound
         Style.inline_code container_class_type
         Style.inline_code container
         Style.inline_code container
         self_or_unbound
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-       (Style.as_inline_code !print_longident) lid
-  | Illegal_reference_to_recursive_module ->
-     fprintf ppf "Illegal recursive module reference"
-=======
-       quoted_longident lid
-  | Illegal_reference_to_recursive_module ->
-     fprintf ppf "Illegal recursive module reference"
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Structure_used_as_functor lid ->
       fprintf ppf "@[The module %a is a structure, it cannot be applied@]"
-<<<<<<< HEAD
-      (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
   | Abstract_used_as_functor (lid, p) ->
       fprintf ppf "@[The module %a is of abstract type %a, it cannot be applied@]"
-        (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
         (Style.as_inline_code !print_path) p
   | Functor_used_as_structure (lid, reason) ->
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code !print_longident) lid
-  | Abstract_used_as_functor lid ->
-      fprintf ppf "@[The module %a is abstract, it cannot be applied@]"
-        (Style.as_inline_code !print_longident) lid
-  | Functor_used_as_structure lid ->
-=======
-        quoted_longident lid
-  | Abstract_used_as_functor lid ->
-      fprintf ppf "@[The module %a is abstract, it cannot be applied@]"
-        quoted_longident lid
-  | Functor_used_as_structure lid ->
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
       fprintf ppf "@[The module %a is a functor, \
-<<<<<<< HEAD
                    it cannot %a@]"
-        (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
         print_structure_components_reason reason
   | Abstract_used_as_structure (lid, p, reason) ->
       fprintf ppf "@[The module %a is of abstract type %a, \
                    it cannot %a@]"
-        (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
         (Style.as_inline_code !print_path) p
         print_structure_components_reason reason
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-                   it cannot have any components@]" !print_longident lid
-  | Abstract_used_as_structure lid ->
-      fprintf ppf "@[The module %a is abstract, \
-                   it cannot have any components@]"
-        (Style.as_inline_code !print_longident) lid
-=======
-                   it cannot have any components@]" pp_longident lid
-  | Abstract_used_as_structure lid ->
-      fprintf ppf "@[The module %a is abstract, \
-                   it cannot have any components@]"
-        quoted_longident lid
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Generative_used_as_applicative lid ->
       fprintf ppf "@[The functor %a is generative,@ it@ cannot@ be@ \
                    applied@ in@ type@ expressions@]"
@@ -5131,8 +5040,7 @@ let report_lookup_error _loc env ppf = function
       in
       fprintf ppf
         "The module %a is an alias for module %a, which %s"
-<<<<<<< HEAD
-        (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
         (Style.as_inline_code !print_path) p cause
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
@@ -5141,14 +5049,14 @@ let report_lookup_error _loc env ppf = function
   | Non_value_used_in_object (lid, typ, err) ->
       fprintf ppf "@[%a must have a type of layout value because it is \
                    captured by an object.@ %a@]"
-        (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
         (fun v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
            ~level v)
         err
   | No_unboxed_version (lid, decl) ->
       fprintf ppf "@[The type %a has no unboxed version.@]"
-        (Style.as_inline_code !print_longident) lid;
+        quoted_longident lid;
       begin match decl.type_kind with
       | Type_record (_, Record_unboxed, _) ->
           fprintf ppf
@@ -5174,7 +5082,7 @@ let report_lookup_error _loc env ppf = function
          %a;@ \
          it is introduced at %a,@ \
          %a.@]"
-        (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
         Location.print_loc usage_loc
         print_stage usage_stage
         Location.print_loc intro_loc
@@ -5186,20 +5094,13 @@ let report_lookup_error _loc env ppf = function
          %a is not defined %a.@]\
          @.@[@{<hint>Hint@}: %a %a is defined %a.@]"
         print_unbound_in_quotation context
-        (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
         Location.print_loc usage_loc
-        (Style.as_inline_code !print_longident) lid
+        quoted_longident lid
         print_stage usage_stage
         print_unbound_in_quotation context
-        (Style.as_inline_code !print_longident) lid
-        print_stage avail_stage
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code !print_longident) lid
-        (Style.as_inline_code !print_path) p cause
-=======
         quoted_longident lid
-        (Style.as_inline_code pp_path) p cause
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        print_stage avail_stage
 
 let report_error ~level ppf = function
   | Missing_module(_, path1, path2) ->

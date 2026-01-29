@@ -452,18 +452,9 @@ let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
 
 (* Error report *)
 
-<<<<<<< HEAD
-open Format
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-open Format
-module Style = Misc.Style
-=======
-module Style = Misc.Style
 open Format_doc
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let report_error ppf = function
-<<<<<<< HEAD
   | Dwarf_fission_objcopy_on_macos ->
     fprintf ppf
       "Error: -gdwarf-fission=objcopy is not supported on macOS systems.@ \
@@ -482,89 +473,6 @@ let report_error ppf = function
     fprintf ppf
       "Missing implementation for module %a which is required by quote"
       CU.Name.print impl
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  | File_not_found name ->
-      fprintf ppf "Cannot find file %a" Style.inline_code name
-  | Not_an_object_file name ->
-      fprintf ppf "The file %a is not a compilation unit description"
-        (Style.as_inline_code Location.print_filename) name
-  | Inconsistent_interface(intf, file1, file2) ->
-      fprintf ppf
-       "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
-              over interface %a@]"
-       (Style.as_inline_code Location.print_filename) file1
-       (Style.as_inline_code Location.print_filename) file2
-       Style.inline_code intf
-  | Inconsistent_implementation(intf, file1, file2) ->
-      fprintf ppf
-       "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
-              over implementation %a@]"
-       (Style.as_inline_code Location.print_filename) file1
-       (Style.as_inline_code Location.print_filename) file2
-       Style.inline_code intf
-  | Assembler_error file ->
-      fprintf ppf "Error while assembling %a"
-        (Style.as_inline_code Location.print_filename) file
-  | Linking_error exitcode ->
-      fprintf ppf "Error during linking (exit code %d)" exitcode
-  | Missing_cmx(filename, name) ->
-      fprintf ppf
-        "@[<hov>File %a@ was compiled without access@ \
-         to the %a file@ for module %a,@ \
-         which was produced by %a.@ \
-         Please recompile %a@ with the correct %a option@ \
-         so that %a@ is found.@]"
-        (Style.as_inline_code Location.print_filename) filename
-        Style.inline_code ".cmx"
-        Style.inline_code name
-        Style.inline_code "ocamlopt -for-pack"
-        (Style.as_inline_code Location.print_filename) filename
-        Style.inline_code "-I"
-        Style.inline_code (name^".cmx")
-  | Link_error e ->
-      Linkdeps.report_error ~print_filename:Location.print_filename ppf e
-=======
-  | File_not_found name ->
-      fprintf ppf "Cannot find file %a" Style.inline_code name
-  | Not_an_object_file name ->
-      fprintf ppf "The file %a is not a compilation unit description"
-        Location.Doc.quoted_filename name
-  | Inconsistent_interface(intf, file1, file2) ->
-      fprintf ppf
-       "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
-              over interface %a@]"
-       Location.Doc.quoted_filename file1
-       Location.Doc.quoted_filename file2
-       Style.inline_code intf
-  | Inconsistent_implementation(intf, file1, file2) ->
-      fprintf ppf
-       "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
-              over implementation %a@]"
-       Location.Doc.quoted_filename file1
-       Location.Doc.quoted_filename file2
-       Style.inline_code intf
-  | Assembler_error file ->
-      fprintf ppf "Error while assembling %a"
-        Location.Doc.quoted_filename file
-  | Linking_error exitcode ->
-      fprintf ppf "Error during linking (exit code %d)" exitcode
-  | Missing_cmx(filename, name) ->
-      fprintf ppf
-        "@[<hov>File %a@ was compiled without access@ \
-         to the %a file@ for module %a,@ \
-         which was produced by %a.@ \
-         Please recompile %a@ with the correct %a option@ \
-         so that %a@ is found.@]"
-        Location.Doc.quoted_filename filename
-        Style.inline_code ".cmx"
-        Style.inline_code name
-        Style.inline_code "ocamlopt -for-pack"
-        Location.Doc.quoted_filename filename
-        Style.inline_code "-I"
-        Style.inline_code (name^".cmx")
-  | Link_error e ->
-      Linkdeps.report_error ~print_filename:Location.Doc.filename ppf e
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let () =
   Location.register_error_of_exn (function

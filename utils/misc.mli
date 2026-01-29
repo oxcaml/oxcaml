@@ -812,7 +812,6 @@ val print_if :
 (** [print_if ppf flag fmt x] prints [x] with [fmt] on [ppf]
     if [flag] is true. *)
 
-<<<<<<< HEAD
 val pp_two_columns :
   ?sep:string -> ?max_lines:int ->
   Format.formatter -> (string * string) list -> unit
@@ -866,38 +865,7 @@ val pp_nested_list :
     always called with [nested:true], indicating that any inner lists are nested
     and need parens. *)
 
-val print_see_manual : Format.formatter -> int list -> unit
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-val pp_two_columns :
-  ?sep:string -> ?max_lines:int ->
-  Format.formatter -> (string * string) list -> unit
-(** [pp_two_columns ?sep ?max_lines ppf l] prints the lines in [l] as two
-   columns separated by [sep] ("|" by default). [max_lines] can be used to
-   indicate a maximum number of lines to print -- an ellipsis gets inserted at
-   the middle if the input has too many lines.
-
-   Example:
-
-    {v pp_two_columns ~max_lines:3 Format.std_formatter [
-      "abc", "hello";
-      "def", "zzz";
-      "a"  , "bllbl";
-      "bb" , "dddddd";
-    ] v}
-
-    prints
-
-    {v
-    abc | hello
-    ...
-    bb  | dddddd
-    v}
-*)
-
-val print_see_manual : Format.formatter -> int list -> unit
-=======
 val print_see_manual : int list Format_doc.printer
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 (** See manual section *)
 
 val output_of_print :

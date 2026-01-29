@@ -180,36 +180,21 @@ let print ~with_scope ppf =
         (if !Clflags.unique_ids then asprintf "/%i" n else "")
   | Scoped { name; stamp = n; scope } ->
       fprintf ppf "%s%s%s" name
-<<<<<<< HEAD
-        (if !Clflags.unique_ids then sprintf "/%i" n else "")
-        (if with_scope then sprintf "[%i]" scope else "")
-  | Global_with_args g ->
-      fprintf ppf "%a!" Global_module.Name.print g
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (if !Clflags.unique_ids then sprintf "/%i" n else "")
-        (if with_scope then sprintf "[%i]" scope else "")
-=======
         (if !Clflags.unique_ids then asprintf "/%i" n else "")
         (if with_scope then asprintf "[%i]" scope else "")
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  | Global_with_args g ->
+      fprintf ppf "%a!" Global_module.Name.print g
 
 let print_with_scope ppf id = print ~with_scope:true ppf id
 
-<<<<<<< HEAD
-let print ppf id = print ~with_scope:false ppf id
+let doc_print ppf id = print ~with_scope:false ppf id
+let print ppf id = Format_doc.compat doc_print ppf id
 
 let to_global_exn id =
   match to_global id with
   | Some global -> global
   | None -> Misc.fatal_errorf "Not global: %a" print id
 
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let print ppf id = print ~with_scope:false ppf id
-
-=======
-let doc_print ppf id = print ~with_scope:false ppf id
-let print ppf id = Format_doc.compat doc_print ppf id
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 (* For the documentation of ['a Ident.tbl], see ident.mli.
 
    The implementation is a copy-paste specialization of

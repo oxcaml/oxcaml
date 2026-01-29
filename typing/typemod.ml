@@ -19,14 +19,8 @@ open Path
 open Asttypes
 open Parsetree
 open Types
-<<<<<<< HEAD
 open Mode
-open Format
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-open Format
-=======
 open Format_doc
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 module Style = Misc.Style
 
@@ -2875,33 +2869,9 @@ let package_subtype env p1 fl1 p2 fl2 =
   | exception Error(_, _, Cannot_scrape_package_type _) -> false
   | mty1, mty2 ->
     let loc = Location.none in
-<<<<<<< HEAD
     match Includemod.modtypes ~loc ~mark:true env ~modes:All mty1 mty2 with
     | Tcoerce_none -> true
     | _ | exception Includemod.Error _ -> false
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    match Includemod.modtypes ~loc ~mark:Mark_both env mty1 mty2 with
-    | Tcoerce_none -> Ok ()
-    | c ->
-        let msg =
-          Includemod_errorprinter.coercion_in_package_subtype env mty1 c
-        in
-        Result.Error (Errortrace.Package_coercion msg)
-    | exception Includemod.Error e ->
-        let msg = Includemod_errorprinter.err_msgs e in
-        Result.Error (Errortrace.Package_inclusion msg)
-=======
-    match Includemod.modtypes ~loc ~mark:Mark_both env mty1 mty2 with
-    | Tcoerce_none -> Ok ()
-    | c ->
-        let msg =
-          Includemod_errorprinter.coercion_in_package_subtype env mty1 c
-        in
-        Result.Error (Errortrace.Package_coercion msg)
-    | exception Includemod.Error e ->
-        let msg = doc_printf "%a" Includemod_errorprinter.err_msgs e in
-        Result.Error (Errortrace.Package_inclusion msg)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let () = Ctype.package_subtype := package_subtype
 
@@ -2966,7 +2936,8 @@ let simplify_app_summary app_view = match app_view.arg with
     | false, Some p -> Includemod.Error.Named p, mty, mode
     | false, None   -> Includemod.Error.Anonymous, mty, mode
 
-<<<<<<< HEAD
+let not_principal msg = Warnings.Not_principal (Format_doc.Doc.msg msg)
+
 let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
   let md, shape =
     type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor
@@ -2976,13 +2947,6 @@ let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
 
 and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
   anchor env ?expected_mode smod =
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let rec type_module ?(alias=false) sttn funct_body anchor env smod =
-=======
-let not_principal msg = Warnings.Not_principal (Format_doc.Doc.msg msg)
-
-let rec type_module ?(alias=false) sttn funct_body anchor env smod =
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   Builtin_attributes.warning_scope smod.pmod_attributes
     (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       ?expected_mode smod)
@@ -4275,16 +4239,8 @@ let type_implementation target modulename initial_env ast =
         Typecore.optimise_allocations ();
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
-<<<<<<< HEAD
-          (fun () -> fprintf std_formatter "%a@."
-              (Printtyp.printed_signature sourcefile)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-          (fun () -> fprintf std_formatter "%a@."
-              (Printtyp.printed_signature @@ Unit_info.source_file target)
-=======
           Format.(fun () -> fprintf std_formatter "%a@."
-              (Printtyp.printed_signature @@ Unit_info.source_file target)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+              (Printtyp.printed_signature sourcefile)
               simple_sg
           );
         gen_annot target (Cmt_format.Implementation str);
@@ -4609,7 +4565,6 @@ let report_error ~loc _env = function
         "@[This module is not a functor; it has type@ %a@]"
         (Style.as_inline_code modtype) mty
   | Not_included errs ->
-<<<<<<< HEAD
       let main = Includemod_errorprinter.err_msgs errs in
       Location.errorf ~loc "@[<v>Signature mismatch:@ %t@]" main
   | Not_included_functor errs ->
@@ -4623,17 +4578,6 @@ let report_error ~loc _env = function
         | Functor_included -> "This functor can't be included directly; please \
                                apply it to an explicit argument"
       in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let main = Includemod_errorprinter.err_msgs errs in
-      let footnote = Printtyp.Conflicts.err_msg in
-      Location.errorf ~loc ~footnote "@[<v>Signature mismatch:@ %t@]" main
-  | Cannot_eliminate_dependency mty ->
-=======
-      Location.errorf ~loc ~footnote:Printtyp.Conflicts.err_msg
-        "@[<v>Signature mismatch:@ %a@]"
-        Includemod_errorprinter.err_msgs errs
-  | Cannot_eliminate_dependency mty ->
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
       Location.errorf ~loc
         "@[This functor has type@ %a@ \
            The parameter cannot be eliminated in the result type.@ \
@@ -4667,16 +4611,7 @@ let report_error ~loc _env = function
         Style.inline_code "with"
         (Style.as_inline_code longident) lid
   | With_mismatch(lid, explanation) ->
-<<<<<<< HEAD
-      let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let main = Includemod_errorprinter.err_msgs explanation in
-      let footnote = Printtyp.Conflicts.err_msg in
-      Location.errorf ~loc ~footnote
-=======
-      Location.errorf ~loc ~footnote:Printtyp.Conflicts.err_msg
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         "@[<v>\
            @[In this %a constraint, the new definition of %a@ \
              does not match its original definition@ \
@@ -4686,16 +4621,7 @@ let report_error ~loc _env = function
         (Style.as_inline_code longident) lid
         Includemod_errorprinter.err_msgs explanation
   | With_makes_applicative_functor_ill_typed(lid, path, explanation) ->
-<<<<<<< HEAD
-      let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let main = Includemod_errorprinter.err_msgs explanation in
-      let footnote = Printtyp.Conflicts.err_msg in
-      Location.errorf ~loc ~footnote
-=======
-      Location.errorf ~loc ~footnote:Printtyp.Conflicts.err_msg
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         "@[<v>\
            @[This %a constraint on %a makes the applicative functor @ \
              type %a ill-typed in the constrained signature:@]@ \
@@ -4722,18 +4648,8 @@ let report_error ~loc _env = function
       let[@manual.ref "ss:module-type-substitution"] manual_ref =
         [ 12; 7; 3 ]
       in
-<<<<<<< HEAD
       let pp_constraint ppf (p,mty) =
-        Format.fprintf ppf "%s := %a" (Path.name p) Printtyp.modtype mty
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let pp_constraint ppf () =
-        Format.fprintf ppf "%s := %a"
-          (Path.name p) Printtyp.modtype mty
-=======
-      let pp_constraint ppf () =
-        fprintf ppf "%s := %a"
-          (Path.name p) Printtyp.modtype mty
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        fprintf ppf "%s := %a" (Path.name p) Printtyp.modtype mty
       in
       Location.errorf ~loc
         "This %a constraint@ %a@ makes a packed module ill-formed.@ %a"

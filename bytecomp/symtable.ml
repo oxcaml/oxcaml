@@ -43,18 +43,9 @@ module Global = struct
   let quote s = "`" ^ s ^ "'"
 
   let description ppf = function
-<<<<<<< HEAD
     | Glob_compunit cu ->
         Format.fprintf ppf "compilation unit %a"
           (Style.as_inline_code Compilation_unit.print) cu
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    | Glob_compunit (Compunit cu) ->
-        Format.fprintf ppf "compilation unit %a" Style.inline_code (quote cu)
-=======
-    | Glob_compunit (Compunit cu) ->
-        Format_doc.fprintf ppf "compilation unit %a"
-          Style.inline_code (quote cu)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
     | Glob_predef (Predef_exn exn) ->
         Format_doc.fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)

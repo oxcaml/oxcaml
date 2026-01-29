@@ -257,16 +257,8 @@ module Conflicts = struct
       match names with
       | [] -> ()
       | [namespace, a] ->
-<<<<<<< HEAD
-          Format.fprintf ppf
-        "@ \
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-          Format.fprintf ppf
-        "@,\
-=======
           Fmt.fprintf ppf
-        "@,\
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        "@ \
          @[<2>@{<hint>Hint@}: The %a %a has been defined multiple times@ \
          in@ this@ toplevel@ session.@ \
          Some toplevel values still refer to@ old@ versions@ of@ this@ %a.\
@@ -274,16 +266,8 @@ module Conflicts = struct
         Namespace.pp namespace
         Style.inline_code a Namespace.pp namespace
       | (namespace, _) :: _ :: _ ->
-<<<<<<< HEAD
-      Format.fprintf ppf
-        "@ \
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      Format.fprintf ppf
-        "@,\
-=======
         Fmt.fprintf ppf
-        "@,\
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        "@ \
          @[<2>@{<hint>Hint@}: The %a %a have been defined multiple times@ \
          in@ this@ toplevel@ session.@ \
          Some toplevel values still refer to@ old@ versions@ of@ those@ %a.\
@@ -301,35 +285,13 @@ module Conflicts = struct
         a.location.Location.loc_start.Lexing.pos_fname = "//toplevel//" in
       List.partition from_toplevel (list_explanations ())
     in
-<<<<<<< HEAD
     begin match l with
     | [] -> ()
-    | l -> Format.fprintf ppf "@,%a" print_located_explanations l
+    | l -> Fmt.fprintf ppf "@,%a" print_located_explanations l
     end;
     (* if there are name collisions in a toplevel session,
        display at least one generic hint by namespace *)
     print_toplevel_hint ppf ltop
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    match l, ltop with
-    | [], [] -> None
-    | _  ->
-        Some
-          (Format.dprintf "%a%a"
-             print_located_explanations l
-             print_toplevel_hint ltop
-          )
-  let err_print ppf = Option.iter (Format.fprintf ppf "@,%t") (err_msg ())
-=======
-    match l, ltop with
-    | [], [] -> None
-    | _  ->
-        Some
-          (Fmt.doc_printf "%a%a"
-             print_located_explanations l
-             print_toplevel_hint ltop
-          )
-  let err_print ppf = Option.iter Fmt.(fprintf ppf "@,%a" pp_doc) (err_msg ())
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
   let exists () = M.cardinal !explanations >0
 end
@@ -650,7 +612,6 @@ let tree_of_rec = function
   | Trec_first -> Orec_first
   | Trec_next -> Orec_next
 
-<<<<<<< HEAD
 (* Print a raw type expression, with sharing *)
 
 let raw_list pr ppf = function
@@ -810,10 +771,6 @@ let raw_type_expr ppf t =
 
 let () = Btype.print_raw := raw_type_expr
 
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-
-=======
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 (* Normalize paths *)
 
 type param_subst = Id | Nth of int | Map of int list
@@ -948,35 +905,8 @@ let wrap_printing_env ~error env f =
   if error then Env.without_cmis (wrap_printing_env env) f
   else wrap_printing_env env f
 
-<<<<<<< HEAD
-let wrap_printing_env_error env f =
-  let wrap (loc : _ Location.loc) =
-    { loc with txt =
-        (fun fmt -> Env.without_cmis (fun () -> loc.txt fmt) ())
-  (* CR nroberts: See https://github.com/oxcaml/oxcaml/pull/2529
-     for an explanation of why this has drifted from upstream. *)
-    }
-  in
-  let err : Location.error = wrap_printing_env ~error:true env f in
-  { Location.kind = err.kind;
-    main = wrap err.main;
-    sub = List.map wrap err.sub;
-  }
-
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let wrap_printing_env_error env f =
-  let wrap_txt f fmt =  wrap_printing_env ~error:true env (fun () -> f fmt) in
-  let wrap (loc : _ Location.loc) = { loc with txt = wrap_txt loc.txt } in
-  let err : Location.error = wrap_printing_env ~error:true env f in
-  { Location.kind = err.kind;
-    main = wrap err.main;
-    sub = List.map wrap err.sub;
-    footnote = (fun () -> wrap_printing_env ~error:true env (fun () ->
-        Option.map wrap_txt (err.footnote ())));
-  }
-
-=======
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+(* CR sspies: [wrap_printing_env_error] was removed upstream. Removed it here
+   as well. Flagging it, because it had subtle changes from upstream. *)
 let rec lid_of_path = function
     Path.Pident id ->
       Longident.Lident (Ident.name id)
@@ -2940,7 +2870,6 @@ let printed_signature sourcefile ppf sg =
   Conflicts.reset ();
   reset_naming_context ();
   let t = tree_of_signature sg in
-<<<<<<< HEAD
   if Warnings.(is_active @@ Erroneous_printed_signature "")
   && Conflicts.exists ()
   then begin
@@ -2949,30 +2878,7 @@ let printed_signature sourcefile ppf sg =
       (Warnings.Erroneous_printed_signature conflicts);
     Warnings.check_fatal ()
   end;
-  fprintf ppf "%a" print_signature t
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  if Warnings.(is_active @@ Erroneous_printed_signature "") then
-    begin match Conflicts.err_msg () with
-    | None -> ()
-    | Some msg ->
-        let conflicts = Format.asprintf "%t" msg in
-        Location.prerr_warning (Location.in_file sourcefile)
-          (Warnings.Erroneous_printed_signature conflicts);
-        Warnings.check_fatal ()
-    end;
-  fprintf ppf "%a" print_signature t
-=======
-  if Warnings.(is_active @@ Erroneous_printed_signature "") then
-    begin match Conflicts.err_msg () with
-    | None -> ()
-    | Some msg ->
-        let conflicts = asprintf "%a" pp_doc msg in
-        Location.prerr_warning (Location.in_file sourcefile)
-          (Warnings.Erroneous_printed_signature conflicts);
-        Warnings.check_fatal ()
-    end;
   compat print_signature ppf t
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 (* Trace-specific printing *)
 
@@ -3041,17 +2947,14 @@ let trees_of_type_expansion'
     else Diff(first,second)
   end
 
-<<<<<<< HEAD
 let trees_of_type_expansion =
   trees_of_type_expansion' ~var_jkinds:false
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-=======
+
 let pp_type ppf t =
   Style.as_inline_code !Oprint.out_type ppf t
 
 let quoted_ident ppf t =
   Style.as_inline_code !Oprint.out_ident ppf t
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let type_expansion ppf = function
   | Same t -> pp_type ppf t
@@ -3193,34 +3096,14 @@ let unifiable env ty1 ty2 =
 let explanation_diff env t3 t4 =
   match get_desc t3, get_desc t4 with
   | Tarrow (_, ty1, ty2, _), _
-<<<<<<< HEAD
     when is_unit_arg env ty1 && unifiable env ty2 t4 ->
-      Some (fun ppf ->
-        fprintf ppf
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    when is_unit env ty1 && unifiable env ty2 t4 ->
-      Some (fun ppf ->
-        fprintf ppf
-=======
-    when is_unit env ty1 && unifiable env ty2 t4 ->
       Some (doc_printf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
           "@,@[@{<hint>Hint@}: Did you forget to provide %a as argument?@]"
           Style.inline_code "()"
         )
   | _, Tarrow (_, ty1, ty2, _)
-<<<<<<< HEAD
     when is_unit_arg env ty1 && unifiable env t3 ty2 ->
-      Some (fun ppf ->
-        fprintf ppf
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-    when is_unit env ty1 && unifiable env t3 ty2 ->
-      Some (fun ppf ->
-        fprintf ppf
-=======
-    when is_unit env ty1 && unifiable env t3 ty2 ->
       Some (doc_printf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
           "@,@[@{<hint>Hint@}: Did you forget to wrap the expression using \
            %a?@]"
           Style.inline_code "fun () ->"
@@ -3250,14 +3133,8 @@ let explain_fixed_row pos expl = match expl with
            Internal_names.add p;
            print_path p ppf))
       p
-<<<<<<< HEAD
-  | Rigid -> ignore
-  | Fixed_existential -> ignore
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  | Rigid -> ignore
-=======
   | Rigid -> Format_doc.Doc.empty
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  | Fixed_existential -> Format_doc.Doc.empty
 
 let explain_variant (type variety) : variety Errortrace.variant -> _ = function
   (* Common *)
@@ -3353,30 +3230,6 @@ let explain_incompatible_fields name (diff: Types.type_expr Errortrace.diff) =
     (Style.as_inline_code type_expr_with_reserved_names) diff.got
     (Style.as_inline_code type_expr_with_reserved_names) diff.expected
 
-<<<<<<< HEAD
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let explain_first_class_module = function
-  | Errortrace.Package_cannot_scrape p -> Some(
-      dprintf "@,@[The module alias %a could not be expanded@]"
-        Style.(as_inline_code path) p
-    )
-  | Errortrace.Package_inclusion pr ->
-      Some(dprintf "@,@[%t@]" pr)
-  | Errortrace.Package_coercion pr ->
-      Some(dprintf "@,@[%t@]" pr)
-
-=======
-let explain_first_class_module = function
-  | Errortrace.Package_cannot_scrape p -> Some(
-      doc_printf "@,@[The module alias %a could not be expanded@]"
-        Style.(as_inline_code path) p
-    )
-  | Errortrace.Package_inclusion pr ->
-      Some(doc_printf "@,@[%a@]" Fmt.pp_doc pr)
-  | Errortrace.Package_coercion pr ->
-      Some(doc_printf "@,@[%a@]" Fmt.pp_doc pr)
-
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 let explanation (type variety) intro prev env
   : (Errortrace.expanded_type, variety) Errortrace.elt -> _ = function
   | Errortrace.Diff {got; expected} ->
@@ -3475,35 +3328,15 @@ let prepare_expansion_head empty_tr = function
       Some (Errortrace.map_diff (may_prepare_expansion empty_tr) d)
   | _ -> None
 
-<<<<<<< HEAD
 let head_error_printer ~var_jkinds mode txt_got txt_but = function
-  | None -> ignore
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let head_error_printer mode txt_got txt_but = function
-  | None -> ignore
-=======
-let head_error_printer mode txt_got txt_but = function
   | None -> Format_doc.Doc.empty
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Some d ->
-<<<<<<< HEAD
       let d =
         Errortrace.map_diff (trees_of_type_expansion' ~var_jkinds mode) d
       in
-      dprintf "%t@;<1 2>%a@ %t@;<1 2>%a"
-        txt_got type_expansion d.Errortrace.got
-        txt_but type_expansion d.Errortrace.expected
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let d = Errortrace.map_diff (trees_of_type_expansion mode) d in
-      dprintf "%t@;<1 2>%a@ %t@;<1 2>%a"
-        txt_got type_expansion d.Errortrace.got
-        txt_but type_expansion d.Errortrace.expected
-=======
-      let d = Errortrace.map_diff (trees_of_type_expansion mode) d in
       doc_printf "%a@;<1 2>%a@ %a@;<1 2>%a"
         pp_doc txt_got type_expansion d.Errortrace.got
         pp_doc txt_but type_expansion d.Errortrace.expected
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let warn_on_missing_defs env ppf = function
   | None -> ()
@@ -3523,7 +3356,6 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
          Errortrace.{ty_exp with expanded = hide_variant_name ty_exp.expanded})
       tr
   in
-<<<<<<< HEAD
   let jkind_error = match Misc.last tr with
     | Some (Bad_jkind _ | Bad_jkind_sort _ | Unequal_var_jkinds _
            | Unequal_tof_kind_jkinds _) ->
@@ -3533,11 +3365,6 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
     | None ->
         false
   in
-  let mis = mismatch txt1 env tr in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let mis = mismatch txt1 env tr in
-=======
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   match tr with
   | [] -> assert false
   | (elt :: tr) as full_trace ->
@@ -3546,16 +3373,10 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       let tr, last = filter_trace tr in
       let head = prepare_expansion_head (tr=[] && last=None) elt in
       let tr = List.map (Errortrace.map_diff prepare_expansion) tr in
-<<<<<<< HEAD
+      let last = Option.map (Errortrace.map_diff prepare_expansion) last in
       let head_error =
         head_error_printer ~var_jkinds:jkind_error mode txt1 txt2 head
       in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let head_error = head_error_printer mode txt1 txt2 head in
-=======
-      let last = Option.map (Errortrace.map_diff prepare_expansion) last in
-      let head_error = head_error_printer mode txt1 txt2 head in
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
       let tr = trees_of_trace mode tr in
       let last =
         Option.map (Errortrace.map_diff (trees_of_type_expansion mode)) last in
@@ -3571,17 +3392,9 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
         pp_doc head_error
         pp_doc ty_expect_explanation
         (trace false (incompatibility_phrase trace_format)) tr
-<<<<<<< HEAD
-        (explain mis);
+        (pp_print_option pp_doc) mis;
       if env <> Env.empty && not jkind_error
        (* the jkinds mechanism has its own way of reporting missing cmis *)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (explain mis);
-      if env <> Env.empty
-=======
-        (pp_print_option pp_doc) mis;
-      if env <> Env.empty
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
       then warn_on_missing_defs env ppf head;
       Internal_names.print_explanations env ppf;
       Conflicts.print_explanations ppf;
@@ -3695,16 +3508,8 @@ module Subtype = struct
         fprintf ppf "%a%a%t@]"
           (trace filter_trace unification_get_diff false
              (mis = None) "is not compatible with type") tr_unif
-<<<<<<< HEAD
-          (explain mis)
-          Conflicts.print_explanations
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-          (explain mis)
-          Conflicts.err_print
-=======
           (pp_print_option pp_doc) mis
-          Conflicts.err_print
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+          Conflicts.print_explanations
     )
 end
 

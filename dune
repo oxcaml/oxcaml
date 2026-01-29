@@ -148,7 +148,6 @@
   mode_hint
   mode_intf)
  (modules
-<<<<<<< HEAD
   ;; UTILS
   arrayset
   config
@@ -164,6 +163,7 @@
   priority_queue
   terminfo
   ccomp
+  format_doc
   warnings
   consistbl
   strongly_connected_components
@@ -331,20 +331,6 @@
   ; See note below about camlinternalQuote
   (:include
    %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-   ;; UTILS
-   config build_path_prefix_map misc identifiable numbers arg_helper clflags
-   profile terminfo ccomp warnings consistbl strongly_connected_components
-   targetint load_path int_replace_polymorphic_compare binutils local_store
-   lazy_backtrack diffing diffing_with_keys unit_info compression linkdeps
-=======
-   ;; UTILS
-   config build_path_prefix_map misc identifiable numbers arg_helper
-   clflags profile terminfo ccomp format_doc warnings consistbl
-   strongly_connected_components targetint load_path
-   int_replace_polymorphic_compare binutils local_store lazy_backtrack diffing
-   diffing_with_keys unit_info compression linkdeps
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 ; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
 ; we need to compile it as an additional target, but only for the first

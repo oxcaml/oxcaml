@@ -443,14 +443,8 @@ let try_run_directive ppf dir_name pdir_arg =
 (* Overriding exception printers with toplevel-specific ones *)
 
 let loading_hint_printer ppf cu =
-<<<<<<< HEAD
-  let global = Symtable.Global.Glob_compunit cu in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  let global = Symtable.Global.Glob_compunit (Cmo_format.Compunit cu) in
-=======
   let open Format_doc in
-  let global = Symtable.Global.Glob_compunit (Cmo_format.Compunit cu) in
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  let global = Symtable.Global.Glob_compunit cu in
   Symtable.report_error ppf (Symtable.Undefined_global global);
   let find_with_ext ext =
     let leafname =

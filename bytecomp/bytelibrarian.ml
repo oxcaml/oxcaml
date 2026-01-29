@@ -118,17 +118,7 @@ let report_error ppf = function
       fprintf ppf "Cannot find file %a" Style.inline_code name
   | Not_an_object_file name ->
       fprintf ppf "The file %a is not a bytecode object file"
-<<<<<<< HEAD
-        (Style.as_inline_code Location.print_filename) name
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code Location.print_filename) name
-  | Link_error e ->
-      Linkdeps.report_error ~print_filename:Location.print_filename ppf e
-=======
         Location.Doc.quoted_filename name
-  | Link_error e ->
-      Linkdeps.report_error ~print_filename:Location.Doc.filename ppf e
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let () =
   Location.register_error_of_exn

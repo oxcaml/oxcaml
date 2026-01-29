@@ -887,17 +887,9 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
       let warn = Warnings.No_cmi_file(name_as_string, None) in
         Location.prerr_warning loc warn
   | Cmi_format.Error err ->
-<<<<<<< HEAD
-      let msg = Format.asprintf "%a" Cmi_format.report_error err in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let msg = Format.asprintf "%a" Cmi_format.report_error err in
-      let warn = Warnings.No_cmi_file(name, Some msg) in
-=======
       let msg = Format.asprintf "%a"
           (Format_doc.compat Cmi_format.report_error) err in
-      let warn = Warnings.No_cmi_file(name, Some msg) in
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
   | Error err ->
       let msg =
@@ -906,24 +898,12 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
             Format_doc.doc_printf
               " %a@ contains the compiled interface for @ \
                %a when %a was expected"
-<<<<<<< HEAD
-              (Style.as_inline_code Location.print_filename) filename
+              Location.Doc.quoted_filename filename
               (Style.as_inline_code CU.Name.print) ps_name
               (Style.as_inline_code CU.Name.print) name
         | Inconsistent_import _ ->
             (* Can't be raised by [find_pers_struct ~check:false] *)
             assert false
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-              (Style.as_inline_code Location.print_filename) filename
-              Style.inline_code ps_name
-              Style.inline_code name
-        | Inconsistent_import _ -> assert false
-=======
-              Location.Doc.quoted_filename filename
-              Style.inline_code ps_name
-              Style.inline_code name
-        | Inconsistent_import _ -> assert false
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         | Need_recursive_types name ->
             Format_doc.doc_printf
               "%a uses recursive types"
@@ -963,14 +943,8 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
             Format.asprintf "Can't find argument %a"
               (Style.as_inline_code Global_module.Name.print) value
       in
-<<<<<<< HEAD
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      let warn = Warnings.No_cmi_file(name, Some msg) in
-=======
       let msg = Format_doc.(asprintf "%a" pp_doc) msg in
-      let warn = Warnings.No_cmi_file(name, Some msg) in
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
 
 let read penv modname a =
@@ -1140,35 +1114,15 @@ let report_error ppf =
   | Illegal_renaming(modname, ps_name, filename) -> fprintf ppf
       "Wrong file naming: %a@ contains the compiled interface for@ \
        %a when %a was expected"
-<<<<<<< HEAD
-      (Style.as_inline_code Location.print_filename) filename
+      Location.Doc.quoted_filename filename
       (Style.as_inline_code CU.Name.print) ps_name
       (Style.as_inline_code CU.Name.print) modname
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      (Style.as_inline_code Location.print_filename) filename
-      Style.inline_code ps_name
-      Style.inline_code modname
-=======
-      Location.Doc.quoted_filename filename
-      Style.inline_code ps_name
-      Style.inline_code modname
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Inconsistent_import(name, source1, source2) -> fprintf ppf
       "@[<hov>The files %a@ and %a@ \
               make inconsistent assumptions@ over interface %a@]"
-<<<<<<< HEAD
-      (Style.as_inline_code Location.print_filename) source1
-      (Style.as_inline_code Location.print_filename) source2
-      (Style.as_inline_code CU.Name.print) name
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-      (Style.as_inline_code Location.print_filename) source1
-      (Style.as_inline_code Location.print_filename) source2
-      Style.inline_code name
-=======
       Location.Doc.quoted_filename source1
       Location.Doc.quoted_filename source2
-      Style.inline_code name
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      (Style.as_inline_code CU.Name.print) name
   | Need_recursive_types(import) ->
       fprintf ppf
         "@[<hov>Invalid import of %a, which uses recursive types.@ \

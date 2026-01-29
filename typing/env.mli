@@ -645,20 +645,10 @@ type error =
 exception Error of error
 
 
-<<<<<<< HEAD
-val report_error: level:int -> formatter -> error -> unit
+val report_error: level:int -> error Format_doc.printer
 
 val report_lookup_error:
-    level:int -> Location.t -> t -> formatter -> lookup_error -> unit
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-val report_error: formatter -> error -> unit
-
-val report_lookup_error: Location.t -> t -> formatter -> lookup_error -> unit
-=======
-val report_error: error Format_doc.printer
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-
-val report_lookup_error: Location.t -> t -> lookup_error Format_doc.printer
+    level:int -> Location.t -> t -> lookup_error Format_doc.printer
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool
@@ -694,19 +684,13 @@ val constrain_type_jkind:
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_longident: Longident.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
-<<<<<<< HEAD
-val print_path: (Format.formatter -> Path.t -> unit) ref
+val print_path: Path.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_type_expr: (Format.formatter -> Types.type_expr -> unit) ref
 (* Forward declaration to break mutual recursion with Jkind. *)
 val report_jkind_violation_with_offender:
   (offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
    Jkind.Violation.t -> unit) ref
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-val print_path: (Format.formatter -> Path.t -> unit) ref
-=======
-val print_path: Path.t Format_doc.printer ref
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 
 (** Folds *)

@@ -118,15 +118,7 @@ module Doc = struct
       else "(%s)"
     in Format_doc.fprintf ppf format txt
 
-<<<<<<< HEAD
-let protect_longident ppf print_longident longprefix txt =
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let ident_of_name_loc ppf s = ident_of_name ppf s.txt
-
-let protect_longident ppf print_longident longprefix txt =
-=======
   let protect_longident ppf print_longident longprefix txt =
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
     if not (needs_parens txt) then
       Format_doc.fprintf ppf "%a.%a"
         print_longident longprefix

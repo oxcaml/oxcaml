@@ -376,55 +376,21 @@ module Style = Misc.Style
 let report_error ppf = function
     Forward_reference(file, compunit) ->
       fprintf ppf "Forward reference to %a in file %a"
-<<<<<<< HEAD
         (Style.as_inline_code CU.print) compunit
-        (Style.as_inline_code Location.print_filename) file
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        Style.inline_code (Compunit.name compunit)
-        (Style.as_inline_code Location.print_filename) file
-=======
-        Style.inline_code (Compunit.name compunit)
         Location.Doc.quoted_filename file
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Multiple_definition(file, compunit) ->
       fprintf ppf "File %a redefines %a"
-<<<<<<< HEAD
-        (Style.as_inline_code Location.print_filename) file
-        (Style.as_inline_code CU.print) compunit
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code Location.print_filename) file
-        Style.inline_code (Compunit.name compunit)
-=======
         Location.Doc.quoted_filename file
-        Style.inline_code (Compunit.name compunit)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        (Style.as_inline_code CU.print) compunit
   | Not_an_object_file file ->
       fprintf ppf "%a is not a bytecode object file"
-<<<<<<< HEAD
-        (Style.as_inline_code Location.print_filename) file
-  | Illegal_renaming(name, file, compunit) ->
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code Location.print_filename) file
-  | Illegal_renaming(name, file, id) ->
-=======
         Location.Doc.quoted_filename file
-  | Illegal_renaming(name, file, id) ->
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  | Illegal_renaming(name, file, compunit) ->
       fprintf ppf "Wrong file naming: %a@ contains the code for\
                    @ %a when %a was expected"
-<<<<<<< HEAD
-        (Style.as_inline_code Location.print_filename) file
+        Location.Doc.quoted_filename file
         (Style.as_inline_code CU.print) name
         (Style.as_inline_code CU.print) compunit
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code Location.print_filename) file
-        Style.inline_code (Compunit.name name)
-        Style.inline_code (Compunit.name id)
-=======
-        Location.Doc.quoted_filename file
-        Style.inline_code (Compunit.name name)
-        Style.inline_code (Compunit.name id)
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | File_not_found file ->
       fprintf ppf "File %a not found"
         Style.inline_code file

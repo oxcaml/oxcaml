@@ -1015,23 +1015,11 @@ let extension_of_error {kind; main; sub} =
   let extension_of_sub sub =
     { loc = sub.loc; txt = "ocaml.error" },
     PStr ([Str.eval (Exp.constant
-<<<<<<< HEAD
-                       (Pconst_string (str_of_pp sub.txt, sub.loc, None)))])
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-                       (Const.string ~loc:sub.loc (str_of_pp sub.txt)))])
-=======
-                       (Const.string ~loc:sub.loc (str_of_msg sub.txt)))])
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+                       (Pconst_string (str_of_msg sub.txt, sub.loc, None)))])
   in
   { loc = main.loc; txt = "ocaml.error" },
   PStr (Str.eval (Exp.constant
-<<<<<<< HEAD
-                    (Pconst_string (str_of_pp main.txt, main.loc, None))) ::
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-                    (Const.string ~loc:main.loc (str_of_pp main.txt))) ::
-=======
-                    (Const.string ~loc:main.loc (str_of_msg main.txt))) ::
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+                    (Pconst_string (str_of_msg main.txt, main.loc, None))) ::
         List.map (fun msg -> Str.extension (extension_of_sub msg)) sub)
 
 let attribute_of_warning loc s =

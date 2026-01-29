@@ -1378,7 +1378,6 @@ let delete_eol_spaces src =
   let stop = loop 0 0 in
   Bytes.sub_string dst 0 stop
 
-<<<<<<< HEAD
 let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
   let left_column_size =
     List.fold_left (fun acc (s, _) -> Int.max acc (String.length s)) 0 lines in
@@ -1531,31 +1530,6 @@ let pp_table ppf (columns : (string * string list) list) =
     print_separator ppf table_width
   done
 
-
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
-  let left_column_size =
-    List.fold_left (fun acc (s, _) -> Int.max acc (String.length s)) 0 lines in
-  let lines_nb = List.length lines in
-  let ellipsed_first, ellipsed_last =
-    match max_lines with
-    | Some max_lines when lines_nb > max_lines ->
-        let printed_lines = max_lines - 1 in (* the ellipsis uses one line *)
-        let lines_before = printed_lines / 2 + printed_lines mod 2 in
-        let lines_after = printed_lines / 2 in
-        (lines_before, lines_nb - lines_after - 1)
-    | _ -> (-1, -1)
-  in
-  Format.fprintf ppf "@[<v>";
-  List.iteri (fun k (line_l, line_r) ->
-    if k = ellipsed_first then Format.fprintf ppf "...@,";
-    if ellipsed_first <= k && k <= ellipsed_last then ()
-    else Format.fprintf ppf "%*s %s %s@," left_column_size line_l sep line_r
-  ) lines;
-  Format.fprintf ppf "@]"
-
-=======
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 (* showing configuration and configuration variables *)
 let show_config_and_exit () =
   Config.print_config stdout;
@@ -1618,7 +1592,10 @@ let print_see_manual ppf manual_section =
     (pp_print_list ~pp_sep:(fun f () -> pp_print_char f '.') pp_print_int)
     manual_section
 
-<<<<<<< HEAD
+let print_if ppf flag printer arg =
+  if !flag then Format.fprintf ppf "%a@." printer arg;
+  arg
+
 let output_of_print print =
   let output out_channel t =
     let ppf = Format.formatter_of_out_channel out_channel in
@@ -1668,12 +1645,6 @@ let to_string_of_print print =
     Buffer.contents buf
   in
   to_string
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-=======
-let print_if ppf flag printer arg =
-  if !flag then Format.fprintf ppf "%a@." printer arg;
-  arg
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 
 type filepath = string

@@ -4445,7 +4445,6 @@ module Reaching_path = struct
     Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" pp path
 end
 
-<<<<<<< HEAD
 let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
   let loc =
     match loc with
@@ -4467,10 +4466,8 @@ let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
        ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
        ~level:(Ctype.get_current_level ())) violation
 
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-=======
 let quoted_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+
 let report_error ppf = function
   | Repeated_parameter ->
       fprintf ppf "A type parameter occurs several times"
@@ -4520,7 +4517,6 @@ let report_error ppf = function
            "the original" "this" "definition" env)
         err
   | Constraint_failed (env, err) ->
-<<<<<<< HEAD
       let get_jkind_error : _ Errortrace.elt -> _ = function
       | Bad_jkind (ty, violation) | Bad_jkind_sort (ty, violation) ->
         Some (ty, violation)
@@ -4532,10 +4528,7 @@ let report_error ppf = function
         report_jkind_mismatch_due_to_bad_inference ppf ty violation
           Check_constraints
       | None ->
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-=======
       let msg = Format_doc.Doc.msg in
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
       fprintf ppf "@[<v>Constraints are not satisfied in this type.@ ";
       Printtyp.report_unification_error ppf env err
         (msg "Type")

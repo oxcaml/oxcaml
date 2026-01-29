@@ -40,31 +40,7 @@ val link_shared :
   ppf_dump:Format.formatter ->
   unit
 
-<<<<<<< HEAD
 val call_linker_shared : ?native_toplevel:bool -> string list -> string -> unit
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-val call_linker_shared: string list -> string -> unit
-
-val reset : unit -> unit
-val check_consistency: filepath -> Cmx_format.unit_infos -> Digest.t -> unit
-val extract_crc_interfaces: unit -> crcs
-val extract_crc_implementations: unit -> crcs
-
-type error =
-  | File_not_found of filepath
-  | Not_an_object_file of filepath
-  | Inconsistent_interface of modname * filepath * filepath
-  | Inconsistent_implementation of modname * filepath * filepath
-  | Assembler_error of filepath
-  | Linking_error of int
-  | Missing_cmx of filepath * modname
-  | Link_error of Linkdeps.error
-
-exception Error of error
-
-val report_error: formatter -> error -> unit
-=======
-val call_linker_shared: string list -> string -> unit
 
 val reset : unit -> unit
 val check_consistency: filepath -> Cmx_format.unit_infos -> Digest.t -> unit
@@ -84,4 +60,3 @@ type error =
 exception Error of error
 
 val report_error: error Format_doc.printer
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)

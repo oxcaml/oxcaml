@@ -937,20 +937,10 @@ let report_error ppf = function
       fprintf ppf
         "@[<hov>Files %a@ and %a@ \
                  make inconsistent assumptions over interface %a@]"
-<<<<<<< HEAD
-        (Style.as_inline_code Location.print_filename) file1
-        (Style.as_inline_code Location.print_filename) file2
-        Style.inline_code
-        (Format.asprintf "%a" CU.Name.print intf)
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (Style.as_inline_code Location.print_filename) file1
-        (Style.as_inline_code Location.print_filename) file2
-        Style.inline_code intf
-=======
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
-        Style.inline_code intf
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        Style.inline_code
+        (Format.asprintf "%a" CU.Name.print intf)
   | Custom_runtime ->
       fprintf ppf "Error while building custom runtime system"
   | File_exists file ->
@@ -958,22 +948,15 @@ let report_error ppf = function
         Location.Doc.quoted_filename file
   | Cannot_open_dll file ->
       fprintf ppf "Error on dynamically loaded library: %a"
-<<<<<<< HEAD
-        Location.print_filename file
+        Location.Doc.filename file
   | Required_compunit_unavailable (unavailable, required_by) ->
       fprintf ppf "Module %a is unavailable (required by %a)"
         (Style.as_inline_code CU.print) unavailable
         (Style.as_inline_code CU.print) required_by
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        Location.print_filename file
-=======
-        Location.Doc.filename file
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Camlheader (msg, header) ->
       fprintf ppf "System error while copying file %a: %a"
         Style.inline_code header
         Style.inline_code msg
-<<<<<<< HEAD
   | Wrong_link_order depset ->
       let l = DepSet.elements depset in
       let depends_on ppf (dep, depending) =
@@ -986,17 +969,9 @@ let report_error ppf = function
   | Multiple_definition(compunit, file1, file2) ->
       fprintf ppf
         "@[<hov>Files %a@ and %a@ both define a module named %a@]"
-        (Style.as_inline_code Location.print_filename) file1
-        (Style.as_inline_code Location.print_filename) file2
+        Location.Doc.quoted_filename file1
+        Location.Doc.quoted_filename file2
         (Style.as_inline_code CU.print) compunit
-
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  | Link_error e ->
-      Linkdeps.report_error ~print_filename:Location.print_filename ppf e
-=======
-  | Link_error e ->
-      Linkdeps.report_error ~print_filename:Location.Doc.filename ppf e
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let () =
   Location.register_error_of_exn

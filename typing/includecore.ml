@@ -415,22 +415,14 @@ let report_value_mismatch first second env ppf err =
   | Type trace ->
       let msg = Fmt.Doc.msg in
       Printtyp.report_moregen_error ppf Type_scheme env trace
-<<<<<<< HEAD
-        (fun ppf -> Format.fprintf ppf "The type")
-        (fun ppf -> Format.fprintf ppf "is not compatible with the type")
+        (msg "The type")
+        (msg "is not compatible with the type")
   | Zero_alloc e -> Zero_alloc.print_error ppf e
   | Modality e -> report_modality_sub_error first second ppf e
   | Mode e ->
       let got = first ^ " is" in
       let expected = second ^ " is" in
       report_mode_sub_error got expected ppf e
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        (fun ppf -> Format.fprintf ppf "The type")
-        (fun ppf -> Format.fprintf ppf "is not compatible with the type")
-=======
-        (msg "The type")
-        (msg "is not compatible with the type")
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let report_type_inequality env ppf err =
   let msg = Fmt.Doc.msg in

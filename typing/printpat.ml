@@ -126,16 +126,8 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
-<<<<<<< HEAD
   | Tpat_alias (v, x, _, _, _, _, _) ->
-      fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-  | Tpat_alias (v, x,_,_) ->
-      fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
-=======
-  | Tpat_alias (v, x,_,_) ->
       fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.doc_print x
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Tpat_value v ->
       fprintf ppf "%a" pretty_val (v :> pattern)
   | Tpat_exception v ->

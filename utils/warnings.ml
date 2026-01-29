@@ -1183,16 +1183,8 @@ let message = function
          %s.\n\
          Only the first match will be used to evaluate the guard expression.\n\
          %a"
-<<<<<<< HEAD
-        vars_explanation Misc.print_see_manual ref_manual
-  | No_cmx_file { missing_extension; module_name } ->
-||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
-        vars_explanation Misc.print_see_manual ref_manual
-  | No_cmx_file name ->
-=======
         vars_explanation (Format_doc.compat Misc.print_see_manual) ref_manual
-  | No_cmx_file name ->
->>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  | No_cmx_file { missing_extension; module_name } ->
       Printf.sprintf
         "no %s file was found in path for module %s, \
          and its interface was not compiled with -opaque"
