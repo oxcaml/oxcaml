@@ -240,14 +240,13 @@ let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
   in
   match r.loc with
   | Stack (Domainstate n) -> (
-    let ofs = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
-    (* x28 is the domain state pointer *)
-    match Ast.DSL.Validated_mem_offset.create ~scale ~offset:ofs with
+    let offset = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
+    match Ast.DSL.Validated_mem_offset.create ~scale ~offset with
     | Some validated ->
       Stack_operand
-        (Ast.DSL.Validated_mem_offset.to_operand ~base:(Ast.Reg.reg_x 28)
+        (Ast.DSL.Validated_mem_offset.to_operand ~base:domainstate_base
            validated)
-    | None -> Stack_large_offset_domainstate { bytes = ofs })
+    | None -> Stack_large_offset_domainstate { bytes = offset })
   | Stack ((Local _ | Incoming _ | Outgoing _) as s) -> (
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
     match Ast.DSL.Validated_mem_offset.create ~scale ~offset:ofs with

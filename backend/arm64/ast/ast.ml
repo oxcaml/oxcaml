@@ -2713,6 +2713,14 @@ module DSL = struct
         Operand.Mem
           (Offset_nine_signed_unscaled (base, Nine_signed_unscaled t.offset))
 
+    let equal t1 t2 =
+      Int.equal t1.scale t2.scale
+      && Int.equal t1.offset t2.offset
+      &&
+      match t1.kind, t2.kind with
+      | Scaled, Scaled | Unscaled, Unscaled -> true
+      | (Scaled | Unscaled), _ -> false
+
     let offset t = t.offset
 
     let scale t = t.scale

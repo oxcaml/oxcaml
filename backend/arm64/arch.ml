@@ -263,10 +263,7 @@ let specific_operation_name : specific_operation -> string = fun op ->
 let equal_addressing_mode left right =
   match left, right with
   | Iindexed left_v, Iindexed right_v ->
-    Int.equal (Validated_mem_offset.offset left_v)
-      (Validated_mem_offset.offset right_v)
-    && Int.equal (Validated_mem_offset.scale left_v)
-         (Validated_mem_offset.scale right_v)
+    Validated_mem_offset.equal left_v right_v
   | Ibased (left_sym, left_int), Ibased (right_sym, right_int) ->
     Asm_targets.Asm_symbol.equal left_sym right_sym
     && Int.equal left_int right_int

@@ -1687,10 +1687,13 @@ module DSL : sig
       [`Mem of [> `Offset_twelve_unsigned_scaled | `Offset_nine_signed_unscaled]]
       Operand.t
 
-    (** The byte offset (for debugging/error messages). *)
+    (** Equality comparison. *)
+    val equal : t -> t -> bool
+
+    (** The byte offset. *)
     val offset : t -> int
 
-    (** The scale used for validation (for debugging/error messages). *)
+    (** The scale used for validation. *)
     val scale : t -> int
 
     (** Check if an offset can be encoded for the given scale. *)
