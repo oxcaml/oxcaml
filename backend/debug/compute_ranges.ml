@@ -506,7 +506,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     | Lprologue | Lepilogue_open | Lepilogue_close | Lop _ | Lcall_op _
     | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
     | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lpushtrap _ | Lpoptrap _
-    | Ladjust_stack_offset _ | Lraise _ | Lstackcheck _ ->
+    | Ladjust_stack_offset _ | Lraise _ | Lstackcheck _ -> (
       let subrange_state =
         Subrange_state.advance_over_instruction subrange_state insn
       in
@@ -526,7 +526,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
       | Some next_insn ->
         process_instruction t fundecl ~fun_contains_calls ~fun_num_stack_slots
           ~first_insn ~insn:next_insn ~prev_insn:(Some insn)
-          ~currently_open_subranges ~subrange_state ~ppf_dump
+          ~currently_open_subranges ~subrange_state ~ppf_dump)
 
   let process_instructions t fundecl ~fun_contains_calls ~fun_num_stack_slots
       ~first_insn ~ppf_dump =

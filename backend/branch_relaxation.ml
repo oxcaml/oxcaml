@@ -21,7 +21,6 @@
 
 open! Int_replace_polymorphic_compare
 open Linear
-
 module DLL = Oxcaml_utils.Doubly_linked_list
 
 module Make (T : Branch_relaxation_intf.S) = struct
@@ -30,14 +29,14 @@ module Make (T : Branch_relaxation_intf.S) = struct
     let rec fill_map pc cell_opt =
       match cell_opt with
       | None -> pc, map
-      | Some cell ->
+      | Some cell -> (
         let data = DLL.value cell in
-        (match data.desc with
+        match data.desc with
         | Llabel { label = lbl; _ } ->
           Hashtbl.add map lbl (pc, cell);
           fill_map pc (DLL.next cell)
-        | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-        | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
+        | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
+        | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
         | Lcondbranch (_, _)
         | Lcondbranch3 (_, _, _)
         | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -89,21 +88,21 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
-      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
-      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-      | Lstackcheck _ ->
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _ | Lswitch _
+      | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
         Misc.fatal_error "Unsupported instruction for branch relaxation")
 
   let fixup_branches ~code_size ~max_out_of_line_code_offset map code =
     let rec fixup did_fix pc cell_opt =
       match cell_opt with
       | None -> did_fix
-      | Some cell ->
+      | Some cell -> (
         let data = DLL.value cell in
-        (match data.desc with
-        | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-        | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
+        match data.desc with
+        | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
+        | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _
+        | Lbranch _
         | Lcondbranch (_, _)
         | Lcondbranch3 (_, _, _)
         | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -120,9 +119,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
               fixup true (pc + T.instr_size cell) (DLL.next cell)
             | Lop (Alloc { bytes = num_bytes; dbginfo; _ }) ->
               DLL.set_value cell
-                { data with
-                  desc = T.relax_allocation ~num_bytes ~dbginfo
-                };
+                { data with desc = T.relax_allocation ~num_bytes ~dbginfo };
               fixup true (pc + T.instr_size cell) (DLL.next cell)
             | Lcondbranch (test, lbl) ->
               let lbl2 = Cmm.new_label () in
@@ -135,14 +132,11 @@ module Make (T : Branch_relaxation_intf.S) = struct
                   ~available_before:Reg_availability_set.Unreachable
                   ~available_across:Reg_availability_set.Unreachable
               in
-              let branch_cell =
-                DLL.insert_and_return_after cell branch_data
-              in
+              let branch_cell = DLL.insert_and_return_after cell branch_data in
               let label_data =
                 make_instr_data
                   (Llabel { label = lbl2; section_name = None })
-                  [||] [||]
-                  ~available_before:Reg_availability_set.Unreachable
+                  [||] [||] ~available_before:Reg_availability_set.Unreachable
                   ~available_across:Reg_availability_set.Unreachable
               in
               DLL.insert_after branch_cell label_data;
@@ -164,8 +158,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
                   in
                   DLL.insert_and_return_after cell_to_insert_after branch_data
               in
-              (* We need to handle the first branch specially by replacing
-                 the current cell, then insert subsequent branches after. *)
+              (* We need to handle the first branch specially by replacing the
+                 current cell, then insert subsequent branches after. *)
               let first_branch_inserted = ref false in
               let last_cell = ref cell in
               Option.iter
@@ -217,15 +211,15 @@ module Make (T : Branch_relaxation_intf.S) = struct
                 ( Move | Spill | Reload | Opaque | Pause | Begin_region
                 | End_region | Dls_get | Tls_get | Domain_index | Const_int _
                 | Const_float32 _ | Const_float _ | Const_symbol _
-                | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-                | Load _
+                | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+                | Stackoffset _ | Load _
                 | Store (_, _, _)
                 | Intop _ | Int128op _
                 | Intop_imm (_, _)
                 | Intop_atomic _
                 | Floatop (_, _)
-                | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-                | Name_for_debugger _ | Specific _ ) ->
+                | Csel _ | Reinterpret_cast _ | Static_cast _
+                | Probe_is_enabled _ | Name_for_debugger _ | Specific _ ) ->
               (* Any other instruction has already been rejected in
                  [instr_overflows] above. We can *never* get here. *)
               assert false))

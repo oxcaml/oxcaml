@@ -531,9 +531,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
       | Lprologue | Lepilogue_open | Lepilogue_close
       | Lop
           ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-          | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
-          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Load _
+          | Tls_get | Domain_index | Poll | Pause | Const_int _
+          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)
@@ -572,11 +572,11 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
         let stack_check_data =
           Linear.make_instr_data
             (Lstackcheck { max_frame_size_bytes = max_frame_size })
-            [||] [||]
-            ~available_before:first_data.Linear.available_before
+            [||] [||] ~available_before:first_data.Linear.available_before
             ~available_across:first_data.Linear.available_across
         in
-        Oxcaml_utils.Doubly_linked_list.add_begin fundecl.fun_body stack_check_data;
+        Oxcaml_utils.Doubly_linked_list.add_begin fundecl.fun_body
+          stack_check_data;
         fundecl)
     else fundecl
 

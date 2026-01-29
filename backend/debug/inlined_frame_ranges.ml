@@ -177,7 +177,8 @@ module Inlined_frames = struct
     match insn_dbg with
     | [] -> None
     | _ :: _ ->
-      Some (Key.Set.Ok (Key.Raw_set.of_list (data.L.dbg :: get_parents insn_dbg)))
+      Some
+        (Key.Set.Ok (Key.Raw_set.of_list (data.L.dbg :: get_parents insn_dbg)))
 
   let available_across insn =
     (* A single [Linear] instruction never spans inlined frames. *)
