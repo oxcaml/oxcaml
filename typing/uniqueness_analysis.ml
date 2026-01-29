@@ -2770,7 +2770,8 @@ let report_multi_use inner first_is_of_second =
       Format.dprintf "This value is %s here as unique,@ but %s %s %s at:"
         second_usage first_is_of_second access_order first_usage
     | true, Linearity ->
-      Format.dprintf "This value is defined as once and %s here,@ but %s %s %s at:"
+      Format.dprintf
+        "This value is defined as once and %s here,@ but %s %s %s at:"
         second_usage first_is_of_second access_order first_usage
   in
   let sub = [Location.msg ~loc:first.loc ""] in
