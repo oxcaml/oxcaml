@@ -55,6 +55,7 @@ Error: The kind of type "int -> int" is value mod aliased immutable non_float
 type t : value mod contended
 external f : unit -> t @ contended = "%identity"
 let _ : unit -> t = f
+(* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
 type t : value mod contended
 external f : unit -> t @ contended = "%identity"
