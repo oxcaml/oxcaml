@@ -739,7 +739,6 @@ let foo (t : (int ref) t @ contended) = use_uncontended t
 val foo : int ref t @ contended -> unit = <fun>
 |}]
 
-
 let foo (t : int t @ aliased) = use_unique t
 [%%expect {|
 Line 1, characters 43-44:
