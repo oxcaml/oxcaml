@@ -149,16 +149,13 @@ let v8h_v8h_v8h (i : Linear.instruction_data) =
   reg_v8h i.res.(0), reg_v8h i.arg.(0), reg_v8h i.arg.(1)
 
 let v16b_v16b_v16b (i : Linear.instruction_data) =
-  (reg_v16b i.res.(0), reg_v16b i.arg.(0), reg_v16b i.arg.(1))
+  reg_v16b i.res.(0), reg_v16b i.arg.(0), reg_v16b i.arg.(1)
 
-let v4s_v4s (i : Linear.instruction_data) =
-  reg_v4s i.res.(0), reg_v4s i.arg.(0)
+let v4s_v4s (i : Linear.instruction_data) = reg_v4s i.res.(0), reg_v4s i.arg.(0)
 
-let v2d_v2d (i : Linear.instruction_data) =
-  reg_v2d i.res.(0), reg_v2d i.arg.(0)
+let v2d_v2d (i : Linear.instruction_data) = reg_v2d i.res.(0), reg_v2d i.arg.(0)
 
-let v8h_v8h (i : Linear.instruction_data) =
-  reg_v8h i.res.(0), reg_v8h i.arg.(0)
+let v8h_v8h (i : Linear.instruction_data) = reg_v8h i.res.(0), reg_v8h i.arg.(0)
 
 let v16b_v16b (i : Linear.instruction_data) =
   reg_v16b i.res.(0), reg_v16b i.arg.(0)
