@@ -231,8 +231,17 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
   | Product sorts ->
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
 
-let rec ignorable_product_array_kind loc sorts =
-  List.map (sort_to_ignorable_product_element_kind loc) sorts
+let rec ignorable_product_array_kind loc (sorts : Jkind.Sort.Const.t list) =
+  match sorts with
+  | [Base Vec128; Base Vec128] ->
+    [ Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128 ]
+  | [Base Vec128; Base Vec128; Base Vec128; Base Vec128] ->
+    [ Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128 ]
+  | _ -> List.map (sort_to_ignorable_product_element_kind loc) sorts
 
 and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   match s with
@@ -271,8 +280,7 @@ let array_kind_of_elt ~elt_sort env loc ty =
   match classify ~classify_product env ty elt_sort with
   | Any ->
     if Config.flat_float_array
-      && not (Language_extension.is_at_least Separability ()
-          && Ctype.check_type_separability env ty Non_float)
+      && not (Ctype.check_type_separability env ty Non_float)
     then Pgenarray
     else Paddrarray
   | Float -> if Config.flat_float_array then Pfloatarray else Paddrarray

@@ -73,7 +73,6 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Labeled_tuples -> (module Unit)
   | Small_numbers -> (module Maturity)
   | Instances -> (module Unit)
-  | Separability -> (module Unit)
   | Let_mutable -> (module Unit)
   | Layout_poly -> (module Maturity)
   | Runtime_metaprogramming -> (module Unit)
@@ -90,7 +89,7 @@ let is_erasable : type a. a t -> bool = function
   | Mode | Unique | Overwriting | Layouts | Layout_poly -> true
   | Comprehensions | Include_functor | Polymorphic_parameters | Immutable_arrays
   | Module_strengthening | SIMD | Labeled_tuples | Small_numbers | Instances
-  | Separability | Let_mutable | Runtime_metaprogramming ->
+  | Let_mutable | Runtime_metaprogramming ->
     false
 
 let maturity_of_unique_for_drf = Stable
@@ -114,7 +113,6 @@ module Exist_pair = struct
     | Pair (Labeled_tuples, ()) -> Stable
     | Pair (Small_numbers, m) -> m
     | Pair (Instances, ()) -> Stable
-    | Pair (Separability, ()) -> Stable
     | Pair (Let_mutable, ()) -> Stable
     | Pair (Layout_poly, m) -> m
     | Pair (Runtime_metaprogramming, ()) -> Alpha
@@ -133,8 +131,8 @@ module Exist_pair = struct
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Labeled_tuples
-           | Instances | Overwriting | Separability | Let_mutable
-           | Runtime_metaprogramming ) as ext),
+           | Instances | Overwriting | Let_mutable | Runtime_metaprogramming )
+           as ext),
           _ ) ->
       to_string ext
 
@@ -166,7 +164,6 @@ module Exist_pair = struct
     | "small_numbers" -> Some (Pair (Small_numbers, Stable))
     | "small_numbers_beta" -> Some (Pair (Small_numbers, Beta))
     | "instances" -> Some (Pair (Instances, ()))
-    | "separability" -> Some (Pair (Separability, ()))
     | "let_mutable" -> Some (Pair (Let_mutable, ()))
     | "layout_poly" -> Some (Pair (Layout_poly, Stable))
     | "layout_poly_alpha" -> Some (Pair (Layout_poly, Alpha))
@@ -193,7 +190,6 @@ let all_extensions =
     Pack Labeled_tuples;
     Pack Small_numbers;
     Pack Instances;
-    Pack Separability;
     Pack Let_mutable;
     Pack Layout_poly;
     Pack Runtime_metaprogramming ]
@@ -235,14 +231,13 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Labeled_tuples, Labeled_tuples -> Some Refl
   | Small_numbers, Small_numbers -> Some Refl
   | Instances, Instances -> Some Refl
-  | Separability, Separability -> Some Refl
   | Let_mutable, Let_mutable -> Some Refl
   | Layout_poly, Layout_poly -> Some Refl
   | Runtime_metaprogramming, Runtime_metaprogramming -> Some Refl
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
       | Layouts | SIMD | Labeled_tuples | Small_numbers | Instances
-      | Separability | Let_mutable | Layout_poly | Runtime_metaprogramming ),
+      | Let_mutable | Layout_poly | Runtime_metaprogramming ),
       _ ) ->
     None
 

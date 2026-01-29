@@ -364,7 +364,24 @@ let value_kind_of_value_jkind env jkind =
    2) A missing cmi file, so that we can't accurately compute the sort of
       some type.
 
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-29
    In case 1, we have a bug and should fail loudly.
+||||||| oxcaml/oxcaml:0a1dc8de0264b1b68a7905fade89c81e0580c685
+let rec ignorable_product_array_kind loc sorts =
+  List.map (sort_to_ignorable_product_element_kind loc) sorts
+=======
+let rec ignorable_product_array_kind loc (sorts : Jkind.Sort.Const.t list) =
+  match sorts with
+  | [Base Vec128; Base Vec128] ->
+    [ Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128 ]
+  | [Base Vec128; Base Vec128; Base Vec128; Base Vec128] ->
+    [ Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128 ]
+  | _ -> List.map (sort_to_ignorable_product_element_kind loc) sorts
+>>>>>>> oxcaml/oxcaml:4ac226a124a59cc8d0eef6b0f10b2269e2803a45
 
    In case 2, we could issue an error and make the user add the dependency
    explicitly.  But because [value_kind] looks at the subcomponents of your type,

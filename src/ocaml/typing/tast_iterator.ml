@@ -38,6 +38,10 @@ type iterator =
     include_declaration: iterator -> include_declaration -> unit;
     include_description: iterator -> include_description -> unit;
     location: iterator -> Location.t -> unit;
+    modalities: iterator -> modalities -> unit;
+    (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
+       we should add an gadt parameter that determines the type of 'a. *)
+    modes: 'a. iterator -> 'a modes -> unit;
     module_binding: iterator -> module_binding -> unit;
     module_coercion: iterator -> module_coercion -> unit;
     module_declaration: iterator -> module_declaration -> unit;
@@ -103,12 +107,13 @@ let module_type_declaration sub x =
   Option.iter (sub.module_type sub) x.mtd_type
 
 let module_declaration sub md =
-  let {md_loc; md_name; md_type; md_attributes; _} = md in
+  let {md_loc; md_name; md_type; md_attributes; md_modalities; _} = md in
   sub.item_declaration sub (Module md);
   sub.location sub md_loc;
   sub.attributes sub md_attributes;
   iter_loc sub md_name;
-  sub.module_type sub md_type
+  sub.module_type sub md_type;
+  sub.modalities sub md_modalities
 
 let module_substitution sub ms =
   let {ms_loc; ms_name; ms_txt; ms_attributes; _} = ms in
@@ -172,18 +177,24 @@ let value_description sub x =
   sub.location sub x.val_loc;
   sub.attributes sub x.val_attributes;
   iter_loc sub x.val_name;
-  sub.typ sub x.val_desc
+  sub.typ sub x.val_desc;
+  (match x.val_modal_info with
+   | Valmi_sig_value moda -> sub.modalities sub moda
+   | Valmi_str_primitive modes -> sub.modes sub modes)
 
-let label_decl sub ({ld_loc; ld_name; ld_type; ld_attributes; ld_modalities = _} as ld) =
+let label_decl sub
+    ({ld_loc; ld_name; ld_type; ld_attributes; ld_modalities} as ld) =
   sub.item_declaration sub (Label ld);
   sub.location sub ld_loc;
   sub.attributes sub ld_attributes;
   iter_loc sub ld_name;
-  sub.typ sub ld_type
+  sub.typ sub ld_type;
+  sub.modalities sub ld_modalities
 
-let field_decl sub {ca_loc; ca_type; ca_modalities = _} =
+let field_decl sub {ca_loc; ca_type; ca_modalities} =
   sub.location sub ca_loc;
-  sub.typ sub ca_type
+  sub.typ sub ca_type;
+  sub.modalities sub ca_modalities
 
 let constructor_args sub = function
   | Cstr_tuple l -> List.iter (field_decl sub) l
@@ -252,7 +263,9 @@ let pat_extra sub (e, loc, attrs) =
   | Tpat_type (_, lid) -> iter_loc sub lid
   | Tpat_unpack -> ()
   | Tpat_open (_, lid, env) -> iter_loc sub lid; sub.env sub env
-  | Tpat_constraint ct -> sub.typ sub ct
+  | Tpat_constraint (ct, ma) -> sub.typ sub ct; sub.modes sub ma
+  | Tpat_inspected_type (Label_disambiguation _) -> ()
+  | Tpat_inspected_type (Polymorphic_parameter (Param _)) -> ()
 
 let pat
   : type k . iterator -> k general_pattern -> unit
@@ -299,15 +312,19 @@ let extra sub = function
   | Texp_newtype _ -> ()
   | Texp_poly cto -> Option.iter (sub.typ sub) cto
   | Texp_stack -> ()
-  | Texp_mode _ -> ()
+  | Texp_mode modes -> sub.modes sub modes
+  | Texp_inspected_type (Label_disambiguation _) -> ()
+  | Texp_inspected_type (Polymorphic_parameter (Method _)) -> ()
+  | Texp_inspected_type (Polymorphic_parameter (Arrow _)) -> ()
 
-let function_param sub { fp_loc; fp_kind; fp_newtypes; _ } =
+let function_param sub { fp_loc; fp_kind; fp_newtypes; fp_mode; _ } =
   sub.location sub fp_loc;
   List.iter
     (fun (_, var, annot, _) ->
        iter_loc sub var;
        Option.iter (sub.jkind_annotation sub) annot)
     fp_newtypes;
+  sub.modes sub fp_mode;
   match fp_kind with
   | Tparam_pat pat -> sub.pat sub pat
   | Tparam_optional_default (pat, default_arg, _) ->
@@ -324,7 +341,7 @@ let function_body sub body =
         fc_partial = _; fc_param = _; fc_param_debug_uid = _;
       } ->
       List.iter (sub.case sub) fc_cases;
-      Option.iter (extra sub) fc_exp_extra;
+      List.iter (extra sub) fc_exp_extra;
       sub.location sub fc_loc;
       sub.attributes sub fc_attributes;
       sub.env sub fc_env
@@ -353,7 +370,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     | Uaccess_unboxed_field (lid, _) -> iter_loc sub lid
   in
   match exp_desc with
-  | Texp_ident (_, lid, _, _, _)  -> iter_loc sub lid
+  | Texp_ident (_, lid, _, _, _, _)  -> iter_loc sub lid
   | Texp_constant _ -> ()
   | Texp_let (rec_flag, list, exp) ->
       sub.value_bindings sub (rec_flag, list);
@@ -361,9 +378,10 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_letmutable (vb, exp) ->
       sub.value_binding sub vb;
       sub.expr sub exp
-  | Texp_function { params; body; _ } ->
+  | Texp_function { params; body; ret_mode; _ } ->
       List.iter (function_param sub) params;
-      function_body sub body
+      function_body sub body;
+      sub.modes sub ret_mode
   | Texp_apply (exp, list, _, _, _) ->
       sub.expr sub exp;
       List.iter (function
@@ -494,9 +512,10 @@ let binding_op sub {bop_loc; bop_op_name; bop_exp; _} =
   iter_loc sub bop_op_name;
   sub.expr sub bop_exp
 
-let signature sub {sig_items; sig_final_env; _} =
+let signature sub {sig_items; sig_final_env; sig_modalities; _} =
   sub.env sub sig_final_env;
-  List.iter (sub.signature_item sub) sig_items
+  List.iter (sub.signature_item sub) sig_items;
+  sub.modalities sub sig_modalities
 
 let sig_include_infos sub {incl_loc; incl_mod; incl_attributes; incl_kind; _ } =
   sub.location sub incl_loc;
@@ -518,7 +537,9 @@ let signature_item sub {sig_loc; sig_desc; sig_env; _} =
   | Tsig_recmodule list -> List.iter (sub.module_declaration sub) list
   | Tsig_modtype x -> sub.module_type_declaration sub x
   | Tsig_modtypesubst x -> sub.module_type_declaration sub x
-  | Tsig_include (incl, _) -> sig_include_infos sub incl
+  | Tsig_include (incl, moda) ->
+      sig_include_infos sub incl;
+      sub.modalities sub moda
   | Tsig_class list -> List.iter (sub.class_description sub) list
   | Tsig_class_type list -> List.iter (sub.class_type_declaration sub) list
   | Tsig_open od -> sub.open_description sub od
@@ -530,7 +551,10 @@ let class_description sub x =
 
 let functor_parameter sub = function
   | Unit -> ()
-  | Named (_, s, mtype) -> iter_loc sub s; sub.module_type sub mtype
+  | Named (_, s, mtype, mmode) ->
+      iter_loc sub s;
+      sub.module_type sub mtype;
+      sub.modes sub mmode
 
 let module_type sub {mty_loc; mty_desc; mty_env; mty_attributes; _} =
   sub.location sub mty_loc;
@@ -540,9 +564,10 @@ let module_type sub {mty_loc; mty_desc; mty_env; mty_attributes; _} =
   | Tmty_ident (_, lid) -> iter_loc sub lid
   | Tmty_alias (_, lid) -> iter_loc sub lid
   | Tmty_signature sg -> sub.signature sub sg
-  | Tmty_functor (arg, mtype2) ->
+  | Tmty_functor (arg, mtype2, mmode2) ->
       functor_parameter sub arg;
-      sub.module_type sub mtype2
+      sub.module_type sub mtype2;
+      sub.modes sub mmode2
   | Tmty_with (mtype, list) ->
       sub.module_type sub mtype;
       List.iter (fun (_, lid, e) ->
@@ -606,9 +631,10 @@ let module_expr sub {mod_loc; mod_desc; mod_env; mod_attributes; _} =
   | Tmod_constraint (mexpr, _, Tmodtype_implicit, c) ->
       sub.module_expr sub mexpr;
       sub.module_coercion sub c
-  | Tmod_constraint (mexpr, _, Tmodtype_explicit mtype, c) ->
+  | Tmod_constraint (mexpr, _, Tmodtype_explicit (mtype, ma), c) ->
       sub.module_expr sub mexpr;
       sub.module_type sub mtype;
+      sub.modes sub ma;
       sub.module_coercion sub c
   | Tmod_unpack (exp, _) -> sub.expr sub exp
 
@@ -688,9 +714,11 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   match ctyp_desc with
   | Ttyp_var (_, jkind) ->
       Option.iter (sub.jkind_annotation sub) jkind
-  | Ttyp_arrow (_, ct1, ct2) ->
+  | Ttyp_arrow (_, ct1, ma1, ct2, ma2) ->
       sub.typ sub ct1;
-      sub.typ sub ct2
+      sub.modes sub ma1;
+      sub.typ sub ct2;
+      sub.modes sub ma2
   | Ttyp_tuple list -> List.iter (fun (_, t) -> sub.typ sub t) list
   | Ttyp_unboxed_tuple list -> List.iter (fun (_, t) -> sub.typ sub t) list
   | Ttyp_constr (_, lid, list) ->
@@ -776,6 +804,12 @@ let jkind_annotation sub l =
   in
   ast_iterator.jkind_annotation ast_iterator l
 
+let modalities sub x =
+  List.iter (iter_loc sub) x.moda_desc
+
+let modes sub x =
+  List.iter (iter_loc sub) x.mode_desc
+
 let item_declaration _sub _ = ()
 
 let default_iterator =
@@ -800,6 +834,8 @@ let default_iterator =
     include_description;
     include_declaration;
     location;
+    modalities;
+    modes;
     module_binding;
     module_coercion;
     module_declaration;

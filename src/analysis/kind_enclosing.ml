@@ -15,12 +15,13 @@ module Kind_info = struct
         kind
     in
     Printtyp.wrap_printing_env ~verbosity env (fun () ->
-        let format_jkind =
-          match Mconfig.Verbosity.to_int ~for_smart:0 verbosity > 0 with
-          | false -> Jkind.format
-          | true -> Jkind.format_expanded
+        let verbosity : Jkind.Format_verbosity.t =
+          match Mconfig.Verbosity.to_int ~for_smart:0 verbosity with
+          | 0 -> Not_verbose
+          | 1 -> Expanded
+          | _ -> Expanded_with_all_mod_bounds
         in
-        Format.asprintf "%a" format_jkind kind)
+        Format.asprintf "%a" (Jkind.format_verbose ~verbosity) kind)
 end
 
 let loc_contains_cursor (loc : Location.t) ~cursor =

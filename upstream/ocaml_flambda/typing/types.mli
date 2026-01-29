@@ -83,53 +83,12 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
     Note on mutability: TBD.
  *)
 
-(** The mod-bounds of a jkind *)
-module Jkind_mod_bounds : sig
-  module Crossing = Mode.Crossing
-  module Externality = Jkind_axis.Externality
-  module Nullability = Jkind_axis.Nullability
-  module Separability = Jkind_axis.Separability
-
-  type t
-
-  val create :
-    Crossing.t->
-    externality:Externality.t ->
-    nullability:Nullability.t ->
-    separability:Separability.t ->
-    t
-
-  val crossing : t -> Crossing.t
-  val externality : t -> Externality.t
-  val nullability : t -> Nullability.t
-  val separability : t -> Separability.t
-
-  val set_crossing : Crossing.t -> t -> t
-  val set_externality : Externality.t -> t -> t
-  val set_nullability : Nullability.t -> t -> t
-  val set_separability : Separability.t -> t -> t
-
-  (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max] within
-      [bounds] *)
-  val set_max_in_set : t -> Jkind_axis.Axis_set.t -> t
-
-  (** [set_min_in_set bounds axes] sets all the axes in [axes] to their [min] within
-      [bounds] *)
-  val set_min_in_set : t -> Jkind_axis.Axis_set.t -> t
-
-  (** [is_max_within_set bounds axes] returns whether or not all the axes in [axes] are
-      [max] within [bounds] *)
-  val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
-  val is_max : t -> bool
-
-  val debug_print : Format.formatter -> t -> unit
-end
-
-
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
   (** The axes that the with-bound applies to *)
   type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+
+  val join : t -> t -> t
 end
 
 type type_expr
@@ -335,6 +294,14 @@ and jkind_history =
 (** The types within the with-bounds of a jkind *)
 and with_bounds_types
 
+(** The mod bounds of a jkind *)
+and mod_bounds =
+  { crossing : Mode.Crossing.t;
+    externality: Jkind_axis.Externality.t;
+    nullability: Jkind_axis.Nullability.t;
+    separability: Jkind_axis.Separability.t;
+  }
+
 and 'd with_bounds =
   | No_with_bounds : ('l * 'r) with_bounds
   | With_bounds
@@ -343,7 +310,7 @@ and 'd with_bounds =
 
 and ('layout, 'd) layout_and_axes =
   { layout : 'layout;
-    mod_bounds : Jkind_mod_bounds.t;
+    mod_bounds : mod_bounds;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
@@ -1039,7 +1006,15 @@ module type Wrapped = sig
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities: Mode.Modality.t;      (* Modalities on the value *)
+      val_modalities: Mode.Modality.t;
+   (** The modalities on the value in a signature. It is [undefined] in several
+      cases:
+    - The value is not in a structure, so there is no modalities
+      to talk about. For example, adding [let x = ... in] to the environment
+      will have [val_modalities] set to [undefined].
+    - The value was from a structure, but the original modalities
+      have been applied and we have the real mode of the value. The original
+      modalities shouldn't be looked again and is replaced by [undefined]. *)
       val_kind: value_kind;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
@@ -1050,14 +1025,14 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type
+  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type
+  | Named of Ident.t option * module_type * Mode.Alloc.lr
 
   and signature = signature_item list wrapped
 
@@ -1075,6 +1050,7 @@ module type Wrapped = sig
   {
     md_type: module_type;
     md_modalities : Mode.Modality.t;
+    (** Similiar to [val_modalities]; see comments there. *)
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -1271,6 +1247,3 @@ val set_univar: type_expr option ref -> type_expr -> unit
 val link_kind: inside:field_kind -> field_kind -> unit
 val link_commu: inside:commutable -> commutable -> unit
 val set_commu_ok: commutable -> unit
-
-val functor_param_mode : Mode.Alloc.lr
-val functor_res_mode : Mode.Alloc.lr

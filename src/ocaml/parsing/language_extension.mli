@@ -1,6 +1,5 @@
 (** Language extensions provided by the Jane Street version of the OCaml
-    compiler.
-*)
+    compiler. *)
 
 (** A setting for extensions that track multiple maturity levels *)
 type maturity = Language_extension_kernel.maturity =
@@ -31,7 +30,6 @@ type 'a t = 'a Language_extension_kernel.t =
   | Labeled_tuples : unit t
   | Small_numbers : maturity t
   | Instances : unit t
-  | Separability : unit t
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t
@@ -58,8 +56,8 @@ module Exist : sig
 
   val is_erasable : t -> bool
 
-  (** Returns a list of all strings, like ["layouts_beta"], that
-      correspond to this extension. *)
+  (** Returns a list of all strings, like ["layouts_beta"], that correspond to
+      this extension. *)
   val to_command_line_strings : t -> string list
 
   val all : t list
@@ -74,10 +72,9 @@ val equal : 'a t -> 'b t -> bool
 
     Each variant corresponds to the [-extension-universe <variant>] CLI flag.
 
-    Each extension universe, except for [No_extensions], should also have
-    a corresponding library in [otherlibs/]. Those libraries must contain
-    OCaml code for corresponding extensions that would normally go into Stdlib.
-*)
+    Each extension universe, except for [No_extensions], should also have a
+    corresponding library in [otherlibs/]. Those libraries must contain OCaml
+    code for corresponding extensions that would normally go into Stdlib. *)
 module Universe : sig
   type t =
     | No_extensions
@@ -86,8 +83,8 @@ module Universe : sig
     | Stable  (** Extensions of [Stable] maturity. *)
     | Beta  (** Extensions of [Beta] maturity. *)
     | Alpha
-        (** All extensions. This is the universe enabled by default
-        for the time being. *)
+        (** All extensions. This is the universe enabled by default for the time
+            being. *)
 
   val all : t list
 
@@ -103,8 +100,8 @@ end
 val disable_all : unit -> unit
 
 (** Check if a language extension is "erasable", i.e. whether it can be
-    harmlessly translated to attributes and compiled with the upstream
-    compiler. *)
+    harmlessly translated to attributes and compiled with the upstream compiler.
+*)
 val is_erasable : 'a t -> bool
 
 (** Print and parse language extensions; parsing is case-insensitive *)
@@ -116,12 +113,12 @@ val of_string : string -> Exist.t option
 
 val maturity_to_string : maturity -> string
 
-(** Get the command line string enabling the given extension, if it's
-    enabled; otherwise None *)
+(** Get the command line string enabling the given extension, if it's enabled;
+    otherwise None *)
 val get_command_line_string_if_enabled : 'a t -> string option
 
-(** Enable and disable according to command-line strings; these raise
-    an exception if the input string is invalid. *)
+(** Enable and disable according to command-line strings; these raise an
+    exception if the input string is invalid. *)
 val enable_of_string_exn : string -> unit
 
 val disable_of_string_exn : string -> unit
@@ -141,9 +138,10 @@ val is_enabled : 'a t -> bool
 val is_at_least : 'a t -> 'a -> bool
 
 (** Tooling support: Temporarily enable and disable language extensions; these
-    operations are idempotent.  Calls to [set], [enable], [disable] inside the body
-    of the function argument will also be rolled back when the function finishes,
-    but this behavior may change; nest multiple [with_*] functions instead.  *)
+    operations are idempotent. Calls to [set], [enable], [disable] inside the
+    body of the function argument will also be rolled back when the function
+    finishes, but this behavior may change; nest multiple [with_*] functions
+    instead. *)
 val with_set : unit t -> enabled:bool -> (unit -> unit) -> unit
 
 val with_enabled : 'a t -> 'a -> (unit -> unit) -> unit
@@ -158,8 +156,8 @@ val erasable_extensions_only : unit -> bool
 (** Set the extension universe and enable all allowed extensions. *)
 val set_universe_and_enable_all : Universe.t -> unit
 
-(** Parse a command-line string and call [set_universe_and_enable_all].
-    Raises if the argument is invalid. *)
+(** Parse a command-line string and call [set_universe_and_enable_all]. Raises
+    if the argument is invalid. *)
 val set_universe_and_enable_all_of_string_exn : string -> unit
 
 (**/**)
@@ -178,8 +176,8 @@ module For_pprintast : sig
   val make_printer_exporter : unit -> printer_exporter
 end
 
-(** Expose the exception type raised by [assert_extension_enabled] to help
-    the exception printer. *)
+(** Expose the exception type raised by [assert_extension_enabled] to help the
+    exception printer. *)
 module Error : sig
   type error = private
     | Disabled_extension :

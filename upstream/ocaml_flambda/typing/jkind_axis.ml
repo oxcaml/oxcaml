@@ -269,19 +269,19 @@ module Per_axis = struct
     | Nonmodal ax -> (Nonmodal.max [@inlined hint]) ax
 
   let le : type a. a t -> a -> a -> bool =
-   fun [@inline available] ax a b ->
+   fun[@inline available] ax a b ->
     match ax with
     | Modal ax -> (Mode.Crossing.Per_axis.le [@inlined hint]) ax a b
     | Nonmodal ax -> (Nonmodal.le [@inlined hint]) ax a b
 
   let meet : type a. a t -> a -> a -> a =
-   fun [@inline available] ax a b ->
+   fun[@inline available] ax a b ->
     match ax with
     | Modal ax -> (Mode.Crossing.Per_axis.meet [@inlined hint]) ax a b
     | Nonmodal ax -> (Nonmodal.meet [@inlined hint]) ax a b
 
   let join : type a. a t -> a -> a -> a =
-   fun [@inline available] ax a b ->
+   fun[@inline available] ax a b ->
     match ax with
     | Modal ax -> (Mode.Crossing.Per_axis.join [@inlined hint]) ax a b
     | Nonmodal ax -> (Nonmodal.join [@inlined hint]) ax a b

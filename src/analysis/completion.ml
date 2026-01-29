@@ -136,7 +136,7 @@ let classify_node = function
   | Open_declaration _ -> `Module
   | Include_declaration _ -> `Module
   | Include_description _ -> `Module
-  | Mode _ | Modality _ ->
+  | Mode _ | Modality _ | Mod_bound _ ->
     (* CR-someday: Have proper completion for modes and modalities *)
     `Expression
   | Jkind_annotation _ ->

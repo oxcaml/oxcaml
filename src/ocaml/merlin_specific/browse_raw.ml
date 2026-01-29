@@ -86,9 +86,10 @@ type node =
   | Module_binding_name of module_binding
   | Module_declaration_name of module_declaration
   | Module_type_declaration_name of module_type_declaration
-  | Mode of Parsetree.mode Location.loc
-  | Modality of Parsetree.modality Location.loc
+  | Mode of Mode.Alloc.atom Location.loc
+  | Modality of Mode.Modality.atom Location.loc
   | Jkind_annotation of Parsetree.jkind_annotation
+  | Mod_bound of Parsetree.mode Location.loc
   | Attribute of attribute
 
 let node_update_env env0 = function
@@ -142,6 +143,7 @@ let node_update_env env0 = function
   | Mode _
   | Modality _
   | Jkind_annotation _
+  | Mod_bound _
   | Attribute _ -> env0
 
 let node_real_loc loc0 = function
@@ -178,6 +180,7 @@ let node_real_loc loc0 = function
   | Mode { loc }
   | Modality { loc }
   | Jkind_annotation { pjkind_loc = loc }
+  | Mod_bound { loc }
   | Attribute { attr_name = { loc } } -> loc
   | Module_type_declaration_name { mtd_name = loc } -> loc.Location.loc
   | Module_declaration_name { md_name = loc }
@@ -297,6 +300,20 @@ let option_fold f' o env (f : _ f0) acc =
 
 let of_core_type ct = app (Core_type ct)
 
+let of_mod_bound mod_bound = app (Mod_bound mod_bound)
+
+let of_mode mode = app (Mode mode)
+
+let of_modes modes = list_fold of_mode modes.mode_desc
+
+let of_modality modality = app (Modality modality)
+
+let of_modalities modalities = list_fold of_modality modalities.moda_desc
+
+let of_value_description_modal_info = function
+  | Valmi_sig_value modalities -> of_modalities modalities
+  | Valmi_str_primitive modes -> of_modes modes
+
 let of_jkind_annotation jkind = app (Jkind_annotation jkind)
 
 let of_jkind_annotation_opt jkind = option_fold of_jkind_annotation jkind
@@ -307,13 +324,14 @@ let of_exp_extra (exp, _, _) =
   | Texp_coerce (cto, ct) -> of_core_type ct ** option_fold of_core_type cto
   | Texp_poly cto -> option_fold of_core_type cto
   | Texp_newtype (_, _, jkind, _) -> of_jkind_annotation_opt jkind
-  | Texp_stack | Texp_mode _ -> id_fold
+  | Texp_mode modes -> of_modes modes
+  | Texp_stack | Texp_inspected_type _ -> id_fold
 let of_expression e = app (Expression e) ** list_fold of_exp_extra e.exp_extra
 
 let of_pat_extra (pat, _, _) =
   match pat with
-  | Tpat_constraint ct -> of_core_type ct
-  | Tpat_type _ | Tpat_unpack | Tpat_open _ -> id_fold
+  | Tpat_constraint (ct, modes) -> of_core_type ct ** of_modes modes
+  | Tpat_type _ | Tpat_unpack | Tpat_open _ | Tpat_inspected_type _ -> id_fold
 
 let of_pattern (type k) (p : k general_pattern) =
   app (Pattern p) ** list_fold of_pat_extra p.pat_extra
@@ -324,7 +342,8 @@ let of_value_binding vb = app (Value_binding vb)
 let of_module_type mt = app (Module_type mt)
 let of_module_expr me = app (Module_expr me)
 let of_typ_param (ct, _) = of_core_type ct
-let of_constructor_arg arg = of_core_type arg.ca_type
+let of_constructor_arg arg =
+  of_core_type arg.ca_type ** of_modalities arg.ca_modalities
 let of_constructor_arguments = function
   | Cstr_tuple cts -> list_fold of_constructor_arg cts
   | Cstr_record lbls -> list_fold of_label_declaration lbls
@@ -405,8 +424,9 @@ let rec of_expression_desc loc = function
   | Texp_new _ | Texp_src_pos | Texp_typed_hole -> id_fold
   | Texp_let (_, vbs, e) -> of_expression e ** list_fold of_value_binding vbs
   | Texp_letmutable (vb, e) -> of_expression e ** of_value_binding vb
-  | Texp_function { params; body; _ } ->
-    list_fold of_function_param params ** of_function_body body
+  | Texp_function { params; body; ret_mode; _ } ->
+    list_fold of_function_param params
+    ** of_function_body body ** of_modes ret_mode
   | Texp_apply (e, ls, _, _, _) ->
     of_expression e
     ** list_fold
@@ -520,6 +540,7 @@ and of_function_param fp =
   ** list_fold
        (fun (_, _, jkind, _) -> of_jkind_annotation_opt jkind)
        fp.fp_newtypes
+  ** of_modes fp.fp_mode
 
 and of_function_param_kind = function
   | Tparam_pat pat -> of_pattern pat
@@ -562,8 +583,8 @@ and of_module_expr_desc = function
   | Tmod_ident _ -> id_fold
   | Tmod_structure str -> app (Structure str)
   | Tmod_functor (Unit, me) -> of_module_expr me
-  | Tmod_functor (Named (_, _, mt), me) ->
-    of_module_type mt ** of_module_expr me
+  | Tmod_functor (Named (_, _, mt, modes), me) ->
+    of_module_type mt ** of_module_expr me ** of_modes modes
   | Tmod_apply (me1, me2, _) -> of_module_expr me1 ** of_module_expr me2
   | Tmod_apply_unit me1 -> of_module_expr me1
   | Tmod_constraint (me, _, mtc, _) ->
@@ -593,9 +614,10 @@ and of_module_type_desc = function
   (* CR module strengthening: need to also fold on the module expression *)
   | Tmty_strengthen (mty, _, _) -> of_module_type mty
   | Tmty_signature sg -> app (Signature sg)
-  | Tmty_functor (Named (_, _, mt1), mt2) ->
-    of_module_type mt1 ** of_module_type mt2
-  | Tmty_functor (Unit, mt) -> of_module_type mt
+  | Tmty_functor (Named (_, _, mt1, modes1), mt2, modes2) ->
+    of_module_type mt1 ** of_module_type mt2 ** of_modes modes1
+    ** of_modes modes2
+  | Tmty_functor (Unit, mt, modes) -> of_module_type mt ** of_modes modes
   | Tmty_with (mt, wcs) ->
     list_fold (fun (_, _, wc) -> app (With_constraint wc)) wcs
     ** of_module_type mt
@@ -611,7 +633,8 @@ and of_signature_item_desc = function
   | Tsig_module md -> app (Module_declaration md)
   | Tsig_recmodule mds -> list_fold (fun md -> app (Module_declaration md)) mds
   | Tsig_modtype mtd -> app (Module_type_declaration mtd)
-  | Tsig_include (i, _modality) -> app (Include_description i)
+  | Tsig_include (i, modalities) ->
+    app (Include_description i) ** of_modalities modalities
   | Tsig_class cds -> list_fold (fun cd -> app (Class_description cd)) cds
   | Tsig_class_type ctds ->
     list_fold (fun ctd -> app (Class_type_declaration ctd)) ctds
@@ -630,7 +653,8 @@ and of_core_type_desc = function
   | Ttyp_call_pos -> id_fold
   | Ttyp_of_kind jkind -> of_jkind_annotation jkind
   | Ttyp_open (_, _, ct) -> of_core_type ct
-  | Ttyp_arrow (_, ct1, ct2) -> of_core_type ct1 ** of_core_type ct2
+  | Ttyp_arrow (_, ct1, modes1, ct2, modes2) ->
+    of_core_type ct1 ** of_core_type ct2 ** of_modes modes1 ** of_modes modes2
   | Ttyp_tuple cts -> list_fold (fun (_, ty) -> of_core_type ty) cts
   | Ttyp_unboxed_tuple cts -> list_fold (fun (_, ty) -> of_core_type ty) cts
   | Ttyp_constr (_, _, cts) | Ttyp_class (_, _, cts) ->
@@ -663,10 +687,6 @@ and of_class_type_field_desc = function
   | Tctf_constraint (ct1, ct2) -> of_core_type ct1 ** of_core_type ct2
   | Tctf_attribute _ -> id_fold
 
-let of_mode mode = app (Mode mode)
-
-let of_modality modality = app (Modality modality)
-
 let of_jkind_annotation_desc : Parsetree.jkind_annotation_desc -> _ =
   let of_core_type (_ : Parsetree.core_type) =
     (* CR-someday: Replace [Parsetree.jkind_annotation] with a version where types are
@@ -677,11 +697,15 @@ let of_jkind_annotation_desc : Parsetree.jkind_annotation_desc -> _ =
   in
   function
   | Pjk_default | Pjk_abbreviation _ -> id_fold
-  | Pjk_mod (jkind, modes) ->
-    of_jkind_annotation jkind ** list_fold of_mode modes
+  | Pjk_mod (jkind, mod_bounds) ->
+    of_jkind_annotation jkind ** list_fold of_mod_bound mod_bounds
   | Pjk_with (jkind, ct, modalities) ->
-    of_jkind_annotation jkind ** of_core_type ct
-    ** list_fold of_modality modalities
+    (* Todo: The compiler should get updated so that the translated modalities are
+       included in the typed tree. *)
+    let modalities =
+      Typemode.transl_modalities ~maturity:Stable Immutable modalities
+    in
+    of_jkind_annotation jkind ** of_core_type ct ** of_modalities modalities
   | Pjk_kind_of ct -> of_core_type ct
   | Pjk_product jkinds -> list_fold of_jkind_annotation jkinds
 
@@ -715,7 +739,8 @@ let of_node node =
     | Class_field_kind (Tcfk_concrete (_, e)) -> of_expression e
     | Module_expr { mod_desc } -> of_module_expr_desc mod_desc
     | Module_type_constraint Tmodtype_implicit -> id_fold
-    | Module_type_constraint (Tmodtype_explicit mt) -> of_module_type mt
+    | Module_type_constraint (Tmodtype_explicit (mt, modes)) ->
+      of_module_type mt ** of_modes modes
     | Structure { str_items; str_final_env } ->
       list_fold_with_next
         (fun next item ->
@@ -729,16 +754,19 @@ let of_node node =
     | Value_binding { vb_pat; vb_expr } ->
       of_pattern vb_pat ** of_expression vb_expr
     | Module_type { mty_desc } -> of_module_type_desc mty_desc
-    | Signature { sig_items; sig_final_env } ->
+    | Signature { sig_items; sig_final_env; sig_modalities } ->
       list_fold_with_next
         (fun next item ->
           match next with
           | None -> app (Signature_item (item, sig_final_env))
           | Some item' -> app (Signature_item (item, item'.sig_env)))
         sig_items
+      ** of_modalities sig_modalities
     | Signature_item ({ sig_desc }, _) -> of_signature_item_desc sig_desc
     | Module_declaration md ->
-      of_module_type md.md_type ** app (Module_declaration_name md)
+      of_module_type md.md_type
+      ** app (Module_declaration_name md)
+      ** of_modalities md.md_modalities
     | Module_type_declaration mtd ->
       option_fold of_module_type mtd.mtd_type
       ** app (Module_type_declaration_name mtd)
@@ -755,7 +783,8 @@ let of_node node =
       | Ttag (_, _, cts) -> list_fold of_core_type cts
       | Tinherit ct -> of_core_type ct
     end
-    | Value_description { val_desc } -> of_core_type val_desc
+    | Value_description { val_desc; val_modal_info } ->
+      of_core_type val_desc ** of_value_description_modal_info val_modal_info
     | Type_declaration
         { typ_params; typ_cstrs; typ_kind; typ_manifest; typ_jkind_annotation }
       ->
@@ -779,7 +808,8 @@ let of_node node =
       ** of_constructor_arguments carg
       ** list_fold (fun (_, jkind) -> of_jkind_annotation_opt jkind) cvars
     | Extension_constructor { ext_kind = Text_rebind _ } -> id_fold
-    | Label_declaration { ld_type } -> of_core_type ld_type
+    | Label_declaration { ld_type; ld_modalities } ->
+      of_core_type ld_type ** of_modalities ld_modalities
     | Constructor_declaration { cd_args; cd_res; cd_vars } ->
       option_fold of_core_type cd_res
       ** of_constructor_arguments cd_args
@@ -808,6 +838,7 @@ let of_node node =
     | Mode _ -> id_fold
     | Modality _ -> id_fold
     | Jkind_annotation { pjkind_desc } -> of_jkind_annotation_desc pjkind_desc
+    | Mod_bound _ -> id_fold
     | Attribute _ -> id_fold
   in
   without_attributes ** list_fold of_attribute (node_attributes node)
@@ -869,6 +900,7 @@ let string_of_node = function
   | Mode _ -> "mode"
   | Modality _ -> "modality"
   | Jkind_annotation _ -> "jkind_annotation"
+  | Mod_bound _ -> "mod_bound"
   | Attribute _ -> "attribute"
 
 let mkloc = Location.mkloc
@@ -909,7 +941,7 @@ let pattern_paths (type k) { Typedtree.pat_desc; pat_extra; _ } =
 let module_expr_paths { Typedtree.mod_desc } =
   match mod_desc with
   | Tmod_ident (path, loc) -> [ (reloc path loc, Some loc.txt) ]
-  | Tmod_functor (Named (Some id, loc, _), _) ->
+  | Tmod_functor (Named (Some id, loc, _, _), _) ->
     [ (reloc (Path.Pident id) loc, Option.map ~f:mk_lident loc.txt) ]
   | _ -> []
 
@@ -921,7 +953,7 @@ let bindop_path { bop_op_name; bop_op_path } =
 let expression_paths { Typedtree.exp_desc; exp_extra; _ } =
   let init =
     match exp_desc with
-    | Texp_ident (path, loc, _, _, _) -> [ (reloc path loc, Some loc.txt) ]
+    | Texp_ident (path, loc, _, _, _, _) -> [ (reloc path loc, Some loc.txt) ]
     | Texp_letop { let_; ands } ->
       bindop_path let_ :: List.map ~f:bindop_path ands
     | Texp_new (path, loc, _, _) -> [ (reloc path loc, Some loc.txt) ]
@@ -999,7 +1031,7 @@ let module_type_paths { Typedtree.mty_desc } =
   match mty_desc with
   | Tmty_ident (path, loc) | Tmty_alias (path, loc) ->
     [ (reloc path loc, Some loc.txt) ]
-  | Tmty_functor (Named (Some id, loc, _), _) ->
+  | Tmty_functor (Named (Some id, loc, _, _), _, _) ->
     [ (reloc (Path.Pident id) loc, Option.map ~f:mk_lident loc.txt) ]
   | Tmty_with (_, ls) ->
     List.map ~f:(fun (p, l, _) -> (reloc p l, Some l.txt)) ls

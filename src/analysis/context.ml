@@ -122,7 +122,7 @@ let inspect_expression ~cursor ~lid e : t =
         Constructor (cd, lid_loc.loc)
       else Module_path
     else Module_path
-  | Texp_ident (p, lid_loc, _, _, _) ->
+  | Texp_ident (p, lid_loc, _, _, _, _) ->
     let name = Path.last p in
     log ~title:"inspect_context" "name is: [%s]" name;
     if name = "*type-error*" then

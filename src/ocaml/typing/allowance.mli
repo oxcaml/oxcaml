@@ -47,34 +47,34 @@ type right_only = disallowed * allowed
 
 type both = allowed * allowed
 
-(** Arrange the permissions appropriately for a positive lattice, by
-doing nothing. *)
+(** Arrange the permissions appropriately for a positive lattice, by doing
+    nothing. *)
 type 'a pos = 'b * 'c constraint 'a = 'b * 'c
 
-(** Arrange the permissions appropriately for a negative lattice, by
-    swapping left and right. *)
+(** Arrange the permissions appropriately for a negative lattice, by swapping
+    left and right. *)
 type 'a neg = 'c * 'b constraint 'a = 'b * 'c
 
 module type Allow_disallow = sig
   type ('a, 'b, 'd) sided constraint 'd = 'l * 'r
 
-  (** Disallows on the right.  *)
+  (** Disallows on the right. *)
   val disallow_right :
     ('a, 'b, 'l * 'r) sided -> ('a, 'b, 'l * disallowed) sided
 
-  (** Disallows a the left.  *)
+  (** Disallows a the left. *)
   val disallow_left : ('a, 'b, 'l * 'r) sided -> ('a, 'b, disallowed * 'r) sided
 
-  (** Generalizes a right-hand-side [allowed] to be any allowance.  *)
+  (** Generalizes a right-hand-side [allowed] to be any allowance. *)
   val allow_right : ('a, 'b, 'l * allowed) sided -> ('a, 'b, 'l * 'r) sided
 
-  (** Generalizes a left-hand-side [allowed] to be any allowance.  *)
+  (** Generalizes a left-hand-side [allowed] to be any allowance. *)
   val allow_left : ('a, 'b, allowed * 'r) sided -> ('a, 'b, 'l * 'r) sided
 end
 
-(** Takes a slow but type-correct [Allow_disallow] module and returns the
-    magic version, which is faster.
-    NOTE: for this to be sound, the functions in the original module must be
-    identity functions (up to runtime representation). *)
+(** Takes a slow but type-correct [Allow_disallow] module and returns the magic
+    version, which is faster. NOTE: for this to be sound, the functions in the
+    original module must be identity functions (up to runtime representation).
+*)
 module Magic_allow_disallow (X : Allow_disallow) :
   Allow_disallow with type ('a, 'b, 'd) sided = ('a, 'b, 'd) X.sided

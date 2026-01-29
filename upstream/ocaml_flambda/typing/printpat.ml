@@ -61,6 +61,8 @@ let pretty_extra ppf (cstr, _loc, _attrs) pretty_rest rest =
      fprintf ppf "@[(# %a)@]" pretty_rest rest
   | Tpat_open _ ->
      fprintf ppf "@[(# %a)@]" pretty_rest rest
+  | Tpat_inspected_type _ ->
+     fprintf ppf "%a" pretty_rest rest
 
 let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   match v.pat_extra with

@@ -17,18 +17,18 @@ let rec module_type =
     Ast_helper.Mty.ident (Location.mknoloc (Untypeast.lident_of_path path))
   | Mty_alias path ->
     Ast_helper.Mty.alias (Location.mknoloc (Untypeast.lident_of_path path))
-  | Mty_functor (param, type_out) ->
+  | Mty_functor (param, type_out, ret_mode) ->
     let param =
       match param with
       | Unit -> Parsetree.Unit
-      | Named (id, type_in) ->
+      | Named (id, type_in, param_mode) ->
         Parsetree.Named
           ( Location.mknoloc (Option.map ~f:Ident.name id),
             module_type type_in,
-            [] )
+            modes param_mode )
     in
     let out = module_type type_out in
-    Mty.functor_ param out
+    Mty.functor_ ~ret_mode:(modes ret_mode) param out
   | Mty_strengthen (mty, path, _aliasability) ->
     Mty.strengthen ~loc:Location.none (module_type mty)
       (Location.mknoloc (Untypeast.lident_of_path path))
@@ -55,16 +55,8 @@ and core_type type_expr =
       | Labelled l -> (Labelled l, core_type type_expr)
       | Optional l -> (Optional l, core_type type_expr)
     in
-    let snap = Btype.snapshot () in
-    let arg_modes =
-      Typemode.untransl_mode_annots
-      @@ Mode.Alloc.(Const.diff (zap_to_legacy arg_alloc_mode) Const.legacy)
-    in
-    let ret_modes =
-      Typemode.untransl_mode_annots
-      @@ Mode.Alloc.(Const.diff (zap_to_legacy ret_alloc_mode) Const.legacy)
-    in
-    Btype.backtrack snap;
+    let arg_modes = modes arg_alloc_mode in
+    let ret_modes = modes ret_alloc_mode in
     Typ.arrow label type_expr (core_type type_expr_out) arg_modes ret_modes
   | Ttuple type_exprs ->
     let labeled_type_exprs =
@@ -158,8 +150,17 @@ and extension_constructor id { ext_args; ext_ret_type; ext_attributes; _ } =
     ?res:(Option.map ~f:core_type ext_ret_type)
     (var_of_id id)
 
-and const_modalities modalities =
-  Typemode.untransl_modalities Immutable modalities
+and modes mode =
+  let snapshot = Btype.snapshot () in
+  let mode = Mode.Alloc.zap_to_legacy mode in
+  Btype.backtrack snapshot;
+  Printtyp.tree_of_modes mode
+  |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Mode mode))
+
+and const_modalities ~mut modality =
+  Printtyp.tree_of_modalities mut modality
+  |> List.map ~f:(fun modality ->
+         Location.mknoloc (Parsetree.Modality modality))
 
 and value_description id
     { val_type; val_kind = _; val_loc; val_attributes; val_modalities; _ } =
@@ -171,14 +172,14 @@ and value_description id
     pval_type = type_;
     pval_prim = [];
     pval_attributes = val_attributes;
-    pval_modalities = const_modalities modalities;
+    pval_modalities = const_modalities ~mut:Immutable modalities;
     pval_loc = val_loc
   }
 
 and constructor_argument { ca_type; ca_loc; ca_modalities; ca_sort = _ } =
   { Parsetree.pca_type = core_type ca_type;
     pca_loc = ca_loc;
-    pca_modalities = const_modalities ca_modalities
+    pca_modalities = const_modalities ~mut:Immutable ca_modalities
   }
 
 and label_declaration
@@ -188,7 +189,7 @@ and label_declaration
       (match ld_mutable with
       | Mutable _ -> Mutable
       | Immutable -> Immutable)
-    ~modalities:(Typemode.untransl_modalities ld_mutable ld_modalities)
+    ~modalities:(const_modalities ~mut:ld_mutable ld_modalities)
     (var_of_id ld_id) (core_type ld_type)
 
 and constructor_arguments = function
