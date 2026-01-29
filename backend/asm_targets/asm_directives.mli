@@ -350,6 +350,23 @@ module Directive : sig
       | Variable of string  (** For .set assignments (macOS only) *)
       | Add of t * t
       | Sub of t * t
+
+    (** Evaluate a constant expression to a 64-bit value.
+        @param this Called to get the current offset when [This] is encountered.
+        @param lookup_label Called to resolve Label values.
+        @param lookup_symbol Called to resolve Symbol values.
+        @param lookup_variable
+          Called to resolve Variable values (for .set on macOS).
+        @return
+          [Some value] if evaluation succeeds, [None] if a symbol cannot be
+          resolved. *)
+    val eval :
+      this:(unit -> int64) ->
+      lookup_label:(Asm_label.t -> int64 option) ->
+      lookup_symbol:(Asm_symbol.t -> int64 option) ->
+      lookup_variable:(string -> int64 option) ->
+      t ->
+      int64 option
   end
 
   module Constant_with_width : sig
@@ -464,6 +481,24 @@ module Directive : sig
   (** Translate the given directive to textual form. This produces output
       suitable for either gas or MASM as appropriate. *)
   val print : Buffer.t -> t -> unit
+
+  (** {1 Binary emission helpers} *)
+
+  (** Given a directive and an current offset in bytes into some section,
+      compute the new offset after the directive is emitted. This accounts for
+      the size of data directives (Bytes, Const, Space, Sleb128, Uleb128) and
+      alignment padding (Align). Directives that don't emit data return the
+      offset unchanged. *)
+  val increment_offset_in_bytes : t -> offset_in_bytes:int -> int
+
+  (** Emit an unsigned LEB128 encoded value to a buffer. *)
+  val emit_uleb128 : Buffer.t -> int64 -> unit
+
+  (** Emit a signed LEB128 encoded value to a buffer. *)
+  val emit_sleb128 : Buffer.t -> int64 -> unit
+
+  (** Emit a little-endian integer value of the given width to a buffer. *)
+  val emit_int_le : Buffer.t -> width_bytes:int -> int64 -> unit
 end
 
 (** To be called by the emitter at the very start of code generation.

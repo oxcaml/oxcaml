@@ -148,6 +148,29 @@ module Directive = struct
     let print = print_aux ~force_decimal:false
 
     let print_using_decimals = print_aux ~force_decimal:true
+
+    let rec eval ~this ~lookup_label ~lookup_symbol ~lookup_variable t =
+      match t with
+      | Signed_int n -> Some n
+      | Unsigned_int n -> Some (Uint64.to_int64 n)
+      | This -> Some (this ())
+      | Label lbl -> lookup_label lbl
+      | Symbol sym -> lookup_symbol sym
+      | Variable name -> lookup_variable name
+      | Add (a, b) -> (
+        match
+          ( eval ~this ~lookup_label ~lookup_symbol ~lookup_variable a,
+            eval ~this ~lookup_label ~lookup_symbol ~lookup_variable b )
+        with
+        | Some va, Some vb -> Some (Int64.add va vb)
+        | _ -> None)
+      | Sub (a, b) -> (
+        match
+          ( eval ~this ~lookup_label ~lookup_symbol ~lookup_variable a,
+            eval ~this ~lookup_label ~lookup_symbol ~lookup_variable b )
+        with
+        | Some va, Some vb -> Some (Int64.sub va vb)
+        | _ -> None)
   end
 
   module Constant_with_width = struct
@@ -547,6 +570,99 @@ module Directive = struct
     match TS.assembler () with
     | MASM -> print_masm b t
     | MacOS | GAS_like -> print_gas b t
+
+  (* DWARF-4 standard section 7.6. *)
+  let uleb128_size i =
+    let rec loop i =
+      if Int64.compare i 128L < 0
+      then 1
+      else 1 + loop (Int64.shift_right_logical i 7)
+    in
+    if Int64.compare i 0L < 0
+    then
+      Misc.fatal_errorf
+        "uleb128_size: cannot compute size for negative number %Ld" i;
+    loop i
+
+  let rec sleb128_size i =
+    if Int64.compare i (-64L) >= 0 && Int64.compare i 64L < 0
+    then 1
+    else 1 + sleb128_size (Int64.shift_right i 7)
+
+  let emit_uleb128 buf (value : int64) =
+    let rec loop v =
+      let byte = Int64.to_int (Int64.logand v 0x7FL) in
+      let v' = Int64.shift_right_logical v 7 in
+      if Int64.equal v' 0L
+      then Buffer.add_char buf (Char.chr byte)
+      else (
+        Buffer.add_char buf (Char.chr (byte lor 0x80));
+        loop v')
+    in
+    loop value
+
+  let emit_sleb128 buf (value : int64) =
+    let rec loop v =
+      let byte = Int64.to_int (Int64.logand v 0x7FL) in
+      let v' = Int64.shift_right v 7 in
+      let more =
+        not
+          ((Int64.equal v' 0L && byte land 0x40 = 0)
+          || (Int64.equal v' (-1L) && byte land 0x40 <> 0))
+      in
+      if more
+      then (
+        Buffer.add_char buf (Char.chr (byte lor 0x80));
+        loop v')
+      else Buffer.add_char buf (Char.chr byte)
+    in
+    loop value
+
+  (* Emit a little-endian integer value of the given width *)
+  let emit_int_le buf ~width_bytes (value : int64) =
+    for i = 0 to width_bytes - 1 do
+      let byte =
+        Int64.to_int
+          (Int64.logand (Int64.shift_right_logical value (i * 8)) 0xFFL)
+      in
+      Buffer.add_char buf (Char.chr byte)
+    done
+
+  let increment_offset_in_bytes t ~offset_in_bytes =
+    match t with
+    | Align { bytes; _ } ->
+      (* Round up to next multiple of [bytes] *)
+      let remainder = offset_in_bytes mod bytes in
+      if remainder = 0
+      then offset_in_bytes
+      else offset_in_bytes + bytes - remainder
+    | Bytes { str; _ } -> offset_in_bytes + String.length str
+    | Const { constant; _ } ->
+      let width = Constant_with_width.width_in_bytes constant in
+      offset_in_bytes + Constant_with_width.Width_in_bytes.to_int width
+    | Space { bytes } -> offset_in_bytes + bytes
+    | Sleb128 { constant; _ } -> (
+      match constant with
+      | Signed_int i -> offset_in_bytes + sleb128_size i
+      | Unsigned_int _ | This | Label _ | Symbol _ | Variable _ | Add _ | Sub _
+        ->
+        Misc.fatal_error
+          "increment_offset_in_bytes: sleb128 with non-integer constant")
+    | Uleb128 { constant; _ } -> (
+      match constant with
+      | Signed_int i -> offset_in_bytes + uleb128_size i
+      | Unsigned_int i -> offset_in_bytes + uleb128_size (Uint64.to_int64 i)
+      | This | Label _ | Symbol _ | Variable _ | Add _ | Sub _ ->
+        Misc.fatal_error
+          "increment_offset_in_bytes: uleb128 with non-integer constant")
+    (* Directives that don't contribute to section size *)
+    | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_endproc
+    | Cfi_offset _ | Cfi_startproc | Cfi_remember_state | Cfi_restore_state
+    | Cfi_def_cfa_register _ | Comment _ | Direct_assignment _ | File _
+    | Global _ | Indirect_symbol _ | Loc _ | New_label _ | New_line
+    | Private_extern _ | Section _ | Size _ | Type _ | Protected _ | Hidden _
+    | Weak _ | External _ | Reloc _ ->
+      offset_in_bytes
 end
 
 (* A higher-level version of [Constant.t] which contains some more abstractions
