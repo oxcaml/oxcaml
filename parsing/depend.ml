@@ -150,6 +150,7 @@ and add_jkind bv (jkind : jkind_annotation) =
       add_type bv typ
   | Pjk_product jkinds ->
       List.iter (fun jkind -> add_jkind bv jkind) jkinds
+  | Pjk_box jkind -> add_jkind bv jkind
 
 and add_vars_jkinds bv vars_jkinds =
   let add_one (_, jkind) = Option.iter (add_jkind bv) jkind in

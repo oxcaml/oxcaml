@@ -68,6 +68,7 @@ module Sort : sig
     | Var of var
     | Base of base
     | Product of t list
+    | Box of t
 
   and var
 
@@ -98,6 +99,7 @@ module Sort : sig
     type t =
       | Var of Var.id
       | Base of base
+      | Box of t
   end
 end
 
@@ -115,6 +117,7 @@ module Layout : sig
       | Any
       | Base of Sort.base
       | Product of t list
+      | Box of t
 
     val equal : t -> t -> bool
 

@@ -54,6 +54,7 @@ module Sort : sig
     type t =
       | Var of Var.id (* [Var.id] is for debugging / printing only *)
       | Base of base
+      | Box of t
   end
 end
 

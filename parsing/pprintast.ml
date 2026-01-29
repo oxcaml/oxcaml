@@ -476,6 +476,10 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
     Misc.pp_parens_if nested (fun f ts ->
       pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
     ) f ts
+  | Pjk_box t ->
+    Misc.pp_parens_if nested (fun f t ->
+      pp f "%a box_kind" (jkind_annotation ~nested:true ctxt) t
+    ) f t
 
 and tyvar_jkind tyvar f (str, jkind) =
   match jkind with

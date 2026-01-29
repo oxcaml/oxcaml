@@ -32,6 +32,7 @@ module Sort = struct
     | Var of var
     | Base of base
     | Product of t list
+    | Box of t
 
   and var =
     { mutable contents : t option;
@@ -79,12 +80,14 @@ module Sort = struct
     type t =
       | Base of base
       | Product of t list
+      | Box of t
 
     let rec equal c1 c2 =
       match c1, c2 with
       | Base b1, Base b2 -> equal_base b1 b2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-      | (Base _ | Product _), _ -> false
+      | Box c1, Box c2 -> equal c1 c2
+      | (Base _ | Product _ | Box _), _ -> false
 
     let format ppf c =
       let rec pp_element ~nested ppf = function
@@ -92,6 +95,9 @@ module Sort = struct
         | Product cs ->
           let pp_sep ppf () = Format.fprintf ppf "@ & " in
           Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf cs
+        | Box c ->
+          pp_element ~nested:true ppf c;
+          Format.fprintf ppf "@ box_kind"
       in
       pp_element ~nested:false ppf c
 
@@ -102,6 +108,7 @@ module Sort = struct
           | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 ) ->
         false
       | Product ts -> List.for_all all_void ts
+      | Box _ -> false
 
     let value = Base Value
 
@@ -153,6 +160,7 @@ module Sort = struct
             Format.fprintf ppf "Product [%a]"
               (Misc.pp_nested_list ~nested ~pp_element ~pp_sep)
               cs
+          | Box c -> Format.fprintf ppf "Box [%a]" (pp_element ~nested) c
         in
         pp_element ~nested:false ppf c
     end
@@ -261,6 +269,7 @@ module Sort = struct
         fprintf ppf "Product [ %a ]"
           (pp_print_list ~pp_sep:(fun ppf () -> pp_print_text ppf "; ") t)
           ts
+      | Box s -> fprintf ppf "Box %a" t s
 
     and opt_t ppf = function
       | Some s -> fprintf ppf "Some %a" t s
@@ -292,6 +301,7 @@ module Sort = struct
     | Var v -> f v
     | Base _ -> ()
     | Product ts -> List.iter (fun t -> t_iter ~f t) ts
+    | Box t -> t_iter ~f t
 
   let update_level u v =
     let new_level = min v.level u.level in
@@ -360,6 +370,7 @@ module Sort = struct
       let rec of_const : Const.t -> t = function
         | Base b -> of_base b
         | Product cs -> Product (List.map of_const cs)
+        | Box c -> Box (of_const c)
     end
 
     module T_option = struct
@@ -410,6 +421,7 @@ module Sort = struct
           Option.map
             (fun x -> Product x)
             (Misc.Stdlib.List.map_option of_const cs)
+        | Box c -> Option.map (fun x -> Box x) (of_const c)
     end
 
     module Const = struct
@@ -471,6 +483,9 @@ module Sort = struct
     | Product ts as t ->
       let ts' = List.map get ts in
       if List.for_all2 ( == ) ts ts' then t else Product ts'
+    | Box s as t ->
+      let s' = get s in
+      if s' == s then t else Box s'
     | Var r as t -> (
       match r.contents with
       | None -> t
@@ -483,6 +498,7 @@ module Sort = struct
   let rec default_to_value_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
     | Product ts -> Product (List.map default_to_value_and_get ts)
+    | Box s -> Box (default_to_value_and_get s)
     | Var r -> (
       match r.contents with
       | None ->
@@ -520,19 +536,25 @@ module Sort = struct
        but that would be much less readable. *)
     match s with
     | Product sorts -> sorts
-    | Var _ | Base _ -> Misc.fatal_error "Jkind_types.sorts_of_product"
+    | Var _ | Base _ | Box _ -> Misc.fatal_error "Jkind_types.sorts_of_product"
+
+  let[@inline] sort_of_box s =
+    match s with
+    | Box sort -> sort
+    | Var _ | Base _ | Product _ -> Misc.fatal_error "Jkind_types.sort_of_box"
 
   let rec equate_sort_sort s1 s2 =
     match s1 with
     | Base b1 -> swap_equate_result (equate_sort_base s2 b1)
     | Var v1 -> equate_var_sort v1 s2
     | Product _ -> swap_equate_result (equate_sort_product s2 s1)
+    | Box _ -> swap_equate_result (equate_sort_box s2 s1)
 
   and equate_sort_base s1 b2 =
     match s1 with
     | Base b1 -> if equal_base b1 b2 then Equal_no_mutation else Unequal
     | Var v1 -> equate_var_base v1 b2
-    | Product _ -> Unequal
+    | Product _ | Box _ -> Unequal
 
   and equate_var_base v1 b2 =
     match v1.contents with
@@ -546,6 +568,7 @@ module Sort = struct
     | Base b2 -> equate_var_base v1 b2
     | Var v2 -> equate_var_var v1 v2
     | Product _ -> equate_var_product v1 s2
+    | Box _ -> equate_var_box v1 s2
 
   and equate_var_var v1 v2 =
     if v1 == v2
@@ -565,13 +588,28 @@ module Sort = struct
       set v1 (Some s2);
       Equal_mutated_first
 
+  and equate_var_box v1 s2 =
+    match v1.contents with
+    | Some s1 -> equate_sort_box s1 s2
+    | None ->
+      set v1 (Some s2);
+      Equal_mutated_first
+
   and equate_sort_product s1 s2 =
     match s1 with
-    | Base _ -> Unequal
+    | Base _ | Box _ -> Unequal
     | Product sorts1 ->
       let sorts2 = sorts_of_product s2 in
       equate_sorts sorts1 sorts2
     | Var v1 -> equate_var_product v1 s2
+
+  and equate_sort_box s1 s2 =
+    match s1 with
+    | Base _ | Product _ -> Unequal
+    | Box sort1 ->
+      let sort2 = sort_of_box s2 in
+      equate_sort_sort sort1 sort2
+    | Var v1 -> equate_var_box v1 s2
 
   and equate_sorts sorts1 sorts2 =
     let rec go sorts1 sorts2 acc =
@@ -617,7 +655,7 @@ module Sort = struct
         ( Value | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
         | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
       false
-    | Product _ -> false
+    | Product _ | Box _ -> false
 
   let decompose_into_product ~level t n =
     let ts = List.init n (fun _ -> new_var ~level) in
@@ -633,6 +671,9 @@ module Sort = struct
       | Product ts ->
         let pp_sep ppf () = Format.fprintf ppf " & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+      | Box s ->
+        pp_element ~nested:true ppf s;
+        Format.fprintf ppf " box_kind"
     in
     pp_element ~nested:false ppf t
 
@@ -642,6 +683,7 @@ module Sort = struct
     type t =
       | Var of Var.id
       | Base of base
+      | Box of t
   end
 end
 
@@ -656,6 +698,7 @@ module Layout = struct
       | Any
       | Base of Sort.base
       | Product of t list
+      | Box of t
 
     let max = Any
 
@@ -664,7 +707,8 @@ module Layout = struct
       | Base b1, Base b2 -> Sort.equal_base b1 b2
       | Any, Any -> true
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-      | (Base _ | Any | Product _), _ -> false
+      | Box c1, Box c2 -> equal c1 c2
+      | (Base _ | Any | Product _ | Box _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any -> None
@@ -673,6 +717,7 @@ module Layout = struct
         Option.map
           (fun x -> Sort.Const.Product x)
           (Misc.Stdlib.List.map_option get_sort ts)
+      | Box t -> Option.map (fun x -> Sort.Const.Box x) (get_sort t)
 
     module Static = struct
       let value = Base Sort.Value
@@ -726,12 +771,14 @@ module Layout = struct
             (fun x -> Product x)
             (* [Sort.get] is deep, so no need to repeat it here *)
             (Misc.Stdlib.List.map_option of_sort sorts)
+        | Box sort -> Option.map (fun x -> Box x) (of_sort sort)
       in
       of_sort (Sort.get s)
 
-    let of_flat_sort : Sort.Flat.t -> _ = function
+    let rec of_flat_sort : Sort.Flat.t -> _ = function
       | Var _ -> None
       | Base b -> Some (Static.of_base b)
+      | Box s -> Option.map (fun x -> Box x) (of_flat_sort s)
   end
 
   let rec of_const (const : Const.t) : _ t =
@@ -739,6 +786,14 @@ module Layout = struct
     | Any -> Any
     | Base b -> Sort (Sort.of_base b)
     | Product cs -> Product (List.map of_const cs)
+    | Box c ->
+      (* Box must have a concrete sort inside, not Any *)
+      let sort_const =
+        match Const.get_sort c with
+        | Some sc -> sc
+        | None -> Misc.fatal_error "Layout.of_const: Box cannot contain Any"
+      in
+      Sort (Sort.Box (Sort.Static.T.of_const sort_const))
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
