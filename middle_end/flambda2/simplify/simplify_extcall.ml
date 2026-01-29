@@ -138,7 +138,7 @@ let simplify_comparison ~dbg ~dacc ~cont ~tagged_prim ~float_prim
   | Proved (Tagged_immediate | Boxed _), Unknown ->
     Unchanged { return_types = Unknown }
 
-let simplify_caml_make_vect dacc ~len_ty ~init_value_ty : t =
+let simplify_caml_array_make dacc ~len_ty ~init_value_ty : t =
   let typing_env = DA.typing_env dacc in
   let element_kind : _ Or_unknown_or_bottom.t =
     (* We can't deduce subkind information, e.g. an array is all-immediates
@@ -148,7 +148,7 @@ let simplify_caml_make_vect dacc ~len_ty ~init_value_ty : t =
     else
       match T.prove_is_or_is_not_a_boxed_float typing_env init_value_ty with
       | Proved true ->
-        (* A boxed float provided to [caml_make_vect] with the float array
+        (* A boxed float provided to [caml_array_make] with the float array
            optimisation on will always yield a flat array of naked floats. *)
         Ok Flambda_kind.With_subkind.naked_float
       | Proved false | Unknown -> Unknown
@@ -209,8 +209,8 @@ let simplify_returning_extcall ~dbg ~cont ~exn_cont:_ dacc fun_name args
       ~float_prim:(fun width -> Float_comp (width, Yielding_bool (Gt ())))
       ~tagged_prim:(Int_comp (Tagged_immediate, Yielding_bool (Gt Signed)))
       ~boxed_int_prim:(fun kind -> Int_comp (kind, Yielding_bool (Gt Signed)))
-  | "caml_make_vect", [_; _], [len_ty; init_value_ty] ->
-    simplify_caml_make_vect dacc ~len_ty ~init_value_ty
+  | "caml_array_make", [_; _], [len_ty; init_value_ty] ->
+    simplify_caml_array_make dacc ~len_ty ~init_value_ty
   | _ -> Unchanged { return_types = Unknown }
 
 (* Exported simplification function *)

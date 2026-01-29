@@ -1206,7 +1206,7 @@ let unary_primitive env res dbg f arg =
       None, res, expr)
   | Is_boxed_float ->
     (* As a note, this omits the [Is_in_value_area] check that exists in
-       [caml_make_array], which is used by non-Flambda 2 compilers. This seems
+       [caml_array_of_uniform_array], which is used by non-Flambda 2 compilers. This seems
        reasonable given known existing use cases of naked pointers and the fact
        that they will be forbidden entirely in OCaml 5. *)
     ( None,

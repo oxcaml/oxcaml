@@ -84,13 +84,7 @@ let int n = Lconst (Const_base (Const_int n))
 
 (* CR layouts v5: To change when we have arrays of other sorts *)
 let prim_makearray =
-<<<<<<< HEAD
-  Lambda.simple_prim_on_values ~name:"caml_make_vect" ~arity:2 ~alloc:true
-||||||| parent of d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
-  Primitive.simple ~name:"caml_make_vect" ~arity:2 ~alloc:true
-=======
-  Primitive.simple ~name:"caml_array_make" ~arity:2 ~alloc:true
->>>>>>> d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
+  Lambda.simple_prim_on_values ~name:"caml_array_make" ~arity:2 ~alloc:true
 
 (* Also use it for required globals *)
 let transl_label_init_general f =

@@ -446,7 +446,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     (mode : L.locality_mode) (has_init : L.has_initializer) args loc :
     Env.t * primitive_transform_result =
   (* %makearray_dynamic is analogous to (from stdlib/array.ml):
-   *   external create: int -> 'a -> 'a array = "caml_make_vect"
+   *   external create: int -> 'a -> 'a array = "caml_array_make"
    * except that it works on any layout, including unboxed products, at both
    * heap and local modes.
    * Additionally, if the initializer is omitted, an uninitialized array will

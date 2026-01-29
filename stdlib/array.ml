@@ -23,7 +23,6 @@ type ('a : any mod separable) t = 'a array
 
 (* Array operations *)
 
-<<<<<<< HEAD
 external length : ('a : value_or_null mod separable).
   ('a array[@local_opt]) @ immutable -> int @@ stateless
   = "%array_length"
@@ -40,9 +39,9 @@ external unsafe_set : ('a : value_or_null mod separable).
   ('a array[@local_opt]) -> int -> 'a -> unit @@ portable
   = "%array_unsafe_set"
 external make : ('a : value_or_null mod separable).
-  int -> 'a -> 'a array @@ portable = "caml_make_vect"
+  int -> 'a -> 'a array @@ portable = "caml_array_make"
 external create : ('a : value_or_null mod separable).
-  int -> 'a -> 'a array @@ portable = "caml_make_vect"
+  int -> 'a -> 'a array @@ portable = "caml_array_make"
 external unsafe_sub : ('a : value_or_null mod separable).
   'a array -> int -> int -> 'a array @@ portable = "caml_array_sub"
 external append_prim : ('a : value_or_null mod separable).
@@ -54,40 +53,7 @@ external unsafe_blit : ('a : value_or_null mod separable).
 external unsafe_fill : ('a : value_or_null mod separable).
   'a array -> int -> int -> 'a -> unit @@ portable = "caml_array_fill"
 external create_float : ('a : value_or_null mod separable).
-  int -> float array @@ portable = "caml_make_float_vect"
-||||||| parent of d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
-external length : 'a array -> int = "%array_length"
-external get: 'a array -> int -> 'a = "%array_safe_get"
-external set: 'a array -> int -> 'a -> unit = "%array_safe_set"
-external unsafe_get: 'a array -> int -> 'a = "%array_unsafe_get"
-external unsafe_set: 'a array -> int -> 'a -> unit = "%array_unsafe_set"
-external make: int -> 'a -> 'a array = "caml_make_vect"
-external create: int -> 'a -> 'a array = "caml_make_vect"
-external unsafe_sub : 'a array -> int -> int -> 'a array = "caml_array_sub"
-external append_prim : 'a array -> 'a array -> 'a array = "caml_array_append"
-external concat : 'a array list -> 'a array = "caml_array_concat"
-external unsafe_blit :
-  'a array -> int -> 'a array -> int -> int -> unit = "caml_array_blit"
-external unsafe_fill :
-  'a array -> int -> int -> 'a -> unit = "caml_array_fill"
-external create_float: int -> float array = "caml_make_float_vect"
-=======
-external length : 'a array -> int = "%array_length"
-external get: 'a array -> int -> 'a = "%array_safe_get"
-external set: 'a array -> int -> 'a -> unit = "%array_safe_set"
-external unsafe_get: 'a array -> int -> 'a = "%array_unsafe_get"
-external unsafe_set: 'a array -> int -> 'a -> unit = "%array_unsafe_set"
-external make: int -> 'a -> 'a array = "caml_array_make"
-external create: int -> 'a -> 'a array = "caml_array_make"
-external unsafe_sub : 'a array -> int -> int -> 'a array = "caml_array_sub"
-external append_prim : 'a array -> 'a array -> 'a array = "caml_array_append"
-external concat : 'a array list -> 'a array = "caml_array_concat"
-external unsafe_blit :
-  'a array -> int -> 'a array -> int -> int -> unit = "caml_array_blit"
-external unsafe_fill :
-  'a array -> int -> int -> 'a -> unit = "caml_array_fill"
-external create_float: int -> float array = "caml_array_create_float"
->>>>>>> d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
+  int -> float array @@ portable = "caml_array_create_float"
 
 module Floatarray = struct
   external create : int -> floatarray @@ portable = "caml_floatarray_create"
