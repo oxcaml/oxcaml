@@ -2075,13 +2075,15 @@ let tree_of_type_decl id decl =
   in
   let (name, args) = type_defined decl in
   let constraints = tree_of_constraints params in
-  let ty, priv, unboxed, flatten_floats, or_null_reexport, unsafe_mode_crossing =
+  let ty, priv, unboxed, flatten_floats, or_null_reexport,
+      unsafe_mode_crossing =
     match decl.type_kind with
     | Type_abstract _ ->
         begin match ty_manifest with
         | None -> (Otyp_abstract, Public, false, false, false, false)
         | Some ty ->
-            tree_of_typexp Type ty, decl.type_private, false, false, false, false
+          tree_of_typexp Type ty, decl.type_private, false, false, false,
+          false
         end
     | Type_variant (cstrs, rep, umc) ->
         let unboxed =
@@ -2106,8 +2108,10 @@ let tree_of_type_decl id decl =
         let flatten_floats = match rep with
           | Record_float -> true
           | Record_mixed shape ->
-              Array.exists (function Types.Float_boxed -> true | _ -> false) shape
-          | Record_boxed _ | Record_ufloat | Record_unboxed | Record_inlined _ ->
+            Array.exists (function Types.Float_boxed -> true | _ -> false)
+              shape
+          | Record_boxed _ | Record_ufloat | Record_unboxed | Record_inlined _
+            ->
               false
         in
         tree_of_manifest (Otyp_record (List.map tree_of_label lbls)),

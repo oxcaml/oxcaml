@@ -4979,8 +4979,8 @@ let report_error ppf = function
       "@[Atomic record fields must have layout value.@]"
   | Missing_flatten_floats_attribute ->
     fprintf ppf
-      "@[This record type has fields stored with a flattened float representation.@ \
-       You must add the %a attribute.@]"
+      "@[This record type has fields stored with a flattened float \
+       representation.@ You must add the %a attribute.@]"
       Style.inline_code "[@@flatten_floats]"
 
 
