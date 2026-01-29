@@ -82,6 +82,7 @@ module Tester (Primitives : sig
     val set_safe : boxed_index setter
     val set_unsafe : boxed_index setter
     val extra_bounds_checks : boxed_index list
+    val max_index : int
   end) : sig end = struct
   open Primitives
 
@@ -156,7 +157,7 @@ module Tester (Primitives : sig
     let check_get_bounds, check_get, check_set_bounds, check_set =
       make_tester_functions length
     in
-    for i = -1 to length + 1 do
+    for i = -1 to min max_index (length + 1) do
       check_get i;
       check_set i (generate_data i)
     done;
@@ -186,6 +187,7 @@ module Tester_no_set (Primitives : sig
     val get_safe : boxed_index getter
     val get_unsafe : boxed_index getter
     val extra_bounds_checks : boxed_index list
+    val max_index : int
   end) : sig end = struct
   open Primitives
 
@@ -226,7 +228,7 @@ module Tester_no_set (Primitives : sig
   let test length =
     Random.init 1234;
     let check_get_bounds, check_get = make_tester_functions length in
-    for i = -1 to length + 1 do
+    for i = -1 to min max_index (length + 1) do
       check_get i;
     done;
     List.iter (fun bound -> check_get_bounds bound) extra_bounds_checks
@@ -277,6 +279,7 @@ let type_utilities_template
   ~box_data
   ~data_equal
   ~extra_bounds
+  ~max_index
   = {|
 type boxed_index = |}^boxed_index^{|
 type boxed_data = |}^boxed_data^{|
@@ -287,7 +290,8 @@ let data_equal = |}^data_equal^{|
 let unbox_index = |}^unbox_index^{|
 let unbox_data = |}^unbox_data^{|
 let box_data = |}^box_data^{|
-let extra_bounds_checks = |}^extra_bounds
+let extra_bounds_checks = |}^extra_bounds^{|
+let max_index = |}^max_index
 
 let one_test_template
   ~test_setters
@@ -311,6 +315,7 @@ module _ = |}^(if test_setters then "Tester" else "Tester_no_set")^{| (struct
     let to_index = to_index
     let data_equal = data_equal
     let extra_bounds_checks = extra_bounds_checks
+    let max_index = max_index
 
     external get_reference
       : |}^container^{|
@@ -410,12 +415,17 @@ let int_extra_bounds_template ~module_ =
   module_ ^ {|.[ min_int; max_int; add min_int one; sub zero one ]|}
 ;;
 
+let small_int_extra_bounds_template ~module_ =
+  module_ ^ {|.[ min_int; add min_int one; sub zero one ]|}
+;;
+
 type index =
   { boxed_type : string
   ; tested_type : string
   ; of_int : string
   ; unbox : string
   ; extra_bounds : string
+  ; max_index : string
   }
 
 type result =
@@ -461,18 +471,35 @@ let indices =
     ; of_int = "Nativeint.of_int"
     ; unbox = "Nativeint_u.of_nativeint"
     ; extra_bounds = int_extra_bounds_template ~module_:"Nativeint"
+    ; max_index = "Int.max_int - 1"
+    }
+  ; { boxed_type = "int8"
+    ; tested_type = "int8#"
+    ; of_int = "Int8.of_int"
+    ; unbox = "Int8_u.of_int8"
+    ; extra_bounds = small_int_extra_bounds_template ~module_:"Int8"
+    ; max_index = "Int8.(to_int max_int) - 1"
+    }
+  ; { boxed_type = "int16"
+    ; tested_type = "int16#"
+    ; of_int = "Int16.of_int"
+    ; unbox = "Int16_u.of_int16"
+    ; extra_bounds = int_extra_bounds_template ~module_:"Int16"
+    ; max_index = "Int16.(to_int max_int) - 1"
     }
   ; { boxed_type = "int32"
     ; tested_type = "int32#"
     ; of_int = "Int32.of_int"
     ; unbox = "Int32_u.of_int32"
     ; extra_bounds = int_extra_bounds_template ~module_:"Int32"
+    ; max_index = "Int32.(to_int max_int) - 1"
     }
   ; { boxed_type = "int64"
     ; tested_type = "int64#"
     ; of_int = "Int64.of_int"
     ; unbox = "Int64_u.of_int64"
     ; extra_bounds = int_extra_bounds_template ~module_:"Int64"
+    ; max_index = "Int.max_int - 1"
     }
   ]
 ;;
@@ -528,6 +555,7 @@ let tests =
        ; of_int
        ; unbox = unbox_index
        ; extra_bounds
+       ; max_index
        }
     =
     indices
@@ -555,6 +583,7 @@ let tests =
       ~box_data
       ~data_equal:eq
       ~extra_bounds
+      ~max_index
   in
   let tests =
     let set_sigil =

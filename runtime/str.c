@@ -118,7 +118,21 @@ CAMLprim value caml_string_set(value str, value index, value newval)
 }
 
 
-CAMLprim value caml_string_get16(value str, value index)
+CAMLprim value caml_string_geti8(value str, value index)
+{
+  unsigned char b1;
+  intnat idx = Long_val(index);
+  if (idx < 0 || idx + 1 >= caml_string_length(str)) caml_array_bound_error();
+  b1 = Byte_u(str, idx);
+  return Val_int8(b1);
+}
+
+CAMLprim value caml_bytes_geti8(value str, value index)
+{
+  return caml_string_geti8(str,index);
+}
+
+intnat caml_string_get16_untagged(value str, value index)
 {
   intnat res;
   unsigned char b1, b2;
@@ -131,12 +145,27 @@ CAMLprim value caml_string_get16(value str, value index)
 #else
   res = b2 << 8 | b1;
 #endif
-  return Val_int(res);
+  return res;
+}
+
+CAMLprim value caml_string_get16(value vb, value vind)
+{
+  return Val_int(caml_string_get16_untagged(vb, vind));
+}
+
+CAMLprim value caml_string_geti16(value vb, value vind)
+{
+  return Val_int16(caml_string_get16_untagged(vb, vind));
 }
 
 CAMLprim value caml_bytes_get16(value str, value index)
 {
   return caml_string_get16(str,index);
+}
+
+CAMLprim value caml_bytes_geti16(value str, value index)
+{
+  return caml_string_geti16(str,index);
 }
 
 CAMLprim value caml_string_get32(value str, value index)
@@ -193,6 +222,16 @@ CAMLprim value caml_string_get64(value str, value index)
 CAMLprim value caml_bytes_get64(value str, value index)
 {
   return caml_string_get64(str,index);
+}
+
+CAMLprim value caml_bytes_set8(value str, value index, value newval)
+{
+  unsigned char b1;
+  intnat idx = Long_val(index);
+  if (idx < 0 || idx + 1 >= caml_string_length(str)) caml_array_bound_error();
+  b1 = 0xFF & Long_val(newval);
+  Byte_u(str, idx) = b1;
+  return Val_unit;
 }
 
 CAMLprim value caml_bytes_set16(value str, value index, value newval)
@@ -280,37 +319,80 @@ CAMLno_tsan_for_perf /* This attribute needs to stay on its own line for this
                         function to be detected as a primitive by the build
                         system. */
 
+CAMLprim value caml_string_geti8_indexed_by_int64(value, value);
+CAMLprim value caml_string_geti8_indexed_by_int32(value, value);
+CAMLprim value caml_string_geti8_indexed_by_int16(value, value);
+CAMLprim value caml_string_geti8_indexed_by_int8(value, value);
+CAMLprim value caml_string_geti8_indexed_by_nativeint(value, value);
+CAMLprim value caml_string_geti16_indexed_by_int64(value, value);
+CAMLprim value caml_string_geti16_indexed_by_int32(value, value);
+CAMLprim value caml_string_geti16_indexed_by_int16(value, value);
+CAMLprim value caml_string_geti16_indexed_by_int8(value, value);
+CAMLprim value caml_string_geti16_indexed_by_nativeint(value, value);
 CAMLprim value caml_string_get16_indexed_by_int64(value, value);
 CAMLprim value caml_string_get16_indexed_by_int32(value, value);
+CAMLprim value caml_string_get16_indexed_by_int16(value, value);
+CAMLprim value caml_string_get16_indexed_by_int8(value, value);
 CAMLprim value caml_string_get16_indexed_by_nativeint(value, value);
 CAMLprim value caml_string_get32_indexed_by_int64(value, value);
 CAMLprim value caml_string_get32_indexed_by_int32(value, value);
+CAMLprim value caml_string_get32_indexed_by_int16(value, value);
+CAMLprim value caml_string_get32_indexed_by_int8(value, value);
 CAMLprim value caml_string_get32_indexed_by_nativeint(value, value);
 CAMLprim value caml_string_get64_indexed_by_int64(value, value);
 CAMLprim value caml_string_get64_indexed_by_int32(value, value);
+CAMLprim value caml_string_get64_indexed_by_int16(value, value);
+CAMLprim value caml_string_get64_indexed_by_int8(value, value);
 CAMLprim value caml_string_get64_indexed_by_nativeint(value, value);
 
+CAMLprim value caml_bytes_geti8_indexed_by_int64(value, value);
+CAMLprim value caml_bytes_geti8_indexed_by_int32(value, value);
+CAMLprim value caml_bytes_geti8_indexed_by_int16(value, value);
+CAMLprim value caml_bytes_geti8_indexed_by_int8(value, value);
+CAMLprim value caml_bytes_geti8_indexed_by_nativeint(value, value);
+CAMLprim value caml_bytes_geti16_indexed_by_int64(value, value);
+CAMLprim value caml_bytes_geti16_indexed_by_int32(value, value);
+CAMLprim value caml_bytes_geti16_indexed_by_int16(value, value);
+CAMLprim value caml_bytes_geti16_indexed_by_int8(value, value);
+CAMLprim value caml_bytes_geti16_indexed_by_nativeint(value, value);
 CAMLprim value caml_bytes_get16_indexed_by_int64(value, value);
 CAMLprim value caml_bytes_get16_indexed_by_int32(value, value);
+CAMLprim value caml_bytes_get16_indexed_by_int16(value, value);
+CAMLprim value caml_bytes_get16_indexed_by_int8(value, value);
 CAMLprim value caml_bytes_get16_indexed_by_nativeint(value, value);
 CAMLprim value caml_bytes_get32_indexed_by_int64(value, value);
 CAMLprim value caml_bytes_get32_indexed_by_int32(value, value);
+CAMLprim value caml_bytes_get32_indexed_by_int16(value, value);
+CAMLprim value caml_bytes_get32_indexed_by_int8(value, value);
 CAMLprim value caml_bytes_get32_indexed_by_nativeint(value, value);
 CAMLprim value caml_bytes_get64_indexed_by_int64(value, value);
 CAMLprim value caml_bytes_get64_indexed_by_int32(value, value);
+CAMLprim value caml_bytes_get64_indexed_by_int16(value, value);
+CAMLprim value caml_bytes_get64_indexed_by_int8(value, value);
 CAMLprim value caml_bytes_get64_indexed_by_nativeint(value, value);
 
+CAMLprim value caml_bytes_set8_indexed_by_int64(value, value, value);
+CAMLprim value caml_bytes_set8_indexed_by_int32(value, value, value);
+CAMLprim value caml_bytes_set8_indexed_by_int16(value, value, value);
+CAMLprim value caml_bytes_set8_indexed_by_int8(value, value, value);
+CAMLprim value caml_bytes_set8_indexed_by_nativeint(value, value, value);
 CAMLprim value caml_bytes_set16_indexed_by_int64(value, value, value);
 CAMLprim value caml_bytes_set16_indexed_by_int32(value, value, value);
+CAMLprim value caml_bytes_set16_indexed_by_int16(value, value, value);
+CAMLprim value caml_bytes_set16_indexed_by_int8(value, value, value);
 CAMLprim value caml_bytes_set16_indexed_by_nativeint(value, value, value);
 CAMLprim value caml_bytes_set32_indexed_by_int64(value, value, value);
 CAMLprim value caml_bytes_set32_indexed_by_int32(value, value, value);
+CAMLprim value caml_bytes_set32_indexed_by_int16(value, value, value);
+CAMLprim value caml_bytes_set32_indexed_by_int8(value, value, value);
 CAMLprim value caml_bytes_set32_indexed_by_nativeint(value, value, value);
 CAMLprim value caml_bytes_set64_indexed_by_int64(value, value, value);
 CAMLprim value caml_bytes_set64_indexed_by_int32(value, value, value);
+CAMLprim value caml_bytes_set64_indexed_by_int16(value, value, value);
+CAMLprim value caml_bytes_set64_indexed_by_int8(value, value, value);
 CAMLprim value caml_bytes_set64_indexed_by_nativeint(value, value, value);
 
-#define String_and_bytes_access_index_by(width, name, index_type, val_func) \
+#define String_and_bytes_get_index_by(width, name, index_type, val_func)    \
   CAMLprim value caml_string_get##width##_indexed_by_##name(value vb,       \
       value vind)                                                           \
   {                                                                         \
@@ -324,7 +406,9 @@ CAMLprim value caml_bytes_set64_indexed_by_nativeint(value, value, value);
     index_type idx = val_func(vind);                                        \
     if (idx != Long_val(Val_long(idx))) caml_array_bound_error();           \
     return caml_bytes_get##width(vb, Val_long(idx));                        \
-  }                                                                         \
+  }
+
+#define Bytes_set_index_by(width, name, index_type, val_func)               \
   CAMLprim value caml_bytes_set##width##_indexed_by_##name(value vb,        \
       value vind, value newval)                                             \
   {                                                                         \
@@ -333,15 +417,46 @@ CAMLprim value caml_bytes_set64_indexed_by_nativeint(value, value, value);
     return caml_bytes_set##width(vb, Val_long(idx), newval);                \
   }
 
+#define String_and_bytes_access_index_by(width, name, index_type, val_func) \
+  String_and_bytes_get_index_by(width, name, index_type, val_func) \
+  Bytes_set_index_by(width, name, index_type, val_func)
+
+#undef int16
+#undef int8
+
+String_and_bytes_get_index_by(i8, int64, int64_t, Int64_val)
+String_and_bytes_get_index_by(i8, int32, int32_t, Int32_val)
+String_and_bytes_get_index_by(i8, int16, int16_t, Int16_val)
+String_and_bytes_get_index_by(i8, int8, int8_t, Int8_val)
+String_and_bytes_get_index_by(i8, nativeint, intnat, Nativeint_val)
+Bytes_set_index_by(8, int64, int64_t, Int64_val)
+Bytes_set_index_by(8, int32, int32_t, Int32_val)
+Bytes_set_index_by(8, int16, int16_t, Int16_val)
+Bytes_set_index_by(8, int8, int8_t, Int8_val)
+Bytes_set_index_by(8, nativeint, intnat, Nativeint_val)
+String_and_bytes_get_index_by(i16, int64, int64_t, Int64_val)
+String_and_bytes_get_index_by(i16, int32, int32_t, Int32_val)
+String_and_bytes_get_index_by(i16, int16, int16_t, Int16_val)
+String_and_bytes_get_index_by(i16, int8, int8_t, Int8_val)
+String_and_bytes_get_index_by(i16, nativeint, intnat, Nativeint_val)
 String_and_bytes_access_index_by(16, int64, int64_t, Int64_val)
 String_and_bytes_access_index_by(16, int32, int32_t, Int32_val)
+String_and_bytes_access_index_by(16, int16, int16_t, Int16_val)
+String_and_bytes_access_index_by(16, int8, int8_t, Int8_val)
 String_and_bytes_access_index_by(16, nativeint, intnat, Nativeint_val)
 String_and_bytes_access_index_by(32, int64, int64_t, Int64_val)
 String_and_bytes_access_index_by(32, int32, int32_t, Int32_val)
+String_and_bytes_access_index_by(32, int16, int16_t, Int16_val)
+String_and_bytes_access_index_by(32, int8, int8_t, Int8_val)
 String_and_bytes_access_index_by(32, nativeint, intnat, Nativeint_val)
 String_and_bytes_access_index_by(64, int64, int64_t, Int64_val)
 String_and_bytes_access_index_by(64, int32, int32_t, Int32_val)
+String_and_bytes_access_index_by(64, int16, int16_t, Int16_val)
+String_and_bytes_access_index_by(64, int8, int8_t, Int8_val)
 String_and_bytes_access_index_by(64, nativeint, intnat, Nativeint_val)
+
+#define int8 caml_ba_int8
+#define int16 caml_ba_int16
 
 CAMLprim value caml_string_equal(value s1, value s2)
 {
