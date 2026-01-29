@@ -1704,7 +1704,7 @@ let report_error env ppf =
             (fun ppf -> let desc = Jkind.get inferred_jkind in
               match desc.layout with
               | Sort (Var _) -> fprintf ppf "a representable kind"
-              | Sort (Base _) | Any | Product _ ->
+              | Sort (Base _ | Product _ | Box _) | Any | Product _ ->
                 fprintf ppf "kind %a" Jkind.format
                   inferred_jkind)))
         inferred_jkind

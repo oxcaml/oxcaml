@@ -439,6 +439,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Untagged_immediate -> Word
     | Void -> Product [||])
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
+  | Box _ -> Value (* Box kinds are values *)
 
 let rec project_layout (layout : Layout.t) path =
   match layout, path with
@@ -481,6 +482,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
   | [i] -> (
     match Array.get fields i with
     | name, sh, Base ly -> name, sh, ly
+    | name, sh, Box _ -> name, sh, Sort.Value (* Box kinds are values *)
     | name, sh, Product prod_layouts ->
       if !Clflags.dwarf_pedantic
       then
@@ -1284,7 +1286,7 @@ let create_base_layout_type ?(simd_vec_split = None) ~reference
 let rec create_packed_layout_type (layout : Layout.t) ~parent_proto_die
     ~fallback_value_die =
   match layout with
-  | Base Value -> fallback_value_die, Arch.size_addr
+  | Base Value | Box _ -> fallback_value_die, Arch.size_addr
   | Base b ->
     let encoding =
       match b with
@@ -1452,6 +1454,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
             let base_layout =
               match type_layout with
               | Base base_layout -> base_layout
+              | Box _ -> Sort.Value (* Box kinds are values *)
               | Product _ ->
                 if !Clflags.dwarf_pedantic
                 then
@@ -1508,7 +1511,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Record { fields = _; kind = Record_unboxed_product }
-    | Record { fields = [(_, _, _, Product _)]; kind = Record_unboxed } ->
+    | Record
+        { fields = [(_, _, _, (Product _ | Box _))]; kind = Record_unboxed } ->
       if !Clflags.dwarf_pedantic
       then
         Misc.fatal_errorf
@@ -1572,6 +1576,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       let base_layout =
         match arg_layout with
         | Base base_layout -> base_layout
+        | Box _ -> Sort.Value (* Box kinds are values *)
         | Product _ ->
           if !Clflags.dwarf_pedantic
           then
@@ -1691,6 +1696,13 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
           element_type_shape base_layout ~rec_env
       in
       create_array_die ~reference ~parent_proto_die ~child_die ?name ()
+    | Box _ ->
+      (* Box kinds are values *)
+      let child_die =
+        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
+          element_type_shape Sort.Value ~rec_env
+      in
+      create_array_die ~reference ~parent_proto_die ~child_die ?name ()
     | Product _ ->
       (* CR sspies: We handle products differently, because they are packed
          specially into arrays. Try to find a unifying approach here. *)
@@ -1762,6 +1774,7 @@ and type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
 let rec flatten_to_base_sorts (sort : Layout.t) : base_layout list =
   match sort with
   | Base b -> [b]
+  | Box _ -> [Value] (* Box kinds are values *)
   | Product sorts -> List.concat_map flatten_to_base_sorts sorts
 
 (* This function performs the counterpart of unarization in the rest of the
@@ -1810,13 +1823,14 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
           Shape.print type_shape (List.length shapes) Layout.format type_layout
           (List.length layouts)
       else unknown_base_layouts type_layout
-    | Layout.Base _ ->
+    | Layout.Base _ | Layout.Box _ ->
       if !Clflags.dwarf_pedantic
       then
         Misc.fatal_errorf "unboxed tuple must have product layout, but got: %a"
           Layout.format type_layout
       else unknown_base_layouts type_layout)
   | Constr _, Base b -> [Known (type_shape, b)]
+  | Constr _, Box _ -> [Known (type_shape, Value)]
   | Constr _, _ -> unknown_base_layouts type_layout
   (* CR sspies: These should not happen with support for recursive types. We
      conservatively give back defaults. *)
@@ -1860,7 +1874,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     (* for unboxed products of the form [{ field: ty } [@@unboxed]] where [ty]
        is of product sort, we simply look through the unboxed product.
        Otherwise, we will create an additional DWARF entry for it. *)
-    | Base b -> [Known (type_shape, b)])
+    | Base b -> [Known (type_shape, b)]
+    | Box _ -> [Known (type_shape, Value)] (* Box kinds are values *))
   | Record { fields = [(_, _, _, ly)]; kind = Record_unboxed }, _ ->
     if !Clflags.dwarf_pedantic
     then
@@ -1887,14 +1902,14 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
           Shape.print type_shape (List.length fields) Layout.format type_layout
           (List.length prod_shapes)
       else unknown_base_layouts type_layout
-    | Layout.Base _ ->
+    | Layout.Base _ | Layout.Box _ ->
       if !Clflags.dwarf_pedantic
       then
         Misc.fatal_errorf
           "unboxed record must have product layout, but has layout %a"
           Layout.format type_layout
       else unknown_base_layouts type_layout)
-  | Variant _, Base Value -> known_value
+  | Variant _, (Base Value | Box _) -> known_value
   | Variant _, _ ->
     if !Clflags.dwarf_pedantic
     then
@@ -2110,6 +2125,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
     let type_shape =
       match unboxed_projection, type_layout with
       | None, Base b -> Known (type_shape, b)
+      | None, Box _ -> Known (type_shape, Value) (* Box kinds are values *)
       | None, Product _ ->
         if !Clflags.dwarf_pedantic
         then

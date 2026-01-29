@@ -2371,6 +2371,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Void -> layout_unboxed_product []
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
+  | Box _ -> layout_any_value (* Box kinds are values *)
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -2389,7 +2390,7 @@ let layout_of_extern_repr : extern_repr -> _ = function
 let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
   | Same_as_ocaml_repr (Product _) -> true
-  | Same_as_ocaml_repr (Base _)
+  | Same_as_ocaml_repr (Base _ | Box _)
   | Unboxed_vector _ | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
     false

@@ -611,7 +611,7 @@ let unary_int_arith_op ppf (o : unary_int_arith_op) =
 
 let unop ppf u =
   let str s = Format.pp_print_string ppf s in
-  let box_or_unbox verb_not_imm (bk : box_kind) =
+  let box_or_unbox verb_not_imm (bk : box_kind_) =
     let print verb obj = Format.fprintf ppf "%%%s_%s" verb obj in
     match bk with
     | Naked_float32 -> print verb_not_imm "float32"

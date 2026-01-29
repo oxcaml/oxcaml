@@ -977,6 +977,7 @@ let maybe_pmod_constraint mode expr =
 %token BARRBRACKET            "|]"
 %token BEGIN                  "begin"
 %token BOX_                   "box_"
+%token BOX_KIND               "box_kind"
 %token <char> CHAR            "'a'" (* just an example *)
 %token <char> HASH_CHAR       "#'a'" (* just an example *)
 %token CLASS                  "class"
@@ -1147,7 +1148,7 @@ The precedences must be listed from low to high.
 %nonassoc SEMI                          /* below EQUAL ({lbl=...; lbl=...}) */
 %nonassoc LET FOR                       /* above SEMI ( ...; let ... in ...) */
 %nonassoc below_WITH
-%nonassoc FUNCTION WITH                 /* below BAR  (match ... with ...) */
+%nonassoc FUNCTION WITH BOX_KIND        /* below BAR  (match ... with ...) */
 %nonassoc AND             /* above WITH (module rec A: SIG with ... and ...) */
 %nonassoc THEN                          /* below ELSE (if ... then ...) */
 %nonassoc ELSE                          /* (if ... then ... else ...) */
@@ -4062,6 +4063,9 @@ jkind_desc:
     }
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
+    }
+  | jkind_annotation BOX_KIND {
+      Pjk_box $1
     }
   | ident {
       Pjk_abbreviation $1

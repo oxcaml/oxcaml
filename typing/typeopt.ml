@@ -212,6 +212,7 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Untagged_immediate -> Unboxed_int Untagged_int
   | Base Void -> Void
   | Product c -> Product (classify_product ty c)
+  | Box _ -> Addr (* Box kinds are represented as values (addresses) *)
 
 let rec scannable_product_array_kind elt_ty_for_error loc sorts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
@@ -230,6 +231,7 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
     raise (Error (loc, Unsupported_void_in_array))
   | Product sorts ->
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
+  | Box _ -> Paddr_scannable (* Box kinds are represented as values *)
 
 let rec ignorable_product_array_kind loc (sorts : Jkind.Sort.Const.t list) =
   match sorts with
@@ -258,6 +260,7 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
     raise (Error (loc, Unsupported_vector_in_product_array))
   | Base Void -> raise (Error (loc, Unsupported_void_in_array))
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
+  | Box _ -> Pint_ignorable (* Box kinds are represented as values *)
 
 let array_kind_of_elt ~elt_sort env loc ty =
   let elt_sort =
@@ -411,7 +414,7 @@ let value_kind_of_value_jkind env jkind =
     Jkind.get_externality_upper_bound ~context jkind
   in
   match layout with
-  | Base Value ->
+  | Base Value | Box _ ->
     value_kind_of_value_with_externality externality_upper_bound
   | Any
   | Product _
@@ -1021,7 +1024,7 @@ let transl_mixed_block_element env loc ty mbe =
 
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function
-  | Base Value -> Lambda.Pvalue (Lazy.force value_kind)
+  | Base Value | Box _ -> Lambda.Pvalue (Lazy.force value_kind)
   | Base Float64 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
@@ -1069,7 +1072,7 @@ let layout env loc sort ty =
   layout_of_const_sort_generic sort
     ~value_kind:(lazy (value_kind env loc ty))
     ~error:(function
-      | Base Value -> assert false
+      | Base Value | Box _ -> assert false
       | Base Void as const ->
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Alpha,
@@ -1091,7 +1094,7 @@ let layout env loc sort ty =
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
     ~error:(function
-    | Base Value -> assert false
+    | Base Value | Box _ -> assert false
     | Base Void as const ->
       raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                  Alpha,

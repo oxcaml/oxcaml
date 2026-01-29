@@ -611,12 +611,15 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
           return_transformer = None
         } ])
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
+  | Box _ ->
+    (* Box kinds are values *)
+    [{ kind = K.value; arg_transformer = None; return_transformer = None }]
 
 let unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
   match extern_repr with
   | Same_as_ocaml_repr (Base Void) -> []
-  | Same_as_ocaml_repr (Base _ as sort) ->
+  | Same_as_ocaml_repr ((Base _ | Box _) as sort) ->
     let kind =
       Typeopt.layout_of_non_void_sort sort
       |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only

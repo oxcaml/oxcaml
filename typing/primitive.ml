@@ -472,7 +472,7 @@ module Repr_check = struct
 
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
-    | Base _ -> false
+    | Base _ | Box _ -> false
 
   let valid_c_stub_arg = function
     | Same_as_ocaml_repr s ->
@@ -481,7 +481,7 @@ module Repr_check = struct
     | Repr_poly -> true
 
   let valid_c_stub_return = function
-    | Same_as_ocaml_repr (Base _)
+    | Same_as_ocaml_repr (Base _ | Box _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Repr_poly -> true
     | Same_as_ocaml_repr (Product [s1; s2]) ->
