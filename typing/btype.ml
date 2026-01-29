@@ -311,6 +311,8 @@ let fold_type_expr f init ty =
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
     List.fold_left f result tyl
+  | Trepr (ty, _sort_vars) ->
+    f init ty
   | Tpackage (_, fl)  ->
     List.fold_left (fun result (_n, ty) -> f result ty) init fl
   | Tof_kind _ -> init
@@ -524,6 +526,8 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tpoly (ty, tyl)     ->
       let tyl = List.map f tyl in
       Tpoly (f ty, tyl)
+  | Trepr (ty, sort_vars) ->
+      Trepr (f ty, sort_vars)
   | Tpackage (p, fl)  -> Tpackage (p, List.map (fun (n, ty) -> (n, f ty)) fl)
   | Tof_kind jk -> Tof_kind jk
 

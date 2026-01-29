@@ -1656,3 +1656,11 @@ type ('a, _ : any) t
 (* quotations syntax *)
 
 (* Test will only be added once quotations work end-to-end. *)
+
+(***********************)
+(* layout polymorphism *)
+
+let f (_ : (repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) = ()
+[%%expect{|
+val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
+|}]

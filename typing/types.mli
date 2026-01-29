@@ -187,6 +187,22 @@ and type_desc =
       where 'a1 ... 'an are names given to types in tyl
       and occurrences of those types in ty. *)
 
+  | Trepr of type_expr * Jkind_types.Sort.univar list
+  (** [Trepr (ty, sl)] represents layout polymorphism (from [repr_] syntax).
+      [sl] is an ordered list of sort univars that abstract over the layouts of
+      type variables in [ty]. The i-th sort univar in [sl] corresponds
+      positionally to the i-th type variable quantified in [ty] (typically by
+      an inner [Tpoly] node), and appears in the [jkind] field of the
+      corresponding [Tvar] or [Tunivar] node in [ty].
+
+      The ordering of [sl] is semantically significant: two [Trepr] types with
+      the same sort univars in different orders represent incompatible types.
+
+      Example: [(repr_ 'a) (repr_ 'b). 'a -> 'b] translates to
+      [Trepr (Tpoly ('a -> 'b, ['a; 'b]), [s1; s2])] where [s1] and [s2] are
+      sort univars that appear in the jkinds of ['a] and ['b] respectively. *)
+
+
   | Tpackage of Path.t * (Longident.t * type_expr) list
   (** Type of a first-class module (a.k.a package). *)
 

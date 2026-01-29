@@ -438,6 +438,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Word -> Word
     | Untagged_immediate -> Word
     | Void -> Product [||])
+  | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
 
 let rec project_layout (layout : Layout.t) path =
@@ -492,7 +493,11 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
       else
         name, sh, Sort.Value
         (* If this is a product type, then the flattening of the record fields
-           has failed. *))
+           has failed. *)
+    | name, sh, Univar _ ->
+      Misc.fatal_errorf "Univar found: unexpected in field %a"
+        (Format.pp_print_option Format.pp_print_string)
+        name)
   | i :: subpath ->
     let field_name, field_type, field_layout = Array.get fields i in
     let field_name = Option.value ~default:("." ^ Int.to_string i) field_name in
@@ -1305,6 +1310,7 @@ let rec create_packed_layout_type (layout : Layout.t) ~parent_proto_die
         ()
     in
     Proto_die.reference die, packed_byte_size
+  | Univar _ -> Misc.fatal_error "create_packed_layout_type: unexpected univar"
   | Product p ->
     let components =
       List.map
@@ -1460,6 +1466,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
                      fields of [Base] layout:@ %a"
                     S.print type_shape
                 else Sort.Value
+              | Univar _ ->
+                Misc.fatal_errorf "Unexpected univar in record field:@ %a"
+                  S.print type_shape
             in
             ( name,
               Arch.size_addr,
@@ -1480,6 +1489,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       let field_size = base_layout_to_byte_size base_layout in
       create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
         ~field_name ~field_size ~field_die ()
+    | Record { fields = [(_, _, _, Univar _)]; kind = Record_unboxed } ->
+      Misc.fatal_errorf "Unexpected univar in unboxed record:@ %a" S.print
+        type_shape
     | Record { fields; kind = Record_mixed mixed_block_shapes } ->
       let fields =
         List.map (fun (name, _, sh, ly) -> Some name, sh, ly) fields
@@ -1580,6 +1592,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
                allowed:@ %a"
               S.print type_shape
           else Sort.Value
+        | Univar _ ->
+          Misc.fatal_errorf "Unexpected univar in [Variant_unboxed]:@ %a"
+            S.print type_shape
       in
       let arg_die =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die arg_shape
@@ -1698,7 +1713,8 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
         create_packed_layout_type ~parent_proto_die ~fallback_value_die
           argument_layout
       in
-      create_array_die ~reference ~parent_proto_die ~child_die ?name ())
+      create_array_die ~reference ~parent_proto_die ~child_die ?name ()
+    | Univar _ -> Misc.fatal_errorf "Unexpected univar in array type")
   | Array, _ ->
     if !Clflags.dwarf_pedantic
     then
@@ -1763,6 +1779,7 @@ let rec flatten_to_base_sorts (sort : Layout.t) : base_layout list =
   match sort with
   | Base b -> [b]
   | Product sorts -> List.concat_map flatten_to_base_sorts sorts
+  | Univar _ -> Misc.fatal_errorf "Unexpected univar in flatten_to_base_sorts"
 
 (* This function performs the counterpart of unarization in the rest of the
    compiler. We flatten the type into a sequence that corresponds to the fields
@@ -1815,7 +1832,10 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       then
         Misc.fatal_errorf "unboxed tuple must have product layout, but got: %a"
           Layout.format type_layout
-      else unknown_base_layouts type_layout)
+      else unknown_base_layouts type_layout
+    | Layout.Univar _ ->
+      Misc.fatal_errorf "Unexpected univar in unboxed tuple, but got: %a"
+        Layout.format type_layout)
   | Constr _, Base b -> [Known (type_shape, b)]
   | Constr _, _ -> unknown_base_layouts type_layout
   (* CR sspies: These should not happen with support for recursive types. We
@@ -1860,7 +1880,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     (* for unboxed products of the form [{ field: ty } [@@unboxed]] where [ty]
        is of product sort, we simply look through the unboxed product.
        Otherwise, we will create an additional DWARF entry for it. *)
-    | Base b -> [Known (type_shape, b)])
+    | Base b -> [Known (type_shape, b)]
+    | Univar _ -> Misc.fatal_errorf "Unexpected univar in unboxed record")
   | Record { fields = [(_, _, _, ly)]; kind = Record_unboxed }, _ ->
     if !Clflags.dwarf_pedantic
     then
@@ -1893,7 +1914,11 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
         Misc.fatal_errorf
           "unboxed record must have product layout, but has layout %a"
           Layout.format type_layout
-      else unknown_base_layouts type_layout)
+      else unknown_base_layouts type_layout
+    | Layout.Univar _ ->
+      Misc.fatal_errorf
+        "Unexpected univar in unboxed record product, but got: %a" Layout.format
+        type_layout)
   | Variant _, Base Value -> known_value
   | Variant _, _ ->
     if !Clflags.dwarf_pedantic
@@ -2118,6 +2143,9 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
              '%s':@ %a"
             Uid.print var_uid type_name S.print type_shape
         else Unknown Sort.Value
+      | None, Univar _ ->
+        Misc.fatal_errorf "Unexpected univar in type layout for uid %a"
+          Uid.print var_uid
       | Some i, _ ->
         let flattened = flatten_shape type_shape type_layout in
         let flattened_length = List.length flattened in

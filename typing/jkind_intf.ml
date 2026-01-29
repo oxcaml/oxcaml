@@ -20,6 +20,14 @@ module type Sort = sig
       calling convention of values of a given type. *)
   type t
 
+  (** Rigid sort variables similiar to [Tunivar] for types. They can be
+      specified to be equal by [enter_repr] but cannot be equated/unified. *)
+  type univar = { name : string option }
+
+  (** [enter_repr pairs f] establishes correspondence between sort univars (for
+      Trepr) using the given list of pairs, then calls [f]. *)
+  val enter_repr : (univar * univar) list -> (unit -> 'a) -> 'a
+
   (** These are the constant sorts -- fully determined and without variables *)
   type base =
     | Void  (** No run time representation at all *)
@@ -45,6 +53,7 @@ module type Sort = sig
     type t =
       | Base of base
       | Product of t list
+      | Univar of univar
 
     val equal : t -> t -> bool
 
@@ -247,6 +256,7 @@ module History = struct
     | Idx_element
     | Structure_item
     | Signature_item
+    | Layout_poly
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)

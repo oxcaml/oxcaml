@@ -484,6 +484,8 @@ and tyvar_jkind tyvar f (str, jkind) =
 
 and tyvar_loc_jkind tyvar f (str, jkind) = tyvar_jkind tyvar f (str.txt,jkind)
 
+and tyvar_loc_repr tyvar f str = pp f "(repr_@ %a)" tyvar str.txt
+
 and tyvar_loc_option_jkind f (str, jkind) =
   match jkind with
   | None -> tyvar_loc_option f str
@@ -514,7 +516,7 @@ and core_type ctxt f x =
     | Ptyp_alias (ct, s, j) ->
         pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct
           tyvar_loc_option_jkind (s, j)
-    | Ptyp_poly ([], ct) ->
+    | Ptyp_poly ([], ct) | Ptyp_repr ([], ct) ->
         core_type ctxt f ct
     | Ptyp_poly (sl, ct) ->
         pp f "@[<2>%a%a@]"
@@ -526,6 +528,16 @@ and core_type ctxt f x =
                           (tyvar_loc_jkind tyvar) ~sep:"@;")
                           l)
           sl (core_type ctxt) ct
+    | Ptyp_repr (lv, ct) ->
+        pp f "@[<2>%a%a@]"
+               (fun f l -> match l with
+                  | [] -> ()
+                  | _ ->
+                      pp f "%a@;.@;"
+                        (list
+                          (tyvar_loc_repr tyvar) ~sep:"@;")
+                          l)
+          lv (core_type ctxt) ct
     | Ptyp_of_kind jkind ->
       pp f "@[(type@ :@ %a)@]" (jkind_annotation reset_ctxt) jkind
     | _ -> pp f "@[<2>%a@]" (core_type1 ctxt) x
@@ -616,7 +628,8 @@ and core_type1 ctxt f x =
     | Ptyp_splice t ->
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
-    | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_of_kind _) ->
+    | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
+      | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
 
 and core_type2 ctxt f x =
