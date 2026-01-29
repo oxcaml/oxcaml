@@ -1125,8 +1125,8 @@ CAMLprim value caml_ba_uint8_set64_indexed_by_nativeint(value, value, value);
   Bigstring_get_index_by(width, name, index_type, val_func)                 \
   Bigstring_set_index_by(width, name, index_type, val_func)
 
-#undef int16
 #undef int8
+#undef int16
 
 Bigstring_get_index_by(i8, int64, int64_t, Int64_val)
 Bigstring_get_index_by(i8, int32, int32_t, Int32_val)

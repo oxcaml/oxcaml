@@ -421,8 +421,8 @@ CAMLprim value caml_bytes_set64_indexed_by_nativeint(value, value, value);
   String_and_bytes_get_index_by(width, name, index_type, val_func) \
   Bytes_set_index_by(width, name, index_type, val_func)
 
-#undef int16
 #undef int8
+#undef int16
 
 String_and_bytes_get_index_by(i8, int64, int64_t, Int64_val)
 String_and_bytes_get_index_by(i8, int32, int32_t, Int32_val)
