@@ -68,7 +68,7 @@ int caml_incoming_interrupts_queued(void);
 
 void caml_poll_gc_work(void);
 void caml_handle_gc_interrupt(void);
-void caml_process_external_interrupt(void);
+void caml_process_tick(void);
 void caml_handle_incoming_interrupts(void);
 
 CAMLextern void caml_interrupt_self(void);
@@ -87,6 +87,13 @@ CAMLextern void caml_bt_exit_ocaml(void);
 CAMLextern void caml_acquire_domain_lock(void);
 CAMLextern void caml_release_domain_lock(void);
 
+/* Start the tick thread unless it is disabled. Returns nonzero in the case of
+   an error. */
+CAMLextern int caml_domain_start_tick_thread(void);
+
+/* Stop the tick thread */
+CAMLextern void caml_domain_stop_tick_thread(void);
+
 /* These hooks are not modified after other domains are spawned. */
 CAMLextern void (*caml_atfork_hook)(void);
 CAMLextern void (*caml_domain_initialize_hook)(void);
@@ -95,6 +102,7 @@ CAMLextern void (*caml_domain_unlock_hook)(void);
 CAMLextern void (*caml_domain_stop_hook)(void);
 CAMLextern void (*caml_domain_external_interrupt_hook)(void);
 CAMLextern void (*caml_domain_send_interrupt_hook)(caml_domain_state*);
+CAMLextern void (*caml_domain_tick_hook)(void);
 
 CAMLextern void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz);
 CAMLextern void caml_init_domain_self(int);
