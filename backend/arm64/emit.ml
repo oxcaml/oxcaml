@@ -199,7 +199,7 @@ end
 
 (* CR mshinwell for TheNumbat: consider making simd_selection generate the AST
    types directly, as was done for amd64. *)
-let simd_instr (op : Simd.operation) (i : Linear.instruction) =
+let simd_instr (op : Simd.operation) (i : Linear.instruction_data) =
   let module Lane_index = Ast.Neon_reg_name.Lane_index in
   (* Check register constraints for instructions that require res = arg0 *)
   (match[@ocaml.warning "-4"] op with

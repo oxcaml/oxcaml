@@ -41,7 +41,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
         | Lcondbranch3 (_, _, _)
         | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
         | Lstackcheck _ ->
-          fill_map (pc + T.instr_size cell) (DLL.next cell))
+          fill_map (pc + T.instr_size data) (DLL.next cell))
     in
     fill_map 0 (DLL.hd_cell code)
 
@@ -111,22 +111,27 @@ module Make (T : Branch_relaxation_intf.S) = struct
             instr_overflows ~code_size ~max_out_of_line_code_offset data map pc
           in
           if not overflows
-          then fixup did_fix (pc + T.instr_size cell) (DLL.next cell)
+          then fixup did_fix (pc + T.instr_size data) (DLL.next cell)
           else
             match data.desc with
             | Lop Poll ->
-              DLL.set_value cell { data with desc = T.relax_poll () };
-              fixup true (pc + T.instr_size cell) (DLL.next cell)
+              let new_data = { data with desc = T.relax_poll () } in
+              DLL.set_value cell new_data;
+              fixup true (pc + T.instr_size new_data) (DLL.next cell)
             | Lop (Alloc { bytes = num_bytes; dbginfo; _ }) ->
-              DLL.set_value cell
-                { data with desc = T.relax_allocation ~num_bytes ~dbginfo };
-              fixup true (pc + T.instr_size cell) (DLL.next cell)
+              let new_data =
+                { data with desc = T.relax_allocation ~num_bytes ~dbginfo }
+              in
+              DLL.set_value cell new_data;
+              fixup true (pc + T.instr_size new_data) (DLL.next cell)
             | Lcondbranch (test, lbl) ->
               let lbl2 = Cmm.new_label () in
-              DLL.set_value cell
+              let new_data =
                 { data with
                   desc = Lcondbranch (Operation.invert_test test, lbl2)
-                };
+                }
+              in
+              DLL.set_value cell new_data;
               let branch_data =
                 make_instr_data (Lbranch lbl) [||] [||]
                   ~available_before:Reg_availability_set.Unreachable
@@ -140,7 +145,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
                   ~available_across:Reg_availability_set.Unreachable
               in
               DLL.insert_after branch_cell label_data;
-              fixup true (pc + T.instr_size cell) (DLL.next cell)
+              fixup true (pc + T.instr_size new_data) (DLL.next cell)
             | Lcondbranch3 (lbl0, lbl1, lbl2) ->
               (* Expand Lcondbranch3 into a sequence of conditional branches.
                  The original instruction is replaced by the first expanded
