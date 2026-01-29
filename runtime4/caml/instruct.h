@@ -62,8 +62,9 @@ enum instructions {
   RERAISE, RAISE_NOTRACE,
   GETSTRINGCHAR,
   PERFORM, RESUME, RESUMETERM, REPERFORMTERM,
-  WITH_STACK, WITH_STACK_BIND,
   MAKE_FAUX_MIXEDBLOCK,
+  WITH_STACK,
+  WITH_STACK_BIND,
 FIRST_UNIMPLEMENTED_OP};
 
 // Think carefully before adding a new bytecode instruction. In general,
