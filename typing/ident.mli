@@ -24,8 +24,15 @@ include Identifiable.S with type t := t
    - [compare] compares identifiers by binding location
 *)
 
+<<<<<<< HEAD
 val print : Format.formatter -> t -> unit
 val print_with_scope : Format.formatter -> t -> unit
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+val print_with_scope : Format.formatter -> t -> unit
+=======
+val doc_print: t Format_doc.printer
+val print_with_scope : t Format_doc.printer
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         (** Same as {!print} except that it will also add a "[n]" suffix
             if the scope of the argument is [n]. *)
 

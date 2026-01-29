@@ -302,7 +302,21 @@ let print_general_infos print_name name crc defines arg_descr mbf
 
 let print_global_table table =
   printf "Globals defined:\n";
+<<<<<<< HEAD
   Symtable.iter_global_map (fun id _ -> print_line (Symtable.Global.name id))
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  Symtable.iter_global_map
+    (fun global _ ->
+       print_line
+         (Format.asprintf "%a" Symtable.Global.description global)
+    )
+=======
+  Symtable.iter_global_map
+    (fun global _ ->
+       let desc = Format_doc.compat Symtable.Global.description in
+       print_line (Format.asprintf "%a" desc global)
+    )
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
     table
 
 open Cmx_format

@@ -373,9 +373,10 @@ let report_modality_equate_error first second ppf
   | Right_le_left -> report_modality_sub_error second first ppf sub_error
 
 module Style = Misc.Style
+module Fmt = Format_doc
 
 let report_primitive_mismatch first second ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   match (err : primitive_mismatch) with
   | Name ->
       pr "The names of the primitives are not the same"
@@ -404,7 +405,7 @@ let report_primitive_mismatch first second ppf err =
       pr "The two primitives have different [@@layout_poly] attributes"
 
 let report_value_mismatch first second env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   pr "@ ";
   match (err : value_mismatch) with
   | Primitive_mismatch pm ->
@@ -412,7 +413,9 @@ let report_value_mismatch first second env ppf err =
   | Not_a_primitive ->
       pr "The implementation is not a primitive."
   | Type trace ->
+      let msg = Fmt.Doc.msg in
       Printtyp.report_moregen_error ppf Type_scheme env trace
+<<<<<<< HEAD
         (fun ppf -> Format.fprintf ppf "The type")
         (fun ppf -> Format.fprintf ppf "is not compatible with the type")
   | Zero_alloc e -> Zero_alloc.print_error ppf e
@@ -421,11 +424,19 @@ let report_value_mismatch first second env ppf err =
       let got = first ^ " is" in
       let expected = second ^ " is" in
       report_mode_sub_error got expected ppf e
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        (fun ppf -> Format.fprintf ppf "The type")
+        (fun ppf -> Format.fprintf ppf "is not compatible with the type")
+=======
+        (msg "The type")
+        (msg "is not compatible with the type")
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let report_type_inequality env ppf err =
+  let msg = Fmt.Doc.msg in
   Printtyp.report_equality_error ppf Type_scheme env err
-    (fun ppf -> Format.fprintf ppf "The type")
-    (fun ppf -> Format.fprintf ppf "is not equal to the type")
+    (msg "The type")
+    (msg "is not equal to the type")
 
 let report_privacy_mismatch ppf err =
   let singular, item =
@@ -436,7 +447,7 @@ let report_privacy_mismatch ppf err =
     | Private_record_unboxed_product_type -> true, "unboxed record constructor"
     | Private_extensible_variant -> true,  "extensible variant"
     | Private_row_type           -> true,  "row type"
-  in Format.fprintf ppf "%s %s would be revealed."
+  in Format_doc.fprintf ppf "%s %s would be revealed."
        (if singular then "A private" else "Private")
        item
 
@@ -445,7 +456,7 @@ let report_label_mismatch first second env ppf err =
   | Type err ->
       report_type_inequality env ppf err
   | Mutability ord ->
-      Format.fprintf ppf "%s is mutable and %s is not."
+      Format_doc.fprintf ppf "%s is mutable and %s is not."
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second)
   | Atomicity ord ->
@@ -457,13 +468,13 @@ let report_label_mismatch first second env ppf err =
 let pp_record_diff first second prefix decl env ppf (x : record_change) =
   match x with
   | Delete cd ->
-      Format.fprintf ppf "%aAn extra field, %a, is provided in %s %s."
+      Fmt.fprintf ppf "%aAn extra field, %a, is provided in %s %s."
         prefix x Style.inline_code (Ident.name cd.delete.ld_id) first decl
   | Insert cd ->
-      Format.fprintf  ppf "%aA field, %a, is missing in %s %s."
+      Fmt.fprintf  ppf "%aA field, %a, is missing in %s %s."
         prefix x Style.inline_code (Ident.name cd.insert.ld_id) first decl
   | Change Type {got=lbl1; expected=lbl2; reason} ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@[<hv>%aFields do not match:@;<1 2>\
          %a@ is not the same as:\
          @;<1 2>%a@ %a@]"
@@ -472,34 +483,34 @@ let pp_record_diff first second prefix decl env ppf (x : record_change) =
         (Style.as_inline_code Printtyp.label) lbl2
         (report_label_mismatch first second env) reason
   | Change Name n ->
-      Format.fprintf ppf "%aFields have different names, %a and %a."
+      Fmt.fprintf ppf "%aFields have different names, %a and %a."
         prefix x
         Style.inline_code n.got
         Style.inline_code n.expected
   | Swap sw ->
-      Format.fprintf ppf "%aFields %a and %a have been swapped."
+      Fmt.fprintf ppf "%aFields %a and %a have been swapped."
         prefix x
         Style.inline_code sw.first
         Style.inline_code sw.last
   | Move {name; got; expected } ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@[<2>%aField %a has been moved@ from@ position %d@ to %d.@]"
         prefix x Style.inline_code name expected got
 
 let report_patch pr_diff first second decl env ppf patch =
-  let nl ppf () = Format.fprintf ppf "@," in
+  let nl ppf () = Fmt.fprintf ppf "@," in
   let no_prefix _ppf _ = () in
   match patch with
   | [ elt ] ->
-      Format.fprintf ppf "@[<hv>%a@]"
+      Fmt.fprintf ppf "@[<hv>%a@]"
         (pr_diff first second no_prefix decl env) elt
   | _ ->
       let pp_diff = pr_diff first second Diffing_with_keys.prefix decl env in
-      Format.fprintf ppf "@[<hv>%a@]"
-        (Format.pp_print_list ~pp_sep:nl pp_diff) patch
+      Fmt.fprintf ppf "@[<hv>%a@]"
+        (Fmt.pp_print_list ~pp_sep:nl pp_diff) patch
 
 let report_record_mismatch first second decl env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   match err with
   | Label_mismatch patch ->
       report_patch pp_record_diff first second decl env ppf patch
@@ -530,7 +541,7 @@ let report_record_mismatch first second decl env ppf err =
         "uses a mixed representation where boxed floats are stored flat"
 
 let report_constructor_mismatch first second decl env ppf err =
-  let pr fmt  = Format.fprintf ppf fmt in
+  let pr fmt  = Fmt.fprintf ppf fmt in
   match (err : constructor_mismatch) with
   | Type err -> report_type_inequality env ppf err
   | Arity -> pr "They have different arities."
@@ -552,13 +563,13 @@ let report_constructor_mismatch first second decl env ppf err =
 let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
   match x with
   | Delete cd ->
-      Format.fprintf ppf  "%aAn extra constructor, %a, is provided in %s %s."
+      Fmt.fprintf ppf  "%aAn extra constructor, %a, is provided in %s %s."
         prefix x Style.inline_code (Ident.name cd.delete.cd_id) first decl
   | Insert cd ->
-      Format.fprintf ppf "%aA constructor, %a, is missing in %s %s."
+      Fmt.fprintf ppf "%aA constructor, %a, is missing in %s %s."
         prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
   | Change Type {got; expected; reason} ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@[<hv>%aConstructors do not match:@;<1 2>\
          %a@ is not the same as:\
          @;<1 2>%a@ %a@]"
@@ -567,24 +578,24 @@ let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
         (Style.as_inline_code Printtyp.constructor) expected
         (report_constructor_mismatch first second decl env) reason
   | Change Name n ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "%aConstructors have different names, %a and %a."
         prefix x
         Style.inline_code n.got
         Style.inline_code n.expected
   | Swap sw ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "%aConstructors %a and %a have been swapped."
         prefix x
         Style.inline_code sw.first
         Style.inline_code sw.last
   | Move {name; got; expected} ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@[<2>%aConstructor %a has been moved@ from@ position %d@ to %d.@]"
         prefix x Style.inline_code name expected got
 
 let report_extension_constructor_mismatch first second decl env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   match (err : extension_constructor_mismatch) with
   | Constructor_privacy ->
       pr "Private extension constructor(s) would be revealed."
@@ -600,8 +611,8 @@ let report_extension_constructor_mismatch first second decl env ppf err =
 
 
 let report_private_variant_mismatch first second decl env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
-  let pp_tag ppf x = Format.fprintf ppf "`%s" x in
+  let pr fmt = Fmt.fprintf ppf fmt in
+  let pp_tag ppf x = Fmt.fprintf ppf "`%s" x in
   match (err : private_variant_mismatch) with
   | Only_outer_closed ->
       (* It's only dangerous in one direction, so we don't have a position *)
@@ -618,14 +629,14 @@ let report_private_variant_mismatch first second decl env ppf err =
       report_type_inequality env ppf err
 
 let report_private_object_mismatch env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   match (err : private_object_mismatch) with
   | Missing s ->
       pr "The implementation is missing the method %a" Style.inline_code s
   | Types err -> report_type_inequality env ppf err
 
 let report_kind_mismatch first second ppf (kind1, kind2) =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   let kind_to_string = function
   | Kind_abstract -> "abstract"
   | Kind_record -> "a record"
@@ -661,7 +672,7 @@ let report_unsafe_mode_crossing_mismatch first second ppf e =
       second print_unsafe_mode_crossing second_umc
 
 let report_type_mismatch first second decl env ppf err =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Fmt.fprintf ppf fmt in
   pr "@ ";
   match err with
   | Arity ->

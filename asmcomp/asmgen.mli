@@ -78,6 +78,12 @@ type error =
   | Asm_generation of string * Emitaux.error
 
 exception Error of error
+<<<<<<< HEAD
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+val report_error: Format.formatter -> error -> unit
+=======
+val report_error: error Format_doc.printer
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 val report_error : Format.formatter -> error -> unit
 

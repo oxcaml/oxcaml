@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+<<<<<<< HEAD
 open Format
 
 (* Convert environment summaries to environments. The Boolean [allow_missing_modules]
@@ -21,6 +22,13 @@ open Format
    will not be opened into the environment such that their contents will be missing from
    the resulting environment. If it set to [false], an exception is raised when missing
    modules are encountered. *)
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+open Format
+
+(* Convert environment summaries to environments *)
+=======
+(* Convert environment summaries to environments *)
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 val env_from_summary : allow_missing_modules:bool -> Env.summary -> Subst.t -> Env.t
 
@@ -42,4 +50,4 @@ type error =
 
 exception Error of error
 
-val report_error: formatter -> error -> unit
+val report_error: error Format_doc.printer

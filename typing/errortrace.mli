@@ -20,7 +20,7 @@ open Types
 type position = First | Second
 
 val swap_position : position -> position
-val print_pos : Format.formatter -> position -> unit
+val print_pos : position Format_doc.printer
 
 type expanded_type = { ty: type_expr; expanded: type_expr }
 
@@ -84,6 +84,20 @@ type 'variety obj =
   (* Unification *)
   | Self_cannot_be_closed : unification obj
 
+<<<<<<< HEAD
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+type first_class_module =
+    | Package_cannot_scrape of Path.t
+    | Package_inclusion of (Format.formatter -> unit)
+    | Package_coercion of (Format.formatter -> unit)
+
+=======
+type first_class_module =
+    | Package_cannot_scrape of Path.t
+    | Package_inclusion of Format_doc.doc
+    | Package_coercion of Format_doc.doc
+
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt

@@ -392,12 +392,20 @@ let loop ppf =
     fprintf ppf "OCaml version %s%s%s@.Enter #help;; for help.@.@."
       Config.version
       (if Topeval.implementation_label = "" then "" else " - ")
+<<<<<<< HEAD
       Topeval.implementation_label;
   begin
     try initialize_toplevel_env ()
     with Env.Error _ | Typetexp.Error _ as exn ->
       Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
   end;
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      Topeval.implementation_label
+      Misc.Style.inline_code "#help;;";
+=======
+      Topeval.implementation_label
+      (Format_doc.compat Misc.Style.inline_code) "#help;;";
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   let lb = Lexing.from_function refill_lexbuf in
   Location.init lb "//toplevel//";
   Location.input_name := "//toplevel//";

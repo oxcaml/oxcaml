@@ -318,6 +318,7 @@ let record_rep ppf r = match r with
   | Record_boxed _ -> fprintf ppf "boxed"
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
+<<<<<<< HEAD
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
 
@@ -357,6 +358,11 @@ and mixed_block_shape
       shape;
     fprintf ppf ")"
   end
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  | Record_extension path -> fprintf ppf "ext(%a)" Printtyp.path path
+=======
+  | Record_extension path -> fprintf ppf "ext(%a)" Printtyp.Compat.path path
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let block_shape ppf shape = match shape with
   | All_value -> ()

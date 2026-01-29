@@ -64,5 +64,14 @@ val tyvar: Format.formatter -> string -> unit
       special treatment required for the single quote character in second
       position, or for keywords by escaping them with \#. No-op on "_". *)
 
+<<<<<<< HEAD
 val jkind_annotation : Format.formatter -> Parsetree.jkind_annotation -> unit
 val mode : Format.formatter -> Parsetree.mode Location.loc -> unit
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+=======
+(** {!Format_doc} functions for error messages *)
+module Doc:sig
+  val longident: Longident.t Format_doc.printer
+  val tyvar: string Format_doc.printer
+end
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)

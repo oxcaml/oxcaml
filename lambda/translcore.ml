@@ -2713,7 +2713,7 @@ let transl_apply
 
 (* Error report *)
 
-open Format
+open Format_doc
 
 let report_error ppf = function
   | Free_super_var ->

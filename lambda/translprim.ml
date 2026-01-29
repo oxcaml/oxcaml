@@ -2468,7 +2468,7 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
 
 (* Error report *)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
 let report_error ppf = function

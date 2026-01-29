@@ -1192,11 +1192,12 @@ module Style = struct
 
 
   let as_inline_code printer ppf x =
-    Format.pp_open_stag ppf (Format.String_tag "inline_code");
+    let open Format_doc in
+    pp_open_stag ppf (Format.String_tag "inline_code");
     printer ppf x;
-    Format.pp_close_stag ppf ()
+    pp_close_stag ppf ()
 
-  let inline_code ppf s = as_inline_code Format.pp_print_string ppf s
+  let inline_code ppf s = as_inline_code Format_doc.pp_print_string ppf s
 
   let as_clflag flag printer ppf x =
     Format.fprintf ppf "@{<inline_code>%s %a@}" flag printer x
@@ -1313,19 +1314,20 @@ let spellcheck env name =
   let env = List.sort_uniq (fun s1 s2 -> String.compare s2 s1) env in
   fst (List.fold_left (compare name) ([], max_int) env)
 
+
 let did_you_mean ppf get_choices =
+  let open Format_doc in
   (* flush now to get the error report early, in the (unheard of) case
      where the search in the get_choices function would take a bit of
      time; in the worst case, the user has seen the error, she can
      interrupt the process before the spell-checking terminates. *)
-  Format.fprintf ppf "@?";
+  fprintf ppf "@?";
   match get_choices () with
   | [] -> ()
   | choices ->
     let rest, last = split_last choices in
-    let comma ppf () = Format.fprintf ppf ", " in
-     Format.fprintf ppf "@\n@{<hint>Hint@}: Did you mean %a%s%a?@?"
-       (Format.pp_print_list ~pp_sep:comma Style.inline_code) rest
+     fprintf ppf "@\n@[@{<hint>Hint@}: Did you mean %a%s%a?@]"
+       (pp_print_list ~pp_sep:comma Style.inline_code) rest
        (if rest = [] then "" else " or ")
        Style.inline_code last
 
@@ -1376,6 +1378,7 @@ let delete_eol_spaces src =
   let stop = loop 0 0 in
   Bytes.sub_string dst 0 stop
 
+<<<<<<< HEAD
 let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
   let left_column_size =
     List.fold_left (fun acc (s, _) -> Int.max acc (String.length s)) 0 lines in
@@ -1529,6 +1532,30 @@ let pp_table ppf (columns : (string * string list) list) =
   done
 
 
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
+  let left_column_size =
+    List.fold_left (fun acc (s, _) -> Int.max acc (String.length s)) 0 lines in
+  let lines_nb = List.length lines in
+  let ellipsed_first, ellipsed_last =
+    match max_lines with
+    | Some max_lines when lines_nb > max_lines ->
+        let printed_lines = max_lines - 1 in (* the ellipsis uses one line *)
+        let lines_before = printed_lines / 2 + printed_lines mod 2 in
+        let lines_after = printed_lines / 2 in
+        (lines_before, lines_nb - lines_after - 1)
+    | _ -> (-1, -1)
+  in
+  Format.fprintf ppf "@[<v>";
+  List.iteri (fun k (line_l, line_r) ->
+    if k = ellipsed_first then Format.fprintf ppf "...@,";
+    if ellipsed_first <= k && k <= ellipsed_last then ()
+    else Format.fprintf ppf "%*s %s %s@," left_column_size line_l sep line_r
+  ) lines;
+  Format.fprintf ppf "@]"
+
+=======
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 (* showing configuration and configuration variables *)
 let show_config_and_exit () =
   Config.print_config stdout;
@@ -1585,16 +1612,13 @@ let debug_prefix_map_flags () =
         []
   end
 
-let print_if ppf flag printer arg =
-  if !flag then Format.fprintf ppf "%a@." printer arg;
-  arg
-
 let print_see_manual ppf manual_section =
-  let open Format in
+  let open Format_doc in
   fprintf ppf "(see manual section %a)"
     (pp_print_list ~pp_sep:(fun f () -> pp_print_char f '.') pp_print_int)
     manual_section
 
+<<<<<<< HEAD
 let output_of_print print =
   let output out_channel t =
     let ppf = Format.formatter_of_out_channel out_channel in
@@ -1644,6 +1668,12 @@ let to_string_of_print print =
     Buffer.contents buf
   in
   to_string
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+=======
+let print_if ppf flag printer arg =
+  if !flag then Format.fprintf ppf "%a@." printer arg;
+  arg
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 
 type filepath = string

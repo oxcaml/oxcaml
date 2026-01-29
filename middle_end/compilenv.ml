@@ -321,21 +321,77 @@ let require_global global_ident =
 
 (* Error report *)
 
+<<<<<<< HEAD
 open Format
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+open Format
+module Style = Misc.Style
+=======
+open Format_doc
+module Style = Misc.Style
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let report_error ppf = function
   | Not_a_unit_info filename ->
       fprintf ppf "%a@ is not a compilation unit description."
+<<<<<<< HEAD
         Location.print_filename filename
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        (Style.as_inline_code Location.print_filename) filename
+=======
+        Location.Doc.quoted_filename filename
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Corrupted_unit_info filename ->
       fprintf ppf "Corrupted compilation unit description@ %a"
+<<<<<<< HEAD
         Location.print_filename filename
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        (Style.as_inline_code Location.print_filename) filename
+=======
+       Location.Doc.quoted_filename filename
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Illegal_renaming(name, modname, filename) ->
       fprintf ppf "%a@ contains the description for unit\
                    @ %a when %a was expected"
+<<<<<<< HEAD
         Location.print_filename filename
         CU.print name
         CU.print modname
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        (Style.as_inline_code Location.print_filename) filename
+        Style.inline_code name
+        Style.inline_code modname
+  | Mismatching_for_pack(filename, pack_1, current_unit, None) ->
+      fprintf ppf "%a@ was built with %a, but the \
+                   @ current unit %a is not"
+        (Style.as_inline_code Location.print_filename) filename
+        Style.inline_code ("-for-pack " ^ pack_1)
+        Style.inline_code current_unit
+  | Mismatching_for_pack(filename, pack_1, current_unit, Some pack_2) ->
+      fprintf ppf "%a@ was built with %a, but the \
+                   @ current unit %a is built with %a"
+        (Style.as_inline_code Location.print_filename) filename
+        Style.inline_code ("-for-pack " ^ pack_1)
+        Style.inline_code current_unit
+        Style.inline_code ("-for-pack " ^ pack_2)
+=======
+        Location.Doc.quoted_filename filename
+        Style.inline_code name
+        Style.inline_code modname
+  | Mismatching_for_pack(filename, pack_1, current_unit, None) ->
+      fprintf ppf "%a@ was built with %a, but the \
+                   @ current unit %a is not"
+        Location.Doc.quoted_filename filename
+        Style.inline_code ("-for-pack " ^ pack_1)
+        Style.inline_code current_unit
+  | Mismatching_for_pack(filename, pack_1, current_unit, Some pack_2) ->
+      fprintf ppf "%a@ was built with %a, but the \
+                   @ current unit %a is built with %a"
+        Location.Doc.quoted_filename filename
+        Style.inline_code ("-for-pack " ^ pack_1)
+        Style.inline_code current_unit
+        Style.inline_code ("-for-pack " ^ pack_2)
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let () =
   Location.register_error_of_exn

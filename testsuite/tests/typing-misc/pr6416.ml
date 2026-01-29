@@ -56,7 +56,14 @@ Error: Signature mismatch:
          "A of t/1"
        is not the same as:
          "A of t/2"
+<<<<<<< HEAD
        The type "t/1" is not equal to the type "t/2"
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+         "A of t"
+       The type "t" is not equal to the type "t/2"
+=======
+       The type "t" is not equal to the type "t/2"
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
        Line 4, characters 9-19:
          Definition of type "t/1"
        Line 2, characters 2-11:
@@ -125,7 +132,14 @@ Error: Signature mismatch:
          "A of T/1.t"
        is not the same as:
          "A of T/2.t"
+<<<<<<< HEAD
        The type "T/1.t" is not equal to the type "T/2.t"
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+         "A of T.t"
+       The type "T.t" is not equal to the type "T/2.t"
+=======
+       The type "T.t" is not equal to the type "T/2.t"
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
        Line 5, characters 6-34:
          Definition of module "T/1"
        Line 2, characters 2-30:

@@ -126,7 +126,6 @@ val input_phrase_buffer: Buffer.t option ref
 (** {1 Toplevel-specific functions} *)
 
 val echo_eof: unit -> unit
-val separate_new_message: formatter -> unit
 val reset: unit -> unit
 
 
@@ -208,11 +207,18 @@ val show_filename: string -> string
         Otherwise, returns the filename unchanged. *)
 
 val print_filename: formatter -> string -> unit
-
 val print_loc: formatter -> t -> unit
 val print_loc_in_lowercase: formatter -> t -> unit
 val print_locs: formatter -> t list -> unit
+val separate_new_message: formatter -> unit
 
+module Doc: sig
+  val separate_new_message: unit Format_doc.printer
+  val filename: string Format_doc.printer
+  val quoted_filename: string Format_doc.printer
+  val loc: t Format_doc.printer
+  val locs: t list Format_doc.printer
+end
 
 (** {1 Toplevel-specific location highlighting} *)
 
@@ -224,9 +230,9 @@ val highlight_terminfo:
 
 (** {2 The type of reports and report printers} *)
 
-type msg = (Format.formatter -> unit) loc
+type msg = Format_doc.t loc
 
-val msg: ?loc:t -> ('a, Format.formatter, unit, msg) format4 -> 'a
+val msg: ?loc:t -> ('a, Format_doc.formatter, unit, msg) format4 -> 'a
 
 type report_kind =
   | Report_error
@@ -239,6 +245,12 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
+<<<<<<< HEAD
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+  footnote: unit -> (Format.formatter -> unit) option
+=======
+  footnote: Format_doc.t option
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 }
 
 type report_printer = {
@@ -251,7 +263,7 @@ type report_printer = {
   pp_main_loc : report_printer -> report ->
     Format.formatter -> t -> unit;
   pp_main_txt : report_printer -> report ->
-    Format.formatter -> (Format.formatter -> unit) -> unit;
+    Format.formatter -> Format_doc.t -> unit;
   pp_submsgs : report_printer -> report ->
     Format.formatter -> msg list -> unit;
   pp_submsg : report_printer -> report ->
@@ -259,7 +271,7 @@ type report_printer = {
   pp_submsg_loc : report_printer -> report ->
     Format.formatter -> t -> unit;
   pp_submsg_txt : report_printer -> report ->
-    Format.formatter -> (Format.formatter -> unit) -> unit;
+    Format.formatter -> Format_doc.t -> unit;
 }
 (** A printer for [report]s, defined using open-recursion.
     The goal is to make it easy to define new printers by re-using code from
@@ -360,15 +372,43 @@ val deprecated_script_alert: string -> unit
 type error = report
 (** An [error] is a [report] which [report_kind] must be [Report_error]. *)
 
+<<<<<<< HEAD
 val error: ?loc:t -> ?sub:msg list -> string -> error
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+type delayed_msg = unit -> (formatter->unit) option
+=======
+type delayed_msg = unit -> Format_doc.t option
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
+<<<<<<< HEAD
 val errorf: ?loc:t -> ?sub:msg list ->
   ('a, Format.formatter, unit, error) format4 -> 'a
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+val error: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg-> string -> error
 
+val errorf:
+  ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ('a, Format.formatter, unit, error) format4 -> 'a
+=======
+val error: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg -> string -> error
+
+val errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ('a, Format_doc.formatter, unit, error) format4 -> 'a
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+
+<<<<<<< HEAD
 val error_of_printer: ?loc:t -> ?sub:msg list ->
   (formatter -> 'a -> unit) -> 'a -> error
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+val error_of_printer:
+  ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  (formatter -> 'a -> unit) -> 'a -> error
+=======
+val error_of_printer: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  (Format_doc.formatter -> 'a -> unit) -> 'a -> error
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
-val error_of_printer_file: (formatter -> 'a -> unit) -> 'a -> error
+val error_of_printer_file: (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
 
 (** {1 Automatically reporting errors for raised exceptions} *)
@@ -391,8 +431,16 @@ exception Already_displayed_error
 (** Raising [Already_displayed_error] signals an error which has already been
    printed. The exception will be caught, but nothing will be printed *)
 
+<<<<<<< HEAD
 val raise_errorf: ?loc:t -> ?sub:msg list ->
   ('a, Format.formatter, unit, 'b) format4 -> 'a
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+val raise_errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ('a, Format.formatter, unit, 'b) format4 -> 'a
+=======
+val raise_errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 val report_exception: formatter -> exn -> unit
 (** Reraise the exception if it is unknown. *)

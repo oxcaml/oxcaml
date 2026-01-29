@@ -298,6 +298,10 @@ type error =
   | Unexpected_hole
   | Eval_format
 
+
+let not_principal fmt =
+  Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
+
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
 
@@ -1901,7 +1905,7 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
           generalize_structure t2;
           if not (fully_generic t1 && fully_generic t2) then
             let msg =
-              Format.asprintf
+              Format_doc.doc_printf
                 "typing this pattern requires considering@ %a@ and@ %a@ as \
                 equal.@,\
                 But the knowledge of these types"
@@ -2250,8 +2254,20 @@ end) = struct
     if Warnings.is_active (Ambiguous_name ([],[],false,"")) then begin
       Printtyp.Conflicts.reset ();
       let paths = ambiguous_types env lbl rest in
+<<<<<<< HEAD
       let expansion =
         Format.asprintf "%t" Printtyp.Conflicts.print_explanations in
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      let expansion = match Printtyp.Conflicts.err_msg () with
+        | None -> ""
+        | Some msg -> Format.asprintf "%t" msg
+      in
+=======
+      let expansion = match Printtyp.Conflicts.err_msg () with
+        | None -> ""
+        | Some msg -> Format_doc.(asprintf "%a" pp_doc) msg
+      in
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
       if paths <> [] then
         warn lid.loc
           (Warnings.Ambiguous_name ([Longident.last lid.txt],
@@ -2262,15 +2278,14 @@ end) = struct
   let warn_non_principal warn lid =
     let name = Datatype_kind.label_name kind in
     warn lid.loc
-      (Warnings.Not_principal
-         ("this type-based " ^ name ^ " disambiguation"))
+      (not_principal "this type-based %s disambiguation" name)
 
   (* we selected a name out of the lexical scope *)
   let warn_out_of_scope warn lid env tpath =
     if Warnings.is_active (Name_out_of_scope ("", Name "")) then begin
       let path_s =
         Printtyp.wrap_printing_env ~error:true env
-          (fun () -> Printtyp.string_of_path tpath) in
+          (fun () -> Format_doc.asprintf "%a" Printtyp.type_path tpath) in
       warn lid.loc
         (Warnings.Name_out_of_scope (path_s, Name (Longident.last lid.txt)))
     end
@@ -2562,9 +2577,15 @@ let disambiguate_sort_lid_a_list
   (* These ambiguity check warnings could probably use [ambiguity] *)
   if !w_pr then
     Location.prerr_warning loc
+<<<<<<< HEAD
       (Warnings.Not_principal
          ("this type-based " ^ (record_form_to_string record_form)
           ^ " disambiguation"))
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      (Warnings.Not_principal "this type-based record disambiguation")
+=======
+      (not_principal  "this type-based record disambiguation")
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   else begin
     match List.rev !w_amb with
       (_,types,ex)::_ as amb ->
@@ -6155,7 +6176,67 @@ and type_expect_
       in
       let exp = rue {
         exp_desc; exp_loc = loc; exp_extra = [];
+<<<<<<< HEAD
         exp_type = desc.val_type;
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        exp_type = instance desc.val_type;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
+  | Pexp_constant({pconst_desc = Pconst_string (str, _, _); _} as cst) -> (
+    let cst = constant_or_raise env loc cst in
+    (* Terrible hack for format strings *)
+    let ty_exp = expand_head env (protect_expansion env ty_expected) in
+    let fmt6_path =
+      Path.(Pdot (Pident (Ident.create_persistent "CamlinternalFormatBasics"),
+                  "format6"))
+    in
+    let is_format = match get_desc ty_exp with
+      | Tconstr(path, _, _) when Path.same path fmt6_path ->
+        if !Clflags.principal && get_level ty_exp <> generic_level then
+          Location.prerr_warning loc
+            (Warnings.Not_principal "this coercion to format6");
+        true
+      | _ -> false
+    in
+    if is_format then
+      let format_parsetree =
+        { (type_format loc str env) with pexp_loc = sexp.pexp_loc }  in
+      type_expect env format_parsetree ty_expected_explained
+    else
+      rue {
+        exp_desc = Texp_constant cst;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance Predef.type_string;
+=======
+        exp_type = instance desc.val_type;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
+  | Pexp_constant({pconst_desc = Pconst_string (str, _, _); _} as cst) -> (
+    let cst = constant_or_raise env loc cst in
+    (* Terrible hack for format strings *)
+    let ty_exp = expand_head env (protect_expansion env ty_expected) in
+    let fmt6_path =
+      Path.(Pdot (Pident (Ident.create_persistent "CamlinternalFormatBasics"),
+                  "format6"))
+    in
+    let is_format = match get_desc ty_exp with
+      | Tconstr(path, _, _) when Path.same path fmt6_path ->
+        if !Clflags.principal && get_level ty_exp <> generic_level then
+          Location.prerr_warning loc
+            (not_principal "this coercion to format6");
+        true
+      | _ -> false
+    in
+    if is_format then
+      let format_parsetree =
+        { (type_format loc str env) with pexp_loc = sexp.pexp_loc }  in
+      type_expect env format_parsetree ty_expected_explained
+    else
+      rue {
+        exp_desc = Texp_constant cst;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance Predef.type_string;
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
       in
@@ -7026,12 +7107,20 @@ and type_expect_
         | Tpoly (ty, tl) ->
             if !Clflags.principal && get_level typ <> generic_level then
               Location.prerr_warning loc
+<<<<<<< HEAD
                 (Warnings.Not_principal "this use of a polymorphic method");
             instance_poly tl ty,
             Some (
               Texp_inspected_type (Polymorphic_parameter (
                 Method (met, Ctype.instance ~partial:true typ))),
               loc, [])
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+                (Warnings.Not_principal "this use of a polymorphic method");
+            snd (instance_poly ~fixed:false tl ty)
+=======
+                (not_principal "this use of a polymorphic method");
+            snd (instance_poly ~fixed:false tl ty)
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         | Tvar _ ->
             let ty' = newvar (Jkind.Builtin.value ~why:Object_field) in
             unify env (instance typ) (newty(Tpoly(ty',[])));
@@ -7323,7 +7412,7 @@ and type_expect_
                 < Btype.generic_level
             then
               Location.prerr_warning loc
-                (Warnings.Not_principal "this module packing");
+                (not_principal "this module packing");
             (p, fl)
         | Tvar _ ->
             raise (Error (loc, env, Cannot_infer_signature))
@@ -7955,7 +8044,7 @@ and type_coerce
             force (); force' ();
             if not gen && !Clflags.principal then
               Location.prerr_warning loc
-                (Warnings.Not_principal "this ground coercion");
+                (not_principal "this ground coercion");
           with Subtype err ->
             (* prerr_endline "coercion failed"; *)
             raise (Error (loc, env, Not_subtype err))
@@ -9214,6 +9303,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
           {arg with exp_type = instance arg.exp_type}, sch
         end
       in
+<<<<<<< HEAD
       (lbl, Arg (arg, mode_arg, sort_arg), sch)
   | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label; _ }) ->
       (match expected_label with
@@ -9228,6 +9318,199 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
 
 and type_application env app_loc expected_mode position_and_mode
       funct funct_mode sargs ret_tvar =
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+      let args =
+        (* Force typing of arguments.
+           Careful: the order matters here. Using [List.rev_map] would be
+           incorrect. *)
+        List.map
+          (function
+            | l, None -> l, None
+            | l, Some (f, _loc) -> l, Some (f ()))
+          (List.rev typed_args)
+      in
+      let result_ty = instance (result_type !omitted_parameters ty_fun) in
+      args, result_ty
+    in
+    if sargs = [] then type_unknown_args () else
+    let ty_fun' = expand_head env ty_fun in
+    match get_desc ty_fun', get_desc (expand_head env ty_fun0) with
+    | Tarrow (l, ty, ty_fun, com), Tarrow (_, ty0, ty_fun0, _)
+      when is_commu_ok com ->
+        let lv = get_level ty_fun' in
+        let may_warn loc w =
+          if not !warned && !Clflags.principal && lv <> generic_level
+          then begin
+            warned := true;
+            Location.prerr_warning loc w
+          end
+        in
+        let name = label_name l
+        and optional = is_optional l in
+        let use_arg sarg l' =
+          if not optional || is_optional l' then
+            (fun () -> type_argument env sarg ty ty0)
+          else begin
+            may_warn sarg.pexp_loc
+              (Warnings.Not_principal "using an optional argument here");
+            (fun () -> option_some env (type_argument env sarg
+                                          (extract_option_type env ty)
+                                          (extract_option_type env ty0)))
+          end
+        in
+        let eliminate_optional_arg () =
+          may_warn funct.exp_loc
+            (Warnings.Non_principal_labels "eliminated optional argument");
+          eliminated_optional_arguments :=
+            (l,ty,lv) :: !eliminated_optional_arguments;
+          (fun () -> option_none env (instance ty) Location.none)
+        in
+        let remaining_sargs, arg =
+          if ignore_labels then begin
+            (* No reordering is allowed, process arguments in order *)
+            match sargs with
+            | [] -> assert false
+            | (l', sarg) :: remaining_sargs ->
+                if name = label_name l' || (not optional && l' = Nolabel) then
+                  (remaining_sargs, Some (use_arg sarg l', Some sarg.pexp_loc))
+                else if
+                  optional &&
+                  not (List.exists (fun (l, _) -> name = label_name l)
+                         remaining_sargs) &&
+                  List.exists (function (Nolabel, _) -> true | _ -> false)
+                    sargs
+                then
+                  (sargs, Some (eliminate_optional_arg (), Some sarg.pexp_loc))
+                else
+                  raise(Error(sarg.pexp_loc, env,
+                              Apply_wrong_label(l', ty_fun', optional)))
+          end else
+            (* Arguments can be commuted, try to fetch the argument
+               corresponding to the first parameter. *)
+            match extract_label name sargs with
+            | Some (l', sarg, commuted, remaining_sargs) ->
+                if commuted then begin
+                  may_warn sarg.pexp_loc
+                    (Warnings.Not_principal "commuting this argument")
+                end;
+                if not optional && is_optional l' then
+                  Location.prerr_warning sarg.pexp_loc
+                    (Warnings.Nonoptional_label (Asttypes.string_of_label l));
+                remaining_sargs, Some (use_arg sarg l', Some sarg.pexp_loc)
+            | None ->
+                sargs,
+                if optional && List.mem_assoc Nolabel sargs then
+                  Some (eliminate_optional_arg (), None)
+                else begin
+                  (* No argument was given for this parameter, we abstract over
+                     it. *)
+                  may_warn funct.exp_loc
+                    (Warnings.Non_principal_labels "commuted an argument");
+                  omitted_parameters := (l,ty,lv) :: !omitted_parameters;
+                  None
+                end
+        in
+        type_args ((l,arg)::args) ty_fun ty_fun0 remaining_sargs
+    | _ ->
+        type_unknown_args ()
+  in
+=======
+      let args =
+        (* Force typing of arguments.
+           Careful: the order matters here. Using [List.rev_map] would be
+           incorrect. *)
+        List.map
+          (function
+            | l, None -> l, None
+            | l, Some (f, _loc) -> l, Some (f ()))
+          (List.rev typed_args)
+      in
+      let result_ty = instance (result_type !omitted_parameters ty_fun) in
+      args, result_ty
+    in
+    if sargs = [] then type_unknown_args () else
+    let ty_fun' = expand_head env ty_fun in
+    match get_desc ty_fun', get_desc (expand_head env ty_fun0) with
+    | Tarrow (l, ty, ty_fun, com), Tarrow (_, ty0, ty_fun0, _)
+      when is_commu_ok com ->
+        let lv = get_level ty_fun' in
+        let may_warn loc w =
+          if not !warned && !Clflags.principal && lv <> generic_level
+          then begin
+            warned := true;
+            Location.prerr_warning loc w
+          end
+        in
+        let name = label_name l
+        and optional = is_optional l in
+        let use_arg sarg l' =
+          if not optional || is_optional l' then
+            (fun () -> type_argument env sarg ty ty0)
+          else begin
+            may_warn sarg.pexp_loc
+              (not_principal "using an optional argument here");
+            (fun () -> option_some env (type_argument env sarg
+                                          (extract_option_type env ty)
+                                          (extract_option_type env ty0)))
+          end
+        in
+        let eliminate_optional_arg () =
+          may_warn funct.exp_loc
+            (Warnings.Non_principal_labels "eliminated optional argument");
+          eliminated_optional_arguments :=
+            (l,ty,lv) :: !eliminated_optional_arguments;
+          (fun () -> option_none env (instance ty) Location.none)
+        in
+        let remaining_sargs, arg =
+          if ignore_labels then begin
+            (* No reordering is allowed, process arguments in order *)
+            match sargs with
+            | [] -> assert false
+            | (l', sarg) :: remaining_sargs ->
+                if name = label_name l' || (not optional && l' = Nolabel) then
+                  (remaining_sargs, Some (use_arg sarg l', Some sarg.pexp_loc))
+                else if
+                  optional &&
+                  not (List.exists (fun (l, _) -> name = label_name l)
+                         remaining_sargs) &&
+                  List.exists (function (Nolabel, _) -> true | _ -> false)
+                    sargs
+                then
+                  (sargs, Some (eliminate_optional_arg (), Some sarg.pexp_loc))
+                else
+                  raise(Error(sarg.pexp_loc, env,
+                              Apply_wrong_label(l', ty_fun', optional)))
+          end else
+            (* Arguments can be commuted, try to fetch the argument
+               corresponding to the first parameter. *)
+            match extract_label name sargs with
+            | Some (l', sarg, commuted, remaining_sargs) ->
+                if commuted then begin
+                  may_warn sarg.pexp_loc
+                    (not_principal "commuting this argument")
+                end;
+                if not optional && is_optional l' then
+                  Location.prerr_warning sarg.pexp_loc
+                    (Warnings.Nonoptional_label (Asttypes.string_of_label l));
+                remaining_sargs, Some (use_arg sarg l', Some sarg.pexp_loc)
+            | None ->
+                sargs,
+                if optional && List.mem_assoc Nolabel sargs then
+                  Some (eliminate_optional_arg (), None)
+                else begin
+                  (* No argument was given for this parameter, we abstract over
+                     it. *)
+                  may_warn funct.exp_loc
+                    (Warnings.Non_principal_labels "commuted an argument");
+                  omitted_parameters := (l,ty,lv) :: !omitted_parameters;
+                  None
+                end
+        in
+        type_args ((l,arg)::args) ty_fun ty_fun0 remaining_sargs
+    | _ ->
+        type_unknown_args ()
+  in
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   let is_ignore funct =
     is_prim ~name:"%ignore" funct &&
     (try ignore (filter_arrow_mono env (instance funct.exp_type) Nolabel); true
@@ -11166,7 +11449,8 @@ let spellcheck ppf unbound_name valid_names =
 let spellcheck_idents ppf unbound valid_idents =
   spellcheck ppf (Ident.name unbound) (List.map Ident.name valid_idents)
 
-open Format
+open Format_doc
+module Fmt = Format_doc
 
 let longident = Printtyp.longident
 
@@ -11211,7 +11495,7 @@ let report_literal_type_constraint expected_type const =
       Some '.'
     else None
   in
-  let pp_const ppf (c,s) = Format.fprintf ppf "%s%c" c s in
+  let pp_const ppf (c,s) = Fmt.fprintf ppf "%s%c" c s in
   match const_str, suffix with
   | Some c, Some s -> [
       Location.msg
@@ -11251,8 +11535,8 @@ let report_pattern_type_clash_hints pat diff =
   | Some (Ppat_constant const) -> report_literal_type_constraint const diff
   | _ -> []
 
-let report_type_expected_explanation expl ppf =
-  let because expl_str = fprintf ppf "@ because it is in %s" expl_str in
+let report_type_expected_explanation expl =
+  let because expl_str = doc_printf "@ because it is in %s" expl_str in
   match expl with
   | If_conditional ->
       because "the condition of an if-statement"
@@ -11330,10 +11614,10 @@ let escaping_submode_reason_hint =
     end
   | Constructor _ | Other -> []
 
-let report_type_expected_explanation_opt expl ppf =
+let report_type_expected_explanation_opt expl =
   match expl with
-  | None -> ()
-  | Some expl -> report_type_expected_explanation expl ppf
+  | None -> Format_doc.Doc.empty
+  | Some expl -> report_type_expected_explanation expl
 
 let report_unification_error ~loc ?sub env err
     ?type_expected_explanation txt1 txt2 =
@@ -11343,11 +11627,11 @@ let report_unification_error ~loc ?sub env err
   ) ()
 
 let report_this_function ppf funct =
-  if Typedtree.exp_is_nominal funct then
-    let pexp = Untypeast.untype_expression funct in
-    Format.fprintf ppf "The function %a"
-      (Style.as_inline_code Pprintast.expression) pexp
-  else Format.fprintf ppf "This function"
+  match Typedtree.nominal_exp_doc Printtyp.longident funct with
+  | None -> Fmt.fprintf ppf "This function"
+  | Some name ->
+    Fmt.fprintf ppf "The function %a"
+      (Style.as_inline_code Fmt.pp_doc) name
 
 let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
     ~extra_arg_loc ~returns_unit loc =
@@ -11379,8 +11663,16 @@ let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
      @ It is applied to too many arguments@]"
     report_this_function funct Printtyp.type_expr func_ty
 
+<<<<<<< HEAD
 let report_error ~loc env =
   function
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+let report_error ~loc env = function
+=======
+let msg = Fmt.doc_printf
+
+let report_error ~loc env = function
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Constructor_arity_mismatch(lid, expected, provided) ->
       Location.errorf ~loc
        "@[The constructor %a@ expects %i argument(s),@ \
@@ -11416,28 +11708,35 @@ let report_error ~loc env =
         hint ()
   | Label_mismatch(P record_form, lid, err) ->
       report_unification_error ~loc env err
+<<<<<<< HEAD
         (function ppf ->
            fprintf ppf "The %s field %a@ belongs to the type"
              (record_form_to_string record_form)
              (Style.as_inline_code longident) lid)
         (function ppf ->
            fprintf ppf "but is mixed here with fields of type")
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        (function ppf ->
+           fprintf ppf "The record field %a@ belongs to the type"
+                   (Style.as_inline_code longident) lid)
+        (function ppf ->
+           fprintf ppf "but is mixed here with fields of type")
+=======
+        (msg "The record field %a@ belongs to the type"
+                   (Style.as_inline_code longident) lid)
+        (msg "but is mixed here with fields of type")
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
   | Pattern_type_clash (err, pat) ->
       let diff = type_clash_of_trace err.trace in
       let sub = report_pattern_type_clash_hints pat diff in
       report_unification_error ~loc ~sub env err
-        (function ppf ->
-          fprintf ppf "This pattern matches values of type")
-        (function ppf ->
-          fprintf ppf "but a pattern was expected which matches values of \
-                       type");
+        (msg "This pattern matches values of type")
+        (msg "but a pattern was expected which matches values of type");
   | Or_pattern_type_clash (id, err) ->
       report_unification_error ~loc env err
-        (function ppf ->
-          fprintf ppf "The variable %a on the left-hand side of this \
+        (msg "The variable %a on the left-hand side of this \
                        or-pattern has type" Style.inline_code (Ident.name id))
-        (function ppf ->
-          fprintf ppf "but on the right-hand side it has type")
+        (msg "but on the right-hand side it has type")
   | Multiply_bound_variable name ->
       Location.errorf ~loc
         "Variable %a is bound several times in this matching"
@@ -11457,10 +11756,8 @@ let report_error ~loc env =
       report_unification_error ~loc ~sub env err
         ~type_expected_explanation:
           (report_type_expected_explanation_opt explanation)
-        (function ppf ->
-           fprintf ppf "This expression has type")
-        (function ppf ->
-           fprintf ppf "but an expression was expected of type");
+        (msg "This expression has type")
+        (msg "but an expression was expected of type");
   | Function_arity_type_clash {
       syntactic_arity; type_constraint; trace = { trace };
     } ->
@@ -11562,10 +11859,10 @@ let report_error ~loc env =
               (Style.as_inline_code Printtyp.type_path) type_path;
           end else begin
             fprintf ppf
-              "@[@[<2>%s type@ %a%t@]@ \
+              "@[@[<2>%s type@ %a%a@]@ \
                There is no %s %a within type %a@]"
               eorp (Style.as_inline_code Printtyp.type_expr) ty
-              (report_type_expected_explanation_opt explanation)
+              pp_doc (report_type_expected_explanation_opt explanation)
               (Datatype_kind.label_name kind)
               Style.inline_code name.txt
               (Style.as_inline_code Printtyp.type_path) type_path;
@@ -11577,17 +11874,14 @@ let report_error ~loc env =
       let name = Datatype_kind.label_name kind in
       Location.error_of_printer ~loc (fun ppf () ->
         Printtyp.report_ambiguous_type_error ppf env tp tpl
-          (function ppf ->
-             fprintf ppf "The %s %a@ belongs to the %s type"
+          (msg "The %s %a@ belongs to the %s type"
                name (Style.as_inline_code longident) lid
               type_name)
-          (function ppf ->
-             fprintf ppf "The %s %a@ belongs to one of the following %s types:"
+          (msg "The %s %a@ belongs to one of the following %s types:"
                name (Style.as_inline_code longident) lid type_name)
-          (function ppf ->
-             fprintf ppf "but a %s was expected belonging to the %s type"
+          (msg "but a %s was expected belonging to the %s type"
                name type_name)
-      ) ()
+        ) ()
   | Invalid_format msg ->
       Location.errorf ~loc "%s" msg
   | Not_an_object (ty, explanation) ->
@@ -11595,7 +11889,7 @@ let report_error ~loc env =
       fprintf ppf "This expression is not an object;@ \
                    it has type %a"
         (Style.as_inline_code Printtyp.type_expr) ty;
-      report_type_expected_explanation_opt explanation ppf
+      pp_doc ppf @@ report_type_expected_explanation_opt explanation
     ) ()
   | Non_value_object (err, explanation) ->
     Location.error_of_printer ~loc (fun ppf () ->
@@ -11655,14 +11949,15 @@ let report_error ~loc env =
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
       Location.error_of_printer ~loc (fun ppf () ->
+          let intro =
+            let ty_exp = Printtyp.prepare_expansion ty_exp in
+            doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
+                        it has type"
+              (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
+          in
         Printtyp.report_unification_error ppf env err
-          (function ppf ->
-             let ty_exp = Printtyp.prepare_expansion ty_exp in
-             fprintf ppf "This expression cannot be coerced to type@;<1 2>%a;@ \
-                          it has type"
-             (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp)
-          (function ppf ->
-             fprintf ppf "but is here used with type");
+          intro
+          (Fmt.doc_printf "but is here used with type");
         if b then
           fprintf ppf
             ".@.@[<hov>This simple coercion was not fully general.@ \
@@ -11673,15 +11968,15 @@ let report_error ~loc env =
   | Not_a_function (ty, explanation) ->
       Location.errorf ~loc
         "This expression should not be a function,@ \
-         the expected type is@ %a%t"
+         the expected type is@ %a%a"
         (Style.as_inline_code Printtyp.type_expr) ty
-        (report_type_expected_explanation_opt explanation)
+        pp_doc (report_type_expected_explanation_opt explanation)
   | Too_many_arguments (ty, explanation) ->
       Location.errorf ~loc
         "This function expects too many arguments,@ \
-         it should have type@ %a%t"
+         it should have type@ %a%a"
         (Style.as_inline_code Printtyp.type_expr) ty
-        (report_type_expected_explanation_opt explanation)
+        pp_doc (report_type_expected_explanation_opt explanation)
   | Abstract_wrong_label {got; expected; expected_type; explanation} ->
       let label ~long ppf = function
         | Nolabel -> fprintf ppf "unlabeled"
@@ -11705,10 +12000,18 @@ let report_error ~loc env =
         | _ -> dprintf ""
       in
       Location.errorf ~loc
+<<<<<<< HEAD
         "@[<v>@[<2>This function should have type@ %a%t@]@,\
          @[but its first argument is %a@ instead of %s%a@]%t@]"
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        "@[<v>@[<2>This function should have type@ %a%t@]@,\
+         @[but its first argument is %a@ instead of %s%a@]@]"
+=======
+        "@[<v>@[<2>This function should have type@ %a%a@]@,\
+         @[but its first argument is %a@ instead of %s%a@]@]"
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         (Style.as_inline_code Printtyp.type_expr) expected_type
-        (report_type_expected_explanation_opt explanation)
+        pp_doc (report_type_expected_explanation_opt explanation)
         (label ~long:true) got
         (if second_long then "being " else "")
         (label ~long:second_long) expected
@@ -11742,8 +12045,8 @@ let report_error ~loc env =
         This is only allowed when the real type is known."
   | Less_general (kind, err) ->
       report_unification_error ~loc env err
-        (fun ppf -> fprintf ppf "This %s has type" kind)
-        (fun ppf -> fprintf ppf "which is less general than")
+        (Fmt.doc_printf "This %s has type" kind)
+        (Fmt.doc_printf "which is less general than")
   | Modules_not_allowed ->
       Location.errorf ~loc "Modules are not allowed in this pattern."
   | Cannot_infer_signature ->
@@ -11823,7 +12126,7 @@ let report_error ~loc env =
         "@[%s@ %s@ @[%a@]@]"
         "This match case could not be refuted."
         "Here is an example of a value that would reach it:"
-        (Style.as_inline_code Printpat.pretty_val) pat
+        (Style.as_inline_code Printpat.top_pretty) pat
   | Invalid_extension_constructor_payload ->
       Location.errorf ~loc
         "Invalid %a payload, a constructor is expected."
@@ -11915,22 +12218,16 @@ let report_error ~loc env =
         "This kind of recursive class expression is not allowed"
   | Letop_type_clash(name, err) ->
       report_unification_error ~loc env err
-        (function ppf ->
-          fprintf ppf "The operator %a has type" Style.inline_code name)
-        (function ppf ->
-          fprintf ppf "but it was expected to have type")
+        (msg "The operator %a has type" Style.inline_code name)
+        (msg "but it was expected to have type")
   | Andop_type_clash(name, err) ->
       report_unification_error ~loc env err
-        (function ppf ->
-          fprintf ppf "The operator %a has type" Style.inline_code name)
-        (function ppf ->
-          fprintf ppf "but it was expected to have type")
+        (msg "The operator %a has type" Style.inline_code name)
+        (msg "but it was expected to have type")
   | Bindings_type_clash(err) ->
       report_unification_error ~loc env err
-        (function ppf ->
-          fprintf ppf "These bindings have type")
-        (function ppf ->
-          fprintf ppf "but bindings were expected of type")
+        (Fmt.doc_printf "These bindings have type")
+        (Fmt.doc_printf  "but bindings were expected of type")
   | Unbound_existential (ids, ty) ->
       let pp_ident ppf id = pp_print_string ppf (Ident.name id) in
       let pp_type ppf (ids,ty)=
@@ -11964,8 +12261,9 @@ let report_error ~loc env =
       in
       Location.errorf ~loc
         "This %s should not be a %s,@ \
-         the expected type is@ %a%t"
+         the expected type is@ %a%a"
         ctx sort (Style.as_inline_code Printtyp.type_expr) ty
+<<<<<<< HEAD
         (report_type_expected_explanation_opt explanation)
   | Wrong_expected_record_boxing(ctx, P record_form, ty) ->
       let ctx, explanation =
@@ -11984,6 +12282,13 @@ let report_error ~loc env =
         actual ctx expected (Style.as_inline_code Printtyp.type_expr) ty
         (report_type_expected_explanation_opt explanation)
   | Expr_not_a_record_type (P record_form, ty) ->
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        (report_type_expected_explanation_opt explanation)
+  | Expr_not_a_record_type ty ->
+=======
+        pp_doc (report_type_expected_explanation_opt explanation)
+  | Expr_not_a_record_type ty ->
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
       Location.errorf ~loc
         "This expression has type %a@ \
          which is not a %s type."
@@ -12228,7 +12533,7 @@ let report_error ~loc env =
         Style.inline_code "[%eval: int]"
 
 let report_error ~loc env err =
-  Printtyp.wrap_printing_env_error env
+  Printtyp.wrap_printing_env ~error:true env
     (fun () -> report_error ~loc env err)
 
 let () =

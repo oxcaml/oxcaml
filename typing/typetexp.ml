@@ -1584,9 +1584,10 @@ let transl_type_scheme env styp =
 
 (* Error report *)
 
-open Format
+open Format_doc
 open Printtyp
 module Style = Misc.Style
+<<<<<<< HEAD
 let pp_tag ppf t = Format.fprintf ppf "`%s" t
 
 let report_unbound_variable_reason ppf = function
@@ -1595,6 +1596,13 @@ let report_unbound_variable_reason ppf = function
                    type variables for compatibility with upstream OCaml.\n\
                    Enable non-erasable extensions to disable this check."
   | None -> ()
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+let pp_tag ppf t = Format.fprintf ppf "`%s" t
+
+=======
+let pp_tag ppf t = fprintf ppf "`%s" t
+let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 
 let report_error env ppf =
   function
@@ -1617,21 +1625,19 @@ let report_error env ppf =
       (Style.as_inline_code longident) lid expected provided
   | Bound_type_variable name ->
       fprintf ppf "Already bound type parameter %a"
-        (Style.as_inline_code Pprintast.tyvar) name
+        (Style.as_inline_code Pprintast.Doc.tyvar) name
   | Recursive_type ->
     fprintf ppf "This type is recursive"
   | Type_mismatch trace ->
+      let msg = Format_doc.Doc.msg in
       Printtyp.report_unification_error ppf Env.empty trace
-        (function ppf ->
-           fprintf ppf "This type")
-        (function ppf ->
-           fprintf ppf "should be an instance of type")
+        (msg "This type")
+        (msg "should be an instance of type")
   | Alias_type_mismatch trace ->
+      let msg = Format_doc.Doc.msg in
       Printtyp.report_unification_error ppf Env.empty trace
-        (function ppf ->
-           fprintf ppf "This alias is bound to type")
-        (function ppf ->
-           fprintf ppf "but is used as an instance of type")
+        (msg "This alias is bound to type")
+        (msg "but is used as an instance of type")
   | Present_has_conjunction l ->
       fprintf ppf "The present constructor %a has a conjunctive type"
         Style.inline_code l
@@ -1648,7 +1654,6 @@ let report_error env ppf =
         Style.inline_code ">"
         (Style.as_inline_code pp_tag) l
   | Constructor_mismatch (ty, ty') ->
-      let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty in
       wrap_printing_env ~error:true env (fun ()  ->
         Printtyp.prepare_for_printing [ty; ty'];
         fprintf ppf "@[<hov>%s %a@ %s@ %a@]"
@@ -1678,9 +1683,25 @@ let report_error env ppf =
   | Cannot_quantify (name, reason) ->
       fprintf ppf
         "@[<hov>The universal type variable %a cannot be generalized:@ "
+<<<<<<< HEAD
         (Style.as_inline_code Pprintast.tyvar) name;
       begin match reason with
       | Unified v ->
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+        (Style.as_inline_code Pprintast.tyvar) name;
+      if Btype.is_Tvar v then
+        fprintf ppf "it escapes its scope"
+      else if Btype.is_Tunivar v then
+        fprintf ppf "it is already bound to another variable"
+      else
+=======
+        (Style.as_inline_code Pprintast.Doc.tyvar) name;
+      if Btype.is_Tvar v then
+        fprintf ppf "it escapes its scope"
+      else if Btype.is_Tunivar v then
+        fprintf ppf "it is already bound to another variable"
+      else
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
         fprintf ppf "it is bound to@ %a"
           (Style.as_inline_code Printtyp.type_expr) v;
       | Univar ->

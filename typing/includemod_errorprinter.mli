@@ -13,5 +13,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
+<<<<<<< HEAD
 val err_msgs: Includemod.explanation -> Format.formatter -> unit
+||||||| parent of 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
+val err_msgs: Includemod.explanation -> Format.formatter -> unit
+val coercion_in_package_subtype:
+  Env.t -> Types.module_type -> Typedtree.module_coercion -> Format.formatter ->
+  unit
+=======
+val err_msgs: Includemod.explanation Format_doc.printer
+val coercion_in_package_subtype:
+  Env.t -> Types.module_type -> Typedtree.module_coercion -> Format_doc.doc
+>>>>>>> 1b09b92c85 (Merge pull request #13169 from Octachron/format_doc_for_error_messages)
 val register: unit -> unit
