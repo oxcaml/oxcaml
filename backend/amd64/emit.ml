@@ -1811,7 +1811,6 @@ let emit_instr ~first ~fallthrough i =
   let open Simd_instrs in
   emit_debug_info_linear i;
   match i.desc with
-  | Lend -> ()
   | Lprologue ->
     assert !prologue_required;
     if fp
@@ -2482,7 +2481,6 @@ let emit_all ~first ~fallthrough (body : Linear.instruction_data Oxcaml_utils.Do
   let fallthrough = ref fallthrough in
   DLL.iter body ~f:(fun data ->
     match data.Linear.desc with
-    | Lend -> ()
     | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
     | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
     | Lcondbranch (_, _)

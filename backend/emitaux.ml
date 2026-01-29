@@ -517,7 +517,6 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
   let fs = ref frame_size in
   Oxcaml_utils.Doubly_linked_list.iter fun_body ~f:(fun data ->
       match data.Linear.desc with
-      | Lend -> ()
       | Ladjust_stack_offset { delta_bytes } ->
         fs := !fs + delta_bytes;
         max_fs := max !fs !max_fs

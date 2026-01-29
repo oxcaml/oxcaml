@@ -890,7 +890,6 @@ let num_call_gc_points (body : Linear.instruction_data Oxcaml_utils.Doubly_linke
   let module DLL = Oxcaml_utils.Doubly_linked_list in
   DLL.fold_left body ~init:0 ~f:(fun call_gc data ->
     match data.Linear.desc with
-    | Lend -> call_gc
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> call_gc + 1
     | Lop Poll -> call_gc + 1
     (* The following four should never be seen, since this function is run
@@ -985,7 +984,7 @@ module BR = Branch_relaxation.Make (struct
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
-      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
       | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
       | Lstackcheck _ ->
@@ -1016,7 +1015,6 @@ module BR = Branch_relaxation.Make (struct
 
   let instr_size instr =
     match instr.Linear.desc with
-    | Lend -> 0
     | Lprologue -> prologue_size ()
     | Lepilogue_open -> epilogue_size ()
     | Lepilogue_close -> 0
@@ -1491,7 +1489,6 @@ let emit_static_cast (cast : Cmm.static_cast) i =
 let emit_instr i =
   emit_debug_info i.dbg;
   match i.desc with
-  | Lend -> ()
   | Lprologue ->
     assert !prologue_required;
     let n = frame_size () in
@@ -2108,10 +2105,7 @@ let emit_instr i =
 
 let emit_all (body : Linear.instruction_data Oxcaml_utils.Doubly_linked_list.t) =
   let module DLL = Oxcaml_utils.Doubly_linked_list in
-  DLL.iter body ~f:(fun data ->
-    match data.Linear.desc with
-    | Lend -> ()
-    | _ -> emit_instr data)
+  DLL.iter body ~f:(fun data -> emit_instr data)
 
 (* Emission of a function declaration *)
 

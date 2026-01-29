@@ -36,7 +36,6 @@ type instruction_desc =
        stack pointer and/or CFA will likely cause incorrect results. *)
   | Lepilogue_open
   | Lepilogue_close
-  | Lend
   | Lop of Operation.t
   | Lcall_op of call_operation
   | Lreloadretaddr
@@ -90,8 +89,6 @@ type instruction_data =
 type instruction = instruction_data Oxcaml_utils.Doubly_linked_list.cell
 
 val has_fallthrough : instruction_desc -> bool
-
-val is_end_desc : instruction_desc -> bool
 
 val make_instr_data :
   instruction_desc ->

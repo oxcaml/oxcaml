@@ -74,7 +74,6 @@ let instr_data' ?(print_reg = Printreg.reg) ppf data =
          fprintf ppf ",AA={%a}" (RAS.print ~print_reg:reg) data.available_across;
          fprintf ppf "@]@,"));
   (match data.desc with
-  | Lend -> ()
   | Lprologue -> fprintf ppf "prologue"
   | Lepilogue_open -> fprintf ppf "epilogue_open"
   | Lepilogue_close -> fprintf ppf "epilogue_close"

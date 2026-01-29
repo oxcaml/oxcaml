@@ -33,7 +33,6 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Some cell ->
         let data = DLL.value cell in
         (match data.desc with
-        | Lend -> pc, map
         | Llabel { label = lbl; _ } ->
           Hashtbl.add map lbl (pc, cell);
           fill_map pc (DLL.next cell)
@@ -90,7 +89,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
-      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
       | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
       | Lstackcheck _ ->
@@ -103,7 +102,6 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Some cell ->
         let data = DLL.value cell in
         (match data.desc with
-        | Lend -> did_fix
         | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
         | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
         | Lcondbranch (_, _)
@@ -211,7 +209,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
                 lbl2;
               (* Continue from the current cell since we've modified it *)
               fixup true pc (Some cell)
-            | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+            | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
             | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _
             | Lbranch _ | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _
             | Lraise _ | Lstackcheck _
