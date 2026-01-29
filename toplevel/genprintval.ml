@@ -280,6 +280,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
+      | Univar _ -> Print_as "<univar>"
 
     let outval_of_value max_steps max_depth check_depth env obj ty =
 

@@ -46,6 +46,7 @@ module Sort : sig
   include
     Jkind_intf.Sort
       with type t = Jkind_types.Sort.t
+       and type univar = Jkind_types.Sort.univar
        and type base = Jkind_types.Sort.base
        and type Const.t = Jkind_types.Sort.Const.t
 
@@ -355,6 +356,13 @@ val of_new_legacy_sort :
     Defaulting the sort variable produces exactly the sort [value]. *)
 val of_new_non_float_sort_var :
   why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
+
+(** Create a jkind with a specific sort univar (for layout-polymorphic types).
+*)
+val of_sort_univar :
+  why:History.concrete_creation_reason ->
+  Jkind_types.Sort.univar ->
+  'd Types.jkind
 
 val of_annotation :
   context:('l * allowed) History.annotation_context ->

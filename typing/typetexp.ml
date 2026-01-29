@@ -174,9 +174,6 @@ module TyVarEnv : sig
     poly_univars -> (string * Parsetree.jkind_annotation option) list
   (* something suitable as an argument to [Ttyp_poly] *)
 
-  val ttyp_repr_arg : poly_univars -> string list
-  (* something suitable as an argument to [Ttyp_repr] *)
-
   val make_poly_univars :
     Env.t -> (string Location.loc * Env.stage) list -> poly_univars
   (* a version of [make_poly_univars_jkinds] that doesn't take jkinds *)
@@ -188,9 +185,9 @@ module TyVarEnv : sig
     -> poly_univars
   (* see mli file *)
 
-  val make_repr_univars : (string Location.loc * Env.stage) list -> poly_univars
-  (* similar to make_poly_univars, but works with univars that are layout
-     polymorphic *)
+  val make_repr_univars :
+    (string Location.loc * Env.stage) list
+    -> Jkind_types.Sort.univar list * poly_univars
 
   val check_poly_univars : Env.t -> Location.t -> poly_univars -> type_expr list
   (* see mli file *)
@@ -371,10 +368,6 @@ end = struct
         Jkind.get_annotation pending_univar.jkind_info.original_jkind)
       poly_univars
 
-  let ttyp_repr_arg (poly_univars : poly_univars) = List.map
-      (fun (name, _pending_univar, _stage) -> name)
-      poly_univars
-
   let mk_pending_univar name jkind jkind_info =
     { univar = newvar ~name jkind; associated = []; jkind_info }
 
@@ -406,16 +399,6 @@ end = struct
     in
     name, mk_pending_univar name original_jkind jkind_info, stage
 
-  let mk_repr_univars_tuple (var, stage) =
-    let name = var.txt in
-    let original_jkind =
-      Jkind.of_new_sort ~why:Layout_poly ~level:Btype.generic_level
-    in
-    let jkind_info =
-      { original_jkind; defaulted = true }
-    in
-    name, mk_pending_univar name original_jkind jkind_info, stage
-
   let make_poly_univars env vars =
     List.map (mk_poly_univars_tuple_without_jkind env) vars
 
@@ -426,8 +409,17 @@ end = struct
     in
     List.map mk_trip vars_jkinds
 
-  let make_repr_univars vars =
-    List.map mk_repr_univars_tuple vars
+  let make_repr_univars vars_with_stage =
+    let sort_vars = List.map (fun (var, _stage) ->
+      Jkind_types.Sort.{ name = Some var.txt }
+    ) vars_with_stage in
+    let poly_univars = List.map2 (fun (var, stage) svar ->
+      let name = var.txt in
+      let original_jkind = Jkind.of_sort_univar ~why:Layout_poly svar in
+      let jkind_info = { original_jkind; defaulted = true } in
+      name, mk_pending_univar name original_jkind jkind_info, stage
+    ) vars_with_stage sort_vars in
+    sort_vars, poly_univars
 
   let promote_generics_to_univars promoted vars =
       List.fold_left
@@ -822,12 +814,9 @@ let jkind_of_annotation annotation_context attrs jkind =
 
 (* translate the ['a 'b ('c : immediate) .] part of a polytype,
    returning a [poly_univars] *)
-let transl_bound_poly_vars env vars_jkinds =
+let transl_bound_vars env vars_jkinds =
   TyVarEnv.make_poly_univars_jkinds env
     ~context:(fun v -> Univar ("'" ^ v)) vars_jkinds
-
-let transl_bound_repr_vars vars =
-  TyVarEnv.make_repr_univars vars
 
 (* Forward declaration (set in Typemod.type_open) *)
 let type_open :
@@ -1163,8 +1152,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp desc typ
   | Ptyp_repr(vars, st) ->
-      Language_extension.assert_enabled ~loc Layout_poly
-        Language_extension.Alpha;
       let desc, typ =
         transl_type_repr env ~policy ~row_context mode styp.ptyp_loc
           vars st
@@ -1274,7 +1261,7 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
   let typed_vars, new_univars, cty =
     with_local_level begin fun () ->
       let vars = List.map (fun (n, v) -> (n, v, Env.stage env)) vars in
-      let new_univars = transl_bound_poly_vars env vars in
+      let new_univars = transl_bound_vars env vars in
       let typed_vars = TyVarEnv.ttyp_poly_arg new_univars in
       let cty = TyVarEnv.with_univars new_univars begin fun () ->
         transl_type env ~policy ~row_context mode st
@@ -1291,23 +1278,24 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
   Ttyp_poly (typed_vars, cty), ty'
 
 and transl_type_repr env ~policy ~row_context mode loc vars st =
-  let typed_vars, new_univars, cty =
+  let sort_vars, new_univars, cty =
     with_local_level begin fun () ->
-      let vars = List.map (fun n -> (n, Env.stage env)) vars in
-      let new_univars = transl_bound_repr_vars vars in
-      let typed_vars = TyVarEnv.ttyp_repr_arg new_univars in
+      let vars_with_stage = List.map (fun var -> var, Env.stage env) vars in
+      let sort_vars, new_univars = TyVarEnv.make_repr_univars vars_with_stage in
       let cty = TyVarEnv.with_univars new_univars begin fun () ->
         transl_type env ~policy ~row_context mode st
       end in
-      (typed_vars, new_univars, cty)
+      (sort_vars, new_univars, cty)
     end
-      ~post:(fun (_,_,cty) -> generalize_ctyp cty)
+      ~post:(fun (_, _, cty) -> generalize_ctyp cty)
   in
   let ty = cty.ctyp_type in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
   let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
-  let ty' = Btype.newgenty (Trepr(ty, ty_list)) in
-  Ttyp_repr (typed_vars, cty), ty'
+  let ty_poly = Btype.newgenty (Tpoly(ty, ty_list)) in
+  let ty' = Btype.newgenty (Trepr(ty_poly, sort_vars)) in
+  unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
+  Ttyp_repr (List.map (fun v -> v.txt) vars, cty), ty'
 
 and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
       jkind_annot_opt =
@@ -1605,7 +1593,7 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
     with_local_level begin fun () ->
       TyVarEnv.reset ();
       let vars = List.map (fun (n, jkind) -> (n, jkind, Env.stage env)) vars in
-      let univars = transl_bound_poly_vars env vars in
+      let univars = transl_bound_vars env vars in
       let typed_vars = TyVarEnv.ttyp_poly_arg univars in
       let typ =
         if Language_extension.erasable_extensions_only () then

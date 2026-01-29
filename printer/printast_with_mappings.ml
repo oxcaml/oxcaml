@@ -273,7 +273,7 @@ and typevar i ppf (s, jkind) =
   jkind_annotation_opt (i+1) ppf jkind
 
 and reprvar i ppf s =
-  line i ppf "sort var: %s\n" s.txt
+  line i ppf "var: %s\n" s.txt
 
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident_loc s;

@@ -87,6 +87,7 @@ module Layout = struct
     let rec of_sort_const : Sort.Const.t -> t = function
       | Base b -> Base b
       | Product consts -> Product (List.map of_sort_const consts)
+      | Univar uv -> Univar uv
 
     let to_string t =
       let rec to_string nested (t : t) =
@@ -98,6 +99,8 @@ module Layout = struct
             [ (if nested then "(" else "");
               String.concat " & " (List.map (to_string true) ts);
               (if nested then ")" else "") ]
+        | Univar { name = Some n } -> n
+        | Univar { name = None } -> "_"
       in
       to_string false t
 
@@ -139,6 +142,8 @@ module Layout = struct
         Sort (Base b)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
       | Product sorts -> Product (List.map flatten_sort sorts)
+      | Univar _ ->
+        Misc.fatal_error "Layout.get: unexpected univar in flatten_sort"
     in
     function
     | Any -> Any
@@ -1413,6 +1418,7 @@ module Const = struct
       | Base Value, Non_null
       | Base Value, Maybe_null ->
         Stable
+      | Univar _, _ -> Alpha
       | Product layouts, _ ->
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
@@ -1510,6 +1516,16 @@ module Jkind_desc = struct
       },
       sort )
 
+  let of_sort_univar univar =
+    let layout = Layout.Sort (Sort.Univar univar) in
+    { layout;
+      mod_bounds =
+        Mod_bounds.max
+        |> Mod_bounds.set_nullability Maybe_null
+        |> Mod_bounds.set_separability Maybe_separable;
+      with_bounds = No_with_bounds
+    }
+
   let get t = Layout_and_axes.map Layout.get t
 
   module Debug_printers = struct
@@ -1548,6 +1564,10 @@ let of_new_non_float_sort_var ~why ~level =
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_legacy_sort ~why ~level = fst (of_new_legacy_sort_var ~why ~level)
+
+let of_sort_univar ~why univar =
+  let jkind = Jkind_desc.of_sort_univar univar in
+  fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why)
 
 let of_annotated_const ~context ~annotation ~const ~const_loc =
   let context = Context_with_transl.get_context context in
@@ -1927,6 +1947,7 @@ let decompose_product ({ jkind; _ } as jk) =
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
     | Product sorts -> Some (List.map (fun sort -> mk_jkind (Sort sort)) sorts)
+    | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
   match jkind.layout with
   | Any -> None

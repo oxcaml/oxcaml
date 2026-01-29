@@ -729,10 +729,16 @@ and raw_type_desc ppf = function
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
         raw_type_list tl
-  | Trepr (t, tl) ->
-      fprintf ppf "@[<hov1>Trepr(@,%a,@,%a)@]"
+  | Trepr (t, sort_vars) ->
+      let print_sort_univar ppf (uv : Jkind_types.Sort.univar) =
+        match uv.name with
+        | Some n -> fprintf ppf "%s" n
+        | None -> fprintf ppf "_"
+      in
+      fprintf ppf "@[<hov1>Trepr(@,%a,@,[@[%a@]])@]"
         raw_type t
-        raw_type_list tl
+        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+          print_sort_univar) sort_vars
   | Tvariant row ->
     raw_row_desc ppf row
   | Tpackage (p, fl) ->
@@ -1349,7 +1355,7 @@ let rec mark_loops_rec visited ty =
             visited_objects := px :: !visited_objects;
           printer_iter_type_expr (mark_loops_rec visited) ty
         end
-    | Tpoly(ty, tyl) | Trepr(ty, tyl) ->
+    | Tpoly(ty, tyl) ->
         List.iter add_alias tyl;
         mark_loops_rec visited ty
     | _ ->
@@ -1627,7 +1633,7 @@ let rec tree_of_modal_typexp mode modal ty =
         fatal_error "Printtyp.tree_of_typexp"
     | Tpoly (ty, []) | Trepr (ty, []) ->
         tree_of_typexp mode alloc_mode ty
-    | Tpoly (ty, tyl) | Trepr (ty, tyl) ->
+    | Tpoly (ty, tyl) ->
         (*let print_names () =
           List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
           prerr_string "; " in *)
@@ -1637,16 +1643,52 @@ let rec tree_of_modal_typexp mode modal ty =
            printed once when used as proxy *)
         List.iter add_delayed tyl;
         let tl = tree_of_qtvs tyl in
-        let tr =
-          (match tty.desc with
-           | Tpoly _ -> Otyp_poly (tl, tree_of_typexp mode alloc_mode ty)
-           | Trepr _ -> Otyp_repr (List.map (fun (s, _jk) -> s) tl,
-                                   tree_of_typexp mode alloc_mode ty)
-           | _ -> assert false)
-        in
+        let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
         (* Forget names when we leave scope *)
         Names.remove_names tyl;
         delayed := old_delayed; tr
+    | Trepr (ty, sort_vars) ->
+        (* Trepr wraps a Tpoly that contains the type variables
+           corresponding to the sort variables. Extract them and print. *)
+        (match get_desc ty with
+         | Tpoly (inner_ty, tyl) when tyl <> [] ->
+             (* Check that the sort_vars match the jkinds of tyl *)
+             let sorts_match =
+               match
+                 List.for_all2
+                   (fun sort_var ty ->
+                     match get_desc ty with
+                     | Tunivar { jkind } ->
+                       (match Jkind.get_layout jkind with
+                        | Some layout ->
+                          (match Jkind.Layout.Const.get_sort layout with
+                           | Some (Jkind.Sort.Const.Univar uv) ->
+                             uv == sort_var
+                           | _ -> false)
+                        | None -> false)
+                     | _ -> false)
+                   sort_vars tyl
+               with
+               | result -> result
+               | exception Invalid_argument _ -> false
+             in
+             if sorts_match then begin
+               let tyl = List.map Transient_expr.repr tyl in
+               let old_delayed = !delayed in
+               List.iter add_delayed tyl;
+               let sort_names = tree_of_qsvs tyl in
+               let tr =
+                Otyp_repr (sort_names, tree_of_typexp mode alloc_mode inner_ty)
+              in
+               Names.remove_names tyl;
+               delayed := old_delayed;
+               tr
+             end else
+               (* Mismatch: print Trepr and Tpoly separately *)
+               tree_of_typexp mode alloc_mode ty
+         | _ ->
+             (* No type variables, just print the body *)
+             tree_of_typexp mode alloc_mode ty)
     | Tunivar _ ->
         Otyp_var (false, Names.name_of_type Names.new_name tty)
     | Tpackage (p, fl) ->
@@ -1701,6 +1743,18 @@ and tree_of_qtvs qtvs =
     | _ -> None
   in
   List.filter_map tree_of_qtv qtvs
+
+(* qsvs = quantified sort variables (for Trepr) *)
+(* Extract names from type variables corresponding to sort variables *)
+and tree_of_qsvs qtvs =
+  List.filter_map
+    (fun v ->
+      match v.desc with
+      | Tvar _ when v.level = generic_level ->
+        Some (Names.name_of_type Names.new_name v)
+      | Tunivar _ -> Some (Names.name_of_type Names.new_name v)
+      | _ -> None)
+    qtvs
 
 and tree_of_row_field (l, f) =
   match row_field_repr f with
