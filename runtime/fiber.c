@@ -291,8 +291,8 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
 
 static struct stack_info*
 alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
-                             value hexn, value heff, value dyn, value val,
-                             int64_t id)
+                             value hexn, value heff, value htick,
+                             value dyn, value val, int64_t id)
 {
   struct stack_info* stack;
   struct stack_cache* caches = Caml_state->stack_caches;
@@ -340,7 +340,9 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   hand->handle_value = hval;
   hand->handle_exn = hexn;
   hand->handle_effect = heff;
+  hand->handle_tick = htick;
   hand->parent = NULL;
+  hand->preemptible_child = NULL;
   stack->sp = Stack_high(stack);
   stack->exception_ptr = NULL;
   stack->id = id;
@@ -368,7 +370,7 @@ caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff,
 {
   int cache_bucket = stack_cache_bucket (wosize);
   return alloc_size_class_stack_noexc(wosize, cache_bucket, hval, hexn, heff,
-                                      dyn, val, id);
+                                      Val_unit, dyn, val, id);
 }
 
 #ifdef NATIVE_CODE
@@ -377,7 +379,7 @@ value caml_alloc_stack_bind (value hval, value hexn, value heff, value dyn, valu
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, dyn, val, id);
+                                 hval, hexn, heff, Val_unit, dyn, val, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -394,6 +396,33 @@ value caml_alloc_stack_bind (value hval, value hexn, value heff, value dyn, valu
 
 value caml_alloc_stack (value hval, value hexn, value heff) {
   return caml_alloc_stack_bind(hval, hexn, heff, Val_null, Val_null);
+}
+
+value caml_alloc_stack_bind_preemptible(value hval, value hexn, value heff,
+                                        value htick, value dyn,
+                                        value val) {
+  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  struct stack_info* stack =
+    alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
+                                 hval, hexn, heff, htick, dyn, val, id);
+
+  if (!stack)
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+    caml_raise_out_of_fibers();
+#else
+    caml_raise_out_of_memory();
+#endif
+
+  fiber_debug_log ("Allocate stack=%p of %" ARCH_INTNAT_PRINTF_FORMAT
+                     "u words", stack, caml_fiber_wsz);
+
+  return Val_ptr(stack);
+}
+
+value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
+                                   value htick) {
+  return caml_alloc_stack_bind_preemptible(hval, hexn, heff, htick,
+                                           Val_null, Val_null);
 }
 
 
@@ -657,6 +686,17 @@ void caml_scan_stack(
   }
 }
 
+void caml_ensure_gc_regs(void)
+{
+  if (Caml_state->gc_regs_buckets == NULL) {
+    /* Ensure there is at least one gc_regs bucket available before
+       running any OCaml code. See fiber.h for documentation. */
+    value* bucket = caml_stat_alloc(sizeof(value) * Wosize_gc_regs);
+    bucket[0] = 0; /* no next bucket */
+    Caml_state->gc_regs_buckets = bucket;
+  }
+}
+
 void caml_maybe_expand_stack (void)
 {
   struct stack_info* stk = Caml_state->current_stack;
@@ -673,13 +713,7 @@ void caml_maybe_expand_stack (void)
     }
   }
 
-  if (Caml_state->gc_regs_buckets == NULL) {
-    /* Ensure there is at least one gc_regs bucket available before
-       running any OCaml code. See fiber.h for documentation. */
-    value* bucket = caml_stat_alloc(sizeof(value) * Wosize_gc_regs);
-    bucket[0] = 0; /* no next bucket */
-    Caml_state->gc_regs_buckets = bucket;
-  }
+  caml_ensure_gc_regs();
 }
 
 #else /* End NATIVE_CODE, begin BYTE_CODE */
@@ -693,7 +727,7 @@ CAMLprim value caml_alloc_stack_bind(value hval, value hexn, value heff,
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, dyn, val, id);
+                                 hval, hexn, heff, Val_unit, dyn, val, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -714,6 +748,39 @@ CAMLprim value caml_alloc_stack_bind(value hval, value hexn, value heff,
 CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
 {
   return caml_alloc_stack_bind(hval, hexn, heff, Val_null, Val_null);
+}
+
+CAMLprim value caml_alloc_stack_bind_preemptible(value hval, value hexn,
+                                                 value heff, value htick,
+                                                 value dyn, value val)
+{
+  value* sp;
+  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  struct stack_info* stack =
+    alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
+                                 hval, hexn, heff, htick, dyn, val, id);
+
+  if (!stack)
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+    caml_raise_out_of_fibers();
+#else
+    caml_raise_out_of_memory();
+#endif
+
+  sp = Stack_high(stack);
+  sp -= 1;
+  sp[0] = Val_long(1);
+
+  stack->sp = sp;
+
+  return Val_ptr(stack);
+}
+
+CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
+                                            value htick)
+{
+  return caml_alloc_stack_bind_preemptible(hval, hexn, heff, htick,
+                                           Val_null, Val_null);
 }
 
 CAMLprim value caml_ensure_stack_capacity(value required_space)
@@ -1145,6 +1212,9 @@ void caml_free_gc_regs_buckets(value *gc_regs_buckets)
   }
 }
 
+static void assert_is_cont(value cont) {
+  CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
+}
 
 CAMLprim value caml_continuation_use_noexc (value cont)
 {
@@ -1154,7 +1224,7 @@ CAMLprim value caml_continuation_use_noexc (value cont)
 
   fiber_debug_log("cont: is_block(%d) tag_val(%ul) is_young(%d)",
                   Is_block(cont), Tag_val(cont), Is_young(cont));
-  CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
+  assert_is_cont(cont);
 
   /* this forms a barrier between execution and any other domains
      that might be marking this continuation */
@@ -1183,8 +1253,23 @@ CAMLprim value caml_continuation_use (value cont)
   return v;
 }
 
+bool caml_continuation_is_preemption(value cont) {
+  assert_is_cont(cont);
+  return Wosize_val(cont) == 3;
+}
+
+value* caml_continuation_gc_regs(value cont) {
+  assert_is_cont(cont);
+  if (caml_continuation_is_preemption(cont)) {
+    return (value*)Field(cont, 2);
+  } else {
+    return NULL;
+  }
+}
+
 void caml_continuation_replace(value cont, struct stack_info* stk)
 {
+  assert_is_cont(cont);
   value n = Val_ptr(NULL);
   int b = atomic_compare_exchange_strong(Op_atomic_val(cont), &n, Val_ptr(stk));
   CAMLassert(b);
@@ -1239,6 +1324,22 @@ static const value * cache_named_exception(const value * _Atomic * cache,
   return exn;
 }
 
+static const value * cache_named_effect(const value * _Atomic * cache,
+                                        const char * name)
+{
+  const value * exn;
+  exn = atomic_load_acquire(cache);
+  if (exn == NULL) {
+    exn = caml_named_value(name);
+    if (exn == NULL) {
+      fprintf(stderr, "Fatal error: effect %s\n", name);
+      exit(2);
+    }
+    atomic_store_release(cache, exn);
+  }
+  return exn;
+}
+
 CAMLexport void caml_raise_continuation_already_resumed(void)
 {
   const value * exn =
@@ -1262,6 +1363,15 @@ value caml_make_unhandled_effect_exn (value effect)
 CAMLexport void caml_raise_unhandled_effect (value effect)
 {
   caml_raise(caml_make_unhandled_effect_exn(effect));
+}
+
+static const value * _Atomic caml_preemption_effect = NULL;
+
+CAMLexport value caml_get_preemption_effect(void) {
+  CAMLparam0();
+  const value *eff =
+    cache_named_effect(&caml_preemption_effect, "Effect.Preemption");
+  CAMLreturn(*eff);
 }
 
 /**** Dynamic Binding ****/

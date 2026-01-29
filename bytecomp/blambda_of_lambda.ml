@@ -418,6 +418,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Presume -> context_switch Resume ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
     | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
+    | Pwith_stack_preemptible -> context_switch With_stack_preemptible ~arity:6
+    | Pwith_stack_bind_preemptible ->
+      context_switch With_stack_bind_preemptible ~arity:8
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
       (* Use a dummy initializer to implement the "uninitialized" primitive *)

@@ -21,6 +21,7 @@
 
 #ifdef CAML_INTERNALS
 
+#include <stdbool.h>
 #include "misc.h"
 #include "mlvalues.h"
 #include "roots.h"
@@ -33,7 +34,11 @@ struct stack_handler {
   value handle_value;
   value handle_exn;
   value handle_effect;
+  value handle_tick; /* tick handler callback, Val_unit if not preemptible */
   struct stack_info* parent; /* parent OCaml stack if any */
+  /* Next /preemptible* descendant fiber, if any. May not be the immediate child
+     fiber. */
+  struct stack_info* preemptible_child;
 };
 
 /* stack_info describes the OCaml stack. It is used for:
@@ -90,6 +95,7 @@ struct stack_info {
 #define Stack_handle_value(stk) (stk)->handler->handle_value
 #define Stack_handle_exception(stk) (stk)->handler->handle_exn
 #define Stack_handle_effect(stk) (stk)->handler->handle_effect
+#define Stack_handle_tick(stk) (stk)->handler->handle_tick
 #define Stack_parent(stk) (stk)->handler->parent
 
 /* Stack layout for native code. Stack grows downwards.
@@ -308,6 +314,11 @@ void caml_scan_stack(
 value caml_alloc_stack(value hval, value hexn, value heff);
 value caml_alloc_stack_bind(value hval, value hexn, value heff, value dyn,
                             value bind);
+value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
+                                   value htick);
+value caml_alloc_stack_bind_preemptible(value hval, value hexn, value heff,
+                                        value htick, value dyn,
+                                        value bind);
 struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
                                           value hexn, value heff,
                                           value dyn, value bind,
@@ -352,6 +363,14 @@ value caml_continuation_use (value cont);
    between continuation_use and continuation_replace.
    Used for cloning continuations and continuation backtraces. */
 void caml_continuation_replace(value cont, struct stack_info* stack);
+
+/* Returns 1 if the given continuation has a gc_regs, marking it as a
+   preemption */
+bool caml_continuation_is_preemption(value cont);
+
+/* If the given continuation is a preeempted continuation, returns a pointer to
+   its [gc_regs] struct, or NULL otherwise */
+value* caml_continuation_gc_regs(value cont);
 
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 

@@ -961,8 +961,9 @@ static void verify_object(struct heap_verify_state* st, value v) {
 
   if (Tag_val(v) == Cont_tag) {
     struct stack_info* stk = Ptr_val(Field(v, 0));
+    value *gc_regs = caml_continuation_gc_regs(v);
     if (stk != NULL)
-      caml_scan_stack(verify_push, verify_scanning_flags, st, stk, 0);
+      caml_scan_stack(verify_push, verify_scanning_flags, st, stk, gc_regs);
   } else if (Scannable_val(v)) {
     int i = 0;
     if (Tag_val(v) == Closure_tag) {
@@ -1145,9 +1146,11 @@ static void compact_update_block(header_t* p)
   CAMLassert(tag != Infix_tag);
 
   if (tag == Cont_tag) {
-    value stk = Field(Val_hp(p), 0);
+    value v = Val_hp(p);
+    value stk = Field(v, 0);
     if (Ptr_val(stk)) {
-      caml_scan_stack(&compact_update_value, 0, NULL, Ptr_val(stk), 0);
+      value *gc_regs = caml_continuation_gc_regs(v);
+      caml_scan_stack(&compact_update_value, 0, NULL, Ptr_val(stk), gc_regs);
     }
   } else {
     uintnat offset = 0;

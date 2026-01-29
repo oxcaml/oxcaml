@@ -142,8 +142,8 @@ void caml_set_minor_heap_size (asize_t wsize)
 
   if (domain_state->young_ptr != domain_state->young_end) {
     CAML_EV_COUNTER (EV_C_FORCE_MINOR_SET_MINOR_HEAP_SIZE, 1);
-    // Don't call caml_minor_collection, since that can run the
-    // caml_domain_external_interrupt_hook, which can allocate.
+    // Don't call caml_minor_collection, since that can run tick hooks, which
+    // can allocate.
     caml_empty_minor_heaps_once();
   }
   CAMLassert (domain_state->young_ptr == domain_state->young_end);
@@ -382,13 +382,19 @@ tail_call:
 
     if (result) {
       if (tag == Cont_tag) {
+        value *gc_regs = 0;
         CAMLassert(infix_offset == 0);
-        CAMLassert(sz == 2);
+        CAMLassert(sz == 2 || sz == 3);
         struct stack_info* stk = Ptr_val(field0);
         Field(result, 0) = field0;
         Field(result, 1) = Field(v, 1);
+        if (sz == 3) {
+          Field(result, 2) = Field(v, 2);
+          gc_regs = (value *)(Field(result, 2));
+        }
         if (stk != NULL) {
-          caml_scan_stack(&oldify_one, oldify_scanning_flags, st, stk, 0);
+          caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
+                          stk, gc_regs);
         }
       } else if (!Scannable_tag(tag)) {
         CAMLassert (infix_offset == 0);
@@ -1127,7 +1133,8 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
     if (flags & CAML_FROM_CAML)
       /* In the case of allocations performed from OCaml, execute
          asynchronous callbacks. */
-      (void) caml_raise_async_if_exception(caml_do_pending_actions_exn(),
+      (void) caml_raise_async_if_exception(
+         caml_do_pending_actions_flags_exn(flags),
         "minor GC");
     else {
       /* In the case of allocations performed from C, only perform
@@ -1144,6 +1151,25 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
        callbacks. */
     CAML_EV_COUNTER(EV_C_FORCE_MINOR_ALLOC_SMALL, 1);
     caml_poll_gc_work();
+  }
+
+  /* If we're about to preempt, we return early. This importantly:
+
+     - Skips redoing the allocation. When we return back into user code, it'll
+       be in the effect handler for the preemption, not the code that just
+       allocated, and we don't want to leave dead bits of minor heap around
+       where nobody's going to initialize it. When the preempted continuation is
+       resumed, it'll handle redoing the allocation by calling
+       [caml_redo_preempted_allocation].
+     - Skips memprof, for the same reason
+
+     Note: This only applies to native OCaml allocations (CAML_FROM_CAML).
+     For C allocations, we must complete the allocation since the caller
+     expects young_ptr to point to valid allocated space (and won't actually
+     trigger a preemption before using it).
+  */
+  if ((flags & CAML_FROM_CAML) && Is_block(Caml_state->preemption)) {
+    return;
   }
 
   /* Re-do the allocation: we now have enough space in the minor heap. */
