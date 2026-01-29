@@ -2261,12 +2261,12 @@ let check_unboxed_paths decls ~unboxed_version_banned =
     in
     List.iter (fun (_, d) -> check_decl d) decls)
 
-let check_flatten_floats_attribute decls =
+let check_flatten_floats_attribute sdecl_list decls =
   let has_float_boxed shape =
     Array.exists (function Types.Float_boxed -> true | _ -> false) shape
   in
-  List.iter
-    (fun (_, decl) ->
+  List.iter2
+    (fun sdecl (_, decl) ->
       match decl.type_kind with
       | Type_record (_, rep, _) ->
         let needs_attribute = match rep with
@@ -2276,11 +2276,11 @@ let check_flatten_floats_attribute decls =
           | Record_inlined _ -> false
         in
         if needs_attribute &&
-           not (Builtin_attributes.has_flatten_floats decl.type_attributes)
+           not (Builtin_attributes.has_flatten_floats sdecl.ptype_attributes)
         then
           raise (Error (decl.type_loc, Missing_flatten_floats_attribute))
       | _ -> ())
-    decls
+    sdecl_list decls
 
 (* Note: Well-foundedness for OCaml types
 
@@ -3104,7 +3104,7 @@ let transl_type_decl env rec_flag sdecl_list =
       if not (Path.Set.is_empty removed) then
         check_unboxed_paths decls
           ~unboxed_version_banned:(fun p -> Path.Set.mem p removed);
-      check_flatten_floats_attribute decls;
+      check_flatten_floats_attribute sdecl_list decls;
       new_env, update_decls_jkind_reason new_env decls
     with
     | Typedecl_variance.Error (loc, err) ->
