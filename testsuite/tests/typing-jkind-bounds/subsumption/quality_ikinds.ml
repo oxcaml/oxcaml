@@ -403,7 +403,6 @@ module M : sig
 end = struct
   type t
 end
-(* CR layouts v2.8: This should not be accepted. Internal ticket 4973 *)
 [%%expect {|
 type gadt = Foo : int -> gadt
 Line 3, characters 2-37:
@@ -493,8 +492,6 @@ end = struct
   type a = { foo : ('a : value). 'a }
   type t
 end
-(* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
-   rejected. Internal ticket 5746. *)
 [%%expect {|
 Line 3, characters 2-37:
 3 |   type t : value mod contended with a
@@ -512,8 +509,6 @@ end = struct
   type a = { foo : ('a : value). 'a } [@@unboxed]
   type t
 end
-(* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
-   rejected. Internal ticket 5746. *)
 [%%expect {|
 Line 3, characters 2-37:
 3 |   type t : value mod contended with a
