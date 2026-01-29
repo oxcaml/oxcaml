@@ -112,7 +112,7 @@ let partition_files ~threshold file_sizes =
                 }));
       (* Check if adding this file would exceed the threshold *)
       let new_size = Int64.add current_size entry_size in
-      if new_size > threshold && current_partition <> []
+      if new_size > threshold
       then
         (* Start a new partition *)
         let partitions = List.rev current_partition :: partitions in
