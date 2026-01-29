@@ -1182,7 +1182,7 @@ end = struct
       then t1
       else if Transform.same_vars tr1 tr2
       then Transform (Transform.flatten tr1 tr2)
-      else Join (Join.trs tr1 tr2)
+      else bounded_join (fun () -> Join.trs tr1 tr2)
     | (Top w as top), Transform tr | Transform tr, (Top w as top) ->
       (* [has_witnesses]: Don't simplify (join Top x) to x if there are any
          witnesses in x. This makes the analysis more expensive because symbolic
