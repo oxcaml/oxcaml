@@ -522,6 +522,7 @@ type t = int list list list list
 
 (***********************************************************************)
 type t : immutable_data = int list list list list list list list list list list list list list list list list list list list list list list list list
+(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 0-149:
 1 | type t : immutable_data = int list list list list list list list list list list list list list list list list list list list list list list list list
@@ -550,6 +551,7 @@ type t =
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
+(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
@@ -595,6 +597,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 (***********************************************************************)
 type 'a t : immutable_data = Flat | Nested of 'a t t
+(* CR layouts v2.8: This should work once we get proper subsumption. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 0-52:
 1 | type 'a t : immutable_data = Flat | Nested of 'a t t
@@ -608,6 +611,7 @@ Error: The kind of type "t" is immutable_data with 'a t t
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
+(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
@@ -625,7 +629,7 @@ Error: This value is "aliased" but is expected to be "unique".
 
 (***********************************************************************)
 type ('a : immutable_data) t = Flat | Nested of 'a t t
-(* CR layouts v2.8: fix immutable_data constraint handling. *)
+(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 0-54:
 1 | type ('a : immutable_data) t = Flat | Nested of 'a t t
@@ -638,6 +642,9 @@ Error:
 |}]
 
 type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
+(* CR layouts v2.8: This should work once we get proper subsumption. Internal ticket 4770 *)
+(* CR layouts v2.8: If we can't get this accepted, investigate the terrible
+   /2 stuff in the error message. That scares me a bit. *)
 [%%expect {|
 Line 1, characters 0-71:
 1 | type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
@@ -651,6 +658,7 @@ Error: The kind of type "t" is immutable_data with 'a t/2 t/2
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
+(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
@@ -659,6 +667,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
+(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
@@ -724,6 +733,7 @@ type 'a t = None | Some of ('a * 'a) t u
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
+(* CR layouts v2.8: this should work when we get tuples working. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
@@ -764,6 +774,8 @@ Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
+(* CR layouts v2.8: this should work, but the recursive expansion
+   of with-bounds presumably runs out of fuel and gives up. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
@@ -779,7 +791,6 @@ Line 1, characters 56-57:
                                                             ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
-
 
 let foo (t : int t @ aliased) = use_unique t
 [%%expect {|
@@ -798,6 +809,7 @@ type 'a t = Leaf of 'a | Some of ('a * 'a) t
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
+(* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
