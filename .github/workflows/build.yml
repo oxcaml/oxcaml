@@ -40,7 +40,9 @@ jobs:
             config: --disable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 dev custom-install-path (x86_64-linux)
+          # We use a custom install prefix for this workflow.
+          # Consider renaming it to indicate as such when convenient.
+          - name: runtime5 dev (x86_64-linux)
             config: --enable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
             install_path: _custom_install
