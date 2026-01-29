@@ -136,7 +136,7 @@ Error: Signature mismatch:
          val x : ('a. 'a -> unit) -> unit
        The type "((repr_ 'a). 'a -> unit) -> unit"
        is not compatible with the type "('a. 'a -> unit) -> unit"
-       Type "(repr_ 'a). 'a -> unit" is not compatible with type "'a. 'a -> unit"
+       Type "(repr_ 'a). 'a -> unit" is not compatible with type "'a -> unit"
 |}]
 
 (** Is alpha-conversion performed? *)
@@ -149,6 +149,27 @@ module Test_3 :
     sig val f : (repr_ 'b). 'b -> unit end
 |}]
 
+module Test_3'' (X : sig val f : (repr_ 'a). 'a -> unit end)
+  : sig val f : (repr_ 'b). 'b -> 'b end
+  = X
+[%%expect {|
+Line 3, characters 4-5:
+3 |   = X
+        ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : (repr_ 'a). 'a -> unit end
+       is not included in
+         sig val f : (repr_ 'b). 'b -> 'b end
+       Values do not match:
+         val f : (repr_ 'a). 'a -> unit
+       is not included in
+         val f : (repr_ 'b). 'b -> 'b
+       The type "(repr_ 'a). 'a -> unit" is not compatible with the type
+         "(repr_ 'b). 'b -> 'b"
+       Type "unit" is not compatible with type "'b"
+|}]
+
 (** Test alpha conversion for multiple variables. *)
 module Test_3' (X : sig val f : (repr_ 'a) (repr_ 'b). 'a -> 'b end)
   : sig val f : (repr_ 'c) (repr_ 'd). 'c -> 'd end
@@ -159,6 +180,7 @@ module Test_3' :
     sig val f : (repr_ 'c) (repr_ 'd). 'c -> 'd end
 |}]
 
+(* CR-someday zqian: we might wanna support this via coercion *)
 (** [repr_]-bound type variable subtyping is handled reasonably. *)
 module Test_4 (X : sig val f : (repr_ 'a). 'a -> unit end)
   : sig val f : (repr_ 'b). ('b -> 'b) -> unit end

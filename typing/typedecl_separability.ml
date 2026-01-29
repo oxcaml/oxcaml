@@ -152,7 +152,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []
   | Tpoly (pty, _) -> [pty]
-  | Trepr (_, _) -> []
+  | Trepr (_, _) -> Misc.fatal_error "immediate_subtypes: Trepr"
   | Tconstr (_path, tys, _) -> tys
 
 and immediate_subtypes_object_row acc ty = match get_desc ty with

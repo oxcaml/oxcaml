@@ -217,6 +217,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
     | Void -> Product [||])
+  | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
 
 let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
@@ -392,6 +393,7 @@ let rec layout_to_unknown_shape (ly : Layout.t) : t =
     match RS.Runtime_layout.of_base_layout b with
     | Other runtime_layout -> runtime (RS.unknown runtime_layout)
     | Void -> void)
+  | Univar _ -> Misc.fatal_error "layout_to_unknown_shape: Univar"
 
 let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     (type_layout : Layout.t option) : t =
@@ -488,6 +490,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
     | (Some None | None), Some (Layout.Product _ as ly) ->
       layout_to_unknown_shape ly
+    | (Some None | None), Some (Univar _) ->
+      Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
     | (Some None | None), None -> raise Layout_missing)
   | Alias sh, type_layout ->
     type_shape_to_complex_shape_exn ~cache ~rec_env sh type_layout
@@ -720,6 +724,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           "variant with [@@unboxed] attribute with expected layout %a, but \
            field has layout %a"
           Layout.format ly Layout.format arg_layout)
+  | ( _, Some (Univar _) ) ->
+      Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
   | ( ( Var _ | Error _ | Proj _ | Abs _ | Comp_unit _ | Struct _ | Mutrec _
       | Constr _ | App _ | Proj_decl _ ),
       _ ) ->
