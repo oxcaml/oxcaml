@@ -2147,12 +2147,13 @@ let rec try_expand_once env ty =
   | Tsplice t -> expand_and_cancel t
   | Tquote t -> expand_and_cancel t
   | Tbox t ->
-      let t' = try try_expand_once env t with Cannot_expand -> t in
-      begin match get_desc t' with
+      begin match get_desc t with
       | Tconstr (p, args, _) when Path.is_unboxed_version p ->
           newconstr (Path.boxed_version p) args
       | _ ->
-          raise Cannot_expand
+          (* Try to expand the inner type one step *)
+          let t' = try_expand_once env t in
+          newty (Tbox t')
       end
   | _ -> raise Cannot_expand
 
@@ -2245,11 +2246,12 @@ let rec try_expand_once_opt env ty =
   | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tbox t ->
-      let t' = try try_expand_once_opt env t with Cannot_expand -> t in
-      begin match get_desc t' with
+      begin match get_desc t with
       | Tconstr (p, args, _) when Path.is_unboxed_version p ->
           newconstr (Path.boxed_version p) args
-      | _ -> raise Cannot_expand
+      | _ ->
+          let t' = try_expand_once_opt env t in
+          newty (Tbox t')
       end
   | _ -> raise Cannot_expand
 

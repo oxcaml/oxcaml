@@ -146,3 +146,22 @@ let test_check (u : uf) (f : float) = check_boxed_by u f;;
 type uf = float#
 val test_check : uf -> float -> unit = <fun>
 |}]
+
+(* Test 11: Multiple levels of type aliasing - the inner type of box_
+   must be fully expanded to find the unboxed type *)
+
+type f = float#
+type g = f
+let test_multi_alias (x : g box_) : float = x;;
+[%%expect{|
+type f = float#
+type g = f
+val test_multi_alias : g box_ -> float = <fun>
+|}]
+
+type h = g
+let test_three_levels (x : h box_) : float = x;;
+[%%expect{|
+type h = g
+val test_three_levels : h box_ -> float = <fun>
+|}]
