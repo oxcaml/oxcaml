@@ -779,8 +779,6 @@ let emit_cmpimm rs n =
    load/store. x16 (IP0) is safe as it's reserved for linker veneers and not
    allocated by the register allocator. *)
 
-(* XXX need to revalidate that reg_x_tmp1 is safe *)
-
 let emit_load_store_sp_offset instr reg offset =
   match O.mem_offset ~base:R.sp ~scale:8 ~offset with
   | Ok operand -> A.ins2 instr reg operand
