@@ -177,7 +177,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        fun (type l r) (h : (allowed * r) t) : (l * r) t ->
         match h with
         | Unknown -> Unknown
-        | Class_legacy_comonadic -> Class_legacy_comonadic
+        | Legacy x -> Legacy x
         | Stack_expression -> Stack_expression
         | Mutable_read m -> Mutable_read m
         | Mutable_write m -> Mutable_write m
@@ -189,7 +189,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
         match h with
         | Unknown -> Unknown
-        | Class_legacy_monadic -> Class_legacy_monadic
+        | Legacy x -> Legacy x
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
@@ -207,8 +207,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         match h with
         | Unknown -> Unknown
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-        | Class_legacy_comonadic -> Class_legacy_comonadic
-        | Class_legacy_monadic -> Class_legacy_monadic
+        | Legacy x -> Legacy x
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
         | Mutable_read m -> Mutable_read m
@@ -229,8 +228,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         match h with
         | Unknown -> Unknown
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-        | Class_legacy_comonadic -> Class_legacy_comonadic
-        | Class_legacy_monadic -> Class_legacy_monadic
+        | Legacy x -> Legacy x
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
         | Mutable_read m -> Mutable_read m
@@ -2045,6 +2043,12 @@ module Report = struct
     | Value -> print_article_noun Consonant "value"
     | Constructor -> print_article_noun Consonant "constructor"
 
+  let print_structure_item : structure_item -> _ =
+   fun (category, id) ~capitalize ->
+    Fmt.dprintf "%t %a"
+      (print_lock_item ~definite:true ~capitalize category)
+      Misc.Style.inline_code (Ident.name id)
+
   let print_pinpoint_desc : pinpoint_desc -> _ = function
     | Unknown -> None
     | Ident { category; lid } ->
@@ -2070,6 +2074,12 @@ module Report = struct
             (print_article_noun ~definite:true ~capitalize Consonant "result")
             (print_article_noun ~definite ~capitalize:false Consonant "cases"))
     | Pattern -> Some (print_article_noun Consonant "pattern")
+    | Module -> Some (print_article_noun Consonant "module")
+    | Structure -> Some (print_article_noun Consonant "structure")
+    | Structure_item x ->
+      Some
+        (fun ~definite:_ ~capitalize ->
+          Fmt.dprintf "%t in the structure" (print_structure_item ~capitalize x))
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
@@ -2101,6 +2111,11 @@ module Report = struct
     | Application -> Fmt.dprintf "function applications"
     | Try_with -> Fmt.dprintf "try-with clauses"
 
+  let print_legacy = function
+    | Toplevel -> print_article_noun Consonant "top-level clause"
+    | Compilation_unit -> print_article_noun Consonant "compilation unit"
+    | Class -> print_article_noun Consonant "class"
+
   let print_region_desc : region_desc -> _ = function
     | Borrow -> print_article_noun Consonant "borrow region"
 
@@ -2113,7 +2128,8 @@ module Report = struct
 
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
       prints the const to explain the mode on the pinpoint. *)
-  let print_const (type l r) (_, pp_desc) ppf : (l * r) const -> unit = function
+  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
+      (l * r) const -> unit = function
     | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
     | Lazy_allocated_on_heap ->
       (match pp_desc with
@@ -2122,12 +2138,15 @@ module Report = struct
         Fmt.pp_print_string ppf "lazy expressions always need"
       | _ -> Fmt.pp_print_string ppf "it is a lazy expression and thus needs");
       Fmt.pp_print_string ppf " to be allocated on the heap"
-    | Class_legacy_monadic | Class_legacy_comonadic ->
-      (match pp_desc with
-      | Ident { category = Class; _ } ->
+    | Legacy m ->
+      (match pp_desc, m with
+      | ( (Ident { category = Class; _ } | Class | Structure_item (Class, _)),
+          Class ) ->
         (* if we already said it's a class, we don't need to emphasize it again. *)
         Fmt.pp_print_string ppf "classes are always"
-      | _ -> Fmt.pp_print_string ppf "it is a class and thus");
+      | _ ->
+        Fmt.fprintf ppf "it is %t and thus always"
+          (print_legacy m ~definite:false ~capitalize:false));
       Fmt.pp_print_string ppf " at the legacy modes"
     | Tailcall_function ->
       Fmt.pp_print_string ppf "it is the function in a tail call"
@@ -2151,7 +2170,9 @@ module Report = struct
       Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
     | Module_allocated_on_heap ->
       (match pp_desc with
-      | Ident { category = Module; _ } | Functor ->
+      | Ident { category = Module; _ }
+      | Functor | Module | Structure
+      | Structure_item (Module, _) ->
         (* if we already said it's a module, we don't need to emphasize it again. *)
         Fmt.pp_print_string ppf "modules always need"
       | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
@@ -2240,6 +2261,10 @@ module Report = struct
           | Constructor (s, moda) ->
             Fmt.dprintf "contains (via constructor %a)%a %t"
               Misc.Style.inline_code s maybe_modality moda print_pp
+          | Structure (x, moda) ->
+            Fmt.dprintf "contains %t%a defined as %t"
+              (print_structure_item ~capitalize:false x)
+              maybe_modality moda print_pp
         in
         pr, contained)
 
@@ -2269,6 +2294,12 @@ module Report = struct
       | Constructor (s, moda) ->
         Fmt.dprintf "is contained (via constructor %a)%a in the value at %a"
           Misc.Style.inline_code s maybe_modality moda
+          (Location.Doc.loc ~capitalize_first:false)
+          container
+      | Structure (x, moda) ->
+        Fmt.dprintf "is %t%a in the structure at %a"
+          (print_structure_item ~capitalize:false x)
+          maybe_modality moda
           (Location.Doc.loc ~capitalize_first:false)
           container
     in

@@ -35,20 +35,35 @@ module F (M : S) @ portable = struct
     let g = M.f
 end
 [%%expect{|
-Line 2, characters 8-9:
+Lines 1-3, characters 30-3:
+1 | ..............................struct
 2 |     let g = M.f
-            ^
-Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" structure.
+3 | end
+Error: The module is "nonportable"
+         because it contains the value "g" defined as the expression at line 2, characters 8-9
+         which is "nonportable".
+       However, the module highlighted is expected to be "portable".
 |}]
 
 module F (M : S) : T @ portable = struct
     let g = M.f
 end
 [%%expect{|
-Line 2, characters 8-9:
+Lines 1-3, characters 34-3:
+1 | ..................................struct
 2 |     let g = M.f
-            ^
-Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" structure.
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : unit -> unit end @ nonportable
+       is not included in
+         T @ portable
+       Values do not match:
+         val g : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val g : unit -> unit (* in a structure at portable *)
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
 |}]
 
 module F : S -> T = functor (M : S) -> struct
@@ -103,7 +118,7 @@ module _ @ portable = F(M)
 Line 1, characters 22-26:
 1 | module _ @ portable = F(M)
                           ^^^^
-Error: This is "nonportable", but expected to be "portable".
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 (* To avoid zapping, explicitly annotate the functor type like below. *)
@@ -340,7 +355,7 @@ end
 Line 2, characters 23-27:
 2 |   module (K' @ many) = K ()
                            ^^^^
-Error: This is "once", but expected to be "many".
+Error: The module is "once" but is expected to be "many".
 |}]
 
 (* For functions we can infer the more permissive choice. *)
@@ -376,7 +391,7 @@ let () =
 Line 6, characters 27-31:
 6 |   let module (M' @ many) = F () in
                                ^^^^
-Error: This is "once", but expected to be "many".
+Error: The module is "once" but is expected to be "many".
 |}]
 
 (* Closing over arguments: given [f : A -> B -> C] and [a : A @ mode], [f a] must close
@@ -417,7 +432,7 @@ end
 Line 2, characters 26-31:
 2 |   module (F_app @ many) = F (M)
                               ^^^^^
-Error: This is "once", but expected to be "many".
+Error: The module is "once" but is expected to be "many".
 |}]
 
 module F : functor (M : S @ once) () -> sig end @ many =
@@ -454,7 +469,7 @@ end
 Line 3, characters 27-32:
 3 |   module (F_app' @ many) = F_app
                                ^^^^^
-Error: This is "once", but expected to be "many".
+Error: The module is "once" but is expected to be "many".
 |}]
 
 module F : functor (M : S @ once) -> (functor () -> sig end) @ many =
@@ -500,7 +515,7 @@ end
 Line 2, characters 26-31:
 2 |   module (F_app @ many) = F (M)
                               ^^^^^
-Error: This is "once", but expected to be "many".
+Error: The module is "once" but is expected to be "many".
 |}]
 
 module F : functor (M : S @ unique) () -> sig end @ many =
@@ -537,7 +552,7 @@ end
 Line 3, characters 27-32:
 3 |   module (F_app' @ many) = F_app
                                ^^^^^
-Error: This is "once", but expected to be "many".
+Error: The module is "once" but is expected to be "many".
 |}]
 
 module F : functor (_ : S @ unique) -> (functor () -> sig end) @ many =
@@ -622,7 +637,7 @@ end
 Line 3, characters 33-48:
 3 |   module (F1_applied_2 @ many) = F1_applied (M2)
                                      ^^^^^^^^^^^^^^^
-Error: This is "once", but expected to be "many".
+Error: The module is "once" but is expected to be "many".
 |}]
 
 let f2 x1 (x2 @ once) x3 =
@@ -685,13 +700,14 @@ Error: The value "x" is "once"
 module F2 (M1 : S @ once) : (functor () -> sig end) @ many =
   functor () -> struct module M2 = M1 end
 [%%expect{|
-Line 2, characters 35-37:
+Line 2, characters 10-41:
 2 |   functor () -> struct module M2 = M1 end
-                                       ^^
-Error: The module "M1" is "once"
-       but is expected to be "many"
-         because it is used inside the functor at line 2, characters 10-41
-         which is expected to be "many".
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Got "once"
+         because it closes over the module "M1" at line 2, characters 35-37
+         which is "once".
+       However, expected "many".
 |}]
 
 (* testing functor type inclusion *)
@@ -918,13 +934,18 @@ val foo : unit -> unit = <fun>
 |}]
 
 (* CR-someday zqian: this should be allowed *)
-(* CR-soon zqian: the error message should refer to [M.f] as the violation. *)
 module F (M : S @ local) : S @ global = struct include M end
 [%%expect{|
-Line 1, characters 47-56:
+Line 1, characters 55-56:
 1 | module F (M : S @ local) : S @ global = struct include M end
-                                                   ^^^^^^^^^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+                                                           ^
+Error: The value "f" in the structure is "local"
+         because it is the value "f" in the structure at line 1, characters 47-56
+         which is "local".
+       However, the value "f" in the structure highlighted is expected to be "global"
+         because it is the value "f" in the structure at line 1, characters 47-56
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* some higher order functor *)
@@ -960,7 +981,9 @@ Error: Signature mismatch:
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+         because it is the value "f" in the structure at line 3, characters 32-44
+         which is "nonportable".
+       However, the right-hand side is "portable".
 |}]
 
 module F(G : S @ portable-> S) = struct

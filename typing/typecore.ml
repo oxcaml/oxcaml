@@ -549,16 +549,6 @@ let mode_morph f expected_mode =
   let tuple_modes = None in
   {expected_mode with mode; tuple_modes}
 
-(** Takes the mode of a container, a child's relation to it, and an optional
-    modality, returns the mode of the child. *)
-let apply_is_contained_by is_contained_by
-  ?(modalities = Modality.Const.id) mode =
-  let hint =
-    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
-      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
-  in
-  Modality.Const.apply ~hint modalities mode
-
 (** Similiar to [apply_is_contained_by] but for [expected_mode]. *)
 let mode_is_contained_by is_contained_by ?modalities expected_mode =
   as_single_mode expected_mode

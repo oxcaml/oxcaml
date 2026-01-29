@@ -1701,3 +1701,7 @@ let undo_compress (changes, _old) =
             Transient_expr.set_desc ty desc; r := !next
         | _ -> ())
         log
+
+let class_mode =
+  let hint : _ Mode.Hint.const = Legacy Class in
+  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)

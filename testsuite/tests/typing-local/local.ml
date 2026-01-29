@@ -503,7 +503,11 @@ module type T = sig val x : int option end
 Line 4, characters 50-51:
 4 |   let _m : (module T) = local_ (module struct let x = thing end) in
                                                       ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 4, characters 46-59
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 let local_module () =
   let thing = local_ Some 1 in
@@ -515,7 +519,11 @@ let local_module () =
 Line 4, characters 30-31:
 4 |     let module M = struct let x = thing end in
                                   ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 4, characters 26-39
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 let obj () =
   let thing = local_ Some 1 in
@@ -2138,7 +2146,13 @@ end
 Line 2, characters 12-13:
 2 |   let (Some z, _, _) | (None, Some z, _)
                 ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+         because it is contained (via constructor "Some") in the value at line 2, characters 30-36
+         which is "local".
+       However, the expression highlighted is expected to be "global"
+         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 module M = struct
@@ -2149,7 +2163,13 @@ end
 Line 2, characters 12-13:
 2 |   let (Some z, _, _) | (None, Some z, _)
                 ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+         because it is contained (via constructor "Some") in the value at line 2, characters 7-13
+         which is "local".
+       However, the expression highlighted is expected to be "global"
+         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* Example of backtracking after mode error *)

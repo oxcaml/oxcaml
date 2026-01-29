@@ -14,6 +14,8 @@ type ident =
             point to [M]. This field would store [M.x]. *)
   }
 
+type structure_item = lock_item * Ident.t
+
 (** Pinpoint's description to accompany pinpoint's location. It's about the
     syntax rather than the value. For example, we distinguish:
     - between a module identifer and a module definition
@@ -27,7 +29,9 @@ type pinpoint_desc =
   | Unknown
   | Ident of ident  (** An identifier *)
   | Function  (** A function definition *)
+  | Module  (** A module definition *)
   | Functor  (** A functor definition *)
+  | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
@@ -37,6 +41,8 @@ type pinpoint_desc =
   | Letop  (** A let op expression *)
   | Cases_result  (** The result of cases *)
   | Pattern  (** A pattern *)
+  | Structure_item of structure_item
+      (** an item in a structure being pointed at *)
 
 (** A pinpoint is a location in the source code, accompanied by additional
     description *)
@@ -49,6 +55,11 @@ type mutable_part =
 type always_dynamic =
   | Application
   | Try_with
+
+type legacy =
+  | Compilation_unit
+  | Toplevel
+  | Class
 
 (* CR-soon zqian: add loop and function body to [region_desc] *)
 type region_desc = Borrow
@@ -70,8 +81,7 @@ printed. *)
 type 'd const =
   | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
   | Lazy_allocated_on_heap : (disallowed * 'r) pos const
-  | Class_legacy_monadic : ('l * disallowed) neg const
-  | Class_legacy_comonadic : ('l * disallowed) pos const
+  | Legacy : legacy -> ('l * 'r) const
   | Tailcall_function : (disallowed * 'r) pos const
   | Tailcall_argument : (disallowed * 'r) pos const
   | Mutable_read : mutable_part -> (disallowed * 'r) neg const
@@ -105,7 +115,9 @@ type containing =
   | Record of string * modality
   | Array of modality
   | Constructor of string * modality
-(* CR-soon zqian: add the relation between structure and items *)
+  | Structure of structure_item * modality
+(* Some structure items (such as classes) don't have modalities. We gloss over
+     for simplicity. *)
 
 type contains =
   { containing : containing;
