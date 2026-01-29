@@ -736,6 +736,8 @@ and raw_type_desc ppf = function
         raw_lid_type_list fl
   | Tof_kind jkind ->
     fprintf ppf "(type@ :@ %a)" Jkind.format jkind
+  | Tbox t ->
+    fprintf ppf "@[Tbox@ %a@]" raw_type t
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"
@@ -1649,6 +1651,8 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_module (tree_of_path (Some Module_type) p, fl)
     | Tof_kind jkind ->
       Otyp_of_kind (out_jkind_of_desc (Jkind.get jkind))
+    | Tbox ty ->
+      Otyp_box (tree_of_typexp mode alloc_mode ty)
   in
   if List.memq px !delayed then delayed := List.filter ((!=) px) !delayed;
   alias_nongen_row mode px ty;

@@ -151,6 +151,7 @@ and out_type =
       (* Currently only introduced with very explicit code in [Printtyp] and not
          synthesized directly from the [Typedtree] *)
   | Otyp_of_kind of out_jkind
+  | Otyp_box of out_type
   | Otyp_ret of out_ret_mode * out_type
   (** INVARIANT: See [out_ret_mode]. *)
 

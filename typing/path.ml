@@ -34,13 +34,14 @@ let unboxed_version t =
   | Pextra_ty (_, Punboxed_ty) ->
     Misc.fatal_error "Path.unboxed_version"
 
-let is_unboxed_version t =
+let boxed_version t =
   match t with
+  | Pextra_ty (inner, Punboxed_ty) -> Some inner
   | Pident _ | Pdot _ | Papply _
   | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) ->
-    false
-  | Pextra_ty (_, Punboxed_ty) ->
-    true
+    None
+
+let is_unboxed_version t = Option.is_some (boxed_version t)
 
 let rec same p1 p2 =
   p1 == p2

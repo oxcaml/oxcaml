@@ -126,6 +126,7 @@ let rec add_type bv ty =
   | Ptyp_quote t -> add_type bv t
   | Ptyp_splice t -> add_type bv t
   | Ptyp_of_kind jkind -> add_jkind bv jkind
+  | Ptyp_box t -> add_type bv t
   | Ptyp_extension e -> handle_extension e
 
 and add_type_labeled_tuple bv tl =

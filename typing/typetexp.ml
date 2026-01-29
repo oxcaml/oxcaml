@@ -1182,6 +1182,10 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
+  | Ptyp_box sty ->
+      let cty = transl_type env ~policy ~row_context Alloc.Const.legacy sty in
+      let ty = cty.ctyp_type in
+      ctyp (Ttyp_box cty) (newty (Tbox ty))
   | Ptyp_quote t ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));

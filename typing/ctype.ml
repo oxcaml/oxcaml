@@ -2146,6 +2146,20 @@ let rec try_expand_once env ty =
     Tconstr _ -> expand_abbrev env ty
   | Tsplice t -> expand_and_cancel t
   | Tquote t -> expand_and_cancel t
+  | Tbox t ->
+      let expand_inner () =
+        (* Try to expand the inner type one step *)
+        let t' = try_expand_once env t in
+        newty (Tbox t')
+      in
+      begin match get_desc t with
+      | Tconstr (p, args, _) ->
+          begin match Path.boxed_version p with
+          | Some boxed_p -> newconstr boxed_p args
+          | None -> expand_inner ()
+          end
+      | _ -> expand_inner ()
+      end
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2208,6 +2222,7 @@ let rec extract_concrete_typedecl env ty =
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
+  | Tbox ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2235,6 +2250,19 @@ let rec try_expand_once_opt env ty =
     Tconstr _ -> expand_abbrev_opt env ty
   | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Tbox t ->
+      let expand_inner () =
+        let t' = try_expand_once_opt env t in
+        newty (Tbox t')
+      in
+      begin match get_desc t with
+      | Tconstr (p, args, _) ->
+          begin match Path.boxed_version p with
+          | Some boxed_p -> newconstr boxed_p args
+          | None -> expand_inner ()
+          end
+      | _ -> expand_inner ()
+      end
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -2350,6 +2378,7 @@ let contained_without_boxing env ty =
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
+  | Tbox ty -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
   | Tquote _ | Tsplice _ -> []
@@ -2464,6 +2493,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
   | Tquote _ -> Jkind.Builtin.value ~why:Tquote
   | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
+  | Tbox _ -> Jkind.Builtin.value ~why:Boxed_variant
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -4297,7 +4327,8 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
       | (Tquote t1, Tquote t2)
-      | (Tsplice t1, Tsplice t2) ->
+      | (Tsplice t1, Tsplice t2)
+      | (Tbox t1, Tbox t2) ->
           unify uenv t1 t2
       | (Tsplice s1, _) when is_flexible s1 ->
           set_type_desc t2' d2;
@@ -5464,6 +5495,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tsplice t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tquote t2) in
               moregen inst_nongen variance type_pairs env t1 t2
+          | (Tbox t1, Tbox t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -5921,6 +5954,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote t1, Tquote t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Tbox t1, Tbox t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
@@ -6647,7 +6682,7 @@ let rec build_subtype env (visited : transient_expr list)
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tpoly(t1', tl)), c)
       else (t, Unchanged)
-  | Tunivar _ | Tpackage _ | Tof_kind _ -> (t, Unchanged)
+  | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _ -> (t, Unchanged)
 
 and build_subtype_tuple env visited loops posi level t labeled_tlist
       constructor =
