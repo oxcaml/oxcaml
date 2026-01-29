@@ -42,6 +42,13 @@ let is_unboxed_version t =
   | Pextra_ty (_, Punboxed_ty) ->
     true
 
+let boxed_version t =
+  match t with
+  | Pextra_ty (inner, Punboxed_ty) -> inner
+  | Pident _ | Pdot _ | Papply _
+  | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) ->
+    Misc.fatal_error "Path.boxed_version"
+
 let rec same p1 p2 =
   p1 == p2
   || match (p1, p2) with
