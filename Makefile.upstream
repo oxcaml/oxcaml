@@ -2835,7 +2835,10 @@ ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
 	   "$(INSTALL_COMPLIBDIR)"
 endif
 
-include .depend
+# Note: The .depend file has been removed. It was part of the traditional
+# upstream OCaml build that tracked OCaml compilation dependencies via
+# ocamldep. OxCaml uses Dune which handles dependency tracking internally,
+# and the runtime build passes COMPUTE_DEPS=false, so .depend was unused.
 
 Makefile.config Makefile.build_config: config.status
 config.status:
