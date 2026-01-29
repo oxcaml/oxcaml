@@ -133,10 +133,10 @@ Error: This unboxed access is expected to have base type "y#"
 (* Float records *)
 
 (* Indicies to flattened float always have element type [float#] *)
-type t = { f : float }
+type t = { f : float } [@@flatten_floats]
 let f () = (.f)
 [%%expect{|
-type t = { f : float; }
+type t = { f : float; } [@@flatten_floats]
 val f : unit -> (t, float#) idx_imm = <fun>
 |}]
 
@@ -159,11 +159,11 @@ val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
 
 (* Singleton unboxed records containing floats can appear in float records *)
 type fr = #{ f : float }
-type t = { f : float; fr : fr  }
+type t = { f : float; fr : fr  } [@@flatten_floats]
 let fr_f () = (.fr.#f)
 [%%expect{|
 type fr = #{ f : float; }
-type t = { f : float; fr : fr; }
+type t = { f : float; fr : fr; } [@@flatten_floats]
 val fr_f : unit -> (t, float#) idx_imm = <fun>
 |}]
 
@@ -182,13 +182,14 @@ Error: This block index points to an element stored as a flattened float.
 (* Mixed float record *)
 type t_float64 : float64
 type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
+[@@flatten_floats]
 let f () = (.f)
 let fu () = (.fu)
 let t_float64 () = (.t_float64)
 let fr_f () = (.fr.#f)
 [%%expect{|
 type t_float64 : float64
-type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr; }
+type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr; } [@@flatten_floats]
 val f : unit -> (t, float#) idx_imm = <fun>
 val fu : unit -> (t, float#) idx_imm = <fun>
 val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
@@ -208,11 +209,11 @@ Error: This block index points to an element stored as a flattened float.
 |}]
 
 type pfa = private float
-type r = { mutable pfa : pfa }
+type r = { mutable pfa : pfa } [@@flatten_floats]
 let f () : (r, pfa#) idx_mut = (.pfa)
 [%%expect{|
 type pfa = private float
-type r = { mutable pfa : pfa; }
+type r = { mutable pfa : pfa; } [@@flatten_floats]
 val f : unit -> (r, pfa#) idx_mut = <fun>
 |}]
 

@@ -4,6 +4,7 @@ type t1 =
   { mutable d0 : float;
     mutable d1 : float
   }
+[@@flatten_floats]
 
 let[@opaque] [@specialize never] add_mutable_record (a : t1) (b : t1) (c : t1) :
     t1 =
@@ -29,6 +30,7 @@ type t4 =
     mutable d2 : float;
     mutable d3 : float
   }
+[@@flatten_floats]
 
 let[@opaque] [@specialize never] add_mutable_record_t4 (a : t1) (b : t1)
     (c : t4) : t4 =

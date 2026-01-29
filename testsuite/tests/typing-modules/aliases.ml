@@ -219,7 +219,7 @@ include C;;
 [%%expect{|
 module type Complex =
   sig
-    type t = Complex.t = { re : float; im : float; }
+    type t = Complex.t = { re : float; im : float; } [@@flatten_floats]
     val zero : t @@ portable
     val one : t @@ portable
     val i : t @@ portable
@@ -242,7 +242,7 @@ module type Complex =
 module M : sig module C : Complex end
 module C = Complex
 - : float = 1.
-type t = Complex.t = { re : float; im : float; }
+type t = Complex.t = { re : float; im : float; } [@@flatten_floats]
 val zero : t = {re = 0.; im = 0.}
 val one : t = {re = 1.; im = 0.}
 val i : t = {re = 0.; im = 1.}

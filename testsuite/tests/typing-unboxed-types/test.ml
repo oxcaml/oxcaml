@@ -441,21 +441,24 @@ module S : sig
   type u = { f1 : t; f2 : t }
 end = struct
   type t = A of float [@@ocaml.unboxed]
-  type u = { f1 : t; f2 : t }
+  type u = { f1 : t; f2 : t } [@@flatten_floats]
 end;;
 [%%expect{|
 Lines 4-7, characters 6-3:
 4 | ......struct
 5 |   type t = A of float [@@ocaml.unboxed]
-6 |   type u = { f1 : t; f2 : t }
+6 |   type u = { f1 : t; f2 : t } [@@flatten_floats]
 7 | end..
 Error: Signature mismatch:
        Modules do not match:
-         sig type t = A of float [@@unboxed] type u = { f1 : t; f2 : t; } end
+         sig
+           type t = A of float [@@unboxed]
+           type u = { f1 : t; f2 : t; } [@@flatten_floats]
+         end
        is not included in
          sig type t type u = { f1 : t; f2 : t; } end
        Type declarations do not match:
-         type u = { f1 : t; f2 : t; }
+         type u = { f1 : t; f2 : t; } [@@flatten_floats]
        is not included in
          type u = { f1 : t; f2 : t; }
        Their internal representations differ:
@@ -467,21 +470,24 @@ module S : sig
   type u = { f1 : t; f2 : t }
 end = struct
   type t = #{ a : float }
-  type u = { f1 : t; f2 : t }
+  type u = { f1 : t; f2 : t } [@@flatten_floats]
 end;;
 [%%expect{|
 Lines 4-7, characters 6-3:
 4 | ......struct
 5 |   type t = #{ a : float }
-6 |   type u = { f1 : t; f2 : t }
+6 |   type u = { f1 : t; f2 : t } [@@flatten_floats]
 7 | end..
 Error: Signature mismatch:
        Modules do not match:
-         sig type t = #{ a : float; } type u = { f1 : t; f2 : t; } end
+         sig
+           type t = #{ a : float; }
+           type u = { f1 : t; f2 : t; } [@@flatten_floats]
+         end
        is not included in
          sig type t type u = { f1 : t; f2 : t; } end
        Type declarations do not match:
-         type u = { f1 : t; f2 : t; }
+         type u = { f1 : t; f2 : t; } [@@flatten_floats]
        is not included in
          type u = { f1 : t; f2 : t; }
        Their internal representations differ:

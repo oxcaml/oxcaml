@@ -2,7 +2,7 @@
 
 type t = Leaf of int | Branch of t * t
 
-type floatref = { mutable f : float }
+type floatref = { mutable f : float } [@@flatten_floats]
 
 let a = { f = 0.0 }
 

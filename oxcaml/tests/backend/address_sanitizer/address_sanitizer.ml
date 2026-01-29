@@ -354,6 +354,7 @@ module Test_use_after_free = struct
   ;;
 
   type t7 = { mutable x : float }
+  [@@flatten_floats]
 
   let field_get_float_hack () =
     let test () =

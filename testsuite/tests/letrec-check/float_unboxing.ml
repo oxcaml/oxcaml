@@ -9,11 +9,11 @@
    unboxed on the flight, so accepting this example
    would dereference (when running `g.f <- y` with y
    uninitialized) an arbitrary address. *)
-type t = { mutable f: float }
+type t = { mutable f: float } [@@flatten_floats]
 let g = { f = 0.0 }
 let rec x = (g.f <- y; ()) and y = 2.0;;
 [%%expect{|
-type t = { mutable f : float; }
+type t = { mutable f : float; } [@@flatten_floats]
 val g : t = {f = 0.}
 Line 3, characters 12-26:
 3 | let rec x = (g.f <- y; ()) and y = 2.0;;
