@@ -36,6 +36,11 @@ type instruction_desc =
        stack pointer and/or CFA will likely cause incorrect results. *)
   | Lepilogue_open
   | Lepilogue_close
+  | Lend
+    (* [Lend] is a zero-size marker instruction placed at the end of each
+       function. It exists purely for debug information: variable ranges need a
+       proper end point after the last real instruction. Code emitters skip this
+       instruction (it generates no assembly). *)
   | Lop of Operation.t
   | Lcall_op of call_operation
   | Lreloadretaddr

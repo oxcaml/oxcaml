@@ -1811,6 +1811,7 @@ let emit_instr ~first ~fallthrough i =
   let open Simd_instrs in
   emit_debug_info_linear i;
   match i.desc with
+  | Lend -> ()
   | Lprologue ->
     assert !prologue_required;
     if fp
@@ -2482,8 +2483,9 @@ let emit_all ~first ~fallthrough
   let fallthrough = ref fallthrough in
   DLL.iter body ~f:(fun data ->
       match data.Linear.desc with
-      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
+      | Lend | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _
+      | Lbranch _
       | Lcondbranch (_, _)
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _

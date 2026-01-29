@@ -30,7 +30,7 @@ open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 let rec defines_label_desc (desc : Linear.instruction_desc)
     (next_cell_opt : Linear.instruction option) =
   match desc with
-  | Llabel _ -> true
+  | Lend | Llabel _ -> true
   | Ladjust_stack_offset _ -> (
     match next_cell_opt with
     | None -> false

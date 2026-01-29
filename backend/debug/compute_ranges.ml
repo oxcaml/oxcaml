@@ -423,6 +423,9 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     let insn_data = DLL.value insn in
     let actions =
       match[@ocaml.warning "-4"] insn_data.L.desc with
+      | Lend ->
+        (* Lend is a zero-size marker for debug info. No actions needed. *)
+        []
       | _ ->
         let known_available_after_prev_insn =
           KM.bindings currently_open_subranges |> List.map fst |> KS.of_list
@@ -461,6 +464,22 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     in
     if !Oxcaml_flags.dranges && not no_actions
     then Format.fprintf ppf_dump "finished applying actions.\n%!";
+    (* Close all subranges when we reach Lend *)
+    let currently_open_subranges =
+      match insn_data.L.desc with
+      | Lend ->
+        if !Oxcaml_flags.dranges
+        then Format.fprintf ppf_dump "closing subranges for Lend\n%!";
+        let currently_open_subranges =
+          KM.fold
+            (fun key _ currently_open_subranges ->
+              close_subrange key ~end_pos_offset:0 ~currently_open_subranges)
+            currently_open_subranges currently_open_subranges
+        in
+        assert (KM.is_empty currently_open_subranges);
+        currently_open_subranges
+      | _ -> currently_open_subranges
+    in
     let first_insn =
       match !used_label with
       | None -> first_insn
@@ -503,6 +522,9 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
                Printlinear.instr_data insn_data KS.print should_be_open KS.print
                currently_open_subranges));
     match insn_data.L.desc with
+    | Lend ->
+      (* All subranges have already been closed above. Just return. *)
+      first_insn
     | Lprologue | Lepilogue_open | Lepilogue_close | Lop _ | Lcall_op _
     | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
     | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lpushtrap _ | Lpoptrap _
@@ -512,17 +534,9 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
       in
       match DLL.next insn with
       | None ->
-        (* End of instruction list - close all remaining subranges *)
-        if !Oxcaml_flags.dranges
-        then Format.fprintf ppf_dump "closing subranges for last insn\n%!";
-        let currently_open_subranges =
-          KM.fold
-            (fun key _ currently_open_subranges ->
-              close_subrange key ~end_pos_offset:0 ~currently_open_subranges)
-            currently_open_subranges currently_open_subranges
-        in
-        assert (KM.is_empty currently_open_subranges);
-        first_insn
+        (* Unexpected end - Lend marker should always be present *)
+        Misc.fatal_error
+          "compute_ranges: missing Lend marker at end of function"
       | Some next_insn ->
         process_instruction t fundecl ~fun_contains_calls ~fun_num_stack_slots
           ~first_insn ~insn:next_insn ~prev_insn:(Some insn)

@@ -35,6 +35,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
         | Llabel { label = lbl; _ } ->
           Hashtbl.add map lbl (pc, cell);
           fill_map pc (DLL.next cell)
+        | Lend -> fill_map pc (DLL.next cell)
         | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
         | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
         | Lcondbranch (_, _)
@@ -76,6 +77,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
         opt_branch_overflows map pc lbl0 max_branch_offset
         || opt_branch_overflows map pc lbl1 max_branch_offset
         || opt_branch_overflows map pc lbl2 max_branch_offset
+      | Lend
       | Lop
           ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
           | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
@@ -100,6 +102,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Some cell -> (
         let data = DLL.value cell in
         match data.desc with
+        | Lend -> fixup did_fix pc (DLL.next cell)
         | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
         | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _
         | Lbranch _
@@ -208,10 +211,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
                 lbl2;
               (* Continue from the current cell since we've modified it *)
               fixup true pc (Some cell)
-            | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
-            | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _
-            | Lbranch _ | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _
-            | Lraise _ | Lstackcheck _
+            | Lend | Lprologue | Lepilogue_open | Lepilogue_close
+            | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _
+            | Llabel _ | Lbranch _ | Lswitch _ | Ladjust_stack_offset _
+            | Lpushtrap _ | Lraise _ | Lstackcheck _
             | Lop
                 ( Move | Spill | Reload | Opaque | Pause | Begin_region
                 | End_region | Dls_get | Tls_get | Domain_index | Const_int _
