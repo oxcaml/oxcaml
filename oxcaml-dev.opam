@@ -1,0 +1,38 @@
+opam-version: "2.0"
+version: "20260108"
+license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
+synopsis: "OxCaml Development Tools"
+maintainer: "David Allsopp <dallsopp@janestreet.com>"
+authors: [
+  "Xavier Leroy"
+  "Damien Doligez"
+  "Alain Frisch"
+  "Jacques Garrigue"
+  "Didier Rémy"
+  "KC Sivaramakrishnan"
+  "Jérôme Vouillon"
+]
+homepage: "https://oxcaml.org"
+bug-reports: "https://github.com/oxcaml/oxcaml/issues"
+depends: [
+  "ocaml" {>= "5.4.0~~" & < "5.5.0~~"}
+
+  "dune" {>= "3.20.0" & < "3.21.0"}
+  "menhir" {= "20231231"}
+  "ocamlformat" {>= "0.28.0" & < "0.29.0"}
+]
+# The upstream compiler used for building OxCaml should not be configured with
+# any of these options.
+conflicts: [
+  "ocaml-option-32bit"
+  "ocaml-option-address-sanitizer"
+  "ocaml-option-afl"
+  "ocaml-option-bytecode-only"
+  "ocaml-option-flambda"
+  "ocaml-option-leak-sanitizer"
+  "ocaml-option-musl"
+  "ocaml-option-no-flat-float-array"
+  "ocaml-option-static"
+  "ocaml-option-tsan"
+]
+flags: compiler
