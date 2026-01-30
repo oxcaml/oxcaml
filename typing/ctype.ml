@@ -2672,15 +2672,16 @@ let constrain_type_jkind ~fixed env ty jkind =
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
            let product ~fuel tys =
              let num_components = List.length tys in
-             let recur ty's_jkinds jkinds =
+             let recur jkinds =
                let results =
-                 Misc.Stdlib.List.map3
-                   (fun { ty; is_open = _; modality } ty's_jkind jkind ->
+                 List.map2
+                   (fun { ty; is_open = _; modality } jkind ->
                       let jkind =
                         Jkind.apply_modality_r modality jkind
                       in
-                      loop ~fuel ~expanded:false ~is_open ty ty's_jkind jkind)
-                   tys ty's_jkinds jkinds
+                      loop ~fuel ~expanded:false ~is_open ty
+                        (estimate_type_jkind env ty) jkind)
+                   tys jkinds
                in
                if List.for_all Result.is_ok results
                then Ok ()
@@ -2692,14 +2693,14 @@ let constrain_type_jkind ~fixed env ty jkind =
              | Some ty's_jkinds, Some jkinds
                   when List.length ty's_jkinds = num_components
                        && List.length jkinds = num_components ->
-               recur ty's_jkinds jkinds
+               recur jkinds
              | Some ty's_jkinds, None
                   when Jkind.has_layout_any jkind
                     && List.length ty's_jkinds = num_components ->
                (* Even though [jkind] has layout any, it still might have
                   mode-crossing restrictions, so we recur, just duplicating
                   the jkind. *)
-               recur ty's_jkinds (List.init num_components (fun _ -> jkind))
+               recur (List.init num_components (fun _ -> jkind))
              | _ ->
                (* Products don't line up. This is only possible if [ty] was
                   given a jkind annotation of the wrong product arity.
