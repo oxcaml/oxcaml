@@ -162,14 +162,36 @@ module Directive = struct
           ( eval ~this ~lookup_label ~lookup_symbol ~lookup_variable a,
             eval ~this ~lookup_label ~lookup_symbol ~lookup_variable b )
         with
-        | Some va, Some vb -> Some (Int64.add va vb)
+        | Some va, Some vb ->
+          let result = Int64.add va vb in
+          if
+            Int64.compare va 0L > 0
+            && Int64.compare vb 0L > 0
+            && Int64.compare result 0L < 0
+            || Int64.compare va 0L < 0
+               && Int64.compare vb 0L < 0
+               && Int64.compare result 0L >= 0
+          then
+            Misc.fatal_errorf "Overflow in constant expression: %Ld + %Ld" va vb;
+          Some result
         | _ -> None)
       | Sub (a, b) -> (
         match
           ( eval ~this ~lookup_label ~lookup_symbol ~lookup_variable a,
             eval ~this ~lookup_label ~lookup_symbol ~lookup_variable b )
         with
-        | Some va, Some vb -> Some (Int64.sub va vb)
+        | Some va, Some vb ->
+          let result = Int64.sub va vb in
+          if
+            Int64.compare va 0L >= 0
+            && Int64.compare vb 0L < 0
+            && Int64.compare result 0L < 0
+            || Int64.compare va 0L < 0
+               && Int64.compare vb 0L > 0
+               && Int64.compare result 0L >= 0
+          then
+            Misc.fatal_errorf "Overflow in constant expression: %Ld - %Ld" va vb;
+          Some result
         | _ -> None)
   end
 

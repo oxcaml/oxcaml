@@ -484,11 +484,11 @@ module Directive : sig
 
   (** {1 Binary emission helpers} *)
 
-  (** Given a directive and an current offset in bytes into some section,
-      compute the new offset after the directive is emitted. This accounts for
-      the size of data directives (Bytes, Const, Space, Sleb128, Uleb128) and
-      alignment padding (Align). Directives that don't emit data return the
-      offset unchanged. *)
+  (** Given a directive and a current offset in bytes into some section, compute
+      the new offset after the directive is emitted. This accounts for the size
+      of data directives (Bytes, Const, Space, Sleb128, Uleb128) and alignment
+      padding (Align). Directives that don't emit data return the offset
+      unchanged. *)
   val increment_offset_in_bytes : t -> offset_in_bytes:int -> int
 
   (** Emit an unsigned LEB128 encoded value to a buffer. *)
