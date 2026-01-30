@@ -55,43 +55,9 @@ module Color : sig
   type t = int
 end
 
-module RegisterStamp : sig
-  type t = int
-
-  type pair
-
-  val pair : t -> t -> pair
-
-  val fst : pair -> t
-
-  val snd : pair -> t
-
-  module PairSet : sig
-    type t
-
-    val make : num_registers:int -> t
-
-    val clear : t -> unit
-
-    val mem : t -> pair -> bool
-
-    val add : t -> pair -> unit
-
-    val cardinal : t -> int
-
-    val iter : t -> f:(pair -> unit) -> unit
-  end
-end
-
-module Degree : sig
-  type t = int
-
-  val infinite : t
-
-  val to_string : t -> string
-
-  val to_float : t -> float
-end
+module Edge = Regalloc_interf_graph.Edge
+module EdgeSet = Regalloc_interf_graph.EdgeSet
+module Degree = Regalloc_interf_graph.Degree
 
 val is_move_instruction : Instruction.t -> bool
 
