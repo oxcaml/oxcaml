@@ -1620,15 +1620,7 @@ module Oxcaml_options_impl = struct
   let ddissector_inputs f = Clflags.ddissector_inputs := Some f
 
   let dissector_assume_lld_without_64_bit_eh_frames () =
-    match Target_system.system () with
-    | Linux ->
-        Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames := true
-    | Windows _ | MacOS_like | FreeBSD | NetBSD | OpenBSD | Generic_BSD
-    | Solaris | Dragonfly | GNU | BeOS | Unknown ->
-        raise
-          (Arg.Bad
-             "-dissector-assume-lld-without-64-bit-eh-frames is only supported \
-              on Linux targets")
+    Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames := true
 
   let no_dissector_assume_lld_without_64_bit_eh_frames =
     clear' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
