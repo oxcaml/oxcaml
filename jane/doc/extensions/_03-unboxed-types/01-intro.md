@@ -182,12 +182,17 @@ We now have `type 'a or_null : value_or_null`, the type of unboxed options.
 It has constructors `Null` and `This v`. See the [`or_null` document](../02-or-null)
 for more details.
 
-## Unboxed unit
+## Unboxed unit and unboxed bool
 
 While we do not have support for unboxed variants in their full generality, we have
 limited support for specific built-in types, including `unit#`, the type of unboxed
-units. Values of this type can be constructed as `#()` in expressions, and destructed
-as `#()` in patterns.
+units, and `bool#`, the type of unboxed booleans.
+
+Values of type `unit#` can be constructed as `#()` in expressions, and destructed as `#()`
+in patterns.
+
+Values of type `bool#` can be constructed as `#false` or `#true` in expressions, and
+destructed as `#false` or `#true` in patterns.
 
 # Unboxed products
 

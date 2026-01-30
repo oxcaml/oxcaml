@@ -419,6 +419,8 @@ module Pat : sig
 
   val unboxed_unit : t
 
+  val unboxed_bool : bool -> t
+
   val tuple : (Label.Nonoptional.t * t) list -> t
 
   val unboxed_tuple : (Label.Nonoptional.t * t) list -> t
@@ -641,6 +643,8 @@ and Exp_desc : sig
   val immutable_array_comprehension : Comprehension.t -> t
 
   val unboxed_unit : t
+
+  val unboxed_bool : bool -> t
 
   val unboxed_tuple : (Label.Nonoptional.t * Exp.t) list -> t
 
