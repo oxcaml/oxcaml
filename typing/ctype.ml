@@ -2136,7 +2136,7 @@ let try_expand_safe env ty =
   with Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
 
-(* Cancel out all pairs of $ and <[_]>, or <[_]> and $. *)
+(* Cancel out a head-position pair of $ and <[_]>, or <[_]> and $. *)
 let rec try_quote_splice_cancel_once ty =
   match get_desc ty with
   | Tquote t -> begin
@@ -2156,6 +2156,7 @@ let rec try_quote_splice_cancel_once ty =
     end
   | _ -> raise Cannot_expand
 
+(* Cancel out all head-position pairs of $ and <[_]>, or <[_]> and $. *)
 let rec try_quote_splice_cancel ty =
   let ty' = try_quote_splice_cancel_once ty in
   try try_quote_splice_cancel ty'
@@ -4305,6 +4306,8 @@ and unify3 uenv t1 t1' t2 t2' =
             mcomp_for Unify (get_env uenv) t1' t2';
             record_equation uenv t1' t2'
           )
+      (* Ordering of scopes is asymmetric to ensure we consistently
+         move quotes/splices to the same side *)
       | (Tsplice s1, _)
         when is_instantiable_ty (get_env uenv) s1
           && instantiable_scope s1 > instantiable_scope t2'
