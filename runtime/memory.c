@@ -686,7 +686,7 @@ CAMLexport value caml_alloc_local_reserved(mlsize_t wosize, tag_t tag,
   } else {
     /* The return value is initialised directly using Field.
        This is invalid if it may create major -> minor pointers.
-       So, perform a minor GC to prevent this. (See caml_make_vect) */
+       So, perform a minor GC to prevent this. (See caml_array_make) */
     caml_minor_collection();
     return caml_alloc_shr_reserved(wosize, tag, reserved);
   }

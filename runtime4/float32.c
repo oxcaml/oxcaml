@@ -839,7 +839,7 @@ CAMLprim value caml_float32_of_string(value vs)
 }
 
 /* Defined in array.c */
-CAMLextern value caml_make_vect(value len, value init);
+CAMLextern value caml_array_make(value len, value init);
 
 
 static value caml_make_unboxed_float32_vect0(value len, int local)
@@ -882,7 +882,7 @@ CAMLprim value caml_make_local_unboxed_float32_vect(value len)
 
 CAMLprim value caml_make_unboxed_float32_vect_bytecode(value len)
 {
-  return caml_make_vect(len, caml_copy_float32(0.0f));
+  return caml_array_make(len, caml_copy_float32(0.0f));
 }
 
 CAMLprim value caml_unboxed_float32_vect_blit(value a1, value ofs1, value a2,
