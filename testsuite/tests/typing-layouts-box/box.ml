@@ -669,3 +669,58 @@ Line 1, characters 14-21:
 Error: This expression has type "string" but an expression was expected of type
          "'a box_"
 |}]
+
+(* Test 28: Subtyping with polymorphic variants and box_ *)
+
+type ab = [ `A | `B ]
+type a  = [ `A ];;
+[%%expect{|
+type ab = [ `A | `B ]
+type a = [ `A ]
+|}]
+
+let coerce_box (x : a box_) : ab box_ = (x :> ab box_);;
+[%%expect{|
+val coerce_box : a box_ -> ab box_ = <fun>
+|}]
+
+(* Also test the other direction fails *)
+let coerce_box_fail (x : ab box_) : a box_ = (x :> a box_);;
+[%%expect{|
+Line 1, characters 45-58:
+1 | let coerce_box_fail (x : ab box_) : a box_ = (x :> a box_);;
+                                                 ^^^^^^^^^^^^^
+Error: Type "ab box_" = "[ `A | `B ] box_" is not a subtype of
+         "a box_" = "[ `A ] box_"
+       Type "ab" = "[ `A | `B ]" is not a subtype of "a" = "[ `A ]"
+       The second variant type does not allow tag(s) "`B"
+|}]
+
+(* Test 29: Recursive type declarations with box_
+   These test well-foundedness and infinite size checks *)
+
+type a_rec = { a_rec : a_rec box_ } [@@unboxed];;
+[%%expect{|
+type a_rec = { a_rec : a_rec box_; } [@@unboxed]
+|}]
+
+type t1_rec = { t2_rec : t2_rec box_ } [@@unboxed]
+and t2_rec = t1_rec box_;;
+[%%expect{|
+type t1_rec = { t2_rec : t2_rec box_; } [@@unboxed]
+and t2_rec = t1_rec box_
+|}]
+
+(* Recursive types with box_ that are NOT unboxed also work *)
+type b_rec = { b_rec_field : b_rec box_ };;
+[%%expect{|
+type b_rec = { b_rec_field : b_rec box_; }
+|}]
+
+(* Mutually recursive with box_ *)
+type c1 = { c2_field : c2 box_ }
+and c2 = { c1_field : c1 box_ };;
+[%%expect{|
+type c1 = { c2_field : c2 box_; }
+and c2 = { c1_field : c1 box_; }
+|}]

@@ -2378,9 +2378,8 @@ let contained_without_boxing env ty =
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
-  | Tbox ty -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
-  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
+  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
   | Tquote _ | Tsplice _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
@@ -6717,7 +6716,11 @@ let rec build_subtype env (visited : transient_expr list)
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tpoly(t1', tl)), c)
       else (t, Unchanged)
-  | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _ -> (t, Unchanged)
+  | Tbox t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tbox t1'), c)
+      else (t, Unchanged)
+  | Tunivar _ | Tpackage _ | Tof_kind _ -> (t, Unchanged)
 
 and build_subtype_tuple env visited loops posi level t labeled_tlist
       constructor =
@@ -6898,6 +6901,12 @@ let rec subtype_rec env trace t1 t2 cstrs =
          subtype_rec env trace t1 t2 cstrs
     | (Tsplice t1, Tsplice t2) ->
          subtype_rec env trace t1 t2 cstrs
+    | (Tbox t1, Tbox t2) ->
+        subtype_rec
+          env
+          (Subtype.Diff {got = t1; expected = t2} :: trace)
+          t1 t2
+          cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end
