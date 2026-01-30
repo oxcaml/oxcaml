@@ -294,8 +294,6 @@ Error: The definition of "Bad_rec1.t" is recursive without boxing:
          "Bad_rec1.t Bad_rec2.id" = "Bad_rec1.t"
 |}]
 
-(* When we allow records with elements of unrepresentable layout, this should
-   still be disallowed. *)
 module M : sig
   type ('a : any) opaque_id : any
 end = struct
@@ -499,7 +497,7 @@ Line 3, characters 0-26:
 3 | and r = #{ x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r is any & any
+       The layout of r is value & value
          because it is an unboxed record.
        But the layout of r must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.

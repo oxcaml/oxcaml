@@ -41,8 +41,8 @@ type 'a t1_constraint = T1_con of 'a constraint 'a = 'b t1_constraint'
 and 'b t1_constraint' = t_void
 |}]
 
-(************************************)
-(* Test 2: but not the "any" layout *)
+(**************************************)
+(* Test 2: including the "any" layout *)
 type t2_any1 = T2_any1 of t_any
 [%%expect {|
 type t2_any1 = T2_any1 of t_any
@@ -118,8 +118,8 @@ Line 1, characters 16-35:
 Error: Records must contain at least one runtime value.
 |}]
 
-(**************************)
-(* Test 4: but any is not *)
+(*************************)
+(* Test 4: and so is any *)
 type t4_any1 = { x : t_any }
 [%%expect {|
 type t4_any1 = { x : t_any; }
@@ -151,7 +151,7 @@ type t4_cany3 = C of { x : t_any; y : t_value; }
 |}];;
 
 (*********************************************************)
-(* Test 5: These same rules apply to extensible variants *)
+(* Test 5: Allow void but not any in extensible variants *)
 type t5 = ..
 
 type t5 += T5_1 of t_void

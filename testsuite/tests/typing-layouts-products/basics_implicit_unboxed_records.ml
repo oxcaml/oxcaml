@@ -561,30 +561,53 @@ type ('a : any) t = { x : int; y : 'a }
 type ('a : any) t = { x : int; y : 'a; }
 |}]
 
+let f = fun t -> t.#y
+[%%expect{|
+val f : 'a t# -> 'a = <fun>
+|}]
+
 (* CR layouts v7.2: once we allow record declarations with unknown kind (right
    now, ['a] in the decl above is defaulted to value), then this should give an
-   error saying that records being projected from must be representable. *)
-let f : ('a : any). 'a t -> 'a = fun t -> t.#y
+   error saying that records being projected from must be representable.
+
+   Update: The kind is now indeed unknown but we can't really get this error
+   since the argument is not representable either. *)
+let f : ('a : any). 'a t# -> 'a = fun t -> t.#y
 [%%expect{|
-Line 1, characters 42-43:
-1 | let f : ('a : any). 'a t -> 'a = fun t -> t.#y
-                                              ^
-Error: This expression has type "'a t",
-       which is a boxed record rather than an unboxed one.
+Line 1, characters 34-47:
+1 | let f : ('a : any). 'a t# -> 'a = fun t -> t.#y
+                                      ^^^^^^^^^^^^^
+Error: This definition has type "'b t# -> 'b" which is less general than
+         "('a : any). 'a t# -> 'a"
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
+|}]
+
+let f = fun a -> #{ x = 1; y = a }
+[%%expect{|
+val f : 'a -> 'a t# = <fun>
 |}]
 
 (* CR layouts v7.2: once we allow record declarations with unknown kind
    (right now, ['a] in the decl above is defaulted to value), then this should
    give an error saying that records used in functional updates must be
    representable.
+
+   Update: Similar issue to above.
 *)
-let f : ('a : any). 'a -> 'a t = fun a -> #{ x = 1; y = a }
+let f : ('a : any). 'a -> 'a t# = fun a -> #{ x = 1; y = a }
 [%%expect{|
-Line 1, characters 42-59:
-1 | let f : ('a : any). 'a -> 'a t = fun a -> #{ x = 1; y = a }
-                                              ^^^^^^^^^^^^^^^^^
-Error: This unboxed record expression should be boxed instead,
-       the expected type is "'a t"
+Line 1, characters 34-60:
+1 | let f : ('a : any). 'a -> 'a t# = fun a -> #{ x = 1; y = a }
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This definition has type "'b -> 'b t#" which is less general than
+         "('a : any). 'a -> 'a t#"
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 

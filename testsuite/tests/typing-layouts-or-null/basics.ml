@@ -38,6 +38,19 @@ type t = { x : t_any_mod_separable }
 type t = { x : t_any_mod_separable; }
 |}]
 
+let f t = t.x
+
+[%%expect{|
+Line 1, characters 10-13:
+1 | let f t = t.x
+              ^^^
+Error: Fields being projected must be representable.
+       The layout of t_any_mod_separable is any
+         because of the definition of t_any_mod_separable at line 2, characters 0-44.
+       But the layout of t_any_mod_separable must be representable
+         because it's the type of a field being projected.
+|}]
+
 module type S1 = sig
   val x : t_any_mod_separable
 end

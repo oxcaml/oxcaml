@@ -226,14 +226,13 @@ Line 1, characters 0-54:
 1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of t6_wrong_inner_record is any & any
+       The layout of t6_wrong_inner_record is value & value
          because it is an unboxed record.
        But the layout of t6_wrong_inner_record must be a sublayout of
            value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
 |}]
-(* CR layouts v7.2: The above has a very bad error message. *)
 
 (* Just like t6/t7, but with the annotation on the other (the order doesn't
    matter) *)
@@ -915,11 +914,6 @@ module F :
     sig type r = X.t4 t_constraint end
 |}]
 
-(* This typechecks for unboxed tuples, but fail for [@@unboxed], unboxed, and
-   boxed records, in the same way as below.
-
-   CR layouts v7.2: These should typecheck for all record forms.
-*)
 module type S_coherence_deep = sig
   type t1 : any
   type t2 = #{ i : int; t1 : t1 }
@@ -1995,17 +1989,6 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
        The kind of string t is immutable_data & immutable_data
-         because of the definition of t at line 2, characters 0-47.
-       But the kind of string t must be a subkind of any mod global
-         because of the definition of needs_any_mod_global at line 4, characters 0-47.
-|}, Principal{|
-Line 1, characters 19-27:
-1 | type should_fail = string t needs_any_mod_global
-                       ^^^^^^^^
-Error: This type "string t" should be an instance of type "('a : any mod global)"
-       The kind of string t is
-           immediate mod dynamic with string u
-           & immediate mod dynamic with string u
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.

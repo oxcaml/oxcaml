@@ -408,15 +408,21 @@ end
 module rec M : S = struct
   include F(M)
   type t = { a : u ; b : u }
-  let rec u = #{ u ; u }
+  let rec u = #{ a = u ; b = u }
 end
 [%%expect{|
 module type S = sig type u : any type t = { a : u; b : u; } end
 module F : functor (X : S) -> sig type u = X.t# = #{ a : X.u; b : X.u; } end
 Line 12, characters 17-18:
-12 |   let rec u = #{ u ; u }
+12 |   let rec u = #{ a = u ; b = u }
                       ^
-Error: Unbound unboxed record field "u"
+Error: The unboxed record field "a" belongs to the type "t#" = "M.t#"
+       but is mixed here with fields of type
+         "('a : '_representable_layout_1 & '_representable_layout_2)"
+       The layout of t# is any & any
+         because it is an unboxed record.
+       But the layout of t# must be representable
+         because it's the record type used in an assignment.
 |}]
 
 (* CR layouts v7.2: improve this error message *)
@@ -429,7 +435,7 @@ Line 3, characters 0-25:
 3 | and r = { x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r# is any & any
+       The layout of r# is value & value
          because it is an unboxed record.
        But the layout of r# must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.

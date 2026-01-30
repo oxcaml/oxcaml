@@ -446,7 +446,6 @@ and r = { x : int; y : float#; }
 and u = r#
 |}]
 
-(* CR layouts v7.2: improve this error message *)
 type s_bad = r# t
 and r = {x:int; y:bool}
 [%%expect{|
@@ -454,7 +453,7 @@ Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r# is any & any
+       The layout of r# is value & value
          because it is an unboxed record.
        But the layout of r# must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
@@ -468,7 +467,7 @@ Line 3, characters 0-10:
 3 | and q = r#
     ^^^^^^^^^^
 Error:
-       The layout of q is any & any
+       The layout of q is value & value
          because it is an unboxed record.
        But the layout of q must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.

@@ -728,6 +728,9 @@ Error: This definition has type "'b t -> 'b" which is less general than
    (right now, ['a] in the decl above is defaulted to value), then this should
    give an error saying that records used in functional updates must be
    representable.
+
+   Update: Similarly, the type is now allowed but the function argument is what
+   gets flagged as an error.
 *)
 let f : ('a : any). 'a -> 'a t = fun a -> #{ x = 1; y = a }
 [%%expect{|

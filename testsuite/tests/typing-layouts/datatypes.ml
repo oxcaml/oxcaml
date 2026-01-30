@@ -30,8 +30,8 @@ type t_void : void
 
 (* CR layouts v5: Needs void - moved to [datatypes_alpha.ml] *)
 
-(************************************)
-(* Test 2: but not the "any" layout *)
+(*******************************)
+(* Test 2: or the "any" layout *)
 
 type t2_any1 = T2_any1 of t_any
 [%%expect {|
@@ -67,8 +67,8 @@ Error:
 (* CR layouts v5: Needs void - moved to [datatypes_alpha.ml].  Will change by
    the time we add back void anyway. *)
 
-(**************************)
-(* Test 4: but any is not *)
+(*************************)
+(* Test 4: and so is any *)
 
 type t4_any1 = { x : t_any }
 [%%expect {|
@@ -134,8 +134,8 @@ type t4_cany3 = C of { x : t_any; y : t_value }
 type t4_cany3 = C of { x : t_any; y : t_value; }
 |}];;
 
-(*********************************************************)
-(* Test 5: These same rules apply to extensible variants *)
+(*******************************************************)
+(* Test 5: But any doesn't work in extensible variants *)
 
 (* CR layouts v5: void parts of this test from [datatypes_alpha] *)
 type t5 = ..

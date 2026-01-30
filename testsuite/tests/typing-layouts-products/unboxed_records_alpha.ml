@@ -45,7 +45,6 @@ Error: The definition of "bad" is recursive without boxing:
 (* The below is adapted from
    [testsuite/tests/typing-layouts-products/basics_alpha.ml]. *)
 
-(* [t3] is allowed for unboxed tuples, and disallowed for (un)boxed records *)
 type t1 : any mod non_null separable
 type t2 : value
 type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2};;
@@ -54,9 +53,6 @@ type t1 : any mod non_null separable
 type t2
 type t3 = #{ t1 : t1; t2 : t2; }
 |}]
-
-(* CR layouts v7.2: once [any] is allowed in unboxed record declarations, check
-   that [non_null] behaves correctly in the following tests. *)
 
 type t1 : any mod non_null separable
 type t2 : value
@@ -85,7 +81,6 @@ type t2 : any mod non_null separable
 type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
-(* Should not be allowed for either unboxed tuples or (un)boxed records. *)
 type t1 : any
 type t2 : any mod non_null separable
 type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
