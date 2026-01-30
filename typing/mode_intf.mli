@@ -683,6 +683,7 @@ module type S = sig
          and type simple_error := simple_error
          and type 'd t := 'd t
 
+    (* CR-soon zqian: take [?hint:(_, _) monadic_comonadic] instead. *)
     val of_const :
       ?hint_monadic:('l * 'r) neg Hint.const ->
       ?hint_comonadic:('l * 'r) pos Hint.const ->

@@ -626,6 +626,8 @@ and Exp_desc : sig
 
   val stack : Exp.t -> t
 
+  val borrow : Exp.t -> t
+
   val extension_constructor : Name.t -> t
 
   val let_exception : Name.t -> Exp.t -> t

@@ -681,6 +681,16 @@ Hint: Label "x" is defined outside any quotations.
 <[fun () -> exclave_ stack_ (Some 42)]>
 |}];;
 
+<[ let x = borrow_ 42 in x + 1 ]>;;
+[%%expect {|
+- : <[int]> expr = <[let x = (borrow_ 42) in x + 1]>
+|}];;
+
+<[ fun x -> let y = borrow_ x in y + 1 ]>;;
+[%%expect {|
+- : <[int -> int]> expr = <[fun x -> let y = (borrow_ x) in y + 1]>
+|}];;
+
 module type S = sig
   type t
   type t2
