@@ -948,6 +948,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         (List.combine (List.combine stl args) params);
       let constr =
         newconstr path (List.map (fun ctyp -> ctyp.ctyp_type) args) in
+      (* Eagerly expand if this is a box_ type alias *)
+      let constr =
+        match decl.type_manifest with
+        | Some manifest when
+            (match get_desc manifest with Tbox _ -> true | _ -> false) ->
+            Ctype.expand_head env constr
+        | _ -> constr
+      in
       ctyp (Ttyp_constr (path, lid, args)) constr
   | Ptyp_object (fields, o) ->
       let ty, fields = transl_fields env ~policy ~row_context o fields in
@@ -1185,7 +1193,10 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   | Ptyp_box sty ->
       let cty = transl_type env ~policy ~row_context Alloc.Const.legacy sty in
       let ty = cty.ctyp_type in
-      ctyp (Ttyp_box cty) (newty (Tbox ty))
+      let box_ty = newty (Tbox ty) in
+      (* Eagerly expand box_ types during translation *)
+      let expanded_ty = Ctype.expand_head env box_ty in
+      ctyp (Ttyp_box cty) expanded_ty
   | Ptyp_quote t ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));
