@@ -180,7 +180,7 @@ module Test_3' :
     sig val f : (repr_ 'c) (repr_ 'd). 'c -> 'd end
 |}]
 
-(* CR-someday zqian: we might wanna support this via coercion *)
+(* CR-someday layout-polymorphism zqian: we might wanna support this via coercion *)
 (** [repr_]-bound type variable subtyping is handled reasonably. *)
 module Test_4 (X : sig val f : (repr_ 'a). 'a -> unit end)
   : sig val f : (repr_ 'b). ('b -> 'b) -> unit end
