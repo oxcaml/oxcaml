@@ -782,21 +782,11 @@ let max_with_zero ~machine_width x =
 
 (* actual (strict) upper bound for an index in a string-like read/write *)
 let actual_max_length_for_string_like_access_as_nativeint ~machine_width
-    ~(access_size : Flambda_primitive.string_accessor_width) length =
+    ~access_len length =
   (* offset to subtract from the length depending on the size of the
      read/write *)
   let length_offset_of_size size =
-    let offset =
-      match (size : Flambda_primitive.string_accessor_width) with
-      | Eight -> 0
-      | Sixteen -> 1
-      | Thirty_two | Single -> 3
-      | Sixty_four -> 7
-      | One_twenty_eight _ -> 15
-      | Two_fifty_six _ -> 31
-      | Five_twelve _ -> 63
-    in
-    Targetint_32_64.of_int machine_width offset
+    Targetint_32_64.of_int machine_width (size - 1)
   in
   (* We need to convert the length into a naked_nativeint because the optimised
      version of the max_with_zero function needs to be on machine-width integers
@@ -805,11 +795,10 @@ let actual_max_length_for_string_like_access_as_nativeint ~machine_width
     H.Prim
       (Unary (Num_conv { src = Naked_immediate; dst = Naked_nativeint }, length))
   in
-  match access_size with
-  | Eight -> length (* micro-optimization *)
-  | Sixteen | Thirty_two | Single | Sixty_four | One_twenty_eight _
-  | Two_fifty_six _ | Five_twelve _ ->
-    let offset = length_offset_of_size access_size in
+  match access_len with
+  | 1 -> length (* micro-optimization *)
+  | _ ->
+    let offset = length_offset_of_size access_len in
     let reduced_length =
       H.Prim
         (Binary
@@ -821,23 +810,23 @@ let actual_max_length_for_string_like_access_as_nativeint ~machine_width
 
 (* String-like validity conditions *)
 
-let string_like_access_validity_condition ~machine_width ~access_size ~length
+let string_like_access_validity_condition ~machine_width ~access_len ~length
     ~index_kind index : H.expr_primitive =
   check_bound ~index_kind ~bound_kind:Naked_nativeint ~index
     ~bound:
       (actual_max_length_for_string_like_access_as_nativeint ~machine_width
-         ~access_size length)
+         ~access_len length)
 
 let string_or_bytes_access_validity_condition ~machine_width str kind
-    access_size ~index_kind index : H.expr_primitive =
+    ~access_len ~index_kind index : H.expr_primitive =
   string_like_access_validity_condition ~index_kind index ~machine_width
-    ~access_size
+    ~access_len
     ~length:(Prim (Unary (String_length kind, str)))
 
-let bigstring_access_validity_condition ~machine_width big_str access_size
+let bigstring_access_validity_condition ~machine_width big_str access_len
     ~index_kind index : H.expr_primitive =
   string_like_access_validity_condition ~index_kind index ~machine_width
-    ~access_size
+    ~access_len
     ~length:(bigarray_dim_bound big_str 1)
 
 let bigstring_alignment_validity_condition ~machine_width bstr alignment
@@ -848,56 +837,32 @@ let bigstring_alignment_validity_condition ~machine_width bstr alignment
         (Binary (Bigarray_get_alignment alignment, bstr, untag_int tagged_index)),
       Simple (Simple.untagged_const_zero machine_width) )
 
-let checked_string_or_bytes_access ~dbg ~machine_width ~access_size ~primitive
-    kind string ~index_kind index =
-  (match (access_size : P.string_accessor_width) with
-  | Eight | Sixteen | Thirty_two | Single | Sixty_four
-  | One_twenty_eight { aligned = false }
-  | Two_fifty_six { aligned = false }
-  | Five_twelve { aligned = false } ->
-    ()
-  | One_twenty_eight { aligned = true }
-  | Two_fifty_six { aligned = true }
-  | Five_twelve { aligned = true } ->
-    Misc.fatal_error
-      "flambda2 cannot yet check string/bytes aligned access safety");
+let checked_string_or_bytes_access ~dbg ~machine_width ~access_len ~align
+    ~primitive kind string ~index_kind index =
+  assert (align = 0);
   checked_access ~dbg ~primitive
     ~conditions:
       [ string_or_bytes_access_validity_condition ~machine_width string kind
-          access_size ~index_kind index ]
+          ~access_len ~index_kind index ]
 
-let checked_bigstring_access ~dbg ~machine_width ~access_size ~primitive arg1
-    ~index_kind arg2 =
+let checked_bigstring_access ~dbg ~machine_width ~access_len ~align ~primitive
+    arg1 ~index_kind arg2 =
   let primitive =
-    match (access_size : P.string_accessor_width) with
-    | One_twenty_eight { aligned = true } ->
+    match align > 0 with
+    | true ->
       checked_alignment ~dbg ~primitive
         ~conditions:
-          [ bigstring_alignment_validity_condition ~machine_width arg1 16
+          [ bigstring_alignment_validity_condition ~machine_width arg1 align
               (convert_index_to_tagged_int ~index:arg2 ~index_kind) ]
-    | Two_fifty_six { aligned = true } ->
-      checked_alignment ~dbg ~primitive
-        ~conditions:
-          [ bigstring_alignment_validity_condition ~machine_width arg1 32
-              (convert_index_to_tagged_int ~index:arg2 ~index_kind) ]
-    | Five_twelve { aligned = true } ->
-      checked_alignment ~dbg ~primitive
-        ~conditions:
-          [ bigstring_alignment_validity_condition ~machine_width arg1 64
-              (convert_index_to_tagged_int ~index:arg2 ~index_kind) ]
-    | Eight | Sixteen | Thirty_two | Single | Sixty_four
-    | One_twenty_eight { aligned = false }
-    | Two_fifty_six { aligned = false }
-    | Five_twelve { aligned = false } ->
-      primitive
+    | false -> primitive
   in
   checked_access ~dbg ~primitive
     ~conditions:
-      [ bigstring_access_validity_condition ~machine_width arg1 access_size
+      [ bigstring_access_validity_condition ~machine_width arg1 access_len
           ~index_kind arg2 ]
 
 (* String-like loads *)
-let string_like_load ~dbg ~unsafe
+let string_like_load ~dbg ~safety
     ~(access_size : Flambda_primitive.string_accessor_width) ~machine_width
     (kind : P.string_like_value) mode ~boxed string ~index_kind index
     ~current_region =
@@ -928,24 +893,24 @@ let string_like_load ~dbg ~unsafe
     in
     wrap (Binary (String_or_bigstring_load (kind, access_size), string, index))
   in
-  if unsafe
-  then unsafe_load
-  else
+  match safety with
+  | None -> unsafe_load
+  | Some (~len, ~align) ->
     let check_access =
       match kind with
       | String -> checked_string_or_bytes_access String
       | Bytes -> checked_string_or_bytes_access Bytes
       | Bigstring -> checked_bigstring_access
     in
-    check_access ~dbg ~machine_width ~access_size ~primitive:unsafe_load string
-      ~index_kind index
+    check_access ~dbg ~machine_width ~access_len:len ~align
+      ~primitive:unsafe_load string ~index_kind index
 
 let get_header obj mode ~current_region =
   let wrap hd = box_bint Boxed_nativeint mode hd ~current_region in
   wrap (Unary (Get_header, obj))
 
 (* Bytes-like set *)
-let bytes_like_set ~dbg ~unsafe
+let bytes_like_set ~dbg ~safety
     ~(access_size : Flambda_primitive.string_accessor_width) ~machine_width
     (kind : P.bytes_like_value) ~boxed bytes ~index_kind index new_value =
   let unsafe_set =
@@ -965,16 +930,16 @@ let bytes_like_set ~dbg ~unsafe
     H.Ternary
       (Bytes_or_bigstring_set (kind, access_size), bytes, index, wrap new_value)
   in
-  if unsafe
-  then unsafe_set
-  else
+  match safety with
+  | None -> unsafe_set
+  | Some (~len, ~align) ->
     let check_access =
       match kind with
       | Bytes -> checked_string_or_bytes_access Bytes
       | Bigstring -> checked_bigstring_access
     in
-    check_access ~dbg ~machine_width ~access_size ~primitive:unsafe_set bytes
-      ~index_kind index
+    check_access ~dbg ~machine_width ~access_len:len ~align
+      ~primitive:unsafe_set bytes ~index_kind index
 
 (* Array bounds checks *)
 
@@ -1779,6 +1744,14 @@ let write_offset write_offset_kind layout mode ~machine_width ~ptr ~idx
   in
   [H.Sequence writes]
 
+let to_safety (size : Flambda_primitive.string_accessor_width) unsafe =
+  if unsafe
+  then None
+  else
+    Some
+      ( ~len:(Flambda_primitive.byte_width_of_string_accessor_width size),
+        ~align:0 )
+
 (* Primitive conversion *)
 let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (prim : L.primitive) (args : Simple.t list list) (dbg : Debuginfo.t)
@@ -2399,75 +2372,94 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pstringlength, [[arg]] -> [tag_int (Unary (String_length String, arg))]
   | Pbyteslength, [[arg]] -> [tag_int (Unary (String_length Bytes, arg))]
   | Pstringrefu, [[str]; [index]] ->
-    [ string_like_load ~unsafe:true ~dbg ~machine_width ~access_size:Eight
-        String None ~boxed:false str ~index_kind:Ptagged_int_index index
+    let safety = to_safety Eight true in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Eight String
+        None ~boxed:false str ~index_kind:Ptagged_int_index index
         ~current_region ]
   | Pbytesrefu, [[bytes]; [index]] ->
-    [ string_like_load ~unsafe:true ~dbg ~machine_width ~access_size:Eight Bytes
-        None ~boxed:false bytes ~index_kind:Ptagged_int_index index
-        ~current_region ]
+    let safety = to_safety Eight true in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Eight Bytes None
+        ~boxed:false bytes ~index_kind:Ptagged_int_index index ~current_region
+    ]
   | Pstringrefs, [[str]; [index]] ->
-    [ string_like_load ~unsafe:false ~dbg ~machine_width ~access_size:Eight
-        String ~boxed:false None str ~index_kind:Ptagged_int_index index
+    let safety = to_safety Eight false in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Eight String
+        ~boxed:false None str ~index_kind:Ptagged_int_index index
         ~current_region ]
   | Pbytesrefs, [[bytes]; [index]] ->
-    [ string_like_load ~unsafe:false ~dbg ~machine_width ~access_size:Eight
-        Bytes ~boxed:false None bytes ~index_kind:Ptagged_int_index index
+    let safety = to_safety Eight false in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Eight Bytes
+        ~boxed:false None bytes ~index_kind:Ptagged_int_index index
         ~current_region ]
   | Pstring_load_16 { unsafe; index_kind }, [[str]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen String
+    let safety = to_safety Sixteen unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Sixteen String
         ~boxed:false None str ~index_kind index ~current_region ]
   | Pbytes_load_16 { unsafe; index_kind }, [[bytes]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen Bytes
+    let safety = to_safety Sixteen unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Sixteen Bytes
         ~boxed:false None bytes ~index_kind index ~current_region ]
   | Pstring_load_32 { unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Thirty_two
+    let safety = to_safety Thirty_two unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Thirty_two
         String ~boxed (Some mode) str ~index_kind index ~current_region ]
   | Pstring_load_f32 { unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Single String
+    let safety = to_safety Single unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Single String
         ~boxed (Some mode) str ~index_kind index ~current_region ]
   | Pbytes_load_32 { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Thirty_two Bytes
+    let safety = to_safety Thirty_two unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Thirty_two Bytes
         ~boxed (Some mode) bytes ~index_kind index ~current_region ]
   | Pbytes_load_f32 { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Single Bytes
+    let safety = to_safety Single unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Single Bytes
         ~boxed (Some mode) bytes ~index_kind index ~current_region ]
   | Pstring_load_64 { unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixty_four
+    let safety = to_safety Sixty_four unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Sixty_four
         String ~boxed (Some mode) str ~index_kind index ~current_region ]
   | Pbytes_load_64 { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixty_four Bytes
+    let safety = to_safety Sixty_four unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Sixty_four Bytes
         ~boxed (Some mode) bytes ~index_kind index ~current_region ]
   | Pstring_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]]
     ->
-    [ string_like_load ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned:false size)
-        String ~boxed (Some mode) str ~index_kind index ~current_region ]
+    let access_size = vec_accessor_width ~aligned:false size in
+    let safety = to_safety access_size unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size String ~boxed
+        (Some mode) str ~index_kind index ~current_region ]
   | Pbytes_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]]
     ->
-    [ string_like_load ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned:false size)
-        Bytes ~boxed (Some mode) str ~index_kind index ~current_region ]
+    let access_size = vec_accessor_width ~aligned:false size in
+    let safety = to_safety access_size unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size Bytes ~boxed
+        (Some mode) str ~index_kind index ~current_region ]
   | Pbytes_set_16 { unsafe; index_kind }, [[bytes]; [index]; [new_value]] ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixteen Bytes
+    let safety = to_safety Sixteen unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Sixteen Bytes
         ~boxed:false bytes ~index_kind index new_value ]
   | Pbytes_set_32 { unsafe; index_kind; boxed }, [[bytes]; [index]; [new_value]]
     ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Thirty_two Bytes
+    let safety = to_safety Thirty_two unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Thirty_two Bytes
         ~boxed bytes ~index_kind index new_value ]
   | Pbytes_set_f32 { unsafe; index_kind; boxed }, [[bytes]; [index]; [new_value]]
     ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Single Bytes
+    let safety = to_safety Single unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Single Bytes
         ~boxed bytes ~index_kind index new_value ]
   | Pbytes_set_64 { unsafe; index_kind; boxed }, [[bytes]; [index]; [new_value]]
     ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixty_four Bytes
+    let safety = to_safety Sixty_four unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Sixty_four Bytes
         ~boxed bytes ~index_kind index new_value ]
   | ( Pbytes_set_vec { size; unsafe; index_kind; boxed },
       [[bytes]; [index]; [new_value]] ) ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned:false size)
-        Bytes ~boxed bytes ~index_kind index new_value ]
+    let access_size = vec_accessor_width ~aligned:false size in
+    let safety = to_safety access_size unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size Bytes ~boxed bytes
+        ~index_kind index new_value ]
   | Pisint { variant_only }, [[arg]] ->
     [tag_int (Unary (Is_int { variant_only }, arg))]
   | Pisnull, [[arg]] -> [tag_int (Unary (Is_null, arg))]
@@ -2670,10 +2662,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
               ~index:(convert_index_to_tagged_int ~index ~index_kind)
               ~new_values)) ]
   | Pbytessetu (* unsafe *), [[bytes]; [index]; [new_value]] ->
-    [ bytes_like_set ~unsafe:true ~dbg ~machine_width ~access_size:Eight Bytes
+    let safety = to_safety Eight true in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Eight Bytes
         ~boxed:false bytes ~index_kind:Ptagged_int_index index new_value ]
   | Pbytessets, [[bytes]; [index]; [new_value]] ->
-    [ bytes_like_set ~unsafe:false ~dbg ~machine_width ~access_size:Eight Bytes
+    let safety = to_safety Eight false in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Eight Bytes
         ~boxed:false bytes ~index_kind:Ptagged_int_index index new_value ]
   | Poffsetref n, [[block]] ->
     let block_access : P.Block_access_kind.t =
@@ -2840,49 +2834,56 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pbigarraydim dimension, [[arg]] ->
     [tag_int (Unary (Bigarray_length { dimension }, arg))]
   | Pbigstring_load_16 { unsafe; index_kind }, [[big_str]; [index]] ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixteen
+    let safety = to_safety Sixteen unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Sixteen
         Bigstring ~boxed:false None big_str ~index_kind index ~current_region ]
   | Pbigstring_load_32 { unsafe; index_kind; mode; boxed }, [[big_str]; [index]]
     ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Thirty_two
+    let safety = to_safety Thirty_two unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Thirty_two
         Bigstring (Some mode) ~boxed big_str ~index_kind index ~current_region
     ]
   | Pbigstring_load_f32 { unsafe; index_kind; mode; boxed }, [[big_str]; [index]]
     ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Single Bigstring
+    let safety = to_safety Single unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Single Bigstring
         (Some mode) ~boxed big_str ~index_kind index ~current_region ]
   | Pbigstring_load_64 { unsafe; index_kind; mode; boxed }, [[big_str]; [index]]
     ->
-    [ string_like_load ~unsafe ~dbg ~machine_width ~access_size:Sixty_four
+    let safety = to_safety Sixty_four unsafe in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size:Sixty_four
         Bigstring (Some mode) ~boxed big_str ~index_kind index ~current_region
     ]
-  | ( Pbigstring_load_vec { size; unsafe; aligned; index_kind; mode; boxed },
+  | ( Pbigstring_load_vec { size; safety; aligned; index_kind; mode; boxed },
       [[big_str]; [index]] ) ->
-    [ string_like_load ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned size)
-        Bigstring (Some mode) ~boxed big_str ~index_kind index ~current_region
-    ]
+    let access_size = vec_accessor_width ~aligned size in
+    [ string_like_load ~safety ~dbg ~machine_width ~access_size Bigstring
+        (Some mode) ~boxed big_str ~index_kind index ~current_region ]
   | Pbigstring_set_16 { unsafe; index_kind }, [[bigstring]; [index]; [new_value]]
     ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixteen Bigstring
+    let safety = to_safety Sixteen unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Sixteen Bigstring
         ~boxed:false bigstring ~index_kind index new_value ]
   | ( Pbigstring_set_32 { unsafe; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Thirty_two
+    let safety = to_safety Thirty_two unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Thirty_two
         Bigstring ~boxed bigstring ~index_kind index new_value ]
   | ( Pbigstring_set_f32 { unsafe; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Single Bigstring
+    let safety = to_safety Single unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Single Bigstring
         ~boxed bigstring ~index_kind index new_value ]
   | ( Pbigstring_set_64 { unsafe; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width ~access_size:Sixty_four
+    let safety = to_safety Sixty_four unsafe in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size:Sixty_four
         Bigstring ~boxed bigstring ~index_kind index new_value ]
-  | ( Pbigstring_set_vec { size; unsafe; aligned; index_kind; boxed },
+  | ( Pbigstring_set_vec { size; safety; aligned; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
-    [ bytes_like_set ~unsafe ~dbg ~machine_width
-        ~access_size:(vec_accessor_width ~aligned size)
-        Bigstring ~boxed bigstring ~index_kind index new_value ]
+    let access_size = vec_accessor_width ~aligned size in
+    [ bytes_like_set ~safety ~dbg ~machine_width ~access_size Bigstring ~boxed
+        bigstring ~index_kind index new_value ]
   | ( Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
     check_float_array_optimisation_enabled "Pfloat_array_load_vec";

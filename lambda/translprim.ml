@@ -246,14 +246,16 @@ let indexing_primitives =
           Pbigstring_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let safety = if unsafe then None else Some (~len:16, ~align:0) in
           Pbigstring_load_vec
-            { size = Boxed_vec128; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec128; safety; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let safety = if unsafe then None else Some (~len:16, ~align:16) in
           Pbigstring_load_vec
-            { size = Boxed_vec128; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec128; safety; index_kind; mode;
+              aligned = true; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bigstring_set16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -269,48 +271,64 @@ let indexing_primitives =
           Pbigstring_set_64 { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec128; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let safety = if unsafe then None else Some (~len:16, ~align:0) in
+          Pbigstring_set_vec
+            { size = Boxed_vec128; safety; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec128; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let safety = if unsafe then None else Some (~len:16, ~align:16) in
+          Pbigstring_set_vec
+            { size = Boxed_vec128; safety; index_kind;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let safety = if unsafe then None else Some (~len:32, ~align:0) in
           Pbigstring_load_vec
-            { size = Boxed_vec256; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec256; safety; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let safety = if unsafe then None else Some (~len:32, ~align:32) in
           Pbigstring_load_vec
-            { size = Boxed_vec256; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec256; safety; index_kind; mode;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec256; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let safety = if unsafe then None else Some (~len:32, ~align:0) in
+          Pbigstring_set_vec
+            { size = Boxed_vec256; safety; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec256; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let safety = if unsafe then None else Some (~len:32, ~align:32) in
+          Pbigstring_set_vec
+            { size = Boxed_vec256; safety; index_kind;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let safety = if unsafe then None else Some (~len:64, ~align:0) in
           Pbigstring_load_vec
-            { size = Boxed_vec512; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec512; safety; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let safety = if unsafe then None else Some (~len:64, ~align:64) in
           Pbigstring_load_vec
-            { size = Boxed_vec512; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec512; safety; index_kind; mode;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec512; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let safety = if unsafe then None else Some (~len:64, ~align:0) in
+          Pbigstring_set_vec
+            { size = Boxed_vec512; safety; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec512; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let safety = if unsafe then None else Some (~len:64, ~align:64) in
+          Pbigstring_set_vec
+            { size = Boxed_vec512; safety; index_kind;
+              aligned = true; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
