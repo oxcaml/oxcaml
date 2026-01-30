@@ -85,25 +85,25 @@ module RegisterStamp = struct
       (* Compute linear bit offset for pair (i,j) in triangular storage. Layout:
          row i contains pairs (i,i), (i,i+1), ..., (i,n-1). Offset = (elements
          before row i) + (position within row i) = [i*n - i*(i-1)/2] + (j-i) *)
-      let bit_offset = (i * num_registers) - (i * (i - 1) / 2) + (j - i) in
-      let byte_index = bit_offset / 8 in
-      let bit_position = bit_offset mod 8 in
+      let bit_offset = (i * num_registers) - ((i * (i - 1)) asr 1) + (j - i) in
+      let byte_index = bit_offset lsr 3 in
+      let bit_position = bit_offset land 7 in
       byte_index, bit_position
 
     let make ~num_registers =
-      let num_pairs = num_registers * (num_registers + 1) / 2 in
-      let num_bytes = (num_pairs + 7) / 8 in
+      let num_pairs = (num_registers * (num_registers + 1)) lsr 1 in
+      let num_bytes = (num_pairs + 7) lsr 3 in
       { bits = Bytes.make num_bytes '\000'; num_registers }
 
     let clear t = Bytes.fill t.bits 0 (Bytes.length t.bits) '\000'
 
-    let mem t ((i, j) : pair) =
-      let byte_index, bit_position = bit_location (i, j) t.num_registers in
+    let mem t edge =
+      let byte_index, bit_position = bit_location edge t.num_registers in
       let byte_val = unsafe_get_uint8 t.bits byte_index in
       byte_val land (1 lsl bit_position) <> 0
 
-    let add t ((i, j) : pair) =
-      let byte_index, bit_position = bit_location (i, j) t.num_registers in
+    let add t edge =
+      let byte_index, bit_position = bit_location edge t.num_registers in
       let byte_val = unsafe_get_uint8 t.bits byte_index in
       unsafe_set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position))
 
