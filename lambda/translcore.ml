@@ -754,7 +754,17 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                         record_repres; _ } ->
     begin match record_repres with
     | Record_unboxed_product sorts ->
-      let lbl_layout l s = layout e.exp_env l.lbl_loc s l.lbl_arg in
+      let lbl_layout l s =
+        if l.lbl_pos == lbl.lbl_pos then
+          (* This is the field being projected, so give it a precise value kind
+             (by using the known type of the expression) *)
+          layout e.exp_env l.lbl_loc s e.exp_type
+        else
+          (* We don't necessarily know this field's precise value kind
+             ([l.lbl_arg] may be an [any]) but for lambda's purposes the sort
+             is good enough *)
+          layout_of_sort l.lbl_loc s
+      in
       let layouts = Array.map2 lbl_layout lbl.lbl_all sorts |> Array.to_list in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
