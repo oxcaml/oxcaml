@@ -104,6 +104,7 @@ module Sort : sig
   module Flat : sig
     type t =
       | Var of Var.id
+      | Univar of univar
       | Base of base
   end
 end

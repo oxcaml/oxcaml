@@ -691,6 +691,7 @@ module Sort = struct
   module Flat = struct
     type t =
       | Var of Var.id
+      | Univar of univar
       | Base of base
   end
 end
@@ -783,8 +784,11 @@ module Layout = struct
       in
       of_sort (Sort.get s)
 
+    let of_univar uv = Univar uv
+
     let of_flat_sort : Sort.Flat.t -> _ = function
       | Var _ -> None
+      | Univar uv -> Some (of_univar uv)
       | Base b -> Some (Static.of_base b)
   end
 
