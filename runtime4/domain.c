@@ -159,3 +159,8 @@ CAMLprim value caml_domain_tls_get(value unused)
 {
   return Caml_state->tls_state;
 }
+
+CAMLprim value caml_domain_preempt_self(value eff)
+{
+  caml_failwith("Effects not supported on runtime4");
+}
