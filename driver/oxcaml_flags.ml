@@ -489,5 +489,8 @@ let use_cached_generic_functions = ref false
 let cached_generic_functions_path =
   ref (Filename.concat Config.standard_library ("cached-generic-functions" ^ Config.ext_lib))
 
+let dissector_assume_lld_without_64_bit_eh_frames = ref true
+  (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)
+
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

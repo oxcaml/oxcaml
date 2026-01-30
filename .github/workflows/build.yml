@@ -23,6 +23,13 @@ jobs:
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
 
+          - name: runtime5 dissector-assembler (x86_64-linux)
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            oxcaml_llvm_source_branch: llvmize-oxcaml
+            dissector_assembler: true
+
           - name: runtime5 stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
             os: warp-ubuntu-latest-x64-8x
@@ -201,15 +208,48 @@ jobs:
             rm -fv $disable_testcases
           fi
 
+      - name: Install custom OxCaml LLVM
+        if: matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
+        run: |
+          # Determine architecture
+          if [[ "${{ runner.arch }}" == "X64" ]]; then
+            ARCH="x86_64"
+          elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
+            ARCH="aarch64"
+          else
+            echo "Unsupported architecture: ${{ runner.arch }}"
+            exit 1
+          fi
+
+          OXCAML_LLVM_TAG="${{ matrix.oxcaml_llvm_tag }}"
+          OXCAML_LLVM_SOURCE_BRANCH="${{ matrix.oxcaml_llvm_source_branch }}"
+          OXCAML_LLVM_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
+
+          # Download and extract custom OxCaml LLVM (includes LLDB and other LLVM tools)
+          cd $GITHUB_WORKSPACE
+          wget -O oxcaml-llvm.tar.gz "$OXCAML_LLVM_URL"
+          mkdir -p oxcaml-llvm
+          tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
+
       - name: Configure OxCaml
         run: |
           if [[ -n "${{matrix.cc}}" ]]; then
             export CC="${{matrix.cc}}"
           fi
+          if [[ -n "${{matrix.install_path}}" ]]; then
+            install_path="${{matrix.install_path}}"
+          else
+            install_path="_install"
+          fi
+          dissector_config=""
+          if [[ "${{matrix.dissector_assembler}}" == "true" ]]; then
+            dissector_config="--enable-assembler-suitable-for-dissector=$GITHUB_WORKSPACE/oxcaml-llvm/bin/llvm-mc"
+          fi
           autoconf
           ./configure \
-            --prefix=$GITHUB_WORKSPACE/_install \
-            ${{ matrix.config }}
+            --prefix=$GITHUB_WORKSPACE/$install_path \
+            ${{ matrix.config }} \
+            $dissector_config
 
       - name: Setup for saving core files (Linux)
         if: runner.os == 'Linux'
@@ -273,29 +313,6 @@ jobs:
             echo "No test output differences found"
             echo "DIFF_CREATED=false" >> $GITHUB_ENV
           fi
-
-      - name: Install custom OxCaml LLVM
-        if: matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
-        run: |
-          # Determine architecture
-          if [[ "${{ runner.arch }}" == "X64" ]]; then
-            ARCH="x86_64"
-          elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
-            ARCH="aarch64"
-          else
-            echo "Unsupported architecture: ${{ runner.arch }}"
-            exit 1
-          fi
-
-          OXCAML_LLVM_TAG="${{ matrix.oxcaml_llvm_tag }}"
-          OXCAML_LLVM_SOURCE_BRANCH="${{ matrix.oxcaml_llvm_source_branch }}"
-          OXCAML_LLVM_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
-
-          # Download and extract custom OxCaml LLVM (includes LLDB and other LLVM tools)
-          cd $GITHUB_WORKSPACE
-          wget -O oxcaml-llvm.tar.gz "$OXCAML_LLVM_URL"
-          mkdir -p oxcaml-llvm
-          tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
 
       - name: Build and test OxCaml DWARF
         if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'

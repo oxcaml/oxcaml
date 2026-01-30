@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -25,23 +25,24 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR mshinwell: This file needs to be code reviewed *)
+(** Generate EH frame registration code for manual runtime registration.
 
-(** Generate linker scripts for the dissector.
+    When using the dissector with LLD that lacks 64-bit EH frame support, we
+    suppress LLD's 32-bit .eh_frame_hdr generation and instead register the
+    .eh_frame section manually at runtime using libgcc's frame registration
+    functions. *)
 
-    This module generates a linker script that places partition sections in the
-    correct output sections. It optionally incorporates an existing linker
-    script provided via --script= on the linker command line.
+(** Linker script sections that define __EH_FRAME_BEGIN__ and provide an empty
+    .eh_frame_hdr table. This should be included in the SECTIONS block of the
+    linker script when manual EH frame registration is used. *)
+val linker_script_sections : string
 
-    In addition, if -assume-lld-without-64-bit-eh-frames was passed to ocamlopt,
-    this generates a custom .eh_frame section with __EH_FRAME_BEGIN__ symbol and
-    an empty .eh_frame_hdr section to work around LLD's inability to generate
-    64-bit .eh_frame_hdr tables. *)
+(** [generate ~temp_dir] creates a C file with .init/.fini constructors that
+    call __register_frame_info_bases and __deregister_frame_info_bases, compiles
+    it, and returns the path to the resulting object file.
 
-(** [write ~output_file ~existing_script ~partitions] generates a linker script
-    and writes it to the specified file. *)
-val write :
-  output_file:string ->
-  existing_script:string option ->
-  partitions:Partition.Linked.t list ->
-  unit
+    @param temp_dir Directory where the C and object files will be created
+    @return Path to the compiled object file
+
+    @raise Misc.Fatal_error if compilation fails *)
+val generate : temp_dir:string -> string

@@ -233,6 +233,11 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
          through as they can't be baked into partition files. *)
       Clflags.all_ccopts
         := Build_linker_args.linker_script_flag args :: !Clflags.all_ccopts;
+      (* When assuming LLD without 64-bit EH frame support, suppress LLD's
+         broken .eh_frame_hdr generation - we provide our own in the linker
+         script. *)
+      if !Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
+      then Clflags.all_ccopts := "-Wl,--no-eh-frame-hdr" :: !Clflags.all_ccopts;
       let c_lib =
         if !Clflags.nopervasives || (main_obj_runtime && not main_dll)
         then ""
@@ -407,6 +412,12 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
               ~cached_genfns)
       in
       let linker_args = Build_linker_args.build result in
+      (* Add EH frame registration object if the dissector generated one. This
+         handles runtime frame registration when using LLD without 64-bit EH
+         frame support. *)
+      (match Dissector.Result.eh_frame_registration_obj result with
+      | Some eh_frame_obj -> Clflags.ccobjs := eh_frame_obj :: !Clflags.ccobjs
+      | None -> ());
       (* Print partition file paths if requested *)
       if !Clflags.ddissector_partitions
       then (
