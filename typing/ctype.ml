@@ -2493,7 +2493,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
   | Tquote _ -> Jkind.Builtin.value ~why:Tquote
   | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
-  | Tbox _ -> Jkind.Builtin.value ~why:Boxed_variant
+  | Tbox _ -> Jkind.Builtin.value ~why:Boxed
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
