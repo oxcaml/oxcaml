@@ -631,3 +631,41 @@ let sum_float_tree (t : float_tree) = sum_tree t;;
 [%%expect{|
 val sum_float_tree : float_tree -> float = <fun>
 |}]
+
+(* Test 27: Polymorphic box_ unification with concrete boxed types *)
+
+let f_box : 'a box_ -> 'a box_ = fun x -> x;;
+[%%expect{|
+val f_box : ('a : any). 'a box_ -> 'a box_ = <fun>
+|}]
+
+let _ = f_box 5.;;
+[%%expect{|
+- : float# box_ = 5.
+|}]
+
+let _ = f_box 42l;;
+[%%expect{|
+- : int32# box_ = 42l
+|}]
+
+let _ = f_box 42L;;
+[%%expect{|
+- : int64# box_ = 42L
+|}]
+
+(* int also has an unboxed version (int#) *)
+let _ = f_box 42;;
+[%%expect{|
+- : int# box_ = 42
+|}]
+
+(* Test that this does NOT work for types without unboxed versions *)
+let _ = f_box "hello";;
+[%%expect{|
+Line 1, characters 14-21:
+1 | let _ = f_box "hello";;
+                  ^^^^^^^
+Error: This expression has type "string" but an expression was expected of type
+         "'a box_"
+|}]
