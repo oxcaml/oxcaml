@@ -258,14 +258,23 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
     =
   let non_empty = String.length name > 0 in
   let name =
-    Printf.sprintf "caml_make%s_%s%svect%s"
-      (match mode with
-      | Alloc_heap -> ""
-      | Alloc_local when !Clflags.jsir -> ""
-      | Alloc_local -> "_local")
-      name
-      (if non_empty then "_" else "")
-      (if non_empty && !Clflags.jsir then "_bytecode" else "")
+    if non_empty
+    then
+      Printf.sprintf "caml_make%s_%s_vect%s"
+        (match mode with
+        | Alloc_heap -> ""
+        | Alloc_local when !Clflags.jsir -> ""
+        | Alloc_local -> "_local")
+        name
+        (if !Clflags.jsir then "_bytecode" else "")
+    else
+      (* For regular (boxed) arrays, use the new #13003 names. JSOO doesn't have
+         the new names yet, so we fall back to the old ones. *)
+      match mode with
+      | Alloc_heap when !Clflags.jsir -> "caml_make_vect"
+      | Alloc_heap -> "caml_array_make"
+      | Alloc_local when !Clflags.jsir -> "caml_make_vect"
+      | Alloc_local -> "caml_array_make_local"
   in
   let external_call_desc =
     Primitive.make ~name ~alloc:true (* the C stub may raise an exception *)
