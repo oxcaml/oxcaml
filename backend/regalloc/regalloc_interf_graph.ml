@@ -4,6 +4,7 @@ open! Int_replace_polymorphic_compare
 open! Regalloc_utils
 
 module Edge = struct
+  (* CR vkarvonen: Consider packing the stamps into a single [int]. *)
   type t = Reg.Stamp.t * Reg.Stamp.t
 
   let make x y = if Reg.Stamp.compare x y <= 0 then x, y else y, x
