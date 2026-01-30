@@ -35,6 +35,10 @@ m4_include([build-aux/ax_compare_version.m4])
 
 AC_CONFIG_AUX_DIR([build-aux])
 
+AC_ARG_ENABLE([tool-checks],
+  [AS_HELP_STRING([--disable-tool-checks],
+    [Skip version checks for ocamlopt, dune and menhir])])
+
 # Check for ocamlopt and its version
 AC_CHECK_PROG([ocamlopt], [ocamlopt], [ocamlopt])
 
@@ -46,14 +50,16 @@ ocamlopt_version=$("$ocamlopt" -version)
 AS_IF([test x"$ocamlopt_version" = 'x'],
   [AC_MSG_ERROR([unable to execute ocamlopt at $ocamlopt])])
 
-AS_CASE([$ocamlopt_version],
-  [*+ox], [AC_MSG_ERROR(m4_normalize(
-    [OxCaml ($ocamlopt_version) cannot be used to build OxCaml;
-     upstream OCaml is required]))])
+AS_IF([test x"$enable_tool_checks" != 'xno'], [
+  AS_CASE([$ocamlopt_version],
+    [*+ox], [AC_MSG_ERROR(m4_normalize(
+      [OxCaml ($ocamlopt_version) cannot be used to build OxCaml;
+       upstream OCaml is required]))])
 
-# eq2 compares only the first 2 version components (major.minor)
-AX_COMPARE_VERSION([$ocamlopt_version], [eq2], [5.4], [],
-  [AC_MSG_ERROR([OCaml 5.4.x is required but $ocamlopt_version was found])])
+  # eq2 compares only the first 2 version components (major.minor)
+  AX_COMPARE_VERSION([$ocamlopt_version], [eq2], [5.4], [],
+    [AC_MSG_ERROR([OCaml 5.4.x is required but $ocamlopt_version was found])])
+])
 
 AC_MSG_NOTICE([Using OCaml $ocamlopt_version])
 
@@ -67,17 +73,20 @@ AC_ARG_WITH([dune],
 AS_IF([test x"$dune" = 'x'],
   [AC_MSG_ERROR([dune not found on PATH; install, or use --with-dune])])
 
-# Check for upstream Dune
-AS_IF(["$dune" help topics >/dev/null 2>&1], [],
-  [AC_MSG_ERROR([upstream Dune is required])])
-
 dune_version=$("$dune" --version)
 
 AS_IF([test x"$dune_version" = 'x'],
   [AC_MSG_ERROR([unable to execute dune at $dune])])
 
-AX_COMPARE_VERSION([$dune_version], [ge], [3.20.0], [],
-  [AC_MSG_ERROR([dune version $dune_version found, but 3.20.0 or later is required])])
+AS_IF([test x"$enable_tool_checks" != 'xno'], [
+  # Check for upstream Dune
+  AS_IF(["$dune" help topics >/dev/null 2>&1], [],
+    [AC_MSG_ERROR([upstream Dune is required])])
+
+  AX_COMPARE_VERSION([$dune_version], [ge], [3.20.0], [],
+    [AC_MSG_ERROR(m4_normalize(
+      [dune version $dune_version found, but 3.20.0 or later is required]))])
+])
 
 AC_MSG_NOTICE([Using dune executable: $dune (version $dune_version)])
 
@@ -92,8 +101,11 @@ menhir_version=$("$menhir" --version | sed -n 's/.*version \([[0-9]]*\).*/\1/p')
 AS_IF([test x"$menhir_version" = 'x'],
   [AC_MSG_ERROR([unable to determine menhir version])])
 
-AS_IF([test x"$menhir_version" != 'x20231231'],
-  [AC_MSG_ERROR([menhir version $menhir_version found, but 20231231 is required])])
+AS_IF([test x"$enable_tool_checks" != 'xno'], [
+  AS_IF([test x"$menhir_version" != 'x20231231'],
+    [AC_MSG_ERROR(m4_normalize(
+      [menhir version $menhir_version found, but 20231231 is required]))])
+])
 
 AC_MSG_NOTICE([Using menhir version: $menhir_version])
 
