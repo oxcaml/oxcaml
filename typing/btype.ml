@@ -314,6 +314,7 @@ let fold_type_expr f init ty =
   | Tpackage (_, fl)  ->
     List.fold_left (fun result (_n, ty) -> f result ty) init fl
   | Tof_kind _ -> init
+  | Tbox ty -> f init ty
 
 let iter_type_expr f ty =
   fold_type_expr (fun () v -> f v) () ty
@@ -526,6 +527,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
       Tpoly (f ty, tyl)
   | Tpackage (p, fl)  -> Tpackage (p, List.map (fun (n, ty) -> (n, f ty)) fl)
   | Tof_kind jk -> Tof_kind jk
+  | Tbox ty -> Tbox (f ty)
 
 (* TODO: rename to [module Copy_scope] *)
 module For_copy : sig

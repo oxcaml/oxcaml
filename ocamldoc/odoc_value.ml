@@ -79,7 +79,8 @@ let parameter_list_from_arrows typ =
     | Types.Tunivar _
     | Types.Tpackage _
     | Types.Tvariant _
-    | Types.Tof_kind _ ->
+    | Types.Tof_kind _
+    | Types.Tbox _ ->
         []
     | Types.Tsubst _ ->
         assert false

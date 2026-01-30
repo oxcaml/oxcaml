@@ -310,6 +310,7 @@ module History = struct
     | Class_field
     | Boxed_record
     | Boxed_variant
+    | Boxed
     | Extensible_variant
     | Primitive of Ident.t
     | Type_argument of

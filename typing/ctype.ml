@@ -2134,6 +2134,36 @@ let rec quote_splice_cancel ty =
     end
   | _ -> raise Cannot_expand
 
+(* Try to expand a Tbox type directly. Returns [Some ty] if the box can be
+   eliminated, [None] if the inner type needs to be expanded first. *)
+let try_simplifying_box t =
+  match get_desc t with
+  | Tconstr (p, args, _) ->
+      begin match Path.boxed_version p with
+      | Some boxed_p -> Some (newconstr boxed_p args)
+      | None -> None
+      end
+  | Tunboxed_tuple tys ->
+      (* #(a * b * ...) box_ = (a * b * ...) *)
+      Some (newty (Ttuple tys))
+  | _ -> None
+
+let try_unbox_desc env = function
+  | Tconstr (p, args, _) ->
+      let has_unboxed_version =
+        not (Path.is_unboxed_version p) &&
+        match Env.find_type p env with
+        | decl -> Option.is_some decl.type_unboxed_version
+        | exception Not_found -> false
+      in
+      if has_unboxed_version then
+        Some (Tconstr(Path.unboxed_version p, args, ref Mnil))
+      else
+        None
+  | Ttuple tys ->
+      Some (Tunboxed_tuple tys)
+  | _ -> None
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
@@ -2146,6 +2176,13 @@ let rec try_expand_once env ty =
     Tconstr _ -> expand_abbrev env ty
   | Tsplice t -> expand_and_cancel t
   | Tquote t -> expand_and_cancel t
+  | Tbox t ->
+      begin match try_simplifying_box t with
+      | Some ty -> ty
+      | None ->
+          let t' = try_expand_once env t in
+          newty (Tbox t')
+      end
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2208,6 +2245,7 @@ let rec extract_concrete_typedecl env ty =
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
+  | Tbox ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2235,6 +2273,13 @@ let rec try_expand_once_opt env ty =
     Tconstr _ -> expand_abbrev_opt env ty
   | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Tbox t ->
+      begin match try_simplifying_box t with
+      | Some ty -> ty
+      | None ->
+          let t' = try_expand_once_opt env t in
+          newty (Tbox t')
+      end
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -2351,7 +2396,7 @@ let contained_without_boxing env ty =
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
-  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
+  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
   | Tquote _ | Tsplice _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
@@ -2464,6 +2509,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
   | Tquote _ -> Jkind.Builtin.value ~why:Tquote
   | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
+  | Tbox _ -> Jkind.Builtin.value ~why:Boxed
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -4297,8 +4343,29 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
       | (Tquote t1, Tquote t2)
-      | (Tsplice t1, Tsplice t2) ->
+      | (Tsplice t1, Tsplice t2)
+      | (Tbox t1, Tbox t2) ->
           unify uenv t1 t2
+      | (_, Tbox t2) ->
+          let env = get_env uenv in
+          begin match try_unbox_desc env d1 with
+          | Some d ->
+            let t1 =
+              newty3 ~level:(get_level t1') ~scope:(get_scope t1') d
+            in
+            unify uenv t1 t2
+          | None -> raise_unexplained_for Unify
+          end
+      | (Tbox t1, _) ->
+          let env = get_env uenv in
+          begin match try_unbox_desc env d2 with
+          | Some d ->
+            let t2 =
+              newty3 ~level:(get_level t2') ~scope:(get_scope t2') d
+            in
+            unify uenv t1 t2
+          | None -> raise_unexplained_for Unify
+          end
       | (Tsplice s1, _) when is_flexible s1 ->
           set_type_desc t2' d2;
           let t =
@@ -5464,6 +5531,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tsplice t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tquote t2) in
               moregen inst_nongen variance type_pairs env t1 t2
+          | (Tbox t1, Tbox t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -5921,6 +5990,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote t1, Tquote t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Tbox t1, Tbox t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
@@ -6647,6 +6718,10 @@ let rec build_subtype env (visited : transient_expr list)
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tpoly(t1', tl)), c)
       else (t, Unchanged)
+  | Tbox t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tbox t1'), c)
+      else (t, Unchanged)
   | Tunivar _ | Tpackage _ | Tof_kind _ -> (t, Unchanged)
 
 and build_subtype_tuple env visited loops posi level t labeled_tlist
@@ -6828,6 +6903,12 @@ let rec subtype_rec env trace t1 t2 cstrs =
          subtype_rec env trace t1 t2 cstrs
     | (Tsplice t1, Tsplice t2) ->
          subtype_rec env trace t1 t2 cstrs
+    | (Tbox t1, Tbox t2) ->
+        subtype_rec
+          env
+          (Subtype.Diff {got = t1; expected = t2} :: trace)
+          t1 t2
+          cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end

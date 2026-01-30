@@ -210,6 +210,7 @@ and core_type_desc =
   | Ptyp_quote of core_type (** [<[T]>] *)
   | Ptyp_splice of core_type (** [$T] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
+  | Ptyp_box of core_type  (** [T box_] boxes the unboxed type [T] *)
   | Ptyp_extension of extension  (** [[%id]]. *)
 
 and arg_label = Asttypes.arg_label =

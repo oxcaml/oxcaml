@@ -311,7 +311,7 @@ module Type_shape = struct
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
                 | Tpackage (_, _)
-                | Tquote _ | Tsplice _ | Tof_kind _ ->
+                | Tquote _ | Tsplice _ | Tof_kind _ | Tbox _ ->
                   assert false
               in
               Misc.fatal_errorf
@@ -351,6 +351,7 @@ module Type_shape = struct
           | Tsplice _ -> unknown_shape_any
           | Tunivar _ -> unknown_shape_any
           | Tof_kind _ -> unknown_shape_any
+          | Tbox _ -> unknown_shape_any
           | Tpackage _ -> unknown_shape_value
           (* CR sspies: Support first-class modules. *)
         in
