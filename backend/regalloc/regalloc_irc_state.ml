@@ -79,8 +79,7 @@ let[@inline] make ~initial ~stack_slots ~affinity () =
           fatal "precolored register %a is not an hardware register"
             Printreg.reg reg);
       Reg.Tbl.replace reg_alias reg None;
-      Regalloc_interf_graph.init_register_with_degree graph reg
-        ~degree:Degree.infinite)
+      Regalloc_interf_graph.init_register_with_infinite_degree graph reg)
     (all_precolored_regs ());
   let original_capacity = num_registers in
   let simplify_work_list = RegWorkListSet.make ~original_capacity in
@@ -165,8 +164,7 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
       | Reg _, None -> assert false
       | (Unknown | Stack _), _ -> assert false);
       Reg.Tbl.replace state.reg_alias reg None;
-      Regalloc_interf_graph.init_register_with_degree state.graph reg
-        ~degree:Degree.infinite;
+      Regalloc_interf_graph.init_register_with_infinite_degree state.graph reg;
       assert (Regalloc_interf_graph.degree state.graph reg = Degree.infinite))
     (all_precolored_regs ());
   state.initial <- Doubly_linked_list.of_list new_inst_temporaries;

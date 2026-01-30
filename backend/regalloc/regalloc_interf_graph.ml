@@ -154,6 +154,6 @@ let[@inline] init_register graph reg =
   Reg.Tbl.replace graph.adj_list reg [];
   Reg.Tbl.replace graph.degree reg 0
 
-let[@inline] init_register_with_degree graph reg ~degree =
+let[@inline] init_register_with_infinite_degree graph reg =
   Reg.Tbl.replace graph.adj_list reg [];
-  Reg.Tbl.replace graph.degree reg degree
+  Reg.Tbl.replace graph.degree reg Degree.infinite

@@ -176,8 +176,8 @@ val cardinal : t -> int
     This must be called before [reg] can be used with other graph operations. *)
 val init_register : t -> Reg.t -> unit
 
-(** [init_register_with_degree graph reg ~degree] initializes [reg] with a
-    specific degree value.
+(** [init_register_with_infinite_degree graph reg] initializes [reg] with the
+    infinite degree value.
 
-    This is used for precolored registers which have infinite degree. *)
-val init_register_with_degree : t -> Reg.t -> degree:int -> unit
+    This is used for precolored registers. *)
+val init_register_with_infinite_degree : t -> Reg.t -> unit
