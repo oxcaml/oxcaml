@@ -163,10 +163,10 @@ module Directive = struct
             eval ~this ~lookup_label ~lookup_symbol ~lookup_variable b )
         with
         | Some va, Some vb ->
-          if not (Misc.no_overflow_add_int64 va vb)
-          then
-            Misc.fatal_errorf "Overflow in constant expression: %Ld + %Ld" va vb;
-          Some (Int64.add va vb)
+          if Misc.no_overflow_add_int64 va vb
+          then Some (Int64.add va vb)
+          else
+            Misc.fatal_errorf "Overflow in constant expression: %Ld + %Ld" va vb
         | _ -> None)
       | Sub (a, b) -> (
         match
@@ -174,10 +174,10 @@ module Directive = struct
             eval ~this ~lookup_label ~lookup_symbol ~lookup_variable b )
         with
         | Some va, Some vb ->
-          if not (Misc.no_overflow_sub_int64 va vb)
-          then
-            Misc.fatal_errorf "Overflow in constant expression: %Ld - %Ld" va vb;
-          Some (Int64.sub va vb)
+          if Misc.no_overflow_sub_int64 va vb
+          then Some (Int64.sub va vb)
+          else
+            Misc.fatal_errorf "Overflow in constant expression: %Ld - %Ld" va vb
         | _ -> None)
   end
 
