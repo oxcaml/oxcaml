@@ -471,7 +471,7 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
     then
       (* may produce a *lot* of lines... *)
       RegisterStamp.PairSet.iter adj_set ~f:(fun p ->
-          log "(%d, %d) <- adj_set" (RegisterStamp.fst p) (RegisterStamp.snd p)));
+          log "%s <- adj_set" (RegisterStamp.Pair.to_string p)));
   make_work_list state;
   State.invariant state;
   if debug then log_work_list_desc "before loop";

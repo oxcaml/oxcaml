@@ -6,22 +6,26 @@ open! Regalloc_utils
 module RegisterStamp = struct
   type t = int
 
-  type pair = t * t
+  module Pair = struct
+    type stamp = t
 
-  let pair (x : t) (y : t) = if x <= y then x, y else y, x
+    type t = stamp * stamp
 
-  let fst = fst
+    let make x y = if x <= y then x, y else y, x
 
-  let snd = snd
+    let fst = fst
 
-  module PS = Hashtbl.Make (struct
-    type t = pair
+    let snd = snd
+
+    let to_string (x, y) = Printf.sprintf "(%d, %d)" x y
 
     let equal (left : t) (right : t) : bool =
       Int.equal (fst left) (fst right) && Int.equal (snd left) (snd right)
 
     let hash ((x, y) : t) = (x lsl 17) lxor y
-  end)
+  end
+
+  module PS = Hashtbl.Make (Pair)
 
   module PairSet = struct
     type t = unit PS.t
@@ -35,9 +39,9 @@ module RegisterStamp = struct
 
     let clear set = PS.clear set
 
-    let mem set (x : pair) = PS.mem set x
+    let mem set x = PS.mem set x
 
-    let add set (x : pair) = PS.replace set x ()
+    let add set x = PS.replace set x ()
 
     let cardinal set = PS.length set
 
@@ -86,7 +90,7 @@ let[@inline] add_edge graph u v =
     | Unknown -> true
     | Stack (Local _ | Incoming _ | Outgoing _ | Domainstate _) -> false
   in
-  let pair = RegisterStamp.pair u.Reg.stamp v.Reg.stamp in
+  let pair = RegisterStamp.Pair.make u.Reg.stamp v.Reg.stamp in
   if
     (not (Reg.same u v))
     && is_interesting_reg u && is_interesting_reg v && same_reg_class u v
@@ -115,7 +119,7 @@ let[@inline] add_edge graph u v =
 
 let[@inline] mem_edge graph reg1 reg2 =
   RegisterStamp.PairSet.mem graph.adj_set
-    (RegisterStamp.pair reg1.Reg.stamp reg2.Reg.stamp)
+    (RegisterStamp.Pair.make reg1.Reg.stamp reg2.Reg.stamp)
 
 let[@inline] adj_list graph reg = Reg.Tbl.find graph.adj_list reg
 

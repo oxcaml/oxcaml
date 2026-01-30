@@ -14,15 +14,25 @@
 
 (** Register stamps - unique identifiers for registers *)
 module RegisterStamp : sig
-  type t = int
+  type t = private int
 
-  type pair
+  module Pair : sig
+    type stamp := t
 
-  val pair : t -> t -> pair
+    type t
 
-  val fst : pair -> t
+    val make : stamp -> stamp -> t
 
-  val snd : pair -> t
+    val equal : t -> t -> bool
+
+    val hash : t -> int
+
+    val fst : t -> stamp
+
+    val snd : t -> stamp
+
+    val to_string : t -> string
+  end
 
   module PairSet : sig
     type t
@@ -31,13 +41,13 @@ module RegisterStamp : sig
 
     val clear : t -> unit
 
-    val mem : t -> pair -> bool
+    val mem : t -> Pair.t -> bool
 
-    val add : t -> pair -> unit
+    val add : t -> Pair.t -> unit
 
     val cardinal : t -> int
 
-    val iter : t -> f:(pair -> unit) -> unit
+    val iter : t -> f:(Pair.t -> unit) -> unit
   end
 end
 
