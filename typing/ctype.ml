@@ -2148,6 +2148,22 @@ let try_simplifying_box t =
       Some (newty (Ttuple tys))
   | _ -> None
 
+let try_unbox_desc env = function
+  | Tconstr (p, args, _) ->
+      let has_unboxed_version =
+        not (Path.is_unboxed_version p) &&
+        match Env.find_type p env with
+        | decl -> Option.is_some decl.type_unboxed_version
+        | exception Not_found -> false
+      in
+      if has_unboxed_version then
+        Some (Tconstr(Path.unboxed_version p, args, ref Mnil))
+      else
+        None
+  | Ttuple tys ->
+      Some (Tunboxed_tuple tys)
+  | _ -> None
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
@@ -3944,13 +3960,12 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
-(* Checks if a type is a type variable under some quotes, splices, or boxes *)
+(* Checks if a type is a type variable under some quotes or splices *)
 let rec is_flexible ty =
   match get_desc ty with
   | Tvar _ -> true
   | Tquote ty' -> is_flexible ty'
   | Tsplice ty' -> is_flexible ty'
-  | Tbox ty' -> is_flexible ty'
   | _ -> false
 
 (* raise Not_found rather than Unify if the module types are incompatible *)
@@ -4331,40 +4346,26 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tsplice t1, Tsplice t2)
       | (Tbox t1, Tbox t2) ->
           unify uenv t1 t2
-      | (Tconstr (p, args, _), Tbox t2) when is_flexible t2 ->
+      | (_, Tbox t2) ->
           let env = get_env uenv in
-          let has_unboxed_version =
-            not (Path.is_unboxed_version p) &&
-            match Env.find_type p env with
-            | decl -> Option.is_some decl.type_unboxed_version
-            | exception Not_found -> false
-          in
-          if has_unboxed_version then begin
-            set_type_desc t1' d1;
-            let unboxed_ty =
-              newty3 ~level:(get_level t1') ~scope:(get_scope t1')
-                (Tconstr (Path.unboxed_version p, args, ref Mnil))
+          begin match try_unbox_desc env d1 with
+          | Some d ->
+            let t1 =
+              newty3 ~level:(get_level t1') ~scope:(get_scope t1') d
             in
-            unify uenv t2 unboxed_ty
-          end else
-            raise_unexplained_for Unify
-      | (Tbox t1, Tconstr (p, args, _)) when is_flexible t1 ->
+            unify uenv t1 t2
+          | None -> raise_unexplained_for Unify
+          end
+      | (Tbox t1, _) ->
           let env = get_env uenv in
-          let has_unboxed_version =
-            not (Path.is_unboxed_version p) &&
-            match Env.find_type p env with
-            | decl -> Option.is_some decl.type_unboxed_version
-            | exception Not_found -> false
-          in
-          if has_unboxed_version then begin
-            set_type_desc t2' d2;
-            let unboxed_ty =
-              newty3 ~level:(get_level t2') ~scope:(get_scope t2')
-                (Tconstr (Path.unboxed_version p, args, ref Mnil))
+          begin match try_unbox_desc env d2 with
+          | Some d ->
+            let t2 =
+              newty3 ~level:(get_level t2') ~scope:(get_scope t2') d
             in
-            unify uenv t1 unboxed_ty
-          end else
-            raise_unexplained_for Unify
+            unify uenv t1 t2
+          | None -> raise_unexplained_for Unify
+          end
       | (Tsplice s1, _) when is_flexible s1 ->
           set_type_desc t2' d2;
           let t =

@@ -6,17 +6,21 @@
 (* Test 1: box_ on unboxed types - the manifest is stored as Tbox but
    expands to the boxed type during unification *)
 
-type t1 = float# box_;;
-type t2 = int32# box_;;
-type t3 = int64# box_;;
-type t4 = nativeint# box_;;
-type t5 = int# box_;;
+type t1 = float# box_
+type t2 = int32# box_
+type t3 = int64# box_
+type t4 = nativeint# box_
+type t5 = int# box_
+type t6 = #(int64# * string) box_
+type 'a t7 = 'a ref# box_
 [%%expect{|
 type t1 = float
 type t2 = int32
 type t3 = int64
 type t4 = nativeint
 type t5 = int
+type t6 = int64# * string
+type 'a t7 = 'a ref
 |}]
 
 let g (x : float# box_) : float# box_ = x;;
@@ -78,6 +82,7 @@ Line 2, characters 28-30:
                                 ^^
 Error: This expression has type "u box_" but an expression was expected of type
          "r"
+       Type "u" is not compatible with type "r#"
 |}]
 
 (* and float records don't get unboxed versions *)
@@ -329,6 +334,7 @@ Line 1, characters 43-44:
                                                ^
 Error: This expression has type "float box_"
        but an expression was expected of type "float"
+       Type "float" is not compatible with type "float#"
 |}]
 
 (* But nested types still unify with each other *)
@@ -536,6 +542,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This expression has type "int box_"
        but an expression was expected of type "int"
+       Type "int" is not compatible with type "int#"
 |}]
 
 let int_is_int_box (x : int) : int box_ = x;;
@@ -545,6 +552,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This expression has type "int" but an expression was expected of type
          "int box_"
+       Type "int#" is not compatible with type "int"
 |}]
 
 type boxed_string = string box_;;

@@ -238,12 +238,12 @@ val f : unit -> unit -> float# = <fun>
 
 type t_box = float# box_;;
 [%%expect{|
-type t_box = float# box_
+type t_box = float
 |}]
 
 let f_box (x : float# box_) : float = x;;
 [%%expect{|
-val f_box : float# box_ -> float = <fun>
+val f_box : float -> float = <fun>
 |}]
 
 type ('a : float64) box_alias = 'a box_;;
