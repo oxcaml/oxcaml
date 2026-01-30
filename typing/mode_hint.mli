@@ -77,7 +77,7 @@ type 'd const =
   | Is_used_in : pinpoint -> (disallowed * 'r) const
       (** A variant of [Is_closed_by] where the closure mode is constant.
           INVARIANT: The [pinpoint] cannot be [Unknown]. *)
-  | Borrowed : Location.t * ('l * disallowed, 'd) polarity -> 'd const
+  | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
   | Escape_region : region -> (disallowed * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

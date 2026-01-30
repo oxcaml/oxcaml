@@ -194,6 +194,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Mutable_write m -> Mutable_write m
         | Lazy_forced -> Lazy_forced
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -209,6 +210,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =

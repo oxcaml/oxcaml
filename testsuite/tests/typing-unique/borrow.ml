@@ -612,3 +612,14 @@ let foo () =
 [%%expect{|
 val foo : unit -> unit = <fun>
 |}]
+
+(* borrowing requiring the original value to be many *)
+let foo (x @ once) =
+  let y = borrow_ x in
+  ()
+[%%expect{|
+Line 2, characters 18-19:
+2 |   let y = borrow_ x in
+                      ^
+Error: This value is "once" but is expected to be "many" because it is borrowed.
+|}]
