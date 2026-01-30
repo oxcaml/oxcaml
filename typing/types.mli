@@ -200,9 +200,7 @@ and type_desc =
       mentioned in with-bounds. See test typing-jkind-bounds/gadt.ml *)
 
   | Tbox of type_expr
-  (** [Tbox ty] ==> [ty box_]
-
-      Boxes an unboxed type. *)
+  (** [Tbox ty] ==> [ty box_] *)
 
 (** This is used in the Typedtree. It is distinct from
     {{!Asttypes.arg_label}[arg_label]} because Position argument labels are
