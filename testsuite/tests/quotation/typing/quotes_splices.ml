@@ -106,5 +106,5 @@ let _ : <[ <[ $($('a)) ]> expr ]> expr = <[<[()]>]>
 
 let _ : <[ <[ <[ $($($('a))) ]> expr ]> expr ]> expr = <[<[<[()]>]>]>
 [%%expect {|
-- : <[<[unit]> expr]> expr = <[<[()]>]>
+- : <[<[<[unit]> expr]> expr]> expr = <[<[<[()]>]>]>
 |}]
