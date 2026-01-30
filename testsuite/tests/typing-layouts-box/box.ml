@@ -698,6 +698,7 @@ type c1 = { c2_field : c2 box_; }
 and c2 = { c1_field : c1 box_; }
 |}]
 
+
 (* Test 30: [any] in [box_] is representable *)
 
 type t : any
@@ -708,4 +709,56 @@ let f (foo : foo) = foo
 type t : any
 type foo = t box_
 val f : t box_ -> t box_ = <fun>
+|}]
+
+
+(* Test 31: GADTs *)
+
+let require_boxed (_ : _ box_) = ()
+type 'a st = T : string st
+type 'a ft = T : float ft
+type 'a bt = T : _ box_ bt
+[%%expect{|
+val require_boxed : ('a : any). 'a box_ -> unit = <fun>
+type 'a st = T : string st
+type 'a ft = T : float ft
+type 'a bt = T : 'b box_ bt
+|}]
+
+(* We can match on a GADT to learn that something is boxed *)
+let ok_bt (x : _ bt) =
+  match x with
+  | T -> require_boxed x
+[%%expect{||}]
+
+let ok_ft (x : _ ft) =
+  match x with
+  | T -> require_boxed x
+[%%expect{||}]
+
+let bad_st (x : _ st) =
+  match x with
+  [%%expect{||}]
+  | T -> require_boxed x
+[%%expect{|
+val ok_bt : 'a box_ bt -> unit = <fun>
+val ok_ft : float ft -> unit = <fun>
+val bad_st : string st -> unit = <fun>
+|}]
+
+(* We can't discover something is boxed, then lower the GADT type (this would be
+   unsound) *)
+
+let bad (x : 'a st) (a : 'a) =
+  require_boxed a;
+  match x with
+  | T ->
+    ()
+[%%expect{|
+Line 4, characters 4-5:
+4 |   | T ->
+        ^
+Error: This pattern matches values of type "string st"
+       but a pattern was expected which matches values of type "$0 box_ st"
+       The type constructor "$0" would escape its scope
 |}]
