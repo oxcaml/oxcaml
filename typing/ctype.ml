@@ -2134,6 +2134,20 @@ let rec quote_splice_cancel ty =
     end
   | _ -> raise Cannot_expand
 
+(* Try to expand a Tbox type directly. Returns [Some ty] if the box can be
+   eliminated, [None] if the inner type needs to be expanded first. *)
+let try_eliminate_box t =
+  match get_desc t with
+  | Tconstr (p, args, _) ->
+      begin match Path.boxed_version p with
+      | Some boxed_p -> Some (newconstr boxed_p args)
+      | None -> None
+      end
+  | Tunboxed_tuple tys ->
+      (* #(a * b * ...) box_ = (a * b * ...) *)
+      Some (newty (Ttuple tys))
+  | _ -> None
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
@@ -2147,18 +2161,11 @@ let rec try_expand_once env ty =
   | Tsplice t -> expand_and_cancel t
   | Tquote t -> expand_and_cancel t
   | Tbox t ->
-      let expand_inner () =
-        (* Try to expand the inner type one step *)
-        let t' = try_expand_once env t in
-        newty (Tbox t')
-      in
-      begin match get_desc t with
-      | Tconstr (p, args, _) ->
-          begin match Path.boxed_version p with
-          | Some boxed_p -> newconstr boxed_p args
-          | None -> expand_inner ()
-          end
-      | _ -> expand_inner ()
+      begin match try_eliminate_box t with
+      | Some ty -> ty
+      | None ->
+          let t' = try_expand_once env t in
+          newty (Tbox t')
       end
   | _ -> raise Cannot_expand
 
@@ -2251,17 +2258,11 @@ let rec try_expand_once_opt env ty =
   | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tbox t ->
-      let expand_inner () =
-        let t' = try_expand_once_opt env t in
-        newty (Tbox t')
-      in
-      begin match get_desc t with
-      | Tconstr (p, args, _) ->
-          begin match Path.boxed_version p with
-          | Some boxed_p -> newconstr boxed_p args
-          | None -> expand_inner ()
-          end
-      | _ -> expand_inner ()
+      begin match try_eliminate_box t with
+      | Some ty -> ty
+      | None ->
+          let t' = try_expand_once_opt env t in
+          newty (Tbox t')
       end
   | _ -> raise Cannot_expand
 

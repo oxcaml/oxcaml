@@ -235,7 +235,7 @@ Error: The type "float_point" has no unboxed version.
 Hint: Float records don't get unboxed versions.
 |}]
 
-(* Test 15: Boxing unboxed tuples are not not yet supported *)
+(* Test 15: Boxing unboxed tuples *)
 
 type ut = #(int * string);;
 [%%expect{|
@@ -244,12 +244,12 @@ type ut = #(int * string)
 
 type boxed_ut = ut box_;;
 [%%expect{|
-type boxed_ut = #(int * string) box_
+type boxed_ut = int * string
 |}]
 
 let eq_ut (x : #(int * string) box_) (y : ut box_) = x = y;;
 [%%expect{|
-val eq_ut : #(int * string) box_ -> #(int * string) box_ -> bool = <fun>
+val eq_ut : int * string -> int * string -> bool = <fun>
 |}]
 
 (* Test 16: Additional jkinds - bits32, bits64, word *)
