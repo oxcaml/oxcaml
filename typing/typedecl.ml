@@ -1675,7 +1675,7 @@ let update_constructor_arguments_sorts env loc cd_args =
   | Types.Cstr_tuple args ->
     let args_and_jkinds =
       List.map (fun ({Types.ca_type; _} as arg) ->
-          let jkind = Ctype.type_jkind_purely env ca_type in
+          let jkind = Ctype.type_jkind env ca_type in
           let sort = Jkind.sort_option_of_jkind jkind in
           let ca_sort = Option.map Jkind.Sort.default_to_value_and_get sort in
           {arg with ca_sort}, jkind)
