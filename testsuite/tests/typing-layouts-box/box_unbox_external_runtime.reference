@@ -1,0 +1,9 @@
+float# roundtrip: PASS
+int32# roundtrip: PASS
+int64# roundtrip: PASS
+nativeint# roundtrip: PASS
+float32# roundtrip: PASS
+int (value) roundtrip: PASS
+unbox boxed float: PASS
+nested box/unbox: PASS
+void roundtrip: PASS
