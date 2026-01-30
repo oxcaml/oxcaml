@@ -22,27 +22,27 @@ module Edge = struct
   let hash ((x, y) : t) = (Reg.Stamp.hash x lsl 17) lxor Reg.Stamp.hash y
 end
 
-module PS = Hashtbl.Make (Edge)
+module EdgeTbl = Hashtbl.Make (Edge)
 
 module EdgeSet = struct
-  type t = unit PS.t
+  type t = unit EdgeTbl.t
 
   let default_size = 256
 
   let make ~num_registers =
     let estimated_size = (num_registers * num_registers) asr 5 in
-    PS.create
+    EdgeTbl.create
       (if estimated_size < default_size then default_size else estimated_size)
 
-  let clear set = PS.clear set
+  let clear set = EdgeTbl.clear set
 
-  let mem set x = PS.mem set x
+  let mem set x = EdgeTbl.mem set x
 
-  let add set x = PS.replace set x ()
+  let add set x = EdgeTbl.replace set x ()
 
-  let cardinal set = PS.length set
+  let cardinal set = EdgeTbl.length set
 
-  let iter set ~f = PS.iter (fun key () -> f key) set
+  let iter set ~f = EdgeTbl.iter (fun key () -> f key) set
 end
 
 module Degree = struct
