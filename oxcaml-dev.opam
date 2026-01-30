@@ -23,6 +23,9 @@ depends: [
   "dune" {>= "3.13.0"}
   "menhir" {= "20231231"}
   "ocamlformat" {>= "0.28.0" & < "0.29.0"}
+
+  "merlin"
+  "ocaml-lsp-server"
 ]
 # The upstream compiler used for building OxCaml should not be configured with
 # any of these options.
