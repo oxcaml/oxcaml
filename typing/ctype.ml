@@ -2136,7 +2136,7 @@ let rec quote_splice_cancel ty =
 
 (* Try to expand a Tbox type directly. Returns [Some ty] if the box can be
    eliminated, [None] if the inner type needs to be expanded first. *)
-let try_eliminate_box t =
+let try_simplifying_box t =
   match get_desc t with
   | Tconstr (p, args, _) ->
       begin match Path.boxed_version p with
@@ -2161,7 +2161,7 @@ let rec try_expand_once env ty =
   | Tsplice t -> expand_and_cancel t
   | Tquote t -> expand_and_cancel t
   | Tbox t ->
-      begin match try_eliminate_box t with
+      begin match try_simplifying_box t with
       | Some ty -> ty
       | None ->
           let t' = try_expand_once env t in
@@ -2258,7 +2258,7 @@ let rec try_expand_once_opt env ty =
   | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | Tbox t ->
-      begin match try_eliminate_box t with
+      begin match try_simplifying_box t with
       | Some ty -> ty
       | None ->
           let t' = try_expand_once_opt env t in
