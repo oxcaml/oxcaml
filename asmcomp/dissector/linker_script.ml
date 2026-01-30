@@ -28,7 +28,7 @@
 (* CR mshinwell: This file needs to be code reviewed *)
 
 let sections =
-  [".text"; ".rodata"; ".data"; ".bss"; ".eh_frame"; ".data.igot"; ".text.iplt"]
+  [".text"; ".rodata"; ".data"; ".bss"; ".data.igot"; ".text.iplt"]
 
 let generate ~existing_script ~partitions ~assume_lld_without_64_bit_eh_frames =
   let buf = Buffer.create 1024 in
