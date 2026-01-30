@@ -86,7 +86,7 @@ let _ : <[<[$($('a))]>]> -> unit  = fun _ -> ()
 |}]
 
 
-(* Flexibility checks -- unifying with variable under quotes/splices *)
+(* Flexibility checks -- unifying variable under quotes/splices *)
 
 (* one *)
 
@@ -107,4 +107,14 @@ let _ : <[ <[ $($('a)) ]> expr ]> expr = <[<[()]>]>
 let _ : <[ <[ <[ $($($('a))) ]> expr ]> expr ]> expr = <[<[<[()]>]>]>
 [%%expect {|
 - : <[<[<[unit]> expr]> expr]> expr = <[<[<[()]>]>]>
+|}]
+
+
+(* Flexibility checks -- unifying locally-equated type under quotes/splices *)
+
+(* one *)
+
+let f (type a) (x : <[$(a)]> expr) (Equal : (a, int) Type.eq) : <[int]> expr = x
+[%%expect {|
+val f : 'a expr -> ('a, <[int]>) Type.eq -> <[int]> expr = <fun>
 |}]
