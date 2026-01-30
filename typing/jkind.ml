@@ -344,6 +344,7 @@ module Error = struct
         }
     | Unimplemented_syntax
     | With_on_right
+    | Box_with_any of Parsetree.jkind_annotation
 
   exception User_error of Location.t * t
 end
@@ -1446,6 +1447,15 @@ module Const = struct
       let base =
         of_user_written_annotation_unchecked_level context base_annot
       in
+      (* box_kind requires a representable sort inside, not any *)
+      let rec contains_any : Layout.Const.t -> bool = function
+        | Any -> true
+        | Base _ -> false
+        | Product ts -> List.exists contains_any ts
+        | Box t -> contains_any t
+      in
+      if contains_any base.layout
+      then raise ~loc:base_annot.pjkind_loc (Box_with_any base_annot);
       { layout = Layout.Const.Box base.layout;
         mod_bounds = base.mod_bounds;
         with_bounds = base.with_bounds
@@ -3225,6 +3235,11 @@ let report_error ~loc : Error.t -> _ = function
     Location.errorf ~loc "@[<v>Unimplemented kind syntax@]"
   | With_on_right ->
     Location.errorf ~loc "'with' syntax is not allowed on a right mode."
+  | Box_with_any inner ->
+    Location.errorf ~loc
+      "@[<v>The layout %a is not representable.@;\
+       box_kind must contain a representable layout, not any.@]"
+      Pprintast.jkind_annotation inner
 
 let () =
   Location.register_error_of_exn (function
