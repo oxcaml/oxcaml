@@ -54,6 +54,7 @@ module Sort : sig
     (** A flat sort is returned from [get]. *)
     type t =
       | Var of Var.id (* [Var.id] is for debugging / printing only *)
+      | Univar of univar
       | Base of base
   end
 end

@@ -142,8 +142,7 @@ module Layout = struct
         Sort (Base b)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
       | Product sorts -> Product (List.map flatten_sort sorts)
-      | Univar _ ->
-        Misc.fatal_error "Layout.get: unexpected univar in flatten_sort"
+      | Univar x -> Sort (Univar x)
     in
     function
     | Any -> Any
@@ -2516,6 +2515,7 @@ module Violation = struct
     in
     let rec has_sort_var : Sort.Flat.t Layout.t -> bool = function
       | Sort (Var _) -> true
+      | Sort (Univar _) -> Misc.fatal_error "has_sort_var: univar"
       | Product layouts -> List.exists has_sort_var layouts
       | Sort (Base _) | Any -> false
     in

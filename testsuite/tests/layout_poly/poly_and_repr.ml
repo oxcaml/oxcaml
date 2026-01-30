@@ -282,3 +282,19 @@ let forced3 : (repr_ 'a) (repr_ 'b) (repr_ 'c). unit =
 [%%expect {|
 Exception: Force_type.
 |}];;
+
+type 'a r = {a : 'a}
+
+(* test [flatten_sort] on [Sort.univar] *)
+let x : (repr_ 'a). 'a r = {a = "hello"}
+[%%expect {|
+type 'a r = { a : 'a; }
+Line 4, characters 20-22:
+4 | let x : (repr_ 'a). 'a r = {a = "hello"}
+                        ^^
+Error: This type "('a : a)" should be an instance of type "('b : value)"
+       The layout of 'a is a
+         because it's the layout polymorphic type.
+       But the layout of 'a must overlap with value
+         because of the definition of r at line 1, characters 0-20.
+|}]
