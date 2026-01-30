@@ -1,4 +1,5 @@
 (* TEST
+   flags = "-extension small_numbers";
    include stdlib_upstream_compatible;
    expect;
 *)
@@ -96,8 +97,92 @@ val box_value : int -> int box_ = <fun>
 val unbox_value : int box_ -> int = <fun>
 |}]
 
-(* Test 6: void - boxing void produces a value *)
-let box_void () : unit box_ = box ();;
+(* Test 6: box/unbox on unit (value type) *)
+let box_unit () : unit box_ = box ();;
 [%%expect{|
-val box_void : unit -> unit box_ = <fun>
+val box_unit : unit -> unit box_ = <fun>
+|}]
+
+(* Test 7: float32# boxing/unboxing *)
+let box_float32 (x : float32#) : float32# box_ = box x;;
+[%%expect{|
+val box_float32 : float32# -> float32# box_ = <fun>
+|}]
+
+let use_as_float32 (x : float32#) : float32 = box x;;
+[%%expect{|
+val use_as_float32 : float32# -> float32 = <fun>
+|}]
+
+let unbox_float32 (x : float32) : float32# = unbox x;;
+[%%expect{|
+val unbox_float32 : float32 -> float32# = <fun>
+|}]
+
+let roundtrip_float32 (x : float32#) : float32# = unbox (box x);;
+[%%expect{|
+val roundtrip_float32 : float32# -> float32# = <fun>
+|}]
+
+(* Test 8: void - proper void type boxing/unboxing *)
+type void : void
+external void : unit -> void = "%unbox_unit";;
+[%%expect{|
+type void : void
+external void : unit -> void = "%unbox_unit"
+|}]
+
+let box_void (v : void) : void box_ = box v;;
+[%%expect{|
+val box_void : void -> void box_ = <fun>
+|}]
+
+let unbox_void (v : void box_) : void = unbox v;;
+[%%expect{|
+val unbox_void : void box_ -> void = <fun>
+|}]
+
+let roundtrip_void (v : void) : void = unbox (box v);;
+[%%expect{|
+val roundtrip_void : void -> void = <fun>
+|}]
+
+(* Test 9: nested box_ - boxing an already boxed type *)
+(* float# box_ is a value type, so boxing it again should work via identity *)
+let double_box (x : float#) : float# box_ box_ = box (box x);;
+[%%expect{|
+val double_box : float# -> float# box_ box_ = <fun>
+|}]
+
+let double_unbox (x : float# box_ box_) : float# = unbox (unbox x);;
+[%%expect{|
+val double_unbox : float# box_ box_ -> float# = <fun>
+|}]
+
+(* Test 10: nested box_ roundtrip *)
+let roundtrip_double (x : float#) : float# = double_unbox (double_box x);;
+[%%expect{|
+val roundtrip_double : float# -> float# = <fun>
+|}]
+
+(* Test 11: product sorts should error *)
+type p = #(int * string);;
+[%%expect{|
+type p = #(int * string)
+|}]
+
+let box_product (x : p) = box x;;
+[%%expect{|
+Line 1, characters 26-31:
+1 | let box_product (x : p) = box x;;
+                              ^^^^^
+Error: Unknown builtin primitive "%box"
+|}]
+
+let unbox_product (x : p box_) = unbox x;;
+[%%expect{|
+Line 1, characters 33-40:
+1 | let unbox_product (x : p box_) = unbox x;;
+                                     ^^^^^^^
+Error: Unknown builtin primitive "%unbox"
 |}]
