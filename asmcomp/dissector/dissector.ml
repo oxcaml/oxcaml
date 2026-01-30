@@ -193,7 +193,7 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
     !Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
   in
   Linker_script.write ~output_file:linker_script ~existing_script
-    ~partitions:linked_partitions ~assume_lld_without_64_bit_eh_frames;
+    ~partitions:linked_partitions;
   log "generated linker script: %s" linker_script;
   let eh_frame_registration_obj =
     if assume_lld_without_64_bit_eh_frames

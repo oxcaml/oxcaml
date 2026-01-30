@@ -29,7 +29,7 @@
 
 let sections = [".text"; ".rodata"; ".data"; ".bss"; ".data.igot"; ".text.iplt"]
 
-let generate ~existing_script ~partitions ~assume_lld_without_64_bit_eh_frames =
+let generate ~existing_script ~partitions =
   let buf = Buffer.create 1024 in
   (match existing_script with
   | None -> ()
@@ -46,7 +46,7 @@ let generate ~existing_script ~partitions ~assume_lld_without_64_bit_eh_frames =
     Buffer.add_string buf
       (Printf.sprintf "/* END include existing linker script: %s */\n\n" path));
   Buffer.add_string buf "SECTIONS {\n";
-  if assume_lld_without_64_bit_eh_frames
+  if !Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
   then Buffer.add_string buf Eh_frame_registration.linker_script_sections;
   List.iter
     (fun linked ->
@@ -65,11 +65,8 @@ let generate ~existing_script ~partitions ~assume_lld_without_64_bit_eh_frames =
   Buffer.add_string buf "} INSERT AFTER .bss\n";
   Buffer.contents buf
 
-let write ~output_file ~existing_script ~partitions
-    ~assume_lld_without_64_bit_eh_frames =
-  let contents =
-    generate ~existing_script ~partitions ~assume_lld_without_64_bit_eh_frames
-  in
+let write ~output_file ~existing_script ~partitions =
+  let contents = generate ~existing_script ~partitions in
   let oc = open_out output_file in
   output_string oc contents;
   close_out oc
