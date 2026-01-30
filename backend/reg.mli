@@ -32,9 +32,21 @@ end
    that it remembers adjacency between machine registers aliased at multiple types.
 *)
 
+module Stamp : sig
+  type t = private int
+
+  val compare : t -> t -> int
+
+  val equal : t -> t -> bool
+
+  val hash : t -> int
+
+  val to_string : t -> string
+end
+
 type t = private
   { name : Name.t; (* Name *)
-    stamp : int; (* Unique stamp *)
+    stamp : Stamp.t; (* Unique stamp *)
     typ : Cmm.machtype_component; (* Type of contents *)
     preassigned : bool; (* Pinned to a hardware register or stack slot *)
     mutable loc : location
@@ -180,7 +192,7 @@ module For_printing : sig
   val create :
     name:Name.t ->
     typ:Cmm.machtype_component ->
-    stamp:int ->
+    stamp:Stamp.t ->
     preassigned:bool ->
     loc:location ->
     t

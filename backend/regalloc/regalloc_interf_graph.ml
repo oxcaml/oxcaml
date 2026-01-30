@@ -3,50 +3,46 @@
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
 
-module RegisterStamp = struct
-  type t = int
+module Edge = struct
+  type t = Reg.Stamp.t * Reg.Stamp.t
 
-  module Pair = struct
-    type stamp = t
+  let make x y = if Reg.Stamp.compare x y <= 0 then x, y else y, x
 
-    type t = stamp * stamp
+  let fst = fst
 
-    let make x y = if x <= y then x, y else y, x
+  let snd = snd
 
-    let fst = fst
+  let to_string (x, y) =
+    Printf.sprintf "(%s, %s)" (Reg.Stamp.to_string x) (Reg.Stamp.to_string y)
 
-    let snd = snd
+  let equal (left : t) (right : t) : bool =
+    Reg.Stamp.equal (fst left) (fst right)
+    && Reg.Stamp.equal (snd left) (snd right)
 
-    let to_string (x, y) = Printf.sprintf "(%d, %d)" x y
+  let hash ((x, y) : t) = (Reg.Stamp.hash x lsl 17) lxor Reg.Stamp.hash y
+end
 
-    let equal (left : t) (right : t) : bool =
-      Int.equal (fst left) (fst right) && Int.equal (snd left) (snd right)
+module PS = Hashtbl.Make (Edge)
 
-    let hash ((x, y) : t) = (x lsl 17) lxor y
-  end
+module EdgeSet = struct
+  type t = unit PS.t
 
-  module PS = Hashtbl.Make (Pair)
+  let default_size = 256
 
-  module PairSet = struct
-    type t = unit PS.t
+  let make ~num_registers =
+    let estimated_size = (num_registers * num_registers) asr 5 in
+    PS.create
+      (if estimated_size < default_size then default_size else estimated_size)
 
-    let default_size = 256
+  let clear set = PS.clear set
 
-    let make ~num_registers =
-      let estimated_size = (num_registers * num_registers) asr 5 in
-      PS.create
-        (if estimated_size < default_size then default_size else estimated_size)
+  let mem set x = PS.mem set x
 
-    let clear set = PS.clear set
+  let add set x = PS.replace set x ()
 
-    let mem set x = PS.mem set x
+  let cardinal set = PS.length set
 
-    let add set x = PS.replace set x ()
-
-    let cardinal set = PS.length set
-
-    let iter set ~f = PS.iter (fun key () -> f key) set
-  end
+  let iter set ~f = PS.iter (fun key () -> f key) set
 end
 
 module Degree = struct
@@ -67,19 +63,19 @@ end
     algorithm requires both fast membership testing (during coalescing) and
     efficient iteration (during simplification and color assignment). *)
 type t =
-  { adj_set : RegisterStamp.PairSet.t;
+  { adj_set : EdgeSet.t;
     adj_list : Reg.t list Reg.Tbl.t;
     degree : int Reg.Tbl.t
   }
 
 let[@inline] make ~num_registers =
-  { adj_set = RegisterStamp.PairSet.make ~num_registers;
+  { adj_set = EdgeSet.make ~num_registers;
     adj_list = Reg.Tbl.create num_registers;
     degree = Reg.Tbl.create num_registers
   }
 
 let[@inline] clear graph =
-  RegisterStamp.PairSet.clear graph.adj_set;
+  EdgeSet.clear graph.adj_set;
   Reg.Tbl.clear graph.adj_list;
   Reg.Tbl.clear graph.degree
 
@@ -90,13 +86,13 @@ let[@inline] add_edge graph u v =
     | Unknown -> true
     | Stack (Local _ | Incoming _ | Outgoing _ | Domainstate _) -> false
   in
-  let pair = RegisterStamp.Pair.make u.Reg.stamp v.Reg.stamp in
+  let pair = Edge.make u.Reg.stamp v.Reg.stamp in
   if
     (not (Reg.same u v))
     && is_interesting_reg u && is_interesting_reg v && same_reg_class u v
-    && not (RegisterStamp.PairSet.mem graph.adj_set pair)
+    && not (EdgeSet.mem graph.adj_set pair)
   then (
-    RegisterStamp.PairSet.add graph.adj_set pair;
+    EdgeSet.add graph.adj_set pair;
     let add_adj_list x y =
       Reg.Tbl.replace graph.adj_list x (y :: Reg.Tbl.find graph.adj_list x)
     in
@@ -118,8 +114,7 @@ let[@inline] add_edge graph u v =
       incr_degree v))
 
 let[@inline] mem_edge graph reg1 reg2 =
-  RegisterStamp.PairSet.mem graph.adj_set
-    (RegisterStamp.Pair.make reg1.Reg.stamp reg2.Reg.stamp)
+  EdgeSet.mem graph.adj_set (Edge.make reg1.Reg.stamp reg2.Reg.stamp)
 
 let[@inline] adj_list graph reg = Reg.Tbl.find graph.adj_list reg
 
@@ -152,7 +147,7 @@ let[@inline] decr_degree graph reg =
 
 let[@inline] adj_set graph = graph.adj_set
 
-let[@inline] cardinal graph = RegisterStamp.PairSet.cardinal graph.adj_set
+let[@inline] cardinal graph = EdgeSet.cardinal graph.adj_set
 
 let[@inline] init_register graph reg =
   Reg.Tbl.replace graph.adj_list reg [];

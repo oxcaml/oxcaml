@@ -12,43 +12,37 @@
 
 (** {1 Core types} *)
 
-(** Register stamps - unique identifiers for registers *)
-module RegisterStamp : sig
-  type t = private int
+(** Register edges - unique identifiers for registers *)
+module Edge : sig
+  type t
 
-  module Pair : sig
-    type stamp := t
+  val make : Reg.Stamp.t -> Reg.Stamp.t -> t
 
-    type t
+  val equal : t -> t -> bool
 
-    val make : stamp -> stamp -> t
+  val hash : t -> int
 
-    val equal : t -> t -> bool
+  val fst : t -> Reg.Stamp.t
 
-    val hash : t -> int
+  val snd : t -> Reg.Stamp.t
 
-    val fst : t -> stamp
+  val to_string : t -> string
+end
 
-    val snd : t -> stamp
+module EdgeSet : sig
+  type t
 
-    val to_string : t -> string
-  end
+  val make : num_registers:int -> t
 
-  module PairSet : sig
-    type t
+  val clear : t -> unit
 
-    val make : num_registers:int -> t
+  val mem : t -> Edge.t -> bool
 
-    val clear : t -> unit
+  val add : t -> Edge.t -> unit
 
-    val mem : t -> Pair.t -> bool
+  val cardinal : t -> int
 
-    val add : t -> Pair.t -> unit
-
-    val cardinal : t -> int
-
-    val iter : t -> f:(Pair.t -> unit) -> unit
-  end
+  val iter : t -> f:(Edge.t -> unit) -> unit
 end
 
 (** Degree tracking *)
@@ -173,7 +167,7 @@ val decr_degree : t -> Reg.t -> unit
 
     This is exposed for iteration and debugging purposes. Modifications to the
     returned set will affect the graph (no defensive copy is made). *)
-val adj_set : t -> RegisterStamp.PairSet.t
+val adj_set : t -> EdgeSet.t
 
 (** [cardinal graph] returns the total number of edges in the graph. *)
 val cardinal : t -> int

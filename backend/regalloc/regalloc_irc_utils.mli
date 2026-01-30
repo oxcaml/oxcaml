@@ -55,7 +55,8 @@ module Color : sig
   type t = int
 end
 
-module RegisterStamp = Regalloc_interf_graph.RegisterStamp
+module Edge = Regalloc_interf_graph.Edge
+module EdgeSet = Regalloc_interf_graph.EdgeSet
 module Degree = Regalloc_interf_graph.Degree
 
 val is_move_instruction : Instruction.t -> bool

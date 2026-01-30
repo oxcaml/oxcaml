@@ -110,7 +110,7 @@ val mem_adj_set : t -> Reg.t -> Reg.t -> bool
 
 val adj_list : t -> Reg.t -> Reg.t list
 
-val adj_set : t -> RegisterStamp.PairSet.t
+val adj_set : t -> EdgeSet.t
 
 val add_edge : t -> Reg.t -> Reg.t -> unit
 
