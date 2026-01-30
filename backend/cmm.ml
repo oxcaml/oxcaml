@@ -336,6 +336,15 @@ type memory_chunk =
   | Fivetwelve_unaligned
   | Fivetwelve_aligned
 
+let size_of_memory_chunk : memory_chunk -> int = function
+  | Byte_unsigned | Byte_signed -> 1
+  | Sixteen_unsigned | Sixteen_signed -> 2
+  | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> 4
+  | Word_int | Word_val | Double -> 8
+  | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 16
+  | Twofiftysix_unaligned | Twofiftysix_aligned -> 32
+  | Fivetwelve_unaligned | Fivetwelve_aligned -> 64
+
 type reinterpret_cast =
   | Int_of_value
   | Value_of_int

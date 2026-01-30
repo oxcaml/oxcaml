@@ -543,6 +543,14 @@ val no_overflow_lsl: int -> int -> bool
        (** [no_overflow_lsl n k] returns [true] if the computation of
            [n lsl k] does not overflow. *)
 
+val no_overflow_add_int64: int64 -> int64 -> bool
+       (** [no_overflow_add_int64 n1 n2] returns [true] if the computation of
+           [Int64.add n1 n2] does not overflow. *)
+
+val no_overflow_sub_int64: int64 -> int64 -> bool
+       (** [no_overflow_sub_int64 n1 n2] returns [true] if the computation of
+           [Int64.sub n1 n2] does not overflow. *)
+
 val letter_of_int : int -> string
 
 module Int_literal_converter : sig

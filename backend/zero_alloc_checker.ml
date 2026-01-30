@@ -1182,7 +1182,7 @@ end = struct
       then t1
       else if Transform.same_vars tr1 tr2
       then Transform (Transform.flatten tr1 tr2)
-      else Join (Join.trs tr1 tr2)
+      else bounded_join (fun () -> Join.trs tr1 tr2)
     | (Top w as top), Transform tr | Transform tr, (Top w as top) ->
       (* [has_witnesses]: Don't simplify (join Top x) to x if there are any
          witnesses in x. This makes the analysis more expensive because symbolic
@@ -1200,7 +1200,8 @@ end = struct
     | Safe, Join j | Join j, Safe -> Join (Join.add_safe j)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
       Join (Join.add_var j var witnesses)
-    | Join j, Transform tr | Transform tr, Join j -> Join (Join.add_tr j tr)
+    | Join j, Transform tr | Transform tr, Join j ->
+      bounded_join (fun () -> Join.add_tr j tr)
     | Join j1, Join j2 -> bounded_join (Join.flatten j1 j2)
 
   (* CR gyorsh: Handling of constant cases here is an optimization, instead of

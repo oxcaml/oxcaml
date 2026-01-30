@@ -854,6 +854,14 @@ let no_overflow_mul a b =
 let no_overflow_lsl a k =
   0 <= k && k < Sys.word_size - 1 && min_int asr k <= a && a <= max_int asr k
 
+let no_overflow_add_int64 a b =
+  let open Int64 in
+  compare (logor (logxor a b) (logxor a (lognot (add a b)))) 0L < 0
+
+let no_overflow_sub_int64 a b =
+  let open Int64 in
+  compare (logor (logxor a (lognot b)) (logxor b (sub a b))) 0L < 0
+
 let letter_of_int n =
   let letter = String.make 1 (Char.chr (Char.code 'a' + n mod 26)) in
   let num = n / 26 in
