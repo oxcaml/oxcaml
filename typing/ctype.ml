@@ -2427,6 +2427,7 @@ let rec estimate_type_jkind ~expand_components env ty =
   | Tunboxed_tuple ltys ->
     let tys = List.map snd ltys in
     estimate_unboxed_product_jkind ~expand_components env tys
+      ~why:Jkind_intf.History.Unboxed_tuple
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind =
@@ -2449,6 +2450,7 @@ let rec estimate_type_jkind ~expand_components env ty =
           end;
           let tys = Array.map snd label_params_and_tys |> Array.to_list in
           estimate_unboxed_product_jkind ~expand_components env tys
+            ~why:Jkind_intf.History.Unboxed_record
         | _ -> type_decl.type_jkind
       in
       (* Checking [has_with_bounds] here is needed for correctness, because
@@ -2493,7 +2495,7 @@ let rec estimate_type_jkind ~expand_components env ty =
   | Tof_kind jkind -> Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 
-and estimate_unboxed_product_jkind ~expand_components env tys =
+and estimate_unboxed_product_jkind ~expand_components ~why env tys =
   let is_open, tys_modalities =
     List.fold_left_map
       (fun is_open1 ty ->
@@ -2512,8 +2514,7 @@ and estimate_unboxed_product_jkind ~expand_components env tys =
       Jkind.extract_layout)
       tys_modalities
   in
-  Jkind.Builtin.product
-    ~why:Unboxed_tuple tys_modalities layouts |>
+  Jkind.Builtin.product ~why tys_modalities layouts |>
   close_open_jkind ~expand_components ~is_open env
 
 and close_open_jkind ~expand_components ~is_open env jkind =
@@ -2685,8 +2686,36 @@ let constrain_type_jkind ~fixed env ty jkind =
                in
                if List.for_all Result.is_ok results
                then Ok ()
-               else Error (Jkind.Violation.of_ ~context
-                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+               else
+                 (* [ty's_jkind] may be an approximation that we tried to refine
+                    when we recursed. We're in an error case anyway so just do
+                    the easy, slow thing of recomputing the jkind now. *)
+                 let ty's_best_jkind =
+                   let tys_and_modalities =
+                     List.map (fun { ty; is_open = _; modality } -> ty, modality)
+                       tys
+                   in
+                   let tys =
+                     List.map (fun { ty; is_open = _; modality = _ } -> ty) tys
+                   in
+                   let layouts =
+                     List.map
+                       (fun ty ->
+                          type_jkind_purely env ty
+                          |> Jkind.extract_layout)
+                       tys
+                   in
+                   (* This [why] might be wrong but we're about to correct it *)
+                   let jkind =
+                     Jkind.Builtin.product ~why:Unboxed_record
+                       tys_and_modalities layouts
+                   in
+                   (* This is a bit gross but we don't want to lose history *)
+                   { jkind with history = ty's_jkind.history }
+                 in
+                 Error (Jkind.Violation.of_ ~context
+                      (Not_a_subjkind (ty's_best_jkind, jkind,
+                                       sub_failure_reasons)))
              in
              begin match Jkind.decompose_product ty's_jkind,
                          Jkind.decompose_product jkind with
