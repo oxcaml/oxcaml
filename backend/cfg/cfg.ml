@@ -725,15 +725,6 @@ let basic_block_contains_calls block =
       | Stack_check _ ->
         false)
 
-let max_instr_id t =
-  fold_blocks t ~init:InstructionId.none ~f:(fun _label block acc ->
-      let acc =
-        DLL.fold_left block.body ~init:acc
-          ~f:(fun acc (instr : basic instruction) ->
-            InstructionId.max acc instr.id)
-      in
-      InstructionId.max acc block.terminator.id)
-
 let remove_trap_instructions t removed_trap_handlers =
   (* Remove Lpushtrap and Lpoptrap instructions that refer to dead labels and
      update stack_offsets of affected instructions and blocks. [stack_offset] is

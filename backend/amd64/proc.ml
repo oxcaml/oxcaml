@@ -655,7 +655,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
     if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call (OCaml { op = Indirect _ | Direct _; _ }) -> all_phys_regs
+  | Call (OCaml _) -> all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns

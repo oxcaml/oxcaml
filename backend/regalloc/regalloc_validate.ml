@@ -614,11 +614,11 @@ end = struct
                stack_align = sa2
              }) )
       when String.equal f1 f2 && Bool.equal a1 a2
-           && Stdlib.compare e1 e2 = 0
-           && Stdlib.compare tr1 tr2 = 0
-           && Stdlib.compare ta1 ta2 = 0
+           && Stdlib.( = ) e1 e2
+           && Misc.Stdlib.Array.equal Cmm.equal_machtype_component tr1 tr2
+           && Misc.Stdlib.List.equal Cmm.equal_exttype ta1 ta2
            && Int.equal so1 so2
-           && Stdlib.compare sa1 sa2 = 0 -> (
+           && Cmm.equal_stack_align sa1 sa2 -> (
       match r1, r2 with
       | None, None -> ()
       | Some l1, Some l2 -> compare_label l1 l2

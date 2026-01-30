@@ -1313,6 +1313,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
   | Probe_is_enabled _ | Name_for_debugger _ -> not_implemented_basic i
   | External_without_caml_c_call _ ->
+    (* CR mshinwell: implement *)
     not_implemented_basic ~msg:"External_without_caml_c_call" i
 
 let emit_basic t (i : Cfg.basic Cfg.instruction) =
