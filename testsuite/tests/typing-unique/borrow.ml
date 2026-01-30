@@ -43,8 +43,7 @@ let x = borrow_ "hello"
 Line 1, characters 8-23:
 1 | let x = borrow_ "hello"
             ^^^^^^^^^^^^^^^
-Error: This value is "local"
-       because it is borrowed.
+Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -56,7 +55,8 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use y
                  ^
-Error: This value is used here as unique, but it has already been borrowed:
+Error: This value is used here as unique,
+       but it has already been borrowed at:
 Line 3, characters 10-19:
 3 |   let x = borrow_ y in
               ^^^^^^^^^
@@ -89,8 +89,7 @@ let foo () =
 Line 3, characters 13-24:
 3 |   unique_use (borrow_ y);
                  ^^^^^^^^^^^
-Error: This value is "aliased"
-       because it is borrowed.
+Error: This value is "aliased" because it is borrowed.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -103,8 +102,7 @@ let foo () =
 Line 3, characters 21-32:
 3 |   global_aliased_use (borrow_ x);
                          ^^^^^^^^^^^
-Error: This value is "local"
-       because it is borrowed.
+Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -120,10 +118,9 @@ let foo () =
 Line 5, characters 4-5:
 5 |     y
         ^
-Error: This value is "local"
-       because it is borrowed.
+Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it escapes the borrow region at Lines 4-5, characters 4-5.
+         because it escapes the borrow region at Lines 4-5, characters 4-5.
 |}]
 
 (* In the borrow region, you are not allowed to use the original value uniquely *)
@@ -137,7 +134,8 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been borrowed:
+Error: This value is used here as unique,
+       but it has already been borrowed at:
 Line 3, characters 10-19:
 3 |   let y = borrow_ x in
               ^^^^^^^^^
@@ -154,7 +152,8 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been borrowed:
+Error: This value is used here as unique,
+       but it has already been borrowed at:
 Line 3, characters 10-19:
 3 |   let _ = borrow_ x in
               ^^^^^^^^^
@@ -183,7 +182,7 @@ let foo () =
 Line 5, characters 13-14:
 5 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 4, characters 21-22:
 4 |   global_aliased_use x);
                          ^
@@ -212,8 +211,7 @@ let foo () =
 Line 4, characters 24-25:
 4 |   (let z = borrow_ y in z)
                             ^
-Error: This value is "local"
-       because it is borrowed.
+Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -240,7 +238,8 @@ let foo () =
 Line 5, characters 13-14:
 5 |   unique_use x
                  ^
-Error: This value is used here as unique, but it has already been borrowed:
+Error: This value is used here as unique,
+       but it has already been borrowed at:
 Line 3, characters 10-19:
 3 |   let y = borrow_ x in
               ^^^^^^^^^
@@ -292,10 +291,9 @@ let foo () =
 Line 5, characters 4-19:
 5 |     stack_ (42, 24)
         ^^^^^^^^^^^^^^^
-Error: This value is "local"
-       because it is "stack_"-allocated.
+Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it escapes the borrow region at Lines 4-5, characters 4-19.
+         because it escapes the borrow region at Lines 4-5, characters 4-19.
 |}]
 
 (* Borrowing in Texp_match/Texp_apply/Texp_let are very similar,
@@ -311,8 +309,7 @@ let foo () =
 Line 4, characters 28-29:
 4 |   | x -> ignore (unique_use x)
                                 ^
-Error: This value is "aliased"
-       because it is borrowed.
+Error: This value is "aliased" because it is borrowed.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -325,8 +322,7 @@ let foo () =
 Line 4, characters 36-37:
 4 |   | x -> ignore (global_aliased_use x)
                                         ^
-Error: This value is "local"
-       because it is borrowed.
+Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -339,7 +335,8 @@ let foo () =
 Line 4, characters 29-30:
 4 |   | _y -> ignore (unique_use x)
                                  ^
-Error: This value is used here as unique, but it has already been borrowed:
+Error: This value is used here as unique,
+       but it has already been borrowed at:
 Line 3, characters 8-17:
 3 |   match borrow_ x with
             ^^^^^^^^^
@@ -358,7 +355,8 @@ let foo () =
 Line 4, characters 28-29:
 4 |   | _ -> ignore (unique_use x)
                                 ^
-Error: This value is used here as unique, but it has already been borrowed:
+Error: This value is used here as unique,
+       but it has already been borrowed at:
 Line 3, characters 8-17:
 3 |   match borrow_ x with
             ^^^^^^^^^
@@ -385,7 +383,7 @@ let foo () =
 Line 6, characters 21-22:
 6 |   ignore (unique_use x)
                          ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 4, characters 28-29:
 4 |   | _ -> global_aliased_use x
                                 ^
@@ -404,7 +402,7 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 3, characters 21-22:
 3 |   global_aliased_use x;
                          ^
@@ -431,7 +429,8 @@ let foo () =
 Line 4, characters 20-31:
 4 |   local_aliased_use (borrow_ x);
                         ^^^^^^^^^^^
-Error: This value is borrowed here, but it has already been used as unique:
+Error: This value is borrowed here,
+       but it has already been used as unique at:
 Line 3, characters 13-14:
 3 |   unique_use x;
                  ^
@@ -458,7 +457,7 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 3, characters 34-35:
 3 |   aliased_aliased_use (borrow_ x) x;
                                       ^
@@ -474,7 +473,7 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 3, characters 49-50:
 3 |   local_aliased_use (borrow_ (global_aliased_use x));
                                                      ^
@@ -490,8 +489,7 @@ let foo () =
 Line 3, characters 13-24:
 3 |   unique_use (borrow_ x);
                  ^^^^^^^^^^^
-Error: This value is "aliased"
-       because it is borrowed.
+Error: This value is "aliased" because it is borrowed.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -504,8 +502,7 @@ let foo () =
 Line 3, characters 21-32:
 3 |   global_aliased_use (borrow_ x);
                          ^^^^^^^^^^^
-Error: This value is "local"
-       because it is borrowed.
+Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -521,7 +518,7 @@ Line 3, characters 2-29:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it escapes the borrow region at Line 3, characters 2-29.
+         because it escapes the borrow region at Line 3, characters 2-29.
 |}]
 
 let foo () =
@@ -532,7 +529,7 @@ let foo () =
 Line 3, characters 33-34:
 3 |   aliased_unique_use (borrow_ x) x;
                                      ^
-Error: This value is used here as unique, but it is already being borrowed:
+Error: This value is used here as unique, but it is also being borrowed at:
 Line 3, characters 21-32:
 3 |   aliased_unique_use (borrow_ x) x;
                          ^^^^^^^^^^^
@@ -559,7 +556,7 @@ Line 10, characters 13-14:
 10 |   unique_use x
                   ^
 Error: This value is used here as unique,
-       but it has already been borrowed in a closure that might be called later:
+       but it has already been borrowed in a closure that might be called later at:
 Line 5, characters 24-35:
 5 |       local_aliased_use (borrow_ x);
                             ^^^^^^^^^^^
@@ -582,7 +579,7 @@ Line 10, characters 13-14:
 10 |   unique_use x
                   ^
 Error: This value is used here as unique,
-       but it has already been borrowed in a closure that might be called later:
+       but it has already been borrowed in a closure that might be called later at:
 Line 5, characters 24-35:
 5 |       local_aliased_use (borrow_ x);
                             ^^^^^^^^^^^

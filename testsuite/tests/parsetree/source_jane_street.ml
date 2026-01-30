@@ -1353,8 +1353,7 @@ end
 Line 8, characters 18-29:
 8 |     String.concat (borrow_ x) (borrow_ y)
                       ^^^^^^^^^^^
-Error: This value is "local"
-       because it is borrowed.
+Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 

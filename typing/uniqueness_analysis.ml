@@ -709,7 +709,7 @@ end = struct
       force_aliased_multiuse t Seq_after m0;
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Maybe_unique t, Borrowing _ ->
-      force_aliased_multiuse t Seq_before m1 ;
+      force_aliased_multiuse t Seq_before m1;
       aliased (Maybe_unique.extract_occurrence t) Aliased.Forced
     | Aliased _, Aliased _ -> m0
     | Maybe_unique l, Aliased _ ->

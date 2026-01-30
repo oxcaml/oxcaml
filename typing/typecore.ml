@@ -6491,7 +6491,7 @@ and type_expect_
       in
       (* Mark borrowed expressions as being in a valid borrowing context *)
       if is_bor then
-        List.iter (fun (_, arg) ->
+        List.iter (fun (_, arg, _) ->
           match arg with
           | Arg (exp, _) -> mark_borrowed_in_context exp
           | Omitted _ -> ()

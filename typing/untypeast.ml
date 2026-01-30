@@ -556,7 +556,7 @@ let expression sub exp =
                         [], modes
                       | Texp_poly _ | Texp_newtype _ | Texp_stack
                       | Texp_inspected_type _ -> [], []
-                      | Texp_ghost_region | Texp_borrowed -> [], []
+                      | Texp_ghost_region | Texp_borrowed _ -> [], []
                     in
                     new_type_constraints @ ret_type_constraints,
                     new_mode_annotations @ ret_mode_annotations)
