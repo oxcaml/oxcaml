@@ -1107,6 +1107,72 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
       Primitive(Pset_ptr (layout, get_first_arg_mode ()), 2)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
+    | "%box" -> begin
+        match poly_sort with
+        | None -> Misc.fatal_error "%box requires resolved sort"
+        | Some sort ->
+          let module SC = Jkind.Sort.Const in
+          let module SB = Jkind_types.Sort in
+          match Jkind.Sort.default_to_value_and_get sort with
+          | SC.Base SB.Value | SC.Base SB.Void | SC.Box _ -> Identity
+          | SC.Base SB.Float64 ->
+            static_cast ~src:(naked (f float)) ~dst:(f float)
+          | SC.Base SB.Float32 ->
+            static_cast ~src:(naked (f float32)) ~dst:(f float32)
+          | SC.Base SB.Bits32 ->
+            static_cast ~src:(naked (i int32)) ~dst:(i int32)
+          | SC.Base SB.Bits64 ->
+            static_cast ~src:(naked (i int64)) ~dst:(i int64)
+          | SC.Base SB.Word ->
+            static_cast ~src:(naked (i nativeint)) ~dst:(i nativeint)
+          | SC.Base SB.Vec128 ->
+            Primitive(Pbox_vector (Boxed_vec128, mode), 1)
+          | SC.Base SB.Vec256 ->
+            Primitive(Pbox_vector (Boxed_vec256, mode), 1)
+          | SC.Base SB.Vec512 ->
+            Primitive(Pbox_vector (Boxed_vec512, mode), 1)
+          | SC.Base SB.Bits8 ->
+            static_cast ~src:(naked (i int8)) ~dst:(i int8)
+          | SC.Base SB.Bits16 ->
+            static_cast ~src:(naked (i int16)) ~dst:(i int16)
+          | SC.Base SB.Untagged_immediate ->
+            static_cast ~src:(naked (i int)) ~dst:(i int)
+          | SC.Product _ ->
+            raise (Error (loc, Unknown_builtin_primitive "%box"))
+      end
+    | "%unbox" -> begin
+        match poly_sort with
+        | None -> Misc.fatal_error "%unbox requires resolved sort"
+        | Some sort ->
+          let module SC = Jkind.Sort.Const in
+          let module SB = Jkind_types.Sort in
+          match Jkind.Sort.default_to_value_and_get sort with
+          | SC.Base SB.Value | SC.Base SB.Void | SC.Box _ -> Identity
+          | SC.Base SB.Float64 ->
+            static_cast ~src:(f float) ~dst:(naked (f float))
+          | SC.Base SB.Float32 ->
+            static_cast ~src:(f float32) ~dst:(naked (f float32))
+          | SC.Base SB.Bits32 ->
+            static_cast ~src:(i int32) ~dst:(naked (i int32))
+          | SC.Base SB.Bits64 ->
+            static_cast ~src:(i int64) ~dst:(naked (i int64))
+          | SC.Base SB.Word ->
+            static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
+          | SC.Base SB.Vec128 ->
+            Primitive(Punbox_vector Boxed_vec128, 1)
+          | SC.Base SB.Vec256 ->
+            Primitive(Punbox_vector Boxed_vec256, 1)
+          | SC.Base SB.Vec512 ->
+            Primitive(Punbox_vector Boxed_vec512, 1)
+          | SC.Base SB.Bits8 ->
+            static_cast ~src:(i int8) ~dst:(naked (i int8))
+          | SC.Base SB.Bits16 ->
+            static_cast ~src:(i int16) ~dst:(naked (i int16))
+          | SC.Base SB.Untagged_immediate ->
+            static_cast ~src:(i int) ~dst:(naked (i int))
+          | SC.Product _ ->
+            raise (Error (loc, Unknown_builtin_primitive "%unbox"))
+      end
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s indexing_primitives with
        | Some prim -> prim ~mode

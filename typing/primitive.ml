@@ -935,6 +935,13 @@ let prim_has_valid_reprs ~loc prim =
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       exactly [Same_as_ocaml_repr C.bits64; Same_as_ocaml_repr C.value]
 
+    | "%box" | "%unbox" ->
+      (* These layout-poly primitives have different reprs for arg and result:
+         %box: arg is Repr_poly, result is Same_as_ocaml_repr (Box _)
+         %unbox: arg is Same_as_ocaml_repr (Box _), result is Repr_poly
+         We use 'any' to accept both configurations. *)
+      check [any; any]
+
     | name -> (
         match String.Map.find_opt name stringlike_indexing_primitives with
         | Some reprs -> exactly reprs
