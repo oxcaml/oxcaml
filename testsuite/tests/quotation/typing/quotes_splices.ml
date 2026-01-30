@@ -112,9 +112,44 @@ let _ : <[ <[ <[ $($($('a))) ]> expr ]> expr ]> expr = <[<[<[()]>]>]>
 
 (* Flexibility checks -- unifying locally-equated type under quotes/splices *)
 
-(* one *)
+(* FIXME: these are quote-miskinded, but we don't have quoted kinds yet anyway *)
 
-let f (type a) (x : <[$(a)]> expr) (Equal : (a, int) Type.eq) : <[int]> expr = x
+let f (x : Obj.t) (Equal : (<[$Obj.t * int]>, <[<[string]> * int]>) Type.eq) : <[<[string]>]> = x
 [%%expect {|
-val f : 'a expr -> ('a, <[int]>) Type.eq -> <[int]> expr = <fun>
+val f :
+  Obj.t ->
+  (<[$(Obj.t) * int]>, <[<[string]> * int]>) Type.eq -> <[<[string]>]> =
+  <fun>
+|}]
+
+let f (x : string) (Equal : (<[<[Obj.t]> * int]>, <[$string * int]>) Type.eq) : <[<[Obj.t]>]> = x
+[%%expect {|
+val f :
+  string ->
+  (<[<[Obj.t]> * int]>, <[$(string) * int]>) Type.eq -> <[<[Obj.t]>]> = <fun>
+|}]
+
+let f (type a) (x : a) (Equal : (<[<[Obj.t]> * int]>, <[$a * int]>) Type.eq) : <[<[Obj.t]>]> = x
+[%%expect {|
+val f : 'a -> (<[<[Obj.t]> * int]>, <[$('a) * int]>) Type.eq -> <[<[Obj.t]>]> =
+  <fun>
+|}]
+
+let f (type a) (x : a) (Equal : (<[$a * int]>, <[<[string]> * int]>) Type.eq) : <[<[string]>]> = x
+[%%expect {|
+val f :
+  'a -> (<[$('a) * int]>, <[<[string]> * int]>) Type.eq -> <[<[string]>]> =
+  <fun>
+|}]
+
+let f (x : int) (Equal : (<[$int * int]>, <[<[string]> * int]>) Type.eq) : <[<[string]>]> = x
+[%%expect {|
+Line 1, characters 17-22:
+1 | let f (x : int) (Equal : (<[$int * int]>, <[<[string]> * int]>) Type.eq) : <[<[string]>]> = x
+                     ^^^^^
+Error: This pattern matches values of type
+         "(<[$(int) * int]>, <[$(int) * int]>) Type.eq"
+       but a pattern was expected which matches values of type
+         "(<[$(int) * int]>, <[<[string]> * int]>) Type.eq"
+       Type "$(int)" is not compatible with type "<[string]>"
 |}]
