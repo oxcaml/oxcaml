@@ -687,7 +687,6 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
              (in particular, you should get an error declaring a custom
              or_null type with an any) *)
           num_nodes_visited, non_nullable Pgenval
-
     end
   | Ttuple labeled_fields ->
     if cannot_proceed () then

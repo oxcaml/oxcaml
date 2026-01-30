@@ -2425,9 +2425,9 @@ let rec estimate_type_jkind ~expand_components env ty =
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
-    let tys = List.map snd ltys in
-    estimate_unboxed_product_jkind ~expand_components env tys
-      ~why:Jkind_intf.History.Unboxed_tuple
+      let tys = List.map snd ltys in
+      estimate_unboxed_product_jkind ~expand_components env tys
+        ~why:Jkind_intf.History.Unboxed_tuple
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind =
