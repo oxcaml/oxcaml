@@ -298,3 +298,15 @@ Error: This type "('a : a)" should be an instance of type "('b : value)"
        But the layout of 'a must overlap with value
          because of the definition of r at line 1, characters 0-20.
 |}]
+
+type r = {a : int}
+
+(* test [extract_concrete_typedecl] on [Trepr] *)
+let f (r : (repr_ 'a). r) = r.a
+[%%expect{|
+type r = { a : int; }
+Line 4, characters 28-29:
+4 | let f (r : (repr_ 'a). r) = r.a
+                                ^
+Error: This expression has type "r" which is not a record type.
+|}]

@@ -2206,7 +2206,7 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
-  | Trepr(_, _) -> Misc.fatal_error "Ctype.extract_concrete_typedecl: repr"
+  | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
