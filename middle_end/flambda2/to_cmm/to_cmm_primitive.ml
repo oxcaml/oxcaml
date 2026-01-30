@@ -672,7 +672,13 @@ let string_like_load_aux ~ptr_out_of_heap ~dbg width ~str ~index =
     (* CR mshinwell: should not be Mutable for [string] *)
     C.load ~dbg Byte_unsigned Mutable
       ~addr:(C.add_int_ptr ~ptr_out_of_heap str index dbg)
+  | Eight_signed ->
+    C.load ~dbg Byte_signed Mutable
+      ~addr:(C.add_int_ptr ~ptr_out_of_heap str index dbg)
   | Sixteen -> C.unaligned_load_16 ~ptr_out_of_heap str index dbg
+  | Sixteen_signed ->
+    C.sign_extend ~bits:16 ~dbg
+      (C.unaligned_load_16 ~ptr_out_of_heap str index dbg)
   | Thirty_two ->
     C.sign_extend ~bits:32 ~dbg
       (C.unaligned_load_32 ~ptr_out_of_heap str index dbg)
@@ -704,10 +710,11 @@ let string_like_load ~dbg kind width ~str ~index =
 let bytes_or_bigstring_set_aux ~ptr_out_of_heap ~dbg width ~bytes ~index
     ~new_value =
   match (width : P.string_accessor_width) with
-  | Eight ->
+  | Eight | Eight_signed ->
     let addr = C.add_int_ptr ~ptr_out_of_heap bytes index dbg in
     C.store ~dbg Byte_unsigned Assignment ~addr ~new_value
-  | Sixteen -> C.unaligned_set_16 ~ptr_out_of_heap bytes index new_value dbg
+  | Sixteen | Sixteen_signed ->
+    C.unaligned_set_16 ~ptr_out_of_heap bytes index new_value dbg
   | Thirty_two -> C.unaligned_set_32 ~ptr_out_of_heap bytes index new_value dbg
   | Single -> C.unaligned_set_f32 ~ptr_out_of_heap bytes index new_value dbg
   | Sixty_four -> C.unaligned_set_64 ~ptr_out_of_heap bytes index new_value dbg

@@ -530,7 +530,9 @@ let string_accessor_width ppf saw =
   Format.fprintf ppf "%s"
     (match saw with
     | Eight -> "8"
+    | Eight_signed -> "i8"
     | Sixteen -> "16"
+    | Sixteen_signed -> "i16"
     | Thirty_two -> "32"
     | Single -> "f32"
     | Sixty_four -> "64"

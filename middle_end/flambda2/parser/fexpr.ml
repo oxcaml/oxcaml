@@ -355,7 +355,9 @@ type binary_float_arith_op = Flambda_primitive.binary_float_arith_op =
 
 type string_accessor_width = Flambda_primitive.string_accessor_width =
   | Eight
+  | Eight_signed
   | Sixteen
+  | Sixteen_signed
   | Thirty_two
   | Single
   | Sixty_four

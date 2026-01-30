@@ -314,7 +314,9 @@ end
 
 type string_accessor_width =
   | Eight
+  | Eight_signed
   | Sixteen
+  | Sixteen_signed
   | Thirty_two
   | Single
   | Sixty_four

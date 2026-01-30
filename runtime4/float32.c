@@ -498,27 +498,41 @@ CAMLprim value caml_ba_uint8_setf32(value vb, value vind, value newval)
 
 CAMLprim value caml_ba_uint8_getf32_indexed_by_int64(value array, value index);
 CAMLprim value caml_ba_uint8_getf32_indexed_by_int32(value array, value index);
+CAMLprim value caml_ba_uint8_getf32_indexed_by_int16(value array, value index);
+CAMLprim value caml_ba_uint8_getf32_indexed_by_int8(value array, value index);
 CAMLprim value caml_ba_uint8_getf32_indexed_by_nativeint(value array, value index);
 
 CAMLprim value caml_ba_uint8_setf32_indexed_by_int64(value array, value index,
                                                      value newval);
 CAMLprim value caml_ba_uint8_setf32_indexed_by_int32(value array, value index,
                                                      value newval);
+CAMLprim value caml_ba_uint8_setf32_indexed_by_int16(value array, value index,
+                                                     value newval);
+CAMLprim value caml_ba_uint8_setf32_indexed_by_int8(value array, value index,
+                                                    value newval);
 CAMLprim value caml_ba_uint8_setf32_indexed_by_nativeint(value array, value index,
                                                          value newval);
 
 CAMLprim value caml_string_getf32_indexed_by_int64(value array, value index);
 CAMLprim value caml_string_getf32_indexed_by_int32(value array, value index);
+CAMLprim value caml_string_getf32_indexed_by_int16(value array, value index);
+CAMLprim value caml_string_getf32_indexed_by_int8(value array, value index);
 CAMLprim value caml_string_getf32_indexed_by_nativeint(value array, value index);
 
 CAMLprim value caml_bytes_getf32_indexed_by_int64(value array, value index);
 CAMLprim value caml_bytes_getf32_indexed_by_int32(value array, value index);
+CAMLprim value caml_bytes_getf32_indexed_by_int16(value array, value index);
+CAMLprim value caml_bytes_getf32_indexed_by_int8(value array, value index);
 CAMLprim value caml_bytes_getf32_indexed_by_nativeint(value array, value index);
 
 CAMLprim value caml_bytes_setf32_indexed_by_int64(value array, value index,
                                                   value newval);
 CAMLprim value caml_bytes_setf32_indexed_by_int32(value array, value index,
                                                   value newval);
+CAMLprim value caml_bytes_setf32_indexed_by_int16(value array, value index,
+                                                  value newval);
+CAMLprim value caml_bytes_setf32_indexed_by_int8(value array, value index,
+                                                 value newval);
 CAMLprim value caml_bytes_setf32_indexed_by_nativeint(value array, value index,
                                                       value newval);
 
@@ -548,9 +562,17 @@ CAMLprim value caml_bytes_setf32_indexed_by_nativeint(value array, value index,
   Float32_set_index_by(name, ba_uint8, index_type, val_func) \
   Float32_set_index_by(name, bytes, index_type, val_func)
 
+#undef int8
+#undef int16
+
 Float32_access_index_by(int64, int64_t, Int64_val)
 Float32_access_index_by(int32, int32_t, Int32_val)
+Float32_access_index_by(int16, int16_t, Int16_val)
+Float32_access_index_by(int8, int8_t, Int8_val)
 Float32_access_index_by(nativeint, intnat, Nativeint_val)
+
+#define int8 caml_ba_int8
+#define int16 caml_ba_int16
 
 /* Defined in bigarray.c */
 CAMLextern intnat caml_ba_offset(struct caml_ba_array * b, intnat * index);
