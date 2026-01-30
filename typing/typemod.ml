@@ -413,14 +413,19 @@ let check_type_decl env sg loc id row_id newdecl decl =
   in
   let newdecl = Subst.type_declaration sub newdecl in
   let decl = Subst.type_declaration sub decl in
-  let sg = List.map (Subst.signature_item Keep sub) sg in
+  let sg =
+    List.map
+      (fun item ->
+        Subst.Lazy.(of_signature_item item |> signature_item Keep sub))
+      sg
+  in
   let env = Env.add_type ~check:false fresh_id newdecl env in
   let env =
     match fresh_row_id with
     | None -> env
     | Some fresh_row_id -> Env.add_type ~check:false fresh_row_id newdecl env
   in
-  let env = Env.add_signature sg env in
+  let env = Env.add_signature_lazy sg env in
   Includemod.type_declarations ~mark:true ~loc env fresh_id newdecl decl;
   Typedecl.check_coherence env loc path newdecl
     (* The use of [check_coherence] here skips the manifest subkind check
@@ -1139,7 +1144,8 @@ module Merge = struct
   (** Type constraints inside a first class module type [(module sg with type
       lid = cty)] *)
   let merge_package env loc sg lid cty =
-    let patch item s sig_env sg_for_env ~ghosts = match item with
+    let patch item s sig_env sg_for_env ~ghosts =
+      match item with
       | Sig_type(id, sig_decl, rs, priv)
         when Ident.name id = s ->
           begin match sig_decl.type_manifest with

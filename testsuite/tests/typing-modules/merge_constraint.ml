@@ -268,6 +268,20 @@ Uncaught exception: Stack overflow
 
 (* Correct *)
 module type S = sig
+    type t = Foo of t
+  end
+
+type s = Foo of s
+
+module type T = S with type t = s
+[%%expect{|
+module type S = sig type t = Foo of t end
+type s = Foo of s
+module type T = sig type t = s = Foo of t end
+|}]
+
+(* Correct *)
+module type S = sig
     type t = Foo of r
     and r = t
   end
