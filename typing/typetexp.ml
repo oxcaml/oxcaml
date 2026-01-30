@@ -1152,6 +1152,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp desc typ
   | Ptyp_repr(vars, st) ->
+      Language_extension.assert_enabled ~loc Layout_poly
+        Language_extension.Alpha;
       let desc, typ =
         transl_type_repr env ~policy ~row_context mode styp.ptyp_loc
           vars st
