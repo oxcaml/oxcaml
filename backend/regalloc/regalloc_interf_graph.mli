@@ -12,7 +12,7 @@
 
 (** {1 Core types} *)
 
-(** Register edges - unique identifiers for registers *)
+(** Undirected edge between registers *)
 module Edge : sig
   type t
 
