@@ -871,7 +871,8 @@ let default_iterator =
              this.typ this ty;
              this.modalities this modalities
          | Pjk_kind_of ty -> this.typ this ty
-         | Pjk_product ts -> List.iter (this.jkind_annotation this) ts);
+         | Pjk_product ts -> List.iter (this.jkind_annotation this) ts
+         | Pjk_box t -> this.jkind_annotation this t);
 
     directive_argument =
       (fun this a ->

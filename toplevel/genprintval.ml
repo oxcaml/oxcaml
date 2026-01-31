@@ -274,7 +274,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Print_as of string (* can't print *)
 
     let print_sort : Jkind.Sort.Const.t -> _ = function
-      | Base Value -> Print_as_value
+      | Base Value | Box _ -> Print_as_value
       | Base Void -> Print_as "<void>"
       | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
               Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->

@@ -1758,6 +1758,7 @@ module Element_repr = struct
       | Base Void -> Void
       | Product l ->
         Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
+      | Box _ -> Value_element (* Box kinds are values *)
       in
       sort_to_t sort
 
@@ -2582,6 +2583,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Any -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
+      | Box c -> has_any c
     in
     if has_any layout then tyl else []
   in
@@ -3496,7 +3498,7 @@ let native_repr_of_type env kind ty sort_or_poly =
     let is_value =
       match sort_or_poly with
       | Poly -> false
-      | Sort (Base Value) -> true
+      | Sort (Base Value | Box _) -> true
       | Sort (Base _ | Product _) -> false
     in
     if is_immediate && is_non_nullable && is_value
@@ -3623,6 +3625,9 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
     Repr_poly
   | Native_repr_attr_absent, Sort (Base (Value | Void) as base) ->
     Same_as_ocaml_repr base
+  | Native_repr_attr_absent, Sort (Box _ as c) ->
+    (* Box kinds are value-like, treated like Same_as_ocaml_repr *)
+    Same_as_ocaml_repr c
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
     then
@@ -3648,7 +3653,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present kind, (Poly | Sort (Base Value))
+  | Native_repr_attr_present kind, (Poly | Sort (Base Value | Box _))
   | Native_repr_attr_present (Untagged as kind), Sort _ ->
     begin match native_repr_of_type env kind ty sort_or_poly with
     | None ->

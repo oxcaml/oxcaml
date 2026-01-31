@@ -199,7 +199,7 @@ type array_kind = Flambda_primitive.Array_kind.t =
   | Naked_vec512s
   | Unboxed_product of array_kind list
 
-type box_kind = Flambda_kind.Boxable_number.t =
+type box_kind_ = Flambda_kind.Boxable_number.t =
   | Naked_float32
   | Naked_float
   | Naked_int32
@@ -302,7 +302,7 @@ type unop =
       }
   | Array_length of array_kind_for_length
   | Boolean_not
-  | Box_number of box_kind * alloc_mode_for_allocations
+  | Box_number of box_kind_ * alloc_mode_for_allocations
   | End_region of { ghost : bool }
   | End_try_region of { ghost : bool }
   | Get_tag
@@ -323,7 +323,7 @@ type unop =
         move_to : function_slot
       }
   | String_length of string_or_bytes
-  | Unbox_number of box_kind
+  | Unbox_number of box_kind_
   | Untag_immediate
   | Tag_immediate
 

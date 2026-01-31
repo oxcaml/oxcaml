@@ -45,6 +45,7 @@ module type Sort = sig
     type t =
       | Base of base
       | Product of t list
+      | Box of t
 
     val equal : t -> t -> bool
 

@@ -534,11 +534,17 @@ module Jkind0 : sig
       (** The jkind of unboxed 32-bit integers with mode crossing. *)
       val kind_of_unboxed_int32 : t
 
+      (** The jkind of boxed 32-bit integers. *)
+      val kind_of_boxed_int32 : t
+
       (** The jkind of unboxed 64-bit integers with no mode crossing. *)
       val bits64 : t
 
       (** The jkind of unboxed 64-bit integers with mode crossing. *)
       val kind_of_unboxed_int64 : t
+
+      (** The jkind of boxed 64-bit integers. *)
+      val kind_of_boxed_int64 : t
 
       (** The jkind of block indices with mode crossing. *)
       val kind_of_idx : t

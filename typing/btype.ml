@@ -1608,6 +1608,14 @@ module Jkind0 = struct
           name = "bits32 mod everything"
         }
 
+      let kind_of_boxed_int32 =
+        { jkind =
+            mk_jkind (Box (Base Bits32)) ~crossing:cross_all_except_staticity
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits32 box_kind"
+        }
+
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let bits64 =
@@ -1626,6 +1634,14 @@ module Jkind0 = struct
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits64 mod everything"
+        }
+
+      let kind_of_boxed_int64 =
+        { jkind =
+            mk_jkind (Box (Base Bits64)) ~crossing:cross_all_except_staticity
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits64 box_kind"
         }
 
       let kind_of_idx =
@@ -1723,8 +1739,10 @@ module Jkind0 = struct
           kind_of_unboxed_int16;
           bits32;
           kind_of_unboxed_int32;
+          kind_of_boxed_int32;
           bits64;
           kind_of_unboxed_int64;
+          kind_of_boxed_int64;
           vec128;
           kind_of_unboxed_128bit_vectors;
           vec256;

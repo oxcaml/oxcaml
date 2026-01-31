@@ -87,6 +87,7 @@ module Layout = struct
     let rec of_sort_const : Sort.Const.t -> t = function
       | Base b -> Base b
       | Product consts -> Product (List.map of_sort_const consts)
+      | Box c -> Box (of_sort_const c)
 
     let to_string t =
       let rec to_string nested (t : t) =
@@ -98,6 +99,7 @@ module Layout = struct
             [ (if nested then "(" else "");
               String.concat " & " (List.map (to_string true) ts);
               (if nested then ")" else "") ]
+        | Box t -> String.concat "" [to_string true t; " box_kind"]
       in
       to_string false t
 
@@ -133,16 +135,23 @@ module Layout = struct
       (Misc.Stdlib.List.map_option to_sort ts)
 
   let rec get : Sort.t t -> Sort.Flat.t t =
-    let rec flatten_sort : Sort.t -> Sort.Flat.t t = function
+    let rec flatten_sort : Sort.t -> Sort.Flat.t = function
+      | Var v -> Var (Sort.Var.get_id v)
+      | Base b -> Base b
+      | Product sorts -> Product (List.map flatten_sort sorts)
+      | Box s -> Box (flatten_sort s)
+    in
+    let rec flatten_layout : Sort.t -> Sort.Flat.t t = function
       | Var v -> Sort (Var (Sort.Var.get_id v))
       | Base b ->
         Sort (Base b)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
-      | Product sorts -> Product (List.map flatten_sort sorts)
+      | Product sorts -> Product (List.map flatten_layout sorts)
+      | Box s -> Sort (Box (flatten_sort s))
     in
     function
     | Any -> Any
-    | Sort s -> flatten_sort (Sort.get s)
+    | Sort s -> flatten_layout (Sort.get s)
     | Product ts -> Product (List.map get ts)
 
   let sort_equal_result ~allow_mutation result =
@@ -174,12 +183,41 @@ module Layout = struct
     | (Any | Sort _ | Product _), _ -> false
 
   let sub ~level t1 t2 =
+    (* Check if a sort is Box and return the inner sort if so *)
+    let get_box_inner s =
+      match Sort.get s with Sort.Box inner -> Some inner | _ -> None
+    in
+    (* Check if a sort can be unified with Value (either is Value or is a var) *)
+    let is_or_can_be_value s =
+      match Sort.get s with
+      | Sort.Base Value -> true
+      | Sort.Var _ -> Sort.equate s (Sort.of_const (Base Value))
+      | _ -> false
+    in
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
       | Any, Any -> Equal
       | _, Any -> Less
       | Any, _ -> Not_le
-      | Sort s1, Sort s2 -> if Sort.equate s1 s2 then Equal else Not_le
+      | Sort s1, Sort s2 -> (
+        (* Handle Box subkinding:
+           - Box s1 < Box s2 when s1 and s2 equate
+           - Box _ < Value (box kinds are subtypes of value)
+           - Box _ < Var _ : try to unify Var with Value
+        *)
+        match get_box_inner s1, get_box_inner s2 with
+        | Some inner1, Some inner2 ->
+          (* Box s1 < Box s2 when s1 = s2 *)
+          if Sort.equate inner1 inner2 then Equal else Not_le
+        | Some _, None ->
+          (* Box _ < Value is Less; Box _ < Var _ tries to unify with Value *)
+          if is_or_can_be_value s2 then Less else Not_le
+        | None, Some _ ->
+          (* non-Box < Box is Not_le *)
+          Not_le
+        | None, None ->
+          (* Regular sort comparison *)
+          if Sort.equate s1 s2 then Equal else Not_le)
       | Product ts1, Product ts2 ->
         if List.compare_lengths ts1 ts2 = 0
         then Misc.Le_result.combine_list (List.map2 sub ts1 ts2)
@@ -212,10 +250,37 @@ module Layout = struct
         (fun x -> Product x)
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
     in
+    (* Check if a sort is Box and return the inner sort if so *)
+    let get_box_inner s =
+      match Sort.get s with Sort.Box inner -> Some inner | _ -> None
+    in
+    (* Check if a sort is or can be unified with Value *)
+    let is_or_can_be_value s =
+      match Sort.get s with
+      | Sort.Base Value -> true
+      | Sort.Var _ -> Sort.equate s (Sort.of_const (Base Value))
+      | _ -> false
+    in
     match t1, t2 with
     | _, Any -> Some t1
     | Any, _ -> Some t2
-    | Sort s1, Sort s2 -> if Sort.equate s1 s2 then Some t1 else None
+    | Sort s1, Sort s2 -> (
+      (* Handle Box intersection:
+         - Box s1 ∩ Box s2 = Box s when s1 = s2
+         - Box _ ∩ Value = Box _ (Box is more specific)
+         - Box _ ∩ Var = Box _ (unify Var with Value)
+         - Box _ ∩ other = None
+      *)
+      match get_box_inner s1, get_box_inner s2 with
+      | Some inner1, Some inner2 ->
+        if Sort.equate inner1 inner2 then Some t1 else None
+      | Some _, None ->
+        (* Box ∩ Value/Var = Box; Box ∩ other = None *)
+        if is_or_can_be_value s2 then Some t1 else None
+      | None, Some _ ->
+        (* Value/Var ∩ Box = Box; other ∩ Box = None *)
+        if is_or_can_be_value s1 then Some t2 else None
+      | None, None -> if Sort.equate s1 s2 then Some t1 else None)
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
     | Product ts, Sort sort | Sort sort, Product ts -> (
@@ -279,6 +344,7 @@ module Error = struct
         }
     | Unimplemented_syntax
     | With_on_right
+    | Box_with_any of Parsetree.jkind_annotation
 
   exception User_error of Location.t * t
 end
@@ -1377,6 +1443,23 @@ module Const = struct
         List.map (of_user_written_annotation_unchecked_level context) ts
       in
       jkind_of_product_annotations jkinds
+    | Pjk_box base_annot ->
+      let base =
+        of_user_written_annotation_unchecked_level context base_annot
+      in
+      (* box_kind requires a representable sort inside, not any *)
+      let rec contains_any : Layout.Const.t -> bool = function
+        | Any -> true
+        | Base _ -> false
+        | Product ts -> List.exists contains_any ts
+        | Box t -> contains_any t
+      in
+      if contains_any base.layout
+      then raise ~loc:base_annot.pjkind_loc (Box_with_any base_annot);
+      { layout = Layout.Const.Box base.layout;
+        mod_bounds = base.mod_bounds;
+        with_bounds = base.with_bounds
+      }
     | Pjk_with (base, type_, modalities) -> (
       let base = of_user_written_annotation_unchecked_level context base in
       match context with
@@ -1419,6 +1502,7 @@ module Const = struct
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
       | Base Void, _ -> Stable
+      | Box inner, _ -> scan_layout inner
     in
     scan_layout jkind.layout
 
@@ -1928,6 +2012,7 @@ let decompose_product ({ jkind; _ } as jk) =
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
     | Product sorts -> Some (List.map (fun sort -> mk_jkind (Sort sort)) sorts)
+    | Box _ -> None
   in
   match jkind.layout with
   | Any -> None
@@ -2498,6 +2583,13 @@ module Violation = struct
       | Sort (Var _) -> true
       | Product layouts -> List.exists has_sort_var layouts
       | Sort (Base _) | Any -> false
+      | Sort (Product sorts) -> List.exists has_flat_sort_var sorts
+      | Sort (Box s) -> has_flat_sort_var s
+    and has_flat_sort_var : Sort.Flat.t -> bool = function
+      | Var _ -> true
+      | Base _ -> false
+      | Product sorts -> List.exists has_flat_sort_var sorts
+      | Box s -> has_flat_sort_var s
     in
     let format_layout_or_kind ppf jkind =
       let indent =
@@ -3145,6 +3237,11 @@ let report_error ~loc : Error.t -> _ = function
     Location.errorf ~loc "@[<v>Unimplemented kind syntax@]"
   | With_on_right ->
     Location.errorf ~loc "'with' syntax is not allowed on a right mode."
+  | Box_with_any inner ->
+    Location.errorf ~loc
+      "@[<v>The layout %a is not representable.@;\
+       box_kind must contain a representable layout, not any.@]"
+      Pprintast.jkind_annotation inner
 
 let () =
   Location.register_error_of_exn (function
