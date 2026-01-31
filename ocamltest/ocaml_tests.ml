@@ -192,6 +192,26 @@ let asmgen =
   test_actions = asmgen_actions
 }
 
+let fexpr_skip_on_bytecode_only =
+  Actions_helpers.skip_with_reason "native compiler disabled"
+
+let fexpr_actions =
+  if not Ocamltest_config.native_compiler then [fexpr_skip_on_bytecode_only]
+  else [
+    setup_simple_build_env;
+    fexpr;
+    check_program_output;
+  ]
+
+let fexpr =
+{
+  test_name = "fexpr";
+  test_run_by_default = false;
+  test_description =
+    "Run middle-end on flambda expression";
+  test_actions = fexpr_actions
+}
+
 let init () =
   List.iter register
   [
@@ -203,4 +223,5 @@ let init () =
     natexpect;
     ocamldoc;
     asmgen;
+    fexpr;
   ]

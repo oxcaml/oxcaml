@@ -36,3 +36,5 @@ val ocamlrun_ocamlobjinfo : string
 val ocamlrun_ocamlmklib : string
 
 val codegen : string
+
+val fexprc : string

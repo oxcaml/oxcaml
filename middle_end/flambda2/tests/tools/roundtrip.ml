@@ -25,10 +25,7 @@ let dump_text filename =
 let () =
   try
     let file = Sys.argv.(1) in
-    let modname =
-      Parse_flambda.make_compilation_unit ~filename:file ~extension:".fl" ()
-    in
-    let unit_info = Unit_info.make_dummy ~input_name:file modname in
+    let unit_info = Parse_flambda.make_unit_info ~filename:file in
     (* Need to get this right or the conversion will complain about binding
        non-local symbols *)
     Env.set_unit_name (Some unit_info);
