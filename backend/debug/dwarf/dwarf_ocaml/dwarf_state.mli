@@ -79,6 +79,8 @@ val sourcefile : t -> string
 
 val diagnostics : t -> Diagnostics.t
 
+val complex_shape_cache : t -> Complex_shape.Shape_cache.t
+
 val add_variable_reduction_diagnostic :
   t -> Diagnostics.variable_reduction -> unit
 
