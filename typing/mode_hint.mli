@@ -111,11 +111,6 @@ type allocation = allocation_desc Location.loc
     [Mode.Report.print_morph] for what each non-trivial constructor means. *)
 type 'd morph =
   | Unknown : ('l * 'r) morph  (** The morphism is not explained. *)
-  | Unknown_non_rigid : ('l * 'r) morph
-      (** Similiar to [Unknown], but in the special case where the morph doesn't
-          change the bound, it can be skipped. *)
-  (* CR-soon zqian: usages of [Unknown_non_rigid] should be replaced with
-     corresponding proper hints *)
   | Skip : ('l * 'r) morph
       (** The morphism doesn't change the bound and should be skipped in
           printing. *)
