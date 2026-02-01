@@ -560,7 +560,7 @@ let record_frame_label live dbg =
   Reg.Set.iter
     (function
       | { typ = Val; loc = Reg r; _ } ->
-        live_offset := ((r lsl 1) + 1) :: !live_offset
+        live_offset := (((r :> int) lsl 1) + 1) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := slot_offset s (Stack_class.of_machtype reg.typ) :: !live_offset

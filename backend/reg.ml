@@ -39,7 +39,7 @@ type t =
 
 and location =
   | Unknown
-  | Reg of int
+  | Reg of Reg_class.Reg_id.t
   | Stack of stack_location
 
 and stack_location =
@@ -284,7 +284,7 @@ let compare_stack_location left right =
 let equal_location left right =
   match left, right with
   | Unknown, Unknown -> true
-  | Reg left, Reg right -> Int.equal left right
+  | Reg left, Reg right -> Reg_class.Reg_id.equal left right
   | Stack left, Stack right -> equal_stack_location left right
   | Unknown, (Reg _ | Stack _)
   | Reg _, (Unknown | Stack _)
@@ -296,7 +296,7 @@ let compare_location left right =
   | Unknown, Unknown -> 0
   | Unknown, (Reg _ | Stack _) -> -1
   | (Reg _ | Stack _), Unknown -> 1
-  | Reg left, Reg right -> Int.compare left right
+  | Reg left, Reg right -> Reg_class.Reg_id.compare left right
   | Reg _, Stack _ -> -1
   | Stack _, Reg _ -> 1
   | Stack left, Stack right -> compare_stack_location left right
@@ -355,7 +355,7 @@ let hash_stack_loc = function
 
 let hash_loc = function
   | Unknown -> -1
-  | Reg r -> r
+  | Reg r -> Reg_class.Reg_id.hash r
   | Stack stack_loc -> hash_stack_loc stack_loc
 
 let is_of_type_addr t =

@@ -371,10 +371,7 @@ module Hardware_register = struct
       reg_index_in_class
 
   let reg_location_of_location { reg_class; reg_index_in_class } =
-    let reg_index =
-      Reg_class.first_available_register reg_class + reg_index_in_class
-    in
-    Reg.Reg reg_index
+    Reg.Reg (Reg_class.reg_id reg_class ~reg_index_in_class)
 
   type assigned =
     { pseudo_reg : Reg.t;
@@ -436,10 +433,10 @@ module Hardware_registers = struct
 
   let of_reg (t : t) (reg : Reg.t) : Hardware_register.t option =
     match reg.loc with
-    | Reg reg_index ->
+    | Reg reg_id ->
       let reg_class : Reg_class.t = Reg_class.of_machtype reg.typ in
       let reg_index_in_class : int =
-        reg_index - Reg_class.first_available_register reg_class
+        Reg_class.reg_index_in_class reg_class reg_id
       in
       let hw_regs = Reg_class.Tbl.find t reg_class in
       if reg_index_in_class < Array.length hw_regs
@@ -491,11 +488,12 @@ module Hardware_registers = struct
       (reg : Reg.t) (interval : Interval.t) : Hardware_register.t option =
     let reg_class = Reg_class.of_machtype reg.typ in
     let hardware_regs = Reg_class.Tbl.find t reg_class in
-    let first_available = Reg_class.first_available_register reg_class in
     let rec find = function
       | [] -> None
       | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
-        let reg_index_in_class : int = phys_reg - first_available in
+        let reg_index_in_class : int =
+          Reg_class.reg_index_in_class reg_class phys_reg
+        in
         let hardware_reg : Hardware_register.t =
           hardware_regs.(reg_index_in_class)
         in

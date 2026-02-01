@@ -25,33 +25,19 @@ let reg_location_description (reg : Reg.t) ~(offset : Stack_reg_offset.t option)
   match reg.loc with
   | Unknown ->
     Misc.fatal_errorf "Register without location: %a" Printreg.reg reg
-  | Reg n -> (
-    let dwarf_reg_number =
-      let reg_class = Reg_class.of_machtype reg.typ in
-      let first_available_reg = Reg_class.first_available_register reg_class in
-      let num_hard_regs = Reg_class.num_available_registers reg_class in
-      let n = n - first_available_reg in
-      (* This [None] case isn't an error to cover situations such as used to be
-         found in the i386 backend where [num_available_registers] does not
-         extend to the end of the register arrays (in that case for the x87 top
-         of stack register). *)
-      if n < 0 || n >= num_hard_regs
-      then None
-      else Some (Reg_class.dwarf_register_numbers reg_class).(n)
-    in
-    match dwarf_reg_number with
-    | None -> None
-    | Some dwarf_reg_number ->
-      let location_description =
-        if not need_rvalue
-        then
-          SLDL.compile
-            (SLDL.of_lvalue (SLDL.Lvalue.in_register ~dwarf_reg_number))
-        else
-          SLDL.compile
-            (SLDL.of_rvalue (SLDL.Rvalue.in_register ~dwarf_reg_number))
-      in
-      Some location_description)
+  | Reg reg_id ->
+    Reg_class.dwarf_reg_number reg.typ reg_id
+    |> Option.map (fun dwarf_reg_number ->
+        let location_description =
+          if not need_rvalue
+          then
+            SLDL.compile
+              (SLDL.of_lvalue (SLDL.Lvalue.in_register ~dwarf_reg_number))
+          else
+            SLDL.compile
+              (SLDL.of_rvalue (SLDL.Rvalue.in_register ~dwarf_reg_number))
+        in
+        location_description)
   | Stack _ -> (
     match offset with
     | None ->
