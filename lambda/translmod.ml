@@ -389,7 +389,7 @@ let reorder_rec_bindings bindings =
   and loc = Array.of_list (List.map (fun (_,loc,_,_) -> loc) bindings)
   and init = Array.of_list (List.map (fun (_,_,init,_) -> init) bindings)
   and rhs = Array.of_list (List.map (fun (_,_,_,rhs) -> rhs) bindings) in
-  let fv = Array.map Lambda.free_variables rhs in
+  let fv = Array.map (fun rhs -> Lambda.free_variables rhs) rhs in
   let num_bindings = Array.length id in
   let status = Array.make num_bindings Undefined in
   let res = ref [] in
@@ -851,7 +851,7 @@ and transl_structure ~scopes loc
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
           in
-          Value_rec_compiler.compile_letrec class_bindings body, repr
+          Ldelayed (Dletrec (class_bindings, body)), repr
       | Tstr_include incl ->
           let ids_with_sorts =
             bound_value_identifiers_and_sorts incl.incl_type
@@ -1109,7 +1109,7 @@ let transl_implementation compilation_unit impl ~loc =
   { SL.compilation_unit;
     main_module_block_format;
     arg_block_idx;
-    code = SL.Quote body }
+    code = SLhalves { sval_comptime = SLunit; sval_runtime = body } }
 
 
 (* Compile a toplevel phrase *)
@@ -1241,7 +1241,7 @@ let transl_toplevel_item ~scopes item =
       let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
       List.iter set_toplevel_unique_name ids;
       let body = make_sequence toploop_setvalue_id ids in
-      Value_rec_compiler.compile_letrec class_bindings body
+      Ldelayed (Dletrec (class_bindings, body))
   | Tstr_include incl ->
       let ids = bound_value_identifiers incl.incl_type in
       let loc = of_location ~scopes incl.incl_loc in
@@ -1399,7 +1399,7 @@ let transl_instance_impl
       ap_probe = None;
     }
   in
-  let code = SL.Quote code in
+  let code = SLhalves { sval_comptime = SLunit; sval_runtime = code } in
   let main_module_block_format =
     Mb_struct { mb_repr = main_module_block_repr }
   in

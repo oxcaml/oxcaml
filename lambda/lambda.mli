@@ -852,8 +852,56 @@ type lambda =
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
   | Lsplice of lambda_splice
+  | Ldelayed of delayed
+    (** A construct that can only be transformed after slambdaeval (during
+        simplif), use [fail_with_delayed_constructor] to assert that it doesn't
+        exist after that point.  *)
 
-and slambda = lambda Slambda0.t0
+and delayed =
+  | Dletrec of
+    (Ident.t * debug_uid * Value_rec_types.recursive_binding_kind * lambda) list
+    * lambda
+
+and slambda =
+  | SLlayout of layout
+  | SLvar of Slambdaident.t
+  | SLunit
+  | SLrecord of (string * slambda) array
+    (** Used for representing the static part of modules and records, the
+        strings are the field names which are soley for debug printing. *)
+  | SLfield of Slambdaident.t * int * string
+    (** Field access of records, the string is the field name for debug
+        printing. *)
+  | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+    (** Project out the compiletime half of a [slambda_halves] *)
+  | SLproj_runtime of slambda
+    (** Project out the runtime half of a [slambda_halves] *)
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
+  | SLsequence of slambda * slambda
+
+and slambda_halves =
+  { sval_comptime: slambda;
+    sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -924,7 +972,11 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
-  and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
+and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
+
+(** Fails with a fatal error indicating that delayed lambda constructors aren't
+    expected at that point in compilation. *)
+val fail_with_delayed_constructor : delayed -> 'a
 
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)
@@ -1128,6 +1180,9 @@ val iter_head_constructor: (lambda -> unit) -> lambda -> unit
 (** [iter_head_constructor f lam] apply [f] to only the first level of
     sub expressions of [lam]. It does not recursively traverse the
     expression.
+
+    Callers should note that if calling this before static evaluation and
+    [Simplif.undelay] you will need to handle [Lsplice] and [Ldelayed].
 *)
 
 val shallow_iter:
@@ -1135,7 +1190,11 @@ val shallow_iter:
   non_tail:(lambda -> unit) ->
   lambda -> unit
 (** Same as [iter_head_constructor], but use a different callback for
-    sub-terms which are in tail position or not. *)
+    sub-terms which are in tail position or not.
+
+    Callers should note that if calling this before static evaluation and
+    [Simplif.undelay] you will need to handle [Lsplice] and [Ldelayed].
+*)
 
 val transl_prim: string -> string -> lambda
 (** Translate a value from a persistent module. For instance:
@@ -1377,3 +1436,7 @@ val static_cast
   -> lambda
   -> loc:scoped_location
   -> lambda
+
+type error = Slambda_unsupported of string
+
+val error : ?loc:Location.t -> error -> 'a
