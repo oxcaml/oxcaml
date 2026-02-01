@@ -9,7 +9,7 @@ let code rec loopify(never) size(18) newer_version_of(even_0)
     | 0 -> k2
     | 1 -> k (1)
     where k2 =
-      let Psubint = n - 1 in
+      let Psubint = %int_barith.`sub` (n, 1) in
       apply direct(odd_1_1)
         ($camlUnroll3__odd_3 ~ depth my_depth -> succ my_depth
          : _ -> imm tagged)
@@ -25,7 +25,7 @@ and code rec loopify(never) size(18) newer_version_of(odd_1)
     | 0 -> k2
     | 1 -> k (0)
     where k2 =
-      let Psubint = n - 1 in
+      let Psubint = %int_barith.`sub` (n, 1) in
       apply direct(even_0_1)
         ($camlUnroll3__even_2 ~ depth my_depth -> succ my_depth
          : _ -> imm tagged)

@@ -221,6 +221,7 @@ check-fmt: $(dune_config_targets)
 .PHONY: regen-flambda2-parser
 regen-flambda2-parser: $(dune_config_targets)
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @middle_end/flambda2/parser/regen --auto-promote || true
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @middle_end/flambda2/parser/regen-messages --auto-promote || true
 # Make sure regeneration is idempotent, and also check that the previous step
 # worked (can't tell the difference between failure and successful
 # auto-promotion)
