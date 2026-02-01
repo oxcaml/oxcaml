@@ -237,7 +237,8 @@ let not_macos_amd64_tsan = make
 let has_cxx = make
     ~name:"has-cxx"
     ~description:"Pass if a C++ compiler is available"
-    (Actions_helpers.pass_or_skip (Ocamltest_config.cxx <> "")
+    ~does_something:false
+    (Actions_helpers.predicate (Ocamltest_config.cxx <> "")
        "C++ compiler is available"
        "C++ compiler not available")
 
