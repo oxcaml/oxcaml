@@ -16,7 +16,7 @@ let constant_minus_pi2 = -1.57079632679489661923
 
 (* -- POINTS ----------------------------------------------------------------*)
 
-type pt = { x : float; y : float; z : float }
+type pt = { x : float; y : float; z : float } [@@flatten_floats]
 
 let
 pt_sub p1 p2
@@ -63,7 +63,7 @@ type tfo =
   {a: float;   b: float;   c: float;
    d: float;   e: float;   f: float;
    g: float;   h: float;   i: float;
-   tx: float;  ty: float;  tz: float}
+   tx: float;  ty: float;  tz: float} [@@flatten_floats]
 
 let tfo_id =
   {a=1.0; b=0.0; c=0.0;

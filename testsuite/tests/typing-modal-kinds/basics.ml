@@ -235,7 +235,7 @@ Line 2, characters 45-46:
 Error: This value is "local" but is expected to be "global".
 |}]
 
-type r = {x : float; y : float}
+type r = {x : float; y : float} [@@flatten_floats]
 
 let foo () =
   let local_ r = {x = 3.0; y = 4.0} in
@@ -243,7 +243,7 @@ let foo () =
   r.x
 
 [%%expect{|
-type r = { x : float; y : float; }
+type r = { x : float; y : float; } [@@flatten_floats]
 val foo : unit -> float = <fun>
 |}]
 
