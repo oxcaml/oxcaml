@@ -113,21 +113,21 @@ val reg_v16b_operand : Reg.t -> v16b
 
 (** {1 Operand tuple helpers for SIMD instructions} *)
 
-val v4s_v4s_v4s : Linear.instruction -> v4s * v4s * v4s
+val v4s_v4s_v4s : Linear.instruction_data -> v4s * v4s * v4s
 
-val v2d_v2d_v2d : Linear.instruction -> v2d * v2d * v2d
+val v2d_v2d_v2d : Linear.instruction_data -> v2d * v2d * v2d
 
-val v8h_v8h_v8h : Linear.instruction -> v8h * v8h * v8h
+val v8h_v8h_v8h : Linear.instruction_data -> v8h * v8h * v8h
 
-val v16b_v16b_v16b : Linear.instruction -> v16b * v16b * v16b
+val v16b_v16b_v16b : Linear.instruction_data -> v16b * v16b * v16b
 
-val v4s_v4s : Linear.instruction -> v4s * v4s
+val v4s_v4s : Linear.instruction_data -> v4s * v4s
 
-val v2d_v2d : Linear.instruction -> v2d * v2d
+val v2d_v2d : Linear.instruction_data -> v2d * v2d
 
-val v8h_v8h : Linear.instruction -> v8h * v8h
+val v8h_v8h : Linear.instruction_data -> v8h * v8h
 
-val v16b_v16b : Linear.instruction -> v16b * v16b
+val v16b_v16b : Linear.instruction_data -> v16b * v16b
 
 (** {1 Polymorphic scalar FP register helpers} *)
 

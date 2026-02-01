@@ -27,8 +27,13 @@ val call_operation :
   Reg.t array ->
   unit
 
-val instr' :
-  ?print_reg:(formatter -> Reg.t -> unit) -> formatter -> instruction -> unit
+val instr_data' :
+  ?print_reg:(formatter -> Reg.t -> unit) ->
+  formatter ->
+  instruction_data ->
+  unit
+
+val instr_data : formatter -> instruction_data -> unit
 
 val instr : formatter -> instruction -> unit
 

@@ -62,8 +62,10 @@ module Vars = struct
       }
 
     let advance_over_instruction t (insn : L.instruction) =
+      let module DLL = Oxcaml_utils.Doubly_linked_list in
+      let data = DLL.value insn in
       let stack_offset =
-        match insn.desc with
+        match data.L.desc with
         | Lop (Stackoffset delta) -> t.stack_offset + delta
         | Lpushtrap _ -> t.stack_offset + Proc.trap_frame_size_in_bytes
         | Lpoptrap _ -> t.stack_offset - Proc.trap_frame_size_in_bytes
@@ -187,10 +189,14 @@ module Vars = struct
     Reg_availability_set.canonicalise avail
 
   let available_before (insn : L.instruction) =
-    Some (availability_set_to_key_set insn.available_before)
+    let module DLL = Oxcaml_utils.Doubly_linked_list in
+    let data = DLL.value insn in
+    Some (availability_set_to_key_set data.L.available_before)
 
   let available_across (insn : L.instruction) =
-    Some (availability_set_to_key_set insn.available_across)
+    let module DLL = Oxcaml_utils.Doubly_linked_list in
+    let data = DLL.value insn in
+    Some (availability_set_to_key_set data.L.available_across)
 end
 
 module Subrange_state = Vars.Subrange_state

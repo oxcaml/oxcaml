@@ -37,7 +37,7 @@ type probe = private
     probe_label : Label.t;
         (** Probe site, recorded in .note.stapsdt section for enabling and
             disabling the probes *)
-    probe_insn : Linear.instruction
+    probe_insn : Linear.instruction_data
         (** For optimized probes, the Iprobe instruction, recorded at the probe
             site and used for emitting the notes and the wrapper code at the end
             of the compilation unit. For non-optimized probes, this will be a
@@ -54,7 +54,7 @@ val add_probe :
   probe_enabled_at_init:bool ->
   probe_handler_code_sym:string ->
   probe_label:Label.t ->
-  probe_insn:Linear.instruction ->
+  probe_insn:Linear.instruction_data ->
   unit
 
 (** Reset the probe semaphore registry *)
