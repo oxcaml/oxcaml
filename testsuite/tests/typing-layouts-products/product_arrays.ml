@@ -61,9 +61,13 @@ type t2 = #(int * float#) array
 type t3 = #(float# * int * int64# * bool) array
 type t4 : immediate & immediate
 type t4a = t4 array
-type t5 : value mod non_float & float64
+type t5 : value mod external_ non_float & float64
 type t5a = t5 array
-type t6 : bits64 & value mod non_float & float64 & value mod non_float
+type t6
+  : bits64
+    & value mod external_ non_float
+    & float64
+    & value mod external_ non_float
 type t6a = t6 array
 |}]
 

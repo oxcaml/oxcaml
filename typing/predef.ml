@@ -567,7 +567,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type ident_floatarray ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_int
        ~jkind:Jkind.Const.Builtin.immediate
-       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_untagged_immediate
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_untagged_int
   |> add_type ident_int32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
   |> add_type ident_int64 ~jkind:Jkind.Const.Builtin.immutable_data
