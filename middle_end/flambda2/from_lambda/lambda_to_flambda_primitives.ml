@@ -1701,10 +1701,17 @@ let floating_scalar : P.float_bitwidth -> _ Scalar.t = function
 module MPB = Mixed_product_bytes
 module BC = Mixed_product_bytes.Byte_count
 
-let block_index_mask = Int64.of_int ((1 lsl MPB.block_index_offset_bits) - 1)
-
-let extract_block_index_offset idx =
-  H.Binary (Int_arith (Naked_int64, And), idx, H.simple_i64 block_index_mask)
+let extract_block_index_offset ~machine_width idx =
+  (* Extract the lower MPB.block_index_offset_bits by shifting left to clear the
+     gap bits, then logical right shifting back to zero-extend. This is
+     equivalent to masking with ((1 << offset_bits) - 1) but avoids creating a
+     large constant. *)
+  let gap_bits = 64 - MPB.block_index_offset_bits in
+  let shift_amount = H.simple_untagged_int ~machine_width gap_bits in
+  let shifted_left =
+    H.Binary (Int_shift (Naked_int64, Lsl), idx, shift_amount)
+  in
+  H.Binary (Int_shift (Naked_int64, Lsr), H.Prim shifted_left, shift_amount)
 
 (* Given an index that points to data of some layout, produce the list of
    offsets needed to access each element *)
@@ -1714,7 +1721,7 @@ let block_index_access_offsets ~machine_width layout idx =
   let cts = MPB.count mbe in
   if MPB.has_value_and_flat cts
   then
-    let offset = extract_block_index_offset idx in
+    let offset = extract_block_index_offset ~machine_width idx in
     let gap =
       let shift =
         H.simple_untagged_int ~machine_width MPB.block_index_offset_bits
@@ -1992,14 +1999,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [Binary (Int_arith (Naked_int64, Add), idx, H.simple_i64 to_add)]
     | Mixed_product_to_all_values ->
       (* gap = 0; offset += left value *)
-      let gap_removed = extract_block_index_offset idx in
+      let gap_removed = extract_block_index_offset ~machine_width idx in
       [ Binary
           ( Int_arith (Naked_int64, Add),
             H.Prim gap_removed,
             H.simple_i64 (Int64.of_int (BC.on_64_bit_arch cts.left.value)) ) ]
     | Mixed_product_to_all_flats ->
       (* offset += gap + left value + right value + left flat; gap = 0 *)
-      let offset = extract_block_index_offset idx in
+      let offset = extract_block_index_offset ~machine_width idx in
       let shifter =
         H.simple_untagged_int MPB.block_index_offset_bits ~machine_width
       in
