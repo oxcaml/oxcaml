@@ -30,7 +30,7 @@
      -c ${test_source_directory}/stubs.cpp";
    script;
    all_modules = "stubs.${objext} cxx_api.ml";
-   flags = "-output-complete-exe  -cclib -lunixbyt -cclib -lthreads -cclib -lcamlruntime_eventsbyt";
+   flags = "-output-complete-exe  -cclib -lunix_stubs -cclib -lthreads_stubs -cclib -lruntime_events_stubs";
    ocamlc.byte;
    output = "${test_build_directory}/program-output";
    stdout = "${output}";
