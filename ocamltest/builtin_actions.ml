@@ -234,6 +234,13 @@ let not_macos_amd64_tsan = make
      "not on a MacOS amd64 system with TSan enabled"
      "on a MacOS amd64 system with TSan enabled")
 
+let has_cxx = make
+    ~name:"has-cxx"
+    ~description:"Pass if a C++ compiler is available"
+    (Actions_helpers.pass_or_skip (Ocamltest_config.cxx <> "")
+       "C++ compiler is available"
+       "C++ compiler not available")
+
 let arch32 = make
   ~name:"arch32"
   ~description:"Pass if running on a 32-bit architecture"
@@ -504,6 +511,7 @@ let init () =
     macos;
     not_macos;
     not_macos_amd64_tsan;
+    has_cxx;
     arch32;
     arch64;
     has_symlink;
