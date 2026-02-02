@@ -40,6 +40,8 @@ let () = require_immutable_data v
 (* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
 val v : 'a t = {f = <cycle>}
+|}, Principal{|
+val v : 'a t = {f = <cycle>}
 Line 2, characters 32-33:
 2 | let () = require_immutable_data v
                                     ^

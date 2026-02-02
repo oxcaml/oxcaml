@@ -20,8 +20,8 @@ let enable_crossing = true
 
 let enable_sub_jkind_l = true
 
-let enable_sub_or_intersect = false
-(* Disabled: or_null intersections regress; keep Jkind path for now. *)
+let enable_sub_or_intersect = true
+(* Enabled for ikinds experiments. *)
 
 let enable_sub_or_error = false
 

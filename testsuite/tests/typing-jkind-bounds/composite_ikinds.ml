@@ -524,23 +524,9 @@ type t = int list list list list
 (***********************************************************************)
 type t : immutable_data = int list list list list list list list list list list list list list list list list list list list list list list list list
 [%%expect {|
-Line 1, characters 0-149:
-1 | type t : immutable_data = int list list list list list list list list list list list list list list list list list list list list list list list list
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int list list list list list list list list list list
-                        list list list list list list list list list list
-                        list list list list" is
-           immutable_data
-             with int list list list list list list list list list list list list list list
-                  list list list list list list list list list
-         because it's a boxed variant type.
-       But the kind of type "int list list list list list list list list list
-                            list list list list list list list list list list
-                            list list list list list" must be a subkind of
-           immutable_data
-         because of the definition of t at line 1, characters 0-149.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type t =
+    int list list list list list list list list list list list list list list
+    list list list list list list list list list list
 |}]
 
 type t = int list list list list list list list list list list list list list list list list list list list list list list list list
