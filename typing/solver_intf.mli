@@ -15,6 +15,8 @@
 
 open Allowance
 
+module Fmt = Format_doc
+
 module type Equal = sig
   type ('a, 'b, 'd) t constraint 'd = 'l * 'r
 
@@ -42,11 +44,11 @@ module type Lattices = sig
 
   val meet : 'a obj -> 'a elt -> 'a elt -> 'a elt
 
-  val print : 'a obj -> Format.formatter -> 'a elt -> unit
+  val print : 'a obj -> Fmt.formatter -> 'a elt -> unit
 
   val eq_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
 
-  val print_obj : Format.formatter -> 'a obj -> unit
+  val print_obj : Fmt.formatter -> 'a obj -> unit
 end
 
 (** Extend [Lattices] with monotone functions (including identity) to form a
@@ -159,7 +161,7 @@ module type Lattices_mono = sig
     ('a0, 'a1) Misc.eq option
 
   (** Print morphism *)
-  val print_morph : 'b obj -> Format.formatter -> ('a, 'b, 'd) morph -> unit
+  val print_morph : 'b obj -> Fmt.formatter -> ('a, 'b, 'd) morph -> unit
 end
 
 type 'd branch =
@@ -316,7 +318,7 @@ module type Solver_mono = sig
 
   (** Printing a mode for debugging. *)
   val print :
-    ?verbose:bool -> 'a obj -> Format.formatter -> ('a, 'l * 'r) mode -> unit
+    ?verbose:bool -> 'a obj -> Fmt.formatter -> ('a, 'l * 'r) mode -> unit
 
   (** Apply a monotone morphism explained by an optional hint *)
   val apply :

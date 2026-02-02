@@ -132,11 +132,11 @@ type unsupported_stack_allocation =
   | Array_comprehension
 
 let print_unsupported_stack_allocation ppf = function
-  | Lazy -> Format.fprintf ppf "lazy expressions"
-  | Module -> Format.fprintf ppf "modules"
-  | Object -> Format.fprintf ppf "objects"
-  | List_comprehension -> Format.fprintf ppf "list comprehensions"
-  | Array_comprehension -> Format.fprintf ppf "array comprehensions"
+  | Lazy -> Format_doc.fprintf ppf "lazy expressions"
+  | Module -> Format_doc.fprintf ppf "modules"
+  | Object -> Format_doc.fprintf ppf "objects"
+  | List_comprehension -> Format_doc.fprintf ppf "list comprehensions"
+  | Array_comprehension -> Format_doc.fprintf ppf "array comprehensions"
 
 type mutable_restriction =
   | In_group
@@ -2255,7 +2255,7 @@ end) = struct
       Printtyp.Conflicts.reset ();
       let paths = ambiguous_types env lbl rest in
       let expansion =
-        Format_doc.(asprintf "%a" pp_doc) Printtyp.Conflicts.print_explanations in
+        Format_doc.asprintf "%t" Printtyp.Conflicts.print_explanations in
       if paths <> [] then
         warn lid.loc
           (Warnings.Ambiguous_name ([Longident.last lid.txt],
@@ -2565,9 +2565,8 @@ let disambiguate_sort_lid_a_list
   (* These ambiguity check warnings could probably use [ambiguity] *)
   if !w_pr then
     Location.prerr_warning loc
-      (not_principal
-         ("this type-based " ^ (record_form_to_string record_form)
-          ^ " disambiguation"))
+      (not_principal "this type-based %s disambiguation"
+         (record_form_to_string record_form))
   else begin
     match List.rev !w_amb with
       (_,types,ex)::_ as amb ->
@@ -11293,7 +11292,7 @@ let report_type_expected_explanation expl =
   | Comprehension_when ->
       because "a when-clause in a comprehension"
   | Error_message_attr msg ->
-      fprintf ppf "@\n@[%s@]" msg
+      doc_printf "@\n@[%s@]" msg
 
 let escaping_submode_reason_hint =
   function
@@ -11593,11 +11592,10 @@ let report_error ~loc env =
     ) ()
   | Non_value_object (err, explanation) ->
     Location.error_of_printer ~loc (fun ppf () ->
-      fprintf ppf "Object types must have layout value.@ %a"
+      fprintf ppf "Object types must have layout value.@ %a%a"
         (Jkind.Violation.report_with_name ~name:"the type of this expression"
-           ~level:(Ctype.get_current_level ()))
-        err;
-      report_type_expected_explanation_opt explanation ppf)
+           ~level:(Ctype.get_current_level ())) err
+        pp_doc (report_type_expected_explanation_opt explanation))
       ()
   | Non_value_let_rec (err, ty) ->
     Location.error_of_printer ~loc (fun ppf () ->
@@ -11680,7 +11678,7 @@ let report_error ~loc env =
   | Abstract_wrong_label {got; expected; expected_type; explanation} ->
       let label ~long ppf = function
         | Nolabel -> fprintf ppf "unlabeled"
-        | Position l -> Style.inline_code ppf (sprintf "~(%s:[%%call_pos])" l)
+        | Position l -> Style.inline_code ppf (Printf.sprintf "~(%s:[%%call_pos])" l)
         | (Labelled _ | Optional _) as l ->
             if long then
               fprintf ppf "labeled %a" Style.inline_code (prefixed_label_name l)
@@ -12012,8 +12010,8 @@ let report_error ~loc env =
       (Style.as_inline_code Printtyp.type_expr) el_ty
   | Block_index_modality_mismatch { mut; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
-    let print_modality id ppf m =
-      Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ax ppf m
+    let print_modality_doc id =
+      Printtyp.modality ~id:(fun ppf -> Format_doc.pp_print_string ppf id) ax
     in
     let expected, actual = match step with
       | Left_le_right -> right, left
@@ -12023,14 +12021,14 @@ let report_error ~loc env =
       if Modality.Per_axis.is_id ax expected then
         "have the identity modality"
       else
-        Format.asprintf "be %a" (print_modality "") expected
+        Format.asprintf "be %a" (Format_doc.compat (print_modality_doc "")) expected
     in
     Location.errorf ~loc
       "Block indices do not yet support non-default modalities. In \
        particular,@ %s elements must %s, but this is %a."
       (if mut then "mutable" else "immutable")
       what_element_must_do
-      (print_modality "not") actual
+      (print_modality_doc "not") actual
   | Block_index_atomic_unsupported ->
     Location.error ~loc
       "Block indices do not yet support [@atomic] record fields."
@@ -12054,7 +12052,7 @@ let report_error ~loc env =
       | Application _ | Other -> sub
     in
     Location.error_of_printer ~loc ~sub (fun ppf e ->
-      let open Format in
+      let open Format_doc in
       let {left; right} : Mode_intf.print_error =
         Value.print_error (loc, Expression) e
       in
@@ -12191,7 +12189,7 @@ let report_error ~loc env =
   | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->
       let hint ppf =
         if some_args_ok
-        then Format.fprintf ppf
+        then Format_doc.fprintf ppf
               "@ Hint: Perhaps you have over-applied the function or used an \
                incorrect label."
       in

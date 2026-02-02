@@ -112,9 +112,12 @@ module Unique_barrier = struct
   let print ppf t =
     let open Format in
     let print = function
-      | Enabled u -> fprintf ppf "Enabled(%a)" (Mode.Uniqueness.print ()) u
+      | Enabled u ->
+        fprintf ppf "Enabled(%a)"
+          (Format_doc.compat (Mode.Uniqueness.print ())) u
       | Resolved uc ->
-        fprintf ppf "Resolved(%a)" Mode.Uniqueness.Const.print uc
+        fprintf ppf "Resolved(%a)"
+          (Format_doc.compat Mode.Uniqueness.Const.print) uc
       | Not_computed -> fprintf ppf "Not_computed"
     in
     print !t
@@ -125,8 +128,8 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 let print_unique_use ppf (u,l) =
   let open Format in
   fprintf ppf "@[(%a,@ %a)@]"
-    (Mode.Uniqueness.print ()) u
-    (Mode.Linearity.print ()) l
+    (Format_doc.compat (Mode.Uniqueness.print ())) u
+    (Format_doc.compat (Mode.Linearity.print ())) l
 
 type alloc_mode = Mode.Alloc.r
 
@@ -1385,19 +1388,19 @@ let nominal_exp_doc lid t =
   let rec nominal_exp_doc doc exp =
     match exp.exp_desc with
     | _ when exp.exp_attributes <> [] -> None
-    | Texp_ident (_,l,_) ->
+    | Texp_ident (_,l,_,_,_,_) ->
         Some (longident l doc)
     | Texp_instvar (_,_,s) ->
         Some (string s.Location.txt doc)
     | Texp_constant _ -> assert false
     | Texp_variant (lbl, None) ->
         Some (printf "`%s" lbl doc)
-    | Texp_construct (l, _, []) -> Some (longident l doc)
-    | Texp_field (parent, lbl, _) ->
+    | Texp_construct (l, _, [], _) -> Some (longident l doc)
+    | Texp_field (parent, _, lbl, _, _, _) ->
         Option.map
           (printf ".%t" (longident lbl))
           (nominal_exp_doc doc parent)
-    | Texp_send (parent, meth) ->
+    | Texp_send (parent, meth, _) ->
         let name = match meth with
           | Tmeth_name name -> name
           | Tmeth_val id | Tmeth_ancestor (id,_) -> Ident.name id in

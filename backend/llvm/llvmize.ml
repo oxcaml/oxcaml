@@ -2040,7 +2040,7 @@ let end_assembly () =
 
 let report_error ppf = function
   | Asm_generation (fn, ret_code) ->
-    Format.fprintf ppf "Error producing assembly code for %s: %d" fn ret_code
+    Format_doc.fprintf ppf "Error producing assembly code for %s: %d" fn ret_code
 
 let () =
   Location.register_error_of_exn (function

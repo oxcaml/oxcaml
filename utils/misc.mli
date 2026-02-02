@@ -29,6 +29,9 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** Format the arguments according to the given format string
       and raise [Fatal_error] with the resulting string. *)
 
+val fatal_errorf_doc: ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
+  (** Like [fatal_errorf] but using [Format_doc]. *)
+
 val splices_should_not_exist_after_eval : unit -> _
   (** Raise a [Fatal_error] explaining that a slambda splice shouldn't exist in
       lambda code after slambda eval has happened. *)
@@ -780,8 +783,7 @@ module Style : sig
   val as_inline_code: 'a Format_doc.printer -> 'a Format_doc.printer
   val inline_code: string Format_doc.printer
 
-  val as_clflag:
-    string -> (Format.formatter -> 'a -> unit as 'printer) -> 'printer
+  val as_clflag: string -> 'a Format_doc.printer -> 'a Format_doc.printer
 
   val default_styles: styles
   val get_styles: unit -> styles
@@ -873,6 +875,10 @@ val output_of_print :
 (** [output_of_print print] produces an output function from a pretty printer.
     Note that naively using [Format.formatter_of_out_channel] typechecks but
     doesn't work because it fails to flush the formatter. *)
+
+val output_of_doc_print :
+  (Format_doc.formatter -> 'a -> unit) -> out_channel -> 'a -> unit
+(** Like [output_of_print] but for [Format_doc] printers. *)
 
 val is_print_longer_than: int -> (Format.formatter -> unit) -> bool
 (** Returns [true] if the printed string is longer than the given integer. Stops

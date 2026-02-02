@@ -83,9 +83,9 @@ module Subst_tests = struct
       let s = s |> Global_module.Parameter_name.Map.of_list in
       let s', _changed = Global_module.subst glob s in
       Format.printf "@[<hv 2>%a@ %a@ =@ %a@]@."
-        Global_module.print glob
-        (Global_module.Parameter_name.Map.print Global_module.print) s
-        Global_module.print s'
+        (Format_doc.compat Global_module.print) glob
+        (Global_module.Parameter_name.Map.print (Format_doc.compat Global_module.print)) s
+        (Format_doc.compat Global_module.print) s'
   end
 
   let run () =
@@ -111,7 +111,7 @@ module Check_tests = struct
       let pp_list_body ppf params =
         Format.pp_print_list
           ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
-          Global_module.Parameter_name.print ppf params
+          (Format_doc.compat Global_module.Parameter_name.print) ppf params
       in
       match params with
       | [] -> Format.fprintf ppf "[]"
@@ -120,7 +120,7 @@ module Check_tests = struct
     let [@ocamlformat "disable"] case s params =
       let s = s |> Global_module.Parameter_name.Map.of_list in
       Format.printf "@[<hv 2>@[<hv 2>check@ %a@ %a@]@ = %a@]@."
-        (Global_module.Parameter_name.Map.print Global_module.print) s
+        (Global_module.Parameter_name.Map.print (Format_doc.compat Global_module.print)) s
         print_params params
         Format.pp_print_bool (Global_module.check s params)
   end

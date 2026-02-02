@@ -26,7 +26,8 @@ let merge_cma ~target ~archives =
     (fun archive -> Load_path.add_dir ~hidden:false (Filename.dirname archive))
     archives;
   let error reporter err =
-    Format.eprintf "Error whilst merging .cma files:@ %a\n%!" reporter err;
+    Format.eprintf "Error whilst merging .cma files:@ %a\n%!"
+      (Format_doc.compat reporter) err;
     exit 1
   in
   try

@@ -161,7 +161,7 @@ let prepare_error err =
               "only module type identifier and %a constraints are supported"
               Style.inline_code "with type"
         | Misplaced_attribute ->
-            Format.fprintf ppf "an attribute cannot go here"
+            Format_doc.fprintf ppf "an attribute cannot go here"
       in
       Location.errorf ~loc "invalid package type: %a" invalid ipt
   | Removed_string_set loc ->

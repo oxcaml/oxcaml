@@ -1273,9 +1273,9 @@ let offset_into_dwarf_section_symbol ?comment:_comment
            undefined symbol %a on macOS (current compilation unit %a, symbol \
            in compilation unit XXX)"
           (* Asm_section.print upper_section *) Asm_symbol.print upper
-          Compilation_unit.print
+          (Format_doc.compat Compilation_unit.print)
           (Compilation_unit.get_current_exn ())
-          Compilation_unit.print
+          (Format_doc.compat Compilation_unit.print)
       (* (Asm_symbol.compilation_unit upper) *)
     else const_symbol upper
   in

@@ -17,6 +17,7 @@
 
 module Name = Odoc_name
 let () = Printtyp.Naming_context.enable false
+module Printtyp_main = Printtyp
 module Printtyp = Printtyp.Compat
 
 let string_of_variance t v =
@@ -142,7 +143,7 @@ let string_of_class_params c =
           (
            match label with
              Types.Nolabel -> ""
-           | s -> Printtyp.string_of_label s ^":"
+           | s -> Printtyp_main.string_of_label s ^":"
           )
           (if parent then "(" else "")
           (Odoc_print.string_of_type_expr

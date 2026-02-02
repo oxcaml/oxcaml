@@ -230,7 +230,8 @@ module Conflicts = struct
 
   let pp_explanation ppf r=
     Fmt.fprintf ppf "@[<v 2>%a:@,Definition of %s %a@]"
-      Location.Doc.loc r.location (Sig_component_kind.to_string r.kind)
+      (Location.Doc.loc ~capitalize_first:true) r.location
+      (Sig_component_kind.to_string r.kind)
       Style.inline_code r.name
 
   let print_located_explanations ppf l =
@@ -456,7 +457,7 @@ let instance_name global =
     String.concat "" (head :: List.map string_of_arg args)
   and string_of_arg arg =
     let ({ param; value } : Global_module.Name.argument) = arg in
-    sprintf "(%s)(%s)"
+    Printf.sprintf "(%s)(%s)"
       (Global_module.Parameter_name.to_string param) (string_of_global value)
   in
   let printed_name =
@@ -591,8 +592,7 @@ let tree_of_path namespace = function
 let tree_of_path namespace p =
   tree_of_path namespace (rewrite_double_underscore_paths !printing_env p)
 
-let path ppf p =
-  !Oprint.out_ident ppf (tree_of_path ~disambiguation:false None p)
+let path ppf p = !Oprint.out_ident ppf (tree_of_path None p)
 
 let string_of_path p =
   Format.asprintf "%a" (Fmt.compat path) p
@@ -769,7 +769,7 @@ let raw_type_expr ppf t =
   raw_type ppf t;
   visited := []; kind_vars := []
 
-let () = Btype.print_raw := raw_type_expr
+let () = Btype.print_raw := compat raw_type_expr
 
 (* Normalize paths *)
 
@@ -1428,7 +1428,7 @@ let tree_of_modalities mut t =
   |> Typemode.least_modalities_implying mut
   |> Typemode.sort_dedup_modalities
   |> List.map (fun (Atom (ax, m) : Modality.atom) ->
-      Format.asprintf "%a" (Modality.Per_axis.print ax) m)
+      Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
 
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   (* Step 1: Compute the modes to print *)
@@ -1468,7 +1468,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     { diff with forkable; yielding; contention; portability }
   in
   (* Step 2: Print the modes *)
-  let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
+  let print_to_string_opt print a = Option.map (Fmt.asprintf "%a" print) a in
   let modes =
     [ print_to_string_opt Mode.Locality.Const.print diff.areality
     ; print_to_string_opt Mode.Uniqueness.Const.print diff.uniqueness
@@ -1805,7 +1805,7 @@ let typexp mode ppf ty =
 let modality ?(id = fun _ppf -> ()) ax ppf modality =
   if Mode.Modality.Per_axis.is_id ax modality then id ppf
   else
-    Format.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
+    Fmt.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
     |> !Oprint.out_modality ppf
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
@@ -1850,7 +1850,7 @@ let () =
     List.map (tree_of_typexp Type) tys);
   Jkind.set_outcometree_of_modalities tree_of_modalities;
   Jkind.set_print_type_expr type_expr;
-  Jkind.set_raw_type_expr raw_type_expr
+  Jkind.set_raw_type_expr (compat raw_type_expr)
 
 (* Print one type declaration *)
 
@@ -2873,7 +2873,7 @@ let printed_signature sourcefile ppf sg =
   if Warnings.(is_active @@ Erroneous_printed_signature "")
   && Conflicts.exists ()
   then begin
-    let conflicts = Format.asprintf "%t" Conflicts.print_explanations in
+    let conflicts = Format_doc.asprintf "%t" Conflicts.print_explanations in
     Location.prerr_warning (Location.in_file sourcefile)
       (Warnings.Erroneous_printed_signature conflicts);
     Warnings.check_fatal ()
@@ -3274,12 +3274,12 @@ let explanation (type variety) intro prev env
         *)
     end
   | Errortrace.Bad_jkind (t,e) ->
-      Some (dprintf "@ @[<hov>%a@]"
+      Some (doc_printf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender
                  ~offender:(fun ppf -> type_expr ppf t)
                  ~level:(get_current_level ())) e)
   | Errortrace.Bad_jkind_sort (t,e) ->
-      Some (dprintf "@ @[<hov>%a@]"
+      Some (doc_printf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender_sort
                  ~offender:(fun ppf -> type_expr ppf t)
                  ~level:(get_current_level ())) e)
@@ -3288,7 +3288,7 @@ let explanation (type variety) intro prev env
         Jkind.(format_history ~intro:(
           dprintf "The layout of %a is %a" prepared_type_expr t format k) ppf k)
       in
-      Some (dprintf "@ because the layouts of their variables are different.\
+      Some (doc_printf "@ because the layouts of their variables are different.\
                      @ @[<v>%t@;%t@]"
               (fmt_history t1 k1) (fmt_history t2 k2))
   | Errortrace.Unequal_tof_kind_jkinds (k1, k2) ->
@@ -3296,7 +3296,7 @@ let explanation (type variety) intro prev env
         Jkind.(format_history ~intro:(
           dprintf "The kind of %s is %a" which format k) ppf k)
       in
-      Some (dprintf "@ because their kinds are different.\
+      Some (doc_printf "@ because their kinds are different.\
                      @ @[<v>%t@;%t@]"
               (fmt_history "the first" k1) (fmt_history "the second" k2))
 
@@ -3561,5 +3561,11 @@ module Compat = struct
   let signature = Fmt.compat signature
   let class_type = Fmt.compat class_type
   let modtype = Fmt.compat modtype
-  let string_of_label = string_of_label
+  let string_of_label (lbl : Asttypes.arg_label) =
+    let lbl : Types.arg_label = match lbl with
+      | Nolabel -> Nolabel
+      | Labelled s -> Labelled s
+      | Optional s -> Optional s
+    in
+    string_of_label lbl
 end

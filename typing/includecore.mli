@@ -200,10 +200,10 @@ val report_type_mismatch :
   type_mismatch Format_doc.printer
 
 val report_modality_sub_error :
-  string -> string -> Format.formatter -> Mode.Modality.error -> unit
+  string -> string -> Format_doc.formatter -> Mode.Modality.error -> unit
 
 val report_mode_sub_error :
-  string -> string -> Format.formatter -> Mode.Value.error -> unit
+  string -> string -> Format_doc.formatter -> Mode.Value.error -> unit
 
 val report_extension_constructor_mismatch :
   string -> string -> string ->

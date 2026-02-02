@@ -54,6 +54,12 @@ module Name : sig
   (** The name of the distinguished compilation unit for predefined exceptions.
   *)
   val predef_exn : t
+
+  (** Print the name for use in error messages. Uses [Format_doc.formatter] and
+    applies inline code styling. *)
+  val print_as_inline_code : Format_doc.formatter -> t -> unit
+
+  val print : Format_doc.formatter -> t -> unit
 end
 
 module Prefix : sig
@@ -79,7 +85,10 @@ module Prefix : sig
 
   val to_string : t -> string
 
+
   val is_empty : t -> bool
+
+  val print : Format_doc.formatter -> t -> unit
 end
 
 (** The name of a compilation unit qualified with any "-for-pack" prefix that
@@ -92,10 +101,16 @@ type t
 (** Printing, comparison, sets, maps, etc. *)
 include Identifiable.S with type t := t
 
-(** Print only the name of the given compilation unit. *)
-val print_name : Format.formatter -> t -> unit
+val print: Format_doc.formatter -> t -> unit
 
-val print_debug : Format.formatter -> t -> unit
+(** Print only the name of the given compilation unit. *)
+val print_name : Format_doc.formatter -> t -> unit
+
+val print_debug : Format_doc.formatter -> t -> unit
+
+(** Print the compilation unit for use in error messages. Uses
+    [Format_doc.formatter] and applies inline code styling. *)
+val print_as_inline_code : Format_doc.formatter -> t -> unit
 
 (** Create a compilation unit with the given [name] (which is not encoded or
     mangled in any way). *)

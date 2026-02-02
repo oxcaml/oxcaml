@@ -285,7 +285,7 @@ end = struct
     if not is_local
     then
       Misc.fatal_errorf "Cannot bind non-local symbol %a@ Current unit is %a"
-        Symbol.print s Compilation_unit.print
+        Symbol.print s (Format_doc.compat Compilation_unit.print)
         (Compilation_unit.get_current_exn ());
     let s = Symbol_name_map.translate t.symbols s in
     (None, s) |> nowhere, t

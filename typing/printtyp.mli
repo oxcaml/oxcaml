@@ -82,7 +82,7 @@ module Conflicts: sig
 
   val print_located_explanations: explanation list printer
 
-  val print_explanations: doc
+  val print_explanations: Format_doc.formatter -> unit
   (** Print all conflict explanations collected up to this point *)
 
   val reset: unit -> unit

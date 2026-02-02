@@ -808,8 +808,8 @@ type no_open_quotations_context =
   | Variant_tag_with_attribute_qt
 
 let print_structure_components_reason ppf = function
-  | Project -> Format.fprintf ppf "have any components"
-  | Open -> Format.fprintf ppf "be opend"
+  | Project -> Format_doc.fprintf ppf "have any components"
+  | Open -> Format_doc.fprintf ppf "be opend"
 
 (* CR-someday aivaskovic: consider extending this enum to include all items
    affected by stages, and attach information to `Incompatible_stage`;
@@ -3329,11 +3329,11 @@ let assert_does_not_cross_quotation ~loc_use ~loc_def path locks =
   match does_not_cross_quotation path locks with
   | Ok () -> ()
   | Error _ ->
-      Misc.fatal_errorf
+      Misc.fatal_errorf_doc
         "Identifier %a defined at %a crosses quotation at %a."
         Path.print path
-        Location.print_loc loc_def
-        Location.print_loc loc_use
+        (Location.Doc.loc ~capitalize_first:false) loc_def
+        (Location.Doc.loc ~capitalize_first:false) loc_use
 
 let report_module_unbound ~errors ~loc env reason =
   match reason with
@@ -4743,14 +4743,13 @@ let print_longident : Longident.t printer ref = ref (fun _ _ -> assert false)
 let pp_longident ppf l = !print_longident ppf l
 
 let print_path: Path.t printer ref = ref (fun _ _ -> assert false)
-let pp_path ppf l = !print_path ppf l
 
-let print_type_expr =
-  ref ((fun _ _ -> assert false) : formatter -> Types.type_expr -> unit)
+let print_type_expr : Types.type_expr printer ref =
+  ref (fun _ _ -> assert false)
 
 let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
-       : offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
+       : offender:(Format_doc.formatter -> unit) -> level:int -> Format_doc.formatter ->
          Jkind.Violation.t -> unit)
 
 let spellcheck ppf extract env lid =
@@ -4816,14 +4815,14 @@ let print_stage ppf stage =
 let print_with_quote_promote ppf (name, intro_stage, usage_stage) =
   let stage_diff = intro_stage - usage_stage in
   let rec loop fmt stage_diff =
-    if stage_diff = 1 then fprintf fmt "<[%s]>" name
-    else if stage_diff = -1 then fprintf fmt "$%s" name
-    else if stage_diff > 1 then fprintf fmt "<[%a]>" loop (stage_diff - 1)
-    else if stage_diff < -1 then fprintf fmt "$(%a)" loop (stage_diff + 1)
+    if stage_diff = 1 then Format.fprintf fmt "<[%s]>" name
+    else if stage_diff = -1 then Format.fprintf fmt "$%s" name
+    else if stage_diff > 1 then Format.fprintf fmt "<[%a]>" loop (stage_diff - 1)
+    else if stage_diff < -1 then Format.fprintf fmt "$(%a)" loop (stage_diff + 1)
     else assert false
   in
-  loop str_formatter stage_diff;
-  fprintf ppf "%a" Style.inline_code (flush_str_formatter ())
+  loop Format.str_formatter stage_diff;
+  fprintf ppf "%a" Style.inline_code (Format.flush_str_formatter ())
 
 let print_unsupported_quotation ppf =
   function
@@ -4901,14 +4900,14 @@ let report_lookup_error ~level _loc env ppf = function
       in
       (match label_of_other_form with
       | Some other_form ->
-        Format.fprintf ppf
+        fprintf ppf
           "@\n@{<hint>Hint@}: @[There is %s field with this name." other_form;
         (match record_form, usage with
         | Unboxed_product, _ ->
           (* If an unboxed field isn't in scope but a boxed field is, then
              the boxed field must come from a record that didn't get an unboxed
              version. *)
-          Format.fprintf ppf
+          fprintf ppf
             "@ Note that float- and [%@%@unboxed]- records don't get unboxed \
              versions."
         | Legacy, Projection ->
@@ -4920,7 +4919,7 @@ let report_lookup_error ~level _loc env ppf = function
             (Style.as_inline_code print_projection) (".#", lid)
             (Style.as_inline_code print_projection) (".", lid)
         | _ -> ());
-        Format.fprintf ppf "@]"
+        fprintf ppf "@]"
       | None -> ());
   | Unbound_class lid -> begin
       fprintf ppf "Unbound class %a"
@@ -5083,9 +5082,9 @@ let report_lookup_error ~level _loc env ppf = function
          it is introduced at %a,@ \
          %a.@]"
         quoted_longident lid
-        Location.print_loc usage_loc
+        (Location.Doc.loc ~capitalize_first:false) usage_loc
         print_stage usage_stage
-        Location.print_loc intro_loc
+        (Location.Doc.loc ~capitalize_first:false) intro_loc
         print_stage intro_stage
   | Unbound_in_stage (context, lid, usage_loc, usage_stage, avail_stage) ->
       fprintf ppf
@@ -5095,7 +5094,7 @@ let report_lookup_error ~level _loc env ppf = function
          @.@[@{<hint>Hint@}: %a %a is defined %a.@]"
         print_unbound_in_quotation context
         quoted_longident lid
-        Location.print_loc usage_loc
+        (Location.Doc.loc ~capitalize_first:false) usage_loc
         quoted_longident lid
         print_stage usage_stage
         print_unbound_in_quotation context
@@ -5123,7 +5122,7 @@ let report_error ~level ppf = function
       fprintf ppf
         "@[<hov>The implicit kind for %a is already defined at %a.@]"
         Style.inline_code name
-        Location.print_loc defined_at
+        (Location.Doc.loc ~capitalize_first:false) defined_at
   | Lookup_error(loc, t, err) -> report_lookup_error ~level loc t ppf err
   | Incomplete_instantiation { unset_param } ->
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
@@ -5134,13 +5133,13 @@ let report_error ~level ppf = function
         "@[<hov>Splices ($) are not allowed in the initial stage,@ \
          as encountered at %a.@,\
          Did you forget to insert a quotation?@]"
-        Location.print_loc loc
+        (Location.Doc.loc ~capitalize_first:false) loc
   | Unsupported_inside_quotation (loc, context) ->
       fprintf ppf
         "@[<hov>%a@ is not supported inside quoted expressions,@ \
          as seen at %a.@]"
         print_unsupported_quotation context
-        Location.print_loc loc
+        (Location.Doc.loc ~capitalize_first:false) loc
 
 let () =
   Location.register_error_of_exn

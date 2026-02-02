@@ -468,11 +468,11 @@ let report_error ppf = function
     fprintf ppf "Error running objcopy (exit code %d)" exitcode
   | Cm_bundle_error (Missing_intf_for_quote intf) ->
     fprintf ppf "Missing interface for module %a which is required by quote"
-      CU.Name.print intf
+      CU.Name.print_as_inline_code intf
   | Cm_bundle_error (Missing_impl_for_quote impl) ->
     fprintf ppf
       "Missing implementation for module %a which is required by quote"
-      CU.Name.print impl
+      CU.Name.print_as_inline_code impl
 
 let () =
   Location.register_error_of_exn (function

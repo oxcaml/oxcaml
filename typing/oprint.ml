@@ -293,7 +293,8 @@ let print_out_value ppf tree =
     | Oval_unboxed_tuple tree_list ->
         fprintf ppf "@[<1>#(%a)@]" (print_labeled_tree_list print_tree_1 ",")
           tree_list
-    | Oval_code e -> CamlinternalQuote.Code.print ppf e
+    | Oval_code e ->
+        deprecated_printer (fun fmt -> CamlinternalQuote.Code.print fmt e) ppf
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
     function
@@ -623,8 +624,8 @@ and print_out_jkind_const ppf ojkind =
       match ojkind with
       | Ojkind_const_with (base, ty, modalities) ->
         let fix_indentation ppf =
-          let { out_newline; out_indent } as out_functions =
-            pp_get_formatter_out_functions ppf ()
+          let ({ Format.out_newline; out_indent; _ } as out_functions) =
+            Format.pp_get_formatter_out_functions ppf ()
           in
           let out_newline () =
             out_newline ();
@@ -632,11 +633,12 @@ and print_out_jkind_const ppf ojkind =
                               here gets included in a larger message, indented
                               by 18 *)
           in
-          pp_set_formatter_out_functions ppf { out_functions with out_newline }
+          Format.pp_set_formatter_out_functions ppf
+             { out_functions with out_newline }
         in
         let base, withs = strip_withs base in
         let with_ =
-          Format.asprintf "%t%a" fix_indentation print_out_type ty
+          Format.asprintf "%t%a" fix_indentation (compat print_out_type) ty
           :: (match modalities with
             | [] -> []
             | modalities -> "@@" :: modalities)
@@ -654,14 +656,14 @@ and print_out_jkind_const ppf ojkind =
         | Some base -> fprintf ppf "%a@ " (pp_element ~nested:true) base
         | None -> ()
       in
-      Misc.pp_parens_if nested (fun ppf (base, modes) ->
+      pp_parens_if nested (fun ppf (base, modes) ->
         fprintf ppf "%amod @[<hv>%a@]" pp_base base
           (pp_print_list ~pp_sep:pp_print_space pp_print_string)
           modes
       ) ppf (base, modes)
     | Ojkind_const_product ts ->
-      let pp_sep ppf () = Format.fprintf ppf "@ & " in
-      Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+      let pp_sep ppf () = fprintf ppf "@ & " in
+      pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     | Ojkind_const_with _ -> failwith "XXX unreachable (stripped off earlier)"
     | Ojkind_const_kind_of _ ->
       failwith "XXX unimplemented jkind syntax");
@@ -671,7 +673,7 @@ and print_out_jkind_const ppf ojkind =
     | withs ->
       pp_print_list
         (fun ppf ->
-           Format.fprintf ppf "@ with @[<hv 2>%a@]"
+           fprintf ppf "@ with @[<hv 2>%a@]"
              (pp_print_list ~pp_sep:pp_print_space pp_print_string))
         ppf
         withs;
@@ -684,8 +686,8 @@ and print_out_jkind ppf ojkind =
     | Ojkind_var v -> fprintf ppf "%s" v
     | Ojkind_const jkind -> print_out_jkind_const ppf jkind
     | Ojkind_product ts ->
-      let pp_sep ppf () = Format.fprintf ppf "@ & " in
-      Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+      let pp_sep ppf () = fprintf ppf "@ & " in
+      pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
   in
   pp_element ~nested:false ppf ojkind
 

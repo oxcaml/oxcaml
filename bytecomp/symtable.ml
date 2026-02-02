@@ -44,8 +44,8 @@ module Global = struct
 
   let description ppf = function
     | Glob_compunit cu ->
-        Format.fprintf ppf "compilation unit %a"
-          (Style.as_inline_code Compilation_unit.print) cu
+        Format_doc.fprintf ppf "compilation unit %a"
+          Compilation_unit.print_as_inline_code cu
     | Glob_predef (Predef_exn exn) ->
         Format_doc.fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)

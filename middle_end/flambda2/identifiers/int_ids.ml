@@ -243,7 +243,7 @@ module Variable_data = struct
         @[<hov 1>(kind@ %a)@]@ \
         @[<hov 1>(user_visible@ %b)@]\
         )@]"
-      Compilation_unit.print_debug compilation_unit
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
       name
       name_stamp
       Flambda_kind.print kind
@@ -294,7 +294,7 @@ module Symbol_data = struct
         @[<hov 1>(compilation_unit@ %a)@]@ \
         @[<hov 1>(linkage_name@ %a)@]\
         )@]"
-      Compilation_unit.print_debug compilation_unit
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
       Linkage_name.print linkage_name
 end
 
@@ -314,7 +314,7 @@ module Code_id_data = struct
         @[<hov 1>(name@ %s)@]@ \
         @[<hov 1>(linkage_name@ %a)@]@ \
         )@]"
-      Compilation_unit.print_debug compilation_unit
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
       name
       Linkage_name.print linkage_name
 
@@ -494,7 +494,7 @@ module Variable = struct
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
       else
-        Format.fprintf ppf "%a.%s/%d%s" Compilation_unit.print cu (name t)
+        Format.fprintf ppf "%a.%s/%d%s" (Format_doc.compat Compilation_unit.print) cu (name t)
           (name_stamp t)
           (if user_visible t then "UV" else "N")
   end
@@ -571,7 +571,7 @@ module Symbol = struct
 
     let print ppf t =
       Format.fprintf ppf "%t" Flambda_colours.symbol;
-      Compilation_unit.print ppf (compilation_unit t);
+      (Format_doc.compat Compilation_unit.print) ppf (compilation_unit t);
       Format.pp_print_string ppf ".";
       Linkage_name.print ppf (linkage_name t);
       Format.fprintf ppf "%t" Flambda_colours.pop

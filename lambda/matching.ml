@@ -3112,7 +3112,7 @@ let mk_failaction_pos partial seen ctx defs =
       pp_partial partial
       Default_environment.pp defs
       (Format.pp_print_list ~pp_sep:Format.pp_print_cut
-         Printpat.pretty_pat) fail_pats
+         Printpat.Compat.pretty_pat) fail_pats
       Jumps.pp jmps
     ;
     (None, fail, jmps)

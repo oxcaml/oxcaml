@@ -25,6 +25,11 @@ let fatal_errorf fmt =
 
 let fatal_error msg = fatal_errorf "%s" msg
 
+let fatal_errorf_doc fmt =
+  Format_doc.kdoc_printf (fun doc ->
+    fatal_errorf "%t" (fun ppf -> Format_doc.Doc.format ppf doc)
+  ) fmt
+
 let splices_should_not_exist_after_eval () =
   fatal_error "slambda splices should not exist in lambda after slambda eval"
 
@@ -1200,7 +1205,7 @@ module Style = struct
   let inline_code ppf s = as_inline_code Format_doc.pp_print_string ppf s
 
   let as_clflag flag printer ppf x =
-    Format.fprintf ppf "@{<inline_code>%s %a@}" flag printer x
+    Format_doc.fprintf ppf "@{<inline_code>%s %a@}" flag printer x
 
   (* either prints the tag of [s] or delegates to [or_else] *)
   let mark_open_tag ~or_else s =
@@ -1608,6 +1613,9 @@ let output_of_print print =
     Format.pp_print_flush ppf ()
   in
   output
+
+let output_of_doc_print doc_print =
+  output_of_print (Format_doc.compat doc_print)
 
 let is_print_longer_than size p =
   let exception Limit_exceeded in

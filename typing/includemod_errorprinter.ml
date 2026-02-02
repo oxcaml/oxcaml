@@ -190,12 +190,14 @@ module Err = Includemod.Error
 
 let is_big p =
   let size = !Clflags.error_size in
-  size > 0 && Misc.is_print_longer_than size p
+  let format_p ppf = Fmt.Doc.format ppf (Fmt.doc_printf "%t" p) in
+  size > 0 && Misc.is_print_longer_than size format_p
 
 let show_loc msg ppf loc =
   let pos = loc.Location.loc_start in
   if List.mem pos.Lexing.pos_fname [""; "_none_"; "//toplevel//"] then ()
-  else Fmt.fprintf ppf "@\n@[<2>%a:@ %s@]" Location.Doc.loc loc msg
+  else Fmt.fprintf ppf "@\n@[<2>%a:@ %s@]"
+    (Location.Doc.loc ~capitalize_first:true) loc msg
 
 let show_locs ppf (loc1, loc2) =
   show_loc "Expected declaration" ppf loc2;
@@ -280,13 +282,13 @@ let zap_axis_to_ceil
         (Mode.Value.proj_monadic ax m)
 
 let print_out_mode
-: type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> _
+: type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> Fmt.formatter -> unit
 = fun ?(in_structure=false) ax mode ->
   let print = Mode.Value.Const.print_axis ax in
   if in_structure then
-    Format.dprintf " (* in a structure at %a *)" print mode
+    fun ppf -> Fmt.fprintf ppf " (* in a structure at %a *)" print mode
   else
-    Format.dprintf " @@ %a" print mode
+    fun ppf -> Fmt.fprintf ppf " @@ %a" print mode
 
 let maybe_print_mode_l ~is_modal mode =
   let mode = Mode.Value.disallow_right mode in
@@ -335,14 +337,14 @@ let maybe_print_modes ?in_structure ~is_modal (modes : Includemod.modes) =
   | Some ax -> print_modes ?in_structure ax modes
 
 let dthen_mode_l ~is_modal mm t =
-  Format.dprintf "%t%t" t (maybe_print_mode_l ~is_modal mm)
+  Fmt.dprintf "%t%t" t (maybe_print_mode_l ~is_modal mm)
 
 let maybe_print_alloc_mode_r ~is_modal mm =
   let mm = Mode.alloc_as_value mm in
   maybe_print_mode_r ~is_modal mm
 
 let dthen_alloc_mode_r ~is_modal mm t =
-  Format.dprintf "%t%t" t (maybe_print_alloc_mode_r ~is_modal mm)
+  Fmt.dprintf "%t%t" t (maybe_print_alloc_mode_r ~is_modal mm)
 
 (**
    In order to display a list of functor arguments in a compact format,
@@ -752,7 +754,7 @@ let subcase_list l ppf = match l with
 let core env id x =
   match x with
   | Err.Value_descriptions {symptom = Modality e} ->
-      Format.dprintf "@[<hv>%s:@;%a@]"
+      Fmt.dprintf "@[<hv>%s:@;%a@]"
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Value_descriptions diff ->
@@ -774,7 +776,7 @@ let core env id x =
         show_locs (diff.got.val_loc, diff.expected.val_loc)
         Printtyp.Conflicts.print_explanations
   | Err.Modalities e ->
-      Format.dprintf "@[<hv>%s:@;%a@]"
+      Fmt.dprintf "@[<hv>%s:@;%a@]"
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Type_declarations diff ->
@@ -822,7 +824,7 @@ let core env id x =
         (Includeclass.report_error Type_scheme) reason
         Printtyp.Conflicts.print_explanations
   | Err.Class_declarations {symptom=Class_mode e} ->
-      Format.dprintf
+      Fmt.dprintf
         "@[<hv 2>Class declarations %s do not match:@ @]@ %a%t"
         (Ident.name id)
         (Includecore.report_mode_sub_error "first is" "second is") e
@@ -866,7 +868,7 @@ let interface_mismatch ppf (diff: _ Err.diff) =
     Style.inline_code diff.got Style.inline_code diff.expected
 
 let parameter_mismatch ppf (diff: _ Err.diff) =
-  Format.fprintf ppf
+  Fmt.fprintf ppf
     "The argument module %s@ does not match the parameter signature %s:@ "
     diff.got diff.expected
 

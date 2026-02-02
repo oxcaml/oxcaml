@@ -407,7 +407,7 @@ let rec print_coercion ppf c =
         print_coercion out
   | Tcoerce_primitive {pc_desc; pc_env = _; pc_type}  ->
       pr "prim %s@ (%a)" pc_desc.Primitive.prim_name
-        Printtyp.raw_type_expr pc_type
+        (Format_doc.compat Printtyp.raw_type_expr) pc_type
   | Tcoerce_alias (_, p, c) ->
       pr "@[<2>alias %a@ (%a)@]"
         Printtyp.Compat.path p

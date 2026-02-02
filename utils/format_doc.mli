@@ -265,6 +265,24 @@ val pp_print_newline: unit printer
 
 val comma: unit printer
 
+(** {2 List printing helpers} *)
+
+val pp_parens_if :
+  bool -> 'a printer -> 'a printer
+(** [pp_parens_if cond pp ppf x] prints [pp ppf x], wrapping it with
+    [()] if [cond] is true. *)
+
+val pp_nested_list :
+  nested:bool ->
+  pp_element:(nested:bool -> 'a printer) ->
+  pp_sep:unit printer ->
+  'a list printer
+(** [pp_nested_list ~nested ~pp_element ~pp_sep ppf args] prints the list [args]
+    with [pp_element] on [ppf]. The elements are separated by [pp_sep]. If
+    [~nested] is true, the list is wrapped in parens. The element printer is
+    always called with [nested:true], indicating that any inner lists are nested
+    and need parens. *)
+
 (** {2 Compiler output} *)
 
 val pp_two_columns :

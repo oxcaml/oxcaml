@@ -376,12 +376,12 @@ module Style = Misc.Style
 let report_error ppf = function
     Forward_reference(file, compunit) ->
       fprintf ppf "Forward reference to %a in file %a"
-        (Style.as_inline_code CU.print) compunit
+        CU.print_as_inline_code compunit
         Location.Doc.quoted_filename file
   | Multiple_definition(file, compunit) ->
       fprintf ppf "File %a redefines %a"
         Location.Doc.quoted_filename file
-        (Style.as_inline_code CU.print) compunit
+        CU.print_as_inline_code compunit
   | Not_an_object_file file ->
       fprintf ppf "%a is not a bytecode object file"
         Location.Doc.quoted_filename file
@@ -389,8 +389,8 @@ let report_error ppf = function
       fprintf ppf "Wrong file naming: %a@ contains the code for\
                    @ %a when %a was expected"
         Location.Doc.quoted_filename file
-        (Style.as_inline_code CU.print) name
-        (Style.as_inline_code CU.print) compunit
+        CU.print_as_inline_code name
+        CU.print_as_inline_code compunit
   | File_not_found file ->
       fprintf ppf "File %a not found"
         Style.inline_code file

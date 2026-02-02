@@ -1587,7 +1587,7 @@ let transl_type_scheme env styp =
 open Format_doc
 open Printtyp
 module Style = Misc.Style
-let pp_tag ppf t = Format.fprintf ppf "`%s" t
+let pp_tag ppf t = fprintf ppf "`%s" t
 let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
 
 let report_unbound_variable_reason ppf = function
@@ -1690,7 +1690,7 @@ let report_error env ppf =
   | Bad_univar_jkind { name; jkind_info; inferred_jkind } ->
       fprintf ppf
         "@[<hov>The universal type variable %a was %s to have kind %a.@;%a@]"
-        Pprintast.tyvar name
+        Pprintast.Doc.tyvar name
         (if jkind_info.defaulted then "defaulted" else "declared")
         Jkind.format jkind_info.original_jkind
         (Jkind.format_history ~intro:(
@@ -1707,7 +1707,7 @@ let report_error env ppf =
         "@[<hov>The type variable %a has conflicting kind annotations.@;\
          It has an explicit annotation %a@ \
          but was already implicitly annotated with %a@]"
-        Pprintast.tyvar name
+        Pprintast.Doc.tyvar name
         Jkind.format explicit_jkind
         Jkind.format implicit_jkind
   | Multiple_constraints_on_type s ->

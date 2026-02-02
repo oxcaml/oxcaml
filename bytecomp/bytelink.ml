@@ -940,7 +940,7 @@ let report_error ppf = function
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
         Style.inline_code
-        (Format.asprintf "%a" CU.Name.print intf)
+        (Format_doc.asprintf "%a" CU.Name.print intf)
   | Custom_runtime ->
       fprintf ppf "Error while building custom runtime system"
   | File_exists file ->
@@ -951,8 +951,8 @@ let report_error ppf = function
         Location.Doc.filename file
   | Required_compunit_unavailable (unavailable, required_by) ->
       fprintf ppf "Module %a is unavailable (required by %a)"
-        (Style.as_inline_code CU.print) unavailable
-        (Style.as_inline_code CU.print) required_by
+        CU.print_as_inline_code unavailable
+        CU.print_as_inline_code required_by
   | Camlheader (msg, header) ->
       fprintf ppf "System error while copying file %a: %a"
         Style.inline_code header
@@ -961,8 +961,8 @@ let report_error ppf = function
       let l = DepSet.elements depset in
       let depends_on ppf (dep, depending) =
         fprintf ppf "%a depends on %a"
-          (Style.as_inline_code CU.print) depending
-          (Style.as_inline_code CU.print) dep
+          CU.print_as_inline_code depending
+          CU.print_as_inline_code dep
       in
       fprintf ppf "@[<hov 2>Wrong link order: %a@]"
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") depends_on) l
@@ -971,7 +971,7 @@ let report_error ppf = function
         "@[<hov>Files %a@ and %a@ both define a module named %a@]"
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
-        (Style.as_inline_code CU.print) compunit
+        CU.print_as_inline_code compunit
 
 let () =
   Location.register_error_of_exn

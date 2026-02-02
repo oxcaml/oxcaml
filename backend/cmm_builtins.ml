@@ -1275,7 +1275,7 @@ let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
   else default
 
 let report_error ppf = function
-  | Bad_immediate msg -> Format.pp_print_string ppf msg
+  | Bad_immediate msg -> Format_doc.pp_print_string ppf msg
 
 let () =
   Location.register_error_of_exn (function

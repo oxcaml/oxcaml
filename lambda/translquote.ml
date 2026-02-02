@@ -2398,7 +2398,7 @@ let quote_value_ident_path loc env path ident_kind =
           Location.print_loc (to_location loc) Ident.print id
     | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ ->
       fatal_errorf "Translquote [at %a]: no global path for identifier %a"
-        Location.print_loc (to_location loc) Path.print path)
+        Location.print_loc (to_location loc) (Format_doc.compat Path.print) path)
 
 let quote_value_ident_path_as_exp loc env path ident_kind =
   Exp_desc.ident loc (quote_value_ident_path loc env path ident_kind)

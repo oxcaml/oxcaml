@@ -1467,7 +1467,7 @@ let report_error loc = function
       Location.errorf ~loc
         "Cannot instantiate using the packed module %a@ \
          as either the instantiated module or an argument"
-      Compilation_unit.print comp_unit
+        Compilation_unit.print_as_inline_code comp_unit
 
 let () =
   Location.register_error_of_exn

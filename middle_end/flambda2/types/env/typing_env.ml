@@ -712,7 +712,7 @@ let add_symbol_definition t sym =
     Misc.fatal_errorf
       "Cannot define symbol %a that belongs to a different compilation unit@ \
        (%a, current unit: %a) %b@ in environment:@ %a"
-      Symbol.print sym Compilation_unit.print comp_unit Compilation_unit.print
+      Symbol.print sym (Format_doc.compat Compilation_unit.print) comp_unit (Format_doc.compat Compilation_unit.print)
       this_comp_unit
       (Compilation_unit.equal comp_unit this_comp_unit)
       print t;

@@ -140,7 +140,6 @@ end
 
 let longident ppf l = Format_doc.compat Doc.longident ppf l
 let ident_of_name ppf i = Format_doc.compat Doc.ident_of_name ppf i
-let ident_of_name_loc ppf s = ident_of_name ppf s.txt
 
 let is_curry_attr attr =
   attr.attr_name.txt = Builtin_attributes.curry_attr_name
@@ -2475,3 +2474,6 @@ let binding = print_reset_with_maximal_extensions binding
 let payload = print_reset_with_maximal_extensions payload
 let type_declaration = print_reset_with_maximal_extensions type_declaration
 let jkind_annotation = print_reset_with_maximal_extensions jkind_annotation
+
+let jkind_annotation_doc ppf jkind =
+  Format_doc.deprecated_printer (fun fmt -> jkind_annotation fmt jkind) ppf

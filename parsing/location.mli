@@ -216,7 +216,7 @@ module Doc: sig
   val separate_new_message: unit Format_doc.printer
   val filename: string Format_doc.printer
   val quoted_filename: string Format_doc.printer
-  val loc: t Format_doc.printer
+  val loc: capitalize_first:bool -> t Format_doc.printer
   val locs: t list Format_doc.printer
 end
 

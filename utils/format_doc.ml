@@ -453,6 +453,18 @@ let pp_print_either  ~left ~right ppf e =
 
 let comma ppf () = fprintf ppf ",@ "
 
+let pp_parens_if condition printer ppf arg =
+  fprintf ppf "%s%a%s"
+    (if condition then "(" else "")
+    printer arg
+    (if condition then ")" else "")
+
+let pp_nested_list ~nested ~pp_element ~pp_sep ppf arg =
+  fprintf ppf "@[<hv>%a@]"
+    (pp_parens_if nested
+       (pp_print_list ~pp_sep (pp_element ~nested:true)))
+    arg
+
 let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
   let left_column_size =
     List.fold_left (fun acc (s, _) -> Int.max acc (String.length s)) 0 lines in

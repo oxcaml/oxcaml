@@ -3643,7 +3643,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
           think (2) hasn't arisen much in practice because for other sorts you
           can add an [@unboxed] annotation to suppress the warning, and because
           in practice people use the layout_poly versions which do work fine. *)
-       let sort = Format.asprintf "%a" Jkind_types.Sort.Const.format c in
+       let sort = Format_doc.asprintf "%a" Jkind_types.Sort.Const.format c in
        Location.prerr_warning core_type.ptyp_loc
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
@@ -4835,7 +4835,7 @@ let report_error ppf = function
             max_value_prefix_len value_prefix_len
       | Insufficient_level { required_layouts_level; mixed_product_kind } -> (
         let hint ppf =
-          Format.fprintf ppf "You must enable -extension %s to use this feature."
+          fprintf ppf "You must enable -extension %s to use this feature."
             (Language_extension.to_command_line_string Layouts
                required_layouts_level)
         in

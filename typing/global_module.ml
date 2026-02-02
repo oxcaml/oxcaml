@@ -1,9 +1,13 @@
+module Fmt = Format_doc
+
 module Parameter_name = struct
   type t = string
 
   let of_string t = t
 
   let to_string t = t
+
+  let doc_print = Fmt.pp_print_string
 
   include Identifiable.Make (struct
     type nonrec t = t
@@ -12,16 +16,18 @@ module Parameter_name = struct
 
     let equal a b = compare a b = 0
 
-    let print = Format.pp_print_string
+    let print ppf x = Fmt.compat doc_print ppf x
 
-    let output = print |> Misc.output_of_print
+    let output = Misc.output_of_doc_print doc_print
 
     let hash = Hashtbl.hash
   end)
+
+  let print = doc_print
 end
 
 let pp_concat pp ppf list =
-  Format.pp_print_list ~pp_sep:Format.pp_print_cut pp ppf list
+  Fmt.pp_print_list ~pp_sep:Fmt.pp_print_cut pp ppf list
 
 type 'value duplicate =
   | Duplicate of { name : Parameter_name.t; value1 : 'value; value2 : 'value }
@@ -99,12 +105,26 @@ module Name : sig
   val to_string : t -> string
 
   include Identifiable.S with type t := t
+
+  val print : Fmt.formatter -> t -> unit
 end = struct
   type t = {
     head : string;
     args : argument list;
   }
   and argument = t Argument.t
+
+  let rec doc_print ppf ({ head; args } : t) =
+    match args with
+    | [] ->
+        (* Preserve simple non-wrapping behaviour in atomic case *)
+        Fmt.fprintf ppf "%s" head
+    | _ ->
+        Fmt.fprintf ppf "@[<hov 1>%s%a@]"
+          head
+          (pp_concat print_arg_pair) args
+  and print_arg_pair ppf ({ param = name; value = arg } : argument) =
+    Fmt.fprintf ppf "[%a:%a]" Parameter_name.print name doc_print arg
 
   include Identifiable.Make (struct
     type nonrec t = t
@@ -122,22 +142,14 @@ end = struct
 
     let equal t1 t2 = compare t1 t2 = 0
 
-    let rec print ppf ({ head; args } : t) =
-      match args with
-      | [] ->
-          (* Preserve simple non-wrapping behaviour in atomic case *)
-          Format.fprintf ppf "%s" head
-      | _ ->
-          Format.fprintf ppf "@[<hov 1>%s%a@]"
-            head
-            (pp_concat print_arg_pair) args
-    and print_arg_pair ppf ({ param = name; value = arg } : argument) =
-      Format.fprintf ppf "[%a:%a]" Parameter_name.print name print arg
+    let print ppf x = Fmt.compat doc_print ppf x
 
-    let output = print |> Misc.output_of_print
+    let output = Misc.output_of_doc_print doc_print
 
     let hash = Hashtbl.hash
   end)
+
+  let print = doc_print
 
   let create head args =
     sort_and_check_uniqueness args
@@ -148,7 +160,7 @@ end = struct
     | Ok t -> t
     | Error (Duplicate _) ->
       Misc.fatal_errorf "Names of instance arguments must be unique:@ %a"
-        print { head; args }
+        (Fmt.compat print) { head; args }
 
   let create_no_args head = create_exn head []
 
@@ -173,7 +185,7 @@ end = struct
     | Some param -> Parameter_name.Set.mem param set
     | None -> false
 
-  let to_string = print |> Misc.to_string_of_print
+  let to_string = Fmt.asprintf "%a" print
 end
 
 module T0 : sig
@@ -187,6 +199,8 @@ module T0 : sig
   and argument = t Argument.t
 
   include Identifiable.S with type t := t
+
+  val print : Fmt.formatter -> t -> unit
 
   val create
      : string
@@ -215,21 +229,21 @@ end = struct
   }
   and argument = t Argument.t
 
-  let rec print ppf { head; visible_args; hidden_args } =
+  let rec doc_print ppf { head; visible_args; hidden_args } =
     let hidden_args =
       (* Assume the value is just the name (because it is) *)
       List.map (fun ({ param; value = _ } : argument) -> param) hidden_args
     in
     print_syntax ppf ~head ~visible_args ~hidden_args
   and print_syntax ppf ~head ~visible_args ~hidden_args =
-    Format.fprintf ppf "@[<hov 1>%s%a%a@]"
+    Fmt.fprintf ppf "@[<hov 1>%s%a%a@]"
       head
       (pp_concat print_visible_pair) visible_args
       (pp_concat print_hidden_pair) hidden_args
   and print_visible_pair ppf ({ param = name; value } : argument) =
-    Format.fprintf ppf "[%a:%a]" Parameter_name.print name print value
+    Fmt.fprintf ppf "[%a:%a]" Parameter_name.print name doc_print value
   and print_hidden_pair ppf name =
-    Format.fprintf ppf "{%a}" Parameter_name.print name
+    Fmt.fprintf ppf "{%a}" Parameter_name.print name
 
   include Identifiable.Make (struct
     type nonrec t = t
@@ -251,12 +265,14 @@ end = struct
 
     let equal t1 t2 = compare t1 t2 = 0
 
-    let print = print
+    let print ppf t = Fmt.compat doc_print ppf t
 
-    let output = print |> Misc.output_of_print
+    let output = Misc.output_of_doc_print doc_print
 
     let hash = Hashtbl.hash
   end)
+
+  let print = doc_print
 
   let of_parameter_name param = { head = param; hidden_args = []; visible_args = [] }
 
@@ -276,7 +292,7 @@ end = struct
     match create head visible_args ~hidden_args with
     | Ok t -> t
     | Error (Duplicate _) ->
-      Misc.fatal_errorf "Names of arguments and parameters must be unique:@ %a"
+      Misc.fatal_errorf_doc "Names of arguments and parameters must be unique:@ %a"
         (fun ppf () -> print_syntax ppf ~head ~visible_args ~hidden_args) ()
 
   let unsafe_create_unchecked head visible_args ~hidden_args =
@@ -294,7 +310,7 @@ end
 
 include T0
 
-let to_string = print |> Misc.to_string_of_print
+let to_string t = Fmt.asprintf "%a" print t
 
 module Subst = Parameter_name.Map
 type subst = t Subst.t
@@ -366,14 +382,16 @@ let has_arguments t =
   | { head = _; visible_args = []; hidden_args = [] } -> false
   | _ -> true
 
+let print_t = print
+
 module Precision = struct
   type t = Exact | Approximate
 
   let print ppf = function
-    | Exact -> Format.fprintf ppf "exact"
-    | Approximate -> Format.fprintf ppf "approx"
+    | Exact -> Fmt.fprintf ppf "exact"
+    | Approximate -> Fmt.fprintf ppf "approx"
 
-  let output = Misc.output_of_print print
+  let output = Misc.output_of_doc_print print
 
   let equal t1 t2 =
     match t1, t2 with
@@ -387,10 +405,10 @@ module With_precision = struct
 
   let print ppf (t, prec) =
     match (prec : Precision.t) with
-    | Exact -> print ppf t
-    | Approximate -> Format.fprintf ppf "@[<hv 2>%a@ (approx)@]" print t
+    | Exact -> print_t ppf t
+    | Approximate -> Fmt.fprintf ppf "@[<hv 2>%a@ (approx)@]" print_t t
 
-  let output = Misc.output_of_print print
+  let output = Misc.output_of_doc_print print
 
   exception Inconsistent
 

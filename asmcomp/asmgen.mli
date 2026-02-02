@@ -79,7 +79,7 @@ type error =
 
 exception Error of error
 
-val report_error : Format.formatter -> error -> unit
+val report_error : Format_doc.formatter -> error -> unit
 
 val compile_unit :
   (module Compiler_owee.Unix_intf.S) ->

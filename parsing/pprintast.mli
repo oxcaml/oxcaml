@@ -72,3 +72,5 @@ module Doc:sig
   val longident: Longident.t Format_doc.printer
   val tyvar: string Format_doc.printer
 end
+
+val jkind_annotation_doc: Parsetree.jkind_annotation Format_doc.printer

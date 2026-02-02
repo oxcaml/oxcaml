@@ -200,7 +200,7 @@ let inline_code = Format_doc.compat Style.inline_code
 let report_error ppf = function
   | Unbound_global glob ->
       fprintf ppf "@[Unbound identifier %a@]@."
-        Style.inline_code (Symtable.Global.name glob)
+        inline_code (Symtable.Global.name glob)
   | Unbound_identifier id ->
       fprintf ppf "@[Unbound identifier %a@]@."
         inline_code (Ident.name id)
