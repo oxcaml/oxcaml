@@ -21,6 +21,14 @@
 
 set -u
 
+# Use configured opam switch from Makefile.config
+repo_root_for_config=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+if [ -f "$repo_root_for_config/Makefile.config" ]; then
+  opam_exec=$(grep '^opam_exec = ' "$repo_root_for_config/Makefile.config" \
+    2>/dev/null | cut -d= -f2- | sed 's/^ *//')
+fi
+opam_exec=${opam_exec:-}
+
 # Compute the feature base as the most recent common ancestor with main branch
 # For GitHub Actions with a merge commit, HEAD^1 is the correct base
 # For local development, use merge-base with oxcaml/main
@@ -73,7 +81,7 @@ do
 
   # Don't check autoformatted files (there's a bug in `ocamlformat` that
   # sometimes produces lines over 80 characters)
-  ocamlformat --print-config "$changed_file" 2>&1 \
+  $opam_exec ocamlformat --print-config "$changed_file" 2>&1 \
   | grep -q disable=false && continue
 
   # Parse git diff output to find added lines and their line numbers

@@ -35,15 +35,35 @@ m4_include([build-aux/ax_compare_version.m4])
 
 AC_CONFIG_AUX_DIR([build-aux])
 
-AC_PATH_PROG([dune], [dune], [])
+# Detect opam switch - REQUIRED for reproducible builds
+AC_PATH_PROG([opam], [opam], [])
+
+AS_IF([test x"$opam" = "x"],
+  [AC_MSG_ERROR([opam not found. Please install opam.])])
+
+AC_ARG_WITH([opam-switch],
+  [AS_HELP_STRING([--with-opam-switch=SWITCH],
+    [Opam switch to use for build tools (default: current switch)])],
+  [opam_switch=$with_opam_switch],
+  [opam_switch=`$opam switch show 2>/dev/null`])
+
+AS_IF([test x"$opam_switch" = "x"],
+  [AC_MSG_ERROR(
+    [No opam switch is active. Activate one with 'opam switch' or use --with-opam-switch=SWITCH])])
+
+AC_MSG_NOTICE([Using opam switch: $opam_switch])
+opam_exec="$opam exec --switch=$opam_switch --"
+opam_bin=`$opam var bin --switch=$opam_switch 2>/dev/null`
+
+AC_PATH_PROG([dune], [dune], [], [$opam_bin:$PATH])
 
 AC_ARG_WITH([dune],
   [AS_HELP_STRING([--with-dune],
-    [Path to dune executable (otherwise PATH is searched)])],
+    [Path to dune executable (otherwise searched in opam switch)])],
   [dune=$with_dune])
 
 AS_IF([test x"$dune" = "x"],
-  [AC_MSG_ERROR([dune not found on PATH; install, or use --with-dune])])
+  [AC_MSG_ERROR([dune not found in opam switch; install with 'opam install dune', or use --with-dune])])
 
 dune_version=`$dune --version | sed -e 's/^\([[0-9]]\.[[0-9]]\).*/\1/'`
 
@@ -363,6 +383,9 @@ AC_SUBST([stack_allocation])
 AC_SUBST([poll_insertion])
 AC_SUBST([enable_multidomain])
 AC_SUBST([dune])
+AC_SUBST([opam])
+AC_SUBST([opam_switch])
+AC_SUBST([opam_exec])
 AC_SUBST([objcopy])
 AC_SUBST([ocaml_bindir])
 AC_SUBST([ocaml_libdir])
