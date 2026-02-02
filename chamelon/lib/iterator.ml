@@ -76,17 +76,12 @@ let minimize_at minimize cur_file map ~pos ~len =
   in
   (nmap, pos <= !r)
 
-let step_minimizer c minimize cur_file map ~pos ~len =
+let step_minimizer ~check minimize cur_file map ~pos ~len =
   Format.eprintf "Trying %s: pos=%d, len=%d... @?" minimize.minimizer_name pos
     len;
   let map, changed = minimize_at minimize cur_file map ~pos ~len in
   let r =
-    if changed then (
-      update_output map;
-      if raise_error c then (
-        save_outputs map;
-        New_state map)
-      else Change_removes_error)
+    if changed then if check map then New_state map else Change_removes_error
     else No_more_changes
   in
   let () =
@@ -97,20 +92,70 @@ let step_minimizer c minimize cur_file map ~pos ~len =
   in
   r
 
-(** [apply_minimizer test map cur_file minimize c] applies [minimize] for
-    [cur_file] in the file set [mapi] for the command [c] as much as possible if
-    (not !test), only once otherwise *)
-let dicho = true
+let test_minimizer ~check ~pos ~len map cur_file minimize =
+  let result, has_changed = minimize_at minimize cur_file map ~pos ~len in
+  if has_changed && check result then (result, true) else (result, false)
 
-let test_minimizer ~pos map cur_file minimize =
-  let result, _has_changed = minimize_at minimize cur_file map ~pos ~len:1 in
-  update_output result;
-  (result, false)
+type strategy = Basic | Dichotomy | Test of { pos : int; len : int }
 
-let apply_minimizer map cur_file minimize (c : string) =
-  let result, has_changed =
-    if dicho then minimize_ranged map (step_minimizer c minimize cur_file)
-    else minimize_basic map (step_minimizer c minimize cur_file ~len:1)
-  in
-  update_output result;
-  (result, has_changed)
+let run_strategy strategy ~check map cur_file minimize =
+  match strategy with
+  | Dichotomy -> minimize_ranged map (step_minimizer ~check minimize cur_file)
+  | Basic -> minimize_basic map (step_minimizer ~check minimize cur_file ~len:1)
+  | Test { pos; len } -> test_minimizer ~check ~pos ~len map cur_file minimize
+
+let basic = Basic
+let dichotomy = Dichotomy
+let test ~pos ~len = Test { pos; len }
+
+type ('a, 'b) schedule =
+  | Minimizer of ('a, 'b) Utils.minimizer
+  | With_strategy of strategy * ('a, 'b) schedule
+  | Sequence of ('a, 'b) schedule list
+  | Fix of ('a, 'b) schedule
+
+let rec run : type a b.
+    ?strategy:strategy ->
+    check:(a -> bool) ->
+    (a, b) schedule ->
+    a ->
+    b ->
+    a * bool =
+ fun ?(strategy = dichotomy) ~check schedule map cur_file ->
+  match schedule with
+  | Minimizer minimizer -> run_strategy strategy ~check map cur_file minimizer
+  | With_strategy (strategy, schedule) ->
+      run ~strategy ~check schedule map cur_file
+  | Sequence schedules ->
+      List.fold_left
+        (fun (map, ever_changed) schedule ->
+          let map', has_changed = run ~check schedule map cur_file in
+          (map', has_changed || ever_changed))
+        (map, false) schedules
+  | Fix schedule ->
+      let rec loop map ever_changed =
+        let map, has_changed = run ~check schedule map cur_file in
+        if has_changed then loop map true else (map, ever_changed)
+      in
+      loop map false
+
+let minimizer minimizer = Minimizer minimizer
+
+let list schedules =
+  Sequence
+    (List.concat_map
+       (function
+         | Sequence schedules -> schedules
+         | (Minimizer _ | Fix _ | With_strategy _) as schedule -> [ schedule ])
+       schedules)
+
+let with_strategy strategy schedules =
+  match list schedules with
+  | With_strategy (_, _) as schedule -> schedule
+  | (Sequence _ | Minimizer _ | Fix _) as schedule ->
+      With_strategy (strategy, schedule)
+
+let fix schedules =
+  match list schedules with
+  | Fix _ as schedule -> schedule
+  | (Sequence _ | Minimizer _ | With_strategy _) as schedule -> Fix schedule
