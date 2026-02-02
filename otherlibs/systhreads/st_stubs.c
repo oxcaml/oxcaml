@@ -52,6 +52,7 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #define DLL_EXPORT
 #endif
 
+#include <math.h>
 #include <stdbool.h>
 
 #include "caml/alloc.h"
@@ -80,10 +81,8 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #define CAMLextern_libthreads
 #include "threads.h"
 
-/* Max computation time before rescheduling, in "ticks"
-
-   Default tick interval is 250 us, giving us 50ms per reschedule by default */
-#define Thread_ticks_per_preemption 200
+/* Max computation time before rescheduling, in microseconds */
+#define Thread_timeout_usec 50000
 
 /* OS-specific code */
 #ifdef _WIN32
@@ -666,7 +665,15 @@ void caml_thread_tick_hook(void)
   /* Do not attempt to yield from the backup thread */
   if (caml_bt_is_self()) return;
 
-  if (++Ticks_elapsed >= Thread_ticks_per_preemption) {
+  /* How many ticks we should wait for per preemption depends on how frequent
+     ticks are. There can be a slight imprecision here if the tick interval is
+     changed while we are waiting to preempt, but that's fine; we'll stabilize
+     on the next go around. */
+  uintnat ticks_per_preemption =
+      ceil((float)Thread_timeout_usec /
+           (float)(atomic_load_relaxed(&Caml_state->tick_thread_interval_usec)));
+
+  if (++Ticks_elapsed >= ticks_per_preemption) {
     Ticks_elapsed = 0;
     thread_yield();
   }

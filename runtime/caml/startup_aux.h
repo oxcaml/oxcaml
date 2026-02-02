@@ -57,7 +57,6 @@ struct caml_params {
   uintnat event_trace;
   uintnat max_domains;
   uintnat use_hugetlb_pages;
-  uintnat tick_interval_usec;
 };
 
 extern const struct caml_params* const caml_params;
