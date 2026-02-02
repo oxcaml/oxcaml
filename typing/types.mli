@@ -98,7 +98,7 @@ type field_kind
 type commutable
 
 and type_desc =
-  | Tvar of { name : string option; jkind : jkind_lr }
+  | Tvar of { name : string option; jkind : jkind_lr; evals_to: evals_to option }
   (** [Tvar (Some "a")] ==> ['a] or ['_a]
       [Tvar None]       ==> [_] *)
 
@@ -181,7 +181,7 @@ and type_desc =
   | Tvariant of row_desc
   (** Representation of polymorphic variants, see [row_desc]. *)
 
-  | Tunivar of { name : string option; jkind : jkind_lr }
+  | Tunivar of { name : string option; jkind : jkind_lr; evals_to: evals_to option }
   (** Occurrence of a type variable introduced by a
       forall quantifier / [Tpoly]. *)
 
@@ -275,6 +275,7 @@ and abbrev_memo =
     This is only allowed when the real type is known.
 *)
 
+and evals_to = type_expr
 
 (**** Jkinds ****)
 

@@ -115,9 +115,9 @@ let lowest_level = Ident.lowest_scope
 (**** Some type creators ****)
 
 let newgenty desc = newty2 ~level:generic_level desc
-let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
+let newgenvar ?name jkind = newgenty (Tvar { name; jkind; evals_to=None })
 let newgenstub ~scope jkind =
-  newty3 ~level:generic_level ~scope (Tvar { name=None; jkind })
+  newty3 ~level:generic_level ~scope (Tvar { name=None; jkind; evals_to=None })
 
 (**** Check some types ****)
 
@@ -502,8 +502,8 @@ let copy_row f fixed row keep more =
 let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 
 let rec copy_type_desc ?(keep_names=false) f = function
-    Tvar { jkind; _ } as tv ->
-     if keep_names then tv else Tvar { name=None; jkind }
+    Tvar { name = _; jkind; evals_to } as tv ->
+     if keep_names then tv else Tvar { name=None; jkind; evals_to }
   | Tarrow (p, ty1, ty2, c)-> Tarrow (p, f ty1, f ty2, copy_commu c)
   | Ttuple l            -> Ttuple (List.map (fun (label, t) -> label, f t) l)
   | Tunboxed_tuple l    ->
