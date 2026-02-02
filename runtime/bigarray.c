@@ -795,7 +795,7 @@ CAMLprim value caml_ba_uint8_geti8(value vb, value vind)
 {
   intnat idx = Long_val(vind);
   struct caml_ba_array * b = Caml_ba_array_val(vb);
-  if (idx < 0 || idx >= b->dim[0] - 1) caml_array_bound_error();
+  if (idx < 0 || idx >= b->dim[0]) caml_array_bound_error();
   return Val_int8(((unsigned char*) b->data)[idx]);
 }
 
@@ -966,7 +966,7 @@ CAMLprim value caml_ba_uint8_set8(value vb, value vind, value newval)
   unsigned char b1;
   intnat idx = Long_val(vind);
   struct caml_ba_array * b = Caml_ba_array_val(vb);
-  if (idx < 0 || idx >= b->dim[0] - 1) caml_array_bound_error();
+  if (idx < 0 || idx >= b->dim[0]) caml_array_bound_error();
   b1 = 0xFF & Long_val(newval);
   ((unsigned char*) b->data)[idx] = b1;
   return Val_unit;

@@ -122,7 +122,7 @@ CAMLprim value caml_string_geti8(value str, value index)
 {
   unsigned char b1;
   intnat idx = Long_val(index);
-  if (idx < 0 || idx + 1 >= caml_string_length(str)) caml_array_bound_error();
+  if (idx < 0 || idx >= caml_string_length(str)) caml_array_bound_error();
   b1 = Byte_u(str, idx);
   return Val_int8(b1);
 }
@@ -228,7 +228,7 @@ CAMLprim value caml_bytes_set8(value str, value index, value newval)
 {
   unsigned char b1;
   intnat idx = Long_val(index);
-  if (idx < 0 || idx + 1 >= caml_string_length(str)) caml_array_bound_error();
+  if (idx < 0 || idx >= caml_string_length(str)) caml_array_bound_error();
   b1 = 0xFF & Long_val(newval);
   Byte_u(str, idx) = b1;
   return Val_unit;
