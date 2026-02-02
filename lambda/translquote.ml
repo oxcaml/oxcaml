@@ -2686,6 +2686,11 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_variant (fields, (if closed then Closed else Open), tags)
         | Tquote ty -> Ttyp_quote (go ty)
+        | Teval ty ->
+          Ttyp_constr
+            ( Predef.path_eval,
+              mkloc (Untypeast.lident_of_path Predef.path_eval) loc,
+              [go ty] )
         | Tsplice _ ->
           fatal_errorf
             "Translquote [at %a]:@ Explicitly quantified type variables@ \

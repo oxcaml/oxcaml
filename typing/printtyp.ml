@@ -713,6 +713,8 @@ and raw_type_desc ppf = function
       fprintf ppf "@[Tquote@ %a@]" raw_type t
   | Tsplice t ->
       fprintf ppf "@[Tsplice@ %a@]" raw_type t
+  | Teval t ->
+      fprintf ppf "@[Teval@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -1614,6 +1616,11 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_quote (tree_of_typexp mode alloc_mode ty)
     | Tsplice ty ->
         Otyp_splice (tree_of_typexp mode alloc_mode ty)
+    | Teval ty ->
+        let p', s = best_type_path Predef.path_eval in
+        let tyl = apply_subst s [ty] in
+        Internal_names.add p';
+        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->

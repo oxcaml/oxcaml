@@ -156,6 +156,8 @@ let classify env ty : classification =
       raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote"))
     | Tsplice _ ->
       raise (Vicuna_unsupported (Other "Unexpected type constructor Tsplice"))
+    | Teval _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Teval"))
 
 type can_be_float_array =
   | YesFloatArray
@@ -286,6 +288,8 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote"))
   | Tsplice _ ->
     raise (Vicuna_unsupported (Other "Unexpected type constructor Tsplice"))
+  | Teval _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Teval"))
   | Tpackage _ -> Block None
 
 and value_kind_variant env subst ~visited ~depth

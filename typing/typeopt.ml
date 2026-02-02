@@ -197,7 +197,7 @@ let classify ~classify_product env ty sort : _ classification =
   | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil
   | Tvariant _ | Tquote _ ->
       Addr
-  | Tsplice _ ->
+  | Tsplice _ | Teval _ ->
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
       assert false
@@ -761,7 +761,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tquote _ | Tsplice _ | Tof_kind _ -> unknown ()
+        | Tquote _ | Tsplice _ | Teval _ | Tof_kind _ -> unknown ()
     in
     let (_, num_nodes_visited), kinds =
       Array.fold_left_map (fun (i, num_nodes_visited) field ->

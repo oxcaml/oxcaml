@@ -506,6 +506,7 @@ let remove_option typ =
     | Tfield _
     | Tquote _
     | Tsplice _
+    | Teval _
     | Tnil
     | Tvariant _
     | Tpackage _
