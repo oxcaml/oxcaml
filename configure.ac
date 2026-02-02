@@ -35,35 +35,36 @@ m4_include([build-aux/ax_compare_version.m4])
 
 AC_CONFIG_AUX_DIR([build-aux])
 
-# Detect opam switch - REQUIRED for reproducible builds
+# Optionally pin to a specific opam switch for reproducible builds
 AC_PATH_PROG([opam], [opam], [])
 
-AS_IF([test x"$opam" = "x"],
-  [AC_MSG_ERROR([opam not found. Please install opam.])])
+opam_switch=""
+opam_exec=""
+opam_bin=""
 
 AC_ARG_WITH([opam-switch],
   [AS_HELP_STRING([--with-opam-switch=SWITCH],
-    [Opam switch to use for build tools (default: current switch)])],
-  [opam_switch=$with_opam_switch],
-  [opam_switch=`$opam switch show 2>/dev/null`])
+    [Opam switch to use for build tools (pins tool invocations to this switch)])])
 
-AS_IF([test x"$opam_switch" = "x"],
-  [AC_MSG_ERROR(
-    [No opam switch is active. Activate one with 'opam switch' or use --with-opam-switch=SWITCH])])
+AS_IF([test x"$with_opam_switch" != "x"],
+  [AS_IF([test x"$opam" = "x"],
+    [AC_MSG_ERROR([--with-opam-switch requires opam, but opam not found])])
+   opam_switch=$with_opam_switch
+   opam_exec="$opam exec --switch=$opam_switch --"
+   opam_bin=`$opam var bin --switch=$opam_switch 2>/dev/null`
+   AC_MSG_NOTICE([Using opam switch: $opam_switch])])
 
-AC_MSG_NOTICE([Using opam switch: $opam_switch])
-opam_exec="$opam exec --switch=$opam_switch --"
-opam_bin=`$opam var bin --switch=$opam_switch 2>/dev/null`
-
-AC_PATH_PROG([dune], [dune], [], [$opam_bin:$PATH])
+AS_IF([test x"$opam_bin" != "x"],
+  [AC_PATH_PROG([dune], [dune], [], [$opam_bin:$PATH])],
+  [AC_PATH_PROG([dune], [dune], [])])
 
 AC_ARG_WITH([dune],
   [AS_HELP_STRING([--with-dune],
-    [Path to dune executable (otherwise searched in opam switch)])],
+    [Path to dune executable (otherwise searched in PATH)])],
   [dune=$with_dune])
 
 AS_IF([test x"$dune" = "x"],
-  [AC_MSG_ERROR([dune not found in opam switch; install with 'opam install dune', or use --with-dune])])
+  [AC_MSG_ERROR([dune not found; install dune or use --with-dune])])
 
 dune_version=`$dune --version | sed -e 's/^\([[0-9]]\.[[0-9]]\).*/\1/'`
 
