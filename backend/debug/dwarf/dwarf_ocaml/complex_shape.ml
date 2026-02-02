@@ -241,7 +241,7 @@ let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
    labels and tuple indices and then let the caller decide whether they want to
    use the resulting access name or not. *)
 let projection_component_name (i : int) (field_name : string option) : string =
-  match field_name with Some n -> n | None -> string_of_int (i + 1)
+  match field_name with Some n -> n | None -> string_of_int i
 
 (* Raises if we hit a void field unintentionally. *)
 let rec lay_out_into_mixed_block_exn
@@ -259,7 +259,7 @@ let rec lay_out_into_mixed_block_exn
   let fields =
     Array.init (Mixed_block_shape.new_block_length reordering) (fun i ->
         let old_path = Mixed_block_shape.new_index_to_old_path reordering i in
-        if Int.equal (List.length old_path) 0
+        if List.compare_length_with old_path 0 = 0
         then
           err_exn (fun f ->
               let pp =
