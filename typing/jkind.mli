@@ -636,7 +636,10 @@ val format_verbose :
 
     The [intro] is something like "The jkind of t is". *)
 val format_history :
-  intro:(Format_doc.formatter -> unit) -> Format_doc.formatter -> 'd Types.jkind -> unit
+  intro:(Format_doc.formatter -> unit) ->
+  Format_doc.formatter ->
+  'd Types.jkind ->
+  unit
 
 (******************************)
 (* relations *)

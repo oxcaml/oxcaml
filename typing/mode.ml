@@ -911,8 +911,7 @@ module Lattices = struct
     | Staticity_op -> Fmt.fprintf ppf "Staticity_op"
     | Monadic_op -> Fmt.fprintf ppf "Monadic_op"
     | Comonadic_with_locality -> Fmt.fprintf ppf "Comonadic_with_locality"
-    | Comonadic_with_regionality ->
-      Fmt.fprintf ppf "Comonadic_with_regionality"
+    | Comonadic_with_regionality -> Fmt.fprintf ppf "Comonadic_with_regionality"
 
   let min : type a. a obj -> a = function
     | Locality -> Locality.min
@@ -2086,11 +2085,13 @@ module Report = struct
         | false, true ->
           fprintf ppf "%t at %a"
             (print_desc ~definite ~capitalize)
-            (Location.Doc.loc ~capitalize_first:false) loc
+            (Location.Doc.loc ~capitalize_first:false)
+            loc
         | false, false ->
           fprintf ppf "%t (at %a)"
             (print_desc ~definite ~capitalize)
-            (Location.Doc.loc ~capitalize_first:false) loc)
+            (Location.Doc.loc ~capitalize_first:false)
+            loc)
 
   let is_known_pinpoint : pinpoint -> bool = function
     | _, Unknown -> false
@@ -2160,19 +2161,24 @@ module Report = struct
    fun { txt; loc } ->
     match txt with
     | Unknown ->
-      dprintf "is allocated at %a containing data" (Location.Doc.loc ~capitalize_first:false) loc
+      dprintf "is allocated at %a containing data"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Optional_argument ->
       dprintf
         "is an optional argument wrapper (and thus allocated) of the value at \
          %a"
-        (Location.Doc.loc ~capitalize_first:false) loc
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Function_coercion ->
       dprintf
         "is a partial application of the function at %a on omittable parameters"
-        (Location.Doc.loc ~capitalize_first:false) loc
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Float_projection ->
       dprintf "is projected (at %a) from a float record (and thus allocated)"
-        (Location.Doc.loc ~capitalize_first:false) loc
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
 
   let print_allocation_r : allocation -> formatter -> unit =
    fun { txt; _ } ->
@@ -2235,17 +2241,23 @@ module Report = struct
     let pr =
       match containing with
       | Tuple ->
-        dprintf "is an element of the tuple at %a" (Location.Doc.loc ~capitalize_first:false) container
+        dprintf "is an element of the tuple at %a"
+          (Location.Doc.loc ~capitalize_first:false)
+          container
       | Record (s, moda) ->
         dprintf "is the field %a%a of the record at %a" Misc.Style.inline_code s
-          maybe_modality moda (Location.Doc.loc ~capitalize_first:false) container
+          maybe_modality moda
+          (Location.Doc.loc ~capitalize_first:false)
+          container
       | Array moda ->
         dprintf "is an element%a of the array at %a" maybe_modality moda
-          (Location.Doc.loc ~capitalize_first:false) container
+          (Location.Doc.loc ~capitalize_first:false)
+          container
       | Constructor (s, moda) ->
         dprintf "is contained (via constructor %a)%a in the value at %a"
           Misc.Style.inline_code s maybe_modality moda
-          (Location.Doc.loc ~capitalize_first:false) container
+          (Location.Doc.loc ~capitalize_first:false)
+          container
     in
     pr, pp
 
@@ -2300,17 +2312,16 @@ module Report = struct
     let mode_printer = Misc.Style.as_inline_code (C.print obj) in
     match side, obj, x with
     | `Actual, Regionality, Regional ->
-      Fmt.fprintf ppf "%a to the parent region" mode_printer
-        C.Regionality.Local
+      Fmt.fprintf ppf "%a to the parent region" mode_printer C.Regionality.Local
       (* CR-someday zqian: treat the following cases generally. *)
     | `Expected, Contention_op, Shared ->
       (* When "shared" is expected, we tell the user that either shared or
          uncontended is expected. *)
-      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Shared
-        mode_printer C.Contention.Uncontended
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
+        C.Contention.Uncontended
     | `Expected, Visibility_op, Read ->
-      Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read
-        mode_printer C.Visibility.Read_write
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
+        C.Visibility.Read_write
     | `Expected, Regionality, Regional ->
       Fmt.fprintf ppf "%a to the parent region or %a" mode_printer
         C.Regionality.Local mode_printer C.Regionality.Global

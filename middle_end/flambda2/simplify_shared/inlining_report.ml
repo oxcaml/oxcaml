@@ -376,17 +376,20 @@ module Uid = struct
     then Format.fprintf ppf "[[%s][here]]" t
     else
       let external_reports =
-        Format_doc.asprintf "%a.0.inlining.org" Compilation_unit.print_name cu_uid
+        Format_doc.asprintf "%a.0.inlining.org" Compilation_unit.print_name
+          cu_uid
       in
       try
         let file = Load_path.find_normalized external_reports in
         Format.fprintf ppf "[[file:%s::%s][in compilation unit %a]]" t file
-          (Format_doc.compat Compilation_unit.print) cu_uid
+          (Format_doc.compat Compilation_unit.print)
+          cu_uid
       with Not_found ->
         Format.fprintf ppf
           "in@ compilation@ unit@ %a@ but@ no@ inlining@ reports@ were@ \
            generated@ for@ this@ unit."
-          (Format_doc.compat Compilation_unit.print) cu_uid
+          (Format_doc.compat Compilation_unit.print)
+          cu_uid
 end
 
 module Inlining_tree = struct
@@ -618,7 +621,10 @@ module Inlining_tree = struct
       let defined_in = IHA.compilation_unit to_ in
       if Compilation_unit.equal defined_in compilation_unit
       then Format.fprintf ppf "this compilation unit"
-      else Format.fprintf ppf "%a" (Format_doc.compat Compilation_unit.print_name) defined_in
+      else
+        Format.fprintf ppf "%a"
+          (Format_doc.compat Compilation_unit.print_name)
+          defined_in
     in
     Format.fprintf ppf
       "@[<hov>The@ decision@ to@ inline@ this@ call@ was@ taken@ in@ %a@ at@ \

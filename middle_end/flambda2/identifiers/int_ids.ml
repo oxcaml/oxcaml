@@ -494,8 +494,9 @@ module Variable = struct
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
       else
-        Format.fprintf ppf "%a.%s/%d%s" (Format_doc.compat Compilation_unit.print) cu (name t)
-          (name_stamp t)
+        Format.fprintf ppf "%a.%s/%d%s"
+          (Format_doc.compat Compilation_unit.print)
+          cu (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
   end
 

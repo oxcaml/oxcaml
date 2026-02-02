@@ -15,7 +15,6 @@
 
 open Allowance
 open Solver_intf
-
 module Fmt = Format_doc
 
 module Magic_equal (X : Equal) :
@@ -406,8 +405,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let traversed = VarSet.add v.id traversed in
         let p = print_morphvar ~traversed obj in
-        Fmt.fprintf ppf "{%a}" (Fmt.pp_print_list p)
-          (var_map_to_list v.vlower)
+        Fmt.fprintf ppf "{%a}" (Fmt.pp_print_list p) (var_map_to_list v.vlower)
 
   and print_morphvar : type a l r.
       ?traversed:VarSet.t -> a C.obj -> _ -> (a, l * r) morphvar -> _ =

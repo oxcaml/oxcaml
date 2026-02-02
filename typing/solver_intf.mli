@@ -14,7 +14,6 @@
 (**************************************************************************)
 
 open Allowance
-
 module Fmt = Format_doc
 
 module type Equal = sig

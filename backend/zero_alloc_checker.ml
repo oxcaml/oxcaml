@@ -111,9 +111,8 @@ module Witness = struct
     | Widen -> fprintf ppf "widen"
 
   let print ppf { kind; dbg; hint } =
-    Format.fprintf ppf "%a {%a}%a@,"
-      (Fmt.compat print_kind) kind Debuginfo.print_compact dbg
-      (Fmt.compat print_hint) hint
+    Format.fprintf ppf "%a {%a}%a@," (Fmt.compat print_kind) kind
+      Debuginfo.print_compact dbg (Fmt.compat print_hint) hint
 end
 
 let take_first_n t n ~to_seq ~of_seq ~cardinal =
@@ -1655,8 +1654,7 @@ end = struct
       Fmt.fprintf ppf "%a:%i" Location.Doc.filename item.dinfo_file
         item.dinfo_line;
       if item.dinfo_char_start >= 0
-      then
-        Fmt.fprintf ppf ",%i--%i" item.dinfo_char_start item.dinfo_char_end;
+      then Fmt.fprintf ppf ",%i--%i" item.dinfo_char_start item.dinfo_char_end;
       if include_scope
       then
         Fmt.fprintf ppf "[%s]"
@@ -1752,8 +1750,7 @@ end = struct
     let pp_alloc_dbginfo_item (item : Cmm.alloc_dbginfo_item) =
       let aloc = Debuginfo.to_location item.alloc_dbg in
       Location.msg ~loc:aloc "allocate %d words%a%a" item.alloc_words
-        pp_alloc_block_kind item.alloc_block_kind pp_inlined_dbg
-        item.alloc_dbg
+        pp_alloc_block_kind item.alloc_block_kind pp_inlined_dbg item.alloc_dbg
     in
     let print_comballoc dbg =
       match dbg with
@@ -1811,9 +1808,7 @@ end = struct
       let dbg = if Debuginfo.is_none w.dbg then t.fun_dbg else w.dbg in
       let loc = Debuginfo.to_location dbg in
       let pp ppf () =
-        Fmt.fprintf ppf "%t%a%a"
-          print_main_msg
-          pp_inlined_dbg dbg
+        Fmt.fprintf ppf "%t%a%a" print_main_msg pp_inlined_dbg dbg
           Witness.print_hint w.hint
       in
       Location.error_of_printer ~loc ~sub pp ()

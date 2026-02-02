@@ -96,7 +96,8 @@ let report_error ppf = function
           if not (Debuginfo.is_none dbg)
           then (
             Format_doc.fprintf ppf " at ";
-            (Location.Doc.loc ~capitalize_first:true) ppf
+            (Location.Doc.loc ~capitalize_first:true)
+              ppf
               (Debuginfo.to_location dbg));
           Format_doc.fprintf ppf "\n")
       (List.sort

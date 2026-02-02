@@ -56,7 +56,7 @@ module Name : sig
   val predef_exn : t
 
   (** Print the name for use in error messages. Uses [Format_doc.formatter] and
-    applies inline code styling. *)
+      applies inline code styling. *)
   val print_as_inline_code : Format_doc.formatter -> t -> unit
 
   val print : Format_doc.formatter -> t -> unit
@@ -85,7 +85,6 @@ module Prefix : sig
 
   val to_string : t -> string
 
-
   val is_empty : t -> bool
 
   val print : Format_doc.formatter -> t -> unit
@@ -101,7 +100,7 @@ type t
 (** Printing, comparison, sets, maps, etc. *)
 include Identifiable.S with type t := t
 
-val print: Format_doc.formatter -> t -> unit
+val print : Format_doc.formatter -> t -> unit
 
 (** Print only the name of the given compilation unit. *)
 val print_name : Format_doc.formatter -> t -> unit

@@ -241,8 +241,7 @@ let report_error ppf = function
     let print_modules ppf =
       List.iter (fun (md, rq) ->
           fprintf ppf "@ @[<hov 2>%a referenced from %a@]"
-            CU.print_as_inline_code md
-            print_references rq)
+            CU.print_as_inline_code md print_references rq)
     in
     fprintf ppf
       "@[<v 2>No implementations provided for the following modules:%a@]"

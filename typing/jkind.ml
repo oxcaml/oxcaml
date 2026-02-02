@@ -21,8 +21,7 @@ module Fmt = Format_doc
 
 [@@@warning "+9"]
 
-let print_type_expr : type_expr Fmt.printer ref =
-  ref (fun _ _ -> assert false)
+let print_type_expr : type_expr Fmt.printer ref = ref (fun _ _ -> assert false)
 
 let set_print_type_expr p = print_type_expr := p
 
@@ -2100,9 +2099,13 @@ module Format_history = struct
     | Implicit_jkind name ->
       fprintf ppf "the implicit kind of type variables named %s" name
     | Type_wildcard loc ->
-      fprintf ppf "the wildcard _ at %a" (Location.Doc.loc ~capitalize_first:false) loc
+      fprintf ppf "the wildcard _ at %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Type_of_kind loc ->
-      fprintf ppf "the type at %a" (Location.Doc.loc ~capitalize_first:false) loc
+      fprintf ppf "the type at %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | With_error_message (_message, context) ->
       (* message gets printed in [format_flattened_history] so we ignore it here *)
       format_annotation_context ppf context
@@ -2293,7 +2296,8 @@ module Format_history = struct
         | None -> ()
       in
       fprintf ppf "of the definition%a at %a" format_id id
-        (Location.Doc.loc ~capitalize_first:false) loc
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Abbreviation -> fprintf ppf "it is the expansion of a type abbreviation"
 
   let format_interact_reason ppf : History.interact_reason -> _ = function
@@ -2452,9 +2456,7 @@ module Violation = struct
                   (fun acc with_bound ->
                     Outcometree.Ojkind_const_with (acc, with_bound, []))
                   (Outcometree.Ojkind_const_mod
-                     ( None,
-                       [Fmt.asprintf "%a" (Per_axis.print axis) mod_bound]
-                     ))
+                     (None, [Fmt.asprintf "%a" (Per_axis.print axis) mod_bound]))
                   with_bounds
               in
               !Oprint.out_jkind_const ppf ojkind
@@ -2559,13 +2561,13 @@ module Violation = struct
         (Format_history.format_history
            ~intro:
              (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
-              former format_layout_or_kind k1)
+                former format_layout_or_kind k1)
            ~layout_or_kind)
-          k1
+        k1
         (Format_history.format_history
            ~intro:
              (dprintf "@[<hov 2>But the %s of %a must %t@]" layout_or_kind
-              pp_former former connective)
+                pp_former former connective)
            ~layout_or_kind)
         k2
     else
@@ -2904,7 +2906,8 @@ module Debug_printers = struct
       History.concrete_legacy_creation_reason -> unit = function
     | Unannotated_type_parameter path ->
       fprintf ppf "Unannotated_type_parameter %a"
-        (Fmt.compat !printtyp_path) path
+        (Fmt.compat !printtyp_path)
+        path
     | Wildcard -> fprintf ppf "Wildcard"
     | Unification_var -> fprintf ppf "Unification_var"
 
@@ -2919,8 +2922,8 @@ module Debug_printers = struct
         var
     | Newtype_declaration name -> fprintf ppf "Newtype_declaration %s" name
     | Constructor_type_parameter (cstr, name) ->
-      fprintf ppf "Constructor_type_parameter (%a, %S)"
-        (Fmt.compat Path.print) cstr name
+      fprintf ppf "Constructor_type_parameter (%a, %S)" (Fmt.compat Path.print)
+        cstr name
     | Existential_unpack name -> fprintf ppf "Existential_unpack %s" name
     | Univar name -> fprintf ppf "Univar %S" name
     | Type_variable name -> fprintf ppf "Type_variable %S" name
@@ -2943,7 +2946,8 @@ module Debug_printers = struct
     | Array_type_argument -> fprintf ppf "Array_type_argument"
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
-        (Fmt.compat !printtyp_path) parent_path
+        (Fmt.compat !printtyp_path)
+        parent_path
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
@@ -2969,7 +2973,8 @@ module Debug_printers = struct
     | Let_rec_variable v -> fprintf ppf "Let_rec_variable %a" Ident.print v
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
-        (Fmt.compat !printtyp_path) parent_path
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
@@ -2987,7 +2992,8 @@ module Debug_printers = struct
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
-        (Fmt.compat !printtyp_path) parent_path
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Tuple -> fprintf ppf "Tuple"
     | Row_variable -> fprintf ppf "Row_variable"
     | Polymorphic_variant -> fprintf ppf "Polymorphic_variant"
@@ -3022,7 +3028,8 @@ module Debug_printers = struct
     | Annotated (ctx, loc) ->
       fprintf ppf "Annotated (%a,%a)" annotation_context ctx Location.print_loc
         loc
-    | Missing_cmi p -> fprintf ppf "Missing_cmi %a" (Fmt.compat !printtyp_path) p
+    | Missing_cmi p ->
+      fprintf ppf "Missing_cmi %a" (Fmt.compat !printtyp_path) p
     | Any_creation any -> fprintf ppf "Any_creation %a" any_creation_reason any
     | Immediate_creation immediate ->
       fprintf ppf "Immediate_creation %a" immediate_creation_reason immediate
@@ -3047,7 +3054,9 @@ module Debug_printers = struct
     | Imported -> fprintf ppf "Imported"
     | Imported_type_argument { parent_path; position; arity } ->
       fprintf ppf "Imported_type_argument (pos %d, arity %d) of %a" position
-        arity (Fmt.compat !printtyp_path) parent_path
+        arity
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Generalized (id, loc) ->
       fprintf ppf "Generalized (%s, %a)"
         (match id with Some id -> Ident.unique_name id | None -> "")
@@ -3055,7 +3064,8 @@ module Debug_printers = struct
     | Abbreviation -> fprintf ppf "Abbreviation"
 
   let interact_reason ppf : History.interact_reason -> _ = function
-    | Gadt_equation p -> fprintf ppf "Gadt_equation %a" (Fmt.compat Path.print) p
+    | Gadt_equation p ->
+      fprintf ppf "Gadt_equation %a" (Fmt.compat Path.print) p
     | Tyvar_refinement_intersection ->
       fprintf ppf "Tyvar_refinement_intersection"
     | Subjkind -> fprintf ppf "Subjkind"

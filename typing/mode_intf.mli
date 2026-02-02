@@ -13,7 +13,6 @@
 (**************************************************************************)
 
 module Fmt = Format_doc
-
 open Allowance
 
 (* While all our lattices are bi-Heyting algebras (see [mode.ml]), the extra

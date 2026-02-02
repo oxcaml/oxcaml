@@ -1165,8 +1165,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
   | Pgetglobal cu, [] ->
     if Compilation_unit.equal cu (Env.current_unit env)
     then
-      Misc.fatal_errorf_doc "Pgetglobal %a in the same unit" Compilation_unit.print
-        cu;
+      Misc.fatal_errorf_doc "Pgetglobal %a in the same unit"
+        Compilation_unit.print cu;
     let symbol =
       Flambda2_import.Symbol.for_compilation_unit cu |> Symbol.create_wrapped
     in

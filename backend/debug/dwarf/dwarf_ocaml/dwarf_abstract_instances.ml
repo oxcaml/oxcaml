@@ -152,7 +152,9 @@ let find state ~compilation_unit_proto_die (dbg : Debuginfo.t) =
   let { demangled_name; fun_symbol; compilation_unit = dbg_comp_unit } =
     decompose_singleton_debuginfo dbg
   in
-  DS.Debug.log "found comp unit %a\n%!" (Format_doc.compat Compilation_unit.print) dbg_comp_unit;
+  DS.Debug.log "found comp unit %a\n%!"
+    (Format_doc.compat Compilation_unit.print)
+    dbg_comp_unit;
   let this_comp_unit = Compilation_unit.get_current_exn () in
   if Compilation_unit.equal dbg_comp_unit this_comp_unit
   then (

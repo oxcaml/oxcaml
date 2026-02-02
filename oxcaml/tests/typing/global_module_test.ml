@@ -111,7 +111,8 @@ module Check_tests = struct
       let pp_list_body ppf params =
         Format.pp_print_list
           ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
-          (Format_doc.compat Global_module.Parameter_name.print) ppf params
+          (Format_doc.compat Global_module.Parameter_name.print)
+          ppf params
       in
       match params with
       | [] -> Format.fprintf ppf "[]"

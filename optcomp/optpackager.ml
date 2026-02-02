@@ -280,24 +280,14 @@ let report_error ppf = function
   | Illegal_renaming (name, file, id) ->
     fprintf ppf
       "Wrong file naming: %a@ contains the code for@ %a when %a was expected"
-      Location.Doc.quoted_filename
-      file
-      CU.Name.print_as_inline_code
-      name
-      CU.Name.print_as_inline_code
-      id
+      Location.Doc.quoted_filename file CU.Name.print_as_inline_code name
+      CU.Name.print_as_inline_code id
   | Forward_reference (file, ident) ->
     fprintf ppf "Forward reference to %a in file %a"
-      CU.Name.print_as_inline_code
-      ident
-      Location.Doc.quoted_filename
-      file
+      CU.Name.print_as_inline_code ident Location.Doc.quoted_filename file
   | Wrong_for_pack (file, path) ->
     fprintf ppf "File %a@ was not compiled with the `-for-pack %a' option"
-      Location.Doc.quoted_filename
-      file
-      CU.print_as_inline_code
-      path
+      Location.Doc.quoted_filename file CU.print_as_inline_code path
   | File_not_found file ->
     fprintf ppf "File %a not found" Style.inline_code file
   | Assembler_error file ->

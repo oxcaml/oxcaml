@@ -114,8 +114,7 @@ end = struct
 
   let to_string t = t
 
-  let print_as_inline_code ppf t =
-    Misc.Style.inline_code ppf (to_string t)
+  let print_as_inline_code ppf t = Misc.Style.inline_code ppf (to_string t)
 end
 
 module Prefix : sig
@@ -458,7 +457,8 @@ let of_string str =
 
 let of_complete_global_exn glob =
   if not (Global_module.is_complete glob)
-  then Misc.fatal_errorf_doc "of_complete_global_exn@ %a" Global_module.print glob;
+  then
+    Misc.fatal_errorf_doc "of_complete_global_exn@ %a" Global_module.print glob;
   of_global_name (glob |> Global_module.to_name)
 
 let dummy = create Prefix.empty (Name.of_string "*none*")
@@ -480,8 +480,7 @@ let rec doc_print ppf t =
   let () =
     if Prefix.is_empty for_pack_prefix
     then Fmt.fprintf ppf "%a" Name.print name
-    else
-      Fmt.fprintf ppf "%a.%a" Prefix.print for_pack_prefix Name.print name
+    else Fmt.fprintf ppf "%a.%a" Prefix.print for_pack_prefix Name.print name
   in
   ListLabels.iter ~f:(print_arg ppf) arguments
 

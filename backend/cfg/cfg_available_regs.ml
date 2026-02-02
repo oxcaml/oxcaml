@@ -276,8 +276,12 @@ module Transfer = struct
                 := RD_quotient_set.add regd
                      (RD_quotient_set.filter_reg_by_loc !avail_after reg)
           done;
-          dprintf "...ident = %a\n%!" (Format_doc.compat Ident.print_with_scope) ident;
-          dprintf "...regd = %a\n%!" (Format_doc.compat Ident.print_with_scope) ident;
+          dprintf "...ident = %a\n%!"
+            (Format_doc.compat Ident.print_with_scope)
+            ident;
+          dprintf "...regd = %a\n%!"
+            (Format_doc.compat Ident.print_with_scope)
+            ident;
           dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
           dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_before;
           dprintf "...avail_after %a\n%!" RD_quotient_set.print !avail_after;

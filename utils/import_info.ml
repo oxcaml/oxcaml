@@ -65,7 +65,8 @@ let cu t =
     Misc.fatal_errorf
       "Cannot extract [Compilation_unit.t] from [Import_info.t] (for unit %a) \
        that never received it"
-      (Format_doc.compat CU.Name.print) name
+      (Format_doc.compat CU.Name.print)
+      name
 
 let crc t =
   match t with
@@ -86,8 +87,8 @@ module Intf = struct
   let create_normal name cu ~crc =
     if CU.instance_arguments cu <> []
     then
-      Misc.fatal_errorf_doc "@[<hv>Interface import with arguments:@ %a@]" CU.print
-        cu;
+      Misc.fatal_errorf_doc "@[<hv>Interface import with arguments:@ %a@]"
+        CU.print cu;
     check_name name cu;
     Intf (Normal (cu, crc))
 
@@ -115,8 +116,8 @@ module Intf = struct
     match t with
     | Intf intf -> intf
     | Impl (Loaded (cu, _) | Unloaded cu) ->
-      Misc.fatal_errorf_doc "Expected an [Import_info.Impl.t] but found %a" CU.print
-        cu
+      Misc.fatal_errorf_doc "Expected an [Import_info.Impl.t] but found %a"
+        CU.print cu
 
   let name t =
     match expect_intf t with
@@ -158,7 +159,8 @@ module Impl = struct
     | Impl impl -> impl
     | Intf _ ->
       Misc.fatal_errorf "Expected an [Import_info.Intf.t] but found %a"
-        (Format_doc.compat CU.Name.print) (Intf.name t)
+        (Format_doc.compat CU.Name.print)
+        (Intf.name t)
 
   let cu t = match expect_impl t with Loaded (cu, _) | Unloaded cu -> cu
 
