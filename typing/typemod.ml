@@ -2979,11 +2979,32 @@ let rec type_module ?alias sttn funct_body anchor env smod =
   in
   md, shape
 
-and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
-  anchor env smod =
-  Builtin_attributes.warning_scope smod.pmod_attributes
-    (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
-      smod)
+(* CR modes: Uniqueness analysis is not implemented for modules.
+   Therefore, to ensure soundness and compatibility with future compilers,
+   we conservatively require all module expressions to be [aliased many]. *)
+and constrain_uniqueness_and_linearity md =
+  let linearity_constraint =
+    { Value.Const.max with linearity = Linearity.Const.min }
+    |> Value.of_const ~hint_comonadic:Module_must_be_many
+  in
+  let uniqueness_constraint =
+    { Value.Const.min with uniqueness = Uniqueness.Const.max }
+    |> Value.of_const ~hint_monadic:Module_must_be_aliased
+  in
+  let (mode, locks) = md.mod_mode in
+  let mode = Value.join [ mode; uniqueness_constraint ] in
+  Value.submode_err (md.mod_loc, Module) mode linearity_constraint;
+  { md with mod_mode = mode, locks }
+
+and type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
+    anchor env smod =
+  let (md, shape) =
+    Builtin_attributes.warning_scope smod.pmod_attributes
+      (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
+        smod)
+  in
+  let md = constrain_uniqueness_and_linearity md in
+  (md, shape)
 
 and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   (* If the module is an identifier, there might be locks between the
