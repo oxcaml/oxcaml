@@ -573,7 +573,6 @@ and expression_extra i ppf x attrs =
       line i ppf "Texp_borrowed %b\n" !r
   | Texp_ghost_region ->
       line i ppf "Texp_ghost_region\n"
-
   | Texp_stack ->
       line i ppf "Texp_stack\n";
       attributes i ppf attrs

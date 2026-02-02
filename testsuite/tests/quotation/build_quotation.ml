@@ -994,3 +994,18 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
   (int) * (string))
 ]>
 |}];;
+
+let x = <[ "foo" ]> in <[ let y = (borrow_ $x) in (fun (a @ local) -> ()) y ]>
+[%%expect{|
+- : <[unit]> expr = <[let y = (borrow_ "foo") in (fun a -> ()) y]>
+|}];;
+
+let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
+[%%expect{|
+Line 1, characters 43-44:
+1 | let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
+                                               ^
+Error: Identifier "x" is used at Line 1, characters 43-44,
+       inside a quotation (<[ ... ]>);
+       it is introduced at Line 1, characters 4-5, outside any quotations.
+|}];;
