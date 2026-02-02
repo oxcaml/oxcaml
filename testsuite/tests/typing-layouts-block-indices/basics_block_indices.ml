@@ -182,6 +182,7 @@ Error: This block index points to an element stored as a flattened float.
 (* Mixed float record *)
 type t_float64 : float64
 type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
+[@@flatten_floats]
 let f () = (.f)
 let fu () = (.fu)
 let t_float64 () = (.t_float64)

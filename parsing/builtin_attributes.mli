@@ -200,7 +200,14 @@ val has_boxed: Parsetree.attributes -> bool
 
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 
-val has_flatten_floats : Parsetree.attributes -> bool
+val has_record_mixed_floats : Parsetree.attributes -> bool
+val has_record_float_us : Parsetree.attributes -> bool
+val has_record_bits8 : Parsetree.attributes -> bool
+val has_record_bits16 : Parsetree.attributes -> bool
+val has_record_vec128 : Parsetree.attributes -> bool
+val has_record_vec256 : Parsetree.attributes -> bool
+val has_record_vec512 : Parsetree.attributes -> bool
+val has_record_with_void : Parsetree.attributes -> bool
 
 val parse_standard_interface_attributes : Parsetree.attribute -> unit
 val parse_standard_implementation_attributes : Parsetree.attribute -> unit

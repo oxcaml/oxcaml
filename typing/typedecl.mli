@@ -200,8 +200,18 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
-  | Missing_flatten_floats_attribute
-  | Unnecessary_flatten_floats_attribute
+  | Missing_record_attribute of required_record_attribute
+  | Unnecessary_record_attribute of required_record_attribute
+
+and required_record_attribute =
+  | Record_mixed_floats
+  | Record_float_us
+  | Record_bits8
+  | Record_bits16
+  | Record_vec128
+  | Record_vec256
+  | Record_vec512
+  | Record_with_void
 
 exception Error of Location.t * error
 

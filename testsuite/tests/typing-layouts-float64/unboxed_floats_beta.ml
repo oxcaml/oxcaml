@@ -126,6 +126,7 @@ type t14 = { a : float#;
              mutable d : float#;
              e : float;
              mutable f : float# }
+[@@flatten_floats]
 
 (* Construction *)
 let t14_1 = { a = Float_u.of_float 3.14;

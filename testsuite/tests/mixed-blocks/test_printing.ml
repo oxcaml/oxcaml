@@ -5,7 +5,7 @@
 (* Test bytecode printing of values *)
 
 (* All-float *)
-type t = { flt : float; uflt : float# }
+type t = { flt : float; uflt : float# } [@@flatten_floats]
 
 let t = { flt = 4.0; uflt = #5.0 }
 

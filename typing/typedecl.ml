@@ -147,8 +147,18 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
-  | Missing_flatten_floats_attribute
-  | Unnecessary_flatten_floats_attribute
+  | Missing_record_attribute of required_record_attribute
+  | Unnecessary_record_attribute of required_record_attribute
+
+and required_record_attribute =
+  | Record_mixed_floats
+  | Record_float_us
+  | Record_bits8
+  | Record_bits16
+  | Record_vec128
+  | Record_vec256
+  | Record_vec512
+  | Record_with_void
 
 open Typedtree
 
@@ -2233,24 +2243,79 @@ let update_decls_jkind env decls =
            | _ -> ()
          end;
 
-         (* Check flatten_floats attribute requirement for mixed float/float#
-            records *)
-         let has_flatten_floats =
-           Builtin_attributes.has_flatten_floats decl.type_attributes
-         in
          let updated_decl = update_decl_jkind env (Pident id) decl in
-         let has_float_boxed =
-           match updated_decl.type_kind with
-           | Type_record (_, Record_mixed shape, _) ->
-             Array.exists (function Float_boxed -> true | _ -> false) shape
-           | _ -> false
+
+         (* Check record representation attribute requirements *)
+         let attrs = decl.type_attributes in
+         let check_attr ~has_attr ~needs_attr attr_kind =
+           match has_attr, needs_attr with
+           | false, true ->
+             raise (Error (decl.type_loc, Missing_record_attribute attr_kind))
+           | true, false ->
+             raise (Error (decl.type_loc, Unnecessary_record_attribute attr_kind))
+           | true, true | false, false -> ()
          in
-         (match has_flatten_floats, has_float_boxed with
-          | false, true ->
-            raise (Error (decl.type_loc, Missing_flatten_floats_attribute))
-          | true, false ->
-            raise (Error (decl.type_loc, Unnecessary_flatten_floats_attribute))
-          | true, true | false, false -> ());
+         let has_mixed_floats =
+           Builtin_attributes.has_record_mixed_floats attrs
+         in
+         let has_float_us = Builtin_attributes.has_record_float_us attrs in
+         let has_bits8 = Builtin_attributes.has_record_bits8 attrs in
+         let has_bits16 = Builtin_attributes.has_record_bits16 attrs in
+         let has_vec128 = Builtin_attributes.has_record_vec128 attrs in
+         let has_vec256 = Builtin_attributes.has_record_vec256 attrs in
+         let has_vec512 = Builtin_attributes.has_record_vec512 attrs in
+         let has_with_void = Builtin_attributes.has_record_with_void attrs in
+
+         let needs_mixed_floats, needs_float_us, needs_bits8, needs_bits16,
+             needs_vec128, needs_vec256, needs_vec512, needs_with_void =
+           match updated_decl.type_kind with
+           | Type_record (_, Record_ufloat, _) ->
+             false, true, false, false, false, false, false, false
+           | Type_record (_, Record_mixed shape, _) ->
+             let has_float_boxed =
+               Array.exists (function Float_boxed -> true | _ -> false) shape
+             in
+             let has_void =
+               Array.exists (function Void -> true | _ -> false) shape
+             in
+             let single_bits8 =
+               Array.length shape = 1 && shape.(0) = Bits8
+             in
+             let single_bits16 =
+               Array.length shape = 1 && shape.(0) = Bits16
+             in
+             let single_vec128 =
+               Array.length shape = 1 && shape.(0) = Vec128
+             in
+             let single_vec256 =
+               Array.length shape = 1 && shape.(0) = Vec256
+             in
+             let single_vec512 =
+               Array.length shape = 1 && shape.(0) = Vec512
+             in
+             has_float_boxed, false, single_bits8, single_bits16,
+             single_vec128, single_vec256, single_vec512, has_void
+           | _ ->
+             false, false, false, false, false, false, false, false
+         in
+
+         check_attr ~has_attr:has_mixed_floats ~needs_attr:needs_mixed_floats
+           Record_mixed_floats;
+         check_attr ~has_attr:has_float_us ~needs_attr:needs_float_us
+           Record_float_us;
+         check_attr ~has_attr:has_bits8 ~needs_attr:needs_bits8
+           Record_bits8;
+         check_attr ~has_attr:has_bits16 ~needs_attr:needs_bits16
+           Record_bits16;
+         check_attr ~has_attr:has_vec128 ~needs_attr:needs_vec128
+           Record_vec128;
+         check_attr ~has_attr:has_vec256 ~needs_attr:needs_vec256
+           Record_vec256;
+         check_attr ~has_attr:has_vec512 ~needs_attr:needs_vec512
+           Record_vec512;
+         check_attr ~has_attr:has_with_void ~needs_attr:needs_with_void
+           Record_with_void;
+
          (id, decl, allow_any_crossing, updated_decl)))
     decls
 
@@ -4952,20 +5017,51 @@ let report_error ppf = function
   | Non_value_atomic_field ->
     fprintf ppf
       "@[Atomic record fields must have layout value.@]"
-  | Missing_flatten_floats_attribute ->
+  | Missing_record_attribute attr_kind ->
+    let attr_name, description = match attr_kind with
+      | Record_mixed_floats ->
+        "[@@record_mixed_floats]",
+        "This record mixes boxed float and unboxed float# fields."
+      | Record_float_us ->
+        "[@@record_float_us]",
+        "This record contains only unboxed float# fields."
+      | Record_bits8 ->
+        "[@@record_bits8]",
+        "This record contains a single bits8 field."
+      | Record_bits16 ->
+        "[@@record_bits16]",
+        "This record contains a single bits16 field."
+      | Record_vec128 ->
+        "[@@record_vec128]",
+        "This record contains a single vec128 field."
+      | Record_vec256 ->
+        "[@@record_vec256]",
+        "This record contains a single vec256 field."
+      | Record_vec512 ->
+        "[@@record_vec512]",
+        "This record contains a single vec512 field."
+      | Record_with_void ->
+        "[@@record_with_void]",
+        "This record contains void fields."
+    in
     fprintf ppf
-      "@[This record mixes boxed %a and unboxed %a fields.@ \
-         To enable this, add the %a attribute.@]"
-      Style.inline_code "float"
-      Style.inline_code "float#"
-      Style.inline_code "[@@flatten_floats]"
-  | Unnecessary_flatten_floats_attribute ->
+      "@[%s@ To enable this, add the %a attribute.@]"
+      description
+      Style.inline_code attr_name
+  | Unnecessary_record_attribute attr_kind ->
+    let attr_name = match attr_kind with
+      | Record_mixed_floats -> "[@@record_mixed_floats]"
+      | Record_float_us -> "[@@record_float_us]"
+      | Record_bits8 -> "[@@record_bits8]"
+      | Record_bits16 -> "[@@record_bits16]"
+      | Record_vec128 -> "[@@record_vec128]"
+      | Record_vec256 -> "[@@record_vec256]"
+      | Record_vec512 -> "[@@record_vec512]"
+      | Record_with_void -> "[@@record_with_void]"
+    in
     fprintf ppf
-      "@[The %a attribute is not needed on this type declaration.@ \
-         It only applies to records that mix %a and %a fields exclusively.@]"
-      Style.inline_code "[@@flatten_floats]"
-      Style.inline_code "float"
-      Style.inline_code "float#"
+      "@[The %a attribute is not needed on this type declaration.@]"
+      Style.inline_code attr_name
 
 
 let () =

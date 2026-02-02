@@ -107,6 +107,7 @@ let () =
   print_newline ()
 
 type mixed_float_record = { mutable f : float; mutable u : float# }
+[@@flatten_floats]
 
 let () =
   print_endline "Mixed float record (float field)";
