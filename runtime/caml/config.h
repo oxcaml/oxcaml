@@ -293,7 +293,7 @@ typedef uint64_t uintnat;
 #define Default_runtime_events_log_wsize 16
 
 /* Default tick thread interval, in microseconds */
-#define Default_tick_interval_usec 250
+#define Default_tick_interval_usec 50000
 
 /* Assumed size of cache line. This value can be bigger than the actual L1
    cache line size. Atomics allocated with aligned constructor are
