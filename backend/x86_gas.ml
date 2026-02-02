@@ -229,3 +229,44 @@ let generate_asm oc lines =
       print_line b i;
       Buffer.add_char b '\n';
       Buffer.output_buffer oc b)
+
+(* Callbacks for filtered assembly output, used by expect tests *)
+let filtered_assembly_callbacks : (string -> unit) list ref = ref []
+
+let register_filtered_assembly_callback f =
+  filtered_assembly_callbacks := f :: !filtered_assembly_callbacks
+
+(* Filter assembly program to only include sections ending in _code,
+   keeping only labels and instructions. *)
+let filter_asm_program (program : asm_program) =
+  let buf = Buffer.create 1024 in
+  let in_code_section = ref false in
+  DLL.iter program ~f:(fun line ->
+      match line with
+      | Directive d -> (
+        match[@warning "-4"] d with
+        | Asm_targets.Asm_directives.Directive.New_label (Symbol sym, Code) ->
+          let encoded = Asm_targets.Asm_symbol.encode sym in
+          if String.ends_with ~suffix:"_code" encoded
+          then (
+            in_code_section := true;
+            print_line buf line;
+            Buffer.add_char buf '\n')
+        | New_label (Label _, _) when !in_code_section ->
+          print_line buf line;
+          Buffer.add_char buf '\n'
+        | Size _ -> in_code_section := false
+        | _ -> ())
+      | Ins _ when !in_code_section ->
+        print_line buf line;
+        Buffer.add_char buf '\n'
+      | Ins _ -> ());
+  "\n" ^ Buffer.contents buf
+
+let invoke_filtered_assembly_callbacks program =
+  match !filtered_assembly_callbacks with
+  | [] -> ()
+  | callbacks ->
+    filtered_assembly_callbacks := [];
+    let filtered_asm = filter_asm_program program in
+    List.iter (fun f -> f filtered_asm) callbacks

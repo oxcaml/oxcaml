@@ -3065,6 +3065,10 @@ let end_assembly () =
   in
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
-  X86_proc.generate_code asm;
+  X86_proc.generate_code
+    ~invoke_assembly_callbacks:X86_gas.invoke_filtered_assembly_callbacks asm;
   (* The internal assembler does not work if reset_all is called here *)
   if not !Oxcaml_flags.internal_assembler then reset_all ()
+
+let register_filtered_assembly_callback =
+  X86_gas.register_filtered_assembly_callback

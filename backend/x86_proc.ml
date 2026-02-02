@@ -436,7 +436,8 @@ let reset_asm_code () =
   asm_code_current_section := DLL.make_empty ();
   Section_name.Tbl.clear asm_code_by_section
 
-let generate_code asm =
+let generate_code ~invoke_assembly_callbacks asm =
+  invoke_assembly_callbacks asm_code;
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());

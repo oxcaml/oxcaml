@@ -22,19 +22,23 @@ type string_constant =
   ; tag : string
   }
 
+type expectation_kind = Expect_toplevel | Expect_asm
+
 type expectation =
   { extid_loc   : Location.t (* Location of "expect" in "[%%expect ...]" *)
   ; payload_loc : Location.t (* Location of the whole payload *)
   ; normal      : string_constant (* expectation without -principal *)
   ; principal   : string_constant (* expectation with -principal *)
+  ; kind        : expectation_kind
   }
 
 (* A list of phrases with the expected toplevel output *)
 type chunk =
   { phrases     : Parsetree.toplevel_phrase list
-  ; expectation : expectation
+  ; expectations : expectation list
   }
 
+let register_assembly_callback : ((string -> unit) -> unit) option ref = ref None
 
 type correction =
   { corrected_expectations : expectation list
@@ -42,8 +46,16 @@ type correction =
   }
 
 let match_expect_extension (ext : Parsetree.extension) =
+  let match_ext_name = function
+    | "expect" | "ocaml.expect" -> Some Expect_toplevel
+    | "expect_asm" | "ocaml.expect_asm" -> Some Expect_asm
+    | _ -> None
+  in
   match ext with
-  | ({Asttypes.txt = "expect" | "ocaml.expect"; loc = extid_loc}, payload) ->
+  | ({Asttypes.txt; loc = extid_loc}, payload) ->
+    match match_ext_name txt with
+    | None -> None
+    | Some kind ->
     let invalid_payload () =
       Location.raise_errorf ~loc:extid_loc "invalid [%%%%expect payload]"
     in
@@ -62,7 +74,7 @@ let match_expect_extension (ext : Parsetree.extension) =
               [ None, a
               ; None, { pexp_desc = Pexp_construct
                                 ({ txt = Lident "Principal"; _ }, Some b) }
-              ] ->
+              ] when kind = Expect_toplevel ->
             (string_constant a, string_constant b)
           | _ -> let s = string_constant e in (s, s)
         in
@@ -70,6 +82,7 @@ let match_expect_extension (ext : Parsetree.extension) =
         ; payload_loc = e.pexp_loc
         ; normal
         ; principal
+        ; kind
         }
       | PStr [] ->
         let s = { tag = ""; str = "" } in
@@ -77,39 +90,43 @@ let match_expect_extension (ext : Parsetree.extension) =
         ; payload_loc  = { extid_loc with loc_start = extid_loc.loc_end }
         ; normal    = s
         ; principal = s
+        ; kind
         }
       | _ -> invalid_payload ()
     in
     Some expectation
-  | _ ->
-    None
 
 (* Split a list of phrases from a .ml file *)
 let split_chunks phrases =
-  let rec loop (phrases : Parsetree.toplevel_phrase list) code_acc acc =
+  let rec loop (phrases : Parsetree.toplevel_phrase list) code_acc expect_acc acc =
     match phrases with
     | [] ->
-      if code_acc = [] then
+      let acc = match expect_acc with
+        | [] -> acc
+        | _ -> { phrases = List.rev code_acc; expectations = List.rev expect_acc } :: acc
+      in
+      if code_acc = [] || expect_acc <> [] then
         (List.rev acc, None)
       else
         (List.rev acc, Some (List.rev code_acc))
     | phrase :: phrases ->
       match phrase with
-      | Ptop_def [] -> loop phrases code_acc acc
+      | Ptop_def [] -> loop phrases code_acc expect_acc acc
       | Ptop_def [{pstr_desc = Pstr_extension(ext, [])}] -> begin
           match match_expect_extension ext with
-          | None -> loop phrases (phrase :: code_acc) acc
+          | None -> loop phrases (phrase :: code_acc) expect_acc acc
           | Some expectation ->
-            let chunk =
-              { phrases     = List.rev code_acc
-              ; expectation
-              }
-            in
-            loop phrases [] (chunk :: acc)
+            loop phrases code_acc (expectation :: expect_acc) acc
         end
-      | _ -> loop phrases (phrase :: code_acc) acc
+      | _ -> begin
+        match expect_acc with
+        | [] -> loop phrases (phrase :: code_acc) [] acc
+        | _ ->
+          let chunk = { phrases = List.rev code_acc; expectations = List.rev expect_acc } in
+          loop phrases [phrase] [] (chunk :: acc)
+      end
   in
-  loop phrases [] []
+  loop phrases [] [] []
 
 module Compiler_messages = struct
   let capture ppf ~f =
@@ -206,6 +223,7 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
   let buf = Buffer.create 1024 in
   let ppf = Format.formatter_of_buffer buf in
   let () = Misc.Style.set_tag_handling ppf in
+  let last_asm = ref None in
   let exec_phrases phrases =
     let phrases =
       match min_line_number phrases with
@@ -214,24 +232,26 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
     in
     (* For formatting purposes *)
     Buffer.add_char buf '\n';
+    let exec_one phrase =
+      Option.iter (fun register -> register (fun asm_out -> last_asm := Some asm_out)) !register_assembly_callback;
+      let snap = Btype.snapshot () in
+      try
+        Sys.with_async_exns
+          (fun () -> exec_phrase ppf phrase ~execute_phrase)
+      with exn ->
+        let bt = Printexc.get_raw_backtrace () in
+        begin try Location.report_exception ppf exn
+        with _ ->
+          Format.fprintf ppf "Uncaught exception: %s\n%s\n"
+            (Printexc.to_string exn)
+            (Printexc.raw_backtrace_to_string bt)
+        end;
+        Btype.backtrack snap;
+        false
+    in
     let _ : bool =
       List.fold_left phrases ~init:true ~f:(fun acc phrase ->
-        acc &&
-        let snap = Btype.snapshot () in
-        try
-          Sys.with_async_exns
-            (fun () -> exec_phrase ppf phrase ~execute_phrase)
-        with exn ->
-          let bt = Printexc.get_raw_backtrace () in
-          begin try Location.report_exception ppf exn
-          with _ ->
-            Format.fprintf ppf "Uncaught exception: %s\n%s\n"
-              (Printexc.to_string exn)
-              (Printexc.raw_backtrace_to_string bt)
-          end;
-          Btype.backtrack snap;
-          false
-      )
+        acc && exec_one phrase)
     in
     Format.pp_print_flush ppf ();
     let len = Buffer.length buf in
@@ -240,25 +260,25 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
       Buffer.add_char buf '\n';
     let s = Buffer.contents buf in
     Buffer.clear buf;
-    Misc.delete_eol_spaces s
+    (Misc.delete_eol_spaces s, !last_asm)
   in
   let corrected_expectations =
     capture_everything buf ppf ~f:(fun () ->
-      List.fold_left chunks ~init:[] ~f:(fun acc chunk ->
-        let output =
-          exec_phrases chunk.phrases
-        in
-        match eval_expectation chunk.expectation ~output with
-        | None -> acc
-        | Some correction -> correction :: acc)
-      |> List.rev)
+      List.concat_map chunks ~f:(fun chunk ->
+        let (toplevel_output, asm_output) = exec_phrases chunk.phrases in
+        List.filter_map chunk.expectations ~f:(fun expectation ->
+          let output = match expectation.kind with
+            | Expect_toplevel -> toplevel_output
+            | Expect_asm -> Option.value asm_output ~default:""
+          in
+          eval_expectation expectation ~output)))
   in
   let trailing_output =
     match trailing_code with
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> exec_phrases phrases)
+        ~f:(fun () -> fst (exec_phrases phrases))
   in
   { corrected_expectations; trailing_output }
 
