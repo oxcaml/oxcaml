@@ -996,19 +996,19 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~load:(fun _ ->
         L.Pbytes_load_vec { desc with size = Boxed_vec128; boxed = false })
   | ( Pbigstring_load_vec
-        ({ size = Boxed_vec256; safety; mode; index_kind; boxed; _ } as desc),
+        ({ size = Boxed_vec256; checks; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
     when L.split_vectors ->
     split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
       ~load:(fun low ->
-        let safety =
+        let checks =
           Option.map
             (fun (~len, ~align) ->
               if low then ~len, ~align else ~len:(len / 2), ~align:(align / 2))
-            safety
+            checks
         in
         L.Pbigstring_load_vec
-          { desc with size = Boxed_vec128; safety; boxed = false })
+          { desc with size = Boxed_vec128; checks; boxed = false })
   | ( Pfloatarray_load_vec
         ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
@@ -1077,19 +1077,19 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~store:(fun _ ->
         L.Pbytes_set_vec { desc with size = Boxed_vec128; boxed = false })
   | ( Pbigstring_set_vec
-        ({ size = Boxed_vec256; safety; index_kind; boxed; _ } as desc),
+        ({ size = Boxed_vec256; checks; index_kind; boxed; _ } as desc),
       [arr; idx; value] )
     when L.split_vectors ->
     split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:1
       ~store:(fun low ->
-        let safety =
+        let checks =
           Option.map
             (fun (~len, ~align) ->
               if low then ~len, ~align else ~len:(len / 2), ~align:(align / 2))
-            safety
+            checks
         in
         L.Pbigstring_set_vec
-          { desc with size = Boxed_vec128; safety; boxed = false })
+          { desc with size = Boxed_vec128; checks; boxed = false })
   | ( Pfloatarray_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
       [arr; idx; value] )
     when L.split_vectors ->
