@@ -62,11 +62,18 @@ module Context = struct
     | Types.Named (None, _, _) -> "_"
     | Types.Named (Some id, _, _) -> Ident.name id
 
+  (* Use deprecated_printer to defer path printing until render time.
+     This ensures the naming context is queried after reset_naming_context()
+     is called in wrap_printing_env, matching the old thunk-based behavior. *)
   let alt_pp ppf cxt =
     if cxt = [] then () else
     if List.for_all (function Module _ -> true | _ -> false) cxt then
-      Fmt.fprintf ppf "in module %a,"
-        (Style.as_inline_code Printtyp.path) (path_of_context cxt)
+      Fmt.fprintf ppf "in module %t,"
+        (fun ppf -> Fmt.deprecated_printer (fun fmt ->
+          Format.fprintf fmt "%a"
+            (Fmt.compat (Style.as_inline_code Printtyp.path))
+            (path_of_context cxt)
+        ) ppf)
     else
       Fmt.fprintf ppf "@[<hv 2>at position@ %a,@]"
         (Style.as_inline_code context) cxt
@@ -74,8 +81,12 @@ module Context = struct
   let pp ppf cxt =
     if cxt = [] then () else
     if List.for_all (function Module _ -> true | _ -> false) cxt then
-      Fmt.fprintf ppf "In module %a:@ "
-        (Style.as_inline_code Printtyp.path) (path_of_context cxt)
+      Fmt.fprintf ppf "In module %t:@ "
+        (fun ppf -> Fmt.deprecated_printer (fun fmt ->
+          Format.fprintf fmt "%a"
+            (Fmt.compat (Style.as_inline_code Printtyp.path))
+            (path_of_context cxt)
+        ) ppf)
     else
       Fmt.fprintf ppf "@[<hv 2>At position@ %a@]@ "
         (Style.as_inline_code context) cxt
@@ -585,10 +596,18 @@ module Functor_suberror = struct
       let diff ~is_modal g e more =
         let g = With_shorthand.definition ~is_modal g in
         let e = With_shorthand.definition ~is_modal e in
+        (* Use deprecated_printer to defer evaluation of [more ()] until print
+           time. This ensures that conflicts are registered by printing [g] and
+           [e] before [print_explanations] is called inside [more ()]. *)
         Fmt.dprintf
           "Module types do not match:@ @[%t@]@;<1 -2>does not include@ \
            @[%t@]%t"
-          g e (more ())
+          g e (fun ppf ->
+            Fmt.deprecated_printer (fun fmt ->
+              let rdoc = ref Fmt.Doc.empty in
+              (more ()) (Fmt.formatter rdoc);
+              Fmt.Doc.format fmt !rdoc
+            ) ppf)
 
       let incompatible = function
         | Types.Unit ->
@@ -644,7 +663,12 @@ module Functor_suberror = struct
       Fmt.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\
          is not included in@ @[%t@]%t"
-        g e (more ())
+        g e (fun ppf ->
+          Fmt.deprecated_printer (fun fmt ->
+              let rdoc = ref Fmt.Doc.empty in
+              (more ()) (Fmt.formatter rdoc);
+              Fmt.Doc.format fmt !rdoc
+            ) ppf)
 
     (** Specialized to avoid introducing shorthand names
         for single change difference
@@ -661,7 +685,12 @@ module Functor_suberror = struct
       Fmt.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\
          is not included in@ @[%t@]%t"
-        mty1_with_mode mty2_with_mode (more ())
+        mty1_with_mode mty2_with_mode (fun ppf ->
+          Fmt.deprecated_printer (fun fmt ->
+              let rdoc = ref Fmt.Doc.empty in
+              (more ()) (Fmt.formatter rdoc);
+              Fmt.Doc.format fmt !rdoc
+            ) ppf)
 
 
     let incompatible = function
