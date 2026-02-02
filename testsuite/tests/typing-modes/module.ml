@@ -257,11 +257,12 @@ module type S = functor () (M : S) -> S -> S @ portable
 |}]
 
 module F () = struct
-    let (foo @ once) () = ()
+    let (foo @ yielding) () = ()
 end
 [%%expect{|
-module F : functor () -> sig val foo : unit -> unit @@ stateless end @ once
-  @@ stateless
+module F :
+  functor () -> sig val foo : unit -> unit @@ stateless end @ yielding @@
+  stateless
 |}]
 
 module type Empty = sig end
@@ -527,3 +528,236 @@ Uncaught exception: File "typing/env.ml", line 2155, characters 13-19: Assertion
 
 |}]
 *)
+
+(* Since uniqueness analysis is not implemented for modules,
+   they are required to be at modes [aliased many]. *)
+(* CR modes: implement uniqueness analysis for modules. *)
+
+(* Cannot create [once] or [unique] modules *)
+let _ =
+    let module M @ once = struct end in
+    ()
+[%%expect{|
+Line 2, characters 17-36:
+2 |     let module M @ once = struct end in
+                     ^^^^^^^^^^^^^^^^^^^
+Error: The module is "once"
+       but is expected to be "many"
+         because modules are always required to be many.
+|}]
+
+let _ =
+    let module M @ unique = struct end in
+    ()
+[%%expect{|
+Line 2, characters 28-38:
+2 |     let module M @ unique = struct end in
+                                ^^^^^^^^^^
+Error: The module is "aliased"
+         because modules are always required to be aliased.
+       However, the module highlighted is expected to be "unique".
+|}]
+
+module M @ once = struct end
+[%%expect{|
+Line 1, characters 9-28:
+1 | module M @ once = struct end
+             ^^^^^^^^^^^^^^^^^^^
+Error: The module is "once"
+       but is expected to be "many"
+         because modules are always required to be many.
+|}]
+
+module M @ unique = struct end
+[%%expect{|
+Line 1, characters 20-30:
+1 | module M @ unique = struct end
+                        ^^^^^^^^^^
+Error: The module is "aliased"
+         because modules are always required to be aliased.
+       However, the module highlighted is expected to be "unique".
+|}]
+
+(* Setup: Module type and functors for testing usage *)
+module type Empty = sig end
+module F_once (M : Empty @ once) = struct end
+module F_unique (M : Empty @ unique) = struct end
+module G (X : Empty) = struct end
+[%%expect{|
+module type Empty = sig end
+module F_once : functor (M : Empty @ once) -> sig end @@ stateless
+module F_unique : functor (M : Empty @ unique) -> sig end @@ stateless
+module G : functor (X : Empty) -> sig end @@ stateless
+|}]
+
+(* Module alias - cannot use [once], cannot use as [unique] *)
+module Alias_once (M : Empty @ once) = struct
+    module N = M
+end
+[%%expect{|
+Line 2, characters 15-16:
+2 |     module N = M
+                   ^
+Error: The module is "once"
+       but is expected to be "many"
+         because modules are always required to be many.
+|}]
+
+module Alias_unique (M : Empty) = struct
+    module N @ unique = M
+end
+[%%expect{|
+Line 2, characters 24-25:
+2 |     module N @ unique = M
+                            ^
+Error: The module is "aliased" but is expected to be "unique".
+|}]
+
+(* Pack into first-class module - cannot use [once], cannot use as [unique] *)
+module Pack_once (M : Empty @ once) = struct
+    let m = (module M : Empty)
+end
+[%%expect{|
+Line 2, characters 20-21:
+2 |     let m = (module M : Empty)
+                        ^
+Error: The module is "once"
+       but is expected to be "many"
+         because modules are always required to be many.
+|}]
+
+module Pack_unique (M : Empty @ unique) = struct
+    let m @ unique = (module M : Empty)
+end
+[%%expect{|
+Line 2, characters 21-39:
+2 |     let m @ unique = (module M : Empty)
+                         ^^^^^^^^^^^^^^^^^^
+Error: This value is "aliased"
+         because it is a module and thus required to be aliased.
+       However, the highlighted expression is expected to be "unique".
+|}]
+
+(* Pass into functor as argument - cannot use [once], cannot use as [unique] *)
+module Apply_once (M : Empty @ once) = struct
+    module N = G(M)
+end
+[%%expect{|
+Line 2, characters 17-18:
+2 |     module N = G(M)
+                     ^
+Error: The module is "once"
+       but is expected to be "many"
+         because modules are always required to be many.
+|}]
+
+module Apply_unique (M : Empty @ unique) = struct
+    module N = F_unique(M)
+end
+[%%expect{|
+Line 2, characters 15-26:
+2 |     module N = F_unique(M)
+                   ^^^^^^^^^^^
+Error: Modules do not match: sig end @ aliased is not included in
+       Empty @ unique
+     Got "aliased" because it is a module and thus required to be aliased.
+     However, expected "unique".
+|}]
+
+(* Include - cannot use [once] *)
+module Include_once (M : Empty @ once) = struct
+    include M
+end
+[%%expect{|
+Line 2, characters 12-13:
+2 |     include M
+                ^
+Error: The module is "once"
+       but is expected to be "many"
+         because modules are always required to be many.
+|}]
+
+(* Including a [unique] module and trying to use a value as [unique] *)
+module type With_string = sig val s : string end
+module Include_unique (M : With_string @ unique) = struct
+    include M
+    let () = use_unique s
+end
+[%%expect{|
+module type With_string = sig val s : string end
+Line 4, characters 24-25:
+4 |     let () = use_unique s
+                            ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* Seemingly sound since [open] is just syntactic. *)
+module Open_once (M : Empty @ once) = struct
+    open M
+    let x = ()
+end
+[%%expect{|
+module Open_once :
+  functor (M : Empty @ once) -> sig val x : unit @@ stateless end @@
+  stateless
+|}]
+
+(* [open] keeps track of the origin. *)
+module Use_twice (M : sig val f : unit -> unit @@ once end @ once) = struct
+  open! M
+
+  let a = f
+  let b = M.f
+end
+[%%expect{|
+Line 4, characters 10-11:
+4 |   let a = f
+              ^
+Error: This value is once but used as many.
+Hint: This value comes from another module or class.
+|}]
+
+
+(* Unpack first-class module - cannot use [once], cannot use as [unique] *)
+let unpack_once (m : (module Empty) @ once) =
+    let module M = (val m) in
+    ()
+[%%expect{|
+Line 2, characters 24-25:
+2 |     let module M = (val m) in
+                            ^
+Error: This value is once but used as many.
+Hint: This value comes from outside the current module or class.
+|}]
+
+let unpack_unique (m : (module Empty) @ unique) =
+    let module M @ unique = (val m) in
+    ()
+[%%expect{|
+Line 2, characters 28-35:
+2 |     let module M @ unique = (val m) in
+                                ^^^^^^^
+Error: The module is "aliased"
+         because modules are always required to be aliased.
+       However, the module highlighted is expected to be "unique".
+|}]
+
+(* [module type of] is type-level allowed on [once] modules. *)
+module Typeof_once (M : Empty @ once) = struct
+    module type T = module type of M
+end
+[%%expect{|
+module Typeof_once :
+  functor (M : Empty @ once) -> sig module type T = Empty end @@ stateless
+|}]
+
+(* Referring to a type from a [once] module is ok *)
+module type With_type = sig type t end
+module Use_type_once (M : With_type @ once) = struct
+    type t = M.t
+end
+[%%expect{|
+module type With_type = sig type t end
+module Use_type_once : functor (M : With_type @ once) -> sig type t = M.t end
+  @@ stateless
+|}]

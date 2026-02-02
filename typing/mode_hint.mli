@@ -90,6 +90,8 @@ type 'd const =
   | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
   | Module_allocated_on_heap : (disallowed * 'r) pos const
+  | Module_must_be_many : (disallowed * 'r) pos const
+  | Module_must_be_aliased : ('l * disallowed) neg const
   | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
   | Branching : ('l * disallowed) neg const
   | Is_used_in : pinpoint -> (disallowed * 'r) const

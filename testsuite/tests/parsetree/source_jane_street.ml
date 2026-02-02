@@ -765,7 +765,9 @@ module G' = F @@ stateless
 module rec (F @ portable) () = struct end
 and (G @ portable) () = struct end
 [%%expect{|
-File "_none_", line 1:
+Line 1, characters 26-41:
+1 | module rec (F @ portable) () = struct end
+                              ^^^^^^^^^^^^^^^
 Error: Recursive modules require an explicit module type.
 |}]
 
