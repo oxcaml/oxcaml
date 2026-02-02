@@ -1651,7 +1651,7 @@ let rec tree_of_modal_typexp mode modal ty =
         (* Trepr wraps a Tpoly that contains the type variables
            corresponding to the sort variables. Extract them and print. *)
         (match get_desc ty with
-         | Tpoly (inner_ty, tyl) when tyl <> [] ->
+         | Tpoly (inner_ty, (_ :: _ as tyl))  ->
              (* Check that the sort_vars match the jkinds of tyl *)
              let sorts_match =
                match
