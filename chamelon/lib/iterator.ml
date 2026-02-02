@@ -114,30 +114,33 @@ type ('a, 'b) schedule =
   | Sequence of ('a, 'b) schedule list
   | Fix of ('a, 'b) schedule
 
-let rec run : type a b.
-    ?strategy:strategy ->
+let rec run0 : type a b.
+    strategy:strategy ->
     check:(a -> bool) ->
     (a, b) schedule ->
     a ->
     b ->
     a * bool =
- fun ?(strategy = dichotomy) ~check schedule map cur_file ->
+ fun ~strategy ~check schedule map cur_file ->
   match schedule with
   | Minimizer minimizer -> run_strategy strategy ~check map cur_file minimizer
   | With_strategy (strategy, schedule) ->
-      run ~strategy ~check schedule map cur_file
+      run0 ~strategy ~check schedule map cur_file
   | Sequence schedules ->
       List.fold_left
         (fun (map, ever_changed) schedule ->
-          let map', has_changed = run ~check schedule map cur_file in
+          let map', has_changed = run0 ~strategy ~check schedule map cur_file in
           (map', has_changed || ever_changed))
         (map, false) schedules
   | Fix schedule ->
       let rec loop map ever_changed =
-        let map, has_changed = run ~check schedule map cur_file in
+        let map, has_changed = run0 ~strategy ~check schedule map cur_file in
         if has_changed then loop map true else (map, ever_changed)
       in
       loop map false
+
+let run ?(strategy = dichotomy) ~check schedule map cur_file =
+  run0 ~strategy ~check schedule map cur_file
 
 let minimizer minimizer = Minimizer minimizer
 
