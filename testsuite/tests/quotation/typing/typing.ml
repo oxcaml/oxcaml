@@ -206,7 +206,7 @@ Line 1, characters 10-23:
 1 | type s7 = $(int -> int);;
               ^^^^^^^^^^^^^
 Error: Splices ($) are not allowed in the initial stage,
-       as encountered at Line 1, characters 10-23.
+       as encountered at line 1, characters 10-23.
        Did you forget to insert a quotation?
 |}];;
 
@@ -231,7 +231,7 @@ Line 1, characters 13-16:
 1 | type 'a t3 = $'a -> $'a -> 'a expr;;
                  ^^^
 Error: Splices ($) are not allowed in the initial stage,
-       as encountered at Line 1, characters 13-16.
+       as encountered at line 1, characters 13-16.
        Did you forget to insert a quotation?
 |}];;
 
@@ -241,7 +241,7 @@ Line 1, characters 13-16:
 1 | type 'a t4 = $'a -> $'a;;
                  ^^^
 Error: Splices ($) are not allowed in the initial stage,
-       as encountered at Line 1, characters 13-16.
+       as encountered at line 1, characters 13-16.
        Did you forget to insert a quotation?
 |}];;
 
@@ -250,9 +250,9 @@ let p x = <[x]>;;
 Line 1, characters 12-13:
 1 | let p x = <[x]>;;
                 ^
-Error: Identifier "x" is used at Line 1, characters 12-13,
+Error: Identifier "x" is used at line 1, characters 12-13,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 6-7, outside any quotations.
+       it is introduced at line 1, characters 6-7, outside any quotations.
 |}];;
 
 let f (x : $'a) = x
@@ -261,7 +261,7 @@ Line 1, characters 11-14:
 1 | let f (x : $'a) = x
                ^^^
 Error: Splices ($) are not allowed in the initial stage,
-       as encountered at Line 1, characters 11-14.
+       as encountered at line 1, characters 11-14.
        Did you forget to insert a quotation?
 |}];;
 
@@ -305,9 +305,9 @@ let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
 Line 1, characters 42-43:
 1 | let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
                                               ^
-Error: Identifier "a" is used at Line 1, characters 42-43,
+Error: Identifier "a" is used at line 1, characters 42-43,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 15-16, outside any quotations.
+       it is introduced at line 1, characters 15-16, outside any quotations.
 |}];;
 
 let foo7 (type a) (type b) x = <[fun (y : $a) -> y]>;;
@@ -353,7 +353,7 @@ type t4 = A | B
 Line 3, characters 2-3:
 3 | <[A]>;;
       ^
-Error: Constructor "A" used at Line 3, characters 2-3
+Error: Constructor "A" used at line 3, characters 2-3
        cannot be used in this context;
        "A" is not defined inside a quotation (<[ ... ]>).
 Hint: Constructor "A" is defined outside any quotations.
@@ -367,9 +367,9 @@ type t5 = int
 Line 3, characters 11-14:
 3 | type s = <[t5#]>;;
                ^^^
-Error: Identifier "t5" is used at Line 3, characters 11-14,
+Error: Identifier "t5" is used at line 3, characters 11-14,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 0-13, outside any quotations.
+       it is introduced at line 1, characters 0-13, outside any quotations.
 |}];;
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
