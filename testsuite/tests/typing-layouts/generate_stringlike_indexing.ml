@@ -517,6 +517,10 @@ let datas =
       ~examples:int_examples_default_bounds
   ; int_result ~width:"64" ~unboxed:false ~module_:"Int64"
       ~examples:int_examples_default_bounds
+  ; int_result ~width:"i8" ~unboxed:true ~module_:"Int8"
+      ~examples:int_examples_default_bounds
+  ; int_result ~width:"i16" ~unboxed:true ~module_:"Int16"
+      ~examples:int_examples_default_bounds
   ; int_result ~width:"32" ~unboxed:true ~module_:"Int32"
       ~examples:int_examples_default_bounds
   ; int_result ~width:"64" ~unboxed:true ~module_:"Int64"

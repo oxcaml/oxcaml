@@ -907,7 +907,10 @@ let string_like_load ~dbg ~unsafe
     let index = convert_index_to_untagged_int ~index ~index_kind in
     let wrap =
       match access_size, mode with
-      | (Eight | Eight_signed | Sixteen | Sixteen_signed), None ->
+      | (Eight | Sixteen), None ->
+        assert boxed_or_tagged;
+        tag_int
+      | (Eight_signed | Sixteen_signed), None ->
         if boxed_or_tagged then tag_int else Fun.id
       | Thirty_two, Some mode ->
         if boxed_or_tagged
@@ -958,7 +961,7 @@ let bytes_like_set ~dbg ~unsafe
     let index = convert_index_to_untagged_int ~index ~index_kind in
     let wrap =
       match access_size with
-      | Eight | Eight_signed | Sixteen | Sixteen_signed ->
+      | Eight | Sixteen | Eight_signed | Sixteen_signed ->
         if boxed_or_tagged then untag_int else Fun.id
       | Thirty_two -> if boxed_or_tagged then unbox_bint Boxed_int32 else Fun.id
       | Single -> if boxed_or_tagged then unbox_float32 else Fun.id

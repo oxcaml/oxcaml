@@ -1021,7 +1021,9 @@ let byte_width_of_string_accessor_width width =
 
 let kind_of_string_accessor_width width =
   match width with
-  | Eight | Eight_signed | Sixteen | Sixteen_signed -> K.value
+  | Eight | Sixteen -> K.value
+  | Eight_signed -> K.naked_int8
+  | Sixteen_signed -> K.naked_int16
   | Thirty_two -> K.naked_int32
   | Single -> K.naked_float32
   | Sixty_four -> K.naked_int64
@@ -2006,9 +2008,10 @@ let result_kind_of_binary_primitive p : result_kind =
     Singleton
       (Array_load_kind.kind_of_loaded_value array_load_kind
       |> K.With_subkind.kind)
-  | String_or_bigstring_load
-      (_, (Eight | Eight_signed | Sixteen | Sixteen_signed)) ->
+  | String_or_bigstring_load (_, (Eight | Sixteen)) ->
     Singleton K.naked_immediate
+  | String_or_bigstring_load (_, Eight_signed) -> Singleton K.naked_int8
+  | String_or_bigstring_load (_, Sixteen_signed) -> Singleton K.naked_int16
   | String_or_bigstring_load (_, Thirty_two) -> Singleton K.naked_int32
   | String_or_bigstring_load (_, Single) -> Singleton K.naked_float32
   | String_or_bigstring_load (_, Sixty_four) -> Singleton K.naked_int64
@@ -2291,9 +2294,12 @@ let args_kind_of_ternary_primitive p =
     ( array_kind,
       array_index_kind,
       Array_set_kind.kind_of_new_value array_set_kind |> K.With_subkind.kind )
-  | Bytes_or_bigstring_set
-      (Bytes, (Eight | Eight_signed | Sixteen | Sixteen_signed)) ->
+  | Bytes_or_bigstring_set (Bytes, (Eight | Sixteen)) ->
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_immediate
+  | Bytes_or_bigstring_set (Bytes, Eight_signed) ->
+    string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_int8
+  | Bytes_or_bigstring_set (Bytes, Sixteen_signed) ->
+    string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_int16
   | Bytes_or_bigstring_set (Bytes, Thirty_two) ->
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_int32
   | Bytes_or_bigstring_set (Bytes, Single) ->
@@ -2306,9 +2312,12 @@ let args_kind_of_ternary_primitive p =
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_vec256
   | Bytes_or_bigstring_set (Bytes, Five_twelve _) ->
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_vec512
-  | Bytes_or_bigstring_set
-      (Bigstring, (Eight | Eight_signed | Sixteen | Sixteen_signed)) ->
+  | Bytes_or_bigstring_set (Bigstring, (Eight | Sixteen)) ->
     bigstring_kind, bytes_or_bigstring_index_kind, K.naked_immediate
+  | Bytes_or_bigstring_set (Bigstring, Eight_signed) ->
+    bigstring_kind, bytes_or_bigstring_index_kind, K.naked_int8
+  | Bytes_or_bigstring_set (Bigstring, Sixteen_signed) ->
+    bigstring_kind, bytes_or_bigstring_index_kind, K.naked_int16
   | Bytes_or_bigstring_set (Bigstring, Thirty_two) ->
     bigstring_kind, bytes_or_bigstring_index_kind, K.naked_int32
   | Bytes_or_bigstring_set (Bigstring, Single) ->

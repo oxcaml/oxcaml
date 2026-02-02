@@ -2668,11 +2668,19 @@ let primitive_result_layout (p : primitive) =
   | Pstringlength | Pstringrefu | Pstringrefs
   | Pbyteslength | Pbytesrefu | Pbytesrefs
   | Parraylength _ | Pisint _ | Pisnull | Pisout
-  | Pstring_load_i8 _ | Pbytes_load_i8 _ | Pbigstring_load_i8 _
-  | Pstring_load_i16 _ | Pbytes_load_i16 _ | Pbigstring_load_i16 _
+  | Pstring_load_i8 { tagged = true; _ } | Pbytes_load_i8 { tagged = true; _ }
+  | Pbigstring_load_i8 { tagged = true; _ }
+  | Pstring_load_i16 { tagged = true; _ } | Pbytes_load_i16 { tagged = true; _ }
+  | Pbigstring_load_i16 { tagged = true; _ }
   | Pstring_load_16 _ | Pbytes_load_16 _ | Pbigstring_load_16 _
   | Pprobe_is_enabled _
     -> layout_int
+  | Pstring_load_i8 { tagged = false; _ } | Pbytes_load_i8 { tagged = false; _ }
+  | Pbigstring_load_i8 { tagged = false; _ } ->
+    layout_unboxed_int8
+  | Pstring_load_i16 { tagged = false; _ } | Pbytes_load_i16 { tagged = false; _ }
+  | Pbigstring_load_i16 { tagged = false; _ } ->
+    layout_unboxed_int16
   | Parrayrefu (array_ref_kind, _, _) | Parrayrefs (array_ref_kind, _, _) ->
     array_ref_kind_result_layout array_ref_kind
   | Punbox_unit -> layout_unboxed_unit
