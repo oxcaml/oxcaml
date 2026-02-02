@@ -216,10 +216,10 @@ let string_or_bigstring_load ~machine_width kind width =
     (* CR gbury: these should actually depend on Arch.allow_unaligned_access,
        but that would add a dependency on the backend which is probably not
        desirable ? *)
-    | Eight_signed -> 5 (* untag, add, load, shr, sal *)
+    | Eight_signed -> 2 (* add, load (allow_unaligned_access) *)
     | Sixteen -> 2 (* add, load (allow_unaligned_access) *)
     (* 7 (not allow_unaligned_access) *)
-    | Sixteen_signed -> 4 (* untag, add, load, shr, sal *)
+    | Sixteen_signed -> 2 (* add, load (allow_unaligned_access) *)
     | Thirty_two | Single -> 2 (* add, load (allow_unaligned_access) *)
     (* 17 (not allow_unaligned_access) *)
     | Sixty_four ->
