@@ -673,8 +673,9 @@ let string_like_load_aux ~ptr_out_of_heap ~dbg width ~str ~index =
     C.load ~dbg Byte_unsigned Mutable
       ~addr:(C.add_int_ptr ~ptr_out_of_heap str index dbg)
   | Eight_signed ->
-    C.load ~dbg Byte_signed Mutable
-      ~addr:(C.add_int_ptr ~ptr_out_of_heap str index dbg)
+    C.sign_extend ~bits:8 ~dbg
+      (C.load ~dbg Byte_signed Mutable
+         ~addr:(C.add_int_ptr ~ptr_out_of_heap str index dbg))
   | Sixteen -> C.unaligned_load_16 ~ptr_out_of_heap str index dbg
   | Sixteen_signed ->
     C.sign_extend ~bits:16 ~dbg
