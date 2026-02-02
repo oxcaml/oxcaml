@@ -291,9 +291,8 @@ module Type_shape = struct
                alternatively introducing abstractions here? *)
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Trepr (type_expr, _sort_vars) ->
-            (* CR aivaskovic: Just like in the Tpoly case, we ignore the
-               layout-polymorphic variables.
-               If changes are made to the Tpoly case, change this one too. *)
+            (* CR layout-polymorphism aivaskovic: sort variables do not
+               influence the type shape. *)
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Tunboxed_tuple exprs ->
             Shape.unboxed_tuple (of_expr_list (List.map snd exprs))

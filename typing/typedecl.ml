@@ -4973,6 +4973,7 @@ let report_error ppf = function
     fprintf ppf
       "@[Layout polymorphism is unsupported in this context.@]"
 
+
 let () =
   Location.register_error_of_exn
     (function
