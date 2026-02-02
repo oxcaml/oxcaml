@@ -99,7 +99,6 @@ static void init_startup_params(void)
   params.max_domains = Max_domains_def;
   params.runtime_events_log_wsize = Default_runtime_events_log_wsize;
   params.use_hugetlb_pages = 0;
-  params.tick_interval_usec = Default_tick_interval_usec;
 
 #ifdef DEBUG
   // Silenced in oxcaml to make it easier to run tests that
@@ -187,7 +186,6 @@ static void parse_ocamlrunparam(char_os* opt)
       case 'R': break; /*  see stdlib/hashtbl.mli */
       case 's': scanmult (opt, &params.init_minor_heap_wsz); break;
       case 't': scanmult (opt, &params.trace_level); break;
-      case 'T': scanmult (opt, &params.tick_interval_usec); break;
       case 'v': scanmult (opt, (uintnat *)&caml_verb_gc); break;
       case 'V': scanmult (opt, &params.verify_heap); break;
       case 'w': break; /* major window in runtime 4 */
