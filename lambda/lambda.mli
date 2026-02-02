@@ -257,7 +257,8 @@ type primitive =
       mode : locality_mode; boxed : bool }
   | Pbigstring_load_vec of {
       size : boxed_vector;
-      safety : (len:int * align:int) option;
+      (* Check [len] bytes are in bounds / base is aligned to [align] bytes. *)
+      checks : (len:int * align:int) option;
       index_kind : array_index_kind;
       mode : locality_mode;
       aligned : bool;
@@ -271,7 +272,8 @@ type primitive =
       boxed : bool }
   | Pbigstring_set_vec of {
       size : boxed_vector;
-      safety : (len:int * align:int) option;
+      (* Check [len] bytes are in bounds / base is aligned to [align] bytes. *)
+      checks : (len:int * align:int) option;
       index_kind : array_index_kind;
       aligned : bool;
       boxed : bool }
