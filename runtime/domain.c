@@ -777,6 +777,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
+
+  atomic_store_relaxed(&domain_state->tick_thread_interval_usec,
+                       Default_tick_interval_usec);
   atomic_store_release(&domain_state->requested_tick, false);
   domain_root_register(&domain_state->preemption, Val_unit);
 
@@ -2032,7 +2035,12 @@ static void* caml_thread_tick(void *arg)
   caml_state = di->state;
 
   while (!atomic_load_acquire(&di->tick_thread_stop)) {
-    usleep(caml_params->tick_interval_usec);
+    /* We reload the interval each iteration of the loop so that the per-domain
+       tick interval can be changed. This hopefully doesn't cause much
+       contention since this atomic is per-domain. */
+    uintnat interval_us =
+      atomic_load_relaxed(&Caml_state->tick_thread_interval_usec);
+    usleep(interval_us);
 
     atomic_store_release(&caml_state->requested_tick, true);
     caml_interrupt_self();
@@ -2082,6 +2090,18 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
   }
 
   return Val_unit;
+}
+
+CAMLprim value caml_domain_set_tick_interval_usec(value interval_usec)
+{
+  atomic_store_relaxed(&Caml_state->tick_thread_interval_usec,
+                       Long_val(interval_usec));
+  return Val_unit;
+}
+
+CAMLprim value caml_domain_get_tick_interval_usec(value v_unit)
+{
+  return Val_long(atomic_load_relaxed(&Caml_state->tick_thread_interval_usec));
 }
 
 CAMLexport int caml_bt_is_in_blocking_section(void)
