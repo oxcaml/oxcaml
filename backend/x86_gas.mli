@@ -19,10 +19,5 @@
 
 val generate_asm : out_channel -> X86_ast.asm_program -> unit
 
-(** Register a callback to receive filtered assembly output. The callback is
-    automatically cleared after being invoked. *)
-val register_filtered_assembly_callback : (string -> unit) -> unit
-
-(** Invoke all registered callbacks with filtered assembly from the program.
-    Called by x86_proc.generate_code. *)
-val invoke_filtered_assembly_callbacks : X86_ast.asm_program -> unit
+val format_asm_for_expect_asm :
+  name:string -> body:X86_ast.asm_line list -> string

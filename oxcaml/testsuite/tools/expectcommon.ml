@@ -74,7 +74,8 @@ let match_expect_extension (ext : Parsetree.extension) =
               [ None, a
               ; None, { pexp_desc = Pexp_construct
                                 ({ txt = Lident "Principal"; _ }, Some b) }
-              ] when kind = Expect_toplevel ->
+              ]
+              ->
             (string_constant a, string_constant b)
           | _ -> let s = string_constant e in (s, s)
         in

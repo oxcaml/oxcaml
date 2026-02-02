@@ -436,8 +436,22 @@ let reset_asm_code () =
   asm_code_current_section := DLL.make_empty ();
   Section_name.Tbl.clear asm_code_by_section
 
-let generate_code ~invoke_assembly_callbacks asm =
-  invoke_assembly_callbacks asm_code;
+type output_pos = asm_line DLL.cell option (* None means the beginning *)
+
+let current_output_pos () = DLL.last_cell asm_code
+
+let output_from pos =
+  match pos with
+  | None -> DLL.to_list asm_code
+  | Some start_excl ->
+    let rec loop pos acc =
+      match pos with
+      | None -> List.rev acc
+      | Some cell -> loop (DLL.next cell) (DLL.value cell :: acc)
+    in
+    loop (DLL.next start_excl) []
+
+let generate_code asm =
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());

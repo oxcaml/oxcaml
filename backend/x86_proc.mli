@@ -71,16 +71,20 @@ val directive : asm_line -> unit
 
 val reset_asm_code : unit -> unit
 
+type output_pos
+
+val current_output_pos : unit -> output_pos
+
+val output_from : output_pos -> asm_line list
+
 (** Code emission *)
 
 (** Post-process the stream of instructions. Dump it (using the provided syntax
     emitter) in a file (if provided) and compile it with an internal assembler
-    (if registered through [register_internal_assembler]).
-    [invoke_assembly_callbacks] is called with the asm_code to allow
-    invoking filtered assembly callbacks (typically X86_gas functions). *)
+    (if registered through [register_internal_assembler]). *)
 val generate_code :
-  invoke_assembly_callbacks:(X86_ast.asm_program -> unit) ->
-  (X86_ast.asm_program -> unit) option -> unit
+  (X86_ast.asm_program -> unit) option ->
+  unit
 
 (** Generate an object file corresponding to the last call to [generate_code].
     An internal assembler is used if available (and the input file is ignored).
