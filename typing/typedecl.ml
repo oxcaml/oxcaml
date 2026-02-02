@@ -147,6 +147,7 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
+  | Layout_poly_unsupported
 
 open Typedtree
 
@@ -475,6 +476,11 @@ let check_representable ~why env loc kloc typ =
   | Ok _ -> ()
   | Error err -> raise (Error (loc,Jkind_sort {kloc; typ; err}))
 
+let check_no_repr cty =
+  match cty.ptyp_desc with
+  | Ptyp_repr _ -> raise (Error (cty.ptyp_loc, Layout_poly_unsupported))
+  | _ -> ()
+
 let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       env univars closed lbls kloc =
   assert (lbls <> []);
@@ -506,6 +512,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          let modalities =
           Typemode.transl_modalities ~maturity:Stable mut modalities
          in
+         check_no_repr arg;
          let arg = Ast_helper.Typ.force_poly arg in
          let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.Alloc.Const.legacy arg in
          {ld_id = Ident.create_local name.txt;
@@ -4962,7 +4969,9 @@ let report_error ppf = function
   | Non_value_atomic_field ->
     fprintf ppf
       "@[Atomic record fields must have layout value.@]"
-
+  | Layout_poly_unsupported ->
+    fprintf ppf
+      "@[Layout polymorphism is unsupported in this context.@]"
 
 let () =
   Location.register_error_of_exn
