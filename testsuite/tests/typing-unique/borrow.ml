@@ -623,3 +623,22 @@ Line 2, characters 18-19:
                       ^
 Error: This value is "once" but is expected to be "many" because it is borrowed.
 |}]
+
+let aliased_local_and_legacy_use (a @ aliased local) () = ();;
+let foo () =
+  let unique_ x = "hello" in
+  let f = aliased_local_and_legacy_use (borrow_ x) in
+  unique_use x;
+  f ();
+  ()
+[%%expect{|
+val aliased_local_and_legacy_use : 'a @ local -> unit -> unit = <fun>
+Line 4, characters 10-50:
+4 |   let f = aliased_local_and_legacy_use (borrow_ x) in
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it escapes the borrow region at Line 4, characters 10-50.
+  Hint: This is a partial application
+        Adding 1 more argument will make the value non-local
+|}]
