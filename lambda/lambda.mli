@@ -218,8 +218,10 @@ type primitive =
   | Pbigarraydim of int
   (* load/set 8,16,32,64 bits from a string: (unsafe)*)
   (* load_i8/i16 is sign-extended *)
-  | Pstring_load_i8 of { unsafe : bool; index_kind : array_index_kind }
-  | Pstring_load_i16 of { unsafe : bool; index_kind : array_index_kind }
+  | Pstring_load_i8 of { unsafe : bool; index_kind : array_index_kind;
+                         tagged : bool }
+  | Pstring_load_i16 of { unsafe : bool; index_kind : array_index_kind;
+                          tagged : bool }
   | Pstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -230,8 +232,10 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
-  | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind }
-  | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind;
+                        tagged : bool }
+  | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind;
+                         tagged : bool }
   | Pbytes_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbytes_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -242,8 +246,10 @@ type primitive =
   | Pbytes_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
-  | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind }
-  | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind;
+                      tagged : bool }
+  | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind;
+                       tagged : bool }
   | Pbytes_set_32 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
   | Pbytes_set_f32 of { unsafe : bool; index_kind : array_index_kind;
@@ -255,8 +261,10 @@ type primitive =
   (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
   (* load_i8/i16 is sign-extended *)
-  | Pbigstring_load_i8 of { unsafe : bool; index_kind : array_index_kind }
-  | Pbigstring_load_i16 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbigstring_load_i8 of { unsafe : bool; index_kind : array_index_kind;
+                            tagged : bool }
+  | Pbigstring_load_i16 of { unsafe : bool; index_kind : array_index_kind;
+                             tagged : bool }
   | Pbigstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -266,8 +274,10 @@ type primitive =
       mode : locality_mode; boxed : bool }
   | Pbigstring_load_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
       index_kind : array_index_kind; mode : locality_mode; boxed : bool }
-  | Pbigstring_set_8 of { unsafe : bool; index_kind : array_index_kind }
-  | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbigstring_set_8 of { unsafe : bool; index_kind : array_index_kind;
+                          tagged : bool }
+  | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind;
+                           tagged : bool }
   | Pbigstring_set_32 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
   | Pbigstring_set_f32 of { unsafe : bool; index_kind : array_index_kind;

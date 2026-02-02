@@ -231,18 +231,16 @@ let to_lambda_prim prim ~poly_sort =
 let indexing_primitives =
   let types_and_widths =
     [
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bigstring_geti8%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbigstring_load_i8 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bigstring_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_load_i8 { unsafe; index_kind; tagged } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bigstring_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pbigstring_load_16 { unsafe; index_kind } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bigstring_geti16%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbigstring_load_i16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bigstring_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bigstring_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_32 { unsafe; index_kind; mode; boxed } );
@@ -262,14 +260,12 @@ let indexing_primitives =
           Pbigstring_load_vec
             { size = Boxed_vec128; aligned = true; unsafe;
               index_kind; mode; boxed } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bigstring_set8%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbigstring_set_8 { unsafe; index_kind } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bigstring_set16%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbigstring_set_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bigstring_set8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_set_8 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bigstring_set16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_set_16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bigstring_set32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbigstring_set_32 { unsafe; index_kind; boxed } );
@@ -323,18 +319,16 @@ let indexing_primitives =
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbigstring_set_vec { size = Boxed_vec512; aligned = true;
                                unsafe; index_kind; boxed } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bytes_geti8%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbytes_load_i8 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bytes_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_load_i8 { unsafe; index_kind; tagged } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pbytes_load_16 { unsafe; index_kind } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bytes_geti16%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbytes_load_i16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bytes_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bytes_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbytes_load_32 { unsafe; index_kind; mode; boxed } );
@@ -348,14 +342,12 @@ let indexing_primitives =
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbytes_load_vec { size = Boxed_vec128; unsafe;
                             index_kind; mode; boxed } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bytes_set8%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbytes_set_8 { unsafe; index_kind } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bytes_set16%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbytes_set_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bytes_set8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_set_8 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bytes_set16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_set_16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bytes_set32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbytes_set_32 { unsafe; index_kind; boxed } );
@@ -382,18 +374,16 @@ let indexing_primitives =
       ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_string_geti8%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pstring_load_i8 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_string_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pstring_load_i8 { unsafe; index_kind; tagged } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_string_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pstring_load_16 { unsafe; index_kind } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_string_geti16%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pstring_load_i16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_string_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pstring_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_string_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pstring_load_32 { unsafe; index_kind; mode; boxed } );
@@ -421,7 +411,8 @@ let indexing_primitives =
       ( (fun unsafe _boxed _index_kind ->
           Printf.sprintf "%%caml_string_set16%s" unsafe),
         fun ~unsafe ~boxed:_ ~index_kind:_ ~mode:_ ->
-          Pbytes_set_16 { unsafe; index_kind = Ptagged_int_index } );
+          Pbytes_set_16
+            { unsafe; index_kind = Ptagged_int_index; tagged = true } );
       ( (fun unsafe _boxed _index_kind ->
           Printf.sprintf "%%caml_string_set32%s" unsafe ),
         fun ~unsafe ~boxed:_ ~index_kind:_ ~mode:_ ->
