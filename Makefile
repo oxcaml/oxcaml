@@ -145,17 +145,17 @@ ci-coverage: boot-runtest coverage
 # CR mshinwell: build is broken
 # .PHONY: minimizer-upstream
 # minimizer-upstream:
-# 	cp chamelon/dune.upstream chamelon/dune
+# 	cp chamelon/compat/dune.upstream chamelon/compat/dune
 # 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
 
 .PHONY: boot-minimizer
 boot-minimizer:
-	cp chamelon/dune.ox chamelon/dune
+	cp chamelon/compat/dune.ox chamelon/compat/dune
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @chamelon/all
 
 .PHONY: minimizer
 minimizer: runtime-stdlib
-	cp chamelon/dune.ox chamelon/dune
+	cp chamelon/compat/dune.ox chamelon/compat/dune
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
 
 .PHONY: hacking-externals
