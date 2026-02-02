@@ -310,3 +310,35 @@ Line 4, characters 28-29:
                                 ^
 Error: This expression has type "r" which is not a record type.
 |}]
+
+type t = Foo of { a : (repr_ 'a). 'a }
+[%%expect{|
+Line 1, characters 22-36:
+1 | type t = Foo of { a : (repr_ 'a). 'a }
+                          ^^^^^^^^^^^^^^
+Error: Layout polymorphism is unsupported in this context.
+|}]
+
+type t = Foo of { a : (repr_ 'a). 'a -> 'a }
+[%%expect{|
+Line 1, characters 22-42:
+1 | type t = Foo of { a : (repr_ 'a). 'a -> 'a }
+                          ^^^^^^^^^^^^^^^^^^^^
+Error: Layout polymorphism is unsupported in this context.
+|}]
+
+type 'a t = Foo of { a : (repr_ 'a). 'a t }
+[%%expect{|
+Line 1, characters 25-41:
+1 | type 'a t = Foo of { a : (repr_ 'a). 'a t }
+                             ^^^^^^^^^^^^^^^^
+Error: Layout polymorphism is unsupported in this context.
+|}]
+
+type 'a t = Foo of { a : (repr_ 'a). ('a -> 'a) t }
+[%%expect{|
+Line 1, characters 25-49:
+1 | type 'a t = Foo of { a : (repr_ 'a). ('a -> 'a) t }
+                             ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Layout polymorphism is unsupported in this context.
+|}]
