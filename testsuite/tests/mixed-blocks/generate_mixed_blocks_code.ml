@@ -313,6 +313,13 @@ module Mixed_record = struct
         | Imm | Str | Float32 | Bits32 | Bits64 | Word | Vec128 | Vec256 -> false
         | Float | Float64 -> true)
 
+  let needs_flatten_floats t =
+    (* [@@flatten_floats] is needed when the record mixes boxed float and
+       unboxed float# exclusively *)
+    is_all_floats t
+    && List.exists t.fields ~f:(fun field -> field.type_ = Float)
+    && List.exists t.fields ~f:(fun field -> field.type_ = Float64)
+
   let of_block index { prefix; suffix } =
     let num_fields, prefix_fields =
       List.fold_left_map
@@ -378,9 +385,10 @@ module Mixed_record = struct
 
   let type_decl t =
     sprintf
-      "type %s = { %s }"
+      "type %s = { %s }%s"
       (type_ t)
       (fields_to_type_decl t.fields)
+      (if needs_flatten_floats t then " [@@flatten_floats]" else "")
   ;;
 
   let record_value_of_fields fields =

@@ -147,6 +147,8 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
+  | Missing_flatten_floats_attribute
+  | Unnecessary_flatten_floats_attribute
 
 open Typedtree
 
@@ -2231,8 +2233,25 @@ let update_decls_jkind env decls =
            | _ -> ()
          end;
 
-         (id, decl, allow_any_crossing,
-          update_decl_jkind env (Pident id) decl)))
+         (* Check flatten_floats attribute requirement for mixed float/float#
+            records *)
+         let has_flatten_floats =
+           Builtin_attributes.has_flatten_floats decl.type_attributes
+         in
+         let updated_decl = update_decl_jkind env (Pident id) decl in
+         let has_float_boxed =
+           match updated_decl.type_kind with
+           | Type_record (_, Record_mixed shape, _) ->
+             Array.exists (function Float_boxed -> true | _ -> false) shape
+           | _ -> false
+         in
+         (match has_flatten_floats, has_float_boxed with
+          | false, true ->
+            raise (Error (decl.type_loc, Missing_flatten_floats_attribute))
+          | true, false ->
+            raise (Error (decl.type_loc, Unnecessary_flatten_floats_attribute))
+          | true, true | false, false -> ());
+         (id, decl, allow_any_crossing, updated_decl)))
     decls
 
 (* See Note [Typechecking unboxed versions of types]. *)
@@ -4933,6 +4952,20 @@ let report_error ppf = function
   | Non_value_atomic_field ->
     fprintf ppf
       "@[Atomic record fields must have layout value.@]"
+  | Missing_flatten_floats_attribute ->
+    fprintf ppf
+      "@[This record mixes boxed %a and unboxed %a fields.@ \
+         To enable this, add the %a attribute.@]"
+      Style.inline_code "float"
+      Style.inline_code "float#"
+      Style.inline_code "[@@flatten_floats]"
+  | Unnecessary_flatten_floats_attribute ->
+    fprintf ppf
+      "@[The %a attribute is not needed on this type declaration.@ \
+         It only applies to records that mix %a and %a fields exclusively.@]"
+      Style.inline_code "[@@flatten_floats]"
+      Style.inline_code "float"
+      Style.inline_code "float#"
 
 
 let () =

@@ -159,9 +159,9 @@ let minimize should_remove map cur_name =
                                 let ncons_decl =
                                   List.fold_left
                                     (* iterate on constructor declarations *)
-                                      (fun l_cd
-                                           (cd :
-                                             Typedtree.constructor_declaration) ->
+                                    (fun l_cd
+                                         (cd :
+                                           Typedtree.constructor_declaration) ->
                                       {
                                         cd with
                                         cd_args =

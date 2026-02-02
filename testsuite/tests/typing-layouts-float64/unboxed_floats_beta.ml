@@ -54,6 +54,7 @@ type mixed_float_record =
     x7 : float#;
     x8_1 : float;
     x9 : float# }
+[@@flatten_floats]
 
 type int_args =
   { x0_1 : int;

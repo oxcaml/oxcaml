@@ -126,6 +126,7 @@ let builtin_attrs =
   ; "cold"
   ; "regalloc"
   ; "regalloc_param"
+  ; "flatten_floats"
   ]
 
 let builtin_attrs =
@@ -515,6 +516,8 @@ let has_boxed attrs = has_attribute "boxed" attrs
 
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs
+
+let has_flatten_floats attrs = has_attribute "flatten_floats" attrs
 
 let parse_empty_payload attr =
   match attr.attr_payload with

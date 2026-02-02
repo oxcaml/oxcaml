@@ -21,6 +21,7 @@ let () =
       { x : float;
         y : float#;
       }
+    [@@flatten_floats]
   end in
   hash { x = 4.0; y = #5.1 }
   |> printf "\t{ x : float; y : float# } = %s\n"
@@ -32,6 +33,7 @@ let () =
       { x : float#;
         y : float;
       }
+    [@@flatten_floats]
   end in
   hash { x = #4.0; y = 5.1 }
   |> printf "\t{ x : float#; y : float } = %s\n"

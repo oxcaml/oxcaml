@@ -200,6 +200,8 @@ val has_boxed: Parsetree.attributes -> bool
 
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 
+val has_flatten_floats : Parsetree.attributes -> bool
+
 val parse_standard_interface_attributes : Parsetree.attribute -> unit
 val parse_standard_implementation_attributes : Parsetree.attribute -> unit
 
