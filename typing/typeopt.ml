@@ -194,8 +194,11 @@ let classify ~classify_product env ty sort : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
-  | Tquote _ | Tsplice _-> Addr
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil
+  | Tvariant _ | Tquote _ ->
+      Addr
+  | Tsplice _ ->
+      Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
       assert false
   end
