@@ -11688,7 +11688,8 @@ let report_error ~loc env =
   | Abstract_wrong_label {got; expected; expected_type; explanation} ->
       let label ~long ppf = function
         | Nolabel -> fprintf ppf "unlabeled"
-        | Position l -> Style.inline_code ppf (Printf.sprintf "~(%s:[%%call_pos])" l)
+        | Position l ->
+            Style.inline_code ppf (Printf.sprintf "~(%s:[%%call_pos])" l)
         | (Labelled _ | Optional _) as l ->
             if long then
               fprintf ppf "labeled %a" Style.inline_code (prefixed_label_name l)
@@ -12031,7 +12032,8 @@ let report_error ~loc env =
       if Modality.Per_axis.is_id ax expected then
         "have the identity modality"
       else
-        Format.asprintf "be %a" (Format_doc.compat (print_modality_doc "")) expected
+        Format.asprintf "be %a"
+          (Format_doc.compat (print_modality_doc "")) expected
     in
     Location.errorf ~loc
       "Block indices do not yet support non-default modalities. In \

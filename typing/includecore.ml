@@ -343,7 +343,8 @@ type type_mismatch =
 let report_modality_sub_error first second ppf e =
   let Modality.Error (ax, {left; right}) = e in
   let print_modality id ppf m =
-    Printtyp.modality ~id:(fun ppf -> Format_doc.pp_print_string ppf id) ax ppf m
+    Printtyp.modality
+      ~id:(fun ppf -> Format_doc.pp_print_string ppf id) ax ppf m
   in
   Format_doc.fprintf ppf "%s is %a and %s is %a."
     (String.capitalize_ascii second)

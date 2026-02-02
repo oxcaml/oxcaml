@@ -4749,8 +4749,8 @@ let print_type_expr : Types.type_expr printer ref =
 
 let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) -> level:int -> Format_doc.formatter ->
-         Jkind.Violation.t -> unit)
+       : offender:(Format_doc.formatter -> unit) ->
+         level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit)
 
 let spellcheck ppf extract env lid =
   let choices ~path name = Misc.spellcheck (extract path env) name in
@@ -4817,8 +4817,10 @@ let print_with_quote_promote ppf (name, intro_stage, usage_stage) =
   let rec loop fmt stage_diff =
     if stage_diff = 1 then Format.fprintf fmt "<[%s]>" name
     else if stage_diff = -1 then Format.fprintf fmt "$%s" name
-    else if stage_diff > 1 then Format.fprintf fmt "<[%a]>" loop (stage_diff - 1)
-    else if stage_diff < -1 then Format.fprintf fmt "$(%a)" loop (stage_diff + 1)
+    else if stage_diff > 1 then
+      Format.fprintf fmt "<[%a]>" loop (stage_diff - 1)
+    else if stage_diff < -1 then
+      Format.fprintf fmt "$(%a)" loop (stage_diff + 1)
     else assert false
   in
   loop Format.str_formatter stage_diff;

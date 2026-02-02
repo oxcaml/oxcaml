@@ -2662,7 +2662,9 @@ let check_ambiguous_bindings =
       ignore (List.fold_left check_case [] cases)
 
 let report_error ppf = function
-  | Float32_match -> Format_doc.pp_print_string ppf "float32 literal patterns are not supported."
+  | Float32_match ->
+    Format_doc.pp_print_string ppf
+      "float32 literal patterns are not supported."
 
 let () =
   Location.register_error_of_exn (function

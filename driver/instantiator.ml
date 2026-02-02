@@ -244,7 +244,8 @@ let report_error ppf = function
       (Style.as_inline_code Global_module.Parameter_name.print) param
       CU.print_as_inline_code base_unit
       (Style.as_inline_code Global_module.Name.print) arg
-      (Style.as_clflag "-as-argument-for" Global_module.Parameter_name.print) param
+      (Style.as_clflag
+         "-as-argument-for" Global_module.Parameter_name.print) param
       CU.print_as_inline_code base_unit
       pp_parameters available_params
   | Repeated_parameter { param; arg1; arg2 } ->
@@ -259,7 +260,8 @@ let report_error ppf = function
       (Style.as_inline_code Global_module.Parameter_name.print) param
       CU.print_as_inline_code arg1
       CU.print_as_inline_code arg2
-      (Style.as_clflag "-as-argument-for" Global_module.Parameter_name.print) param
+      (Style.as_clflag
+         "-as-argument-for" Global_module.Parameter_name.print) param
 let () =
   Location.register_error_of_exn
     (function

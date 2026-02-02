@@ -424,10 +424,12 @@ and poly_param : type a. _ -> _ -> a poly_param -> unit =
     line i ppf "Arrow\n";
     list (i+1) (fun i ppf (label, ty) ->
         arg_label i ppf label;
-        option i (fun i f -> line i f "%a" (Format_doc.compat Printtyp.raw_type_expr)) ppf ty)
+        option i (fun i f ->
+          line i f "%a" (Format_doc.compat Printtyp.raw_type_expr)) ppf ty)
       ppf args
   | Method ({txt}, ty) ->
-    fprintf ppf "Method %s %a\n" txt (Format_doc.compat Printtyp.raw_type_expr) ty
+    fprintf ppf "Method %s %a\n" txt
+      (Format_doc.compat Printtyp.raw_type_expr) ty
 
 and type_inspection : type a. _ -> _ -> a type_inspection -> unit =
   fun i ppf -> function

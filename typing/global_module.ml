@@ -292,7 +292,8 @@ end = struct
     match create head visible_args ~hidden_args with
     | Ok t -> t
     | Error (Duplicate _) ->
-      Misc.fatal_errorf_doc "Names of arguments and parameters must be unique:@ %a"
+      Misc.fatal_errorf_doc
+        "Names of arguments and parameters must be unique:@ %a"
         (fun ppf () -> print_syntax ppf ~head ~visible_args ~hidden_args) ()
 
   let unsafe_create_unchecked head visible_args ~hidden_args =
