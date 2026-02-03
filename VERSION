@@ -1,10 +1,4 @@
-<<<<<<< oxcaml
-5.2.0+ox
-||||||| upstream-base
-5.2.0+dev1-2023-12-22
-=======
-5.4.1+dev0-2025-10-09
->>>>>>> upstream-incoming
+5.4.1+ox
 
 # Starting with OCaml 4.14, although the version string that appears above is
 # still correct and this file can thus still be used to figure it out,

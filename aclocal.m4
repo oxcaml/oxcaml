@@ -459,24 +459,8 @@ AC_DEFUN([OCAML_C99_CHECK_FMA], [
     AS_CASE([$enable_imprecise_c99_float_ops,$target],
       [no,*], [hard_error=true],
       [yes,*], [hard_error=false],
-<<<<<<< oxcaml
       [*,x86_64-w64-mingw32*|*,x86_64-*-cygwin*], [hard_error=false],
-      [AS_CASE([$ocaml_cc_vendor],
-        [msvc-*], [AS_IF([test "${ocaml_cc_vendor#msvc-}" -lt 1920 ],
-          [hard_error=false],
-          [hard_error=true])],
-        [hard_error=true])])
-||||||| upstream-base
-      [*,x86_64-w64-mingw32*|*,x86_64-*-cygwin*], [hard_error=false],
-      [AS_CASE([$ocaml_cv_cc_vendor],
-        [msvc-*], [AS_IF([test "${ocaml_cv_cc_vendor#msvc-}" -lt 1920 ],
-          [hard_error=false],
-          [hard_error=true])],
-        [hard_error=true])])
-=======
-      [*,x86_64-w64-mingw32*|*,x86_64-*-cygwin], [hard_error=false],
       [hard_error=true])
->>>>>>> upstream-incoming
     AS_IF([test x"$hard_error" = "xtrue"],
       [AC_MSG_ERROR(m4_normalize([
         fma does not work, enable emulation with
