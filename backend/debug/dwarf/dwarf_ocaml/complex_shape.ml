@@ -724,7 +724,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           "variant with [@@unboxed] attribute with expected layout %a, but \
            field has layout %a"
           Layout.format ly Layout.format arg_layout)
-  | ( _, Some (Univar _) ) ->
+  | _, Some (Univar _) ->
     Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
   | ( ( Var _ | Error _ | Proj _ | Abs _ | Comp_unit _ | Struct _ | Mutrec _
       | Constr _ | App _ | Proj_decl _ ),
