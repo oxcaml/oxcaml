@@ -905,8 +905,6 @@ let wrap_printing_env ~error env f =
   if error then Env.without_cmis (wrap_printing_env env) f
   else wrap_printing_env env f
 
-(* CR sspies: [wrap_printing_env_error] was removed upstream. Removed it here
-   as well. Flagging it, because it had subtle changes from upstream. *)
 let rec lid_of_path = function
     Path.Pident id ->
       Longident.Lident (Ident.name id)
