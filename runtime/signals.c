@@ -439,11 +439,11 @@ value caml_do_pending_actions_flags_exn(int flags)
   check_async_exn(exn, "finaliser");
   if (Is_exception_result(exn)) goto exception;
 
-  /* Process external interrupts (e.g. preemptive systhread switching).
-     By doing this last, we do not need to set the action pending flag
-     in case a context switch happens: all actions have been processed
-     at this point. */
-  caml_process_tick();
+  /* Process ticks (fiber preemptions and preemptive systhread switching). By
+     doing this last, we do not need to set the action pending flag in case a
+     context switch happens: all actions have been processed at this point. */
+  exn = caml_process_tick_exn();
+  check_async_exn(exn, "tick handler");
 
   /* Check for a pending preemption
 
