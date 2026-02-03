@@ -132,6 +132,7 @@
   typemode
   value_rec_types
   lazy_backtrack
+  hash_consed
   type_shape
   zero_alloc_utils
   diffing
@@ -253,6 +254,8 @@
 (copy_files ../../utils/linkage_name.ml)
 
 (copy_files ../../utils/lazy_backtrack.ml)
+
+(copy_files ../../utils/hash_consed.ml)
 
 (copy_files ../../utils/zero_alloc_utils.ml)
 
@@ -443,6 +446,8 @@
 (copy_files ../../utils/linkage_name.mli)
 
 (copy_files ../../utils/lazy_backtrack.mli)
+
+(copy_files ../../utils/hash_consed.mli)
 
 (copy_files ../../utils/zero_alloc_utils.mli)
 
@@ -685,6 +690,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Printast.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Syntaxerr.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lazy_backtrack.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Hash_consed.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Zero_alloc_utils.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Diffing.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Diffing_with_keys.cmo
@@ -798,6 +804,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lexer.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Path.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lazy_backtrack.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Hash_consed.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Zero_alloc_utils.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Diffing.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Diffing_with_keys.cmx

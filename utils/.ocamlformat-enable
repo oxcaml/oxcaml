@@ -2,6 +2,8 @@ compilation_unit.ml
 compilation_unit.mli
 doubly_linked_list.ml
 doubly_linked_list.mli
+hash_consed.ml
+hash_consed.mli
 import_info.ml
 import_info.mli
 language_extension_kernel.ml
@@ -16,4 +18,3 @@ arrayset.ml
 arrayset.mli
 priority_queue.ml
 priority_queue.mli
-

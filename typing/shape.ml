@@ -131,7 +131,16 @@ module Rec_var_ident = struct
   let print fmt n = Format.fprintf fmt "rv%d" n
 end
 
-module Rec_var_env = Map.Make (Rec_var_ident)
+module Rec_var_env = struct
+  include Map.Make (Rec_var_ident)
+
+  let hash hash_value m =
+    fold
+      (fun k v acc -> Hashtbl.hash (Rec_var_ident.hash k, hash_value v, acc))
+      m 0
+
+  let equal eq_value m1 m2 = m1 == m2 || equal eq_value m1 m2
+end
 
 module Sig_component_kind = struct
   type t =
@@ -614,7 +623,7 @@ let rec equal_desc0 d1 d2 =
     Rec_var_ident.equal rv1 rv2 && equal t1_body t2_body
   | Rec_var rv1, Rec_var rv2 -> Rec_var_ident.equal rv1 rv2
   | Struct t1, Struct t2 ->
-    Item.Map.equal equal t1 t2
+    t1 == t2 || Item.Map.equal equal t1 t2
   | Proj (t1, i1), Proj (t2, i2) ->
     if Item.compare i1 i2 <> 0 then false
     else equal t1 t2
@@ -623,7 +632,7 @@ let rec equal_desc0 d1 d2 =
     Ident.equal c1 c2
     && List.equal equal ts1 ts2
   | Mutrec t1, Mutrec t2 ->
-    Ident.Map.equal equal t1 t2
+    t1 == t2 || Ident.Map.equal equal t1 t2
   | Proj_decl (t1, i1), Proj_decl (t2, i2) ->
     if Ident.equal i1 i2 then
       equal t1 t2
