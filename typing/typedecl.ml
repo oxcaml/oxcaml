@@ -1079,13 +1079,31 @@ let transl_declaration env sdecl (id, uid) =
       | Type_abstract _ | Type_variant _ | Type_record _
       | Type_open -> jkind
     in
+  (* Check constraints *)
+    List.iter
+      (fun (cty, cty', loc) ->
+        let ty = cty.ctyp_type in
+        let ty' = cty'.ctyp_type in
+        try Ctype.unify env ty ty' with Ctype.Unify err ->
+          raise(Error(loc, Inconsistent_constraint (env, err))))
+      cstrs;
+  (* Propagate evals-to constraints from the temporary manifest
+     CR-someday jbachurski: We should use jkind annotations for evals-to *)
+    let evals_to =
+      if sdecl.ptype_manifest = None && sdecl.ptype_params = []
+      then
+        match Option.map get_desc (Env.find_type path env).type_manifest with
+        | Some (Tvar { name = _; jkind = _; evals_to }) -> evals_to
+        | exception Not_found | _ -> None
+      else None
+    in
     let arity = List.length params in
     let decl =
       { type_params = params;
         type_arity = arity;
         type_kind = kind;
         type_jkind = jkind;
-        type_evals_to = None;
+        type_evals_to = evals_to;
         type_private = sdecl.ptype_private;
         type_manifest = man;
         type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1099,15 +1117,8 @@ let transl_declaration env sdecl (id, uid) =
         type_unboxed_version = None;
         (* Unboxed versions are computed after all declarations have been
            translated, in [derive_unboxed_versions] *)
-      } in
-  (* Check constraints *)
-    List.iter
-      (fun (cty, cty', loc) ->
-        let ty = cty.ctyp_type in
-        let ty' = cty'.ctyp_type in
-        try Ctype.unify env ty ty' with Ctype.Unify err ->
-          raise(Error(loc, Inconsistent_constraint (env, err))))
-      cstrs;
+      }
+    in
   (* Add abstract row *)
     if is_fixed_type sdecl then begin
       let p, _ =

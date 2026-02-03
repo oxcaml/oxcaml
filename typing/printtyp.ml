@@ -1543,7 +1543,7 @@ let rec tree_of_modal_typexp mode modal ty =
   let pr_typ alloc_mode =
     let tty = Transient_expr.repr ty in
     match tty.desc with
-    | Tvar _ ->
+    | Tvar { name = _; jkind = _; evals_to } ->
         let non_gen = is_non_gen mode ty in
         let name_gen = Names.new_var_name ~non_gen ty in
         let oty = Otyp_var (non_gen, Names.name_of_type name_gen tty) in
@@ -2145,10 +2145,17 @@ let tree_of_type_decl id decl =
         Some (out_jkind_of_desc (Jkind.get decl.type_jkind))
     | _ -> None (* other cases have no jkind annotation *)
   in
+  let attrs = [] in
   let attrs =
     if unsafe_mode_crossing
-    then [{ oattr_name = "unsafe_allow_any_mode_crossing" }]
-    else []
+    then { oattr_name = "unsafe_allow_any_mode_crossing" } :: attrs
+    else attrs
+  in
+  let attrs =
+    match decl.type_evals_to with
+    | Some { to_ = _; stage_offset = _; n_evals = _ } ->
+      { oattr_name = "evals_to" } :: attrs
+    | None -> attrs
   in
     { otype_name = name;
       otype_params = args;

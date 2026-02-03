@@ -2239,6 +2239,35 @@ let rec try_distribute_eval ty =
   try try_distribute_eval ty'
   with Cannot_expand -> ty'
 
+let try_instantiate_eval_once env ty =
+  let rec loop ty =
+    match get_desc ty with
+    | Teval t ->
+      let ty, n_evals = loop t in
+      ty, n_evals + 1
+    | Tconstr (path, [], _) -> begin
+      match (Env.find_type path env).type_evals_to with
+      | Some { to_; stage_offset; n_evals } ->
+        assert (stage_offset = 0);
+        to_, -n_evals
+      | None -> raise Cannot_expand
+      end
+    | _ -> raise Cannot_expand
+  in
+  let ty, n_evals =
+    match get_desc ty with
+    | Teval _ -> loop ty
+    | _ -> raise Cannot_expand
+  in
+  if n_evals >= 0
+  then n_evals_ty n_evals ty
+  else raise Cannot_expand
+
+let rec try_instantiate_eval env ty =
+  let ty' = try_instantiate_eval_once env ty in
+  try try_instantiate_eval env ty'
+  with Cannot_expand -> ty'
+
 (* Fully expand the head of a type. *)
 let try_expand_head
     (try_once : Env.t -> type_expr -> type_expr) env ty =
@@ -2249,13 +2278,17 @@ let try_expand_head
       try try_quote_splice_cancel ty'
       with Cannot_expand ->
         try try_distribute_eval ty'
-        with Cannot_expand -> ty'
+        with Cannot_expand ->
+          try try_instantiate_eval env ty'
+          with Cannot_expand -> ty'
   in
   try loop try_once env ty
   with Cannot_expand ->
     try try_quote_splice_cancel ty
     with Cannot_expand ->
-      try_distribute_eval ty
+      try try_distribute_eval ty
+      with Cannot_expand ->
+        try_instantiate_eval env ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
 let expand_head_unif env ty =

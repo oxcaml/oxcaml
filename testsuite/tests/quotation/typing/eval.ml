@@ -109,7 +109,8 @@ val foo' : 'a eval -> 'a expr -> bool -> 'a eval = <fun>
 let must_evals_to_unit e = if true then eval e else ()
 
 [%%expect{|
-val must_evals_to_unit : 'a expr -> 'a eval = <fun>
+val must_evals_to_unit : ('a [@evals_to]) expr -> ('a [@evals_to]) eval =
+  <fun>
 |}]
 
 (* [evals_to_unit] is already generalised:
@@ -174,11 +175,7 @@ end = struct
 end
 
 [%%expect{|
-Line _, characters _-_:
- |   type t constraint int = t eval
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type constructor expands to type "t" but is used here with type "'a"
-       Type "int" is not compatible with type "t eval"
+module M : sig type t end
 |}]
 
 module M : sig
@@ -188,11 +185,7 @@ end = struct
 end
 
 [%%expect{|
-Line _, characters _-_:
- |   type t constraint int = t eval
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type constructor expands to type "t" but is used here with type "'a"
-       Type "int" is not compatible with type "t eval"
+module M : sig type t [@@evals_to] end
 |}]
 
 module M : sig
@@ -202,11 +195,7 @@ end = struct
 end
 
 [%%expect{|
-Line _, characters _-_:
- |   type t constraint int = t eval
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type constructor expands to type "t" but is used here with type "'a"
-       Type "int" is not compatible with type "t eval"
+module M : sig type t [@@evals_to] end
 |}]
 
 (* We can hide a concrete type with one that evaluates to it
@@ -218,11 +207,7 @@ end = struct
 end
 
 [%%expect{|
-Line _, characters _-_:
- |   type t constraint int = t eval
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type constructor expands to type "t" but is used here with type "'a"
-       Type "int" is not compatible with type "t eval"
+module M : sig type t [@@evals_to] end
 |}]
 
 (* eval is not injective -- t eval = int does not imply t = <[int]> *)
@@ -233,11 +218,21 @@ end = struct
 end
 
 [%%expect{|
-Line _, characters _-_:
+Lines _-_, characters _-_:
+ | ......struct
  |   type t constraint int = t eval
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type constructor expands to type "t" but is used here with type "'a"
-       Type "int" is not compatible with type "t eval"
+ | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t [@@evals_to] end
+       is not included in
+         sig type t = <[int]> end
+       Type declarations do not match:
+         type t
+       [@@evals_to]
+       is not included in
+         type t = <[int]>
+       The type "t" is not equal to the type "<[int]>"
 |}]
 
 (* the image of eval is not necessarily the space of all types *)
@@ -280,18 +275,31 @@ module M : sig val x : unit -> int end
 |}]
 
 (* we can abstract over a type that is known to evaluate to something *)
+(* FIXME jbachurski: moregen *)
 module M : sig
   type t constraint int = t eval
-  val x : unit -> t expr
+  val x : unit -> t
 end = struct
   type t constraint int = t eval
   let x () = eval <[ 42 ]>
 end
 
 [%%expect{|
-Line _, characters _-_:
+Lines _-_, characters _-_:
+ | ......struct
  |   type t constraint int = t eval
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type constructor expands to type "t" but is used here with type "'a"
-       Type "int" is not compatible with type "t eval"
+ |   let x () = eval <[ 42 ]>
+ | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t [@@evals_to] val x : unit -> <[int]> eval end
+       is not included in
+         sig type t [@@evals_to] val x : unit -> t end
+       Values do not match:
+         val x : unit -> <[int]> eval
+       is not included in
+         val x : unit -> t
+       The type "unit -> <[int]> eval" is not compatible with the type
+         "unit -> t"
+       Type "<[int]> eval" = "int" is not compatible with type "t"
 |}]
