@@ -455,23 +455,23 @@ Error: The kind of type "M1.t" is value mod non_float
 module type S = sig
   type t = private [< `A of string | `B ]
 end
-module M1 : S = struct
+module M1b : S = struct
   type t = [ `B ]
 end
 [%%expect{|
 module type S = sig type t = private [< `A of string | `B ] end
-module M1 : S
+module M1b : S
 |}]
 
 (* This should not be accepted. *)
-type t2 : immediate with M1.t = C of string
+type t2 : immediate with M1b.t = C of string
 [%%expect{|
-Line 1, characters 0-43:
-1 | type t2 : immediate with M1.t = C of string
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-44:
+1 | type t2 : immediate with M1b.t = C of string
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immediate with M1.t
+       But the kind of type "t2" must be a subkind of immediate with M1b.t
          because of the annotation on the declaration of the type t2.
 |}]
 
@@ -493,13 +493,13 @@ let sneaky (x : (M1.t, [ `A of string | `B of int ]) eq) = match x with
     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
   end in ()
 [%%expect{|
-Line 2, characters 4-8:
-2 |   | Refl -> let open struct
-        ^^^^
-Error: This pattern matches values of type "(M1.t, M1.t) eq"
-       but a pattern was expected which matches values of type
-         "(M1.t, [ `A of string | `B of int ]) eq"
-       Type "M1.t" is not compatible with type "[ `A of string | `B of int ]"
+Line 3, characters 4-47:
+3 |     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t4" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t4" must be a subkind of immediate with M1.t
+         because of the annotation on the declaration of the type t4.
 |}]
 
 type json : immutable_data =
