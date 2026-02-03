@@ -2664,6 +2664,9 @@ let type_for_annotation ~env ~loc typ =
           match List.filter_map unwrap_univar tyl with
           | [] -> cty.ctyp_desc
           | _ :: _ as ctyl -> Ttyp_poly (ctyl, go ty))
+        | Trepr _ ->
+          Misc.fatal_errorf "Translquote [at %a]: no support for Trepr"
+            Location.print_loc_in_lowercase loc
         | Ttuple tyl -> Ttyp_tuple (List.map (fun (l, ty') -> l, go ty') tyl)
         | Tunboxed_tuple tyl ->
           Ttyp_unboxed_tuple (List.map (fun (l, ty') -> l, go ty') tyl)
@@ -3004,6 +3007,7 @@ and quote_core_type ~scopes ty =
     Type.package loc mod_type with_types |> Type.wrap
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ~scopes ty) |> Type.wrap
   | Ttyp_splice _ -> Type.var loc None |> Type.wrap
+  | Ttyp_repr _ -> fatal_error "Translquote: Ttyp_repr not implemented."
   | Ttyp_open _ ->
     fatal_errorf "Translquote [at %a]: Ttyp_open not implemented."
       Location.print_loc (to_location loc)

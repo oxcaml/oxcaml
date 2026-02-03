@@ -187,6 +187,14 @@ let arg_label i ppf = function
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
 
+let typevar_no_jkind ~print_quote ppf v =
+  let pptv =
+    if print_quote
+    then Pprintast.tyvar
+    else fun ppf s -> fprintf ppf "%s" s
+  in
+  fprintf ppf " %a" pptv v
+
 let typevar_jkind ~print_quote ppf (v, l) =
   let pptv =
     if print_quote
@@ -396,6 +404,10 @@ let rec core_type i ppf x =
   | Ttyp_splice t ->
       line i ppf "Ttyp_splice\n";
       core_type i ppf t
+  | Ttyp_repr (lv, ct) ->
+      line i ppf "Ttyp_repr%a\n"
+        (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;
+      core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";

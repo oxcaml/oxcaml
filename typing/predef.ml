@@ -481,7 +481,7 @@ let mk_add_extension add_extension id args =
       | Base Value -> ()
       | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
-      | Product _ -> raise_error ())
+      | Univar _ | Product _ -> raise_error ())
     args;
   add_extension id
     { ext_type_path = path_exn;

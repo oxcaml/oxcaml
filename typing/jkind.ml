@@ -87,6 +87,7 @@ module Layout = struct
     let rec of_sort_const : Sort.Const.t -> t = function
       | Base b -> Base b
       | Product consts -> Product (List.map of_sort_const consts)
+      | Univar uv -> Univar uv
 
     let to_string t =
       let rec to_string nested (t : t) =
@@ -98,6 +99,8 @@ module Layout = struct
             [ (if nested then "(" else "");
               String.concat " & " (List.map (to_string true) ts);
               (if nested then ")" else "") ]
+        | Univar { name = Some n } -> n
+        | Univar { name = None } -> "_"
       in
       to_string false t
 
@@ -139,6 +142,7 @@ module Layout = struct
         Sort (Base b)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
       | Product sorts -> Product (List.map flatten_sort sorts)
+      | Univar x -> Sort (Univar x)
     in
     function
     | Any -> Any
@@ -723,7 +727,7 @@ module Layout_and_axes = struct
             ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
             ty =
           match Types.get_desc ty with
-          | Tpoly (ty, _) -> check ~relevant_axes t ty
+          | Tpoly (ty, _) | Trepr (ty, _) -> check ~relevant_axes t ty
           | Ttuple _ ->
             if tuple_fuel > 0
             then
@@ -1426,6 +1430,7 @@ module Const = struct
       | Base Value, Non_null
       | Base Value, Maybe_null ->
         Stable
+      | Univar _, _ -> Alpha
       | Product layouts, _ ->
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
@@ -1523,6 +1528,16 @@ module Jkind_desc = struct
       },
       sort )
 
+  let of_sort_univar univar =
+    let layout = Layout.Sort (Sort.Univar univar) in
+    { layout;
+      mod_bounds =
+        Mod_bounds.max
+        |> Mod_bounds.set_nullability Maybe_null
+        |> Mod_bounds.set_separability Maybe_separable;
+      with_bounds = No_with_bounds
+    }
+
   let get t = Layout_and_axes.map Layout.get t
 
   module Debug_printers = struct
@@ -1561,6 +1576,10 @@ let of_new_non_float_sort_var ~why ~level =
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_legacy_sort ~why ~level = fst (of_new_legacy_sort_var ~why ~level)
+
+let of_sort_univar ~why univar =
+  let jkind = Jkind_desc.of_sort_univar univar in
+  fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why)
 
 let of_annotated_const ~context ~annotation ~const ~const_loc =
   let context = Context_with_transl.get_context context in
@@ -1940,6 +1959,7 @@ let decompose_product ({ jkind; _ } as jk) =
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
     | Product sorts -> Some (List.map (fun sort -> mk_jkind (Sort sort)) sorts)
+    | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
   match jkind.layout with
   | Any -> None
@@ -2084,6 +2104,7 @@ module Format_history = struct
     | Structure_item ->
       fprintf ppf "it's the type of something stored in a module"
     | Signature_item -> fprintf ppf "it's the type of something in a signature"
+    | Layout_poly -> fprintf ppf "it's the layout polymorphic type"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -2507,6 +2528,7 @@ module Violation = struct
     in
     let rec has_sort_var : Sort.Flat.t Layout.t -> bool = function
       | Sort (Var _) -> true
+      | Sort (Univar _) -> Misc.fatal_error "has_sort_var: univar"
       | Product layouts -> List.exists has_sort_var layouts
       | Sort (Base _) | Any -> false
     in
@@ -2911,6 +2933,7 @@ module Debug_printers = struct
     | Idx_element -> fprintf ppf "Idx_element"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
+    | Layout_poly -> fprintf ppf "Layout_poly"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function

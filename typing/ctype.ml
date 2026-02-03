@@ -2206,6 +2206,7 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
@@ -2350,6 +2351,7 @@ let contained_without_boxing env ty =
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
+  | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
   | Tquote _ | Tsplice _ -> []
@@ -2476,6 +2478,8 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
        [Tof_kind]s. *)
     instance_poly_for_jkind univars ty
     |> estimate_type_jkind ~expand_component ~ignore_mod_bounds env
+  | Trepr (ty, _sort_vars) ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
   | Tof_kind jkind ->
     (* A [Tof_kind] is substitued for existential [Tvar]s or [Tunivar]s bound in
        a [Tpoly] that would escape their scope. In both cases, we can never
@@ -3124,6 +3128,10 @@ let occur_univar ?(inj_only=false) env ty =
       | Tpoly (ty, tyl) ->
           let bound = List.fold_right TypeSet.add tyl bound in
           occur_rec bound  ty
+      | Trepr (ty, _sort_vars) ->
+          (* Sort variables are not type expressions, so we don't add them
+             to bound *)
+          occur_rec bound ty
       | Tconstr (_, [], _) -> ()
       | Tconstr (p, tl, _) ->
           begin try
@@ -3539,6 +3547,14 @@ let rec mcomp type_pairs env t1 t2 =
                enter_poly env univar_pairs
                  t1 tl1 t2 tl2 (mcomp type_pairs env)
              with Escape _ -> raise Incompatible)
+        | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2), _, _) ->
+            (* For layout-polymorphic types, establish correspondence between
+               sort variables positionally, then compare the bodies. *)
+            (try
+              let pairs = List.combine sort_vars1 sort_vars2 in
+              Jkind_types.Sort.enter_repr pairs
+                (fun () -> mcomp type_pairs env t1 t2)
+            with Invalid_argument _ -> raise Incompatible)
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
             (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
@@ -4283,6 +4299,14 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
           enter_poly_for Unify (get_env uenv) univar_pairs t1 tl1 t2 tl2
             (unify uenv)
+      | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
+          (* For layout-polymorphic types, establish correspondence between
+             sort variables positionally, then unify the bodies. *)
+          (try
+            let pairs = List.combine sort_vars1 sort_vars2 in
+            Jkind_types.Sort.enter_repr pairs
+              (fun () -> unify uenv t1 t2)
+          with Invalid_argument _ -> raise_unexplained_for Unify)
       | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
           begin try
             unify_package (get_env uenv) (unify_list uenv)
@@ -5452,6 +5476,15 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
               enter_poly_for Moregen env univar_pairs t1 tl1 t2 tl2
                 (moregen inst_nongen variance type_pairs env)
+          | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
+              (* For layout-polymorphic types, establish correspondence
+                 between sort variables positionally, then check moregen on
+                 the bodies. *)
+              (try
+                let pairs = List.combine sort_vars1 sort_vars2 in
+                Jkind_types.Sort.enter_repr pairs (fun () ->
+                    moregen inst_nongen variance type_pairs env t1 t2)
+              with Invalid_argument _ -> raise_unexplained_for Moregen)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
@@ -5916,6 +5949,15 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
               enter_poly_for Equality env univar_pairs t1 tl1 t2 tl2
                 (eqtype rename type_pairs subst env ~do_jkind_check)
+          | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
+              (* For layout-polymorphic types, establish correspondence
+                 between sort variables positionally, then check equality on
+                 the bodies. *)
+              (try
+                let pairs = List.combine sort_vars1 sort_vars2 in
+                Jkind_types.Sort.enter_repr pairs (fun () ->
+                    eqtype rename type_pairs subst env t1 t2 ~do_jkind_check)
+              with Invalid_argument _ -> raise_unexplained_for Equality)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Equality t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
@@ -6647,6 +6689,10 @@ let rec build_subtype env (visited : transient_expr list)
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tpoly(t1', tl)), c)
       else (t, Unchanged)
+  | Trepr(t1, tl) ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Trepr(t1', tl)), c)
+      else (t, Unchanged)
   | Tunivar _ | Tpackage _ | Tof_kind _ -> (t, Unchanged)
 
 and build_subtype_tuple env visited loops posi level t labeled_tlist
@@ -6799,6 +6845,14 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Escape _ ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
+    | (Trepr (u1, sort_vars1), Trepr (u2, sort_vars2)) ->
+        (* For layout-polymorphic types, establish correspondence between
+           sort variables positionally, then check subtype on the bodies. *)
+        (try
+          let pairs = List.combine sort_vars1 sort_vars2 in
+          Jkind_types.Sort.enter_repr pairs
+            (fun () -> subtype_rec env trace u1 u2 cstrs)
+        with Invalid_argument _ -> (trace, t1, t2, !univar_pairs)::cstrs)
     | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
         begin try
           let ntl1 =
