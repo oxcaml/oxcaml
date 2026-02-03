@@ -186,6 +186,22 @@ Warning 216 [aliased-use-during-borrowing]: This value is used in an aliased man
 val foo : unit -> unit = <fun>
 |}]
 
+(* local_aliased_use is not recognized as borrow *)
+let foo () =
+  let x = "hello" in
+  let _y = borrow_ x in
+  local_aliased_use x;
+  ()
+[%%expect{|
+Line 4, characters 20-21:
+4 |   local_aliased_use x;
+                        ^
+Warning 216 [aliased-use-during-borrowing]: This value is used in an aliased manner during an active borrow.
+
+val foo : unit -> unit = <fun>
+|}]
+
+
 (* But that aliased usage ruins the borrowing, so you can't uniquely use the
    value even after the borrow region. *)
 let foo () =
