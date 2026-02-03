@@ -2007,11 +2007,52 @@ void caml_handle_gc_interrupt(void)
   caml_poll_gc_work();
 }
 
-void caml_process_tick(void)
+value caml_process_tick_exn(void)
 {
-  if (atomic_load_acquire(&Caml_state->requested_tick)) {
+  if (atomic_exchange_explicit(&Caml_state->requested_tick, false,
+                               memory_order_acquire)) {
     caml_domain_tick_hook();
+
+    bool any_preemptible = false;
+    struct stack_info *stack = caml_state->current_stack;
+    while (stack->handler->parent) {
+      if (stack->handler->handle_tick != Val_unit) {
+        any_preemptible = true;
+      }
+      stack = stack->handler->parent;
+    }
+
+    if (!any_preemptible) {
+      return Val_unit;
+    }
+
+    while (stack) {
+      if (stack->handler->handle_tick != Val_unit) {
+        value res = caml_callback_exn(stack->handler->handle_tick, Val_unit);
+        if (Is_exception_result(res)) {
+          return res;
+        }
+
+        switch (Long_val(res)) {
+        case 0: /* Preempt */
+          caml_domain_setup_preemption();
+          return Val_unit;
+        case 1: /* Continue */
+          break;
+        default:
+          /* Should be impossible unless the user defines their own tick handler
+             API with the wrong structure for the Outcome.t type
+          */
+          CAMLassert(false);
+          break;
+        }
+      }
+
+      stack = stack->handler->preemptible_child;
+    }
   }
+
+  return Val_unit;
 }
 
 /* Tick thread */

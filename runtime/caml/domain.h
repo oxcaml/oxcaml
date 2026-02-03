@@ -68,9 +68,9 @@ int caml_incoming_interrupts_queued(void);
 
 void caml_poll_gc_work(void);
 void caml_handle_gc_interrupt(void);
-void caml_process_tick(void);
 void caml_handle_incoming_interrupts(void);
 void caml_domain_setup_preemption(void);
+value caml_process_tick_exn(void);
 
 CAMLextern void caml_interrupt_self(void);
 void caml_interrupt_all_signal_safe(void);

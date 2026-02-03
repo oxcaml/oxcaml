@@ -429,11 +429,6 @@ value caml_do_pending_actions_exn(void)
   check_async_exn(exn, "signal handler");
   if (Is_exception_result(exn)) goto exception;
 
-  /* Check for a pending preemption */
-  if (Caml_state->preemption == Val_long(1)) {
-    caml_domain_setup_preemption();
-  }
-
   /* Call memprof callbacks */
   exn = caml_memprof_run_callbacks_exn();
   check_async_exn(exn, "memprof callback");
@@ -447,7 +442,8 @@ value caml_do_pending_actions_exn(void)
   /* Process ticks (fiber preemptions and preemptive systhread switching). By
      doing this last, we do not need to set the action pending flag in case a
      context switch happens: all actions have been processed at this point. */
-  caml_process_tick();
+  exn = caml_process_tick_exn();
+  check_async_exn(exn, "tick handler");
 
   return Val_unit;
 

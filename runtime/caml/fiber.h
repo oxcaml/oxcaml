@@ -36,6 +36,9 @@ struct stack_handler {
   value handle_effect;
   value handle_tick; /* tick handler callback, Val_unit if not preemptible */
   struct stack_info* parent; /* parent OCaml stack if any */
+  /* Next /preemptible* descendant fiber, if any. May not be the immediate child
+     fiber. */
+  struct stack_info* preemptible_child;
 };
 
 /* stack_info describes the OCaml stack. It is used for:

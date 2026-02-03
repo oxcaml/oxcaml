@@ -149,11 +149,12 @@
 #define Stack_local_limit        80
 
 /* struct stack_handler */
-#define Handler_value(REG)       0(REG)
-#define Handler_exception(REG)   8(REG)
-#define Handler_effect(REG)     16(REG)
-#define Handler_tick(REG)       24(REG)
-#define Handler_parent          32
+#define Handler_value(REG)         0(REG)
+#define Handler_exception(REG)     8(REG)
+#define Handler_effect(REG)       16(REG)
+#define Handler_tick              24
+#define Handler_parent            32
+#define Handler_preemptible_child 40
 
 /* struct dynamic_thread_s */
 
@@ -1470,7 +1471,7 @@ CFI_STARTPROC
         movq    %r12, %rax      /* %rax := argument to the function in %rbx */
     /*  check if stack null, then already used */
         testq   %r10, %r10
-        jz      4f
+        jz      6f
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers %rax, %rsi and %r10 before C call */
         ENTER_FUNCTION
@@ -1494,8 +1495,10 @@ CFI_STARTPROC
         TSAN_RESTORE_CALLER_REGS
         LEAVE_FUNCTION
 #endif
-    /* Add current stack to the last fiber */
+    /* Pop gc_regs */
         popq    %rdx; CFI_ADJUST(-8)
+    /* Set the current stack as the parent of the last_fiber of the
+       continuation (%r13) */
         movq    (Stack_handler-1)(%r13), %rdi
         movq    Caml_state(current_stack), %rsi
         movq    %rsi, Handler_parent(%rdi)
@@ -1508,8 +1511,29 @@ CFI_STARTPROC
         testq   %rdx, %rdx /* Do we have a gc_regs? */
         jnz     3f
         jmpq    *(%rbx)    /* no, just jump into the continuation */
-3:      /* This continuation represents a preemption, meaning we have to restore
-           its gc_regs before resuming */
+3:      /* This continuation represents a preemption, meaning that before
+           resuming we have to:
+
+           1. set preemptible_child of the next preemptible fiber up the stack
+              (or the root fiber) to this continuation's fiber
+           2. Redo whatever allocation, if any, was interrupted by the
+              preemption
+           2. Restore its gc_regs
+
+           before resuming */
+        /* 1. Find the parent preemptible fiber. Loop variable is %rsi */
+4:      movq    (Stack_handler-1)(%rsi), %r11
+        cmpq    $1, Handler_tick(%rsi) /* %rsi->htick == Val_unit ? */
+        jne     5f
+        movq    Handler_parent(%rsi), %r11
+        testq   %r11, %r11 /* does this stack have a parent? */
+        jz      5f      /* no parent, so set us as its first premptible child */
+        movq    %r11, %rsi
+        jmp     4b
+5:      /* %rsi is now the parent preemptible fiber or root fiber. So set us as
+           its next preemptible child, then keep going. */
+        movq    %r13, Handler_preemptible_child(%rsi)
+        /* 2. Redo allocation */
         movq    %rdx, Caml_state(gc_regs)  /* Save gc_regs */
         movq    %r15, Caml_state(young_ptr)
         /* Before restoring registers, redo whatever allocation was interrupted
@@ -1521,11 +1545,12 @@ CFI_STARTPROC
         SWITCH_OCAML_TO_C
         C_call  (GCALL(caml_redo_preempted_allocation))
         SWITCH_C_TO_OCAML
-        movq    Caml_state(gc_regs), %r15  /* Restore gc_regs */
+        /* 3. Restore gc_regs */
+        movq    Caml_state(gc_regs), %r15
         /* Jump into the second half of caml_do_call_gc, which will restore the
            registers and `ret` to resume */
         jmp     LBL(resume_from_preempt)
-4:      ENTER_FUNCTION
+6:      ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
                                   in the TSan backtrace */
         LEA_VAR(caml_raise_continuation_already_resumed, %rax)
@@ -1561,7 +1586,15 @@ CFI_STARTPROC
     /* Load new stack pointer and set parent */
         movq    Stack_handler(%rax), %r11
         movq    %rcx, Handler_parent(%r11)
-        movq    %rax, Caml_state(current_stack)
+    /* If this fiber is preemptible, set it as the preemptible_child of the
+       current stack */
+        cmpq    $1, Handler_tick(%r11)
+        je      1f
+    /* CR aspsmith: Iterate up the stack until we find either the root fiber or
+       another preemptible fiber */
+        movq    Stack_handler(%rcx), %r12
+        movq    %rax, Handler_preemptible_child(%r12)
+1:      movq    %rax, Caml_state(current_stack)
         movq    Stack_sp(%rax), %r11
 #if Stack_padding_word
     /* If the stack has a padding word, advance an additional word so that it
