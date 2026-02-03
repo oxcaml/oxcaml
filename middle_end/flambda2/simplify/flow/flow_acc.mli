@@ -65,6 +65,9 @@ val enter_continuation :
     handler. *)
 val exit_continuation : Continuation.t -> t -> t
 
+(** TODO *)
+val record_lifted_constants : Lifted_constant_state.t -> t -> t
+
 (** That variable is defined in the current handler *)
 val record_defined_var : Variable.t -> t -> t
 

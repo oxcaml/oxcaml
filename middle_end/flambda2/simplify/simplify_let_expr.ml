@@ -335,77 +335,6 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     in
     after_rebuild body uacc
 
-let record_one_value_slot_for_data_flow symbol value_slot simple data_flow =
-  Flow.Acc.record_value_slot (Name.symbol symbol) value_slot
-    (Simple.free_names simple) data_flow
-
-let record_one_function_slot_for_data_flow ~free_names ~value_slots _
-    (symbol, _) data_flow =
-  let data_flow = Flow.Acc.record_symbol_binding symbol free_names data_flow in
-  Value_slot.Map.fold
-    (record_one_value_slot_for_data_flow symbol)
-    value_slots data_flow
-
-let record_lifted_constant_definition_for_data_flow ~being_defined data_flow
-    definition =
-  let module D = LC.Definition in
-  match D.descr definition with
-  | Code code_id ->
-    Flow.Acc.record_code_id_binding code_id
-      (NO.union being_defined (D.free_names definition))
-      data_flow
-  | Block_like { symbol; _ } ->
-    let free_names = NO.union being_defined (D.free_names definition) in
-    Flow.Acc.record_symbol_binding symbol free_names data_flow
-  | Set_of_closures { closure_symbols_with_types; _ } -> (
-    let expr = D.defining_expr definition in
-    match Rebuilt_static_const.to_const expr with
-    | Some (Static_const const) ->
-      let set_of_closures = Static_const.must_be_set_of_closures const in
-      let free_names =
-        NO.union being_defined
-          (Function_declarations.free_names
-             (Set_of_closures.function_decls set_of_closures))
-      in
-      let value_slots = Set_of_closures.value_slots set_of_closures in
-      Function_slot.Lmap.fold
-        (record_one_function_slot_for_data_flow ~free_names ~value_slots)
-        closure_symbols_with_types data_flow
-    | None | Some (Code _ | Deleted_code) ->
-      let free_names = NO.union being_defined (D.free_names definition) in
-      Function_slot.Lmap.fold
-        (fun _ (symbol, _) data_flow ->
-          Flow.Acc.record_symbol_binding symbol free_names data_flow)
-        closure_symbols_with_types data_flow)
-
-let record_lifted_constant_for_data_flow data_flow lifted_constant =
-  let data_flow =
-    (* Record all projections as potential dependencies. *)
-    Variable.Map.fold
-      (fun var proj data_flow ->
-        Flow.Acc.record_symbol_projection var
-          (Symbol_projection.free_names proj)
-          data_flow)
-      (LC.symbol_projections lifted_constant)
-      data_flow
-  in
-  let being_defined =
-    let bound_static = Lifted_constant.bound_static lifted_constant in
-    (* Note: We're not registering code IDs in the set, because we can actually
-       make the code bindings deleted individually. In particular, code IDs that
-       are only used in the newer_version_of field of another binding will be
-       deleted as expected. *)
-    let symbols = Bound_static.symbols_being_defined bound_static in
-    NO.empty
-    |> Symbol.Set.fold
-         (fun symbol acc -> NO.add_symbol acc symbol Name_mode.normal)
-         symbols
-  in
-  ListLabels.fold_left
-    (LC.definitions lifted_constant)
-    ~init:data_flow
-    ~f:(record_lifted_constant_definition_for_data_flow ~being_defined)
-
 let record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id
     data_flow (binding : Expr_builder.binding_to_place) : Flow.Acc.t =
   let generate_phantom_lets = DE.generate_phantom_lets (DA.denv dacc) in
@@ -427,8 +356,8 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
          to do anything here. *)
       data_flow
     | Not_in_a_closure ->
-      LCS.fold lifted_constants_from_defining_expr ~init:data_flow
-        ~f:record_lifted_constant_for_data_flow
+      Flow.Acc.record_lifted_constants lifted_constants_from_defining_expr
+        data_flow
   in
   ListLabels.fold_left
     (Simplify_named_result.bindings_to_place simplify_named_result)
