@@ -144,7 +144,10 @@ and _ commutable_gen =
   | Cunknown : [> `none] commutable_gen
   | Cvar : {mutable commu: any commutable_gen} -> [> `var] commutable_gen
 
-and evals_to = type_expr
+and evals_to =
+  { to_ : type_expr;
+    stage_offset : int;
+    n_evals : int }
 
 (* jkinds *)
 
@@ -1172,6 +1175,11 @@ module Transient_expr = struct
     | Tvar { name; jkind = _; evals_to } ->
       set_desc ty (Tvar { name; jkind = jkind'; evals_to })
     | _ -> Misc.fatal_error "set_var_jkind called on non-var"
+  let set_var_evals_to ty evals_to' =
+    match ty.desc with
+    | Tvar { name; jkind; evals_to =_ } ->
+      set_desc ty (Tvar { name; jkind; evals_to = evals_to' })
+    | _ -> Misc.fatal_error "set_var_evals_to called on non-var"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1599,6 +1607,10 @@ let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
+let set_var_evals_to ty evals_to =
+  let ty = repr ty in
+  log_type ty;
+  Transient_expr.set_var_evals_to ty evals_to
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =

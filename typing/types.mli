@@ -275,7 +275,18 @@ and abbrev_memo =
     This is only allowed when the real type is known.
 *)
 
-and evals_to = type_expr
+(** Description of an evals-to constraint on a type variable or declaration.
+    For a constrained ['a], the constraint is equivalent to the equation:
+      [<['a]>^(stage_offset) eval^(n_evals) = to_].
+    where we write [<[_]>^n] for quoting (or, for n < 0: splicing) [n] times,
+    and [eval^n] is evaluation [n] times (defined only for n > 0).  *)
+and evals_to =
+  { to_ : type_expr;
+    (** Target type expression. *)
+    stage_offset : int;
+    (** Number of quotes (or splices, when negative). *)
+    n_evals : int
+    (** Number of evaluations. *) }
 
 (**** Jkinds ****)
 
@@ -1240,7 +1251,8 @@ val set_type_desc: type_expr -> type_desc -> unit
 val set_level: type_expr -> int -> unit
 val set_scope: type_expr -> int -> unit
 val set_var_jkind: type_expr -> jkind_lr -> unit
-        (* May only be called on Tvars *)
+val set_var_evals_to: type_expr -> evals_to option -> unit
+        (* [set_var_*] functions may only be called on Tvars *)
 val set_name:
     (Path.t * type_expr list) option ref ->
     (Path.t * type_expr list) option -> unit

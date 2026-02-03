@@ -2122,6 +2122,20 @@ let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_eval_ty t = newty2 ~level:(get_level t) (Teval t)
 let new_quote_eval_ty t = new_eval_ty (new_quote_ty t)
 
+let rec n_evals_ty n t =
+  if n > 0 then
+    n_evals_ty (n - 1) (new_eval_ty t)
+  else if n < 0 then
+    assert false
+  else t
+
+let rec offset_stage_ty n t =
+  if n > 0 then
+    offset_stage_ty (n - 1) (new_quote_ty t)
+  else if n < 0 then
+    offset_stage_ty (n + 1) (new_splice_ty t)
+  else t
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
@@ -4005,21 +4019,23 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
-(* Checks if a type is a type variable under some quotes or splices *)
+(* Checks if a type is a type variable under some quotes, splices, or evals *)
 let rec is_flexible_ty ty =
   match get_desc ty with
   | Tvar _ -> true
   | Tquote ty' -> is_flexible_ty ty'
   | Tsplice ty' -> is_flexible_ty ty'
+  | Teval ty' -> is_flexible_ty ty'
   | _ -> false
 
-(* Checks if a type is an instantiable type under some quotes or splices *)
+(* Checks if a type is an instantiable type under some quotes, splices, or evals *)
 let rec is_instantiable_ty env ty =
   match get_desc ty with
   | Tconstr (path, [], _) ->
       is_instantiable env ~for_jkind_eqn:false path
   | Tquote ty' -> is_instantiable_ty env ty'
   | Tsplice ty' -> is_instantiable_ty env ty'
+  | Teval ty' -> is_instantiable_ty env ty'
   | _ -> false
 
 (* Checks if a type is equatable under some quotes or splices *)
@@ -4059,7 +4075,7 @@ let unify_alloc_mode_for tr_exn a b =
    environment is built in subst. *)
 let rigid_variants = ref false
 
-let unify1_var uenv t1 t2 =
+let rec unify1_var uenv t1 t2 =
   let jkind = match get_desc t1 with
     | Tvar { jkind } -> jkind
     | _ -> assert false
@@ -4068,7 +4084,8 @@ let unify1_var uenv t1 t2 =
   let env = get_env uenv in
   match
     occur_univar_for Unify env t2;
-    unification_jkind_check uenv t2 (Jkind.disallow_left jkind)
+    unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
+    unification_evals_to_check_direct uenv t1 ~to_:t2
   with
   | () ->
       begin
@@ -4084,7 +4101,7 @@ let unify1_var uenv t1 t2 =
       false
 
 (* Called from unify3 *)
-let unify3_var uenv jkind1 t1' t2 t2' =
+and unify3_var uenv jkind1 t1' t2 t2' =
   occur_for Unify uenv t1' t2;
   (* There are two possible ways forward here. Either the variable [t1']
      will succeed in unifying with [t2], in which case we're done; or
@@ -4096,7 +4113,8 @@ let unify3_var uenv jkind1 t1' t2 t2' =
   let snap = snapshot () in
   match
     occur_univar_for Unify (get_env uenv) t2;
-    unification_jkind_check uenv t2' (Jkind.disallow_left jkind1)
+    unification_jkind_check uenv t2' (Jkind.disallow_left jkind1);
+    unification_evals_to_check_direct uenv t1' ~to_:t2'
   with
   | () -> link_type t1' t2
   | exception Unify_trace _ when in_pattern_mode uenv ->
@@ -4146,7 +4164,7 @@ let unify3_var uenv jkind1 t1' t2 t2' =
       information is indeed lost, but it probably does not worth it.
 *)
 
-let rec unify uenv t1 t2 =
+and unify uenv t1 t2 =
   (* First step: special cases (optimizations) *)
   if unify_eq uenv t1 t2 then () else
   let reset_tracing = check_trace_gadt_instances (get_env uenv) in
@@ -4294,6 +4312,10 @@ and unify3 uenv t1 t1' t2 t2' =
         newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
       in
       unify uenv t s2
+  | (Teval _, _) when can_constrain_eval t1' ->
+      constrain_eval uenv t1' ~to_:t2'
+  | (_, Teval _) when can_constrain_eval t2' ->
+      constrain_eval uenv t2' ~to_:t1'
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -4524,7 +4546,7 @@ and unify_labeled_list env labeled_tl1 labeled_tl2 =
       unify env ty1 ty2)
     labeled_tl1 labeled_tl2
 
-(* Build a fresh row variable for unification *)
+(** Build a fresh row variable for unification *)
 and make_rowvar level use1 rest1 use2 rest2  =
   let set_name ty name =
     match get_desc ty with
@@ -4545,6 +4567,75 @@ and make_rowvar level use1 rest1 use2 rest2  =
   if use1 then rest1 else
   if use2 then rest2
   else newvar2 ?name level (Jkind.Builtin.value ~why:Row_variable)
+
+(** Check that we could use an evals-to constraint to unify [ty]. *)
+and can_constrain_eval ty =
+  let rec loop ty =
+    match get_desc ty with
+    | Tvar _ -> true
+    | Tsplice t | Tquote t | Teval t -> loop t
+    | _ -> false
+  in
+  match get_desc ty with
+  | Teval _ -> loop ty
+  | _ -> false
+
+(** Returns a type variable [tv] underneath [ty]
+    and an evals-to constraint that unifies [tv ~ to_].
+    Only called when [can_constrain_eval ty] is true. *)
+and gen_constrain_eval ty ~to_ =
+  match get_desc ty with
+  | Tvar _ ->
+    ty, { to_; stage_offset = 0; n_evals = 0 }
+  | Tquote t ->
+    let tv, c = gen_constrain_eval t ~to_ in
+    tv, { c with stage_offset = c.stage_offset + 1 }
+  | Tsplice t ->
+    let tv, c = gen_constrain_eval t ~to_ in
+    tv, { c with stage_offset = c.stage_offset - 1 }
+  | Teval t ->
+    let tv, c = gen_constrain_eval t ~to_ in
+    tv, { c with n_evals = c.n_evals + 1 }
+  | _ -> assert false
+
+(** Use an evals-to constraint on the variable in [ty] to unify [ty] and [to_].
+    Only called when [can_constrain_eval ty] is true. *)
+and constrain_eval uenv ty ~to_ =
+  gen_constrain_eval ty ~to_ |> constrain_eval' uenv
+
+(** Place an evals-to constraint [c] on a type variable [tv],
+    so that we unify [tv ~ c.to_]. *)
+and constrain_eval' uenv (tv, c) =
+  assert (c.n_evals >= 1);
+  unification_evals_to_check uenv tv c;
+  set_var_evals_to tv (Some c)
+
+and unify_evals_to uenv c c' =
+  let { to_; stage_offset; n_evals } = c in
+  let { to_ = to_'; stage_offset = stage_offset'; n_evals = n_evals' } = c' in
+  if n_evals < n_evals' then
+    unify_evals_to uenv c' c
+  else begin
+    assert (stage_offset = stage_offset' || (n_evals' = 0 && stage_offset' = 0));
+    to_'
+    |> offset_stage_ty (stage_offset - stage_offset')
+    |> n_evals_ty (n_evals - n_evals')
+    |> unify uenv to_
+  end
+
+(** Ensure that any existing evals-to constraint on [tv]
+    is consistent with the new constraint [c]. *)
+and unification_evals_to_check uenv tv c =
+  match get_desc tv with
+  | Tvar { evals_to = None; _ } -> ()
+  | Tvar { evals_to = Some c' } ->
+    unify_evals_to uenv c c'
+  | _ -> assert false
+
+(** Ensure that any existing evals-to constraint on [tv]
+    is consistent with unifying [tv ~ to_]. *)
+and unification_evals_to_check_direct uenv tv ~to_ =
+  unification_evals_to_check uenv tv { to_; stage_offset = 0; n_evals = 0 }
 
 and unify_fields uenv ty1 ty2 =          (* Optimization *)
   let (fields1, rest1) = flatten_fields ty1
@@ -4835,6 +4926,7 @@ let unify_var uenv t1 t2 =
         update_level_for Unify env (get_level t1) t2;
         update_scope_for Unify (get_scope t1) t2;
         unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
+        unification_evals_to_check_direct uenv t1 ~to_:t2;
         link_type t1 t2;
         reset_trace_gadt_instances reset_tracing;
       with Unify_trace trace ->

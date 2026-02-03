@@ -68,17 +68,7 @@ val map : unit -> <[f:($('a) -> $('b)) -> $('a) list -> $('b) list]> eval =
 let map_int : f:(int -> int) -> int list -> int list = map ()
 
 [%%expect{|
-Line _, characters _-_:
- | let map_int : f:(int -> int) -> int list -> int list = map ()
-                                                          ^^^^^^
-Error: This expression has type
-         "<[f:($('a) -> $('b)) -> $('a) list -> $('b) list]> eval" =
-           "f:<[$('a) -> $('b)]> eval -> <[$('a) list -> $('b) list]> eval"
-       but an expression was expected of type
-         "f:(int -> int) -> int list -> int list"
-       Type "<[$('a) -> $('b)]> eval" = "'a eval -> 'b eval"
-       is not compatible with type "int -> int"
-       Type "'a eval" is not compatible with type "int"
+val map_int : f:(int -> int) -> int list -> int list = <fun>
 |}]
 
 let map_int2
@@ -88,33 +78,22 @@ let map_int2
   = map ()
 
 [%%expect{|
-Line _, characters _-_:
- |   = map ()
-       ^^^^^^
-Error: This expression has type
-         "<[f:($('a) -> $('b)) -> $('a) list -> $('b) list]> eval" =
-           "f:<[$('a) -> $('b)]> eval -> <[$('a) list -> $('b) list]> eval"
-       but an expression was expected of type
-         "f:(int * int -> int * int * int) ->
-         (int * int) list -> (int * int * int) list"
-       Type "<[$('a) -> $('b)]> eval" = "'a eval -> 'b eval"
-       is not compatible with type "int * int -> int * int * int"
-       Type "'a eval" is not compatible with type "int * int"
+val map_int2 :
+  f:(int * int -> int * int * int) ->
+  (int * int) list -> (int * int * int) list = <fun>
 |}]
 
-let map_int2'
+let map_int2' ()
     ~(f : int * int -> int * int * int)
     (x : (int * int) list)
   : (int * int * int) list
   = map () ~f x
 
 [%%expect{|
-Line _, characters _-_:
- |   = map () ~f x
-               ^
-Error: This expression has type "int * int -> int * int * int"
-       but an expression was expected of type "'a eval -> 'b eval"
-       Type "int * int" is not compatible with type "'a eval"
+val map_int2' :
+  unit ->
+  f:(int * int -> int * int * int) ->
+  (int * int) list -> (int * int * int) list = <fun>
 |}]
 
 
@@ -126,6 +105,39 @@ val foo : 'a eval -> 'a expr -> bool -> 'a eval = <fun>
 val foo' : 'a eval -> 'a expr -> bool -> 'a eval = <fun>
 |}]
 
+(* FIXME: The type scheme should show that 'a eval = unit. *)
+let must_evals_to_unit e = if true then eval e else ()
+
+[%%expect{|
+val must_evals_to_unit : 'a expr -> 'a eval = <fun>
+|}]
+
+(* [evals_to_unit] is already generalised:
+   its return value might not be unit. *)
+let must_unit e : unit = must_evals_to_unit e
+
+[%%expect{|
+val must_unit : 'a expr -> unit = <fun>
+|}]
+
+
+(* FIXME: I'm fairly certain this should work, and it's almost like the above.
+   The error message sure is confusing, so this might be an expansion bug. *)
+let () =
+  let f x : <[ _ format6 ]> expr = x in
+  must_unit
+    <[let p = $(f <[""]>) in
+      Format.printf p ]>
+
+[%%expect{|
+Line _, characters _-_:
+ |       Format.printf p ]>
+         ^^^^^^^^^^^^^^^
+Error: This expression has type "unit" = "unit"
+       but an expression was expected of type "'a"
+       Type "unit" is not compatible with type "<[unit]> eval"
+|}]
+
 
 open (struct
   let inject a = Obj.magic a
@@ -133,27 +145,68 @@ end : sig
   val inject : 'a eval -> 'a expr
 end)
 
-let injected_ints : unit -> int =
-  eval <[ fun () -> $(inject 2) + $(inject 2) ]>
+let injected_ints () : int =
+  eval <[ $(inject 2) + $(inject 2) ]>
 
 [%%expect{|
 val inject : 'a eval -> 'a expr = <fun>
-Line _, characters _-_:
- |   eval <[ fun () -> $(inject 2) + $(inject 2) ]>
-                                ^
-Error: This expression has type "int" but an expression was expected of type
-         "'a eval"
+val injected_ints : unit -> int = <fun>
 |}]
 
-let not_injected_ints : unit -> int =
-  eval <[ fun () -> $(inject 2) + $(inject "2") ]>
+let not_injected_ints () : int =
+  eval <[ $(inject 2) + $(inject "2") ]>
 
 [%%expect{|
 Line _, characters _-_:
- |   eval <[ fun () -> $(inject 2) + $(inject "2") ]>
-                                ^
-Error: This expression has type "int" but an expression was expected of type
-         "'a eval"
+ |   eval <[ $(inject 2) + $(inject "2") ]>
+                            ^^^^^^^^^^^^
+Error: This expression has type "'a expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "string" is not compatible with type "<[int]> eval" = "int"
+|}]
+
+(* inclusion checks for eval constraints *)
+
+module M : sig
+  type t
+end = struct
+  type t constraint int = t eval
+end
+
+[%%expect{|
+Line _, characters _-_:
+ |   type t constraint int = t eval
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type constructor expands to type "t" but is used here with type "'a"
+       Type "int" is not compatible with type "t eval"
+|}]
+
+module M : sig
+  type t constraint int = t eval
+end = struct
+  type t constraint int = t eval
+end
+
+[%%expect{|
+Line _, characters _-_:
+ |   type t constraint int = t eval
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type constructor expands to type "t" but is used here with type "'a"
+       Type "int" is not compatible with type "t eval"
+|}]
+
+module M : sig
+  type t constraint int = t eval
+end = struct
+  type t
+end
+
+[%%expect{|
+Line _, characters _-_:
+ |   type t constraint int = t eval
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type constructor expands to type "t" but is used here with type "'a"
+       Type "int" is not compatible with type "t eval"
 |}]
 
 (* We can hide a concrete type with one that evaluates to it
@@ -167,8 +220,8 @@ end
 [%%expect{|
 Line _, characters _-_:
  |   type t constraint int = t eval
-                       ^^^^^^^^^^^^
-Error: The type constraints are not consistent.
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type constructor expands to type "t" but is used here with type "'a"
        Type "int" is not compatible with type "t eval"
 |}]
 
@@ -182,7 +235,63 @@ end
 [%%expect{|
 Line _, characters _-_:
  |   type t constraint int = t eval
-                       ^^^^^^^^^^^^
-Error: The type constraints are not consistent.
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type constructor expands to type "t" but is used here with type "'a"
+       Type "int" is not compatible with type "t eval"
+|}]
+
+(* the image of eval is not necessarily the space of all types *)
+module M : sig
+  val id : unit -> 'a -> 'a
+end = struct
+  let id () = eval <[ fun x -> x ]>
+end
+
+[%%expect{|
+Lines _-_, characters _-_:
+ | ......struct
+ |   let id () = eval <[ fun x -> x ]>
+ | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val id : unit -> <[$('a) -> $('a)]> eval end
+       is not included in
+         sig val id : unit -> 'a -> 'a end
+       Values do not match:
+         val id : unit -> <[$('a) -> $('a)]> eval
+       is not included in
+         val id : unit -> 'a -> 'a
+       The type "unit -> <[$('a) -> $('a)]> eval"
+       is not compatible with the type "unit -> 'b -> 'b"
+       Type "<[$('a) -> $('a)]> eval" = "'a eval -> 'a eval"
+       is not compatible with type "'b -> 'b"
+       Type "'a eval" is not compatible with type "'b"
+|}]
+
+(* we can concretise a type that is known to evaluate to something *)
+module M : sig
+  val x : unit -> int
+end = struct
+  let x () = eval <[ 42 ]>
+end
+
+[%%expect{|
+module M : sig val x : unit -> int end
+|}]
+
+(* we can abstract over a type that is known to evaluate to something *)
+module M : sig
+  type t constraint int = t eval
+  val x : unit -> t expr
+end = struct
+  type t constraint int = t eval
+  let x () = eval <[ 42 ]>
+end
+
+[%%expect{|
+Line _, characters _-_:
+ |   type t constraint int = t eval
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type constructor expands to type "t" but is used here with type "'a"
        Type "int" is not compatible with type "t eval"
 |}]
