@@ -707,9 +707,36 @@ let run_fexpr log env =
   end
 
 let fexpr =
+  native_action @@
   Actions.make ~name:"fexpr" ~description:"Run fexprc on the test file"
     ~does_something:true
     run_fexpr
+
+let run_fexpr_check log env =
+  let passes_sfx =
+    Actions_helpers.words_of_variable env Ocaml_variables.fexpr_dump_files
+  in
+  let test_build_dir = Actions_helpers.test_build_directory env in
+  let test_source_dir = Actions_helpers.test_source_directory env in
+  let test_name = Filename.chop_extension (Actions_helpers.testfile env) in
+  List.fold_left (fun (res, env) pass_sfx ->
+      if Result.is_pass res then
+        let pass_dump_file = Filename.make_filename test_name pass_sfx in
+        let pass_ref_file = Filename.(make_filename (chop_extension pass_dump_file) "reference") in
+        let dump_file =
+          Filename.make_path [test_build_dir; pass_dump_file]
+        in
+        let ref_file =
+          Filename.make_path [test_source_dir; pass_ref_file]
+        in
+        Actions_helpers.compare_files "fexpr" dump_file ref_file log env
+      else (res, env))
+    (Result.pass, env)
+    passes_sfx
+
+let check_fexpr_dump =
+  native_action @@
+  Actions.make ~name:"check_fexpr_dump" ~description:"Compare passes fexpr dumps to reference" ~does_something:true run_fexpr_check
 
 let finalise_codegen_cc test_basename _log env =
   let test_module =
@@ -1662,6 +1689,7 @@ let init () =
     ocamldebug;
     ocamlmklib;
     fexpr;
+    check_fexpr_dump;
     codegen;
     cc;
     ocamlobjinfo;

@@ -1,6 +1,7 @@
 open Import
 
 let check_invariants program =
+  (* CR Keryan : do we want to restore this at some point ? *)
   try () (* Flambda_unit.invariant program *)
   with exn ->
     Format.eprintf "Program which failed invariant check:@ %a\n%!"
@@ -17,7 +18,7 @@ let parse_flambda filename =
     check_invariants fl2;
     (* CR gbury/lmaurer/bclement: add a proper traversal to compute the actual
        code_slot_offsets here (as well as free_names) *)
-    Flambda2.flambda_to_flambda ~ppf_dump:Format.std_formatter ~prefixname:""
+    Flambda2.flambda_to_flambda ~ppf_dump:Format.std_formatter ~prefixname:(Filename.chop_extension filename)
       ~machine_width:Sixty_four fl2
   | Error e ->
     Test_utils.dump_error e;

@@ -192,16 +192,12 @@ let asmgen =
   test_actions = asmgen_actions
 }
 
-let fexpr_skip_on_bytecode_only =
-  Actions_helpers.skip_with_reason "native compiler disabled"
-
-let fexpr_actions =
-  if not Ocamltest_config.native_compiler then [fexpr_skip_on_bytecode_only]
-  else [
-    setup_simple_build_env;
-    fexpr;
-    check_program_output;
-  ]
+let fexpr_actions = [
+  setup_simple_build_env;
+  fexpr;
+  check_fexpr_dump;
+  check_program_output;
+]
 
 let fexpr =
 {

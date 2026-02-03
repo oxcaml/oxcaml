@@ -56,6 +56,7 @@ val afl_instrument : Actions.t
 val no_afl_instrument : Actions.t
 
 val fexpr : Actions.t
+val check_fexpr_dump : Actions.t
 
 val codegen : Actions.t
 
