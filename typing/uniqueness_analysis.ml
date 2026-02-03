@@ -419,15 +419,15 @@ module Usage : sig
               usage *)
     }
 
-  type borrowed_value_escapes_error =
+  type unique_use_during_borrowing_error =
     { region_loc : Location.t;
       borrow_occ : Occurrence.t;
-      usage_occ : Occurrence.t
+      cannot_force : Maybe_unique.cannot_force
     }
 
   exception Cannot_force of cannot_force_error
 
-  exception Borrowed_value_escapes of borrowed_value_escapes_error
+  exception Unique_use_during_borrowing of unique_use_during_borrowing_error
 
   (** Unused *)
   val empty : t
@@ -551,15 +551,15 @@ end = struct
       order : usage_order
     }
 
-  type borrowed_value_escapes_error =
+  type unique_use_during_borrowing_error =
     { region_loc : Location.t;
       borrow_occ : Occurrence.t;
-      usage_occ : Occurrence.t
+      cannot_force : Maybe_unique.cannot_force
     }
 
   exception Cannot_force of cannot_force_error
 
-  exception Borrowed_value_escapes of borrowed_value_escapes_error
+  exception Unique_use_during_borrowing of unique_use_during_borrowing_error
 
   let force_aliased_multiuse t order there =
     match Maybe_unique.mark_multi_use t with
@@ -688,17 +688,26 @@ end = struct
 
   let rec confine_borrow ~region_loc borrow_occ = function
     | Unused -> Borrowed borrow_occ
-    | Borrowed _ as usage -> usage
+    | Borrowed _ -> Borrowed borrow_occ
     | Maybe_aliased ma ->
       (* Force maybe_aliased to borrowed by adding a Unique barrier *)
       Maybe_aliased.add_barrier ma (Uniqueness.disallow_left Uniqueness.unique);
       Maybe_aliased ma
-    | Aliased aliased_value ->
+    | Aliased aliased_value as usage ->
       let usage_occ = Aliased.extract_occurrence aliased_value in
-      raise (Borrowed_value_escapes { region_loc; borrow_occ; usage_occ })
-    | Maybe_unique mu ->
+      Location.prerr_warning usage_occ.loc Warnings.Aliased_use_during_borrowing;
+      usage
+    | Maybe_unique mu -> (
       let usage_occ = Maybe_unique.extract_occurrence mu in
-      raise (Borrowed_value_escapes { region_loc; borrow_occ; usage_occ })
+      match Maybe_unique.mark_multi_use mu with
+      | Ok () ->
+        Location.prerr_warning usage_occ.loc
+          Warnings.Aliased_use_during_borrowing;
+        Aliased (Aliased.singleton usage_occ Forced)
+      | Error cannot_force ->
+        raise
+          (Unique_use_during_borrowing { region_loc; borrow_occ; cannot_force })
+      )
     | Antiquote inner -> Antiquote (confine_borrow ~region_loc borrow_occ inner)
 
   let rec print ppf =
@@ -2926,13 +2935,6 @@ let check_uniqueness_value_bindings vbs =
   UF.check_no_remaining_overwritten_as uf;
   ()
 
-let report_borrowed_value_escapes Usage.{ region_loc; borrow_occ; usage_occ } =
-  let sub =
-    [ Location.msg ~loc:borrow_occ.loc "The value is being borrowed";
-      Location.msg ~loc:region_loc "during this borrow context" ]
-  in
-  Location.errorf ~loc:usage_occ.loc ~sub "This value is used here,@ but:"
-
 (* CR-someday zqian: improve error message wrt borrowing. In particular, say
 "being borrowed" or "borrowed" instead of "used". *)
 let report_multi_use inner first_is_of_second =
@@ -3048,6 +3050,25 @@ let report_borrowed_value_used_uniquely cannot_force =
   in
   Location.errorf ~loc:occ.loc "%t" error
 
+let report_unique_use_during_borrowing
+    (Usage.{ region_loc; borrow_occ; cannot_force } :
+      Usage.unique_use_during_borrowing_error) =
+  let { Maybe_unique.occ; axis } = cannot_force in
+  let error =
+    match axis with
+    | Uniqueness ->
+      Format.dprintf "This value is used as %a here,@ but it is being borrowed."
+        Misc.Style.inline_code "unique"
+    | Linearity ->
+      Format.dprintf "This value is used as %a here,@ but it is being borrowed."
+        Misc.Style.inline_code "once"
+  in
+  let sub =
+    [ Location.msg ~loc:borrow_occ.loc "The value is being borrowed";
+      Location.msg ~loc:region_loc "during this borrow context" ]
+  in
+  Location.errorf ~loc:occ.loc ~sub "%t" error
+
 let report_tag_change (err : Overwrites.error) =
   match err with
   | Changed_tag { old_tag; new_tag } ->
@@ -3089,10 +3110,6 @@ let report_error err =
 let () =
   Location.register_error_of_exn (function
     | Error e -> Some (report_error e)
-    | Usage.Borrowed_value_escapes inner ->
-      (* CR-someday zqian: lift this into [Error e] and track the relation
-      (first_is_of_second) between the borrowing site and the usage site to
-         provide more precise error messages (e.g., "part of it is borrowed" vs
-         "it is borrowed"). *)
-      Some (report_borrowed_value_escapes inner)
+    | Usage.Unique_use_during_borrowing inner ->
+      Some (report_unique_use_during_borrowing inner)
     | _ -> None)

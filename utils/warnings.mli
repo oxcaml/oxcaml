@@ -149,6 +149,7 @@ type t =
     }                                       (* 213 *)
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
+  | Aliased_use_during_borrowing            (* 216 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 
