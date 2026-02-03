@@ -32,4 +32,11 @@ void caml_register_dyn_globals(void **globals, int nglobals);
 
 #endif /* CAML_INTERNALS */
 
+#ifdef NATIVE_CODE
+/* Initialize a module and its dependencies by name.
+   Requires the executable to be compiled with -manual-module-init.
+   Raises an exception if the module is not found or if initialization fails. */
+CAMLextern void caml_init_module(const char *name);
+#endif
+
 #endif /* CAML_GLOBROOTS_H */

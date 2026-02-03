@@ -699,6 +699,11 @@ val entry_point : Compilation_unit.t list -> phrase list
 (** Generate the caml_globals table *)
 val global_table : Compilation_unit.t list -> phrase
 
+(** Generate the caml_unit_deps_table for shared objects / complete objects.
+    Maps compilation unit names to their entry functions, gc_roots, and
+    dependencies. *)
+val unit_deps_table : (Compilation_unit.t * Import_info.t list) list -> phrase
+
 (** Add references to the given symbols *)
 val reference_symbols : symbol list -> phrase
 

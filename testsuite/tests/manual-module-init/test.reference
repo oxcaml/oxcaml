@@ -1,0 +1,65 @@
+=== Manual Module Init Test ===
+Step 1: caml_startup (no modules should initialize)
+Step 1: done
+
+Step 2: Initialize Gc_compact_test module (should init all dependencies)
+Base: initializing
+Base: initialized with base_value=100
+Dep_b: initializing
+Dep_b: initialized with dep_b_value=5150 (sum 1..100=5050)
+Dep_a: initializing
+Dep_a: initialized with dep_a_value=110, random_seed=864
+Diamond: initializing
+Diamond: initialized with combined=5260, with_seed=906
+Gc_test: initializing
+Gc_test: allocated array of 1000 strings
+Gc_test: running Gc.minor() during init
+Gc_test: Gc.minor() completed
+Gc_test: sum of string lengths after minor = 2890
+Gc_test: running Gc.full_major() during init
+Gc_test: Gc.full_major() completed
+Gc_test: sum of string lengths after full_major = 2890
+Gc_test: running Gc.compact() during init
+Gc_test: Gc.compact() completed
+Gc_test: sum of string lengths after compact = 2890
+Gc_test: Diamond.combined after GC = 5260
+Gc_test: Dep_a.add_seed 100 after GC = 964
+Gc_test: final_value = 8150
+Closures: initializing
+Closures: even 10 = true, odd 10 = false
+Closures: adder 5 = 6
+Closures: after Gc.minor, adder 100 = 101
+Closures: closures_value = 51
+Gc_compact_test: initializing
+Step 2: done
+
+Step 3: Initialize Gc_compact_test again (should be no-op)
+Step 3: done
+
+Step 4: Initialize Base directly (should be no-op since already initialized)
+Step 4: done
+
+Step 5: Run GC test (outside of init callback)
+Gc_compact_test: before Gc.full_major()
+Gc_compact_test: Base.base_value = 100
+Gc_compact_test: Dep_a.dep_a_value = 110
+Gc_compact_test: Dep_b.dep_b_value = 5150
+Gc_compact_test: Diamond.combined = 5260
+Gc_compact_test: Gc_test.final_value = 8150
+Gc_compact_test: Closures.closures_value = 51
+Gc_compact_test: running Gc.full_major()
+Gc_compact_test: Gc.full_major() completed
+Gc_compact_test: running Gc.compact()
+Gc_compact_test: Gc.compact() completed
+Gc_compact_test: Base.base_value = 100
+Gc_compact_test: Dep_a.dep_a_value = 110
+Gc_compact_test: Dep_b.dep_b_value = 5150
+Gc_compact_test: Diamond.combined = 5260
+Gc_compact_test: Gc_test.final_value = 8150
+Gc_compact_test: Closures.closures_value = 51
+Gc_compact_test: persistent_data sum = 495000
+Gc_compact_test: Dep_a.add_seed 1000 = 1864
+Gc_compact_test: all checks passed
+Step 5: done
+
+=== All tests passed ===
