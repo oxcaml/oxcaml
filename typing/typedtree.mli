@@ -350,12 +350,9 @@ and exp_extra =
             during inference. Generally, elaborated to a type constraint.
 
             See specific [type_inspection] cases for details. *)
-  | Texp_borrowed of bool ref
-        (** This expression is wrapped in a borrow_ operator. The boolean
-            starts with [false] but are set to [true] by the borrowing
-            context. If it is still [false] at the end of type checking,
-            that means borrowing out of context and this will be picked up
-            by the uniqueness analysis. *)
+  | Texp_borrowed
+        (** This expression is wrapped in a borrow_ operator. Validation that it
+            matches a borrow region is performed by uniqueness analysis. *)
   | Texp_ghost_region
         (** This expression is wrapped inside a ghost region. *)
         (* NB. If an expression has both [Texp_borrowed] and

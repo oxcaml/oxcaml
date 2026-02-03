@@ -304,7 +304,7 @@ let extra sub = function
       sub.typ sub cty2
   | Texp_newtype _ -> ()
   | Texp_poly cto -> Option.iter (sub.typ sub) cto
-  | Texp_borrowed _ -> ()
+  | Texp_borrowed -> ()
   | Texp_ghost_region -> ()
   | Texp_stack -> ()
   | Texp_mode modes -> sub.modes sub modes

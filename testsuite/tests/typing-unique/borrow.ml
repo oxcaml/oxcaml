@@ -55,12 +55,15 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use y
                  ^
-Error: This value is used here as unique,
-       but it has already been borrowed at:
+Error: This value is used here, but:
 Line 3, characters 10-19:
 3 |   let x = borrow_ y in
               ^^^^^^^^^
-
+  The value is being borrowed
+Lines 3-4, characters 2-14:
+3 | ..let x = borrow_ y in
+4 |   unique_use y
+  during this borrow context
 |}]
 
 
@@ -134,12 +137,16 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique,
-       but it has already been borrowed at:
+Error: This value is used here, but:
 Line 3, characters 10-19:
 3 |   let y = borrow_ x in
               ^^^^^^^^^
-
+  The value is being borrowed
+Lines 3-5, characters 2-4:
+3 | ..let y = borrow_ x in
+4 |   unique_use x;
+5 |   ()
+  during this borrow context
 |}]
 
 (* borrowing is still counted even if you don't bind the borrowed value *)
@@ -152,12 +159,16 @@ let foo () =
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique,
-       but it has already been borrowed at:
+Error: This value is used here, but:
 Line 3, characters 10-19:
 3 |   let _ = borrow_ x in
               ^^^^^^^^^
-
+  The value is being borrowed
+Lines 3-5, characters 2-4:
+3 | ..let _ = borrow_ x in
+4 |   unique_use x;
+5 |   ()
+  during this borrow context
 |}]
 
 (* In the borrow region, you can use the original value as aliased *)
@@ -167,7 +178,19 @@ let foo () =
   global_aliased_use x;
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+Line 4, characters 21-22:
+4 |   global_aliased_use x;
+                         ^
+Error: This value is used here, but:
+Line 3, characters 11-20:
+3 |   let _y = borrow_ x in
+               ^^^^^^^^^
+  The value is being borrowed
+Lines 3-5, characters 2-4:
+3 | ..let _y = borrow_ x in
+4 |   global_aliased_use x;
+5 |   ()
+  during this borrow context
 |}]
 
 (* But that aliased usage ruins the borrowing, so you can't uniquely use the
@@ -179,14 +202,18 @@ let foo () =
   unique_use x;
   ()
 [%%expect{|
-Line 5, characters 13-14:
-5 |   unique_use x;
-                 ^
-Error: This value is used here as unique, but it has already been used at:
 Line 4, characters 21-22:
 4 |   global_aliased_use x);
                          ^
-
+Error: This value is used here, but:
+Line 3, characters 11-20:
+3 |   (let y = borrow_ x in
+               ^^^^^^^^^
+  The value is being borrowed
+Lines 3-4, characters 2-23:
+3 | ..(let y = borrow_ x in
+4 |   global_aliased_use x).
+  during this borrow context
 |}]
 
 (* Typical usage - borrowed followed by unique is ok. *)
@@ -238,12 +265,16 @@ let foo () =
 Line 5, characters 13-14:
 5 |   unique_use x
                  ^
-Error: This value is used here as unique,
-       but it has already been borrowed at:
+Error: This value is used here, but:
 Line 3, characters 10-19:
 3 |   let y = borrow_ x in
               ^^^^^^^^^
-
+  The value is being borrowed
+Lines 3-5, characters 2-14:
+3 | ..let y = borrow_ x in
+4 |   (let z = borrow_ x in ());
+5 |   unique_use x
+  during this borrow context
 |}]
 
 let foo () =
@@ -335,12 +366,15 @@ let foo () =
 Line 4, characters 29-30:
 4 |   | _y -> ignore (unique_use x)
                                  ^
-Error: This value is used here as unique,
-       but it has already been borrowed at:
+Error: This value is used here, but:
 Line 3, characters 8-17:
 3 |   match borrow_ x with
             ^^^^^^^^^
-
+  The value is being borrowed
+Lines 3-4, characters 2-31:
+3 | ..match borrow_ x with
+4 |   | _y -> ignore (unique_use x)
+  during this borrow context
 |}]
 
 
@@ -355,12 +389,15 @@ let foo () =
 Line 4, characters 28-29:
 4 |   | _ -> ignore (unique_use x)
                                 ^
-Error: This value is used here as unique,
-       but it has already been borrowed at:
+Error: This value is used here, but:
 Line 3, characters 8-17:
 3 |   match borrow_ x with
             ^^^^^^^^^
-
+  The value is being borrowed
+Lines 3-4, characters 2-30:
+3 | ..match borrow_ x with
+4 |   | _ -> ignore (unique_use x)
+  during this borrow context
 |}]
 
 (* but aliased use is fine *)
@@ -369,7 +406,18 @@ let foo () =
   match borrow_ x with
   | _ -> ignore (global_aliased_use x)
 [%%expect{|
-val foo : unit -> unit = <fun>
+Line 4, characters 36-37:
+4 |   | _ -> ignore (global_aliased_use x)
+                                        ^
+Error: This value is used here, but:
+Line 3, characters 8-17:
+3 |   match borrow_ x with
+            ^^^^^^^^^
+  The value is being borrowed
+Lines 3-4, characters 2-38:
+3 | ..match borrow_ x with
+4 |   | _ -> ignore (global_aliased_use x)
+  during this borrow context
 |}]
 
 (* Moreover, that aliased use will clash with later unique use *)
@@ -380,14 +428,19 @@ let foo () =
   );
   ignore (unique_use x)
 [%%expect{|
-Line 6, characters 21-22:
-6 |   ignore (unique_use x)
-                         ^
-Error: This value is used here as unique, but it has already been used at:
 Line 4, characters 28-29:
 4 |   | _ -> global_aliased_use x
                                 ^
-
+Error: This value is used here, but:
+Line 3, characters 9-18:
+3 |   (match borrow_ x with
+             ^^^^^^^^^
+  The value is being borrowed
+Lines 3-5, characters 2-3:
+3 | ..(match borrow_ x with
+4 |   | _ -> global_aliased_use x
+5 |   ).
+  during this borrow context
 |}]
 
 (* function application borrowing *)
@@ -454,14 +507,18 @@ let foo () =
   unique_use x;
   ()
 [%%expect{|
-Line 4, characters 13-14:
-4 |   unique_use x;
-                 ^
-Error: This value is used here as unique, but it has already been used at:
 Line 3, characters 34-35:
 3 |   aliased_aliased_use (borrow_ x) x;
                                       ^
-
+Error: This value is used here, but:
+Line 3, characters 22-33:
+3 |   aliased_aliased_use (borrow_ x) x;
+                          ^^^^^^^^^^^
+  The value is being borrowed
+Line 3, characters 2-35:
+3 |   aliased_aliased_use (borrow_ x) x;
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  during this borrow context
 |}]
 
 let foo () =
@@ -529,11 +586,15 @@ let foo () =
 Line 3, characters 33-34:
 3 |   aliased_unique_use (borrow_ x) x;
                                      ^
-Error: This value is used here as unique, but it is also being borrowed at:
+Error: This value is used here, but:
 Line 3, characters 21-32:
 3 |   aliased_unique_use (borrow_ x) x;
                          ^^^^^^^^^^^
-
+  The value is being borrowed
+Line 3, characters 2-34:
+3 |   aliased_unique_use (borrow_ x) x;
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  during this borrow context
 |}]
 
 (* Closing over borrowing *)

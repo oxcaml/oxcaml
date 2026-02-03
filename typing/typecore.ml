@@ -391,15 +391,6 @@ let is_borrow e =
   | Pexp_borrow _ -> true
   | _ -> false
 
-(* Mark all Texp_borrowed nodes in an expression as being in a valid
-   borrowing context *)
-let mark_borrowed_in_context exp =
-  List.iter (fun (extra, _, _) ->
-    match extra with
-    | Texp_borrowed r -> r := true
-    | _ -> ()
-  ) exp.exp_extra
-
 type position_in_function = FTail | FNontail
 
 
@@ -6281,12 +6272,6 @@ and type_expect_
             type_let existential_context env mutable_flag rec_flag
               spat_sexp_list allow_modules
           in
-          (* Mark borrowed expressions as being in a valid borrowing
-             context *)
-          if is_bor then
-            List.iter
-              (fun vb -> mark_borrowed_in_context vb.vb_expr)
-              pat_exp_list;
           let body =
             type_expect
               new_env expected_mode sbody ty_expected_explained
@@ -6401,7 +6386,7 @@ and type_expect_
     { exp with
       exp_loc = loc;
       exp_extra =
-        (Texp_borrowed (ref false), Location.none, []) :: exp.exp_extra;
+        (Texp_borrowed, Location.none, []) :: exp.exp_extra;
       exp_attributes = sexp.pexp_attributes @ exp.exp_attributes;
     }
   | Pexp_apply(sfunct, sargs) ->
@@ -6495,13 +6480,6 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
-      (* Mark borrowed expressions as being in a valid borrowing context *)
-      if is_bor then
-        List.iter (fun (_, arg, _) ->
-          match arg with
-          | Arg (exp, _) -> mark_borrowed_in_context exp
-          | Omitted _ -> ()
-        ) args;
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
@@ -6558,8 +6536,6 @@ and type_expect_
         end ~post:(fun (arg, _) ->
           may_lower_contravariant_then_generalize env arg)
       in
-      (* Mark borrowed expressions as being in a valid borrowing context *)
-      if is_bor then mark_borrowed_in_context arg;
       let cases, partial =
         type_cases Computation env arg_pat_mode expected_mode
           arg.exp_type sort ty_expected_explained

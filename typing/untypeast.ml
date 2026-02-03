@@ -433,7 +433,7 @@ let exp_extra sub (extra, loc, attrs) sexp =
         (* Type inspections are unnecessary in a Parsetree,
            as type inference reproduces them *)
         sexp.pexp_desc
-    | Texp_borrowed _ -> Pexp_borrow sexp
+    | Texp_borrowed -> Pexp_borrow sexp
     | Texp_ghost_region ->sexp.pexp_desc
   in
   Exp.mk ~loc ~attrs desc
@@ -556,7 +556,7 @@ let expression sub exp =
                         [], modes
                       | Texp_poly _ | Texp_newtype _ | Texp_stack
                       | Texp_inspected_type _ -> [], []
-                      | Texp_ghost_region | Texp_borrowed _ -> [], []
+                      | Texp_ghost_region | Texp_borrowed -> [], []
                     in
                     new_type_constraints @ ret_type_constraints,
                     new_mode_annotations @ ret_mode_annotations)
