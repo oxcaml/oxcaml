@@ -172,10 +172,10 @@ Line 3, characters 28-31:
 Error: This expression is not an allocation site.
 |}]
 
-type r = {x : float; y : float}
+type r = {x : float; y : float} [@@flatten_floats]
 let f (r : r) = ref (stack_ r.x)
 [%%expect{|
-type r = { x : float; y : float; }
+type r = { x : float; y : float; } [@@flatten_floats]
 Line 2, characters 20-32:
 2 | let f (r : r) = ref (stack_ r.x)
                         ^^^^^^^^^^^^

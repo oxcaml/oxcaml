@@ -62,7 +62,7 @@ let () =
   Printf.printf "%f\n" r.f;
   print_newline ()
 
-type float_record = { f' : float; mutable f : float }
+type float_record = { f' : float; mutable f : float } [@@flatten_floats]
 
 let () =
   print_endline "Float record";
@@ -106,7 +106,7 @@ let () =
   Printf.printf "%f\n" r.r.#f;
   print_newline ()
 
-type mixed_float_record = { mutable f : float; mutable u : float# }
+type mixed_float_record = { mutable f : float; mutable u : float# } [@@flatten_floats]
 
 let () =
   print_endline "Mixed float record (float field)";

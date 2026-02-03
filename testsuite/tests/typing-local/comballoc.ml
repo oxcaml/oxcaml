@@ -9,7 +9,7 @@ let[@inline never] f g n =
   g a c;
   ()
 
-type junk = { a : float; b : float; c : float; d : float; e : float; f : float }
+type junk = { a : float; b : float; c : float; d : float; e : float; f : float } [@@flatten_floats]
 let[@inline never] clear g n =
   let junk = local_ {a=n;b=n;c=n;d=n;e=n;f=n} in
   g junk;

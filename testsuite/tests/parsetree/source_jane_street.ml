@@ -1652,6 +1652,19 @@ type ('a, _[@foo] : any)  t
 type ('a, _ : any) t
 |}]
 
+(**********************************************)
+(* [@@unboxed] and [@@flatten_floats] records *)
+
+type t = { i : int } [@@unboxed]
+[%%expect{|
+type t = { i : int; } [@@unboxed]
+|}]
+
+type t = { f : float } [@@flatten_floats]
+[%%expect{|
+type t = { f : float; } [@@flatten_floats]
+|}]
+
 (*********************)
 (* quotations syntax *)
 

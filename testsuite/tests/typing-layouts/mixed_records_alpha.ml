@@ -29,10 +29,11 @@ type t_void_at_border_of_prefix_and_suffix = {
 |}]
 
 type t_void_in_all_float_mixed_record = { x : t_void; y : float#; z : float }
+[@@flatten_floats]
 [%%expect {|
 type t_void_in_all_float_mixed_record = {
   x : t_void;
   y : float#;
   z : float;
-}
+} [@@flatten_floats]
 |}]

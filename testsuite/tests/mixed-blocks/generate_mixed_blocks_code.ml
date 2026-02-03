@@ -376,11 +376,24 @@ module Mixed_record = struct
              name
              (type_to_string type_)))
 
+  (* Returns true if the record needs [@@flatten_floats] attribute.
+     This is needed when:
+     - All fields are floats (boxed or unboxed) AND at least one is boxed (Float)
+     - i.e., Record_float or Record_mixed with Float_boxed *)
+  let needs_flatten_floats t =
+    is_all_floats t &&
+    List.exists t.fields ~f:(fun field ->
+      match field.type_ with
+      | Float -> true
+      | _ -> false)
+
   let type_decl t =
+    let attr = if needs_flatten_floats t then " [@@flatten_floats]" else "" in
     sprintf
-      "type %s = { %s }"
+      "type %s = { %s }%s"
       (type_ t)
       (fields_to_type_decl t.fields)
+      attr
   ;;
 
   let record_value_of_fields fields =

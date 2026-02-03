@@ -20,7 +20,7 @@ open! Stdlib
 
 (* Complex numbers *)
 
-type t = { re: float; im: float }
+type t = { re: float; im: float } [@@flatten_floats]
 
 let zero = { re = 0.0; im = 0.0 }
 let one = { re = 1.0; im = 0.0 }

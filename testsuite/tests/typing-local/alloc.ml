@@ -159,7 +159,7 @@ let dupbig r =
   ignore_local v;
   ()
 
-type floatrecord = { x: float; y: float; z: float }
+type floatrecord = { x: float; y: float; z: float } [@@flatten_floats]
 let makefloat n =
   ignore_local { x=n; y=n; z=n };
   ()

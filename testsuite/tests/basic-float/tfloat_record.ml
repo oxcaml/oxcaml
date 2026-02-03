@@ -6,7 +6,7 @@ module Float_record : sig
   val make : float -> t;;
   val from : t -> float;;
 
-  type s = {f : t};;
+  type s = {f : t} [@@flatten_floats];;
 end = struct
   type t = float;;
 
@@ -14,7 +14,7 @@ end = struct
 
   let from t = t;;
 
-  type s = {f : t};;
+  type s = {f : t} [@@flatten_floats];;
 end
 
 module Float_array = struct

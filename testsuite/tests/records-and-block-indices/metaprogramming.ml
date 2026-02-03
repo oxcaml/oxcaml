@@ -291,6 +291,13 @@ module Type_structure = struct
       List.for_all ts ~f:(fun t -> layout t = Float64 || scrape t = Float)
     | _ -> false
 
+  let needs_flatten_floats_attribute t =
+    is_flat_float_record t
+    &&
+    match t with
+    | Record (ts, Boxed) -> List.exists ts ~f:(fun t -> scrape t = Float)
+    | _ -> false
+
   let rec contains_vec128 t =
     match t with
     | Record (ts, _) | Tuple (ts, _) -> List.exists ts ~f:contains_vec128
@@ -934,8 +941,13 @@ module Type_naming = struct
             | _ -> assert false
           in
           let type_name = Type.code ty in
+          let attr =
+            if Type_structure.needs_flatten_floats_attribute ty_structure
+            then " [@@flatten_floats]"
+            else ""
+          in
           ( id,
-            sprintf "type %s = %s (* %s *)" type_name type_definition
+            sprintf "type %s = %s%s (* %s *)" type_name type_definition attr
               (Type_structure.to_string (Type.structure ty))
           )
           :: acc

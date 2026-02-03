@@ -6,7 +6,7 @@ open Printf
    constants and force the FP values to be loaded in an FP register,
    then stored in memory and passed to the "test" function. *)
 
-type t = { mutable f : float }
+type t = { mutable f : float } [@@flatten_floats]
 
 let test x y =
   if Int64.bits_of_float x.f <> y then
