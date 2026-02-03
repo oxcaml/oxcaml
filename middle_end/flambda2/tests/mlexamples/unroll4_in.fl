@@ -1,65 +1,79 @@
-let $camlUnroll4__first_const54 = Block 0 () in
-let code rec size(29)
-      even_1 (n : imm tagged)
-        my_closure my_region my_ghost_region my_depth
-        -> k * k1 =
-  let next_depth = rec_info (succ my_depth) in
-  let k = %project_value_slot.[`even`].[`k`] (my_closure) in
-  let odd = %project_function_slot.[`even`].[`odd`] (my_closure) in
-  let prim = %phys_eq (n, 0) in
-  let Pintcomp = %tag_imm (prim) in
-  (let untagged = %untag_imm (Pintcomp) in
-   switch untagged
-     | 0 -> k2
-     | 1 -> k3)
-    where k3 =
-      apply inlined(hint) k (1) -> k * k1
-    where k2 =
-      let Psubint = %int_barith.`sub` (n, 1) in
-      apply direct(odd_2)
-        odd ~ depth my_depth -> next_depth (Psubint) -> k * k1
-and code rec size(29)
-      odd_2 (n : imm tagged)
-        my_closure my_region my_ghost_region my_depth
-        -> k * k1 =
-  let next_depth = rec_info (succ my_depth) in
-  let k = %project_value_slot.[`odd`].[`k`] (my_closure) in
-  let even = %project_function_slot.[`odd`].[`even`] (my_closure) in
-  let prim = %phys_eq (n, 0) in
-  let Pintcomp = %tag_imm (prim) in
-  (let untagged = %untag_imm (Pintcomp) in
-   switch untagged
-     | 0 -> k2
-     | 1 -> k3)
-    where k3 =
-      apply inlined(hint) k (0) -> k * k1
-    where k2 =
-      let Psubint = %int_barith.`sub` (n, 1) in
-      apply direct(even_1)
-        even ~ depth my_depth -> next_depth (Psubint) -> k * k1
-in
-let code inline(always) size(87)
-      parity_is_0 (p : imm tagged, n : imm tagged, k)
-        my_closure my_region my_ghost_region my_depth
-        -> k * k1 =
-  let even = closure even_1 @even
-  and odd = closure odd_2 @odd
-  with { k = k }
-  in
-  (let untagged = %untag_imm (p) in
-   switch untagged
-     | 0 -> k2
-     | 1 -> k3)
-    where k3 =
-      apply direct(odd_2) unroll(4) odd (n) -> k * k1
-    where k2 =
-      apply direct(even_1) unroll(3) even (n) -> k * k1
-in
-let code inline(always) size(1)
-      k_3 (b) my_closure my_region my_ghost_region my_depth -> k * k1 =
-  cont k (b)
-in
-(let parity_is = closure parity_is_0 @parity_is in
+let $camlUnroll4__first_const = Block 0 () in
+(let code rec size(31)
+       even_1 (n : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let k = %project_value_slot.[`even`].[`k`] (my_closure) in
+   let odd = %project_function_slot.[`even`].[`odd`] (my_closure) in
+   (let prim = %phys_eq (n, 0) in
+    let eq = %tag_imm (prim) in
+    (let untagged = %untag_imm (eq) in
+     switch untagged
+       | 0 -> k5
+       | 1 -> k6)
+      where k6 =
+        cont k3
+      where k5 =
+        cont k4)
+     where k4 =
+       let int_sub = %int_barith.sub (n, 1) in
+       apply direct(odd_2)
+         odd ~ depth my_depth -> next_depth (int_sub) -> k1 * k2
+     where k3 =
+       apply inlined(hint) k (1) -> k1 * k2
+ and code rec size(31)
+       odd_2 (n : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let k = %project_value_slot.[`odd`].[`k`] (my_closure) in
+   let even = %project_function_slot.[`odd`].[`even`] (my_closure) in
+   (let prim = %phys_eq (n, 0) in
+    let eq = %tag_imm (prim) in
+    (let untagged = %untag_imm (eq) in
+     switch untagged
+       | 0 -> k5
+       | 1 -> k6)
+      where k6 =
+        cont k3
+      where k5 =
+        cont k4)
+     where k4 =
+       let int_sub = %int_barith.sub (n, 1) in
+       apply direct(even_1)
+         even ~ depth my_depth -> next_depth (int_sub) -> k1 * k2
+     where k3 =
+       apply inlined(hint) k (0) -> k1 * k2
+ in
+ let code inline(always) size(93)
+       parity_is_0 (p : imm tagged, n : imm tagged, k : val)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let even = closure even_1 @even
+   and odd = closure odd_2 @odd
+   with { k = k }
+   in
+   (let untagged = %untag_imm (p) in
+    switch untagged
+      | 0 -> k5
+      | 1 -> k6)
+     where k6 =
+       cont k3
+     where k5 =
+       cont k4
+     where k4 =
+       apply direct(even_1) unroll(3) even (n) -> k1 * k2
+     where k3 =
+       apply direct(odd_2) unroll(4) odd (n) -> k1 * k2
+ in
+ let code inline(always) size(1)
+       k_3 (b) my_closure _region _ghost_region my_depth -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   cont k1 (b)
+ in
+ let parity_is = closure parity_is_0 @parity_is in
  let k = closure k_3 @k in
  apply direct(parity_is_0)
    (parity_is : _ -> imm tagged) (0, 1, k) -> k1 * error
@@ -72,9 +86,9 @@ in
           in
           cont k (Pmakeblock)))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.`tag`[`0`].`size`[`4`].[`0`] (module_block) in
-    let field_1 = %block_load.`tag`[`0`].`size`[`4`].[`1`] (module_block) in
-    let field_2 = %block_load.`tag`[`0`].`size`[`4`].[`2`] (module_block) in
-    let field_3 = %block_load.`tag`[`0`].`size`[`4`].[`3`] (module_block) in
+    let field_0 = %block_load.tag[`0`].`size`[`4`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`4`].[`1`] (module_block) in
+    let field_2 = %block_load.tag[`0`].`size`[`4`].[`2`] (module_block) in
+    let field_3 = %block_load.tag[`0`].`size`[`4`].[`3`] (module_block) in
     let $camlUnroll4 = Block 0 (field_0, field_1, field_2, field_3) in
     cont done ($camlUnroll4)

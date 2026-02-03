@@ -174,7 +174,9 @@ let string_accessor_width =
         let s =
           match (saw : P.string_accessor_width) with
           | Eight -> "8"
+          | Eight_signed -> "i8"
           | Sixteen -> "16"
+          | Sixteen_signed -> "i16"
           | Thirty_two -> "32"
           | Single -> "f32"
           | Sixty_four -> "64"

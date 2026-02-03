@@ -1083,6 +1083,22 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       ~load:(fun _ ->
         L.Punboxed_float32_array_load_vec
           { desc with size = Boxed_vec128; boxed = false })
+  | ( Puntagged_int8_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:1
+      ~load:(fun _ ->
+        L.Puntagged_int8_array_load_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Puntagged_int16_array_load_vec
+        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
+      [arr; idx] )
+    when L.split_vectors ->
+    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:2
+      ~load:(fun _ ->
+        L.Puntagged_int16_array_load_vec
+          { desc with size = Boxed_vec128; boxed = false })
   | ( Punboxed_int32_array_load_vec
         ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
@@ -1161,6 +1177,22 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:4
       ~store:(fun _ ->
         L.Punboxed_float32_array_set_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Puntagged_int8_array_set_vec
+        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:1
+      ~store:(fun _ ->
+        L.Puntagged_int8_array_set_vec
+          { desc with size = Boxed_vec128; boxed = false })
+  | ( Puntagged_int16_array_set_vec
+        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
+      [arr; idx; value] )
+    when L.split_vectors ->
+    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:2
+      ~store:(fun _ ->
+        L.Puntagged_int16_array_set_vec
           { desc with size = Boxed_vec128; boxed = false })
   | ( Punboxed_int32_array_set_vec
         ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
