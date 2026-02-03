@@ -69,14 +69,16 @@ let match_expect_extension (ext : Parsetree.extension) =
     match match_ext_name txt with
     | None -> None
     | Some kind ->
-    let invalid_payload ?(msg = "invalid [%%expect payload]") () =
-      Location.raise_errorf ~loc:extid_loc "%s" msg
+    let invalid_payload ?(loc=extid_loc) ?(msg = "invalid [%%expect payload]") () =
+      Location.raise_errorf ~loc "%s" msg
     in
+    if Option.is_none !register_assembly_callback && kind = Expect_asm
+    then invalid_payload ~msg:"expect_asm is only supported by expect.opt" ();
     let string_constant (e : Parsetree.expression) =
       match e.pexp_desc with
       | Pexp_constant (Pconst_string (str, _, Some tag)) ->
         { str; tag }
-      | _ -> invalid_payload ()
+      | _ -> invalid_payload ~loc:e.pexp_loc ()
     in
     (* Parse a single element: either {|...|} or Filter{|...|} *)
     let parse_element (e : Parsetree.expression) =
@@ -84,12 +86,12 @@ let match_expect_extension (ext : Parsetree.extension) =
       | Pexp_constant (Pconst_string _) ->
         (* Bare string constant - no filter *)
         (None, string_constant e)
-      | Pexp_construct ({ txt = Lident name; _ }, Some arg) -> (
+      | Pexp_construct ({ txt = Lident name; }, Some arg) -> (
         (* Filter{|content|} - filter with string content *)
         match filter_of_string name with
         | Some filter -> (Some filter, string_constant arg)
-        | None -> invalid_payload ())
-      | _ -> invalid_payload ()
+        | None -> invalid_payload ~msg:("unexpected filter \""^name^"\"") ~loc:e.pexp_loc ())
+      | _ -> invalid_payload ~loc:e.pexp_loc ~msg:("expected {|...|} or Filter{|...|}") ()
     in
     let is_arch_filter = function
       | X86_64 | AArch64 -> true

@@ -82,9 +82,7 @@ val output_from : output_pos -> asm_line list
 (** Post-process the stream of instructions. Dump it (using the provided syntax
     emitter) in a file (if provided) and compile it with an internal assembler
     (if registered through [register_internal_assembler]). *)
-val generate_code :
-  (X86_ast.asm_program -> unit) option ->
-  unit
+val generate_code : (X86_ast.asm_program -> unit) option -> unit
 
 (** Generate an object file corresponding to the last call to [generate_code].
     An internal assembler is used if available (and the input file is ignored).
