@@ -31,20 +31,12 @@
 
     This module generates a linker script that places partition sections in the
     correct output sections. It optionally incorporates an existing linker
-    script provided via --script= on the linker command line. *)
+    script provided via --script= on the linker command line.
 
-(** [generate ~existing_script ~partitions] generates a linker script string.
-
-    @param existing_script
-      Optional path to an existing linker script to include. This is extracted
-      from -Wl,-T,<path> or -Wl,--script=<path> in Clflags.all_ccopts by the
-      dissector.
-
-    @param partitions
-      List of linked partitions. The first partition (Main) is skipped.
-      Subsequent partitions get sections named .caml.p1.*, .caml.p2.*, etc. *)
-val generate :
-  existing_script:string option -> partitions:Partition.Linked.t list -> string
+    In addition, if -assume-lld-without-64-bit-eh-frames was passed to ocamlopt,
+    this generates a custom .eh_frame section with __EH_FRAME_BEGIN__ symbol and
+    an empty .eh_frame_hdr section to work around LLD's inability to generate
+    64-bit .eh_frame_hdr tables. *)
 
 (** [write ~output_file ~existing_script ~partitions] generates a linker script
     and writes it to the specified file. *)

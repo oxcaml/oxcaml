@@ -442,13 +442,13 @@ let match_guard_unique (unique_ r) =
   | { y } when String.equal ((unique_use r).x) "" -> y
   | _ -> ""
 [%%expect{|
-Line 3, characters 4-9:
-3 |   | { y } when String.equal ((unique_use r).x) "" -> y
-        ^^^^^
-Error: This value is read from here, but it is already being used as unique:
 Line 3, characters 41-42:
 3 |   | { y } when String.equal ((unique_use r).x) "" -> y
                                              ^
+Error: This value is used here as unique, but it is also being read from at:
+Line 3, characters 4-9:
+3 |   | { y } when String.equal ((unique_use r).x) "" -> y
+        ^^^^^
 
 |}]
 

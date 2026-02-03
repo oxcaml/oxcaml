@@ -82,7 +82,8 @@ module Result = struct
   type t =
     { linked_partitions : Partition.Linked.t list;
       passthrough_files : string list;
-      linker_script : string
+      linker_script : string;
+      eh_frame_registration_obj : string option
     }
 
   let linked_partitions r = r.linked_partitions
@@ -90,6 +91,8 @@ module Result = struct
   let passthrough_files r = r.passthrough_files
 
   let linker_script r = r.linker_script
+
+  let eh_frame_registration_obj r = r.eh_frame_registration_obj
 end
 
 let dump_sizes file_sizes =
@@ -186,7 +189,23 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   | Some path -> log "found existing linker script: %s" path
   | None -> ());
   let linker_script = Filename.concat temp_dir "linker.script" in
+  let assume_lld_without_64_bit_eh_frames =
+    !Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
+  in
   Linker_script.write ~output_file:linker_script ~existing_script
     ~partitions:linked_partitions;
   log "generated linker script: %s" linker_script;
-  { Result.linked_partitions; passthrough_files; linker_script }
+  let eh_frame_registration_obj =
+    if assume_lld_without_64_bit_eh_frames
+    then begin
+      let obj = Eh_frame_registration.generate ~temp_dir in
+      log "generated EH frame registration object: %s" obj;
+      Some obj
+    end
+    else None
+  in
+  { Result.linked_partitions;
+    passthrough_files;
+    linker_script;
+    eh_frame_registration_obj
+  }

@@ -47,7 +47,7 @@ let () =
 Line 4, characters 13-17:
 4 |   unique_use t.#x
                  ^^^^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 13-17:
 3 |   unique_use t.#x;
                  ^^^^
@@ -62,7 +62,7 @@ let () =
 Line 4, characters 13-14:
 4 |   unique_use x
                  ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 13-14:
 3 |   unique_use x;
                  ^
@@ -88,7 +88,7 @@ let () =
 Line 4, characters 13-14:
 4 |   let t = #{ t with y = "fresh" } in
                  ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 13-17:
 3 |   unique_use t.#x;
                  ^^^^
@@ -105,7 +105,7 @@ Line 4, characters 13-14:
 4 |   let _ = #{ t with y = "fresh" } in
                  ^
 Error: This value is used here,
-       but it is part of a value that has already been used as unique:
+       but it is part of a value that has already been used as unique at:
 Line 3, characters 14-15:
 3 |   unique_use2 t;
                   ^
@@ -151,7 +151,7 @@ Line 4, characters 13-14:
 4 |   let t = #{ t with y = "fresh" } in
                  ^
 Error: This value is used here,
-       but it is part of a value that has already been used as unique:
+       but it is part of a value that has already been used as unique at:
 Line 3, characters 14-15:
 3 |   unique_use2 t;
                   ^

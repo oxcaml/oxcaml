@@ -1656,3 +1656,21 @@ type ('a, _ : any) t
 (* quotations syntax *)
 
 (* Test will only be added once quotations work end-to-end. *)
+
+(*************************)
+(* unboxed unit literals *)
+
+let f #() = #()
+
+[%%expect{|
+val f : unit# -> unit# = <fun>
+|}]
+
+(*************************)
+(* unboxed bool literals *)
+
+let f = function #false -> #true | #true -> #false
+
+[%%expect{|
+val f : bool# -> bool# = <fun>
+|}]

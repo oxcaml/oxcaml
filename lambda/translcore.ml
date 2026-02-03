@@ -489,6 +489,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes sort pat_expr_list),
                return_layout)
+  | Texp_unboxed_unit ->
+      Lprim(Punbox_unit, [lambda_unit], of_location ~scopes e.exp_loc)
+  | Texp_unboxed_bool b ->
+      Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
   | Texp_tuple (el, alloc_mode) ->
       let ll, shape =
         transl_value_list_with_shape ~scopes
@@ -2757,8 +2761,9 @@ let report_error ppf = function
          enforce, see [Lambda.Mixed_product_bytes_wrt_path] *)
       fprintf ppf
         "This block index cannot be created because it refers to values@ \
-         and non-values that are separated by 2^16 or more bytes in their@ \
+         and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
+        (64 - Mixed_product_bytes.block_index_offset_bits)
   | Element_would_be_reordered_in_record ->
       fprintf ppf
         "Block indices into arrays whose element layout contains a@ \

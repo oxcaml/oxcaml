@@ -197,6 +197,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_atomic_loc _
     | Texp_extension_constructor _
     | Texp_constant _
+    | Texp_unboxed_unit
+    | Texp_unboxed_bool _
     | Texp_src_pos ->
         Static
 
@@ -689,6 +691,10 @@ let rec expression : Typedtree.expression -> term_judg =
         expression tf.for_body << Guard;
       ]
     | Texp_constant _ ->
+      empty
+    | Texp_unboxed_unit ->
+      empty
+    | Texp_unboxed_bool _ ->
       empty
     | Texp_new (pth, _, _, _) ->
       (*
@@ -1526,6 +1532,8 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_var (_, _, _, _, _) -> false
     | Tpat_alias (pat, _, _, _, _, _, _) -> is_destructuring_pattern pat
     | Tpat_constant _ -> true
+    | Tpat_unboxed_unit -> true
+    | Tpat_unboxed_bool _ -> true
     | Tpat_tuple _ -> true
     | Tpat_unboxed_tuple _ -> true
     | Tpat_construct _ -> true

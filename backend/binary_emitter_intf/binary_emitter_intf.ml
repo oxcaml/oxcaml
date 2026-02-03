@@ -52,13 +52,13 @@ module type Relocation = sig
   val target_symbol : t -> target
 
   (** For paired relocations (e.g., SUBTRACTOR + UNSIGNED), returns all symbols.
-      For single relocations, returns a singleton list.
-      Used for saving relocations to files for verification. *)
+      For single relocations, returns a singleton list. Used for saving
+      relocations to files for verification. *)
   val target_symbols : t -> target list
 
-  (** For paired relocations, returns all symbols with their addends.
-      On RELA platforms (Linux ELF), addends are stored in relocations.
-      On REL platforms (macOS), addends are encoded in instructions. *)
+  (** For paired relocations, returns all symbols with their addends. On RELA
+      platforms (Linux ELF), addends are stored in relocations. On REL platforms
+      (macOS), addends are encoded in instructions. *)
   val target_symbols_with_addends : t -> (target * int) list
 
   (** Is this a GOT relocation? (JIT needs to know for GOT table building) *)
@@ -71,8 +71,8 @@ module type Relocation = sig
       - [place_address]: where the relocation site is in memory
       - [lookup_target]: resolve symbol/label -> address
       - [read_instruction]: read the 32-bit instruction at the relocation site
-        (used by ARM64 to read-modify-write instruction bit fields)
-      Returns the value to write at the relocation site, or an error. *)
+        (used by ARM64 to read-modify-write instruction bit fields) Returns the
+        value to write at the relocation site, or an error. *)
   val compute_value :
     t ->
     place_address:int64 ->
@@ -108,9 +108,9 @@ module type Assembled_section = sig
   val add_patch : t -> offset:int -> size:data_size -> data:int64 -> unit
 end
 
-(** Internal assembler hook for JIT support.
-    When set, the binary emitter will call this function with assembled sections
-    instead of (or in addition to) writing to a file. *)
+(** Internal assembler hook for JIT support. When set, the binary emitter will
+    call this function with assembled sections instead of (or in addition to)
+    writing to a file. *)
 module type Internal_assembler_hook = sig
   type assembled_section
 
@@ -135,14 +135,14 @@ module type S = sig
   module Assembled_section :
     Assembled_section with type relocation = Relocation.t
 
-  (** PLT (Procedure Linkage Table) stub generation for JIT. Each PLT entry is
-      a small piece of machine code that jumps to an address. *)
+  (** PLT (Procedure Linkage Table) stub generation for JIT. Each PLT entry is a
+      small piece of machine code that jumps to an address. *)
   module Plt : sig
     (** Size in bytes of each PLT entry *)
     val entry_size : int
 
-    (** Write a PLT entry to the buffer that will jump to the given address.
-        The address is the absolute target address to jump to. *)
+    (** Write a PLT entry to the buffer that will jump to the given address. The
+        address is the absolute target address to jump to. *)
     val write_entry : Buffer.t -> int64 -> unit
   end
 

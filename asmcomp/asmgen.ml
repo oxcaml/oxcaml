@@ -559,6 +559,7 @@ let compile_genfuns ~ppf_dump f =
 let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     ~may_reduce_heap ~ppf_dump gen =
   reset ();
+  Emitaux.output_prefix := output_prefix;
   let create_asm =
     should_emit () && (keep_asm || not !Emitaux.binary_backend_available)
   in
@@ -641,6 +642,7 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
           "Binary emitter verification skipped (no binary sections)@."
     | (Mismatch _ | Object_file_error _) as result ->
       Binary_emitter_verify.print_result Format.err_formatter result;
+      Format.eprintf "Binary sections saved to: %s@." binary_sections_dir;
       raise (Error (Binary_emitter_mismatch obj_filename))
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =

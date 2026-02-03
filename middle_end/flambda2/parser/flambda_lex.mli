@@ -5,7 +5,6 @@ type location = Lexing.position * Lexing.position
 type error =
   | Illegal_character of char
   | Invalid_literal of string
-  | No_such_primitive of string
 
 exception Error of error * location
 

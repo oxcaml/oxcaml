@@ -4,18 +4,18 @@ let code rec size(29)
         my_closure my_region my_ghost_region my_depth
         -> k * k1 =
   let next_depth = rec_info (succ my_depth) in
-  let k = %project_value_slot even.k my_closure in
-  let odd = %project_function_slot (even -> odd) my_closure in
+  let k = %project_value_slot.[`even`].[`k`] (my_closure) in
+  let odd = %project_function_slot.[`even`].[`odd`] (my_closure) in
   let prim = %phys_eq (n, 0) in
-  let Pintcomp = %Tag_imm prim in
-  (let untagged = %untag_imm Pintcomp in
+  let Pintcomp = %tag_imm (prim) in
+  (let untagged = %untag_imm (Pintcomp) in
    switch untagged
      | 0 -> k2
      | 1 -> k3)
     where k3 =
       apply inlined(hint) k (1) -> k * k1
     where k2 =
-      let Psubint = n - 1 in
+      let Psubint = %int_barith.`sub` (n, 1) in
       apply direct(odd_2)
         odd ~ depth my_depth -> next_depth (Psubint) -> k * k1
 and code rec size(29)
@@ -23,18 +23,18 @@ and code rec size(29)
         my_closure my_region my_ghost_region my_depth
         -> k * k1 =
   let next_depth = rec_info (succ my_depth) in
-  let k = %project_value_slot odd.k my_closure in
-  let even = %project_function_slot (odd -> even) my_closure in
+  let k = %project_value_slot.[`odd`].[`k`] (my_closure) in
+  let even = %project_function_slot.[`odd`].[`even`] (my_closure) in
   let prim = %phys_eq (n, 0) in
-  let Pintcomp = %Tag_imm prim in
-  (let untagged = %untag_imm Pintcomp in
+  let Pintcomp = %tag_imm (prim) in
+  (let untagged = %untag_imm (Pintcomp) in
    switch untagged
      | 0 -> k2
      | 1 -> k3)
     where k3 =
       apply inlined(hint) k (0) -> k * k1
     where k2 =
-      let Psubint = n - 1 in
+      let Psubint = %int_barith.`sub` (n, 1) in
       apply direct(even_1)
         even ~ depth my_depth -> next_depth (Psubint) -> k * k1
 in
@@ -46,7 +46,7 @@ let code inline(always) size(87)
   and odd = closure odd_2 @odd
   with { k = k }
   in
-  (let untagged = %untag_imm p in
+  (let untagged = %untag_imm (p) in
    switch untagged
      | 0 -> k2
      | 1 -> k3)
@@ -67,13 +67,14 @@ in
      (apply direct(parity_is_0)
         (parity_is : _ -> imm tagged) (1, 4, k) -> k1 * error
         where k1 (four_is_odd : imm tagged) =
-          let Pmakeblock = %Block 0 (parity_is, k, one_is_even, four_is_odd)
+          let Pmakeblock =
+            %block.[`0`] (parity_is, k, one_is_even, four_is_odd)
           in
           cont k (Pmakeblock)))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load tag(0) size(4) (0) module_block in
-    let field_1 = %block_load tag(0) size(4) (1) module_block in
-    let field_2 = %block_load tag(0) size(4) (2) module_block in
-    let field_3 = %block_load tag(0) size(4) (3) module_block in
+    let field_0 = %block_load.`tag`[`0`].`size`[`4`].[`0`] (module_block) in
+    let field_1 = %block_load.`tag`[`0`].`size`[`4`].[`1`] (module_block) in
+    let field_2 = %block_load.`tag`[`0`].`size`[`4`].[`2`] (module_block) in
+    let field_3 = %block_load.`tag`[`0`].`size`[`4`].[`3`] (module_block) in
     let $camlUnroll4 = Block 0 (field_0, field_1, field_2, field_3) in
     cont done ($camlUnroll4)

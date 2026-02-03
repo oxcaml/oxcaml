@@ -90,6 +90,11 @@ let fmt_constant f x =
   | Const_unboxed_int64 (i) -> fprintf f "Const_unboxed_int64 %Ld" i
   | Const_unboxed_nativeint (i) -> fprintf f "Const_unboxed_nativeint %nd" i
 
+let fmt_bool f x =
+  match x with
+  | false -> fprintf f "false"
+  | true -> fprintf f "true"
+
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -453,6 +458,8 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       value_mode i ppf m;
       pattern i ppf p;
   | Tpat_constant (c) -> line i ppf "Tpat_constant %a\n" fmt_constant c;
+  | Tpat_unboxed_unit -> line i ppf "Tpat_unboxed_unit\n";
+  | Tpat_unboxed_bool b -> line i ppf "Tpat_unboxed_bool %a\n" fmt_bool b;
   | Tpat_tuple (l) ->
       line i ppf "Tpat_tuple\n";
       list i labeled_pattern ppf l;
@@ -652,6 +659,8 @@ and expression i ppf x =
       line i ppf "Texp_try\n";
       expression i ppf e;
       list i case ppf l;
+  | Texp_unboxed_unit -> line i ppf "Texp_unboxed_unit\n";
+  | Texp_unboxed_bool b -> line i ppf "Texp_unboxed_bool %a\n" fmt_bool b;
   | Texp_tuple (l, am) ->
       line i ppf "Texp_tuple\n";
       alloc_mode i ppf am;

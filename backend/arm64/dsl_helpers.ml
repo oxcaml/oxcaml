@@ -182,13 +182,12 @@ let gp_reg_of_reg r : [`GP of [`X]] Ast.Reg.t =
     Misc.fatal_errorf "gp_reg_of_reg: expected integer register, got %a"
       Printreg.reg r
 
-let mem_offset_reg r offset =
-  let base = gp_reg_of_reg r in
-  Ast.DSL.mem_offset ~base ~offset
-
 let addressing addr r =
   match addr with
-  | Iindexed ofs -> mem_offset_reg r ofs
+  | Iindexed validated ->
+    (* The offset is already validated; just convert to operand *)
+    let base = gp_reg_of_reg r in
+    Ast.DSL.Validated_mem_offset.to_operand ~base validated
   | Ibased (s, ofs) ->
     assert (not !Clflags.dlcode);
     (* see cfg_selection.ml *)
@@ -203,6 +202,21 @@ let addressing addr r =
       mem_label base ~reloc:(Needs_reloc LOWER_TWELVE) ~offset:ofs lbl
     else mem_symbol_reg base ~reloc:(Needs_reloc LOWER_TWELVE) ~offset:ofs s
 
+(* x28 is the domain state pointer *)
+let domainstate_base = Ast.Reg.reg_x 28
+
+let domainstate_field field =
+  let offset = Domainstate.idx_of_field field * 8 in
+  match Ast.DSL.Validated_mem_offset.create ~scale:8 ~offset with
+  | Some validated ->
+    Ast.DSL.Validated_mem_offset.to_operand ~base:domainstate_base validated
+  | None -> Misc.fatal_errorf "domainstate_field: offset %d out of range" offset
+
+type 'a stack_result =
+  | Stack_operand of 'a
+  | Stack_large_offset_sp of { bytes : int }
+  | Stack_large_offset_domainstate of { bytes : int }
+
 let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
   let slot_offset loc stack_class =
     let offset =
@@ -214,17 +228,32 @@ let stack ~stack_offset ~contains_calls ~num_stack_slots (r : Reg.t) =
     | Bytes_relative_to_domainstate_pointer _ ->
       Misc.fatal_errorf "Not a stack slot"
   in
-  let reg_domain_state_ptr =
-    Proc.phys_reg Int 25
-    (* x28 *)
+  (* Scale is the access size in bytes, determined by the register type *)
+  let scale =
+    match r.typ with
+    | Val | Int | Addr | Float -> 8
+    | Float32 -> 4
+    | Vec128 -> 16
+    | Valx2 | Vec256 | Vec512 ->
+      Misc.fatal_errorf "Dsl_helpers.stack: unsupported register type %a"
+        Printreg.reg r
   in
   match r.loc with
-  | Stack (Domainstate n) ->
-    let ofs = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
-    mem_offset_reg reg_domain_state_ptr ofs
-  | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
+  | Stack (Domainstate n) -> (
+    let offset = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
+    match Ast.DSL.Validated_mem_offset.create ~scale ~offset with
+    | Some validated ->
+      Stack_operand
+        (Ast.DSL.Validated_mem_offset.to_operand ~base:domainstate_base
+           validated)
+    | None -> Stack_large_offset_domainstate { bytes = offset })
+  | Stack ((Local _ | Incoming _ | Outgoing _) as s) -> (
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
-    Ast.DSL.mem_offset ~base:Ast.Reg.sp (* SP *) ~offset:ofs
+    match Ast.DSL.Validated_mem_offset.create ~scale ~offset:ofs with
+    | Some validated ->
+      Stack_operand
+        (Ast.DSL.Validated_mem_offset.to_operand ~base:Ast.Reg.sp validated)
+    | None -> Stack_large_offset_sp { bytes = ofs })
   | Reg _ | Unknown ->
     Misc.fatal_errorf "Dsl_helpers.stack: register %a not on stack" Printreg.reg
       r

@@ -55,7 +55,8 @@ let default_heap_reduction_threshold = 500_000_000 / (Sys.word_size / 8)
 let heap_reduction_threshold = ref default_heap_reduction_threshold (* -heap-reduction-threshold *)
 let dump_zero_alloc = ref false          (* -dzero-alloc *)
 let disable_zero_alloc_checker = ref false       (* -disable-zero-alloc-checker *)
-let disable_precise_zero_alloc_checker = ref false  (* -disable-precise-zero_alloc_checker *)
+let disable_precise_zero_alloc_checker = ref false
+                                      (* -disable-precise-zero-alloc-checker *)
 
 type zero_alloc_checker_details_cutoff =
   | Keep_all
@@ -492,6 +493,9 @@ let opt_flag_handler : Clflags.Opt_flag_handler.t =
 let use_cached_generic_functions = ref false
 let cached_generic_functions_path =
   ref (Filename.concat Config.standard_library ("cached-generic-functions" ^ Config.ext_lib))
+
+let dissector_assume_lld_without_64_bit_eh_frames = ref true
+  (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)
 
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

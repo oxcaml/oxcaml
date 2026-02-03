@@ -28,7 +28,6 @@
 (** Minimizer **)
 
 open Utils
-open Iterator
 open Typedtree
 open Cmt_format
 
@@ -151,24 +150,40 @@ let minimizers_to_run =
           exit 1)
     minimizer_names
 
+let schedule =
+  if !test >= 0 then (
+    if List.compare_length_with minimizers_to_run 1 <> 0 then (
+      Format.eprintf "Please provide exactly one minimizer in test mode@.";
+      exit 1);
+    Iterator.with_strategy
+      (Iterator.test ~pos:!test ~len:1)
+      [ Iterator.minimizer (List.hd minimizers_to_run) ])
+  else
+    Iterator.list
+      [
+        Iterator.fix (List.map Iterator.minimizer minimizers_to_run);
+        Iterator.minimizer Remdef.minimizer;
+      ]
+
 (* ______ ONE FILE MINIMIZATION ______ *)
+
+let check ~command map =
+  update_output map;
+  if raise_error command then (
+    save_outputs map;
+    true)
+  else false
 
 (** [one_file_minimize c map file] minimizes [file] in the file set [map]
     regarding to the command [c] *)
 let one_file_minimize c (map : structure Smap.t) file : structure Smap.t * bool
     =
-  if !test >= 0 then (
-    if List.compare_length_with minimizers_to_run 1 <> 0 then (
-      Format.eprintf "Please provide exactly one minimizer in test mode@.";
-      exit 1);
-    test_minimizer ~pos:!test map file (List.hd minimizers_to_run))
-  else (
-    Format.eprintf "Starting to minimize %s @." file;
-    List.fold_left
-      (fun (nmap, b) minimizer ->
-        let nmap, has_changed = apply_minimizer nmap file minimizer c in
-        (nmap, b || has_changed))
-      (map, false) minimizers_to_run)
+  Format.eprintf "Starting to minimize %s @." file;
+  let nmap, has_changed =
+    Iterator.run ~check:(check ~command:c) schedule map file
+  in
+  update_output nmap;
+  (nmap, has_changed)
 
 let main () =
   (* LIST MINIMIZERS *)
@@ -254,22 +269,10 @@ let main () =
       else !output_file
     in
     let c = if !inplace then !command else !command ^ " " ^ output_file in
-    let input_str = ref (List.hd file_strs) in
-    update_single output_file !input_str;
-    let has_changed = ref true in
-    while !has_changed do
-      let a, b =
-        one_file_minimize c (Smap.singleton output_file !input_str) output_file
-      in
-      input_str := Smap.find output_file a;
-      has_changed := b
-    done;
-    let a, _ =
-      apply_minimizer
-        (Smap.singleton output_file !input_str)
-        output_file Remdef.minimizer c
-    in
-    input_str := Smap.find output_file a)
+    let input_str = List.hd file_strs in
+    update_single output_file input_str;
+    ignore
+      (one_file_minimize c (Smap.singleton output_file input_str) output_file))
   else (
     if !inplace then (
       Format.eprintf

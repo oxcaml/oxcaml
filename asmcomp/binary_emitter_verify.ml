@@ -162,7 +162,7 @@ let read_text_sections dir =
           if
             String.starts_with ~prefix:"section_text." f
             && String.ends_with ~suffix:".bin" f
-            && f <> "section_text.bin"
+            && not (String.equal f "section_text.bin")
           then
             let name = "." ^ String.sub f 8 (String.length f - 12) in
             Some (name, read_file (Filename.concat dir f))
@@ -170,23 +170,36 @@ let read_text_sections dir =
     in
     match function_sections with
     | [] -> No_function_sections (read_section dir "text")
-    | sections -> Function_sections sections
+    | sections ->
+      (* When there are function sections, also include the main .text section
+         if it exists (even if empty) to match assembler output *)
+      let main_text =
+        match read_section dir "text" with
+        | Some content -> [".text", content]
+        | None -> []
+      in
+      Function_sections (main_text @ sections)
 
-let read_text_relocations dir =
+let read_text_relocations dir ~include_main_text =
   if (not (Sys.file_exists dir)) || not (Sys.is_directory dir)
   then []
   else
     let files = Sys.readdir dir in
-    Array.to_list files
-    |> List.filter_map (fun f ->
-        if
-          String.starts_with ~prefix:"section_text." f
-          && String.ends_with ~suffix:".relocs" f
-          && f <> "section_text.relocs"
-        then
-          let name_part = String.sub f 8 (String.length f - 15) in
-          Some ("." ^ name_part, read_relocations dir name_part)
-        else None)
+    let function_relocs =
+      Array.to_list files
+      |> List.filter_map (fun f ->
+          if
+            String.starts_with ~prefix:"section_text." f
+            && String.ends_with ~suffix:".relocs" f
+            && not (String.equal f "section_text.relocs")
+          then
+            let name_part = String.sub f 8 (String.length f - 15) in
+            Some ("." ^ name_part, read_relocations dir name_part)
+          else None)
+    in
+    if include_main_text
+    then (".text", read_relocations dir "text") :: function_relocs
+    else function_relocs
 
 (* Section comparison *)
 
@@ -390,7 +403,7 @@ let compare unix ~obj_file ~binary_sections_dir =
     let be_text_relocs, asm_text_relocs =
       match be_text with
       | Function_sections _ ->
-        ( read_text_relocations binary_sections_dir,
+        ( read_text_relocations binary_sections_dir ~include_main_text:true,
           Owee_object.extract_individual_text_relocations buf )
       | No_function_sections _ ->
         ( [".text", read_relocations binary_sections_dir "text"],

@@ -17,22 +17,22 @@ let code rec loopify(never) size(42) newer_version_of(fact_1)
     | 0 -> k (1)
     | 1 -> k2
     where k2 =
-      ((let Psubint = n - 1 in
+      ((let Psubint = %int_barith.`sub` (n, 1) in
         let prim_1 = %phys_ne (Psubint, 0) in
         switch prim_1
           | 0 -> k2 (1)
           | 1 -> k3
           where k3 =
-            ((let Psubint_1 = Psubint - 1 in
+            ((let Psubint_1 = %int_barith.`sub` (Psubint, 1) in
               apply direct(fact_1_1) inlining_state(depth(12))
                 $camlInlined_rec__fact_3 ~ depth my_depth -> succ (unroll 1 (succ my_depth))
                   (Psubint_1)
                   -> k3 * k1)
                where k3 (apply_result : imm tagged) =
-                 let Pmulint = Psubint * apply_result in
+                 let Pmulint = %int_barith.`mul` (Psubint, apply_result) in
                  cont k2 (Pmulint)))
          where k2 (apply_result : imm tagged) =
-           let Pmulint = n * apply_result in
+           let Pmulint = %int_barith.`mul` (n, apply_result) in
            cont k (Pmulint))
 and $camlInlined_rec__fact_3 =
   closure fact_1_1 @fact

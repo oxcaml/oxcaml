@@ -1474,7 +1474,7 @@ let assemble_line b loc ins =
             (get_symbol b (Asm_symbol.encode sym)).sy_size
               <- Some (Int64.to_int n)
         | _ -> assert false)
-    | Directive (D.Align { fill_x86_bin_emitter=data; bytes = n}) -> (
+    | Directive (D.Align { fill=data; bytes = n}) -> (
         (* TODO: Buffer.length = 0 => set section align *)
         let pos = Buffer.length b.buf in
         let current = pos mod n in

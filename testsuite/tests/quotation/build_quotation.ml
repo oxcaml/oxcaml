@@ -72,9 +72,20 @@
 - : <[bool]> expr = <[false]>
 |}];;
 
+<[ function #false -> #true | #true -> #false ]>;;
+[%%expect {|
+- : <[bool# -> bool#]> expr = <[function | #false -> #true | #true -> #false
+]>
+|}];;
+
 <[ () ]>;;
 [%%expect {|
 - : <[unit]> expr = <[()]>
+|}];;
+
+<[ fun #() -> #() ]>;;
+[%%expect {|
+- : <[unit# -> unit#]> expr = <[fun #() -> #()]>
 |}];;
 
 <[ (1, 2) ]>;;
