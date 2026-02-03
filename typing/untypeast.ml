@@ -1086,6 +1086,7 @@ let core_type sub ct =
     | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
+    | Ttyp_box t -> Ptyp_box (sub.typ sub t)
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension
   in

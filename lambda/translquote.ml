@@ -2701,6 +2701,7 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_variant (fields, (if closed then Closed else Open), tags)
         | Tquote ty -> Ttyp_quote (go ty)
+        | Tbox ty -> Ttyp_box (go ty)
         | Tsplice _ ->
           fatal_errorf
             "Translquote [at %a]:@ Explicitly quantified type variables@ \
@@ -3009,6 +3010,9 @@ and quote_core_type ~scopes ty =
       Location.print_loc (to_location loc)
   | Ttyp_of_kind _ ->
     fatal_errorf "Translquote [at %a]: Ttyp_of_kind not implemented."
+      Location.print_loc (to_location loc)
+  | Ttyp_box _ ->
+    fatal_errorf "Translquote [at %a]: Ttyp_box not implemented."
       Location.print_loc (to_location loc)
   | Ttyp_call_pos -> Type.wrap Type.call_pos
 

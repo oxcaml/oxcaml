@@ -62,6 +62,7 @@ and extra_ty =
   *)
 
 val unboxed_version : t -> t
+val boxed_version : t -> t option
 val is_unboxed_version : t -> bool
 
 val same: t -> t -> bool

@@ -91,6 +91,7 @@ and type_desc =
   | Tpoly of type_expr * type_expr list
   | Tpackage of Path.t * (Longident.t * type_expr) list
   | Tof_kind of jkind_lr
+  | Tbox of type_expr
 
 and arg_label =
   | Nolabel
@@ -1241,6 +1242,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tarrow (_, _, _, _)
         | Tquote _
         | Tsplice _
+        | Tbox _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in

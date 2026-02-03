@@ -619,6 +619,8 @@ and core_type1 ctxt f x =
         pp f "@[<hov2><[%a]>@]" (core_type ctxt) t
     | Ptyp_splice t ->
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
+    | Ptyp_box t ->
+        pp f "@[<hov2>%a@ box_@]" (core_type1 ctxt) t
     | Ptyp_extension e -> extension ctxt f e
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x

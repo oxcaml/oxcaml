@@ -553,6 +553,8 @@ and print_out_type_3 ppf =
         fprintf ppf "@[<1>$@,(%a)@]"
           print_out_type_0 t'
       | t' -> print_out_type ppf t')
+  | Otyp_box t ->
+      fprintf ppf "@[<1>%a@ box_@]" print_simple_out_type t
 and print_out_type ppf typ =
   print_out_type_0 ppf typ
 and print_simple_out_type ppf typ =

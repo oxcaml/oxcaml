@@ -803,6 +803,7 @@ and core_type_desc =
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
+  | Ttyp_box of core_type
   | Ttyp_call_pos
 
 and package_type = {

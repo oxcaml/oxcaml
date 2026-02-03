@@ -234,6 +234,23 @@ let f () = fun () : float# -> #0.
 val f : unit -> unit -> float# = <fun>
 |}]
 
+(* box_ type operator *)
+
+type t_box = float# box_;;
+[%%expect{|
+type t_box = float
+|}]
+
+let f_box (x : float# box_) : float = x;;
+[%%expect{|
+val f_box : float -> float = <fun>
+|}]
+
+type ('a : float64) box_alias = 'a box_;;
+[%%expect{|
+type ('a : float64) box_alias = 'a box_
+|}]
+
 (******************)
 (* Comprehensions *)
 
