@@ -40,4 +40,4 @@ done
 cd $tempdir
 rm -f $target
 
-ar rD $target $(cat $files)
+ar rcD $target $(cat $files)
