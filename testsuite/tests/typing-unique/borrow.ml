@@ -92,8 +92,8 @@ let foo () =
 Line 3, characters 13-24:
 3 |   unique_use (borrow_ y);
                  ^^^^^^^^^^^
-Error: This value is "aliased" because it is borrowed.
-       However, the highlighted expression is expected to be "unique".
+Error: This value is "aliased" because it is borrowed,
+       but it is expected to be "unique".
 |}]
 
 (* borrowed values are local and cannot escape *)
@@ -337,11 +337,11 @@ let foo () =
   match borrow_ y with
   | x -> ignore (unique_use x)
 [%%expect{|
-Line 4, characters 28-29:
-4 |   | x -> ignore (unique_use x)
-                                ^
-Error: This value is "aliased" because it is borrowed.
-       However, the highlighted expression is expected to be "unique".
+Line 3, characters 8-17:
+3 |   match borrow_ y with
+            ^^^^^^^^^
+Error: This value is "aliased" because it is borrowed,
+       but it is expected to be "unique".
 |}]
 
 (* borrowed values are local and cannot escape *)
@@ -546,8 +546,8 @@ let foo () =
 Line 3, characters 13-24:
 3 |   unique_use (borrow_ x);
                  ^^^^^^^^^^^
-Error: This value is "aliased" because it is borrowed.
-       However, the highlighted expression is expected to be "unique".
+Error: This value is "aliased" because it is borrowed,
+       but it is expected to be "unique".
 |}]
 
 (* borrowed values are local and cannot escape *)
@@ -679,10 +679,10 @@ let foo (x @ once) =
   let y = borrow_ x in
   ()
 [%%expect{|
-Line 2, characters 18-19:
+Line 2, characters 10-19:
 2 |   let y = borrow_ x in
-                      ^
-Error: This value is "once" but is expected to be "many" because it is borrowed.
+              ^^^^^^^^^
+Error: The value is "once" but expected to be "many" because it is to be borrowed.
 |}]
 
 let aliased_local_and_legacy_use (a @ aliased local) () = ();;

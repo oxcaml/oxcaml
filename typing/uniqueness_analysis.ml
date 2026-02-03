@@ -1152,6 +1152,7 @@ type error =
       }
   | Overwrite_changed_tag of Overwrites.error
   | Borrowed_out_of_context of Location.t
+  | Borrowed_value_used_uniquely of Maybe_unique.cannot_force
 
 exception Error of error
 
@@ -1728,6 +1729,13 @@ let force_aliased_boundary unique_use occ ~reason =
   | Ok () -> ()
   | Error cannot_force -> raise (Error (Boundary { cannot_force; reason }))
 
+let force_aliased_borrow unique_use occ =
+  let maybe_unique = Maybe_unique.singleton unique_use occ in
+  match Maybe_unique.mark_multi_use maybe_unique with
+  | Ok () -> ()
+  | Error cannot_force ->
+    raise (Error (Borrowed_value_used_uniquely cannot_force))
+
 module Value : sig
   (** See [existing] for its meaning *)
   type t
@@ -1838,7 +1846,8 @@ end = struct
   let confine_borrow ~region_loc value uf =
     match value with
     | Fresh -> uf
-    | Existing { paths; occ; _ } ->
+    | Existing { paths; unique_use; occ } ->
+      force_aliased_borrow unique_use occ;
       Paths.confine_borrow ~region_loc occ paths uf
 
   let invalidate_tag = function
@@ -3023,6 +3032,22 @@ let report_boundary cannot_force reason =
   Location.errorf ~loc:occ.loc "@[%s.\nHint: This value comes from %s.@]" error
     reason
 
+let report_borrowed_value_used_uniquely cannot_force =
+  let { Maybe_unique.occ; axis } = cannot_force in
+  let error =
+    (* CR-soon zqian: incorperate this into the mode error hint system. *)
+    match axis with
+    | Uniqueness ->
+      Format.dprintf
+        "This value is %a because it is borrowed,@ but it is expected to be %a."
+        Misc.Style.inline_code "aliased" Misc.Style.inline_code "unique"
+    | Linearity ->
+      Format.dprintf
+        "The value is %a but expected to be %a because it is to be borrowed."
+        Misc.Style.inline_code "once" Misc.Style.inline_code "many"
+  in
+  Location.errorf ~loc:occ.loc "%t" error
+
 let report_tag_change (err : Overwrites.error) =
   match err with
   | Changed_tag { old_tag; new_tag } ->
@@ -3057,14 +3082,17 @@ let report_error err =
           "The borrow_ operator must appear directly in a valid borrowing \
            context:@ - As an argument to a function application@ - On the \
            right-hand side of a let binding@ - As the scrutinee of a pattern \
-           match")
+           match"
+      | Borrowed_value_used_uniquely inner ->
+        report_borrowed_value_used_uniquely inner)
 
 let () =
   Location.register_error_of_exn (function
     | Error e -> Some (report_error e)
     | Usage.Borrowed_value_escapes inner ->
-      (* CR-someday zqian: Track the relation (first_is_of_second) between the
-         borrowing site and the usage site to provide more precise error messages
-         (e.g., "part of it is borrowed" vs "it is borrowed"). *)
+      (* CR-someday zqian: lift this into [Error e] and track the relation
+      (first_is_of_second) between the borrowing site and the usage site to
+         provide more precise error messages (e.g., "part of it is borrowed" vs
+         "it is borrowed"). *)
       Some (report_borrowed_value_escapes inner)
     | _ -> None)

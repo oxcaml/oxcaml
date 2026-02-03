@@ -6366,20 +6366,12 @@ and type_expect_
           }
       end
   | Pexp_borrow body ->
-    let hint_monadic = Hint.Borrowed (loc, Monadic)
-    and hint_comonadic = Hint.Borrowed (loc, Comonadic) in
+    let hint_comonadic = Hint.Borrowed (loc, Comonadic) in
     let mode =
-      { Mode.Value.Const.min with
-        areality = Local;
-        uniqueness = Aliased }
-      |> Value.of_const ~hint_monadic ~hint_comonadic
+      { Mode.Value.Const.min with areality = Local }
+      |> Value.of_const ~hint_comonadic
     in
     submode ~loc ~env mode expected_mode;
-    let mode =
-      {Mode.Value.Const.max with linearity = Many}
-      |> Value.of_const ~hint_monadic ~hint_comonadic
-    in
-    let expected_mode = mode_coerce mode expected_mode in
     let exp =
       type_expect ~recarg env expected_mode body ty_expected_explained
     in
