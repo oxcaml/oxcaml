@@ -724,13 +724,15 @@ let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
 
 (* Error report *)
 
+let fprintf = Format_doc.fprintf
+
 let report_error ppf = function
   | Assembler_error file ->
-    fprintf ppf "Assembler error, input left in file %a" Location.print_filename
-      file
+    fprintf ppf "Assembler error, input left in file %a"
+      Location.Doc.quoted_filename file
   | Binary_emitter_mismatch file ->
     fprintf ppf "Binary emitter verification failed for %a"
-      Location.print_filename file
+      Location.Doc.quoted_filename file
   | Mismatched_for_pack saved ->
     let msg prefix =
       if Compilation_unit.Prefix.is_empty prefix

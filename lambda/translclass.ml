@@ -1115,7 +1115,7 @@ let () =
 
 (* Error report *)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
 let report_error ppf = function

@@ -2,6 +2,8 @@
  include ocamlcommon;
 *)
 
+module Fmt = Format_doc
+
 let () =
   let open Location in
   (* Some dummy locations for demo purposes *)
@@ -27,12 +29,12 @@ let () =
   } in
   let report = {
     kind = Report_error;
-    main = msg ~loc:loc1 "%a" Format.pp_print_text
+    main = msg ~loc:loc1 "%a" Fmt.pp_print_text
         "These are the contents of the main error message. \
          It is very long and should wrap across several lines.";
     sub = [
       msg ~loc:loc2 "A located first sub-message.";
-      msg ~loc:loc3 "%a" Format.pp_print_text
+      msg ~loc:loc3 "%a" Fmt.pp_print_text
         "Longer sub-messages that do not fit on the \
          same line as the location get indented.";
       msg "@[<v>This second sub-message does not have \

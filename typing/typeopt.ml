@@ -1114,7 +1114,7 @@ let layout_of_non_void_sort c =
     c
     ~value_kind:(lazy Lambda.generic_value)
     ~error:(fun const ->
-      Misc.fatal_errorf "layout_of_const_sort: %a encountered"
+      Misc.fatal_errorf_doc "layout_of_const_sort: %a encountered"
         Jkind.Sort.Const.format const)
 
 let function_return_layout env loc sort ty =
@@ -1180,7 +1180,7 @@ let classify_lazy_argument : Typedtree.expression ->
        `Other
 
 (* Error report *)
-open Format
+open Format_doc
 
 let report_error ppf = function
   | Non_value_layout (ty, err) ->
@@ -1252,7 +1252,7 @@ let report_error ppf = function
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) ) err
+           ~level:(Ctype.get_current_level ())) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \

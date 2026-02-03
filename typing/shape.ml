@@ -846,7 +846,8 @@ let rec print fmt t =
       Ident.print id
   | Unknown_type -> Format.fprintf fmt "?"
   | At_layout (shape, layout) ->
-    Format.fprintf fmt "(%a : %a)" print_nested shape Layout.format layout
+    Format.fprintf fmt "(%a : %a)" print_nested shape
+      (Format_doc.compat Layout.format) layout
 
   in
   if t.approximated then

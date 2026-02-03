@@ -12,6 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Fmt = Format_doc
 open Allowance
 
 (* While all our lattices are bi-Heyting algebras (see [mode.ml]), the extra
@@ -34,7 +35,7 @@ module type Lattice = sig
 
   val meet : t -> t -> t
 
-  val print : Format.formatter -> t -> unit
+  val print : Fmt.formatter -> t -> unit
 end
 
 module type Const = sig
@@ -77,7 +78,7 @@ type print_error_result =
   | Mode  (** A mode constant is printed *)
   | Mode_with_hint  (** A mode constant with hints is printed *)
 
-type print_error = (Format.formatter -> print_error_result) simple_error
+type print_error = (Fmt.formatter -> print_error_result) simple_error
 
 module type Common = sig
   module Const : Const
@@ -179,7 +180,7 @@ module type Common = sig
 
   val newvar_below : ('l * allowed) t -> ('l_ * 'r) t * bool
 
-  val print : ?verbose:bool -> unit -> Format.formatter -> ('l * 'r) t -> unit
+  val print : ?verbose:bool -> unit -> Fmt.formatter -> ('l * 'r) t -> unit
 
   val zap_to_ceil : ('l * allowed) t -> Const.t
 
@@ -209,7 +210,7 @@ module type Axis = sig
 
   type packed = P : 'a t -> packed
 
-  val print : Format.formatter -> 'a t -> unit
+  val print : Fmt.formatter -> 'a t -> unit
 
   (** List of all axes, ordered by [compare]. *)
   val all : packed list
@@ -247,7 +248,7 @@ type 'd neg_hint_morph = 'd neg Mode_hint.morph constraint 'd = _ * _
 type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 
 module type S = sig
-  val print_longident : (Format.formatter -> Longident.t -> unit) ref
+  val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
 
   (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
      into [disallow_*]. *)
@@ -262,7 +263,7 @@ module type S = sig
       otherwise. Defaults to the latter. *)
   val print_pinpoint :
     Hint.pinpoint ->
-    (definite:bool -> capitalize:bool -> Format.formatter -> unit) option
+    (definite:bool -> capitalize:bool -> Fmt.formatter -> unit) option
 
   type nonrec 'a simple_error = 'a simple_error
 
@@ -526,7 +527,7 @@ module type S = sig
       | Contention : (monadic, Contention.Const.t) t
       | Staticity : (monadic, Staticity.Const.t) t
 
-    val print : Format.formatter -> ('p, 'r) t -> unit
+    val print : Fmt.formatter -> ('p, 'r) t -> unit
 
     val eq : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
   end
@@ -631,7 +632,7 @@ module type S = sig
 
         val value : t -> default:some -> some
 
-        val print : Format.formatter -> t -> unit
+        val print : Fmt.formatter -> t -> unit
 
         val proj : 'a Axis.t -> t -> 'a option
 
@@ -660,7 +661,7 @@ module type S = sig
       val comonadic_to_monadic_min : Comonadic.Const.t -> Monadic.Const.t
 
       (** Prints a constant on any axis. *)
-      val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
+      val print_axis : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end
 
     (** Existentially holds a mode together with its axis. *)
@@ -835,7 +836,7 @@ module type S = sig
       (** Test if the given modality is a constant modality. *)
       val is_constant : 'a Axis.t -> 'a -> bool
 
-      val print : 'a Axis.t -> Format.formatter -> 'a -> unit
+      val print : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end
 
     type error = Error : 'a Axis.t * 'a simple_error -> error
@@ -894,7 +895,7 @@ module type S = sig
       val equate : t -> t -> (unit, equate_error) Result.t
 
       (** Printing for debugging. *)
-      val print : Format.formatter -> t -> unit
+      val print : Fmt.formatter -> t -> unit
     end
 
     (** A modality that acts on [Value] modes. Conceptually it is a record where
@@ -939,7 +940,7 @@ module type S = sig
     val equate : t -> t -> (unit, equate_error) Result.t
 
     (** Printing for debugging. *)
-    val print : Format.formatter -> t -> unit
+    val print : Fmt.formatter -> t -> unit
 
     (** Given [md_mode] the mode of a module, and [mode] the mode of a value to
         be put in that module, return the inferred modality to be put on the
@@ -1141,6 +1142,6 @@ module type S = sig
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic
 
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
-    val print : Format.formatter -> t -> unit
+    val print : Fmt.formatter -> t -> unit
   end
 end

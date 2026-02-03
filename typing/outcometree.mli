@@ -53,7 +53,7 @@ type out_value =
   | Oval_int64 of int64
   | Oval_nativeint of nativeint
   | Oval_list of out_value list
-  | Oval_printer of (Format.formatter -> unit)
+  | Oval_printer of (Format_doc.formatter -> unit)
   | Oval_record of (out_ident * out_value) list
   | Oval_record_unboxed_product of (out_ident * out_value) list
   | Oval_string of string * int * out_string (* string, size-to-print, kind *)

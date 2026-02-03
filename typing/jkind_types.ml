@@ -87,11 +87,12 @@ module Sort = struct
       | (Base _ | Product _), _ -> false
 
     let format ppf c =
+      let module Fmt = Format_doc in
       let rec pp_element ~nested ppf = function
-        | Base b -> Format.fprintf ppf "%s" (to_string_base b)
+        | Base b -> Fmt.fprintf ppf "%s" (to_string_base b)
         | Product cs ->
-          let pp_sep ppf () = Format.fprintf ppf "@ & " in
-          Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf cs
+          let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+          Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf cs
       in
       pp_element ~nested:false ppf c
 
@@ -626,13 +627,14 @@ module Sort = struct
   (*** pretty printing ***)
 
   let format ppf t =
+    let module Fmt = Format_doc in
     let rec pp_element ~nested ppf t =
       match get t with
-      | Base b -> Format.fprintf ppf "%s" (to_string_base b)
-      | Var v -> Format.fprintf ppf "%s" (Var.name v)
+      | Base b -> Fmt.fprintf ppf "%s" (to_string_base b)
+      | Var v -> Fmt.fprintf ppf "%s" (Var.name v)
       | Product ts ->
-        let pp_sep ppf () = Format.fprintf ppf " & " in
-        Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+        let pp_sep ppf () = Fmt.fprintf ppf " & " in
+        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf t
 

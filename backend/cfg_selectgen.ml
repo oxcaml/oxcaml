@@ -1604,7 +1604,7 @@ end
 
 let report_error ppf = function
   | Builtin_not_recognized name ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "External annotated with [@@@@builtin] is not recognized: %S" name
 
 let () =

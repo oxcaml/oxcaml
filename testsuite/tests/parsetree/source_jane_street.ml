@@ -625,7 +625,7 @@ Line 1, characters 48-49:
                                                     ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "x" (with some modality) of the record at Line 1, characters 46-54.
+         because it is the field "x" (with some modality) of the record at line 1, characters 46-54.
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -841,7 +841,7 @@ Line 1, characters 23-36:
                            ^^^^^^^^^^^^^
 Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global"
-         because it is an element of the tuple at Line 1, characters 23-39
+         because it is an element of the tuple at line 1, characters 23-39
          which is expected to be "global" because it is an allocation
          which is expected to be "local" to the parent region or "global"
          because it is a function return value.
@@ -1570,7 +1570,7 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 

@@ -2163,7 +2163,7 @@ let do_check_partial ~pred loc casel pss = match pss with
           try
             let buf = Buffer.create 16 in
             let fmt = Format.formatter_of_buffer buf in
-            Format.fprintf fmt "%a@?" Printpat.pretty_pat v;
+            Format.fprintf fmt "%a@?" Printpat.Compat.pretty_pat v;
             if do_match (initial_only_guarded casel) [v] then
               Buffer.add_string buf
                 "\n(However, some guarded clause may match this value.)";
@@ -2670,7 +2670,9 @@ let check_ambiguous_bindings =
       ignore (List.fold_left check_case [] cases)
 
 let report_error ppf = function
-  | Float32_match -> Format.pp_print_string ppf "float32 literal patterns are not supported."
+  | Float32_match ->
+    Format_doc.pp_print_string ppf
+      "float32 literal patterns are not supported."
 
 let () =
   Location.register_error_of_exn (function

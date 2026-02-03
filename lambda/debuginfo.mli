@@ -116,6 +116,9 @@ val compare : t -> t -> int
 
 val print_compact : Format.formatter -> t -> unit
 
+(** Like [print_compact] but uses [Format_doc.formatter]. *)
+val doc_print_compact : Format_doc.formatter -> t -> unit
+
 (** Like [print_compact] but also prints uid and function symbol info. *)
 val print_compact_extended : Format.formatter -> t -> unit
 

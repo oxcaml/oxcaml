@@ -1183,7 +1183,7 @@ let value_description s descr =
   Lazy.(descr |> of_value_description |> value_description s |> force_value_description)
 
 (* Error report *)
-open Format
+open Format_doc
 
 let report_error ppf = function
   | Unconstrained_jkind_variable ->

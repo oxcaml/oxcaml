@@ -44,10 +44,10 @@ module Global = struct
 
   let description ppf = function
     | Glob_compunit cu ->
-        Format.fprintf ppf "compilation unit %a"
-          (Style.as_inline_code Compilation_unit.print) cu
+        Format_doc.fprintf ppf "compilation unit %a"
+          Compilation_unit.print_as_inline_code cu
     | Glob_predef (Predef_exn exn) ->
-        Format.fprintf ppf "predefined exception %a"
+        Format_doc.fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)
 
   let of_compilation_unit cu = Glob_compunit cu
@@ -451,7 +451,7 @@ let empty_global_map = GlobalMap.empty
 
 (* Error report *)
 
-open Format
+open Format_doc
 
 let report_error ppf = function
   | Undefined_global global ->

@@ -43,9 +43,9 @@ Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
 Error: This value is "nonportable"
-         because it closes over the module "F" at Line 7, characters 23-24
+         because it closes over the module "F" at line 7, characters 23-24
          which is "nonportable"
-         because it closes over the value "foo" at Line 15, characters 12-15
+         because it closes over the value "foo" at line 15, characters 12-15
          which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -181,7 +181,7 @@ Line 3, characters 4-9:
         ^^^^^
 Error: The value "N.foo" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at Lines 1-3, characters 21-12
+         because it is used inside the function at lines 1-3, characters 21-12
          which is expected to be "portable".
 |}]
 
@@ -194,7 +194,7 @@ Line 3, characters 4-9:
         ^^^^^
 Error: The value "M.foo" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at Lines 1-3, characters 21-12
+         because it is used inside the function at lines 1-3, characters 21-12
          which is expected to be "portable".
 |}]
 
@@ -220,7 +220,7 @@ Line 4, characters 4-10:
         ^^^^^^
 Error: The value "N'.foo" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at Lines 1-4, characters 21-13
+         because it is used inside the function at lines 1-4, characters 21-13
          which is expected to be "portable".
 |}]
 
@@ -236,7 +236,7 @@ Line 3, characters 19-20:
                        ^
 Error: The module "M" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at Lines 1-5, characters 21-14
+         because it is used inside the function at lines 1-5, characters 21-14
          which is expected to be "portable".
 |}]
 
@@ -382,7 +382,7 @@ Line 4, characters 14-17:
                   ^^^
 Error: The value "foo" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the functor at Lines 3-5, characters 22-3
+         because it is used inside the functor at lines 3-5, characters 22-3
          which is expected to be "portable".
 |}]
 

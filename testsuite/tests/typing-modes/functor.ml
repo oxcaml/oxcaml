@@ -182,7 +182,7 @@ Error: Modules do not match: sig val f : unit -> unit end @ nonportable
      is not included in
        val f : unit -> unit (* in a structure at portable *)
      The left-hand side is "nonportable"
-       because it contains a usage (of the value "r" at Line 2, characters 40-41)
+       because it contains a usage (of the value "r" at line 2, characters 40-41)
        which is expected to be "uncontended".
      However, the right-hand side is "portable".
 |}]
@@ -279,7 +279,7 @@ Error: Signature mismatch in included functor's parameter:
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The left-hand side is "nonportable"
-         because it contains a usage (of the value "r" at Line 2, characters 40-41)
+         because it contains a usage (of the value "r" at line 2, characters 40-41)
          which is expected to be "uncontended".
        However, the right-hand side is "portable".
 |}]
@@ -678,7 +678,7 @@ Line 2, characters 21-22:
                          ^
 Error: The value "x" is "once"
        but is expected to be "many"
-         because it is used inside the function at Line 2, characters 2-28
+         because it is used inside the function at line 2, characters 2-28
          which is expected to be "many".
 |}]
 
@@ -690,7 +690,7 @@ Line 2, characters 35-37:
                                        ^^
 Error: The module "M1" is "once"
        but is expected to be "many"
-         because it is used inside the functor at Line 2, characters 10-41
+         because it is used inside the functor at line 2, characters 10-41
          which is expected to be "many".
 |}]
 

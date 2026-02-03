@@ -45,7 +45,7 @@ type error =
 exception Error of error
 
 (** Pretty-print a dissector error. *)
-val report_error : Format.formatter -> error -> unit
+val report_error : Format_doc.formatter -> error -> unit
 
 (** Result of running the dissector. After the dissector runs, OCaml object
     files (ml_objfiles, startup_obj) are baked into the partition files.

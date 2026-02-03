@@ -66,3 +66,11 @@ val tyvar: Format.formatter -> string -> unit
 
 val jkind_annotation : Format.formatter -> Parsetree.jkind_annotation -> unit
 val mode : Format.formatter -> Parsetree.mode Location.loc -> unit
+
+(** {!Format_doc} functions for error messages *)
+module Doc:sig
+  val longident: Longident.t Format_doc.printer
+  val tyvar: string Format_doc.printer
+end
+
+val jkind_annotation_doc: Parsetree.jkind_annotation Format_doc.printer

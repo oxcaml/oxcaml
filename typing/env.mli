@@ -644,13 +644,11 @@ type error =
 
 exception Error of error
 
-open Format
 
-val report_error: level:int -> formatter -> error -> unit
+val report_error: level:int -> error Format_doc.printer
 
 val report_lookup_error:
-    level:int -> Location.t -> t -> formatter -> lookup_error -> unit
-
+    level:int -> Location.t -> t -> lookup_error Format_doc.printer
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool
@@ -684,15 +682,15 @@ val same_constr: (t -> type_expr -> type_expr -> bool) ref
 val constrain_type_jkind:
   (t -> type_expr -> jkind_r -> (unit, Jkind.Violation.t) result) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
-val print_longident: (Format.formatter -> Longident.t -> unit) ref
+val print_longident: Longident.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
-val print_path: (Format.formatter -> Path.t -> unit) ref
+val print_path: Path.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
-val print_type_expr: (Format.formatter -> Types.type_expr -> unit) ref
+val print_type_expr: Types.type_expr Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Jkind. *)
 val report_jkind_violation_with_offender:
-  (offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
-   Jkind.Violation.t -> unit) ref
+  (offender:(Format_doc.formatter -> unit) ->
+   level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit) ref
 
 
 (** Folds *)
@@ -737,7 +735,7 @@ type address_head =
 
 val address_head : address -> address_head
 
-val print_stage : Format.formatter -> stage -> unit
+val print_stage : Format_doc.formatter -> stage -> unit
 
 val print_with_quote_promote :
-  Format.formatter -> (string * stage * stage) -> unit
+  Format_doc.formatter -> (string * stage * stage) -> unit

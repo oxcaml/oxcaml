@@ -169,25 +169,26 @@ let to_global = function
   | _ -> None
 
 let print ~with_scope ppf =
-  let open Format in
+  let open Format_doc in
   function
   | Global name -> fprintf ppf "%s!" name
   | Predef { name; stamp = n } ->
       fprintf ppf "%s%s!" name
-        (if !Clflags.unique_ids then sprintf "/%i" n else "")
+        (if !Clflags.unique_ids then asprintf "/%i" n else "")
   | Local { name; stamp = n } ->
       fprintf ppf "%s%s" name
-        (if !Clflags.unique_ids then sprintf "/%i" n else "")
+        (if !Clflags.unique_ids then asprintf "/%i" n else "")
   | Scoped { name; stamp = n; scope } ->
       fprintf ppf "%s%s%s" name
-        (if !Clflags.unique_ids then sprintf "/%i" n else "")
-        (if with_scope then sprintf "[%i]" scope else "")
+        (if !Clflags.unique_ids then asprintf "/%i" n else "")
+        (if with_scope then asprintf "[%i]" scope else "")
   | Global_with_args g ->
       fprintf ppf "%a!" Global_module.Name.print g
 
 let print_with_scope ppf id = print ~with_scope:true ppf id
 
-let print ppf id = print ~with_scope:false ppf id
+let doc_print ppf id = print ~with_scope:false ppf id
+let print ppf id = Format_doc.compat doc_print ppf id
 
 let to_global_exn id =
   match to_global id with

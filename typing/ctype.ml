@@ -120,10 +120,11 @@ let raise_scope_escape_exn ty = raise (scope_escape_exn ty)
 exception Tags of label * label
 
 let () =
+  let open Format_doc in
   Location.register_error_of_exn
     (function
       | Tags (l, l') ->
-          let pp_tag ppf s = Format.fprintf ppf "`%s" s in
+          let pp_tag ppf s = fprintf ppf "`%s" s in
           let inline_tag = Misc.Style.as_inline_code pp_tag in
           Some
             Location.
@@ -2390,7 +2391,7 @@ let mk_is_abstract env p =
   let decl =
     try Env.find_type p env
     with Not_found ->
-      Misc.fatal_errorf "mk_is_abstract: type %a not found in environment"
+      Misc.fatal_errorf_doc "mk_is_abstract: type %a not found in environment"
         Path.print p
   in
   match decl.type_kind with
@@ -3826,7 +3827,7 @@ let add_gadt_equation uenv source destination =
     let jkind = jkind_of_abstract_type_declaration env source in
     let jkind = match Jkind.try_allow_r jkind with
       | None -> Misc.fatal_errorf "Abstract kind with [with]: %a"
-                  Jkind.format
+                  (Format_doc.compat Jkind.format)
                   jkind
       | Some jkind -> jkind
     in

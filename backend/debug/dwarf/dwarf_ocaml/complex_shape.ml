@@ -33,6 +33,11 @@ module S = Shape
 module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 
+(* CR sspies: Update the printing below to use the new doc-based formatting.
+   This does require updating the shape printing, which was postponed when
+   switching large parts of the compiler over to doc-based formatting. *)
+let pp_layout = Format_doc.compat Layout.format
+
 type t =
   { desc : desc;
     layout : Layout.t;
@@ -427,7 +432,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     with Layout_missing -> runtime (RS.unknown Value))
   | Tuple _, Some type_layout ->
     err_or_unknown_exn (fun f ->
-        f "tuple must have value layout, but got: %a" Layout.format type_layout)
+        f "tuple must have value layout, but got: %a" pp_layout type_layout)
   | At_layout (shape, ly), None ->
     type_shape_to_complex_shape ~cache ~rec_env shape ly
   | At_layout (shape, ly1), Some ly2 when Layout.equal ly1 ly2 ->
@@ -437,7 +442,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
         f
           "shape at layout does not match expected layout, expected %a, got \
            %a; shape: %a"
-          Layout.format type_layout Layout.format layout Shape.print shape)
+          pp_layout type_layout pp_layout layout Shape.print shape)
   | Predef (pre, args), _ -> (
     try
       let predef_shape =
@@ -470,8 +475,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
     | Some (Some ly1), Some ly2 when not (Layout.equal ly1 ly2) ->
       err_or_unknown_exn (fun f ->
-          f "Recursive variable has wrong layout. Expected %a, got %a"
-            Layout.format ly2 Layout.format ly1)
+          f "Recursive variable has wrong layout. Expected %a, got %a" pp_layout
+            ly2 pp_layout ly1)
       (* In all cases below, if there are two layouts, they are the same. *)
     | (Some (Some ly1), (None | Some _)) as _ly2_opt ->
       (*= In this case, either:
@@ -494,8 +499,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | Arrow, (None | Some (Base Value)) -> runtime RS.func
   | Arrow, Some type_layout ->
     err_or_unknown_exn (fun f ->
-        f "function must have value layout, but got: %a" Layout.format
-          type_layout)
+        f "function must have value layout, but got: %a" pp_layout type_layout)
   | Unboxed_tuple shapes, None ->
     unboxed_tuple
       (List.map
@@ -507,14 +511,14 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       (List.map2 (type_shape_to_complex_shape ~cache ~rec_env) fields lys)
   | Unboxed_tuple _, Some (Base b) ->
     err_or_unknown_exn (fun f ->
-        f "unboxed tuple must have product layout, but got: %a" Layout.format
+        f "unboxed tuple must have product layout, but got: %a" pp_layout
           (Layout.Base b))
   | Unboxed_tuple fields, Some (Product _ as type_layout) ->
     err_or_unknown_exn (fun f ->
         f
           "unboxed tuple layout length mismatch: expected a product layout of \
            length %d, but got: %a"
-          (List.length fields) Layout.format type_layout)
+          (List.length fields) pp_layout type_layout)
   | Variant constructors, (None | Some (Base Value)) -> (
     try
       let constructors =
@@ -557,7 +561,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       (* should only be raised by [lay_out_into_mixed_block_exn] *))
   | Variant _, Some ((Product _ | Base _) as ly) ->
     err_or_unknown_exn (fun f ->
-        f "variant must have value layout, but got: %a" Layout.format ly)
+        f "variant must have value layout, but got: %a" pp_layout ly)
   | Poly_variant constructors, (None | Some (Base Value)) -> (
     try
       let constructors =
@@ -590,8 +594,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       (* should only be raised by [lay_out_into_mixed_block_exn] *))
   | Poly_variant _, Some ((Product _ | Base _) as ly) ->
     err_or_unknown_exn (fun f ->
-        f "polymorphic variant must have value layout, but got: %a"
-          Layout.format ly)
+        f "polymorphic variant must have value layout, but got: %a" pp_layout ly)
   | Record { fields; kind = Record_unboxed_product }, None ->
     record_unboxed
       (List.map
@@ -616,8 +619,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       Layout.Product (List.map (fun (_, _, _, ly) -> ly) fields)
     in
     err_or_unknown_exn (fun f ->
-        f "unboxed record expected to be of layout %a, but got: %a"
-          Layout.format layout_from_shapes Layout.format ly)
+        f "unboxed record expected to be of layout %a, but got: %a" pp_layout
+          layout_from_shapes pp_layout ly)
   | Record { fields; kind = Record_boxed }, (None | Some (Base Value))
   | Record { fields; kind = Record_floats }, (None | Some (Base Value))
   | Record { fields; kind = Record_mixed _ }, (None | Some (Base Value)) -> (
@@ -645,7 +648,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | ( Record { fields; kind = Record_boxed | Record_mixed _ | Record_floats },
       Some ((Product _ | Base _) as ly) ) ->
     err_or_unknown_exn (fun f ->
-        f "record must have value layout, but got: %a" Layout.format ly)
+        f "record must have value layout, but got: %a" pp_layout ly)
   | ( Record
         { fields = [(field_name, _, field_type, field_layout)];
           kind = Record_unboxed
@@ -679,7 +682,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
         f
           "record with [@@unboxed] attribute with expected layout %a, but \
            field has layout %a"
-          Layout.format ly Layout.format field_layout)
+          pp_layout ly pp_layout field_layout)
   | Record { fields = ([] | _ :: _ :: _) as fields; kind = Record_unboxed }, _
     ->
     err_or_unknown_exn (fun f ->
@@ -719,7 +722,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
         f
           "variant with [@@unboxed] attribute with expected layout %a, but \
            field has layout %a"
-          Layout.format ly Layout.format arg_layout)
+          pp_layout ly pp_layout arg_layout)
   | ( ( Var _ | Error _ | Proj _ | Abs _ | Comp_unit _ | Struct _ | Mutrec _
       | Constr _ | App _ | Proj_decl _ ),
       _ ) ->

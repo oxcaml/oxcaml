@@ -182,6 +182,12 @@ end = struct
   let tyvar = test "tyvar" tyvar Example.tyvar
   let jkind_annotation = test "jkind" jkind_annotation Example.jkind_annotation
   let mode = test "mode" mode Example.mode
+
+  module Doc = struct
+    let longident = Doc.longident
+    let tyvar = Doc.tyvar
+  end
+  let jkind_annotation_doc = jkind_annotation_doc
 end
 
 
