@@ -64,8 +64,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   in
   let dacc =
     DA.map_flow_acc dacc ~f:(fun _ ->
-        Flow.Acc.init_toplevel ~dummy_toplevel_cont Bound_parameters.empty
-          (Flow.Acc.empty ()))
+        Flow.Acc.init_toplevel ~dummy_toplevel_cont Bound_parameters.empty)
   in
   let _, uacc =
     simplify_expr dacc expr ~down_to_up:(fun dacc ~rebuild ->
