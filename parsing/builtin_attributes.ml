@@ -128,12 +128,9 @@ let builtin_attrs =
   ; "regalloc_param"
   ; "record_mixed_floats"
   ; "record_float_us"
-  ; "record_bits8"
-  ; "record_bits16"
-  ; "record_vec128"
-  ; "record_vec256"
-  ; "record_vec512"
+  ; "record_single_unboxed"
   ; "record_with_void"
+  ; "record_unknown"
   ]
 
 let builtin_attrs =
@@ -526,12 +523,9 @@ let has_unsafe_allow_any_mode_crossing attrs =
 
 let has_record_mixed_floats attrs = has_attribute "record_mixed_floats" attrs
 let has_record_float_us attrs = has_attribute "record_float_us" attrs
-let has_record_bits8 attrs = has_attribute "record_bits8" attrs
-let has_record_bits16 attrs = has_attribute "record_bits16" attrs
-let has_record_vec128 attrs = has_attribute "record_vec128" attrs
-let has_record_vec256 attrs = has_attribute "record_vec256" attrs
-let has_record_vec512 attrs = has_attribute "record_vec512" attrs
+let has_record_single_unboxed attrs = has_attribute "record_single_unboxed" attrs
 let has_record_with_void attrs = has_attribute "record_with_void" attrs
+let has_record_unknown attrs = has_attribute "record_unknown" attrs
 
 let parse_empty_payload attr =
   match attr.attr_payload with

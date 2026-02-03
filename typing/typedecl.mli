@@ -206,12 +206,9 @@ type error =
 and required_record_attribute =
   | Record_mixed_floats
   | Record_float_us
-  | Record_bits8
-  | Record_bits16
-  | Record_vec128
-  | Record_vec256
-  | Record_vec512
+  | Record_single_unboxed
   | Record_with_void
+  | Record_unknown
 
 exception Error of Location.t * error
 
