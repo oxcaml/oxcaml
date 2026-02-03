@@ -125,7 +125,8 @@
    ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (preprocess
   (per_module
    ((action
@@ -205,7 +206,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+               ;; TYPING
   ident
   path
   jkind
@@ -360,7 +361,8 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlcommon)
  (modules
   ;; bytecomp/
@@ -402,7 +404,8 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlcommon flambda2)
  (modules jsmaindriver jscompile jslibrarian))
 
@@ -503,10 +506,7 @@
  (package ocaml))
 
 (install
- (files
-  Makefile.build_config
-  Makefile.config_if_required
-  Makefile.config)
+ (files Makefile.build_config Makefile.config_if_required Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -519,7 +519,8 @@
  (flags
   (:standard -w -27-32-33-34-37-39-60-69-70))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
  (modules_without_implementation
@@ -748,7 +749,8 @@
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
    ))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
  (libraries
@@ -807,14 +809,11 @@
   (backend bisect_ppx))
  ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
  ; to be built against the system compiler, which won't work.
- (ocamlc_flags (:standard -I +unix unix.cma))
- (ocamlopt_flags (:standard -I +unix unix.cmxa))
- (libraries
-  flambda2
-  flambda2_ui
-  flambda2_to_cmm
-  ocamloptcomp
-  ocamlcommon)
+ (ocamlc_flags
+  (:standard -I +unix unix.cma))
+ (ocamlopt_flags
+  (:standard -I +unix unix.cmxa))
+ (libraries flambda2 flambda2_ui flambda2_to_cmm ocamloptcomp ocamlcommon)
  (modules boot_ocamlopt))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules

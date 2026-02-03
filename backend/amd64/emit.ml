@@ -51,26 +51,25 @@ let function_name = ref ""
 let current_basic_block_section = ref ""
 
 (* These callbacks are just instrumentation for expect_asm tests. *)
-let filtered_assembly_callbacks = ref []
+let expect_asm_callbacks = ref []
 
-let functions_for_filtered_assembly_callbacks = ref []
+let asm_collected_for_expect_asm = ref []
 
-let register_filtered_assembly_callback f =
-  filtered_assembly_callbacks := f :: !filtered_assembly_callbacks
+let register_expect_asm_callback f =
+  expect_asm_callbacks := f :: !expect_asm_callbacks
 
-let invoke_filtered_assembly_callbacks () =
+let invoke_expect_asm_callbacks () =
   let output =
-    "\n"
-    ^ String.concat "\n" (List.rev !functions_for_filtered_assembly_callbacks)
+    "\n" ^ String.concat "\n" (List.rev !asm_collected_for_expect_asm)
   in
-  let callbacks = !filtered_assembly_callbacks in
-  filtered_assembly_callbacks := [];
-  functions_for_filtered_assembly_callbacks := [];
+  let callbacks = !expect_asm_callbacks in
+  expect_asm_callbacks := [];
+  asm_collected_for_expect_asm := [];
   List.iter (fun f -> f output) callbacks
 
-let add_filtered_assembly_function ~name ~debug_info ~asm_start =
+let record_for_expect_asm ~name ~debug_info ~asm_start =
   if
-    (not (List.is_empty !filtered_assembly_callbacks))
+    (not (List.is_empty !expect_asm_callbacks))
     && not (String.ends_with ~suffix:"__entry" name)
   then
     let name =
@@ -78,14 +77,15 @@ let add_filtered_assembly_function ~name ~debug_info ~asm_start =
       | item :: _ ->
         Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
           item.dinfo_scopes
+        |> String.split_first_exn ~split_on:'.'
+        |> snd
       | _ -> name
     in
     let output =
       X86_gas.format_asm_for_expect_asm ~name
         ~body:(X86_proc.output_from asm_start)
     in
-    functions_for_filtered_assembly_callbacks
-      := output :: !functions_for_filtered_assembly_callbacks
+    asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
 
 module I = struct
   include I
@@ -2595,8 +2595,8 @@ let fundecl fundecl =
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
-  add_filtered_assembly_function ~name:fundecl.fun_name
-    ~debug_info:fundecl.fun_dbg ~asm_start:fun_body_start;
+  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+    ~asm_start:fun_body_start;
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
   emit_call_safety_errors ();
@@ -3105,7 +3105,7 @@ let end_assembly () =
   in
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
-  invoke_filtered_assembly_callbacks ();
+  invoke_expect_asm_callbacks ();
   X86_proc.generate_code asm;
   (* The internal assembler does not work if reset_all is called here *)
   if not !Oxcaml_flags.internal_assembler then reset_all ()

@@ -22,14 +22,15 @@ type string_constant =
   ; tag : string
   }
 
+type expectation_filter = Principal | X86_64 | AArch64
+
 type expectation_kind = Expect_toplevel | Expect_asm
 
 type expectation =
-  { extid_loc   : Location.t (* Location of "expect" in "[%%expect ...]" *)
-  ; payload_loc : Location.t (* Location of the whole payload *)
-  ; normal      : string_constant (* expectation without -principal *)
-  ; principal   : string_constant (* expectation with -principal *)
-  ; kind        : expectation_kind
+  { extid_loc       : Location.t (* Location of "expect" in "[%%expect ...]" *)
+  ; payload_loc     : Location.t (* Location of the whole payload *)
+  ; expected_output : (expectation_filter option * string_constant) list
+  ; kind            : expectation_kind
   }
 
 (* A list of phrases with the expected toplevel output *)
@@ -38,12 +39,24 @@ type chunk =
   ; expectations : expectation list
   }
 
-let register_assembly_callback : ((string -> unit) -> unit) option ref = ref None
+let register_assembly_callback :
+  ((string -> unit) -> unit) option ref = ref None
 
 type correction =
   { corrected_expectations : expectation list
   ; trailing_output        : string
   }
+
+let filter_of_string = function
+  | "Principal" -> Some Principal
+  | "X86_64" -> Some X86_64
+  | "AArch64" -> Some AArch64
+  | _ -> None
+
+let string_of_filter = function
+  | Principal -> "Principal"
+  | X86_64 -> "X86_64"
+  | AArch64 -> "AArch64"
 
 let match_expect_extension (ext : Parsetree.extension) =
   let match_ext_name = function
@@ -56,8 +69,8 @@ let match_expect_extension (ext : Parsetree.extension) =
     match match_ext_name txt with
     | None -> None
     | Some kind ->
-    let invalid_payload () =
-      Location.raise_errorf ~loc:extid_loc "invalid [%%%%expect payload]"
+    let invalid_payload ?(msg = "invalid [%%expect payload]") () =
+      Location.raise_errorf ~loc:extid_loc "%s" msg
     in
     let string_constant (e : Parsetree.expression) =
       match e.pexp_desc with
@@ -65,46 +78,92 @@ let match_expect_extension (ext : Parsetree.extension) =
         { str; tag }
       | _ -> invalid_payload ()
     in
+    (* Parse a single element: either {|...|} or Filter{|...|} *)
+    let parse_element (e : Parsetree.expression) =
+      match e.pexp_desc with
+      | Pexp_constant (Pconst_string _) ->
+        (* Bare string constant - no filter *)
+        (None, string_constant e)
+      | Pexp_construct ({ txt = Lident name; _ }, Some arg) -> (
+        (* Filter{|content|} - filter with string content *)
+        match filter_of_string name with
+        | Some filter -> (Some filter, string_constant arg)
+        | None -> invalid_payload ())
+      | _ -> invalid_payload ()
+    in
+    let is_arch_filter = function
+      | X86_64 | AArch64 -> true
+      | Principal -> false
+    in
+    let validate_expect_toplevel entries =
+      (* Valid formats:
+         - [{|...|}] (one untagged)
+         - [{|...|}, Principal{|...|}] (untagged + Principal)
+         - [Principal{|...|}] (Principal only) *)
+      match entries with
+      | [(None, _)] -> entries
+      | [(None, _); (Some Principal, _)]-> entries
+      | _ -> invalid_payload ~msg:"expected [%%expect {|...|}] or [%%expect {|...|}, Principal{|...|}]" ()
+    in
+    let validate_expect_asm entries =
+      (* All entries must have architecture tags *)
+      if List.for_all ~f:(fun (f, _) ->
+        match f with
+        | Some filter -> is_arch_filter filter
+        | None -> false
+      ) entries
+      then entries
+      else invalid_payload ~msg:"expected [%%expect_asm Arch1{|...|}, Arch2{|...|}, ...]" ()
+    in
     let expectation =
       match payload with
-      | PStr [{ pstr_desc = Pstr_eval (e, []) }] ->
-        let normal, principal =
+      | PStr [{ pstr_desc = Pstr_eval (e, _attrs) }] ->
+        let expected_output =
           match e.pexp_desc with
-          | Pexp_tuple
-              [ None, a
-              ; None, { pexp_desc = Pexp_construct
-                                ({ txt = Lident "Principal"; _ }, Some b) }
-              ]
-              ->
-            (string_constant a, string_constant b)
-          | _ -> let s = string_constant e in (s, s)
+          | Pexp_tuple elements ->
+            (* Multiple elements *)
+            List.map ~f:(fun (_, elem) -> parse_element elem) elements
+          | _ ->
+            (* Single element *)
+            [parse_element e]
+        in
+        let expected_output =
+          match kind with
+          | Expect_toplevel -> validate_expect_toplevel expected_output
+          | Expect_asm -> validate_expect_asm expected_output
         in
         { extid_loc
         ; payload_loc = e.pexp_loc
-        ; normal
-        ; principal
+        ; expected_output
         ; kind
         }
       | PStr [] ->
-        let s = { tag = ""; str = "" } in
-        { extid_loc
-        ; payload_loc  = { extid_loc with loc_start = extid_loc.loc_end }
-        ; normal    = s
-        ; principal = s
-        ; kind
-        }
+        (* Empty payload - only valid for expect_toplevel *)
+        (match kind with
+        | Expect_toplevel ->
+          { extid_loc
+          ; payload_loc = { extid_loc with loc_start = extid_loc.loc_end }
+          ; expected_output = [(None, { tag = ""; str = "" })]
+          ; kind
+          }
+        | Expect_asm -> invalid_payload ())
       | _ -> invalid_payload ()
     in
     Some expectation
 
 (* Split a list of phrases from a .ml file *)
 let split_chunks phrases =
-  let rec loop (phrases : Parsetree.toplevel_phrase list) code_acc expect_acc acc =
+  let rec loop
+      (phrases : Parsetree.toplevel_phrase list) code_acc expect_acc acc =
     match phrases with
     | [] ->
-      let acc = match expect_acc with
+      let acc =
+        match expect_acc with
         | [] -> acc
-        | _ -> { phrases = List.rev code_acc; expectations = List.rev expect_acc } :: acc
+        | _ ->
+          { phrases = List.rev code_acc
+          ; expectations = List.rev expect_acc
+          } :: acc
       in
       if code_acc = [] || expect_acc <> [] then
         (List.rev acc, None)
@@ -123,7 +182,11 @@ let split_chunks phrases =
         match expect_acc with
         | [] -> loop phrases (phrase :: code_acc) [] acc
         | _ ->
-          let chunk = { phrases = List.rev code_acc; expectations = List.rev expect_acc } in
+          let chunk =
+            { phrases = List.rev code_acc
+            ; expectations = List.rev expect_acc
+            }
+          in
           loop phrases [phrase] [] (chunk :: acc)
       end
   in
@@ -176,23 +239,38 @@ let parse_contents ~fname contents =
   Location.input_lexbuf := Some lexbuf;
   Parse.use_file lexbuf
 
+let current_arch_filter () =
+  match Target_system.architecture () with
+  | X86_64 -> Some X86_64
+  | AArch64 -> Some AArch64
+  | IA32 | ARM | POWER | Z | Riscv -> None
+
+(* For [%%expect]:
+   - {|...|} alone: used for both principal and non-principal
+   - {|...|}, Principal{|...|}: first for non-principal, second for principal
+
+   For [%%expect_asm]:
+   - All entries must have architecture tags (X86_64, AArch64)
+*)
 let eval_expectation expectation ~output =
-  let s =
-    if !Clflags.principal then
-      expectation.principal
-    else
-      expectation.normal
-  in
-  if s.str = output then
-    None
-  else
+  let to_update = match expectation.kind with
+  | Expect_toplevel ->
+    (match expectation.expected_output with
+      | [(None, expected)] -> [(None, expected)]
+      | [(None, if_not_principal); (Some Principal, if_principal)] ->
+        if !Clflags.principal
+        then [(Some Principal, if_principal)]
+        else [(None, if_not_principal)]
+      | _ -> Misc.fatal_error "impossible: already validated")
+  | Expect_asm -> List.filter ~f:(fun (f, _) -> f = current_arch_filter ()) expectation.expected_output in
+  match to_update with
+  | [(filter, s)] when s.str <> output ->
     let s = { s with str = output } in
-    Some (
-      if !Clflags.principal then
-        { expectation with principal = s }
-      else
-        { expectation with normal = s }
-    )
+    Some { expectation with expected_output =
+      List.map ~f:(fun (f, e) -> (f, if f = filter then s else e)) expectation.expected_output
+    }
+  | _ :: _ :: _ -> Location.raise_errorf ~loc:expectation.payload_loc "duplicate architectures in [%%%%expect_asm]"
+  | _ -> None
 
 let shift_lines delta phrases =
   let position (pos : Lexing.position) =
@@ -234,7 +312,9 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
     (* For formatting purposes *)
     Buffer.add_char buf '\n';
     let exec_one phrase =
-      Option.iter (fun register -> register (fun asm_out -> last_asm := Some asm_out)) !register_assembly_callback;
+      Option.iter
+        (fun register -> register (fun asm_out -> last_asm := Some asm_out))
+        !register_assembly_callback;
       let snap = Btype.snapshot () in
       try
         Sys.with_async_exns
@@ -290,15 +370,22 @@ let output_corrected oc ~file_contents correction =
   let output_body oc { str; tag } =
     Printf.fprintf oc "{%s|%s|%s}" tag str tag
   in
+  let output_entry oc (filter, str_const) =
+    Option.iter (fun f -> output_string oc (string_of_filter f)) filter;
+    output_body oc str_const
+  in
   let ofs =
     List.fold_left correction.corrected_expectations ~init:0
       ~f:(fun ofs c ->
         output_slice oc file_contents ofs c.payload_loc.loc_start.pos_cnum;
-        output_body oc c.normal;
-        if c.normal.str <> c.principal.str then begin
-          output_string oc ", Principal";
-          output_body oc c.principal
-        end;
+        (match c.expected_output with
+        | [] -> ()
+        | entry :: rest ->
+          output_entry oc entry;
+          List.iter ~f:(fun e ->
+            output_string oc ", ";
+            output_entry oc e
+          ) rest);
         c.payload_loc.loc_end.pos_cnum)
   in
   output_slice oc file_contents ofs (String.length file_contents);

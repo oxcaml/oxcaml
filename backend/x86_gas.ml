@@ -231,11 +231,35 @@ let generate_asm oc lines =
       Buffer.output_buffer oc b)
 
 let format_asm_for_expect_asm ~name ~body =
+  let tab_stops = [| 2; 8 |] in
+  let tabs_to_spaces s =
+    let result = Buffer.create (String.length s) in
+    let col = ref 0 in
+    let tab_index = ref 0 in
+    String.iter
+      (fun c ->
+        if Char.equal c '\t' && !tab_index < Array.length tab_stops
+        then (
+          let target_col = tab_stops.(!tab_index) in
+          let spaces = max 1 (target_col - !col) in
+          for _ = 1 to spaces do
+            Buffer.add_char result ' '
+          done;
+          col := !col + spaces;
+          incr tab_index)
+        else (
+          Buffer.add_char result c;
+          incr col))
+      s;
+    Buffer.contents result
+  in
   let buf = Buffer.create 1024 in
   bprintf buf "%s:\n" name;
   List.iter
     (fun line ->
-      print_line buf line;
+      let line_buf = Buffer.create 128 in
+      print_line line_buf line;
+      Buffer.add_string buf (tabs_to_spaces (Buffer.contents line_buf));
       Buffer.add_char buf '\n')
     body;
   Buffer.contents buf
