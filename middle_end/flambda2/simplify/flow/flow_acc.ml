@@ -34,6 +34,7 @@ let empty () =
     { stack = [];
       map = Continuation.Map.empty;
       extra = Continuation.Map.empty;
+      lifted_constants = Lifted_constant_state.empty;
       dummy_toplevel_cont = wrong_dummy_toplevel_cont
     }
   in
