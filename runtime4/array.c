@@ -421,6 +421,11 @@ static value make_array_gen(value len, value init, int local)
   CAMLreturn (res);
 }
 
+/* Naming convention: "make" is used for functions that take an init value,
+   while "create" is used for functions that create arrays with uninitialized
+   contents.
+   See https://github.com/ocaml/ocaml/pull/13003#issuecomment-2046623594 */
+
 CAMLprim value caml_array_make(value len, value init)
 {
   return make_array_gen(len, init, 0);
@@ -578,6 +583,8 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
 
 /* [len] is a [value] representing number of floats */
 /* [ int -> float array ] */
+/* This function is named "create" (not "make") because it does not take an
+   init value. See the comment above caml_array_make for more details. */
 CAMLprim value caml_array_create_float(value len)
 {
 #ifdef FLAT_FLOAT_ARRAY
