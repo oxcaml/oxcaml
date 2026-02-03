@@ -286,11 +286,21 @@ let iter_on_occurrences
           f ~namespace:Type ctyp_env path lid
       | Ttyp_open (path, lid, _ct) ->
           f ~namespace:Module ctyp_env path lid
+<<<<<<< HEAD
       | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
       | Ttyp_unboxed_tuple _
       | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
       | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos
       | Ttyp_repr _ | Ttyp_newlayout _ -> ());
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+      | Ttyp_any | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
+      | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ -> ());
+=======
+      | Ttyp_functor (_, _, {tpt_path; tpt_txt}, _) ->
+          f ~namespace:Module_type ctyp_env tpt_path tpt_txt
+      | Ttyp_any | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
+      | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ -> ());
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       default_iterator.typ sub ct);
 
   pat =

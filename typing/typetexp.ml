@@ -92,6 +92,7 @@ type error =
   | Repeated_tuple_label of string
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param of string
+<<<<<<< HEAD
   | Non_value of
       {vloc : value_loc; typ : type_expr; err : Jkind.Violation.t}
   | Non_sort of
@@ -106,6 +107,10 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+  | Functor_optional_param of string
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -653,9 +658,22 @@ end = struct
 
 (* Support for first-class modules. *)
 
+type 'a maybe_compute_mty =
+  | ComputeMType : Types.module_type maybe_compute_mty
+  | NoMType : unit maybe_compute_mty
+
+type forward_decl = {
+  mutable check_package_with_type_constraints :
+    'a. Location.t -> Env.t -> Types.module_type ->
+        'a maybe_compute_mty ->
+        (Longident.t Asttypes.loc * Typedtree.core_type) list -> 'a
+}
+
 let transl_modtype_longident = ref (fun _ -> assert false)
 let transl_modtype = ref (fun _ -> assert false)
-let check_package_with_type_constraints = ref (fun _ -> assert false)
+let forward_decl = {
+    check_package_with_type_constraints = (fun _ -> assert false);
+  }
 
 let sort_constraints_no_duplicates loc env l =
   List.sort
@@ -1206,6 +1224,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       Env.check_no_open_quotations loc env Layout_polymorphism_qt;
       raise (Error (loc, env, Lpoly_unsupported))
   | Ptyp_package ptyp ->
+<<<<<<< HEAD
       let path, ptys = transl_package env ~policy ~row_context ptyp in
       let pack = {
         pack_path = path;
@@ -1214,8 +1233,22 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       } in
       let ty = newty (Tpackage pack)
       in
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+      let path, ptys = transl_package env ~policy ~row_context ptyp in
+      let pack = {
+        pack_path = path;
+        pack_constraints = List.map (fun (s, cty) ->
+                         (Longident.flatten s.txt, cty.ctyp_type)) ptys
+      } in
+      let ty = newty (Tpackage pack)
+      in
+=======
+      let pack, (), ptys =
+        transl_package env ~policy ~row_context NoMType ptyp in
+      let ty = newty (Tpackage pack) in
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       ctyp (Ttyp_package {
-            tpt_path = path;
+            tpt_path = pack.pack_path;
             tpt_type = pack;
             tpt_cstrs = ptys;
             tpt_txt = ptyp.ppt_path;
@@ -1247,6 +1280,40 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
+  | Ptyp_functor (lbl, name, ptyp, st) ->
+    begin match lbl with
+      | Optional l ->
+        raise (Error (ptyp.ppt_loc, env, Functor_optional_param l));
+      | Nolabel | Labelled _ -> ()
+    end;
+    let pack, mty, ptys =
+      transl_package env ~policy ~row_context ComputeMType ptyp in
+    let t = newvar () in
+    let ident = Ident.Unscoped.create name.txt in
+    let scoped_ident, cty, ty =
+      with_local_level begin fun () ->
+        let scoped_ident =
+          Ident.create_scoped ~scope:(Ctype.get_current_level()) name.txt
+        in
+        let env = Env.add_module scoped_ident Mp_present mty env in
+        let cty = transl_type env ~policy ~row_context st in
+        let ctyp_type =
+          instance_funct ~p_out:(Pident (Ident.of_unscoped ident))
+                         ~id_in:scoped_ident ~fixed:false cty.ctyp_type
+        in
+        let ty = newty (Tfunctor (lbl, ident, pack, ctyp_type)) in
+        (* Here we reduce the level of [cty] before leaving the local level *)
+        let _ = try unify env ty t with Unify trace ->
+          raise (Error (loc, env, Type_mismatch trace))
+        in
+        scoped_ident, cty, ty
+      end in
+    ctyp (Ttyp_functor (lbl, {txt = scoped_ident; loc = name.loc}, {
+                tpt_path = pack.pack_path;
+                tpt_type = pack;
+                tpt_constraints = ptys;
+                tpt_txt = ptyp.ppt_path;
+                }, cty)) ty
 
 and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
   let print_name = "'" ^ name in
@@ -1528,6 +1595,7 @@ and transl_fields env ~policy ~row_context o fields =
       newty (Tfield (s, field_public, ty', ty))) ty_init fields in
   ty, object_fields
 
+<<<<<<< HEAD
 and transl_package env ~policy ~row_context ptyp =
   (* CR layouts: right now we're doing a real gross hack where we demand
       everything in a package type with constraint be value.
@@ -1539,6 +1607,14 @@ and transl_package env ~policy ~row_context ptyp =
   *)
   (* CR layouts: and in the long term, rewrite all of this to eliminate
       the [create_package_mty] hack that constructs fake source code. *)
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+and transl_package env ~policy ~row_context ptyp =
+=======
+and transl_package
+  : type a. Env.t -> policy:_ -> row_context:_ -> a maybe_compute_mty ->
+    Parsetree.package_type -> Types.package * a * _ list
+  = fun env ~policy ~row_context (maybe : a maybe_compute_mty) ptyp ->
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   let loc = ptyp.ppt_loc in
   let l = sort_constraints_no_duplicates loc env ptyp.ppt_cstrs in
   let mty = Ast_helper.Mty.mk ~loc (Pmty_ident ptyp.ppt_path) in
@@ -1549,10 +1625,19 @@ and transl_package env ~policy ~row_context ptyp =
          s, transl_type env ~policy ~row_context Alloc.Const.legacy pty)
       l
   in
-  if ptys <> [] then
-    !check_package_with_type_constraints loc env mty.mty_type ptys;
-  let path = !transl_modtype_longident loc env ptyp.ppt_path.txt in
-  path, ptys
+  let mty : a =
+    if ptys <> [] then
+      forward_decl.check_package_with_type_constraints
+        loc env mty.mty_type maybe ptys
+    else match maybe with
+      | ComputeMType -> mty.mty_type
+      | NoMType -> ()
+  in
+  let pack_path = !transl_modtype_longident loc env ptyp.ppt_path.txt in
+  let pack_constraints =
+    List.map (fun (s, cty) -> (Longident.flatten s.txt, cty.ctyp_type)) ptys
+  in
+  {pack_path; pack_constraints}, mty, ptys
 
 (* Make the rows "fixed" in this type, to make universal check easier *)
 let rec make_fixed_univars mark ty =
@@ -1970,6 +2055,10 @@ let report_error_doc loc env = function
          annotations"
   | Polymorphic_optional_param l ->
       Location.errorf ~loc "@[Optional parameter %a cannot be polymorphic@]"
+        Style.inline_code l
+  | Functor_optional_param l ->
+      Location.errorf ~loc
+        "@[Module-dependent parameter %a cannot be optional@]"
         Style.inline_code l
 
 let () =

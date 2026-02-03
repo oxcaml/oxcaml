@@ -265,6 +265,7 @@ and type_desc =
   | Tpackage of package
   (** Type of a first-class module (a.k.a package). *)
 
+<<<<<<< HEAD
   | Tof_kind of jkind_lr
   (** [Tof_kind jkind] ==> [(type : jkind)]
 
@@ -286,6 +287,12 @@ and arg_label =
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr
 
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+  | Tfunctor of arg_label * Ident.Unscoped.t * package * type_expr
+  (** Type of a dependent arrow *)
+
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 (** [package] corresponds to the type of a first-class module *)
 and package =
   { pack_path : Path.t;
@@ -477,6 +484,12 @@ val is_commu_ok: commutable -> bool
 val commu_ok: commutable
 val commu_var: unit -> commutable
 
+type tfunctor = {
+  id_us : Ident.Unscoped.t;
+  pack : package;
+  ty : type_expr;
+}
+
 (** [field_kind] indicates the accessibility of a method.
 
     An [Fprivate] field may become [Fpublic] or [Fabsent] during unification,
@@ -666,6 +679,8 @@ val row_fixed: row_desc -> fixed_explanation option
 val row_name: row_desc -> (Path.t * type_expr list) option
 
 val set_row_name: row_desc -> (Path.t * type_expr list) option -> row_desc
+
+val subst_row_name_path: (Ident.t * Path.t) list -> row_desc -> row_desc
 
 val get_row_field: label -> row_desc -> row_field
 

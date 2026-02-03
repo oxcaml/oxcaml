@@ -829,12 +829,17 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
+<<<<<<< HEAD
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
   | Ttyp_newlayout of string loc list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+  | Ttyp_functor of arg_label * Ident.t loc * package_type * core_type
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 and package_type = {
   tpt_path : Path.t;
@@ -1436,6 +1441,7 @@ let split_pattern pat =
 let map_apply_arg f = function
   | Arg arg -> Arg (f arg)
   | Omitted _ as arg -> arg
+<<<<<<< HEAD
 
 let loc_of_decl ~uid =
   let of_option { txt; loc } =
@@ -1645,3 +1651,29 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+
+(* Try to convert a module expression to a module path. *)
+
+exception Not_a_path
+
+let rec path_of_module mexp =
+  match mexp.mod_desc with
+  | Tmod_ident (p,_) -> p
+  | Tmod_apply(funct, arg, _coercion) when !Clflags.applicative_functors ->
+      Path.Papply(path_of_module funct, path_of_module arg)
+  | Tmod_constraint (mexp, _, _, _) ->
+      path_of_module mexp
+  | (Tmod_structure _ | Tmod_functor _ | Tmod_apply_unit _ | Tmod_unpack _ |
+    Tmod_apply _) ->
+    raise Not_a_path
+
+let path_of_module mexp =
+ try Some (path_of_module mexp) with Not_a_path -> None
+
+let remove_module_constraint me =
+  match me.mod_desc with
+  | Tmod_constraint (me, _, _, _) -> me
+  | _ -> me
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)

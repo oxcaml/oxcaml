@@ -163,6 +163,7 @@ and type_desc =
   | Tpoly of type_expr * type_expr list
   | Trepr of type_expr * Jkind_types.Sort.univar list
   | Tpackage of package
+<<<<<<< HEAD
   | Tof_kind of jkind_lr
 
 and arg_label =
@@ -173,6 +174,10 @@ and arg_label =
 
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+  | Tfunctor of arg_label * Ident.Unscoped.t * package * type_expr
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 and package =
     { pack_path : Path.t;
@@ -221,6 +226,7 @@ and _ commutable_gen =
   | Cunknown : [> `none] commutable_gen
   | Cvar : {mutable commu: any commutable_gen} -> [> `var] commutable_gen
 
+<<<<<<< HEAD
 (* jkinds *)
 
 and jkind_history =
@@ -290,6 +296,15 @@ and jkind_declaration =
     jkind_loc : Location.t
   }
 
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+type tfunctor = {
+  id_us : Ident.Unscoped.t;
+  pack : package;
+  ty : type_expr;
+}
+
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 module TransientTypeOps = struct
   type t = type_expr
   let compare t1 t2 = t1.id - t2.id
@@ -1100,6 +1115,7 @@ let mixed_block_element_to_lowercase_string = function
 (**** Definitions for backtracking ****)
 
 type change =
+<<<<<<< HEAD
     Ctype : type_expr * type_desc -> change
   | Ccompress : type_expr * type_desc * type_desc -> change
   | Clevel : type_expr * int -> change
@@ -1113,6 +1129,30 @@ type change =
   | Cmodes : Mode.changes -> change
   | Csort : Jkind_types.Sort.change -> change
   | Czero_alloc : Zero_alloc.change -> change
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+    Ctype of type_expr * type_desc
+  | Ccompress of type_expr * type_desc * type_desc
+  | Clevel of type_expr * int
+  | Cscope of type_expr * int
+  | Cname of
+      (Path.t * type_expr list) option ref * (Path.t * type_expr list) option
+  | Crow of [`none|`some] row_field_gen ref
+  | Ckind of [`var] field_kind_gen
+  | Ccommu of [`var] commutable_gen
+  | Cuniv of type_expr option ref * type_expr option
+=======
+    Ctype of type_expr * type_desc
+  | Ccompress of type_expr * type_desc * type_desc
+  | Clevel of type_expr * int
+  | Cscope of type_expr * int
+  | Cname of
+      (Path.t * type_expr list) option ref * (Path.t * type_expr list) option
+  | Crow of [`none|`some] row_field_gen ref
+  | Ckind of [`var] field_kind_gen
+  | Ccommu of [`var] commutable_gen
+  | Cuniv of type_expr option ref * type_expr option
+  | Cuident of Ident.Unscoped.change
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 type changes =
     Change of change * changes ref
@@ -1126,11 +1166,18 @@ let log_change ch =
   !trail := Change (ch, r');
   trail := r'
 
+<<<<<<< HEAD
 let () =
   Mode.set_append_changes (fun changes -> log_change (Cmodes !changes));
   Jkind_types.Sort.set_change_log (fun change -> log_change (Csort change));
   Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change))
 
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+let () =
+    Ident.Unscoped.change_log := (fun change -> log_change (Cuident change))
+
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 (* constructor and accessors for [field_kind] *)
 
 type field_kind_view =
@@ -1509,6 +1556,11 @@ let set_row_name row row_name =
   let row = row_repr_no_fields row in
   {row with row_fields; row_name}
 
+let subst_row_name_path id_map row =
+  match row_name row with
+  | Some (p, tl) -> set_row_name row (Some (Path.subst id_map p, tl))
+  | None -> row
+
 type row_desc_repr =
     Row of { fields: (label * row_field) list;
              more:type_expr;
@@ -1617,9 +1669,14 @@ let undo_change = function
   | Ckind  (FKvar r) -> r.field_kind <- FKprivate
   | Ccommu (Cvar r)  -> r.commu <- Cunknown
   | Cuniv  (r, v)    -> r := v
+<<<<<<< HEAD
   | Cmodes c          -> Mode.undo_changes c
   | Csort change -> Jkind_types.Sort.undo_change change
   | Czero_alloc c -> Zero_alloc.undo_change c
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+  | Cuident change    -> Ident.Unscoped.undo_change change
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 type snapshot = changes ref * int
 let last_snapshot = Local_store.s_ref 0

@@ -553,10 +553,21 @@ let lapply ~loc p1 loc_p1 p2 loc_p2 =
   else raise (Syntaxerr.Error(
                   Syntaxerr.Applicative_path (make_loc loc)))
 
+<<<<<<< HEAD
 let make_ghost x =
   if x.loc.loc_ghost
   then x (* Save an allocation *)
   else { x with loc = Location.ghostify x.loc }
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+(* [loc_map] could be [Location.map]. *)
+let loc_map (f : 'a -> 'b) (x : 'a Location.loc) : 'b Location.loc =
+  { x with txt = f x.txt }
+
+let make_ghost x = { x with loc = { x.loc with loc_ghost = true }}
+=======
+
+let make_ghost x = { x with loc = { x.loc with loc_ghost = true }}
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let loc_last (id : Longident.t Location.loc) : string Location.loc =
   Location.map Longident.last id
@@ -4719,11 +4730,27 @@ strict_function_or_labeled_tuple_type:
     { let ty, ltys = $3 in
       mktyp ~loc:$sloc (Ptyp_tuple ((Some label, ty) :: ltys))
     }
+  | mktyp(
+      label = arg_label_no_opt
+      LPAREN
+        MODULE attrs = ext_attributes id = mkrhs(UIDENT) COLON
+        ptyp = package_type_
+      RPAREN
+      MINUSGREATER
+      codomain = function_type
+        { let ptyp = {ptyp with ppt_attrs = snd attrs @ ptyp.ppt_attrs } in
+          Ptyp_functor(label, id, ptyp, codomain) }
+    )
+    { $1 }
 ;
 
 %inline strict_arg_label:
   | label = optlabel
       { Optional label }
+  | arg_label_no_opt
+      { $1 }
+
+%inline arg_label_no_opt:
   | label = LIDENT COLON
       { Labelled label }
 ;

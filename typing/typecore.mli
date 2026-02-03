@@ -348,6 +348,7 @@ type error =
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
   | Optional_poly_param of string
+<<<<<<< HEAD
   | Exclave_in_nontail_position
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
@@ -369,6 +370,11 @@ type error =
 
 and invalid_layout_poly_inst_context =
   | Binding_op
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+  | Cannot_unify_tfunctor_to_tarrow of Errortrace.unification_error
+  | Cannot_omit_tfunctor_argument of Ident.Unscoped.t * type_expr
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -396,6 +402,11 @@ val type_object:
 val type_package:
   (Env.t -> Parsetree.module_expr -> package ->
    Typedtree.module_expr * package) ref
+(* Forward declaration, to be filled in by Typemod.check_package_closed.
+   Ensures that the package type does not contain any type variable. *)
+val check_package_closed:
+  (loc:Location.t -> env:Env.t -> typ:type_expr ->
+   (string list * type_expr) list -> unit) ref
 
 val constant: Parsetree.constant -> (Typedtree.constant, error) result
 

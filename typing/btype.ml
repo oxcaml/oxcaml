@@ -393,8 +393,8 @@ let fold_type_expr f init ty =
       let result = f init ty1 in
       f result ty2
   | Tnil                -> init
-  | Tlink _
-  | Tsubst _            -> assert false
+  | Tlink _             -> assert false
+  | Tsubst _            -> init
   | Tunivar _           -> init
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
@@ -402,8 +402,21 @@ let fold_type_expr f init ty =
   | Trepr (ty, _sort_vars) ->
     f init ty
   | Tpackage pack ->
+<<<<<<< HEAD
     List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
   | Tof_kind _ -> init
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+      List.fold_left
+        (fun result (_n, ty) -> f result ty) init pack.pack_constraints
+=======
+      List.fold_left
+        (fun result (_n, ty) -> f result ty) init pack.pack_constraints
+  | Tfunctor (_, _, pack, ty) ->
+      let res =
+        List.fold_left (fun result (_n, ty) -> f result ty) init
+          pack.pack_constraints in
+      f res ty
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let iter_type_expr f ty =
   fold_type_expr (fun () v -> f v) () ty
@@ -437,6 +450,12 @@ let iter_type_expr_kind f = function
       List.iter (fun d -> f d.ld_type) lbls
   | Type_open ->
       ()
+
+let map_pack map_path map_type { pack_path; pack_constraints } =
+  {
+    pack_path = map_path pack_path;
+    pack_constraints = List.map (Pair.map_snd map_type) pack_constraints;
+  }
 
                   (**********************************)
                   (*     Utilities for marking      *)
@@ -565,6 +584,7 @@ let type_iterators mark =
     match get_desc ty with
       Tconstr (p, _, _)
     | Tobject (_, {contents=Some (p, _)})
+    | Tfunctor (_, _, {pack_path = p}, _)
     | Tpackage {pack_path = p} ->
         it.it_path p
     | Tvariant row ->
@@ -642,9 +662,22 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Trepr (ty, sort_vars) ->
       Trepr (f ty, sort_vars)
   | Tpackage pack       ->
+<<<<<<< HEAD
       Tpackage {pack with
         pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
   | Tof_kind jk -> Tof_kind jk
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+      let pack_constraints =
+        List.map (fun (n, ty) -> (n, f ty)) pack.pack_constraints in
+      Tpackage {pack with pack_constraints }
+=======
+      let pack_constraints =
+        List.map (fun (n, ty) -> (n, f ty)) pack.pack_constraints in
+      Tpackage {pack with pack_constraints}
+  | Tfunctor _ ->
+      (* doing this would break unicity of unscoped binding in Tfunctor *)
+      assert false
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 (* TODO: rename to [module Copy_scope] *)
 module For_copy : sig

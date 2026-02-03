@@ -182,6 +182,7 @@ type error =
   | Repeated_tuple_label of string
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param of string
+<<<<<<< HEAD
   | Non_value of
       {vloc : value_loc; typ : type_expr; err : Jkind.Violation.t}
   | Non_sort of
@@ -196,6 +197,10 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+  | Functor_optional_param of string
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 exception Error of Location.t * Env.t * error
 
@@ -204,7 +209,15 @@ val transl_modtype_longident:  (* from Typemod *)
     (Location.t -> Env.t -> Longident.t -> Path.t) ref
 val transl_modtype: (* from Typemod *)
     (Env.t -> Parsetree.module_type -> Typedtree.module_type) ref
-val check_package_with_type_constraints: (* from Typemod *)
-    (Location.t -> Env.t -> Types.module_type ->
-     (Longident.t Asttypes.loc * Typedtree.core_type) list ->
-     unit) ref
+
+type 'a maybe_compute_mty =
+  | ComputeMType : Types.module_type maybe_compute_mty
+  | NoMType : unit maybe_compute_mty
+type forward_decl = {
+  mutable check_package_with_type_constraints : (* from Typemod *)
+    'a. Location.t -> Env.t -> Types.module_type ->
+        'a maybe_compute_mty ->
+        (Longident.t Asttypes.loc * Typedtree.core_type) list -> 'a;
+}
+
+val forward_decl : forward_decl

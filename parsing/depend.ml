@@ -129,6 +129,9 @@ let rec add_type bv ty =
   | Ptyp_repr(_, t) -> add_type bv t
   | Ptyp_newlayout(_, t) -> add_type bv t
   | Ptyp_extension e -> handle_extension e
+  | Ptyp_functor (_, id, pt, t2) ->
+    add_package_type bv pt;
+    add_type (String.Map.add id.txt bound bv) t2
 
 and add_package_type bv ptyp =
   add bv ptyp.ppt_path;

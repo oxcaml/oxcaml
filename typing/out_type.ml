@@ -1238,6 +1238,35 @@ let prepare_for_printing tyl =
 
 let add_type_to_preparation = prepare_type
 
+let wrap_env ?(keep_short_paths = false) fenv ftree arg =
+  (* We save the current value of the short-path cache *)
+  (* From keys *)
+  let env = !printing_env in
+  let old_pers = !printing_pers in
+  (* to data *)
+  let old_map = !printing_map in
+  let old_depth = !printing_depth in
+  let old_cont = !printing_cont in
+  if keep_short_paths then
+    printing_env := fenv env
+  else
+    set_printing_env (fenv env);
+  let tree = ftree arg in
+  if !Clflags.real_paths
+     || same_printing_env env then ()
+   (* our cached key is still live in the cache, and we want to keep all
+      progress made on the computation of the [printing_map] *)
+  else begin
+    (* we restore the snapshotted cache before calling set_printing_env *)
+    printing_old := env;
+    printing_pers := old_pers;
+    printing_depth := old_depth;
+    printing_cont := old_cont;
+    printing_map := old_map
+  end;
+  set_printing_env env;
+  tree
+
 (* Disabled in classic mode when printing an unification error *)
 let print_labels = ref true
 let with_labels b f = Misc.protect_refs [R (print_labels,b)] f
@@ -1448,6 +1477,7 @@ let rec tree_of_modal_typexp mode modal ty =
                   tree_of_typexp mode arg_mode ty
               | _ -> Otyp_stuff "<hidden>"
             else Otyp_stuff "<hidden>"
+<<<<<<< HEAD
           else
             tree_of_typexp mode arg_mode ty1
         in
@@ -1459,6 +1489,31 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
         Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+          else tree_of_typexp mode ty1 in
+        Otyp_arrow (lab, t1, tree_of_typexp mode ty2)
+    | Ttuple tyl ->
+        Otyp_tuple (tree_of_labeled_typlist mode tyl)
+=======
+          else tree_of_typexp mode ty1 in
+        Otyp_arrow (lab, t1, tree_of_typexp mode ty2)
+    | Tfunctor (l, id, pack, ty) ->
+        let lab =
+          if !print_labels || is_optional l then l else Nolabel
+        in
+        let fenv env =
+          (* We compute an approximation of the signature. *)
+          let mty = Mty_ident pack.pack_path in
+          Env.add_module ~noalias:true (Ident.of_unscoped id) Mp_present mty env
+        in
+        let ty =
+          wrap_env ~keep_short_paths:true fenv (tree_of_typexp mode) ty
+        in
+        Otyp_functor (lab, Oide_ident { printed_name = Ident.Unscoped.name id },
+                      tree_of_package mode pack, ty)
+    | Ttuple tyl ->
+        Otyp_tuple (tree_of_labeled_typlist mode tyl)
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     | Tconstr(p, tyl, _abbrev) ->
         let p', s = best_type_path p in
         let tyl' = apply_subst s tyl in
@@ -2473,32 +2528,6 @@ let tree_of_jkind_declaration id decl =
   Osig_jkind ojkind
 
 (* Print a module type *)
-
-let wrap_env fenv ftree arg =
-  (* We save the current value of the short-path cache *)
-  (* From keys *)
-  let env = !printing_env in
-  let old_pers = !printing_pers in
-  (* to data *)
-  let old_map = !printing_map in
-  let old_depth = !printing_depth in
-  let old_cont = !printing_cont in
-  set_printing_env (fenv env);
-  let tree = ftree arg in
-  if !Clflags.real_paths
-     || same_printing_env env then ()
-   (* our cached key is still live in the cache, and we want to keep all
-      progress made on the computation of the [printing_map] *)
-  else begin
-    (* we restore the snapshotted cache before calling set_printing_env *)
-    printing_old := env;
-    printing_pers := old_pers;
-    printing_depth := old_depth;
-    printing_cont := old_cont;
-    printing_map := old_map
-  end;
-  set_printing_env env;
-  tree
 
 let dummy =
   {

@@ -129,10 +129,17 @@ type 'a loc = {
 
 val mknoloc : 'a -> 'a loc
 val mkloc : 'a -> t -> 'a loc
+<<<<<<< HEAD
 val get_txt : 'a loc -> 'a
 val get_loc : 'a loc -> t
 val map : ('a -> 'b) -> 'a loc -> 'b loc
 val compare_txt : ('a -> 'b -> 'c) -> 'a loc -> 'b loc -> 'c
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+
+=======
+val map : ('a -> 'b) -> 'a loc -> 'b loc
+
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 (** {1 Input info} *)
 

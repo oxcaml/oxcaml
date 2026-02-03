@@ -115,6 +115,7 @@ type error =
   | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
+<<<<<<< HEAD
   | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
   | Jkind_mismatch_of_path of Env.t * Path.t * Jkind.Violation.t
   | Jkind_mismatch_due_to_bad_inference of
@@ -129,6 +130,12 @@ type error =
   | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+  | Immediacy of Typedecl_immediacy.error
+=======
+  | Type_cannot_be_external of type_expr
+  | Immediacy of Typedecl_immediacy.error
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   | Separability of Typedecl_separability.error
   | Bad_unboxed_attribute of string
   | Poly_not_yet_implemented
@@ -1480,6 +1487,12 @@ let rec check_constraints_rec env loc visited ty =
         | All_good -> ()
       end;
       List.iter (check_constraints_rec env loc visited) args
+  | Tfunctor (_, us, pack, ty) ->
+      List.iter (fun (_, t) -> check_constraints_rec env loc visited t)
+        pack.pack_constraints;
+      let (env, ty) =
+        Ctype.open_tfunctor env ~loc us pack ty in
+      check_constraints_rec env loc visited ty
   | Tpoly (ty, tl) ->
       let ty = Ctype.instance_poly tl ty in
       check_constraints_rec env loc visited ty
@@ -4048,6 +4061,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
         env ct1 t1 ~global_repr
         ~is_layout_poly ~why:External_argument ~is_return:false
     in
+<<<<<<< HEAD
     let mode =
       if Builtin_attributes.has_local_opt ct1.ptyp_attributes
       then Prim_poly
@@ -4073,6 +4087,27 @@ let rec parse_native_repr_attributes env core_type ty rmode
         ~is_layout_poly ~why:External_result ~is_return:true
      in
      ([], (rmode, repr_res))
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+    (repr_arg :: repr_args, repr_res)
+  | (Ptyp_poly (_, t) | Ptyp_alias (t, _)), _, _ ->
+     parse_native_repr_attributes env t ty ~global_repr
+  | Ptyp_arrow _, _, _ -> assert false
+  | _, Tarrow _, _ ->
+      raise (Error (core_type.ptyp_loc, External_with_non_syntactic_arity))
+  | _ -> ([], make_native_repr env core_type ty ~global_repr)
+
+=======
+    (repr_arg :: repr_args, repr_res)
+  | Ptyp_functor _, Tfunctor _, _ ->
+    raise (Error (core_type.ptyp_loc, Type_cannot_be_external ty))
+  | (Ptyp_poly (_, t) | Ptyp_alias (t, _)), _, _ ->
+     parse_native_repr_attributes env t ty ~global_repr
+  | Ptyp_arrow _, _, _ | Ptyp_functor _, _, _ -> assert false
+  | _, Tarrow _, _ | _, Tfunctor _, _ ->
+      raise (Error (core_type.ptyp_loc, External_with_non_syntactic_arity))
+  | _ -> ([], make_native_repr env core_type ty ~global_repr)
+
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let check_unboxable env loc ty =
   let rec check_type acc ty : Path.Set.t =
@@ -5269,6 +5304,7 @@ let report_error ~loc = function
          a direct argument or result of the primitive,@ \
          it should not occur deeply into its type."
         Style.inline_code
+<<<<<<< HEAD
         (match kind with
          | Unboxed -> "@unboxed"
          | Untagged -> "@untagged"
@@ -5381,6 +5417,45 @@ let report_error ~loc = function
             (Mixed_product_kind.to_plural_string mixed_product_kind)
             ~sub:hint)
     end
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+        (match kind with Unboxed -> "@unboxed" | Untagged -> "@untagged")
+  | Immediacy (Typedecl_immediacy.Bad_immediacy_attribute violation) ->
+      (match violation with
+       | Type_immediacy.Violation.Not_always_immediate ->
+           Location.errorf ~loc
+             "Types@ marked@ with@ the@ immediate@ attribute@ must@ be@ \
+              non-pointer@ types@ like@ %a@ or@ %a."
+             Style.inline_code "int"
+             Style.inline_code "bool"
+       | Type_immediacy.Violation.Not_always_immediate_on_64bits ->
+           Location.errorf ~loc
+           "Types@ marked@ with@ the@ %a@ attribute@ must@ be@ \
+              produced@ using@ the@ %a@ functor."
+             Style.inline_code "immediate64"
+             Style.inline_code "Stdlib.Sys.Immediate64.Make"
+      )
+=======
+        (match kind with Unboxed -> "@unboxed" | Untagged -> "@untagged")
+  | Type_cannot_be_external ty ->
+      Location.errorf ~loc
+        "The type@ %a@ cannot be used to annotate an external function."
+          (Style.as_inline_code Printtyp.type_expr) ty
+  | Immediacy (Typedecl_immediacy.Bad_immediacy_attribute violation) ->
+      (match violation with
+       | Type_immediacy.Violation.Not_always_immediate ->
+           Location.errorf ~loc
+             "Types@ marked@ with@ the@ immediate@ attribute@ must@ be@ \
+              non-pointer@ types@ like@ %a@ or@ %a."
+             Style.inline_code "int"
+             Style.inline_code "bool"
+       | Type_immediacy.Violation.Not_always_immediate_on_64bits ->
+           Location.errorf ~loc
+           "Types@ marked@ with@ the@ %a@ attribute@ must@ be@ \
+              produced@ using@ the@ %a@ functor."
+             Style.inline_code "immediate64"
+             Style.inline_code "Stdlib.Sys.Immediate64.Make"
+      )
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
   | Bad_unboxed_attribute msg ->
       Location.errorf ~loc "This type cannot be unboxed because@ %s." msg
   | Poly_not_yet_implemented ->

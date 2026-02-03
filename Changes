@@ -1,6 +1,1200 @@
 OCaml 5.4.1
 -----------
 
+<<<<<<< HEAD
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+(Changes that can break existing programs are marked with a "*")
+
+### Language features:
+
+* #14009: infix extension points/attributes appearing in local structure items,
+  eg `let module%foo[@bar] ... in ...` are attached to the AST node of the
+  corresponding structure item (similar to their global counterparts) and no
+  longer to the enclosing `let` expression.  Extension points/attributes that
+  are to be attached to the enclosing `let` expression are to be written next to
+  the `let` keyword, eg `let%foo[@bar] module ... in ...`. The same holds for
+  `let exception` and `let open`.
+  (Nicolás Ojeda Bär, review by Gabriel Scherer)
+
+- #14029: Recognize `%identity` as nonexpansive
+  (Stephen Dolan and Olivier Nicole, review by Hugo Heuzard, Jacques Garrigue,
+  Jeremy Yallop,  and Gabriel Scherer)
+
+* #13712: Introduce a new kind `Type_external` and syntax
+  `type t = external "name"` to discriminate external types from other types
+  and each other.  This PR turns primitive types into external and removes the
+  past behavior of discriminating abstract types defined in the current module.
+  (Takafumi Saikawa, Jacques Garrigue, review by Richard Eisenberg)
+
+- #13806: Enable the use of function parameters with polymorphic types.
+  (Ulysse Gérard, Leo White, review by Florian Angeletti, Samuel Vivien, Gabriel
+  Scherer and Jacques Garrigue)
+
+- #14040: generalize the constructs `let module`, `let exception` and `let open`
+  to most other structure items, eg `let type t = ... in ...`, `let type t +=
+  ... in ...`, etc.
+  (Nicolás Ojeda Bär, review by Valentin Gatien-Baron)
+
+### Runtime system:
+
+- #14416: Spawned domains will record backtraces if the parent domain has
+  enabled it.
+  (Nathan Taylor, review by Gabriel Scherer)
+
+- #13616: Change free list representation in shared heap
+  (Sadiq Jaffer, review by Damien Doligez)
+
+- #13580: Introduce sweep-only phase at start of major GC cycle,
+  to reduce latent-garbage delay and therefore improve GC performance.
+  (Stephen Dolan and Nick Barnes, review by KC Sivaramakrishnan)
+
+- #14123: Fix integer-overflow problems in heap compaction.
+  (Nick Barnes, review by Antonin Décimo).
+
+- #14035: Fix the alignment of _Atomic long long unsigned int fields
+  before GCC 11.1 on i686. Silence GCC note on newer versions.
+  (Antonin Décimo, review by Sadiq Jaffer)
+
+- #13574, #13594: Generational scanning of stack frames for ARM 64 bits, POWER,
+  and RISC-V.  This reduces minor GC work in the presence of deep call stacks.
+  (Xavier Leroy, review by Miod Vallat, Gabriel Scherer and Olivier Nicole)
+
+- #14053: Statmemprof: it is now possible to replace a profile in the
+  current domain without stopping it in all domains.
+  Added the function [Gc.Memprof.is_sampling].
+  (Guillaume Munch-Maccagnoni, review by Gabriel Scherer)
+
+- #14168: restore the stack size statistic in `Gc.stat` and adds a new
+  `live_stacks_words` field tracking the total size in words of live stacks.
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #14189: Add runtime counters EV_C_MINOR_PROMOTED_WORDS and
+  EV_C_MINOR_ALLOCATED_WORDS. EV_C_MINOR_PROMOTED_WORDS reports words promoted
+  by minor GC and EV_C_MINOR_ALLOCATED_WORDS reports words allocated by minor
+  GC. Both have equivalent bytes counters. Also updated the documentation for
+  EV_C_MINOR_PROMOTED and EV_C_MINOR_ALLOCATED to qualify scope of the values
+  reported as being per-domain.
+  (Tim McGilchrist, review by Nick Barnes, Sadiq Jaffer and
+  Gabriel Scherer)
+
+* #14243: Explicit relative paths in ld.conf (".", "..", "./<path...>",
+  "../<path...>") are interpreted as being relative to the directory ld.conf
+  was loaded from, and the default ld.conf now uses relative paths, rather than
+  embedding the absolute path to the Standard Library. The brave may continue to
+  put implicit paths in ld.conf. The interpretation of CAML_LD_LIBRARY_PATH is
+  unaltered. Additionally, ld.conf is loaded from all of $OCAMLLIB/ld.conf,
+  $CAMLLIB/ld.conf and standard_library_default/ld.conf rather than just the
+  first one found. ld.conf files with CRLF line endings are now consistently
+  normalised on both Windows and Unix.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+- #14244: Added --with-relative-libdir which allows the runtime and the
+  compilers to locate the Standard Library relative to where the binaries
+  themselves are installed, removing the absolute path previously embedded in
+  caml_standard_library_default. Executables linked with `ocamlc -custom` now
+  always attempt to load bytecode from the executable itself, rather than first
+  trying `argv[0]`.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez,
+   Samuel Hym and Vincent Laviron)
+
+- #14245: Introduce Runtime IDs for use in filename mangling to allow different
+  configurations and different versions of the runtime system to coexist
+  harmoniously on a single system. The IDs are used, along with the host
+  triplet, to provide mangled names for the ocamlrun executable and its variants
+  and the DLL versions of both the bytecode and native runtimes, with symlinks
+  created for the original names. They are also used to mangle the names of stub
+  libraries so that stub libraries compiled for a given configuration of the
+  runtime will only be sought by that runtime. The behaviour is disabled by
+  configuring with --disable-suffixing.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+- #12269, #12410, #13063: Fix unsafety, deadlocks, and/or leaks should
+  rare errors happen during domain creation and thread
+  creation/registration.
+  (Guillaume Munch-Maccagnoni, review by Gabriel Scherer, B. Szilvasy,
+   Miod Vallat)
+
+- #14275: Add function caml_c_thread_register_in_domain, which makes it
+  possible to register "C threads" in another domain than 0 (which is
+  what caml_c_thread_register does). The function takes a domain unique
+  ID in which to register the thread. The domain must be running
+  when the function is called.
+  (Jack Nørskov Jørgensen, review by Gabriel Scherer,
+   Guillaume Munch-Maccagnoni)
+
+- #14337: Fix potential segfault due to the C callback mechanism dropping
+  continuations without calling `caml_continuation_use`.
+  (Max Slater, review by Nick Barnes and Stephen Dolan)
+
+- #13416: Implement concurrency primitives using WinAPI instead of
+  winpthreads on Windows.
+  (Antonin Décimo, review by Samuel Hym, Gabriel Scherer, Miod Vallat,
+  B. Szilvasy, and Nicolás Ojeda Bär)
+
+- #14367: Gc.Tweak mechanism to allow named GC parameters
+  (Stephen Dolan and Nick Barnes, review by Gabriel Scherer, David Allsopp and
+  Antonin Décimo)
+
+- #14461: Fix racy socketpair on Windows. Address-in-use errors would sometimes
+  occur when concurrent threads or processes were trying to create socketpairs.
+  (Jessie Grosen, review by Antonin Décimo and Nicolás Ojeda Bär)
+
+- #14494: Consistently use macro to test header promotion.
+  (Nick Barnes, review by Gabriel Scherer)
+
+### Code generation and optimizations:
+
+### Standard library:
+
+- #14437: Add String.split_{first,last,all} and String.rsplit_all
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Florian Angeletti)
+
+- #14436: Add String.replace_{first,last,all}
+  (Daniel Bünzli, review by Nicolás Ojeda Bär, Ali Caglayan and
+   Florian Angeletti)
+
+- #13343: Add Array.stable_sort_sub
+  (François Pottier, review by Gabriel Scherer, Corentin Leruth and Nicolás
+   Ojeda Bär)
+
+- #14439: Add String.includes
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Olivier Nicole)
+
+- #10177: Seq.(delay : (unit -> 'a t) -> 'a t)
+  (Gabriel Scherer, review by Jeremy Yallop and François Pottier)
+
+- #14381: Add String.find_{first,last}_index, String.find_{first,last},
+  String.[r]find_all.
+  (Daniel Bünzli, review by Nicolás Ojeda Bär, Ali Caglayan and
+   Florian Angeletti)
+
+- #14438: Add String.is_empty
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+- #14440: Add String.of_char
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+- #14362: Add String.{drop,take,cut}_{first,last}_while
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and David Allsopp)
+
+- #14363: Preserve the backtrace at exceptional domain termination. Domain.join
+  on an exceptionally terminated domain re-raises the exception with the
+  backtrace.
+  (KC Sivaramakrishnan, report by Nathan Taylor, review by Gabriel Scherer,
+  David Allsopp)
+
+- #13372: New Format and Printf printf-like functions that accept a
+   heterogeneous list as arguments.
+  (Leonardo Santos, review by Florian Angeletti and Gabriel Scherer)
+
+- #14352: Add String.{drop,take,cut}_{first,last}.
+  (Daniel Bünzli, review by David Allsopp, Nicolás Ojeda Bär and
+  Vincent Laviron)
+
+- #14185: List.split_map
+  (Jeremy Yallop, review by Daniel Bünzli, Nicolás Ojeda Bär and Damien Doligez)
+
+- #13728: Add Sys.runtime_executable containing the full path (if available) to
+  the currently executing runtime.
+  (David Allsopp, review by Nicolás Ojeda Bär and Daniel Bünzli)
+
+- #13916: Add Option.product and Option.Syntax.
+  (Nicolás Ojeda Bär, review by Daniel Bünzli, Gabriel Scherer and David
+  Allsopp)
+
+- #13995: Add Option.blend.
+  (Kate Deplaix, review by Daniel Bünzli, Gabriel Scherer,
+   Nicolás Ojeda Bär, Florian Angeletti and Josh Berdine)
+
+- #14086: Add Domain.count.
+  (Nicolás Ojeda Bär, review by David Allsopp, Gabriel Scherer, Daniel Bünzli
+  and KC Sivaramakrishnan)
+
+- #13920: add Option.{for_all, exists}
+  (Gabriel Scherer, review by Kate Deplaix, Nicolás Ojeda Bär, Richard Eisenberg
+  and Jeremy Yallop)
+
+- #12877: Dynarray.rev_iter, Dynarray.rev_iteri
+  (Gabriel Scherer, review by Léo Andrès, Jeremy Yallop and Nicolás Ojeda Bär)
+
+- #14118: Add {Set,Map}.S.is_singleton
+  (Kate Deplaix, review by Daniel Bünzli, Vincent Laviron, Nicolás Ojeda Bär
+   and Stephen Dolan)
+
+- #14060: Add Hashtbl.find_and_replace and Hashtbl.find_and_remove.
+  (Sacha-Élie Ayoun, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+- #14227: Add List.filter_mapi.
+  (Émile Trotignon, review by Nicolás Ojeda Bär, Jan Midtgaard and
+   Damien Doligez)
+
+- #14084: Future-proof Dynarray implementation against a smarter compiler
+  (Basile Clément, review by Gabriel Scherer)
+
+- #14432: Add floor division, ceil division, Euclidean division and remainder
+  to the Int, Int32, Int64 and Nativeint modules.
+  (Xavier Leroy, review by Ali Caglayan, Nicolás Ojeda Bär, Gabriel Scherer)
+
+- #14433: Add bit-counting functions `leading_zeros`, `leading_sign_bits`,
+  `trailing_zeros`, `bit_count`, `unsigned_bitsize`, `signed_bitsize`
+  to Int, Int32, Int64, and Nativeint
+  (Xavier Leroy, review by Ali Caglayan and David Allsopp)
+
+### Type system:
+
+- #13781: Set scope of internal type nodes during abbreviation expansion
+  rather than recursing during unification.
+  (Jacques Garrigue, review by Gabriel Scherer)
+
+* #14066: catch invalid aliases introduced by signature constraints during
+  merging rather than in subtyping:
+  ```ocaml
+    module X = struct end module F (_:sig end) = struct end
+    module type T = (sig module X0 : sig end module X1 = X0 end)
+      with module X0 := F(X)
+  ```
+  Before, it failed with a subtyping error. Now, it fails with a proper error,
+  explaining that `X1` would keep an invalid alias to `F(X)`
+  (Clement Blaudeau, review by Florian Angeletti)
+
+* #14100: Do not ignore type-constraints and module-constraints when building
+  the approximated signature of recursive modules. Ignoring those constraints
+  resulted in incorrect (wrong set of fields, wrong shadowing between fields)
+  approximated signatures, failing to typecheck, as in:
+  ```ocaml
+  module X0 : sig type t end
+  module rec X : ((sig module A : sig end end) with module A := X0)
+  and Y : sig type t = X.A.t end (* Unbound type constructor X.A.t *)
+  ```
+  Now, type and module constraints are properly merged during approximation ,
+  reusing the infrastructure for normal merging of constraints, but disabling
+  any wellformedness check.
+  (Clement Blaudeau and Ryan Tjoa, review by Florian Angeletti)
+
+- #14327: Allow retyping as-patterns that contain existentials
+  (completing #14229)
+  (Jacques Garrigue and Takafumi Saikawa, reported by Olivier Nicole,
+   review by Gabriel Scherer)
+
+- #14483: Reset type ID and level counters between compilations to restore
+  reproducibility of debug information between `ocamlc -c foo.mli foo.ml` versus
+  `ocamlc -c foo.mli; ocamlc -c foo.ml`. Also hashcons the identifiers used for
+  persistent structures across resets of the type checker. In particular, that
+  means the initialisation of globals in Matching do not become observable in
+  the marshalled output.
+  (David Allsopp, review by Gabriel Scherer)
+
+### Other libraries:
+
+- #13700, #14454: Use POSIX thread-safe getgrnam_r, getgrgid_r, getpwnam_r,
+  getpwuid_r, gmtime_r, localtime_r, getlogin_r, and fix mktime error checking.
+  (Antonin Décimo, review by David Allsopp, Stefan Muenzel, and Miod Vallat)
+
+- #14406: Better handling of address length for unix sockets, improving Haiku
+  compatibility.
+  (Sylvain Kerjean, review by Antonin Décimo and Nicolás Ojeda Bär)
+
+* #14046: On Windows, `Unix.kill pid Sys.sigkill` causes the receiving process
+  to exit with code ERROR_PROCESS_ABORTED (1067) instead of 0.
+  (Nicolás Ojeda Bär, review by Miod Vallat, Antonin Décimo and David Allsopp)
+
+- #14020: Add Unix.unsetenv.
+  (Nicolás Ojeda Bär, review by Antonin Décimo and David Allsopp)
+
+- #13447: Symmetrize shared `Sys` and `Unix` functions. Apply fixes
+  of #12072, #12184, #12320, and #13166, from `Sys.rename` to
+  `Unix.rename`.  Make `caml_sys_close` raise on error, allowing
+  `Filename.temp_file` retries if close fails. Flush buffers when
+  calling `caml_sys_system_command` on Windows. Error with EINVAL
+  instead of ENOENT if the command string is not a valid C string.
+  (Antonin Décimo, review by Gabriel Scherer and Nicolás Ojeda Bär)
+
+- #14310: Deprecate union sock_addr_union for struct sockaddr_storage
+  and socklen_param_type for socklen_t.
+  (Antonin Décimo, review by Nicolás Ojeda Bär, David Allsopp and Samuel Hym)
+
+- #14391: unload native dynlinked objects when an error occurs and it is safe to
+  do so. (Fixes #14323)
+  (Nicolás Ojeda Bär, review by Vincent Laviron)
+
+### Tools:
+
+- #14055: Invert BUILD_PATH_PREFIX_MAP in directories loaded at startup
+  by the debugger.
+  (Pierre Boutillier, review by Gabriel Scherer and Daniel Bünzli)
+
+* #13638: ocamlmklib exits with code 4 if passed an unrecognised option, as it
+  does with an unrecognised file.
+  (David Allsopp, review by Antonin Décimo and Sébastien Hinderer)
+
+- #13941, #13961: Fix `ocamltest` variable handing.
+  (Damien Doligez, report by Olivier Nicole, review by Gabriel Scherer)
+
+- #13962: Little ocamltest refactors. Fix error handling in C code,
+  leaking file descriptors, code style.
+  (Antonin Décimo, review by Gabriel Scherer)
+
+- #14059: Fix flaky TSan tests
+  (Fabrice Buoro and Olivier Nicole, review by Gabriel Scherer)
+
+- #13966, #13969: Enable "generalized polymorphic #install_printer"
+  in the debugger
+  (Pierre Boutillier and Gabriel Scherer, review by Florian Angeletti)
+
+- #14063 : Debugger fallbacks to "looking for 'module_name'.ml in the
+  loadpath" when seeking source files. It improves hit rate for
+  sources of installed packages.
+  (Pierre Boutillier, review by Gabriel Scherer)
+
+- #14032, #14034: Update to and require FlexDLL 0.44.
+  (Jan Midtgaard, Antonin Décimo, review by David Allsopp)
+
+- #14239: Fix `#show_constructor` when printing non-GADT type parameters
+  (Takafumi Saikawa, Jacques Garrigue, review by Gabriel Scherer)
+
+- #14245: ocamlobjinfo now displays the runtime invoked by a bytecode
+  executable (either from the RNTM section or by analysing the shebang lines)
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+### Manual and documentation:
+
+- #14397: Improve documentation of type-directed disambiguation of array
+  literals (Alicia Michael, review by Olivier Nicole and Florian Angeletti)
+
+- #14293: Improve documentation of Runtime_events.Timestamp (Raphaël Proust,
+  review by Gabriel Scherer)
+
+- #13747: Document support for native debugging with GDB and LLDB.
+   (Tim McGilchrist, review by Daniel Bünzli, Samuel Hym, Olivier Nicole
+   and Antonin Décimo)
+
+* #13975: documented the `[@remove_aliases]` built-in attribute for signatures
+  (introduced by #1652 in 2018). Small refactor of the code that fetches the
+  attribute.
+  (Clement Blaudeau, review by Gabriel Scherer)
+
+- #14002: Add anchors to items and headings of the web version of the API
+  documentation for easier linking.
+  (Nicolás Ojeda Bär, report by Louis Roché, review by Gabriel Scherer and
+  Florian Angeletti)
+
+- #14023: Add documentation for the [row_more] function.
+  (Richard Eisenberg, review by Jacques Garrigue)
+
+- #14038: Fall back immediately to user-agent-defined fonts when web fonts
+  fail to load.
+  (toastal)
+
+- #14077: Add missing `item-attribute` rule for `let-binding`s in documentation
+  for attributes.
+  (Shon Feder)
+
+- #14228: Trim leading spaces from first lines of LaTeX `ocamldoccode`
+  environments.
+  (Yukai Chou, review by Nicolás Ojeda Bär)
+
+- #14248: Added documentation about the way `Domain.join` triggers a
+  `Thread.join` on the domain's systhreads.
+  (Raphaël Proust, review by Gabriel Scherer)
+
+- #14392: Fix AsciiDoc files, add more markup, xrefs, documentation.
+  (Antonin Décimo, review by Gabriel Scherer and David Allsopp)
+
+### Compiler user-interface and warnings:
+
+- #12628: Improved error message for unsafe values: print out the full path for
+  the value that is unsafe when they are detected during the compilation of
+  recursive modules.
+  (Shivam Acharya, review by Gabriel Scherer and Florian Angeletti)
+
+- #13994: documentation for external types
+  (Gabriel Scherer, review by Jan Midtgaard, Jacques Garrigue
+   and Florian Angeletti)
+
+- #14076, 14111: error messages, add a short explanation for mismatched
+  universal variables and universal quantifications.
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #14126: Document the `-i-variance` option and `+-`, `-+` variance indicators
+  in the reference manual.
+  (Takafumi Saikawa, review by Florian Angeletti)
+
+- #14146: add an error message for external declaration with
+  a non-syntactic arity
+  ```
+   external fail: (int -> int as 'a) -> 'a = "%identity"
+  ```
+  rather than failing with an internal error.
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #14147: print row types in error messages when they are a type constructor,
+  e.g. `< foo : int; .. as $0>` when $0 is introduced by a GADT constructor
+  (Stefan Muenzel, review by Jacques Garrigue and Florian Angeletti)
+
+- #14190: `ocaml -e` now also processes `-init` (previously it was ignored).
+  (Emile Trotignon, review by David Allsopp and @ygrek)
+
+- #14225: do not raise unused-constructor warning on private
+  constructor in type implementations, for example
+  `type safe = private Safe`, which are typically used to
+  create new fresh/generative types (here `safe`) to be used
+  as GADT indices.
+  (Gabriel Scherer, review by Nicolás Ojeda Bär and Florian Angeletti,
+   report by Kate Deplaix)
+
+- #14244: Add -set-runtime-default option to the compiler, allowing the default
+  value of the Standard Library location used by the runtime to be overridden.
+  (Antonin Décimo, review by David Allsopp, Jonah Beckford, Damien Doligez and
+   Samuel Hym)
+
+- #14245: New option -launch-method for ocamlc allows the method used by a
+  tendered bytecode executable to locate the interpreter to be given explicitly.
+  In particular, it makes it easier to specify the use of the executable
+  launcher on Unix. New option -runtime-search extends the bytecode executable
+  header to be able to search for the runtime interpreter in the directory
+  containing the executable and in PATH rather than relying on a single
+  hard-coded path.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+- #14315: enable -i-variance also for classes and extension constructors,
+  and add description of -i-variance in manpages
+  (Takafumi Saikawa, review by Florian Angeletti and Jacques Garrigue)
+
+- #14373: remove the OCAML_BINANNOT_WITHENV environment variable, and
+   always strip typing environment in cmt files
+   (Florian Angeletti, review by David Allsopp)
+
+- #14330: add suggestions when a signature mismatch is likely to be be caused by
+  spellchecking mistakes, for instance
+  ```
+      module M: sig type albatross end = struct type albatros end
+  ```
+  (Malo Monin, Florian Angeletti, review by Gabriel Scherer)
+
+### Internal/compiler-libs changes:
+
+- #13839, #14008: Reimplement `let open`, `let module` and `let exception` in
+  terms of a single construct.
+  (Nicolás Ojeda Bär, review by Gabriel Scherer, Samuel Vivien, Ulysse Gérard
+  and Vincent Laviron)
+
+- #13911, #14117, #14127: Refactor the merging of signature constraints, by
+  splitting the monolithic merge function into separate, specialized functions
+  (for merging types, modules and module types) - sharing only the recursive
+  part for handling deep constraints.
+  (Clement Blaudeau, review by Florian Angeletti and Samuel Vivien, fix by Ryan
+  Tjoa)
+
+- #13980 Refactor `type-approx` and improve some errors' locations.
+  (Leo White, Ulysse Gérard, review by Samuel Vivien and Florian Angeletti)
+
+- #14024: Fix unterminated-string-initialization warnings from the C compiler.
+  (Antonin Décimo, review by David Allsopp and Miod Vallat)
+
+- #14094: toplevel, simplify check on installed printer types
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #13656, #14114, #14308: Use C99 stdint.h/inttypes.h fixed-width
+  integer types and macros to define OCaml integers.
+  (Antonin Décimo, review by Nick Barnes and David Allsopp)
+
+- #14148: Remove an unused field from package_type in typedtree
+  (Samuel Vivien, review by Gabriel Scherer)
+
+- #14141: Rename cstrs to constraints when it refers to constraints to avoid
+  confusing it with constructors.
+  (Stefan Muenzel, review by Nicolás Ojeda Bär)
+
+- #14149: Distinguish `(module M : S)` from `(module M) : (module S)` in
+  patterns.
+  (Samuel Vivien, review by Gabriel Scherer)
+
+- #14161: refactor the STW-participants machinery to add an intermediate
+  category of 'parked' domain structures.
+  (Gabriel Scherer, review by Sivaramakrishnan)
+
+- #14198 Constraints on module unpacking are not ghost
+  (Thomas Refis, review by Nicolás Ojeda Bär)
+
+- #14243: ocamlc now uses the same code as the runtime to parse ld.conf (via a
+  C primitive), eliminating some highly obscure corner cases.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+- #14260: Refactor Lambda.structured_constant to avoid duplicate
+  representations for string constants
+  (Vincent Laviron, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+- #13913: Use Blake128 as the hash function for the compiler's CRCs
+  (Vincent Laviron, review by Xavier Leroy and Gabriel Scherer)
+
+- #14297, #14299: Avoid iterating on hash tables to produce types or terms
+  (Vincent Laviron, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+* #14322: Remove leftover hacks for handling pattern constraints
+  As a side effect, `let rec (_ as x) = ...` is now always rejected instead of
+  being treated as equivalent to `let rec x = ...`
+  (Vincent Laviron, review by Alistair O'Brien and Florian Angeletti)
+
+- #14331: Enforce current_level <= generic_level, and explain create_scope
+  (Jacques Garrigue and Takafumi Saikawa, review by Gabriel Scherer)
+
+* #14388: Remove support for `let rec (module M : S) = e1 in e2`.
+  (Alistair O'Brien, review by Vincent Laviron and Gabriel Scherer)
+
+- #14413: Introduce and use the C2y countof operator.
+  (Antonin Décimo, review by David Allsopp)
+
+- #14422: Refactoring an `if match e with p1 -> true | p2 -> false then ...`
+  into a match in typetexp.
+  (Samuel Vivien, review by Gabriel Scherer)
+
+- #13224: Clarify barriers and spin macros with delayed expansion.
+  (Antonin Décimo, review by David Allsopp and Gabriel Scherer)
+
+- #14435, #14455: Add the not-root builtin ocamltest action. This allows to skip
+  tests that fail if the current user is root (superuser).
+  (Kate Deplaix, review by Gabriel Scherer, Nicolás Ojeda Bär, and
+   Antonin Décimo)
+
+- #14457: Handle qualified `M.{ x }` patterns in untypeast
+  (Basile Clément, review by Florian Angeletti)
+
+- #14120, #14474, #14476: Associate Uids to items that don't have a concrete
+  definition
+  (Ulysse Gérard, review by Florian Angeletti and Gabriel Scherer)
+
+### Build system:
+
+- #13705, #14444: Cache test results of custom Autoconf tests from aclocal.m4.
+  (Antonin Décimo, review by David Allsopp and Miod Vallat)
+
+- #13810: Support build of cross compilers to native freestanding targets
+  (Samuel Hym, review by Antonin Décimo and Romain Calascibetta)
+
+- #14243: New configure option --with-additional-stublibsdir allows an
+  additional directory to be added to the start of ld.conf. Additionally, the
+  stublibs subdirectory is no longer created, nor added to ld.conf, when
+  building OCaml with --disable-shared.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+- #14244: When targeting native Windows on Cygwin or MSYS2, preserve
+  backslashes in the supplied `--prefix` (in particular, backslashes instead of
+  slashes will then be displayed by `ocamlopt -config-var standard_library`).
+  If the supplied prefix contains a slash, then it is normalised, as
+  previously.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
+   Samuel Hym)
+
+- #14245: New --enable-runtime-search configure option controls the
+  -runtime-search option used to build the bytecode binaries in the compiler
+  distribution. --enable-runtime-search-target controls the default value of
+  -runtime-search used for bytecode executables produced by the compiler.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+- #14484: Set `_WIN32_WINNT` to require Windows 8/Server 2012 Windows header SDK
+  support.
+  (Antonin Décimo, review by David Allsopp)
+
+=======
+(Changes that can break existing programs are marked with a "*")
+
+### Language features:
+
+* #14009: infix extension points/attributes appearing in local structure items,
+  eg `let module%foo[@bar] ... in ...` are attached to the AST node of the
+  corresponding structure item (similar to their global counterparts) and no
+  longer to the enclosing `let` expression.  Extension points/attributes that
+  are to be attached to the enclosing `let` expression are to be written next to
+  the `let` keyword, eg `let%foo[@bar] module ... in ...`. The same holds for
+  `let exception` and `let open`.
+  (Nicolás Ojeda Bär, review by Gabriel Scherer)
+
+- #14029: Recognize `%identity` as nonexpansive
+  (Stephen Dolan and Olivier Nicole, review by Hugo Heuzard, Jacques Garrigue,
+  Jeremy Yallop,  and Gabriel Scherer)
+
+* #13712: Introduce a new kind `Type_external` and syntax
+  `type t = external "name"` to discriminate external types from other types
+  and each other.  This PR turns primitive types into external and removes the
+  past behavior of discriminating abstract types defined in the current module.
+  (Takafumi Saikawa, Jacques Garrigue, review by Richard Eisenberg)
+
+- #13806: Enable the use of function parameters with polymorphic types.
+  (Ulysse Gérard, Leo White, review by Florian Angeletti, Samuel Vivien, Gabriel
+  Scherer and Jacques Garrigue)
+
+- #14040: generalize the constructs `let module`, `let exception` and `let open`
+  to most other structure items, eg `let type t = ... in ...`, `let type t +=
+  ... in ...`, etc.
+  (Nicolás Ojeda Bär, review by Valentin Gatien-Baron)
+
+### Runtime system:
+
+- #14416: Spawned domains will record backtraces if the parent domain has
+  enabled it.
+  (Nathan Taylor, review by Gabriel Scherer)
+
+- #13616: Change free list representation in shared heap
+  (Sadiq Jaffer, review by Damien Doligez)
+
+- #13580: Introduce sweep-only phase at start of major GC cycle,
+  to reduce latent-garbage delay and therefore improve GC performance.
+  (Stephen Dolan and Nick Barnes, review by KC Sivaramakrishnan)
+
+- #14123: Fix integer-overflow problems in heap compaction.
+  (Nick Barnes, review by Antonin Décimo).
+
+- #14035: Fix the alignment of _Atomic long long unsigned int fields
+  before GCC 11.1 on i686. Silence GCC note on newer versions.
+  (Antonin Décimo, review by Sadiq Jaffer)
+
+- #13574, #13594: Generational scanning of stack frames for ARM 64 bits, POWER,
+  and RISC-V.  This reduces minor GC work in the presence of deep call stacks.
+  (Xavier Leroy, review by Miod Vallat, Gabriel Scherer and Olivier Nicole)
+
+- #14053: Statmemprof: it is now possible to replace a profile in the
+  current domain without stopping it in all domains.
+  Added the function [Gc.Memprof.is_sampling].
+  (Guillaume Munch-Maccagnoni, review by Gabriel Scherer)
+
+- #14168: restore the stack size statistic in `Gc.stat` and adds a new
+  `live_stacks_words` field tracking the total size in words of live stacks.
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #14189: Add runtime counters EV_C_MINOR_PROMOTED_WORDS and
+  EV_C_MINOR_ALLOCATED_WORDS. EV_C_MINOR_PROMOTED_WORDS reports words promoted
+  by minor GC and EV_C_MINOR_ALLOCATED_WORDS reports words allocated by minor
+  GC. Both have equivalent bytes counters. Also updated the documentation for
+  EV_C_MINOR_PROMOTED and EV_C_MINOR_ALLOCATED to qualify scope of the values
+  reported as being per-domain.
+  (Tim McGilchrist, review by Nick Barnes, Sadiq Jaffer and
+  Gabriel Scherer)
+
+* #14243: Explicit relative paths in ld.conf (".", "..", "./<path...>",
+  "../<path...>") are interpreted as being relative to the directory ld.conf
+  was loaded from, and the default ld.conf now uses relative paths, rather than
+  embedding the absolute path to the Standard Library. The brave may continue to
+  put implicit paths in ld.conf. The interpretation of CAML_LD_LIBRARY_PATH is
+  unaltered. Additionally, ld.conf is loaded from all of $OCAMLLIB/ld.conf,
+  $CAMLLIB/ld.conf and standard_library_default/ld.conf rather than just the
+  first one found. ld.conf files with CRLF line endings are now consistently
+  normalised on both Windows and Unix.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+- #14244: Added --with-relative-libdir which allows the runtime and the
+  compilers to locate the Standard Library relative to where the binaries
+  themselves are installed, removing the absolute path previously embedded in
+  caml_standard_library_default. Executables linked with `ocamlc -custom` now
+  always attempt to load bytecode from the executable itself, rather than first
+  trying `argv[0]`.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez,
+   Samuel Hym and Vincent Laviron)
+
+- #14245: Introduce Runtime IDs for use in filename mangling to allow different
+  configurations and different versions of the runtime system to coexist
+  harmoniously on a single system. The IDs are used, along with the host
+  triplet, to provide mangled names for the ocamlrun executable and its variants
+  and the DLL versions of both the bytecode and native runtimes, with symlinks
+  created for the original names. They are also used to mangle the names of stub
+  libraries so that stub libraries compiled for a given configuration of the
+  runtime will only be sought by that runtime. The behaviour is disabled by
+  configuring with --disable-suffixing.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+- #12269, #12410, #13063: Fix unsafety, deadlocks, and/or leaks should
+  rare errors happen during domain creation and thread
+  creation/registration.
+  (Guillaume Munch-Maccagnoni, review by Gabriel Scherer, B. Szilvasy,
+   Miod Vallat)
+
+- #14275: Add function caml_c_thread_register_in_domain, which makes it
+  possible to register "C threads" in another domain than 0 (which is
+  what caml_c_thread_register does). The function takes a domain unique
+  ID in which to register the thread. The domain must be running
+  when the function is called.
+  (Jack Nørskov Jørgensen, review by Gabriel Scherer,
+   Guillaume Munch-Maccagnoni)
+
+- #14337: Fix potential segfault due to the C callback mechanism dropping
+  continuations without calling `caml_continuation_use`.
+  (Max Slater, review by Nick Barnes and Stephen Dolan)
+
+- #13416: Implement concurrency primitives using WinAPI instead of
+  winpthreads on Windows.
+  (Antonin Décimo, review by Samuel Hym, Gabriel Scherer, Miod Vallat,
+  B. Szilvasy, and Nicolás Ojeda Bär)
+
+- #14367: Gc.Tweak mechanism to allow named GC parameters
+  (Stephen Dolan and Nick Barnes, review by Gabriel Scherer, David Allsopp and
+  Antonin Décimo)
+
+- #14461: Fix racy socketpair on Windows. Address-in-use errors would sometimes
+  occur when concurrent threads or processes were trying to create socketpairs.
+  (Jessie Grosen, review by Antonin Décimo and Nicolás Ojeda Bär)
+
+- #14494: Consistently use macro to test header promotion.
+  (Nick Barnes, review by Gabriel Scherer)
+
+### Code generation and optimizations:
+
+### Standard library:
+
+- #14437: Add String.split_{first,last,all} and String.rsplit_all
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Florian Angeletti)
+
+- #14436: Add String.replace_{first,last,all}
+  (Daniel Bünzli, review by Nicolás Ojeda Bär, Ali Caglayan and
+   Florian Angeletti)
+
+- #13343: Add Array.stable_sort_sub
+  (François Pottier, review by Gabriel Scherer, Corentin Leruth and Nicolás
+   Ojeda Bär)
+
+- #14439: Add String.includes
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Olivier Nicole)
+
+- #10177: Seq.(delay : (unit -> 'a t) -> 'a t)
+  (Gabriel Scherer, review by Jeremy Yallop and François Pottier)
+
+- #14381: Add String.find_{first,last}_index, String.find_{first,last},
+  String.[r]find_all.
+  (Daniel Bünzli, review by Nicolás Ojeda Bär, Ali Caglayan and
+   Florian Angeletti)
+
+- #14438: Add String.is_empty
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+- #14440: Add String.of_char
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+- #14362: Add String.{drop,take,cut}_{first,last}_while
+  (Daniel Bünzli, review by Nicolás Ojeda Bär and David Allsopp)
+
+- #14363: Preserve the backtrace at exceptional domain termination. Domain.join
+  on an exceptionally terminated domain re-raises the exception with the
+  backtrace.
+  (KC Sivaramakrishnan, report by Nathan Taylor, review by Gabriel Scherer,
+  David Allsopp)
+
+- #13372: New Format and Printf printf-like functions that accept a
+   heterogeneous list as arguments.
+  (Leonardo Santos, review by Florian Angeletti and Gabriel Scherer)
+
+- #14352: Add String.{drop,take,cut}_{first,last}.
+  (Daniel Bünzli, review by David Allsopp, Nicolás Ojeda Bär and
+  Vincent Laviron)
+
+- #14185: List.split_map
+  (Jeremy Yallop, review by Daniel Bünzli, Nicolás Ojeda Bär and Damien Doligez)
+
+- #13728: Add Sys.runtime_executable containing the full path (if available) to
+  the currently executing runtime.
+  (David Allsopp, review by Nicolás Ojeda Bär and Daniel Bünzli)
+
+- #13916: Add Option.product and Option.Syntax.
+  (Nicolás Ojeda Bär, review by Daniel Bünzli, Gabriel Scherer and David
+  Allsopp)
+
+- #13995: Add Option.blend.
+  (Kate Deplaix, review by Daniel Bünzli, Gabriel Scherer,
+   Nicolás Ojeda Bär, Florian Angeletti and Josh Berdine)
+
+- #14086: Add Domain.count.
+  (Nicolás Ojeda Bär, review by David Allsopp, Gabriel Scherer, Daniel Bünzli
+  and KC Sivaramakrishnan)
+
+- #13920: add Option.{for_all, exists}
+  (Gabriel Scherer, review by Kate Deplaix, Nicolás Ojeda Bär, Richard Eisenberg
+  and Jeremy Yallop)
+
+- #12877: Dynarray.rev_iter, Dynarray.rev_iteri
+  (Gabriel Scherer, review by Léo Andrès, Jeremy Yallop and Nicolás Ojeda Bär)
+
+- #14118: Add {Set,Map}.S.is_singleton
+  (Kate Deplaix, review by Daniel Bünzli, Vincent Laviron, Nicolás Ojeda Bär
+   and Stephen Dolan)
+
+- #14060: Add Hashtbl.find_and_replace and Hashtbl.find_and_remove.
+  (Sacha-Élie Ayoun, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+- #14227: Add List.filter_mapi.
+  (Émile Trotignon, review by Nicolás Ojeda Bär, Jan Midtgaard and
+   Damien Doligez)
+
+- #14084: Future-proof Dynarray implementation against a smarter compiler
+  (Basile Clément, review by Gabriel Scherer)
+
+- #14432: Add floor division, ceil division, Euclidean division and remainder
+  to the Int, Int32, Int64 and Nativeint modules.
+  (Xavier Leroy, review by Ali Caglayan, Nicolás Ojeda Bär, Gabriel Scherer)
+
+- #14433: Add bit-counting functions `leading_zeros`, `leading_sign_bits`,
+  `trailing_zeros`, `bit_count`, `unsigned_bitsize`, `signed_bitsize`
+  to Int, Int32, Int64, and Nativeint
+  (Xavier Leroy, review by Ali Caglayan and David Allsopp)
+
+### Type system:
+
+* #13681, #13682, #13683, #13684, #13275 :
+  Introduce a new type `(module M : S) -> t[M]` that corresponds to
+  module-dependent functions (aka modular explicits).
+  (Samuel Vivien review by Leo White, Gabriel Scherer, Florian Angeletti,
+    Jacques Garrigue and Stephen Dolan)
+
+- #13781: Set scope of internal type nodes during abbreviation expansion
+  rather than recursing during unification.
+  (Jacques Garrigue, review by Gabriel Scherer)
+
+* #14066: catch invalid aliases introduced by signature constraints during
+  merging rather than in subtyping:
+  ```ocaml
+    module X = struct end module F (_:sig end) = struct end
+    module type T = (sig module X0 : sig end module X1 = X0 end)
+      with module X0 := F(X)
+  ```
+  Before, it failed with a subtyping error. Now, it fails with a proper error,
+  explaining that `X1` would keep an invalid alias to `F(X)`
+  (Clement Blaudeau, review by Florian Angeletti)
+
+* #14100: Do not ignore type-constraints and module-constraints when building
+  the approximated signature of recursive modules. Ignoring those constraints
+  resulted in incorrect (wrong set of fields, wrong shadowing between fields)
+  approximated signatures, failing to typecheck, as in:
+  ```ocaml
+  module X0 : sig type t end
+  module rec X : ((sig module A : sig end end) with module A := X0)
+  and Y : sig type t = X.A.t end (* Unbound type constructor X.A.t *)
+  ```
+  Now, type and module constraints are properly merged during approximation ,
+  reusing the infrastructure for normal merging of constraints, but disabling
+  any wellformedness check.
+  (Clement Blaudeau and Ryan Tjoa, review by Florian Angeletti)
+
+- #14327: Allow retyping as-patterns that contain existentials
+  (completing #14229)
+  (Jacques Garrigue and Takafumi Saikawa, reported by Olivier Nicole,
+   review by Gabriel Scherer)
+
+- #14483: Reset type ID and level counters between compilations to restore
+  reproducibility of debug information between `ocamlc -c foo.mli foo.ml` versus
+  `ocamlc -c foo.mli; ocamlc -c foo.ml`. Also hashcons the identifiers used for
+  persistent structures across resets of the type checker. In particular, that
+  means the initialisation of globals in Matching do not become observable in
+  the marshalled output.
+  (David Allsopp, review by Gabriel Scherer)
+
+### Other libraries:
+
+- #13700, #14454: Use POSIX thread-safe getgrnam_r, getgrgid_r, getpwnam_r,
+  getpwuid_r, gmtime_r, localtime_r, getlogin_r, and fix mktime error checking.
+  (Antonin Décimo, review by David Allsopp, Stefan Muenzel, and Miod Vallat)
+
+- #14406: Better handling of address length for unix sockets, improving Haiku
+  compatibility.
+  (Sylvain Kerjean, review by Antonin Décimo and Nicolás Ojeda Bär)
+
+* #14046: On Windows, `Unix.kill pid Sys.sigkill` causes the receiving process
+  to exit with code ERROR_PROCESS_ABORTED (1067) instead of 0.
+  (Nicolás Ojeda Bär, review by Miod Vallat, Antonin Décimo and David Allsopp)
+
+- #14020: Add Unix.unsetenv.
+  (Nicolás Ojeda Bär, review by Antonin Décimo and David Allsopp)
+
+- #13447: Symmetrize shared `Sys` and `Unix` functions. Apply fixes
+  of #12072, #12184, #12320, and #13166, from `Sys.rename` to
+  `Unix.rename`.  Make `caml_sys_close` raise on error, allowing
+  `Filename.temp_file` retries if close fails. Flush buffers when
+  calling `caml_sys_system_command` on Windows. Error with EINVAL
+  instead of ENOENT if the command string is not a valid C string.
+  (Antonin Décimo, review by Gabriel Scherer and Nicolás Ojeda Bär)
+
+- #14310: Deprecate union sock_addr_union for struct sockaddr_storage
+  and socklen_param_type for socklen_t.
+  (Antonin Décimo, review by Nicolás Ojeda Bär, David Allsopp and Samuel Hym)
+
+- #14391: unload native dynlinked objects when an error occurs and it is safe to
+  do so. (Fixes #14323)
+  (Nicolás Ojeda Bär, review by Vincent Laviron)
+
+### Tools:
+
+- #14055: Invert BUILD_PATH_PREFIX_MAP in directories loaded at startup
+  by the debugger.
+  (Pierre Boutillier, review by Gabriel Scherer and Daniel Bünzli)
+
+* #13638: ocamlmklib exits with code 4 if passed an unrecognised option, as it
+  does with an unrecognised file.
+  (David Allsopp, review by Antonin Décimo and Sébastien Hinderer)
+
+- #13941, #13961: Fix `ocamltest` variable handing.
+  (Damien Doligez, report by Olivier Nicole, review by Gabriel Scherer)
+
+- #13962: Little ocamltest refactors. Fix error handling in C code,
+  leaking file descriptors, code style.
+  (Antonin Décimo, review by Gabriel Scherer)
+
+- #14059: Fix flaky TSan tests
+  (Fabrice Buoro and Olivier Nicole, review by Gabriel Scherer)
+
+- #13966, #13969: Enable "generalized polymorphic #install_printer"
+  in the debugger
+  (Pierre Boutillier and Gabriel Scherer, review by Florian Angeletti)
+
+- #14063 : Debugger fallbacks to "looking for 'module_name'.ml in the
+  loadpath" when seeking source files. It improves hit rate for
+  sources of installed packages.
+  (Pierre Boutillier, review by Gabriel Scherer)
+
+- #14032, #14034: Update to and require FlexDLL 0.44.
+  (Jan Midtgaard, Antonin Décimo, review by David Allsopp)
+
+- #14239: Fix `#show_constructor` when printing non-GADT type parameters
+  (Takafumi Saikawa, Jacques Garrigue, review by Gabriel Scherer)
+
+- #14245: ocamlobjinfo now displays the runtime invoked by a bytecode
+  executable (either from the RNTM section or by analysing the shebang lines)
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+### Manual and documentation:
+
+- #14397: Improve documentation of type-directed disambiguation of array
+  literals (Alicia Michael, review by Olivier Nicole and Florian Angeletti)
+
+- #14293: Improve documentation of Runtime_events.Timestamp (Raphaël Proust,
+  review by Gabriel Scherer)
+
+- #13747: Document support for native debugging with GDB and LLDB.
+   (Tim McGilchrist, review by Daniel Bünzli, Samuel Hym, Olivier Nicole
+   and Antonin Décimo)
+
+* #13975: documented the `[@remove_aliases]` built-in attribute for signatures
+  (introduced by #1652 in 2018). Small refactor of the code that fetches the
+  attribute.
+  (Clement Blaudeau, review by Gabriel Scherer)
+
+- #14002: Add anchors to items and headings of the web version of the API
+  documentation for easier linking.
+  (Nicolás Ojeda Bär, report by Louis Roché, review by Gabriel Scherer and
+  Florian Angeletti)
+
+- #14023: Add documentation for the [row_more] function.
+  (Richard Eisenberg, review by Jacques Garrigue)
+
+- #14038: Fall back immediately to user-agent-defined fonts when web fonts
+  fail to load.
+  (toastal)
+
+- #14077: Add missing `item-attribute` rule for `let-binding`s in documentation
+  for attributes.
+  (Shon Feder)
+
+- #14228: Trim leading spaces from first lines of LaTeX `ocamldoccode`
+  environments.
+  (Yukai Chou, review by Nicolás Ojeda Bär)
+
+- #14248: Added documentation about the way `Domain.join` triggers a
+  `Thread.join` on the domain's systhreads.
+  (Raphaël Proust, review by Gabriel Scherer)
+
+- #14392: Fix AsciiDoc files, add more markup, xrefs, documentation.
+  (Antonin Décimo, review by Gabriel Scherer and David Allsopp)
+
+### Compiler user-interface and warnings:
+
+- #12628: Improved error message for unsafe values: print out the full path for
+  the value that is unsafe when they are detected during the compilation of
+  recursive modules.
+  (Shivam Acharya, review by Gabriel Scherer and Florian Angeletti)
+
+- #13994: documentation for external types
+  (Gabriel Scherer, review by Jan Midtgaard, Jacques Garrigue
+   and Florian Angeletti)
+
+- #14076, 14111: error messages, add a short explanation for mismatched
+  universal variables and universal quantifications.
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #14126: Document the `-i-variance` option and `+-`, `-+` variance indicators
+  in the reference manual.
+  (Takafumi Saikawa, review by Florian Angeletti)
+
+- #14146: add an error message for external declaration with
+  a non-syntactic arity
+  ```
+   external fail: (int -> int as 'a) -> 'a = "%identity"
+  ```
+  rather than failing with an internal error.
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #14147: print row types in error messages when they are a type constructor,
+  e.g. `< foo : int; .. as $0>` when $0 is introduced by a GADT constructor
+  (Stefan Muenzel, review by Jacques Garrigue and Florian Angeletti)
+
+- #14190: `ocaml -e` now also processes `-init` (previously it was ignored).
+  (Emile Trotignon, review by David Allsopp and @ygrek)
+
+- #14225: do not raise unused-constructor warning on private
+  constructor in type implementations, for example
+  `type safe = private Safe`, which are typically used to
+  create new fresh/generative types (here `safe`) to be used
+  as GADT indices.
+  (Gabriel Scherer, review by Nicolás Ojeda Bär and Florian Angeletti,
+   report by Kate Deplaix)
+
+- #14244: Add -set-runtime-default option to the compiler, allowing the default
+  value of the Standard Library location used by the runtime to be overridden.
+  (Antonin Décimo, review by David Allsopp, Jonah Beckford, Damien Doligez and
+   Samuel Hym)
+
+- #14245: New option -launch-method for ocamlc allows the method used by a
+  tendered bytecode executable to locate the interpreter to be given explicitly.
+  In particular, it makes it easier to specify the use of the executable
+  launcher on Unix. New option -runtime-search extends the bytecode executable
+  header to be able to search for the runtime interpreter in the directory
+  containing the executable and in PATH rather than relying on a single
+  hard-coded path.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+- #14315: enable -i-variance also for classes and extension constructors,
+  and add description of -i-variance in manpages
+  (Takafumi Saikawa, review by Florian Angeletti and Jacques Garrigue)
+
+- #14373: remove the OCAML_BINANNOT_WITHENV environment variable, and
+   always strip typing environment in cmt files
+   (Florian Angeletti, review by David Allsopp)
+
+- #14330: add suggestions when a signature mismatch is likely to be be caused by
+  spellchecking mistakes, for instance
+  ```
+      module M: sig type albatross end = struct type albatros end
+  ```
+  (Malo Monin, Florian Angeletti, review by Gabriel Scherer)
+
+### Internal/compiler-libs changes:
+
+- #13839, #14008: Reimplement `let open`, `let module` and `let exception` in
+  terms of a single construct.
+  (Nicolás Ojeda Bär, review by Gabriel Scherer, Samuel Vivien, Ulysse Gérard
+  and Vincent Laviron)
+
+- #13911, #14117, #14127: Refactor the merging of signature constraints, by
+  splitting the monolithic merge function into separate, specialized functions
+  (for merging types, modules and module types) - sharing only the recursive
+  part for handling deep constraints.
+  (Clement Blaudeau, review by Florian Angeletti and Samuel Vivien, fix by Ryan
+  Tjoa)
+
+- #13980 Refactor `type-approx` and improve some errors' locations.
+  (Leo White, Ulysse Gérard, review by Samuel Vivien and Florian Angeletti)
+
+- #14024: Fix unterminated-string-initialization warnings from the C compiler.
+  (Antonin Décimo, review by David Allsopp and Miod Vallat)
+
+- #14094: toplevel, simplify check on installed printer types
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #13656, #14114, #14308: Use C99 stdint.h/inttypes.h fixed-width
+  integer types and macros to define OCaml integers.
+  (Antonin Décimo, review by Nick Barnes and David Allsopp)
+
+- #14148: Remove an unused field from package_type in typedtree
+  (Samuel Vivien, review by Gabriel Scherer)
+
+- #14141: Rename cstrs to constraints when it refers to constraints to avoid
+  confusing it with constructors.
+  (Stefan Muenzel, review by Nicolás Ojeda Bär)
+
+- #14149: Distinguish `(module M : S)` from `(module M) : (module S)` in
+  patterns.
+  (Samuel Vivien, review by Gabriel Scherer)
+
+- #14161: refactor the STW-participants machinery to add an intermediate
+  category of 'parked' domain structures.
+  (Gabriel Scherer, review by Sivaramakrishnan)
+
+- #14198 Constraints on module unpacking are not ghost
+  (Thomas Refis, review by Nicolás Ojeda Bär)
+
+- #14243: ocamlc now uses the same code as the runtime to parse ld.conf (via a
+  C primitive), eliminating some highly obscure corner cases.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+- #14260: Refactor Lambda.structured_constant to avoid duplicate
+  representations for string constants
+  (Vincent Laviron, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+- #13913: Use Blake128 as the hash function for the compiler's CRCs
+  (Vincent Laviron, review by Xavier Leroy and Gabriel Scherer)
+
+- #14297, #14299: Avoid iterating on hash tables to produce types or terms
+  (Vincent Laviron, review by Nicolás Ojeda Bär and Gabriel Scherer)
+
+* #14322: Remove leftover hacks for handling pattern constraints
+  As a side effect, `let rec (_ as x) = ...` is now always rejected instead of
+  being treated as equivalent to `let rec x = ...`
+  (Vincent Laviron, review by Alistair O'Brien and Florian Angeletti)
+
+- #14331: Enforce current_level <= generic_level, and explain create_scope
+  (Jacques Garrigue and Takafumi Saikawa, review by Gabriel Scherer)
+
+* #14388: Remove support for `let rec (module M : S) = e1 in e2`.
+  (Alistair O'Brien, review by Vincent Laviron and Gabriel Scherer)
+
+- #14413: Introduce and use the C2y countof operator.
+  (Antonin Décimo, review by David Allsopp)
+
+- #14422: Refactoring an `if match e with p1 -> true | p2 -> false then ...`
+  into a match in typetexp.
+  (Samuel Vivien, review by Gabriel Scherer)
+
+- #13224: Clarify barriers and spin macros with delayed expansion.
+  (Antonin Décimo, review by David Allsopp and Gabriel Scherer)
+
+- #14435, #14455: Add the not-root builtin ocamltest action. This allows to skip
+  tests that fail if the current user is root (superuser).
+  (Kate Deplaix, review by Gabriel Scherer, Nicolás Ojeda Bär, and
+   Antonin Décimo)
+
+- #14457: Handle qualified `M.{ x }` patterns in untypeast
+  (Basile Clément, review by Florian Angeletti)
+
+- #14120, #14474, #14476: Associate Uids to items that don't have a concrete
+  definition
+  (Ulysse Gérard, review by Florian Angeletti and Gabriel Scherer)
+
+### Build system:
+
+- #13705, #14444: Cache test results of custom Autoconf tests from aclocal.m4.
+  (Antonin Décimo, review by David Allsopp and Miod Vallat)
+
+- #13810: Support build of cross compilers to native freestanding targets
+  (Samuel Hym, review by Antonin Décimo and Romain Calascibetta)
+
+- #14243: New configure option --with-additional-stublibsdir allows an
+  additional directory to be added to the start of ld.conf. Additionally, the
+  stublibs subdirectory is no longer created, nor added to ld.conf, when
+  building OCaml with --disable-shared.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+- #14244: When targeting native Windows on Cygwin or MSYS2, preserve
+  backslashes in the supplied `--prefix` (in particular, backslashes instead of
+  slashes will then be displayed by `ocamlopt -config-var standard_library`).
+  If the supplied prefix contains a slash, then it is normalised, as
+  previously.
+  (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
+   Samuel Hym)
+
+- #14245: New --enable-runtime-search configure option controls the
+  -runtime-search option used to build the bytecode binaries in the compiler
+  distribution. --enable-runtime-search-target controls the default value of
+  -runtime-search used for bytecode executables produced by the compiler.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+- #14484: Set `_WIN32_WINNT` to require Windows 8/Server 2012 Windows header SDK
+  support.
+  (Antonin Décimo, review by David Allsopp)
+
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 ### Bug fixes:
 
 - #14010: Fix miscompilation / liveness errors for string operations
@@ -811,7 +2005,6 @@ OCaml 5.3.0 (8 January 2025)
   compatible identifiers.
   (Xavier Leroy and Florian Angeletti, review by Daniel Bünzli and
    Jules Aguillon)
-
 
 - #12828, #13283: Add short syntax for dependent functor types `(X:A) -> ...`
   (Jeremy Yallop, review by Nicolás Ojeda Bär and Gabriel Scherer)

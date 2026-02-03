@@ -770,12 +770,20 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_open (_, mod_ident, t) ->
       iter_loc_lid sub mod_ident;
       sub.typ sub t
+<<<<<<< HEAD
   | Ttyp_quote t -> sub.typ sub t
   | Ttyp_splice t -> sub.typ sub t
   | Ttyp_repr (_, ct) -> sub.typ sub ct
   | Ttyp_newlayout (_, ct) -> sub.typ sub ct
   | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
   | Ttyp_call_pos -> ()
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+  | Ttyp_functor (_, id, pack, ct) ->
+      iter_loc sub id;
+      sub.package_type sub pack;
+      sub.typ sub ct
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 
 let class_structure sub {cstr_self; cstr_fields; _} =
   sub.pat sub cstr_self;

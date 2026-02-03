@@ -225,6 +225,9 @@ and core_type_desc =
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_repr of string loc list * core_type
   | Ptyp_extension of extension  (** [[%id]]. *)
+  | Ptyp_functor of arg_label * string loc * package_type * core_type
+        (** [(module M : S) -> ...] : module-dependent arrow *)
+
 
 and arg_label = Asttypes.arg_label =
     Nolabel

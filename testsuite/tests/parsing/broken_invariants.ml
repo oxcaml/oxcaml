@@ -26,8 +26,11 @@ let f (x:[%empty_poly_binder]) = 0;;
 let f x = (x:[%empty_poly_binder]);;
 let g: int -> [%empty_poly_binder] = fun n x -> x;;
 
+let f (x : [%tfunctor_opt_arg]) = ();;
+
 let f ([%empty_open_tuple_pat]) = ();;
 let f ([%short_closed_tuple_pat]) = ();;
+<<<<<<< HEAD
 
 let f ([%nested_pat_constraint]) = ();;
 
@@ -38,6 +41,10 @@ let _ = [%multiple_mutable_let];;
 let _ = [%mutable_let_ppat_tuple];;
 let _ = [%mutable_let_ppat_any];;
 
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+=======
+
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
 (* TEST
  readonly_files = "illegal_ppx.ml";
  setup-ocamlc.byte-build-env;

@@ -396,6 +396,17 @@ and print_out_type_1 ppf =
       pp_print_space ppf ();
       print_out_ret ppf ty2;
       pp_close_box ppf ()
+  | Otyp_functor (lab, id, pack, ty) ->
+      pp_open_box ppf 0;
+      print_arg_label ppf lab;
+      pp_print_string ppf "(module ";
+      print_ident ppf id;
+      pp_print_string ppf " : ";
+      print_package ppf pack;
+      pp_print_string ppf ") ->";
+      pp_print_space  ppf ();
+      print_out_type_1 ppf ty;
+      pp_close_box ppf ()
   | ty -> print_out_type_2 ~arg:false ppf ty
 
 and print_out_arg am ppf ty =
@@ -468,9 +479,16 @@ and print_simple_out_type ppf =
          else if tags = None then "> " else "? ")
         print_fields row_fields
         print_present tags
+<<<<<<< HEAD
   | Otyp_alias _ | Otyp_poly _ | Otyp_repr _ | Otyp_arrow _ | Otyp_tuple _
   | Otyp_newlayout _
     as ty ->
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+  | Otyp_alias _ | Otyp_poly _ | Otyp_arrow _ | Otyp_tuple _ as ty ->
+=======
+  | Otyp_alias _ | Otyp_poly _ | Otyp_arrow _
+  | Otyp_functor _ | Otyp_tuple _ as ty ->
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
       pp_open_box ppf 1;
       pp_print_char ppf '(';
       print_out_type_0 ppf ty;

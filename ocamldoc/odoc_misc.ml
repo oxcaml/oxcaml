@@ -499,8 +499,14 @@ let remove_option typ =
     | Tvar _
     | Tunivar _
     | Tpoly _
+<<<<<<< HEAD
     | Trepr _
     | Tarrow _
+||||||| parent of 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
+    | Tarrow _
+=======
+    | Tarrow _ | Tfunctor _
+>>>>>>> 314f4fa364 (Merge pull request #13275 from samsa1/modular-explicit2)
     | Ttuple _
     | Tunboxed_tuple _
     | Tobject _
