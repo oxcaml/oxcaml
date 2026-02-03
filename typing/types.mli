@@ -364,6 +364,8 @@ and jkind_r = (disallowed * allowed) jkind  (* the jkind expected of a type *)
 and jkind_lr = (allowed * allowed) jkind    (* the jkind of a variable *)
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
 
+val evals_to_map_type_expr : (type_expr -> type_expr) -> evals_to -> evals_to
+
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
    jkind.
@@ -752,6 +754,7 @@ type type_declaration =
        the jkind stored here might be a subjkind of the jkind that would
        be computed from the decl kind. This happens in
        Ctype.add_jkind_equation. *)
+    type_evals_to: evals_to option;
 
     type_private: private_flag;
     type_manifest: type_expr option;

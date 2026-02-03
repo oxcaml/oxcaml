@@ -379,6 +379,7 @@ let mk_add_type add_type =
           type_arity = 0;
           type_kind;
           type_jkind = Jkind.mark_best type_jkind;
+          type_evals_to = None;
           type_loc = Location.none;
           type_private = Asttypes.Public;
           type_manifest;
@@ -397,6 +398,7 @@ let mk_add_type add_type =
       type_arity = 0;
       type_kind = kind;
       type_jkind = Jkind.mark_best jkind;
+      type_evals_to = None;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = manifest;
@@ -435,6 +437,7 @@ let mk_add_type1 add_type type_ident
       type_arity = 1;
       type_kind = kind param;
       type_jkind = Jkind.mark_best (jkind param);
+      type_evals_to = None;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = Option.map (fun f -> f param) manifest;
@@ -459,6 +462,7 @@ let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
       type_arity = 2;
       type_kind = Type_abstract Definition;
       type_jkind = Jkind.mark_best jkind;
+      type_evals_to = None;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = None;

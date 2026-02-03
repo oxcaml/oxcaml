@@ -208,6 +208,11 @@ end
 
 module TransientTypeHash = Hashtbl.Make(TransientTypeOps)
 
+(* Eval constraints *)
+
+let evals_to_map_type_expr f { to_; stage_offset; n_evals } =
+  { to_ = f to_; stage_offset; n_evals }
+
 (* *)
 
 module Uid = Shape.Uid
@@ -350,6 +355,7 @@ type type_declaration =
     type_arity: int;
     type_kind: type_decl_kind;
     type_jkind: jkind_l;
+    type_evals_to: evals_to option;
     type_private: private_flag;
     type_manifest: type_expr option;
     type_variance: Variance.t list;

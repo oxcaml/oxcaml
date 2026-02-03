@@ -1415,6 +1415,7 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_arity = 0;
     type_kind = Type_abstract origin;
     type_jkind = Jkind.disallow_right jkind;
+    type_evals_to = None;
     type_private = Public;
     type_manifest = manifest;
     type_variance = [];
@@ -7584,6 +7585,12 @@ let rec nondep_type_decl env mid is_covariant decl =
         let context = mk_jkind_context_check_principal env in
         Jkind.round_up ~context decl.type_jkind |>
         Jkind.disallow_right
+    and evals_to =
+      try
+        Option.map
+          (evals_to_map_type_expr (nondep_type_rec env mid))
+          decl.type_evals_to
+      with Nondep_cannot_erase _ when is_covariant -> None
     in
     clear_hash ();
     let priv =
@@ -7599,6 +7606,7 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_arity = decl.type_arity;
       type_kind = tk;
       type_jkind = jkind;
+      type_evals_to = evals_to;
       type_manifest = tm;
       type_private = priv;
       type_variance = decl.type_variance;
