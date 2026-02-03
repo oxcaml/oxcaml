@@ -375,7 +375,13 @@ module Solver = struct
         else
           (* All-constant (immediate) polymorphic variant. *)
           Ldd.const Axis_lattice.immediate
-      | Types.Tpackage _ -> Ldd.const Axis_lattice.nonfloat_value
+      | Types.Tpackage _ ->
+        (* Like open polymorphic variants, model first-class modules as boxed
+           values intersected with an unknown so they behave as not-best. *)
+        let unknown =
+          rigid_name ctx (Ldd.Name.unknown (fresh_unknown_uid ()))
+        in
+        Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
     in
     decr kind_of_depth;
     kind_poly

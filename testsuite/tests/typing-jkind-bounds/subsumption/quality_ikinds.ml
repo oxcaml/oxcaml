@@ -533,7 +533,24 @@ end
 [%%expect {|
 module type S = sig val nonportable_f : int -> int end
 type s = (module S)
-module M : sig type t : value mod portable with s end
+Lines 7-9, characters 6-3:
+7 | ......struct
+8 |   type t
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t end
+       is not included in
+         sig type t : value mod portable with s end
+       Type declarations do not match:
+         type t
+       is not included in
+         type t : value mod portable with s
+       The kind of the first is value
+         because of the definition of t at line 8, characters 2-8.
+       But the kind of the first must be a subkind of
+           value mod portable with s
+         because of the definition of t at line 6, characters 2-36.
 |}]
 
 type a : value = private int
