@@ -397,6 +397,7 @@ val of_type_decl :
 
     Raises if a disallowed or unknown jkind is present. *)
 val of_type_decl_default :
+  ?skip_with_bounds:bool ->
   context:History.annotation_context_l ->
   transl_type:(Parsetree.core_type -> Types.type_expr) ->
   default:Types.jkind_l ->

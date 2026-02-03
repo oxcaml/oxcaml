@@ -269,22 +269,16 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
      are checked and then unified with the real manifest and checked against the
      kind. *)
   let type_jkind =
+    let transl_type sty =
+      Misc.fatal_errorf
+        "@[Unexpected [with]-type or [kind_of] (such as %a)@ in enter_type. \
+         Please report this to the Jane Street OCaml Language team."
+        Pprintast.core_type sty
+    in
     Jkind.of_type_decl_default
+      ~skip_with_bounds:true
       ~context:(Type_declaration path)
-      (* CR layouts v2.8: This next line is truly terrible. But I think it's OK
-         for now: it will mean that any [with] constraints get interpreted to
-         mean that the thing does not cross that mode. That's OK: the jkind
-         produced here can be an overapproximation of the correct jkind (note
-         that [any] is the default).  Indeed the only reason (I think) we need a
-         non-[any] jkind here is to produce better error messages.
-
-         Doing better here will be annoying, because a type is in scope in its
-         own jkind... and yet we don't have an env that we can use at this
-         point. I think probably the solution will be to have
-         [Jkind.of_type_decl_default] just return [max] every time it sees a
-         [with]-kind... which basically just does this [type_exn] trick but much
-         more sanely. Internal ticket 5116. *)
-      ~transl_type:(fun _ -> Predef.type_exn)
+      ~transl_type
       ~default:(Jkind.disallow_right any)
       sdecl
   in

@@ -1626,11 +1626,22 @@ let of_type_decl ~context ~transl_type (decl : Parsetree.type_declaration) =
     raise ~loc:decl.ptype_loc
       (Multiple_jkinds { from_annotation; from_attribute })
 
-let of_type_decl_default ~context ~transl_type ~default
-    (decl : Parsetree.type_declaration) =
-  match of_type_decl ~context ~transl_type decl with
-  | Some (t, _) -> t
-  | None -> default
+let of_type_decl_default ?(skip_with_bounds = false) ~context ~transl_type
+    ~default (decl : Parsetree.type_declaration) =
+  (* Used to avoid computing with-kinds when we have no environment. *)
+  let rec has_with_bounds (jkind : Parsetree.jkind_annotation) =
+    match jkind.pjkind_desc with
+    | Pjk_with _ -> true
+    | Pjk_mod (base, _) -> has_with_bounds base
+    | Pjk_product jkinds -> List.exists has_with_bounds jkinds
+    | Pjk_abbreviation _ | Pjk_default | Pjk_kind_of _ -> false
+  in
+  match decl.ptype_jkind_annotation with
+  | Some annot when skip_with_bounds && has_with_bounds annot -> default
+  | _ -> (
+    match of_type_decl ~context ~transl_type decl with
+    | Some (t, _) -> t
+    | None -> default)
 
 let for_unboxed_record lbls =
   let open Types in
