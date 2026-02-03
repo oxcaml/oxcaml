@@ -1546,7 +1546,11 @@ let rec tree_of_modal_typexp mode modal ty =
     | Tvar _ ->
         let non_gen = is_non_gen mode ty in
         let name_gen = Names.new_var_name ~non_gen ty in
-        Otyp_var (non_gen, Names.name_of_type name_gen tty)
+        let oty = Otyp_var (non_gen, Names.name_of_type name_gen tty) in
+        begin match evals_to with
+        | Some _ -> Otyp_attribute (oty, { oattr_name = "evals_to" })
+        | None -> oty
+        end
     | Tarrow ((l, marg, mret), ty1, ty2, _) ->
         let lab =
           if !print_labels || is_omittable l then outcome_label l

@@ -117,7 +117,7 @@ val must_evals_to_unit : 'a expr -> 'a eval = <fun>
 let must_unit e : unit = must_evals_to_unit e
 
 [%%expect{|
-val must_unit : 'a expr -> unit = <fun>
+val must_unit : ('a [@evals_to]) expr -> unit = <fun>
 |}]
 
 
@@ -134,7 +134,7 @@ Line _, characters _-_:
  |       Format.printf p ]>
          ^^^^^^^^^^^^^^^
 Error: This expression has type "unit" = "unit"
-       but an expression was expected of type "'a"
+       but an expression was expected of type "('a [@evals_to])"
        Type "unit" is not compatible with type "<[unit]> eval"
 |}]
 
@@ -160,7 +160,7 @@ let not_injected_ints () : int =
 Line _, characters _-_:
  |   eval <[ $(inject 2) + $(inject "2") ]>
                             ^^^^^^^^^^^^
-Error: This expression has type "'a expr"
+Error: This expression has type "('a [@evals_to]) expr"
        but an expression was expected of type "<[int]> expr"
        Type "string" is not compatible with type "<[int]> eval" = "int"
 |}]
