@@ -527,3 +527,161 @@ Uncaught exception: File "typing/env.ml", line 2155, characters 13-19: Assertion
 
 |}]
 *)
+
+(* Testing modalities on module declarations in signatures.
+   Those are currently treated as modalities on signatures, not on the module. *)
+
+module type SigS = sig
+  val f : unit -> unit
+end
+[%%expect{|
+module type SigS = sig val f : unit -> unit end
+|}]
+
+module type SigWithModalModule = sig
+  module (M @@ portable) : SigS
+end
+[%%expect{|
+module type SigWithModalModule =
+  sig module M : sig val f : unit -> unit @@ portable end end
+|}]
+
+module type SigWithNonmodalModule = sig
+  module M : SigS
+end
+[%%expect{|
+module type SigWithNonmodalModule = sig module M : SigS end
+|}]
+
+(* Both behave identically when accessed from a nonportable first-class module:
+   the contents are nonportable. *)
+let use_portable_module ((module M) : (module SigWithModalModule) @ nonportable) =
+  let module _ @ portable = M.M in ()
+[%%expect{|
+Line 2, characters 28-31:
+2 |   let module _ @ portable = M.M in ()
+                                ^^^
+Error: This is "nonportable", but expected to be "portable".
+|}]
+
+let use_nonportable_module
+    ((module M) : (module SigWithNonmodalModule) @ nonportable) =
+  let module _ @ portable = M.M in ()
+[%%expect{|
+Line 3, characters 28-31:
+3 |   let module _ @ portable = M.M in ()
+                                ^^^
+Error: This is "nonportable", but expected to be "portable".
+|}]
+
+(* However, a module satisfying SigWithModalModule can be used as
+   SigWithNonmodalModule (portable is more restrictive), but not vice versa. *)
+module F (M : SigWithModalModule) = (M : SigWithNonmodalModule)
+[%%expect{|
+module F : functor (M : SigWithModalModule) -> SigWithNonmodalModule @@
+  stateless
+|}]
+
+module F (M : SigWithNonmodalModule) = (M : SigWithModalModule)
+[%%expect{|
+Line 1, characters 40-41:
+1 | module F (M : SigWithNonmodalModule) = (M : SigWithModalModule)
+                                            ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig module M : sig val f : unit -> unit end end @ nonportable
+       is not included in
+         SigWithModalModule @ nonportable
+       In module "M":
+       Modules do not match:
+         sig val f : unit -> unit end @ nonportable
+       is not included in
+         sig val f : unit -> unit @@ portable end @ nonportable
+       In module "M":
+       Values do not match:
+         val f : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val f : unit -> unit @@ portable (* in a structure at nonportable *)
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
+|}]
+
+(* Testing modalities on module aliases in signatures.
+   Default modalities like `sig @@ portable` apply to the alias module itself. *)
+
+module AliasTarget = struct
+  let f () = ()
+end
+[%%expect{|
+module AliasTarget : sig val f : unit -> unit end @@ stateless
+|}]
+
+module type SigWithModalAlias = sig @@ portable
+  module M = AliasTarget
+end
+[%%expect{|
+module type SigWithModalAlias = sig module M = AliasTarget @@ portable end
+|}]
+
+(* The alias M is portable (due to sig @@ portable), so it can be accessed
+   as portable even from a nonportable first-class module. *)
+let test_modal_alias
+    ((module X) : (module SigWithModalAlias) @ nonportable) =
+  let module _ @ portable = X.M in
+  ()
+[%%expect{|
+val test_modal_alias : (module SigWithModalAlias) -> unit = <fun>
+|}]
+
+(* Without the default modality, accessing the alias as portable fails. *)
+module type SigWithNonmodalAlias = sig
+  module M = AliasTarget
+end
+
+let test_nonmodal_alias
+    ((module X) : (module SigWithNonmodalAlias) @ nonportable) =
+  let module _ @ portable = X.M in
+  ()
+[%%expect{|
+module type SigWithNonmodalAlias = sig module M = AliasTarget end
+Line 7, characters 28-31:
+7 |   let module _ @ portable = X.M in
+                                ^^^
+Error: This is "nonportable", but expected to be "portable".
+|}]
+
+(* Explicit modality on alias: `module M = AliasTarget @@ portable` syntax *)
+module type SigWithExplicitModalAlias1 = sig
+  module M = AliasTarget @@ portable
+end
+[%%expect{|
+module type SigWithExplicitModalAlias1 =
+  sig module M = AliasTarget @@ portable end
+|}]
+
+let test_explicit_modal_alias1
+    ((module X) : (module SigWithExplicitModalAlias1) @ nonportable) =
+  let module _ @ portable = X.M in
+  ()
+[%%expect{|
+val test_explicit_modal_alias1 : (module SigWithExplicitModalAlias1) -> unit =
+  <fun>
+|}]
+
+(* Explicit modality on alias: `module (M @@ portable) = AliasTarget` syntax *)
+module type SigWithExplicitModalAlias2 = sig
+  module (M @@ portable) = AliasTarget
+end
+[%%expect{|
+module type SigWithExplicitModalAlias2 =
+  sig module M = AliasTarget @@ portable end
+|}]
+
+let test_explicit_modal_alias2
+    ((module X) : (module SigWithExplicitModalAlias2) @ nonportable) =
+  let module _ @ portable = X.M in
+  ()
+[%%expect{|
+val test_explicit_modal_alias2 : (module SigWithExplicitModalAlias2) -> unit =
+  <fun>
+|}]
