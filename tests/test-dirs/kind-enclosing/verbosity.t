@@ -53,5 +53,5 @@
   > type t : value mod portable
   > EOF
   Verbosity 0: value mod portable
-  Verbosity 1: value mod portable
+  Verbosity 1: value mod portable internal non_null separable
   Verbosity 2: value mod portable internal non_null separable
