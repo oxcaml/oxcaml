@@ -395,6 +395,23 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
           | false -> `Index i
         in
         (loc, kind_info))
+  | Mode_enclosing { position; override_verbosity } ->
+    let typer = Mpipeline.typer_result pipeline in
+    let verbosity =
+      match override_verbosity with
+      | Some verbosity -> verbosity
+      | None -> verbosity pipeline
+    in
+    let position = Mpipeline.get_lexing_pos pipeline position in
+    let mbrowse =
+      Mbrowse.enclosing position
+        [ Mbrowse.of_typedtree (Mtyper.get_typedtree typer) ]
+    in
+    let result = Mode_enclosing.from_mbrowse mbrowse in
+    (* Unlike type-enclosing, we always print all results because printing modes is cheap,
+       unlike printing types. *)
+    List.map result ~f:(fun (loc, mode_info) ->
+        (loc, Mode_enclosing.Mode_info.to_string ~verbosity mode_info))
   | Enclosing pos ->
     let typer = Mpipeline.typer_result pipeline in
     let structures = Mbrowse.of_typedtree (Mtyper.get_typedtree typer) in

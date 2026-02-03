@@ -229,6 +229,13 @@ type _ t =
                 Mconfig. *)
       }
       -> (Location.t * [ `Kind of string | `Index of int ]) list t
+  | Mode_enclosing (* *) :
+      { position : Msource.position;
+        override_verbosity : Mconfig.Verbosity.t option
+            (** Use a different verbosity for printing modes than as specified by the
+                Mconfig. *)
+      }
+      -> (Location.t * string) list t
   | Type_enclosing (* *) :
       (string * int) option * Msource.position * int option
       -> (Location.t * [ `String of string | `Index of int ] * is_tail_position)

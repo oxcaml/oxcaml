@@ -38,6 +38,11 @@ let dump (type a) : a t -> json =
     | `Logical (line, col) ->
       `Assoc [ ("line", `Int line); ("column", `Int col) ]
   in
+  let mk_verbosity (verbosity : Mconfig.Verbosity.t) =
+    match verbosity with
+    | Lvl n -> `Int n
+    | Smart -> `String "smart"
+  in
   let kinds_to_json kind =
     `List
       (List.map
@@ -86,11 +91,15 @@ let dump (type a) : a t -> json =
            | Some n -> `Int n );
          ("position", mk_position position)
        ]
-      @
-      match override_verbosity with
-      | Some (Lvl n) -> [ ("override-verbosity", `Int n) ]
-      | Some Smart -> [ ("override-verbosity", `String "smart") ]
-      | None -> [])
+      @ (Option.map override_verbosity ~f:(fun v ->
+             ("override-verbosity", mk_verbosity v))
+        |> Option.to_list))
+  | Mode_enclosing { position; override_verbosity } ->
+    mk "mode-enclosing"
+      ([ ("position", mk_position position) ]
+      @ (Option.map override_verbosity ~f:(fun v ->
+             ("override-verbosity", mk_verbosity v))
+        |> Option.to_list))
   | Locate_type pos -> mk "locate-type" [ ("position", mk_position pos) ]
   | Locate_types pos -> mk "locate-types" [ ("position", mk_position pos) ]
   | Enclosing pos -> mk "enclosing" [ ("position", mk_position pos) ]
@@ -271,6 +280,8 @@ let json_of_stack_or_heap (loc, desc) =
         | `String _ as str -> str
         | `Index n -> `Int n )
     ]
+
+let json_of_mode (loc, mode) = with_location loc [ ("mode", `String mode) ]
 
 let json_of_type_loc (loc, desc, tail) =
   with_location loc
@@ -510,6 +521,7 @@ let json_of_response (type a) (query : a t) (response : a) : json =
   | Type_expr _, str -> `String str
   | Stack_or_heap_enclosing _, results ->
     `List (List.map ~f:json_of_stack_or_heap results)
+  | Mode_enclosing _, results -> `List (List.map ~f:json_of_mode results)
   | Type_enclosing _, results -> `List (List.map ~f:json_of_type_loc results)
   | Kind_enclosing _, results ->
     `List (List.map ~f:json_of_kind_enclosing_res results)

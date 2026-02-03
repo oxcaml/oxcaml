@@ -866,6 +866,32 @@ let all_commands =
               (Query_protocol.Kind_enclosing
                  { position; index; override_verbosity = None })
       end;
+    command "mode-enclosing"
+      ~doc:
+        "Returns a list of modes all expressions (that have mode information \
+         available) at given position, sorted by increasing size.\n\
+         The result is returned as a list of:\n\
+         ```javascript\n\
+         {\n\
+        \  'start': position,\n\
+        \  'end': position,\n\
+        \  'mode': string\n\
+         }\n\
+         ```"
+      ~spec:
+        [ arg "-position" "<position> Position to complete"
+            (marg_position (fun pos _pos -> pos))
+        ]
+      ~default:`None
+      begin
+        fun buffer pos ->
+          match pos with
+          | `None -> failwith "-position <pos> is mandatory"
+          | #Msource.position as position ->
+            run buffer
+              (Query_protocol.Mode_enclosing
+                 { position; override_verbosity = None })
+      end;
     command "type-expression"
       ~doc:
         "Returns the type of the expression when typechecked in the \
