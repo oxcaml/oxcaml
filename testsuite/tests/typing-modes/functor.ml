@@ -1235,3 +1235,22 @@ let test_default_modality
 [%%expect{|
 val test_default_modality : (module SigWithDefaultModality) -> unit = <fun>
 |}]
+
+(* Test 6: Explicit modality on functor overrides the default modality. *)
+module type SigWithOverriddenModality = sig @@ portable
+  module F : S -> S @@ nonportable
+end
+[%%expect{|
+module type SigWithOverriddenModality = sig module F : S -> S end
+|}]
+
+let test_overridden_modality
+    ((module M) : (module SigWithOverriddenModality) @ nonportable) =
+  let module _ @ portable = M.F in
+  ()
+[%%expect{|
+Line 3, characters 28-31:
+3 |   let module _ @ portable = M.F in
+                                ^^^
+Error: This is "nonportable", but expected to be "portable".
+|}]
