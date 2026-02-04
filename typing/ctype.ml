@@ -251,16 +251,18 @@ let proper_abbrevs tl abbrev =
 let newty desc              = newty2 ~level:!current_level desc
 let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
 
-let newvar ?name jkind =
-  newty2 ~level:!current_level (Tvar { name; jkind })
+let newvar ?name ?evals_to jkind =
+  newty2 ~level:!current_level (Tvar { name; jkind; evals_to })
 let new_rep_var ?name ~why () =
   let jkind, sort = Jkind.of_new_sort_var ~why ~level:!current_level in
   newvar ?name jkind, sort
-let newvar2 ?name level jkind = newty2 ~level (Tvar { name; jkind })
-let new_global_var ?name jkind =
-  newty2 ~level:!global_level (Tvar { name; jkind })
-let newstub ~scope jkind =
-  newty3 ~level:!current_level ~scope (Tvar { name = None; jkind })
+let newvar2 ?name ?evals_to level jkind =
+  newty2 ~level (Tvar { name; jkind; evals_to })
+let new_global_var ?name ?evals_to jkind =
+  newty2 ~level:!global_level (Tvar { name; jkind; evals_to })
+let newstub ?evals_to ~scope jkind =
+  newty3 ~level:!current_level ~scope
+    (Tvar { name = None; jkind; evals_to })
 
 let newobj fields      = newty (Tobject (fields, ref None))
 
@@ -1273,8 +1275,7 @@ let rec copy ?partial ?keep_names copy_scope ty =
     if forget <> generic_level then
       (* Using jkind "any" is ok here: We're forgetting the type because it
          will be unified with the original later. *)
-      newty2 ~level:forget
-        (Tvar { name = None; jkind = Jkind.Builtin.any ~why:Dummy_jkind })
+      newvar2 forget (Jkind.Builtin.any ~why:Dummy_jkind)
     else
     let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
     For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
@@ -1414,6 +1415,7 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_arity = 0;
     type_kind = Type_abstract origin;
     type_jkind = Jkind.disallow_right jkind;
+    type_evals_to = None;
     type_private = Public;
     type_manifest = manifest;
     type_variance = [];
@@ -1629,7 +1631,8 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
             if keep then
               (add_delayed_copy t ty;
                Tvar { name = None;
-                      jkind = Jkind.for_non_float ~why:Polymorphic_variant })
+                      jkind = (Jkind.for_non_float ~why:Polymorphic_variant);
+                      evals_to = None })
             else
             let more' = copy_rec ~may_share:false more in
             let fixed' = fixed && (is_Tvar more || is_Tunivar more) in
@@ -1658,8 +1661,8 @@ let instance_poly' copy_scope ~keep_names ~fixed ~copy_var univars sch =
       ~default:
         (fun ty ->
           match get_desc ty with
-            Tunivar { name; jkind } ->
-              if keep_names then newty (Tvar { name; jkind }) else newvar jkind
+            Tunivar { name; jkind; evals_to } ->
+              newvar ?name:(if keep_names then name else None) ?evals_to jkind
           | _ -> assert false)
   in
   let vars = List.map copy_var univars in
@@ -2115,6 +2118,25 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
+let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
+let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
+let new_eval_ty t = newty2 ~level:(get_level t) (Teval t)
+let new_quote_eval_ty t = new_eval_ty (new_quote_ty t)
+
+let rec n_evals_ty n t =
+  if n > 0 then
+    n_evals_ty (n - 1) (new_eval_ty t)
+  else if n < 0 then
+    assert false
+  else t
+
+let rec offset_stage_ty n t =
+  if n > 0 then
+    offset_stage_ty (n - 1) (new_quote_ty t)
+  else if n < 0 then
+    offset_stage_ty (n + 1) (new_splice_ty t)
+  else t
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
@@ -2123,10 +2145,13 @@ let rec try_expand_once env ty =
     Tconstr _ -> expand_abbrev env ty
   | Tsplice t ->
       let t = try_expand_once env t in
-      newty2 ~level:(get_level t) (Tsplice t)
+      new_splice_ty t
   | Tquote t ->
       let t = try_expand_once env t in
-      newty2 ~level:(get_level t) (Tquote t)
+      new_quote_ty t
+  | Teval t ->
+      let t = try_expand_once env t in
+      new_eval_ty t
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2145,14 +2170,14 @@ let rec try_quote_splice_cancel_once ty =
       | _ ->
           let t = try_quote_splice_cancel_once t in
           (* New types are only constructed whenever we expand the subterm *)
-          newty2 ~level:(get_level t) (Tquote t)
+          new_quote_ty t
     end
   | Tsplice t -> begin
       match get_desc t with
       | Tquote t' -> t'
       | _ ->
           let t = try_quote_splice_cancel_once t in
-          newty2 ~level:(get_level t) (Tsplice t)
+          new_splice_ty t
     end
   | _ -> raise Cannot_expand
 
@@ -2160,6 +2185,87 @@ let rec try_quote_splice_cancel_once ty =
 let rec try_quote_splice_cancel ty =
   let ty' = try_quote_splice_cancel_once ty in
   try try_quote_splice_cancel ty'
+  with Cannot_expand -> ty'
+
+(* Distribute a head-position eval across a top-level type constructor. *)
+let rec try_distribute_eval_once ty =
+  match get_desc ty with
+  | Teval t -> begin
+    match get_desc t with
+    | Teval t ->
+      new_eval_ty (try_distribute_eval_once t)
+    | Tquote t -> begin
+      match get_desc t with
+      | Teval t ->
+        Teval (new_quote_eval_ty t)
+      | Tconstr (p, tl, a) ->
+        Tconstr (p, List.map new_quote_eval_ty tl, a)
+      | Ttuple tl ->
+        Ttuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+      | Tunboxed_tuple tl ->
+        Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+      (* FIXME jbachurski: handling Tpoly is awkward,
+         since we rewrite <[ 'a. t ]> to 'a. <[ t ]> *)
+      | Tarrow (a, t1, t2, c) ->
+        (* We distribute across the parameter type immediately
+           to ensure it is a [Tpoly] and not under a [Teval] *)
+        Tarrow (
+          a, try_distribute_eval_once (new_quote_eval_ty t1),
+          new_quote_eval_ty t2, c)
+      | Tpoly (t, tl) ->
+        Tpoly (new_quote_eval_ty t, tl)
+      | Tobject (t, ct) ->
+        Tobject (
+          new_quote_eval_ty t,
+          ref (
+            Option.map
+              (fun (p, tl) -> p, List.map new_quote_eval_ty tl)
+              !ct))
+      | Tfield (s, k, t1, t2) ->
+        Tfield (s, k, new_quote_eval_ty t1, new_quote_eval_ty t2)
+      (* TODO jbachurski: Tvariant *)
+      | Tpackage (p, fl) ->
+        Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
+      (* TODO jbachurski: Tof_kind, once we have quoted kinds *)
+      | _ -> raise Cannot_expand
+      end |> newty2 ~level:(get_level t)
+    | _ -> raise Cannot_expand
+    end
+  | _ -> raise Cannot_expand
+
+(* Distribute all head-position evals across top-level type constructors. *)
+let rec try_distribute_eval ty =
+  let ty' = try_distribute_eval_once ty in
+  try try_distribute_eval ty'
+  with Cannot_expand -> ty'
+
+let try_instantiate_eval_once env ty =
+  let rec loop ty =
+    match get_desc ty with
+    | Teval t ->
+      let ty, n_evals = loop t in
+      ty, n_evals + 1
+    | Tconstr (path, [], _) -> begin
+      match (Env.find_type path env).type_evals_to with
+      | Some { to_; stage_offset; n_evals } ->
+        assert (stage_offset = 0);
+        to_, -n_evals
+      | None -> raise Cannot_expand
+      end
+    | _ -> raise Cannot_expand
+  in
+  let ty, n_evals =
+    match get_desc ty with
+    | Teval _ -> loop ty
+    | _ -> raise Cannot_expand
+  in
+  if n_evals >= 0
+  then n_evals_ty n_evals ty
+  else raise Cannot_expand
+
+let rec try_instantiate_eval env ty =
+  let ty' = try_instantiate_eval_once env ty in
+  try try_instantiate_eval env ty'
   with Cannot_expand -> ty'
 
 (* Fully expand the head of a type. *)
@@ -2170,10 +2276,19 @@ let try_expand_head
     try loop try_once env ty'
     with Cannot_expand ->
       try try_quote_splice_cancel ty'
-      with Cannot_expand -> ty'
+      with Cannot_expand ->
+        try try_distribute_eval ty'
+        with Cannot_expand ->
+          try try_instantiate_eval env ty'
+          with Cannot_expand -> ty'
   in
   try loop try_once env ty
-  with Cannot_expand -> try_quote_splice_cancel ty
+  with Cannot_expand ->
+    try try_quote_splice_cancel ty
+    with Cannot_expand ->
+      try try_distribute_eval ty
+      with Cannot_expand ->
+        try_instantiate_eval env ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
 let expand_head_unif env ty =
@@ -2221,6 +2336,7 @@ let rec extract_concrete_typedecl env ty =
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
+  | Teval ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2252,6 +2368,9 @@ let rec try_expand_once_opt env ty =
   | Tquote t ->
       let t = try_expand_once_opt env t in
       newty2 ~level:(get_level t) (Tquote t)
+  | Teval t ->
+      let t = try_expand_once_opt env t in
+      newty2 ~level:(get_level t) (Teval t)
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -2369,7 +2488,7 @@ let contained_without_boxing env ty =
   | Tpoly (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
-  | Tquote _ | Tsplice _ -> []
+  | Tquote _ | Tsplice _ | Teval _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -2481,6 +2600,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
   | Tquote _ -> Jkind.Builtin.value ~why:Tquote
   | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
+  | Teval _ -> Jkind.Builtin.value ~why:Teval
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3249,8 +3369,8 @@ let univar_pairs = ref []
 let polyfy env ty vars =
   let subst_univar copy_scope ty =
     match get_desc ty with
-    | Tvar { name; jkind } when get_level ty = generic_level ->
-        let t = newty (Tunivar { name; jkind }) in
+    | Tvar { name; jkind; evals_to } when get_level ty = generic_level ->
+        let t = newty (Tunivar { name; jkind; evals_to }) in
         For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
         Some t
     | _ -> None
@@ -3562,6 +3682,8 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tquote t1, Tquote t2, _, _) ->
             mcomp type_pairs env t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Teval t1, Teval t2, _, _) ->
             mcomp type_pairs env t1 t2
         | (Tsplice t1, _, _, _) ->
             mcomp type_pairs env t1 t2'
@@ -3931,21 +4053,23 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
-(* Checks if a type is a type variable under some quotes or splices *)
+(* Checks if a type is a type variable under some quotes, splices, or evals *)
 let rec is_flexible_ty ty =
   match get_desc ty with
   | Tvar _ -> true
   | Tquote ty' -> is_flexible_ty ty'
   | Tsplice ty' -> is_flexible_ty ty'
+  | Teval ty' -> is_flexible_ty ty'
   | _ -> false
 
-(* Checks if a type is an instantiable type under some quotes or splices *)
+(* Checks if a type is an instantiable type under some quotes, splices, or evals *)
 let rec is_instantiable_ty env ty =
   match get_desc ty with
   | Tconstr (path, [], _) ->
       is_instantiable env ~for_jkind_eqn:false path
   | Tquote ty' -> is_instantiable_ty env ty'
   | Tsplice ty' -> is_instantiable_ty env ty'
+  | Teval ty' -> is_instantiable_ty env ty'
   | _ -> false
 
 (* Checks if a type is equatable under some quotes or splices *)
@@ -3985,7 +4109,7 @@ let unify_alloc_mode_for tr_exn a b =
    environment is built in subst. *)
 let rigid_variants = ref false
 
-let unify1_var uenv t1 t2 =
+let rec unify1_var uenv t1 t2 =
   let jkind = match get_desc t1 with
     | Tvar { jkind } -> jkind
     | _ -> assert false
@@ -3994,7 +4118,8 @@ let unify1_var uenv t1 t2 =
   let env = get_env uenv in
   match
     occur_univar_for Unify env t2;
-    unification_jkind_check uenv t2 (Jkind.disallow_left jkind)
+    unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
+    unification_evals_to_check_direct uenv t1 ~to_:t2
   with
   | () ->
       begin
@@ -4010,7 +4135,7 @@ let unify1_var uenv t1 t2 =
       false
 
 (* Called from unify3 *)
-let unify3_var uenv jkind1 t1' t2 t2' =
+and unify3_var uenv jkind1 t1' t2 t2' =
   occur_for Unify uenv t1' t2;
   (* There are two possible ways forward here. Either the variable [t1']
      will succeed in unifying with [t2], in which case we're done; or
@@ -4022,7 +4147,8 @@ let unify3_var uenv jkind1 t1' t2 t2' =
   let snap = snapshot () in
   match
     occur_univar_for Unify (get_env uenv) t2;
-    unification_jkind_check uenv t2' (Jkind.disallow_left jkind1)
+    unification_jkind_check uenv t2' (Jkind.disallow_left jkind1);
+    unification_evals_to_check_direct uenv t1' ~to_:t2'
   with
   | () -> link_type t1' t2
   | exception Unify_trace _ when in_pattern_mode uenv ->
@@ -4072,7 +4198,7 @@ let unify3_var uenv jkind1 t1' t2 t2' =
       information is indeed lost, but it probably does not worth it.
 *)
 
-let rec unify uenv t1 t2 =
+and unify uenv t1 t2 =
   (* First step: special cases (optimizations) *)
   if unify_eq uenv t1 t2 then () else
   let reset_tracing = check_trace_gadt_instances (get_env uenv) in
@@ -4190,8 +4316,11 @@ and unify3 uenv t1 t1' t2 t2' =
       unify3_var uenv jkind t1' t2 t2'
   | (_, Tvar { jkind }) ->
       unify3_var uenv jkind t2' t1 t1'
-  | (Tquote t1, Tquote t2)
+  | (Tquote t1, Tquote t2) ->
+      unify uenv t1 t2
   | (Tsplice t1, Tsplice t2) ->
+      unify uenv t1 t2
+  | (Teval t1, Teval t2) ->
       unify uenv t1 t2
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       set_type_desc t2' d2;
@@ -4217,6 +4346,10 @@ and unify3 uenv t1 t1' t2 t2' =
         newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
       in
       unify uenv t s2
+  | (Teval _, _) when can_constrain_eval t1' ->
+      constrain_eval uenv t1' ~to_:t2'
+  | (_, Teval _) when can_constrain_eval t2' ->
+      constrain_eval uenv t2' ~to_:t1'
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -4447,11 +4580,12 @@ and unify_labeled_list env labeled_tl1 labeled_tl2 =
       unify env ty1 ty2)
     labeled_tl1 labeled_tl2
 
-(* Build a fresh row variable for unification *)
+(** Build a fresh row variable for unification *)
 and make_rowvar level use1 rest1 use2 rest2  =
   let set_name ty name =
     match get_desc ty with
-      Tvar { name = None; jkind } -> set_type_desc ty (Tvar { name; jkind })
+      Tvar { name = None; jkind; evals_to } ->
+        set_type_desc ty (Tvar { name; jkind; evals_to })
     | _ -> ()
   in
   let name =
@@ -4466,7 +4600,82 @@ and make_rowvar level use1 rest1 use2 rest2  =
   in
   if use1 then rest1 else
   if use2 then rest2
-  else newty2 ~level (Tvar { name; jkind = Jkind.Builtin.value ~why:Row_variable })
+  else newvar2 ?name level (Jkind.Builtin.value ~why:Row_variable)
+
+(** Check that we could use an evals-to constraint to unify [ty]. *)
+and can_constrain_eval ty =
+  let rec loop ty =
+    match get_desc ty with
+    | Tvar _ -> true
+    | Tsplice t | Tquote t | Teval t -> loop t
+    | _ -> false
+  in
+  match get_desc ty with
+  | Teval _ -> loop ty
+  | _ -> false
+
+(** Returns a type variable [tv] underneath [ty]
+    and an evals-to constraint that unifies [tv ~ to_].
+    Only called when [can_constrain_eval ty] is true. *)
+and gen_constrain_eval ty ~to_ =
+  match get_desc ty with
+  | Tvar _ ->
+    ty, { to_; stage_offset = 0; n_evals = 0 }
+  | Tquote t ->
+    let tv, c = gen_constrain_eval t ~to_ in
+    tv, { c with stage_offset = c.stage_offset + 1 }
+  | Tsplice t ->
+    let tv, c = gen_constrain_eval t ~to_ in
+    tv, { c with stage_offset = c.stage_offset - 1 }
+  | Teval t ->
+    let tv, c = gen_constrain_eval t ~to_ in
+    tv, { c with n_evals = c.n_evals + 1 }
+  | _ -> assert false
+
+(** Use an evals-to constraint on the variable in [ty] to unify [ty] and [to_].
+    Only called when [can_constrain_eval ty] is true. *)
+and constrain_eval uenv ty ~to_ =
+  gen_constrain_eval ty ~to_ |> constrain_eval' uenv
+
+(** Place an evals-to constraint [c] on a type variable [tv]. *)
+and constrain_eval' uenv (tv, c) =
+  assert (c.n_evals >= 1);
+  unification_evals_to_check uenv tv c;
+  set_var_evals_to tv (Some c)
+
+and unify_evals_to uenv c c' =
+  let { to_; stage_offset; n_evals } = c in
+  let { to_ = to_'; stage_offset = stage_offset'; n_evals = n_evals' } = c' in
+  if n_evals < n_evals' then
+    unify_evals_to uenv c' c
+  else begin
+    assert (stage_offset = stage_offset' || (n_evals' = 0 && stage_offset' = 0));
+    to_'
+    |> offset_stage_ty (stage_offset - stage_offset')
+    |> n_evals_ty (n_evals - n_evals')
+    |> unify uenv to_
+  end
+
+(** Ensure that any existing evals-to constraint on [tv]
+    is consistent with the new constraint [c]. *)
+and unification_evals_to_check uenv tv c =
+  match get_desc tv with
+  | Tvar { evals_to = None } | Tunivar { evals_to = None } -> ()
+  | Tvar { evals_to = Some c' } | Tunivar { evals_to = Some c' } ->
+    unify_evals_to uenv c c'
+  | _ -> assert false
+
+(** Ensure that any existing evals-to constraint on [tv]
+    is consistent with unifying [tv ~ to_]. *)
+and unification_evals_to_check_direct uenv tv ~to_ =
+  (* In [unify_var], this might be called after a recursive call links
+     [tv] against a concrete type. In that case, the only possibility
+     has to be that [tv] and [to] were unified which must have already
+     been checked, so we can skip the evals-to check. *)
+  match get_desc tv with
+  | Tvar _ | Tunivar _ ->
+    unification_evals_to_check uenv tv { to_; stage_offset = 0; n_evals = 0 }
+  | _ -> ()
 
 and unify_fields uenv ty1 ty2 =          (* Optimization *)
   let (fields1, rest1) = flatten_fields ty1
@@ -4528,8 +4737,8 @@ and unify_row uenv row1 row2 =
     | Some _, None -> rm1
     | None, Some _ -> rm2
     | None, None ->
-        newty2 ~level:(Int.min (get_level rm1) (get_level rm2))
-          (Tvar { name = None; jkind = Jkind.Builtin.value ~why:Row_variable })
+        newvar2 (Int.min (get_level rm1) (get_level rm2))
+          (Jkind.Builtin.value ~why:Row_variable)
   in
   let fixed = merge_fixed_explanation fixed1 fixed2
   and closed = row1_closed || row2_closed in
@@ -4756,6 +4965,7 @@ let unify_var uenv t1 t2 =
         occur_for Unify uenv t1 t2;
         update_level_for Unify env (get_level t1) t2;
         update_scope_for Unify (get_scope t1) t2;
+        unification_evals_to_check_direct uenv t1 ~to_:t2;
         unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
         link_type t1 t2;
         reset_trace_gadt_instances reset_tracing;
@@ -5549,6 +5759,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tsplice t1, Tsplice t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
+          | (Teval t1, Teval t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (Tquote t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
               moregen inst_nongen variance type_pairs env t1 t2
@@ -6012,6 +6224,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote t1, Tquote t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Teval t1, Teval t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
@@ -6616,7 +6830,8 @@ let rec build_subtype env (visited : transient_expr list)
           set_type_desc ty
             (Tvar { name = None;
                     jkind = Jkind.Builtin.value
-                               ~why:(Unknown "build subtype 1")});
+                               ~why:(Unknown "build subtype 1");
+                    evals_to = None});
           let t'' = newvar (Jkind.Builtin.value ~why:(Unknown "build subtype 2"))
           in
           let loops = (get_id ty, t'') :: loops in
@@ -6723,6 +6938,10 @@ let rec build_subtype env (visited : transient_expr list)
   | Tsplice t1 ->
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tsplice t1'), c)
+      else (t, Unchanged)
+  | Teval t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Teval t1'), c)
       else (t, Unchanged)
   | Tnil ->
       if posi then
@@ -7405,6 +7624,12 @@ let rec nondep_type_decl env mid is_covariant decl =
         let context = mk_jkind_context_check_principal env in
         Jkind.round_up ~context decl.type_jkind |>
         Jkind.disallow_right
+    and evals_to =
+      try
+        Option.map
+          (evals_to_map_type_expr (nondep_type_rec env mid))
+          decl.type_evals_to
+      with Nondep_cannot_erase _ when is_covariant -> None
     in
     clear_hash ();
     let priv =
@@ -7420,6 +7645,7 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_arity = decl.type_arity;
       type_kind = tk;
       type_jkind = jkind;
+      type_evals_to = evals_to;
       type_manifest = tm;
       type_private = priv;
       type_variance = decl.type_variance;

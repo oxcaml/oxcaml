@@ -713,6 +713,8 @@ and raw_type_desc ppf = function
       fprintf ppf "@[Tquote@ %a@]" raw_type t
   | Tsplice t ->
       fprintf ppf "@[Tsplice@ %a@]" raw_type t
+  | Teval t ->
+      fprintf ppf "@[Teval@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -1541,10 +1543,14 @@ let rec tree_of_modal_typexp mode modal ty =
   let pr_typ alloc_mode =
     let tty = Transient_expr.repr ty in
     match tty.desc with
-    | Tvar _ ->
+    | Tvar { name = _; jkind = _; evals_to } ->
         let non_gen = is_non_gen mode ty in
         let name_gen = Names.new_var_name ~non_gen ty in
-        Otyp_var (non_gen, Names.name_of_type name_gen tty)
+        let oty = Otyp_var (non_gen, Names.name_of_type name_gen tty) in
+        begin match evals_to with
+        | Some _ -> Otyp_attribute (oty, { oattr_name = "evals_to" })
+        | None -> oty
+        end
     | Tarrow ((l, marg, mret), ty1, ty2, _) ->
         let lab =
           if !print_labels || is_omittable l then outcome_label l
@@ -1614,6 +1620,11 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_quote (tree_of_typexp mode alloc_mode ty)
     | Tsplice ty ->
         Otyp_splice (tree_of_typexp mode alloc_mode ty)
+    | Teval ty ->
+        let p', s = best_type_path Predef.path_eval in
+        let tyl = apply_subst s [ty] in
+        Internal_names.add p';
+        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
@@ -1975,9 +1986,9 @@ let prepare_decl id decl =
       List.iter
         (fun ty ->
           match get_desc ty with
-          | Tvar { name = Some "_"; jkind }
+          | Tvar { name = Some "_"; jkind; evals_to }
               when List.exists (eq_type ty) vars ->
-            set_type_desc ty (Tvar {name = None; jkind})
+            set_type_desc ty (Tvar {name = None; jkind; evals_to})
           | _ -> ())
         params
   | None -> ()
@@ -2134,10 +2145,17 @@ let tree_of_type_decl id decl =
         Some (out_jkind_of_desc (Jkind.get decl.type_jkind))
     | _ -> None (* other cases have no jkind annotation *)
   in
+  let attrs = [] in
   let attrs =
     if unsafe_mode_crossing
-    then [{ oattr_name = "unsafe_allow_any_mode_crossing" }]
-    else []
+    then { oattr_name = "unsafe_allow_any_mode_crossing" } :: attrs
+    else attrs
+  in
+  let attrs =
+    match decl.type_evals_to with
+    | Some { to_ = _; stage_offset = _; n_evals = _ } ->
+      { oattr_name = "evals_to" } :: attrs
+    | None -> attrs
   in
     { otype_name = name;
       otype_params = args;
@@ -2579,6 +2597,7 @@ let dummy =
     type_arity = 0;
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+    type_evals_to = None;
     type_private = Public;
     type_manifest = None;
     type_variance = [];

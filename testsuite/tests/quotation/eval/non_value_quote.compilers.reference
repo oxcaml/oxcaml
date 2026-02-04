@@ -1,0 +1,9 @@
+File "non_value_quote.ml", line 16, characters 20-30:
+16 |   let output = eval <[ #42L ]> in
+                         ^^^^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "<[int64#]> expr"
+       The layout of int64# is bits64
+         because it is the unboxed version of the primitive type int64.
+       But the layout of int64# must be a sublayout of value
+         because it's the result type of a quotation.

@@ -74,7 +74,7 @@ and scope_field = int
 and type_expr = transient_expr
 
 and type_desc =
-  | Tvar of { name : string option; jkind : jkind_lr }
+  | Tvar of { name : string option; jkind : jkind_lr; evals_to: evals_to option }
   | Tarrow of arrow_desc * type_expr * type_expr * commutable
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
@@ -83,11 +83,12 @@ and type_desc =
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
   | Tsplice of type_expr
+  | Teval of type_expr
   | Tnil
   | Tlink of type_expr
   | Tsubst of type_expr * type_expr option
   | Tvariant of row_desc
-  | Tunivar of { name : string option; jkind : jkind_lr }
+  | Tunivar of { name : string option; jkind : jkind_lr; evals_to: evals_to option }
   | Tpoly of type_expr * type_expr list
   | Tpackage of Path.t * (Longident.t * type_expr) list
   | Tof_kind of jkind_lr
@@ -142,6 +143,11 @@ and _ commutable_gen =
     Cok      : [> `some] commutable_gen
   | Cunknown : [> `none] commutable_gen
   | Cvar : {mutable commu: any commutable_gen} -> [> `var] commutable_gen
+
+and evals_to =
+  { to_ : type_expr;
+    stage_offset : int;
+    n_evals : int }
 
 (* jkinds *)
 
@@ -201,6 +207,11 @@ module TransientTypeOps = struct
 end
 
 module TransientTypeHash = Hashtbl.Make(TransientTypeOps)
+
+(* Eval constraints *)
+
+let evals_to_map_type_expr f { to_; stage_offset; n_evals } =
+  { to_ = f to_; stage_offset; n_evals }
 
 (* *)
 
@@ -344,6 +355,7 @@ type type_declaration =
     type_arity: int;
     type_kind: type_decl_kind;
     type_jkind: jkind_l;
+    type_evals_to: evals_to option;
     type_private: private_flag;
     type_manifest: type_expr option;
     type_variance: Variance.t list;
@@ -1166,9 +1178,14 @@ module Transient_expr = struct
   let set_level ty lv = ty.level <- lv
   let set_var_jkind ty jkind' =
     match ty.desc with
-    | Tvar { name; _ } ->
-      set_desc ty (Tvar { name; jkind = jkind' })
+    | Tvar { name; jkind = _; evals_to } ->
+      set_desc ty (Tvar { name; jkind = jkind'; evals_to })
     | _ -> Misc.fatal_error "set_var_jkind called on non-var"
+  let set_var_evals_to ty evals_to' =
+    match ty.desc with
+    | Tvar { name; jkind; evals_to =_ } ->
+      set_desc ty (Tvar { name; jkind; evals_to = evals_to' })
+    | _ -> Misc.fatal_error "set_var_evals_to called on non-var"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1241,6 +1258,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tarrow (_, _, _, _)
         | Tquote _
         | Tsplice _
+        | Teval _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in
@@ -1547,16 +1565,19 @@ let link_type ty ty' =
   (* Name is a user-supplied name for this unification variable (obtained
    * through a type annotation for instance). *)
   match desc, ty'.desc with
-    Tvar { name }, Tvar { name = name'; jkind = jkind' } ->
+    Tvar { name },
+    Tvar { name = name'; jkind = jkind'; evals_to = evals_to' } ->
       begin match name, name' with
       | Some _, None ->
         log_type ty';
-        Transient_expr.set_desc ty' (Tvar { name; jkind = jkind' })
+        Transient_expr.set_desc ty'
+          (Tvar { name; jkind = jkind'; evals_to = evals_to' })
       | None, Some _ -> ()
       | Some _, Some _ ->
         if ty.level < ty'.level then begin
           log_type ty';
-          Transient_expr.set_desc ty' (Tvar { name; jkind = jkind' })
+          Transient_expr.set_desc ty'
+            (Tvar { name; jkind = jkind'; evals_to = evals_to' })
         end
       | None, None   -> ()
       end
@@ -1592,6 +1613,10 @@ let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
+let set_var_evals_to ty evals_to =
+  let ty = repr ty in
+  log_type ty;
+  Transient_expr.set_var_evals_to ty evals_to
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =

@@ -1,21 +1,23 @@
 (* TEST
-  flags = "-extension runtime_metaprogramming";
+  include camlinternaleval;
+  flags = "-extension runtime_metaprogramming -no-locs";
   arch_amd64;
   native;
 *)
 
 #syntax quotations on
+open Camlinternaleval
 
 let test_simple_eval =
   Printf.printf "\nTest simple eval\n";
-  let eval : <[int]> expr -> int = [%eval: int] in
+  let eval : <[int]> expr -> int = eval in
   let output = eval <[ 42 ]> in
   Printf.printf "Output: %d\n" output;
 ;;
 
 let test_complex_return_type =
   Printf.printf "\nTest complex return type\n";
-  let compiled = [%eval: int -> int list] <[ fun x -> [ x ; x + 1 ] ]> in
+  let compiled = eval <[ fun x -> [ x ; x + 1 ] ]> in
   let output = compiled 42 in
   Printf.printf
   "Output: [%s]\n"
@@ -25,7 +27,7 @@ let test_complex_return_type =
 let test_side_effects =
   Printf.printf "\nTest side effects\n";
   Printf.printf "Compiling...\n";
-  let compiled = [%eval: unit -> unit]
+  let compiled = eval
     <[ print_endline "Outside";
        fun () -> print_endline "Inside" ]>
   in
@@ -41,7 +43,7 @@ let test_side_effects =
    lookup that resolves to Stdlib__Buffer). *)
 let test_reference_to_global =
   Printf.printf "\nTest reference to global\n";
-  let eval = [%eval: Buffer.t] in
+  let eval = eval in
   let output : Buffer.t = eval
     <[ let b = Buffer.create 42 in Buffer.add_string b "Hello world!" ; b ]>
   in
@@ -64,7 +66,7 @@ let test_late_compilation_error =
      to trigger this."
   ]> in
   try
-    let output = [%eval: string] quote in
+    let output = eval quote in
     Printf.printf "Output: %s\n" output;
   with Failure error -> Printf.printf "Error: %s\n" error
 ;;
@@ -72,5 +74,5 @@ let test_late_compilation_error =
 let test_warning =
   Printf.printf "\nTest warnings emitted during eval\n";
   (* Unused variable *)
-  [%eval: unit] <[ let a = () in $( if false then <[ a ]> else <[ () ]>) ]>;
+  eval <[ let a = () in $( if false then <[ a ]> else <[ () ]>) ]>;
   Printf.printf "Done\n"

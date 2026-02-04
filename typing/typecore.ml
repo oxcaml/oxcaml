@@ -296,7 +296,7 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Eval_format
+  | Eval_non_value of type_expr * Jkind.Violation.t
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -4520,9 +4520,7 @@ let rec is_nonexpansive exp =
   | Texp_probe_is_enabled _
   | Texp_src_pos
   | Texp_quotation _
-  | Texp_array (_, _, [], _)
-    (* CR metaprogramming mshinwell: Make sure this is correct for Texp_eval *)
-  | Texp_eval _ -> true
+  | Texp_array (_, _, [], _) -> true
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
@@ -5103,10 +5101,7 @@ let check_partial_application ~statement exp =
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
-            | Texp_function _ | Texp_quotation _ | Texp_antiquotation _
-            | Texp_eval _ ->
-                (* CR metaprogramming mshinwell: make sure this is correct for
-                   Texp_eval *)
+            | Texp_function _ | Texp_quotation _ | Texp_antiquotation _ ->
                 check_statement ()
             | Texp_match (_, _, cases, _) ->
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases
@@ -7555,43 +7550,6 @@ and type_expect_
       | _ ->
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
-  | Pexp_extension ({ txt = ("eval" | "ocaml.eval"); _ }, payload) ->
-    (* CR metaprogramming mshinwell: This match clause needs code review *)
-    if not (Language_extension.is_enabled Runtime_metaprogramming) then
-      raise (Typetexp.Error (loc, env,
-                             Unsupported_extension Runtime_metaprogramming));
-    begin match Builtin_attributes.get_eval_payload payload with
-    | Error () -> raise (Error (loc, env, Eval_format))
-    | Ok typ ->
-      let _ =
-        (* Check that the type is valid in a quote too. *)
-        let env' = Env.enter_quotation env in
-        Typetexp.transl_simple_type env' ~new_var_jkind:Any ~closed:true
-          Alloc.Const.legacy typ in
-      let typ =
-        Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true
-          Alloc.Const.legacy typ
-      in
-      let sort =
-        match type_sort ~why:Function_result ~fixed:false env typ.ctyp_type with
-        | Ok sort -> sort
-        | Error err ->
-            raise (Error (loc, env, Function_type_not_rep (typ.ctyp_type, err)))
-      in
-      let eval_type = newty
-        (Tarrow
-          ((Nolabel, Alloc.legacy, Alloc.legacy)
-          , newmono (Predef.type_code (newgenty (Tquote typ.ctyp_type)))
-          , typ.ctyp_type
-          , commu_ok))
-      in
-      rue {
-        exp_desc = Texp_eval (typ, sort);
-        exp_loc = loc; exp_extra = [];
-        exp_type = eval_type;
-        exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
-    end
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -12221,11 +12179,13 @@ let report_error ~loc env =
   | Unexpected_hole ->
       Location.errorf ~loc
         "wildcard \"_\" not expected."
-  | Eval_format ->
+  | Eval_non_value (ty, violation) ->
       Location.errorf ~loc
-        "The eval extension takes a single type as its argument, for \
-         example %a."
-        Style.inline_code "[%eval: int]"
+        "@[Only quotations with value-kinded types may be evaluated.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(get_current_level ())) violation
+
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env

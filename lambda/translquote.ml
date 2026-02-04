@@ -1995,8 +1995,6 @@ and Exp_desc : sig
   val antiquote : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
   val splice : Debuginfo.Scoped_location.t -> Code.t -> t'
-
-  val eval : Debuginfo.Scoped_location.t -> Type.t -> t'
 end = struct
   type s = lambda
 
@@ -2152,8 +2150,6 @@ end = struct
   let antiquote loc a1 = apply1 "Exp_desc" "antiquote" loc (extract a1)
 
   let splice loc a1 = apply1 "Exp_desc" "splice" loc (extract a1)
-
-  let eval loc a1 = apply1 "Exp_desc" "eval" loc (extract a1)
 end
 
 and Exp : sig
@@ -2690,6 +2686,11 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_variant (fields, (if closed then Closed else Open), tags)
         | Tquote ty -> Ttyp_quote (go ty)
+        | Teval ty ->
+          Ttyp_constr
+            ( Predef.path_eval,
+              mkloc (Untypeast.lident_of_path Predef.path_eval) loc,
+              [go ty] )
         | Tsplice _ ->
           fatal_errorf
             "Translquote [at %a]:@ Explicitly quantified type variables@ \
@@ -3766,7 +3767,6 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_idx _ ->
       fatal_errorf "Translquote [at %a]: Texp_idx" Location.print_loc
         (to_location loc)
-    | Texp_eval (typ, _) -> Exp_desc.eval loc (quote_core_type ~scopes typ)
   in
   List.iter (update_env_without_extra ~loc) e.exp_extra;
   List.fold_right

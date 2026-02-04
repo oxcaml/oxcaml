@@ -338,8 +338,10 @@ module History = struct
     | Array_type_kind
     | Quotation_result
     | Antiquotation_result
+    | Evaluation_result
     | Tquote
     | Tsplice
+    | Teval
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =

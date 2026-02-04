@@ -1,0 +1,4 @@
+File "basics.ml", line _, characters _-_:
+ |     let[@tail_mod_cons] rec foo x = exclave_
+            ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "tail_mod_cons" attribute cannot appear in this context

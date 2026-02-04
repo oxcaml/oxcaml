@@ -98,7 +98,7 @@ type field_kind
 type commutable
 
 and type_desc =
-  | Tvar of { name : string option; jkind : jkind_lr }
+  | Tvar of { name : string option; jkind : jkind_lr; evals_to: evals_to option }
   (** [Tvar (Some "a")] ==> ['a] or ['_a]
       [Tvar None]       ==> [_] *)
 
@@ -160,6 +160,9 @@ and type_desc =
   | Tsplice of type_expr
   (** [Tsplice t] ==> [$t] *)
 
+  | Teval of type_expr
+  (** [Teval t] ==> [t eval] *)
+
   | Tnil
   (** [Tnil] ==> [<...; >] *)
 
@@ -178,7 +181,7 @@ and type_desc =
   | Tvariant of row_desc
   (** Representation of polymorphic variants, see [row_desc]. *)
 
-  | Tunivar of { name : string option; jkind : jkind_lr }
+  | Tunivar of { name : string option; jkind : jkind_lr; evals_to: evals_to option }
   (** Occurrence of a type variable introduced by a
       forall quantifier / [Tpoly]. *)
 
@@ -272,6 +275,18 @@ and abbrev_memo =
     This is only allowed when the real type is known.
 *)
 
+(** Description of an evals-to constraint on a type variable or declaration.
+    For a constrained ['a], the constraint is equivalent to the equation:
+      [<['a]>^(stage_offset) eval^(n_evals) = to_].
+    where we write [<[_]>^n] for quoting (or, for n < 0: splicing) [n] times,
+    and [eval^n] is evaluation [n] times (defined only for n > 0).  *)
+and evals_to =
+  { to_ : type_expr;
+    (** Target type expression. *)
+    stage_offset : int;
+    (** Number of quotes (or splices, when negative). *)
+    n_evals : int
+    (** Number of evaluations. *) }
 
 (**** Jkinds ****)
 
@@ -348,6 +363,8 @@ and jkind_l = (allowed * disallowed) jkind  (* the jkind of an actual type *)
 and jkind_r = (disallowed * allowed) jkind  (* the jkind expected of a type *)
 and jkind_lr = (allowed * allowed) jkind    (* the jkind of a variable *)
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
+
+val evals_to_map_type_expr : (type_expr -> type_expr) -> evals_to -> evals_to
 
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
@@ -737,6 +754,7 @@ type type_declaration =
        the jkind stored here might be a subjkind of the jkind that would
        be computed from the decl kind. This happens in
        Ctype.add_jkind_equation. *)
+    type_evals_to: evals_to option;
 
     type_private: private_flag;
     type_manifest: type_expr option;
@@ -1236,7 +1254,8 @@ val set_type_desc: type_expr -> type_desc -> unit
 val set_level: type_expr -> int -> unit
 val set_scope: type_expr -> int -> unit
 val set_var_jkind: type_expr -> jkind_lr -> unit
-        (* May only be called on Tvars *)
+val set_var_evals_to: type_expr -> evals_to option -> unit
+        (* [set_var_*] functions may only be called on Tvars *)
 val set_name:
     (Path.t * type_expr list) option ref ->
     (Path.t * type_expr list) option -> unit

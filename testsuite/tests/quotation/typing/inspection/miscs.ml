@@ -22,7 +22,7 @@ let () =
   let f (x : <[ _ format6 ]> expr) = x in
   test ~eval:false
     <[let p = $(f <[ "e_format6 says: %s %s\n\n" ]>)
-      in Format.printf p "abc" "xyz" ]>
+      in (Format.printf p "abc" "xyz" : unit) ]>
 
 (* Eliminating optional arguments *)
 (* FIXME: For ~eval:true, we need to prevent the eta expansion introduced by

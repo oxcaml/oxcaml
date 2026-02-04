@@ -371,12 +371,12 @@ let location_for_jkind_check_errors = ref Location.none
 
 let norm desc ~prepare_jkind =
   match desc with
-  | Tvar { name; jkind } ->
+  | Tvar { name; jkind; evals_to } ->
       let loc = !location_for_jkind_check_errors in
-      Tvar { name; jkind = prepare_jkind loc jkind }
-  | Tunivar { name; jkind } ->
+      Tvar { name; jkind = prepare_jkind loc jkind; evals_to }
+  | Tunivar { name; jkind; evals_to } ->
       let loc = !location_for_jkind_check_errors in
-      Tunivar { name; jkind = prepare_jkind loc jkind }
+      Tunivar { name; jkind = prepare_jkind loc jkind; evals_to }
     | desc -> desc
 
 let apply_type_function params args body =
@@ -482,7 +482,8 @@ let rec typexp copy_scope s ty =
     (* Make a stub *)
     let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
     let ty' =
-      if should_duplicate_vars then newpersty (Tvar {name = None; jkind})
+      if should_duplicate_vars
+      then newpersty (Tvar {name = None; jkind; evals_to = None})
       else newgenstub ~scope:(get_scope ty) jkind
     in
     For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
@@ -679,6 +680,10 @@ let rec type_declaration' copy_scope s decl =
         in
         Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
       end;
+    type_evals_to =
+      Option.map
+        (evals_to_map_type_expr (typexp copy_scope s decl.type_loc))
+        decl.type_evals_to;
     type_private = decl.type_private;
     type_variance = decl.type_variance;
     type_separability = decl.type_separability;
