@@ -83,6 +83,28 @@ Error: The borrow_ operator must appear directly in a valid borrowing context:
        - As the scrutinee of a pattern match
 |}]
 
+(* the uniqueness analysis might pair a borrow with a borrowing context wider
+   than what's actually checked by typecore. This is sound.
+
+   In the following example, typecore guarantees that [x'] doesn't escape the for-loop.
+   But uniqueness analysis will assume that [x'] doesn't escape the outer region
+   (which is a weaker assumption than what can be provided by typecore). *)
+let foo () =
+  let y = "hello" in
+  let x = borrow_ y in
+  for _ = 0 to 10 do
+    let (), x' = (), borrow_ y in
+    ()
+  done
+[%%expect{|
+Line 3, characters 6-7:
+3 |   let x = borrow_ y in
+          ^
+Warning 26 [unused-var]: unused variable x.
+
+val foo : unit -> unit = <fun>
+|}]
+
 (* borrowed values are aliased and cannot be used as unique *)
 let foo () =
   let unique_ y = "hello" in
@@ -746,4 +768,14 @@ Error: The value "y" is "local" because it is borrowed.
          which is expected to be "global" because it is an allocation
          which is expected to be "local" to the parent region or "global"
          because it escapes the borrow region at Lines 3-4, characters 4-17.
+|}]
+
+let foo () =
+  let x = "foo" in
+  let y = "bar" in
+  let z1 = borrow_ x in
+  (let z2 = borrow_ y in aliased_aliased_use z1 z2);
+  unique_aliased_use y z1
+[%%expect{|
+val foo : unit -> unit = <fun>
 |}]

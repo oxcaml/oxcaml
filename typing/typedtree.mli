@@ -351,8 +351,15 @@ and exp_extra =
 
             See specific [type_inspection] cases for details. *)
   | Texp_borrowed
-        (** This expression is wrapped in a borrow_ operator. Validation that it
-            matches a borrow region is performed by uniqueness analysis. *)
+        (** Indicate that the current expression is wrapped in a [borrow_]
+        operator. The uniqueness analysis pairs this with an innermost
+        [Texp_ghost_region] and assumes that typecore guarantees the borrowed
+        value doesn't escape the ghost region.
+
+        Note that there could be other regions (such as loop or function body)
+        inner than the ghost region, and it's the innermost region that typecore
+        actually guarantees for. That is, the actual guarantee is stronger than
+        what's assumed by the UA. Therefore, such a mismatch would be sound. *)
   | Texp_ghost_region
         (** This expression is wrapped inside a ghost region. *)
         (* NB. If an expression has both [Texp_borrowed] and
