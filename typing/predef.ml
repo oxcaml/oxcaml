@@ -710,8 +710,7 @@ let build_initial_env add_type add_extension empty_env =
        ~separability:Separability.Ind
        ~manifest:type_eval
        ~jkind:(fun param ->
-         (* FIXME: This isn't right. Also, would like quoted kinds. *)
-         Jkind.Builtin.immutable_data ~why:Teval |>
+         Jkind.Builtin.value ~why:Evaluation_result |>
            Jkind.add_with_bounds
              ~modality:Mode.Modality.Const.id
              ~type_expr:param)
