@@ -499,7 +499,25 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
       Subrange_state.advance_over_instruction subrange_state insn
     in
     let at_end_of_function = Option.is_none (DLL.next insn) in
-    (* Close all subranges if at end of function, BEFORE updating first_insn *)
+    (* Update first_insn based on labels created during normal action
+       processing, BEFORE end-of-function handling *)
+    let first_insn =
+      match !used_label with
+      | None -> first_insn
+      | Some (_label, label_insn) -> (
+        (* The label has already been inserted before insn by DLL operations *)
+        (* (Note that by virtue of [Lprologue], we can insert labels prior to
+           the first assembly instruction of the function.) *)
+        match prev_insn with
+        | None ->
+          (* The label becomes the new first instruction. *)
+          label_insn
+        | Some _prev_insn ->
+          (* The linkage is already handled by DLL insertion *)
+          first_insn)
+    in
+    (* Close all subranges if at end of function, AFTER updating first_insn. End
+       labels shouldn't affect first_insn. *)
     let currently_open_subranges =
       if at_end_of_function
       then (
@@ -515,22 +533,6 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
         assert (KM.is_empty currently_open_subranges);
         currently_open_subranges)
       else currently_open_subranges
-    in
-    (* Now update first_insn based on any labels that were created *)
-    let first_insn =
-      match !used_label with
-      | None -> first_insn
-      | Some (_label, label_insn) -> (
-        (* The label has already been inserted before insn by DLL operations *)
-        (* (Note that by virtue of [Lprologue], we can insert labels prior to
-           the first assembly instruction of the function.) *)
-        match prev_insn with
-        | None ->
-          (* The label becomes the new first instruction. *)
-          label_insn
-        | Some _prev_insn ->
-          (* The linkage is already handled by DLL insertion *)
-          first_insn)
     in
     (if !Dwarf_flags.ddebug_invariants
      then
