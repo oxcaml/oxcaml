@@ -31,9 +31,9 @@ module Ldd = Types.Ldd
 
 let fresh_unknown_uid () : Types.Uid.t =
   let current_unit =
-    match Compilation_unit.get_current () with
-    | None -> None
-    | Some cu -> Some (Unit_info.make_dummy ~input_name:"<ikind>" cu)
+    Some
+      (Unit_info.make_dummy ~input_name:"<ikind>"
+         (Compilation_unit.get_current_or_dummy ()))
   in
   Types.Uid.mk ~current_unit
 
