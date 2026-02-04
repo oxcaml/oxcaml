@@ -146,7 +146,7 @@ type t =
     } (* 213 *)
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
-  | Aliased_use_during_borrowing            (* 216 *)
+  | Use_during_borrowing                    (* 216 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -240,7 +240,7 @@ let number = function
   | Modal_axis_specified_twice _ -> 213
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
-  | Aliased_use_during_borrowing -> 216
+  | Use_during_borrowing -> 216
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -637,8 +637,8 @@ let descriptions = [
     description = "An attribute is unused because it is implied by another.";
     since = since 4 14 };
   { number = 216;
-    names = ["aliased-use-during-borrowing"];
-    description = "Aliased use of a value during an active borrow.";
+    names = ["use-during-borrowing"];
+    description = "Use of a value during an active borrow.";
     since = since 5 3 };
 ]
 
@@ -1325,8 +1325,8 @@ let message = function
     Printf.sprintf
       "attribute [@%s] is unused because it is implied by [@%s]"
       implied implying
-  | Aliased_use_during_borrowing ->
-      "This value is used in an aliased manner during an active borrow."
+  | Use_during_borrowing ->
+      "This value is used while being borrowed."
 ;;
 
 let nerrors = ref 0

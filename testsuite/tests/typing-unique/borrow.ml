@@ -203,7 +203,7 @@ let foo () =
 Line 4, characters 21-22:
 4 |   global_aliased_use x;
                          ^
-Warning 216 [aliased-use-during-borrowing]: This value is used in an aliased manner during an active borrow.
+Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
 val foo : unit -> unit = <fun>
 |}]
@@ -218,7 +218,7 @@ let foo () =
 Line 4, characters 20-21:
 4 |   local_aliased_use x;
                         ^
-Warning 216 [aliased-use-during-borrowing]: This value is used in an aliased manner during an active borrow.
+Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
 val foo : unit -> unit = <fun>
 |}]
@@ -236,12 +236,13 @@ let foo () =
 Line 4, characters 21-22:
 4 |   global_aliased_use x);
                          ^
-Warning 216 [aliased-use-during-borrowing]: This value is used in an aliased manner during an active borrow.
+Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
 Line 5, characters 13-14:
 5 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been used at:
+Error: This value is used here as unique,
+       but it has already been used while being borrowed at:
 Line 4, characters 21-22:
 4 |   global_aliased_use x);
                          ^
@@ -441,7 +442,7 @@ let foo () =
 Line 4, characters 36-37:
 4 |   | _ -> ignore (global_aliased_use x)
                                         ^
-Warning 216 [aliased-use-during-borrowing]: This value is used in an aliased manner during an active borrow.
+Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
 val foo : unit -> unit = <fun>
 |}]
@@ -457,12 +458,13 @@ let foo () =
 Line 4, characters 28-29:
 4 |   | _ -> global_aliased_use x
                                 ^
-Warning 216 [aliased-use-during-borrowing]: This value is used in an aliased manner during an active borrow.
+Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
 Line 6, characters 21-22:
 6 |   ignore (unique_use x)
                          ^
-Error: This value is used here as unique, but it has already been used at:
+Error: This value is used here as unique,
+       but it has already been used while being borrowed at:
 Line 4, characters 28-29:
 4 |   | _ -> global_aliased_use x
                                 ^
@@ -536,12 +538,13 @@ let foo () =
 Line 3, characters 34-35:
 3 |   aliased_aliased_use (borrow_ x) x;
                                       ^
-Warning 216 [aliased-use-during-borrowing]: This value is used in an aliased manner during an active borrow.
+Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
 Line 4, characters 13-14:
 4 |   unique_use x;
                  ^
-Error: This value is used here as unique, but it has already been used at:
+Error: This value is used here as unique,
+       but it has already been used while being borrowed at:
 Line 3, characters 34-35:
 3 |   aliased_aliased_use (borrow_ x) x;
                                       ^

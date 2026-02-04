@@ -301,6 +301,7 @@ module Aliased : sig
         (** aliased because lifted from implicit borrowing, carries the original
             access *)
     | Lifted_borrowed  (** aliased because lifted from explicit borrowing. *)
+    | In_borrowing  (** aliased because it's a usage during active borrowing *)
 
   (** The occurrence is only for future error messages. The share_reason must
       corresponds to the occurrence *)
@@ -319,6 +320,7 @@ end = struct
     | Constant
     | Lifted of Maybe_aliased.access
     | Lifted_borrowed
+    | In_borrowing
 
   type t = Occurrence.t * reason
 
@@ -337,6 +339,7 @@ end = struct
       | Constant -> fprintf ppf "Constant"
       | Lifted ma -> fprintf ppf "Lifted(%a)" Maybe_aliased.print_access ma
       | Lifted_borrowed -> fprintf ppf "Lifted_borrowed"
+      | In_borrowing -> fprintf ppf "In_borrowing"
     in
     fprintf ppf "(%a,%a)" Occurrence.print occ print_reason reason
 end
@@ -695,15 +698,14 @@ end = struct
       Maybe_aliased ma
     | Aliased aliased_value as usage ->
       let usage_occ = Aliased.extract_occurrence aliased_value in
-      Location.prerr_warning usage_occ.loc Warnings.Aliased_use_during_borrowing;
+      Location.prerr_warning usage_occ.loc Warnings.Use_during_borrowing;
       usage
     | Maybe_unique mu -> (
       let usage_occ = Maybe_unique.extract_occurrence mu in
       match Maybe_unique.mark_multi_use mu with
       | Ok () ->
-        Location.prerr_warning usage_occ.loc
-          Warnings.Aliased_use_during_borrowing;
-        Aliased (Aliased.singleton usage_occ Forced)
+        Location.prerr_warning usage_occ.loc Warnings.Use_during_borrowing;
+        Aliased (Aliased.singleton usage_occ In_borrowing)
       | Error cannot_force ->
         raise
           (Unique_use_during_borrowing { region_loc; borrow_occ; cannot_force })
@@ -2935,8 +2937,6 @@ let check_uniqueness_value_bindings vbs =
   UF.check_no_remaining_overwritten_as uf;
   ()
 
-(* CR-someday zqian: improve error message wrt borrowing. In particular, say
-"being borrowed" or "borrowed" instead of "used". *)
 let report_multi_use inner first_is_of_second =
   let { Usage.cannot_force = { occ; axis }; there; order } = inner in
   let here_usage = "used" in
@@ -2954,7 +2954,8 @@ let report_multi_use inner first_is_of_second =
       | Lifted access ->
         Maybe_aliased.string_of_access access
         ^ " in a closure that might be called later"
-      | Lifted_borrowed -> "borrowed in a closure that might be called later")
+      | Lifted_borrowed -> "borrowed in a closure that might be called later"
+      | In_borrowing -> "used while being borrowed")
     | _ -> "used"
   in
   let first, first_usage, second, second_usage, access_order, second_is_occ =
