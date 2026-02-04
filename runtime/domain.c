@@ -1818,7 +1818,7 @@ CAMLprim value caml_domain_preempt_self(value unit) {
 
 void caml_domain_setup_preemption(void) {
   CAMLparam0();
-  value cont = caml_alloc_3(Cont_tag, Val_long(0), Val_long(0), Val_long(0));
+  value cont = caml_alloc_3(Cont_tag, Val_ptr(NULL), Val_ptr(NULL), Val_ptr(NULL));
   domain_root_set(&Caml_state->preemption, cont);
   CAMLreturn0;
 }
