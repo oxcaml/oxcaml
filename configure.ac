@@ -1772,9 +1772,7 @@ AS_IF([test "$with_pic"],
 # Handle --enable-assembler-suitable-for-dissector
 AS_IF([test x"$enable_assembler_suitable_for_dissector" != "x" && \
        test x"$enable_assembler_suitable_for_dissector" != "xno"],
-  [AS_IF([test -n "$AS"],
-    [AC_MSG_ERROR(m4_normalize([Cannot use
-      --enable-assembler-suitable-for-dissector when AS is already set]))])
+  [
   AS_IF([test x"$enable_assembler_suitable_for_dissector" = "xyes"],
     [AC_PATH_PROG([llvm_mc], [llvm-mc], [])
     AS_IF([test -z "$llvm_mc"],
