@@ -22,7 +22,7 @@ type string_constant =
   ; tag : string
   }
 
-type expectation_filter = Principal | X86_64 | AArch64
+type expectation_filter = Principal | X86_64
 
 type expectation_kind = Expect_toplevel | Expect_asm
 
@@ -50,13 +50,11 @@ type correction =
 let filter_of_string = function
   | "Principal" -> Some Principal
   | "X86_64" -> Some X86_64
-  | "AArch64" -> Some AArch64
   | _ -> None
 
 let string_of_filter = function
   | Principal -> "Principal"
   | X86_64 -> "X86_64"
-  | AArch64 -> "AArch64"
 
 let match_expect_extension (ext : Parsetree.extension) =
   let match_ext_name = function
@@ -90,11 +88,11 @@ let match_expect_extension (ext : Parsetree.extension) =
         (* Filter{|content|} - filter with string content *)
         match filter_of_string name with
         | Some filter -> (Some filter, string_constant arg)
-        | None -> invalid_payload ~msg:("unexpected filter \""^name^"\"") ~loc:e.pexp_loc ())
+        | None -> invalid_payload ~msg:(Printf.sprintf "unexpected filter \"%s\"" name) ~loc:e.pexp_loc ())
       | _ -> invalid_payload ~loc:e.pexp_loc ~msg:("expected {|...|} or Filter{|...|}") ()
     in
     let is_arch_filter = function
-      | X86_64 | AArch64 -> true
+      | X86_64 -> true
       | Principal -> false
     in
     let validate_expect_toplevel entries =
@@ -243,15 +241,14 @@ let parse_contents ~fname contents =
 let current_arch_filter () =
   match Target_system.architecture () with
   | X86_64 -> Some X86_64
-  | AArch64 -> Some AArch64
-  | IA32 | ARM | POWER | Z | Riscv -> None
+  | AArch64 | IA32 | ARM | POWER | Z | Riscv -> None
 
 (* For [%%expect]:
    - {|...|} alone: used for both principal and non-principal
    - {|...|}, Principal{|...|}: first for non-principal, second for principal
 
    For [%%expect_asm]:
-   - All entries must have architecture tags (X86_64, AArch64)
+   - All entries must have architecture tags (X86_64)
 *)
 let eval_expectation expectation ~output =
   let to_update = match expectation.kind with

@@ -2297,7 +2297,7 @@ let begin_assembly _unix =
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
 
-(* Stub for expect test assembly filtering - not yet implemented for arm64 *)
+(* Not implemented for arm64 *)
 let register_expect_asm_callback (_ : string -> unit) = ()
 
 let end_assembly () =

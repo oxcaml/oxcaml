@@ -56,6 +56,7 @@ let expect_asm_callbacks = ref []
 let asm_collected_for_expect_asm = ref []
 
 let register_expect_asm_callback f =
+  (* Reset label counter to make assembly more predictable. *)
   Label.reset ();
   expect_asm_callbacks := f :: !expect_asm_callbacks
 
@@ -74,10 +75,11 @@ let record_for_expect_asm ~name ~debug_info ~asm_start =
     && not (String.ends_with ~suffix:"__entry" name)
   then
     let name =
-      match List.rev (Debuginfo.to_items debug_info) with
+      match Debuginfo.to_items debug_info with
       | item :: _ ->
         Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
           item.dinfo_scopes
+        (* Remove the module name introduced by the toplevel eval loop. *)
         |> String.split_first_exn ~split_on:'.'
         |> snd
       | _ -> name
