@@ -11,9 +11,9 @@ let code size(18)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : any array =
-  let prim = %is_int param in
-  let Pisint = %Tag_imm prim in
-  (let untagged = %untag_imm Pisint in
+  let prim = %is_int (param) in
+  let Pisint = %tag_imm (prim) in
+  (let untagged = %untag_imm (Pisint) in
    switch untagged
      | 0 -> k2
      | 1 -> k3)
@@ -31,10 +31,10 @@ let code size(18)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  (let prim = %get_tag param in
-   let scrutinee_tag = %Tag_imm prim in
-   let untagged = %untag_imm scrutinee_tag in
-   let eq = %int_comp imm untagged = 2i in
+  (let prim = %get_tag (param) in
+   let scrutinee_tag = %tag_imm (prim) in
+   let untagged = %untag_imm (scrutinee_tag) in
+   let eq = %int_comp.`imm`.`eq` (untagged, 2i) in
    switch eq
      | 0 -> k2
      | 1 -> k (1))
@@ -46,9 +46,9 @@ let code size(6)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %untag_imm 120 in
-  let prim_1 = %num_conv (imm tagged -> imm) i in
-  let Pbytessetu = %bytes_set 8 b.(prim_1) prim in
+  let prim = %untag_imm (120) in
+  let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+  let Pbytessetu = %bytes_or_bigstring_set.`bytes`.[`8`] (b, prim_1, prim) in
   cont k (Pbytessetu)
 in
 let code size(3)
@@ -56,8 +56,8 @@ let code size(3)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pnot = %not b in
-  let Pnot_1 = %not Pnot in
+  let Pnot = %boolean_not (b) in
+  let Pnot_1 = %boolean_not (Pnot) in
   cont k (Pnot_1)
 in
 let code size(9)
@@ -65,9 +65,9 @@ let code size(9)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %untag_imm 287454020 in
-  let prim_1 = %int_arith imm bswap prim in
-  let Pbswap16 = %Tag_imm prim_1 in
+  let prim = %untag_imm (287454020) in
+  let prim_1 = %int_uarith.`imm`.`bswp` (prim) in
+  let Pbswap16 = %tag_imm (prim_1) in
   cont k (Pbswap16)
 in
 let code size(2)
@@ -75,7 +75,7 @@ let code size(2)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pnegint = 0 - x in
+  let Pnegint = %int_barith.`sub` (0, x) in
   cont k (Pnegint)
 in
 let code size(2)
@@ -83,7 +83,7 @@ let code size(2)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Porint = x lor 42 in
+  let Porint = %int_barith.`or` (x, 42) in
   cont k (Porint)
 in
 (let list_to_array = closure list_to_array_0 @list_to_array in
@@ -94,7 +94,7 @@ in
  let negate = closure negate_5 @negate in
  let foo = closure foo_6 @foo in
  let Pmakeblock =
-   %Block 0
+   %block.[`0`]
      (list_to_array,
       is_c,
       set_to_x,
@@ -106,14 +106,14 @@ in
  in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load tag(0) size(8) (0) module_block in
-    let field_1 = %block_load tag(0) size(8) (1) module_block in
-    let field_2 = %block_load tag(0) size(8) (2) module_block in
-    let field_3 = %block_load tag(0) size(8) (3) module_block in
-    let field_4 = %block_load tag(0) size(8) (4) module_block in
-    let field_5 = %block_load tag(0) size(8) (5) module_block in
+    let field_0 = %block_load.`tag`[`0`].`size`[`8`].[`0`] (module_block) in
+    let field_1 = %block_load.`tag`[`0`].`size`[`8`].[`1`] (module_block) in
+    let field_2 = %block_load.`tag`[`0`].`size`[`8`].[`2`] (module_block) in
+    let field_3 = %block_load.`tag`[`0`].`size`[`8`].[`3`] (module_block) in
+    let field_4 = %block_load.`tag`[`0`].`size`[`8`].[`4`] (module_block) in
+    let field_5 = %block_load.`tag`[`0`].`size`[`8`].[`5`] (module_block) in
     let field_6 = $camlTests15__immstring75 in
-    let field_7 = %block_load tag(0) size(8) (7) module_block in
+    let field_7 = %block_load.`tag`[`0`].`size`[`8`].[`7`] (module_block) in
     let $camlTests15 =
       Block 0 (field_0,
                field_1,
@@ -146,14 +146,14 @@ let code loopify(never) size(11) newer_version_of(list_to_array_0)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : any array =
-  let prim = %is_int param in
+  let prim = %is_int (param) in
   switch prim
     | 0 -> k1 pop(regular k1) ($camlTests15__Pmakeblock23)
     | 1 -> k ($camlTests15__empty_array14)
 in
 let $camlTests15__list_to_array_7 = closure list_to_array_0_1 @list_to_array
 in
-let code loopify(never) size(14) newer_version_of(is_c_1)
+let code loopify(never) size(6) newer_version_of(is_c_1)
       is_c_1_1
         (x,
          param :
@@ -162,9 +162,9 @@ let code loopify(never) size(14) newer_version_of(is_c_1)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %get_tag param in
-  let eq = %int_comp imm prim = 2i in
-  let tagged_scrutinee = %Tag_imm eq in
+  let prim = %get_tag (param) in
+  let eq = %int_comp.`imm`.`eq` (prim, 2i) in
+  let tagged_scrutinee = %tag_imm (eq) in
   cont k (tagged_scrutinee)
 in
 let $camlTests15__is_c_8 = closure is_c_1_1 @is_c in
@@ -173,8 +173,8 @@ let code loopify(never) size(5) newer_version_of(set_to_x_2)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %num_conv (imm tagged -> imm) i in
-  let Pbytessetu = %bytes_set 8 b.(prim) 120i in
+  let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+  let Pbytessetu = %bytes_or_bigstring_set.`bytes`.[`8`] (b, prim_1, 120i) in
   cont k (0)
 in
 let $camlTests15__set_to_x_9 = closure set_to_x_2_1 @set_to_x in
@@ -183,8 +183,8 @@ let code loopify(never) size(3) newer_version_of(classical_id_3)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pnot = %not b in
-  let Pnot_1 = %not Pnot in
+  let Pnot = %boolean_not (b) in
+  let Pnot_1 = %boolean_not (Pnot) in
   cont k (Pnot_1)
 in
 let $camlTests15__classical_id_10 = closure classical_id_3_1 @classical_id in
@@ -196,12 +196,12 @@ let code loopify(never) size(1) newer_version_of(swapped_4)
   cont k (17459)
 in
 let $camlTests15__swapped_11 = closure swapped_4_1 @swapped in
-let code loopify(never) size(2) newer_version_of(negate_5)
+let code loopify(never) size(3) newer_version_of(negate_5)
       negate_5_1 (x : imm tagged)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pnegint = 0 - x in
+  let Pnegint = %int_barith.`sub` (0, x) in
   cont k (Pnegint)
 in
 let $camlTests15__negate_12 = closure negate_5_1 @negate in
@@ -210,7 +210,7 @@ let code loopify(never) size(2) newer_version_of(foo_6)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Porint = x lor 42 in
+  let Porint = %int_barith.`or` (x, 42) in
   cont k (Porint)
 in
 let $camlTests15__foo_13 = closure foo_6_1 @foo in

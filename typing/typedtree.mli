@@ -233,6 +233,8 @@ and 'k pattern_desc =
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
         (** #() *)
+  | Tpat_unboxed_bool : bool -> value pattern_desc
+        (** #false, #true *)
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
         (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
             (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
@@ -454,6 +456,8 @@ and expression_desc =
         (** try E with P1 -> E1 | ... | PN -> EN *)
   | Texp_unboxed_unit
         (** #() *)
+  | Texp_unboxed_bool of bool
+        (** #false, #true *)
   | Texp_tuple of (string option * expression) list * alloc_mode
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]
@@ -1155,6 +1159,7 @@ and core_type_desc =
   | Ttyp_open of Path.t * Longident.t loc * core_type
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
+  | Ttyp_repr of string list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position

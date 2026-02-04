@@ -1952,21 +1952,22 @@ let emit_instr ~first ~fallthrough i =
            via a regular call, and restores r15 itself, thus avoiding the code
            size increase. *)
         I.mov (domain_field Domainstate.Domain_young_ptr) r15)
-    else (
-      if Config.runtime5
+    else
+      let switch_stacks = Config.runtime5 && not Config.no_stack_checks in
+      if switch_stacks
       then (
-        I.mov rsp rbx;
+        I.mov rsp r13;
         D.cfi_remember_state ();
-        D.cfi_def_cfa_register ~reg:"rbx";
+        D.cfi_def_cfa_register ~reg:"r13";
         (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
            through this unless we were to tag this calling frame with
            cfi_signal_frame in it's definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
       emit_call (Cmm.global_symbol func);
-      if Config.runtime5
+      if switch_stacks
       then (
-        I.mov rbx rsp;
-        D.cfi_restore_state ()))
+        I.mov r13 rsp;
+        D.cfi_restore_state ())
   | Lop (Stackoffset n) -> emit_stack_offset n
   | Lop (Load { memory_chunk; addressing_mode; _ }) -> (
     let[@inline always] load ~dest data_type instruction =
@@ -2997,15 +2998,13 @@ let end_assembly () =
   D.int64 0L;
   D.text ();
   (* We align to 8 bytes before the frame table. Perhaps somewhat
-     counterintuitively, we use [~fill:Zero] even though we are
-     now in the text section. The reason is that the additional padding will
-     never be executed, so there is no need to pad it with nops in the X86
-     binary emitter. *)
+     counterintuitively, we use [~fill:Zero] even though we are now in the text
+     section. The reason is that the additional padding will never be executed,
+     so there is no need to pad it with nops in the X86 binary emitter. *)
   (* CR sspies: We should just determine the filling based on the current
-     section for the binary emitter and then remove the argument
-     [fill]. This is the only place, where it does not seem to
-     match the current section, and it seems it does not matter whether we pad
-     with zeros or nops here. *)
+     section for the binary emitter and then remove the argument [fill]. This is
+     the only place, where it does not seem to match the current section, and it
+     seems it does not matter whether we pad with zeros or nops here. *)
   D.align ~fill:Zero ~bytes:8;
   (* PR#7591 *)
   emit_global_label ~section:Text "frametable";

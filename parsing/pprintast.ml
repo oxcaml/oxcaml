@@ -268,6 +268,10 @@ let constant f = function
       paren (first_is '-' x) (fun f (x, suffix) -> pp f "%s%c" x suffix) f
         (Misc.format_as_unboxed_literal x, suffix)
 
+let bool f = function
+  | false -> pp f "false"
+  | true -> pp f "true"
+
 (* trailing space*)
 let mutable_flag f = function
   | Immutable -> ()
@@ -484,6 +488,8 @@ and tyvar_jkind tyvar f (str, jkind) =
 
 and tyvar_loc_jkind tyvar f (str, jkind) = tyvar_jkind tyvar f (str.txt,jkind)
 
+and tyvar_loc_repr tyvar f str = pp f "(repr_@ %a)" tyvar str.txt
+
 and tyvar_loc_option_jkind f (str, jkind) =
   match jkind with
   | None -> tyvar_loc_option f str
@@ -514,7 +520,7 @@ and core_type ctxt f x =
     | Ptyp_alias (ct, s, j) ->
         pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct
           tyvar_loc_option_jkind (s, j)
-    | Ptyp_poly ([], ct) ->
+    | Ptyp_poly ([], ct) | Ptyp_repr ([], ct) ->
         core_type ctxt f ct
     | Ptyp_poly (sl, ct) ->
         pp f "@[<2>%a%a@]"
@@ -526,6 +532,16 @@ and core_type ctxt f x =
                           (tyvar_loc_jkind tyvar) ~sep:"@;")
                           l)
           sl (core_type ctxt) ct
+    | Ptyp_repr (lv, ct) ->
+        pp f "@[<2>%a%a@]"
+               (fun f l -> match l with
+                  | [] -> ()
+                  | _ ->
+                      pp f "%a@;.@;"
+                        (list
+                          (tyvar_loc_repr tyvar) ~sep:"@;")
+                          l)
+          lv (core_type ctxt) ct
     | Ptyp_of_kind jkind ->
       pp f "@[(type@ :@ %a)@]" (jkind_annotation reset_ctxt) jkind
     | _ -> pp f "@[<2>%a@]" (core_type1 ctxt) x
@@ -616,7 +632,8 @@ and core_type1 ctxt f x =
     | Ptyp_splice t ->
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
-    | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_of_kind _) ->
+    | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
+      | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
 
 and core_type2 ctxt f x =
@@ -764,6 +781,7 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_record_unboxed_product (l, closed) ->
         record_pattern ctxt f ~unboxed:true l closed
     | Ppat_unboxed_unit -> pp f "#()"
+    | Ppat_unboxed_bool b -> pp f "#%a" bool b
     | Ppat_tuple (l, closed) ->
         labeled_tuple_pattern ctxt f ~unboxed:false l closed
     | Ppat_unboxed_tuple (l, closed) ->
@@ -1181,6 +1199,7 @@ and simple_expr ctxt f x =
     | Pexp_pack me ->
         pp f "(module@;%a)" (module_expr ctxt) me
     | Pexp_unboxed_unit -> pp f "#()"
+    | Pexp_unboxed_bool b -> pp f "#%a" bool b
     | Pexp_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:false l
     | Pexp_unboxed_tuple l ->

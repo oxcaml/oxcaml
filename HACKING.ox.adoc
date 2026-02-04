@@ -6,41 +6,41 @@ See HACKING.md.
 
 You can
 
-    $ make -f Makefile.ox runtest-upstream
+    $ make runtest-upstream
 
 to run the entire testsuite. As a shorter synonym, you may also
 
-    $ make -f Makefile.ox test
+    $ make test
 
 If you want to run just one test or one test directory, you can
 
-    $ make -f Makefile.ox test-one TEST=<<test file here>>
-    $ make -f Makefile.ox test-one DIR=<<test dir here>>
+    $ make test-one TEST=<<test file here>>
+    $ make test-one DIR=<<test dir here>>
 
 where the test file or test dir are specified with respect to the
 `testsuite/tests` directory. For example:
 
-    $ make -f Makefile.ox test-one TEST=typing-local/local.ml
-    $ make -f Makefile.ox test-one DIR=typing-local
+    $ make test-one TEST=typing-local/local.ml
+    $ make test-one DIR=typing-local
 
 Likewise, you can use `promote-one` to accept the diff from a failed
 test:
 
-    $ make -f Makefile.ox promote-one TEST=typing-local/local.ml
-    $ make -f Makefile.ox promote-one DIR=typing-local
+    $ make promote-one TEST=typing-local/local.ml
+    $ make promote-one DIR=typing-local
 
 If you've run some series of tests and would like to accept the diff
 from all failed tests in that run, use `promote-failed`:
 
-    $ make -f Makefile.ox promote-failed
+    $ make promote-failed
 
 To run just one test without running a full dune build, you can use
 `*-no-rebuild` versions of `test-one` and `promote-one`. Note that these
 targets won't pick up changes you've made to compiler code, though they will
 faithfully pick up changes you've made to test files.
 
-    $ make -f Makefile.ox test-one-no-rebuild TEST=typing-local/local.ml
-    $ make -f Makefile.ox promote-one-no-rebuild DIR=typing-local
+    $ make test-one-no-rebuild TEST=typing-local/local.ml
+    $ make promote-one-no-rebuild DIR=typing-local
 
 ## Debugging
 
@@ -87,7 +87,7 @@ Remember to check that the newly installed switch is being used:
 
 Then build the compiler &mdash; the following command will build the compiler using the opam switch, then use the newly-built compiler to build itself.
 
-    $ make -f Makefile.ox compiler
+    $ make compiler
 
 We can now benchmark our compiler against `typecore.ml`. The following `_bootinstall` is built using the opam switch and has FP enabled.
 

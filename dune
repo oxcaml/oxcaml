@@ -545,6 +545,7 @@
   dissector_log
   build_igot_and_iplt
   build_linker_args
+  eh_frame_registration
   dissector
   extract_relocations
   form_rewrite_plan
@@ -573,6 +574,7 @@
   cmmgen_state
   CSE
   dsl_helpers
+  binary_emitter_helpers
   emit
   emitaux
   fdo_info
@@ -695,6 +697,8 @@
   dwarf_reg_locations
   dwarf_state
   dwarf_variables_and_parameters
+  runtime_shape
+  complex_shape
   dwarf_type
   ;; optcomp/
   linkenv
@@ -745,7 +749,12 @@
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
- (libraries ocamlcommon dwarf_flags asm_targets)
+ (libraries
+  ocamlcommon
+  dwarf_flags
+  asm_targets
+  arm64_ast
+  arm64_binary_emitter)
  (modules oxcaml_args oxcaml_flags))
 
 (executable
@@ -818,6 +827,7 @@
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.a}
    %{dep:backend/asm_targets/asm_targets.a}
    %{dep:backend/arm64/ast/arm64_ast.a}
+   %{dep:backend/arm64/binary_emitter/arm64_binary_emitter.a}
    %{dep:backend/binary_emitter_intf/binary_emitter_intf.a}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
@@ -859,6 +869,7 @@
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cma}
    %{dep:backend/asm_targets/asm_targets.cma}
    %{dep:backend/arm64/ast/arm64_ast.cma}
+   %{dep:backend/arm64/binary_emitter/arm64_binary_emitter.cma}
    %{dep:backend/binary_emitter_intf/binary_emitter_intf.cma}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
@@ -900,6 +911,7 @@
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cmxa}
    %{dep:backend/asm_targets/asm_targets.cmxa}
    %{dep:backend/arm64/ast/arm64_ast.cmxa}
+   %{dep:backend/arm64/binary_emitter/arm64_binary_emitter.cmxa}
    %{dep:backend/binary_emitter_intf/binary_emitter_intf.cmxa}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}

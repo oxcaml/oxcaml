@@ -280,6 +280,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
+      | Univar _ -> Print_as "<univar>"
 
     let print_sort_option : Jkind.Sort.Const.t option -> _ = function
       | None -> Print_as "<unknown>"
@@ -643,6 +644,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Tquote _ | Tsplice _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
+              tree_of_val (depth - 1) obj ty
+          | Trepr (ty, _) ->
               tree_of_val (depth - 1) obj ty
           | Tpackage _ ->
               Oval_stuff "<module>"

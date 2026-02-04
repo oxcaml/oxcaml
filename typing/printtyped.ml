@@ -90,6 +90,11 @@ let fmt_constant f x =
   | Const_unboxed_int64 (i) -> fprintf f "Const_unboxed_int64 %Ld" i
   | Const_unboxed_nativeint (i) -> fprintf f "Const_unboxed_nativeint %nd" i
 
+let fmt_bool f x =
+  match x with
+  | false -> fprintf f "false"
+  | true -> fprintf f "true"
+
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -181,6 +186,14 @@ let arg_label i ppf = function
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
+
+let typevar_no_jkind ~print_quote ppf v =
+  let pptv =
+    if print_quote
+    then Pprintast.tyvar
+    else fun ppf s -> fprintf ppf "%s" s
+  in
+  fprintf ppf " %a" pptv v
 
 let typevar_jkind ~print_quote ppf (v, l) =
   let pptv =
@@ -395,6 +408,10 @@ let rec core_type i ppf x =
   | Ttyp_splice t ->
       line i ppf "Ttyp_splice\n";
       core_type i ppf t
+  | Ttyp_repr (lv, ct) ->
+      line i ppf "Ttyp_repr%a\n"
+        (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;
+      core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
@@ -458,6 +475,7 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       pattern i ppf p;
   | Tpat_constant (c) -> line i ppf "Tpat_constant %a\n" fmt_constant c;
   | Tpat_unboxed_unit -> line i ppf "Tpat_unboxed_unit\n";
+  | Tpat_unboxed_bool b -> line i ppf "Tpat_unboxed_bool %a\n" fmt_bool b;
   | Tpat_tuple (l) ->
       line i ppf "Tpat_tuple\n";
       list i labeled_pattern ppf l;
@@ -658,6 +676,7 @@ and expression i ppf x =
       expression i ppf e;
       list i case ppf l;
   | Texp_unboxed_unit -> line i ppf "Texp_unboxed_unit\n";
+  | Texp_unboxed_bool b -> line i ppf "Texp_unboxed_bool %a\n" fmt_bool b;
   | Texp_tuple (l, am) ->
       line i ppf "Texp_tuple\n";
       alloc_mode i ppf am;

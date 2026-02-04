@@ -3,6 +3,8 @@ ROOTDIR = .
 include Makefile.config_if_required
 export ARCH
 
+dune = $(opam_exec) $(DUNE)
+
 boot_ocamlc = main_native.exe
 boot_ocamlopt = boot_ocamlopt.exe
 boot_ocamlj = boot_ocamlj.exe
@@ -145,17 +147,17 @@ ci-coverage: boot-runtest coverage
 # CR mshinwell: build is broken
 # .PHONY: minimizer-upstream
 # minimizer-upstream:
-# 	cp chamelon/dune.upstream chamelon/dune
+# 	cp chamelon/compat/dune.upstream chamelon/compat/dune
 # 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
 
 .PHONY: boot-minimizer
 boot-minimizer:
-	cp chamelon/dune.ox chamelon/dune
+	cp chamelon/compat/dune.ox chamelon/compat/dune
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @chamelon/all
 
 .PHONY: minimizer
 minimizer: runtime-stdlib
-	cp chamelon/dune.ox chamelon/dune
+	cp chamelon/compat/dune.ox chamelon/compat/dune
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
 
 .PHONY: hacking-externals
@@ -221,6 +223,7 @@ check-fmt: $(dune_config_targets)
 .PHONY: regen-flambda2-parser
 regen-flambda2-parser: $(dune_config_targets)
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @middle_end/flambda2/parser/regen --auto-promote || true
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @middle_end/flambda2/parser/regen-messages --auto-promote || true
 # Make sure regeneration is idempotent, and also check that the previous step
 # worked (can't tell the difference between failure and successful
 # auto-promotion)
@@ -277,7 +280,7 @@ build_and_test_upstream: build_upstream
 .PHONY: coverage
 coverage: boot-runtest
 	set -eu; rm -rf _coverage
-	bisect-ppx-report html --tree -o _coverage \
+	$(opam_exec) bisect-ppx-report html --tree -o _coverage \
 	  --coverage-path=_build/default \
 		--source-path=. \
 	  --source-path=_build/default

@@ -228,6 +228,19 @@ let to_lambda_prim prim ~poly_sort =
     ~native_repr_res
     ~is_layout_poly:prim.prim_is_layout_poly
 
+let bigstring_checks ~unsafe ~aligned size =
+  if unsafe
+  then None
+  else
+    let len =
+      match size with
+      | Boxed_vec128 -> 16
+      | Boxed_vec256 -> 32
+      | Boxed_vec512 -> 64
+    in
+    let align = if aligned then len else 0 in
+    Some (~len, ~align)
+
 let indexing_primitives =
   let types_and_widths =
     [
@@ -246,14 +259,16 @@ let indexing_primitives =
           Pbigstring_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec128 in
           Pbigstring_load_vec
-            { size = Boxed_vec128; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec128; checks; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec128 in
           Pbigstring_load_vec
-            { size = Boxed_vec128; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec128; checks; index_kind; mode;
+              aligned = true; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bigstring_set16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -269,48 +284,64 @@ let indexing_primitives =
           Pbigstring_set_64 { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec128; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec128 in
+          Pbigstring_set_vec
+            { size = Boxed_vec128; checks; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec128; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec128 in
+          Pbigstring_set_vec
+            { size = Boxed_vec128; checks; index_kind;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec256 in
           Pbigstring_load_vec
-            { size = Boxed_vec256; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec256; checks; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec256 in
           Pbigstring_load_vec
-            { size = Boxed_vec256; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec256; checks; index_kind; mode;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec256; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec256 in
+          Pbigstring_set_vec
+            { size = Boxed_vec256; checks; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec256; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec256 in
+          Pbigstring_set_vec
+            { size = Boxed_vec256; checks; index_kind;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec512 in
           Pbigstring_load_vec
-            { size = Boxed_vec512; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec512; checks; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec512 in
           Pbigstring_load_vec
-            { size = Boxed_vec512; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec512; checks; index_kind; mode;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec512; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec512 in
+          Pbigstring_set_vec
+            { size = Boxed_vec512; checks; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec512; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec512 in
+          Pbigstring_set_vec
+            { size = Boxed_vec512; checks; index_kind;
+              aligned = true; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->

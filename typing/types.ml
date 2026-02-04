@@ -89,6 +89,7 @@ and type_desc =
   | Tvariant of row_desc
   | Tunivar of { name : string option; jkind : jkind_lr }
   | Tpoly of type_expr * type_expr list
+  | Trepr of type_expr * Jkind_types.Sort.univar list
   | Tpackage of Path.t * (Longident.t * type_expr) list
   | Tof_kind of jkind_lr
 
@@ -935,6 +936,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
+  | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
 
 let find_unboxed_type decl =
   match decl.type_kind with
@@ -1276,6 +1278,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tconstr (_, _, _) -> 5
         | Tpoly (_, _) -> 6
         | Tof_kind _ -> 7
+        | Trepr (_, _) -> 8
         (* Types we should never see *)
         | Tlink _ -> Misc.fatal_error "Tlink encountered in With_bounds_types"
       in
@@ -1298,6 +1301,14 @@ let best_effort_compare_type_expr te1 te2 =
         (* NOTE: this is mostly broken according to the semantics of type_expr, but probably
            fine for the particular "best-effort" comparison we want. *)
         List.compare (aux (depth + 1)) (t1 :: ts1) (t2 :: ts2)
+      | Trepr (t1, sort_vars1), Trepr (t2, sort_vars2) ->
+        (* Compare by establishing correspondence between univars and comparing
+           the inner types with that correspondence. *)
+        (match List.combine sort_vars1 sort_vars2 with
+         | exception Invalid_argument _ ->
+           Int.compare (List.length sort_vars1) (List.length sort_vars2)
+         | pairs ->
+           Jkind_types.Sort.enter_repr pairs (fun () -> aux (depth + 1) t1 t2))
       | _, _ -> rank te1 - rank te2
   in
   aux 0 te1 te2

@@ -1011,7 +1011,7 @@ let emit_shift reg b dst src =
       assert (is_imm8L n);
       emit_mod_rm_reg b rexw [ 0xC1 ] rm reg;
       buf_int8L b n
-  | ((Reg64 _ | Reg32 _) as rm), Reg8L RCX ->
+  | ((Reg64 _ | Reg32 _ | Mem _) as rm), Reg8L RCX ->
       emit_mod_rm_reg b rexw [ 0xD3 ] rm reg
   | _ ->
       Format.eprintf "emit_shift: src=%a dst=%a@." print_old_arg src

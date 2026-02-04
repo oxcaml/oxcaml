@@ -27,8 +27,7 @@
 
 (* CR mshinwell: This file needs to be code reviewed *)
 
-let sections =
-  [".text"; ".rodata"; ".data"; ".bss"; ".eh_frame"; ".data.igot"; ".text.iplt"]
+let sections = [".text"; ".rodata"; ".data"; ".bss"; ".data.igot"; ".text.iplt"]
 
 let generate ~existing_script ~partitions =
   let buf = Buffer.create 1024 in
@@ -47,6 +46,8 @@ let generate ~existing_script ~partitions =
     Buffer.add_string buf
       (Printf.sprintf "/* END include existing linker script: %s */\n\n" path));
   Buffer.add_string buf "SECTIONS {\n";
+  if !Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
+  then Buffer.add_string buf Eh_frame_registration.linker_script_sections;
   List.iter
     (fun linked ->
       let kind = Partition.kind (Partition.Linked.partition linked) in

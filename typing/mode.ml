@@ -46,7 +46,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Captured_by_partial_application ->
         (Location.none, Expression), Adj_captured_by_partial_application
       | Crossing -> pp, Crossing
-      | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation_l loc
       | Contains_r (Comonadic, { containing; contained }) ->
@@ -73,7 +72,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Adj_captured_by_partial_application ->
         (Location.none, Expression), Captured_by_partial_application
       | Crossing -> pp, Crossing
-      | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation_r loc
       | Contains_l (Comonadic, { containing; contained }) ->
@@ -101,7 +99,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
-        | Unknown_non_rigid -> Unknown_non_rigid
         | Allocation_l loc -> Allocation_l loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
@@ -117,7 +114,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Captured_by_partial_application -> Captured_by_partial_application
         | Crossing -> Crossing
-        | Unknown_non_rigid -> Unknown_non_rigid
         | Allocation_r loc -> Allocation_r loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
@@ -137,7 +133,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
-        | Unknown_non_rigid -> Unknown_non_rigid
         | Allocation_r loc -> Allocation_r loc
         | Allocation_l loc -> Allocation_l loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
@@ -160,7 +155,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
-        | Unknown_non_rigid -> Unknown_non_rigid
         | Allocation_l loc -> Allocation_l loc
         | Allocation_r loc -> Allocation_r loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
@@ -2258,7 +2252,7 @@ module Report = struct
       ((formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
-    | Unknown | Unknown_non_rigid -> None
+    | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
@@ -2343,8 +2337,7 @@ module Report = struct
     | Contains_l _ | Contains_r _ | Is_contained_by _
     | Adj_captured_by_partial_application ->
       true
-    | Allocation_r _ | Allocation_l _ | Skip | Crossing | Unknown_non_rigid ->
-      false
+    | Allocation_r _ | Allocation_l _ | Skip | Crossing -> false
 
   let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
@@ -4129,7 +4122,7 @@ module Modality = struct
       let apply : type l r.
           ?hint:(l * r) neg Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
           =
-       fun ?(hint = Hint.Unknown_non_rigid) t x ->
+       fun ?(hint = Hint.Unknown) t x ->
         match t with Join_const c -> Mode.join_const ~hint c x
 
       let proj ax (Join_const c) : _ Atom.t = Join_with (Axis.proj ax c)
@@ -4275,7 +4268,7 @@ module Modality = struct
       let apply : type l r.
           ?hint:(l * r) pos Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
           =
-       fun ?(hint = Hint.Unknown_non_rigid) t x ->
+       fun ?(hint = Hint.Unknown) t x ->
         match t with Meet_const c -> Mode.meet_const ~hint c x
 
       let proj ax (Meet_const c) : _ Atom.t = Meet_with (Axis.proj ax c)

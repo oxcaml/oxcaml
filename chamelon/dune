@@ -1,0 +1,32 @@
+(executable
+ (name chamelon)
+ (public_name chamelon)
+ (modes native)
+ ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
+ ; to be built against the system compiler, which won't work.
+ ;
+ ; Even though we don't use the unix library directly, it is used in
+ ; `chamelon_lib` and we need to find it during linking.
+ (flags (:standard -open Chamelon_lib))
+ (ocamlc_flags (:standard -I +unix unix.cma))
+ (ocamlopt_flags (:standard -I +unix unix.cmxa))
+ (libraries chamelon_lib)
+ (package ocaml)
+ (enabled_if (= %{context_name} "default"))
+)
+
+(executable
+ (name chamelon)
+ (public_name chamelon)
+ (modes native)
+ (libraries chamelon_lib unix)
+ (package ocaml)
+ (flags (:standard -open Chamelon_lib))
+ (enabled_if (= %{context_name} "main"))
+)
+
+(env
+  (dev
+    (flags (:standard -no-principal -warn-error -A -w -70)))
+  (_
+    (flags (:standard -no-principal -w -70))))

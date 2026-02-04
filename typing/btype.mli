@@ -452,6 +452,9 @@ module Jkind0 : sig
       (** Value of types of this jkind are not retained at all at runtime *)
       val void : t
 
+      (** Same kind, not mod external_ *)
+      val void_internal : t
+
       (** This is the jkind of normal ocaml values or null pointers *)
       val value_or_null : t
 
@@ -492,14 +495,23 @@ module Jkind0 : sig
       (** The jkind of unboxed 64-bit floats with no mode crossing. *)
       val float64 : t
 
+      (** Same kind, not mod external_. *)
+      val float64_internal : t
+
       (** The jkind of unboxed 64-bit floats with mode crossing. *)
       val kind_of_unboxed_float : t
 
       (** The jkind of unboxed units with mode crossing. *)
       val kind_of_unboxed_unit : t
 
+      (** The jkind of unboxed bools with mode crossing. *)
+      val kind_of_unboxed_bool : t
+
       (** The jkind of unboxed 32-bit floats with no mode crossing. *)
       val float32 : t
+
+      (** Same kind, not mod external_. *)
+      val float32_internal : t
 
       (** The jkind of unboxed 32-bit floats with mode crossing. *)
       val kind_of_unboxed_float32 : t
@@ -507,17 +519,26 @@ module Jkind0 : sig
       (** The jkind of unboxed native-sized integers with no mode crossing. *)
       val word : t
 
+      (** Same kind, not mod external_. *)
+      val word_internal : t
+
       (** The jkind of unboxed native-sized integers with mode crossing. *)
       val kind_of_unboxed_nativeint : t
 
       (** The jkind of untagged immediates ([int#]) with no mode crossing. *)
       val untagged_immediate : t
 
+      (** Same kind, not mod external_. *)
+      val untagged_immediate_internal : t
+
       (** The jkind of untagged immediates ([int#]) with mode crossing. *)
-      val kind_of_untagged_immediate : t
+      val kind_of_untagged_int : t
 
       (** The jkind of unboxed 8-bit integers with no mode crossing. *)
       val bits8 : t
+
+      (** Same kind, not mod external_. *)
+      val bits8_internal : t
 
       (** The jkind of unboxed 8-bit integers with mode crossing. *)
       val kind_of_unboxed_int8 : t
@@ -525,17 +546,26 @@ module Jkind0 : sig
       (** The jkind of unboxed 16-bit integers with no mode crossing. *)
       val bits16 : t
 
+      (** Same kind, not mod external_. *)
+      val bits16_internal : t
+
       (** The jkind of unboxed 16-bit integers with mode crossing. *)
       val kind_of_unboxed_int16 : t
 
       (** The jkind of unboxed 32-bit integers with no mode crossing. *)
       val bits32 : t
 
+      (** Same kind, not mod external_. *)
+      val bits32_internal : t
+
       (** The jkind of unboxed 32-bit integers with mode crossing. *)
       val kind_of_unboxed_int32 : t
 
       (** The jkind of unboxed 64-bit integers with no mode crossing. *)
       val bits64 : t
+
+      (** Same kind, not mod external_. *)
+      val bits64_internal : t
 
       (** The jkind of unboxed 64-bit integers with mode crossing. *)
       val kind_of_unboxed_int64 : t
@@ -551,6 +581,15 @@ module Jkind0 : sig
 
       (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
       val vec512 : t
+
+      (** Same kind, not mod external_. *)
+      val vec128_internal : t
+
+      (** Same kind, not mod external_. *)
+      val vec256_internal : t
+
+      (** Same kind, not mod external_. *)
+      val vec512_internal : t
 
       (** The jkind of unboxed 128-bit vectors with mode crossing. *)
       val kind_of_unboxed_128bit_vectors : t
