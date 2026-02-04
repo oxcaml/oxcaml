@@ -131,6 +131,13 @@ let rec path_concat head p =
   | Papply _ -> assert false
   | Pextra_ty (p, extra) -> Pextra_ty (path_concat head p, extra)
 
+let location_of_structure sstr =
+  sstr
+  |> List.map (fun {pstr_loc; _} -> pstr_loc)
+  |> function
+  | [] -> Location.none
+  | (_ :: _) as xs -> Location.merge xs
+
 (** [pp] is the [pinpoint] of some value, while [is_contained_by] describes how
       that value is contained in a structure. [md_mode] is the mode of the
       structure and [mode] is the mode of the value. *)
@@ -3436,13 +3443,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
   let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
-  let loc_md =
-    sstr
-    |> List.map (fun {pstr_loc; _} -> pstr_loc)
-    |> function
-    | [] -> Location.none
-    | (_ :: _) as xs -> Location.merge xs
-  in
+  let loc_md = location_of_structure sstr in
 
   let item item_category id : Mode.Hint.is_contained_by =
     { containing = Structure ((item_category, id), Modality);
