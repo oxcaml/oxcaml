@@ -352,6 +352,21 @@ and exp_extra =
             during inference. Generally, elaborated to a type constraint.
 
             See specific [type_inspection] cases for details. *)
+  | Texp_borrowed
+        (** Indicate that the current expression is wrapped in a [borrow_]
+        operator. The uniqueness analysis pairs this with an innermost
+        [Texp_ghost_region] and assumes that typecore guarantees the borrowed
+        value doesn't escape the ghost region.
+
+        Note that there could be other regions (such as loop or function body)
+        inner than the ghost region, and it's the innermost region that typecore
+        actually guarantees for. That is, the actual guarantee is stronger than
+        what's assumed by the UA. Therefore, such a mismatch would be sound. *)
+  | Texp_ghost_region
+        (** This expression is wrapped inside a ghost region. *)
+        (* NB. If an expression has both [Texp_borrowed] and
+        [Texp_ghost_region], we assume the [Texp_borrowed] is inner than
+        [Texp_ghost_region]. Currently it's impossible. *)
 
 and arg_label = Types.arg_label =
   | Nolabel

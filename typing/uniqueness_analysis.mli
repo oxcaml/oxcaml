@@ -15,6 +15,10 @@
 
 open Typedtree
 
+(* CR-soon zqian: rename the following so others can call
+[Uniqueness_analysis.xxx] instead of
+[Uniqueness_analysis.check_uniqueness_xxx] *)
+
 (* Check that idents which are used more than once, are not used with mode
    unique. *)
 val check_uniqueness_exp : expression -> unit

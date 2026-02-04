@@ -528,6 +528,9 @@ and expression i ppf x =
       expression i ppf e
   | Pexp_hole ->
       line i ppf "Pexp_hole"
+  | Pexp_borrow e ->
+      line i ppf "Pexp_borrow\n";
+      expression i ppf e
   )
 
 and block_access i ppf = function
