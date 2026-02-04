@@ -528,7 +528,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         fs := !fs + n;
         max_fs := max !fs !max_fs
       | Lcall_op (Lcall_ind | Lcall_imm _) -> nontail_flag := true
-      | Lend | Lprologue | Lepilogue_open | Lepilogue_close
+      | Lprologue | Lepilogue_open | Lepilogue_close
       | Lop
           ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
           | Tls_get | Domain_index | Poll | Pause | Const_int _

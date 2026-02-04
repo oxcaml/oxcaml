@@ -511,10 +511,6 @@ let run cfg_with_layout =
       List.iter
         (fun instr_data -> DLL.add_end body_dll instr_data)
         terminator_instr_data_list);
-  (* Add Lend marker for debug info - see comment in linear.mli *)
-  DLL.add_end body_dll
-    (L.make_instr_data Lend [||] [||] ~available_before:Unreachable
-       ~available_across:Unreachable);
   let fun_contains_calls = cfg.fun_contains_calls in
   let fun_num_stack_slots = cfg.fun_num_stack_slots in
   let fun_frame_required =

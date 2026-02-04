@@ -25,7 +25,6 @@ type instruction_desc =
   | Lprologue
   | Lepilogue_open
   | Lepilogue_close
-  | Lend
   | Lop of Operation.t
   | Lcall_op of call_operation
   | Lreloadretaddr
@@ -79,7 +78,7 @@ type instruction_data =
 type instruction = instruction_data Oxcaml_utils.Doubly_linked_list.cell
 
 let has_fallthrough = function
-  | Lend | Lreturn | Lbranch _ | Lswitch _ | Lraise _
+  | Lreturn | Lbranch _ | Lswitch _ | Lraise _
   | Lcall_op Ltailcall_ind
   | Lcall_op (Ltailcall_imm _)
   | Lepilogue_close ->

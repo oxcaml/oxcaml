@@ -77,7 +77,6 @@ let instr_data' ?(print_reg = Printreg.reg) ppf data =
   | Lprologue -> fprintf ppf "prologue"
   | Lepilogue_open -> fprintf ppf "epilogue_open"
   | Lepilogue_close -> fprintf ppf "epilogue_close"
-  | Lend -> ()
   | Lop op ->
     (match[@warning "-4"] op with
     | Alloc _ | Poll -> fprintf ppf "@[<1>{%a}@]@," regsetaddr data.live

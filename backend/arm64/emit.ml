@@ -915,8 +915,8 @@ let num_call_gc_points
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
-      | Lend | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
-      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
       | Lcondbranch (_, _)
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -986,10 +986,9 @@ module BR = Branch_relaxation.Make (struct
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
-      | Lend | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
-      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-      | Lstackcheck _ ->
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _ | Lswitch _
+      | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
         None
       | Lop (Const_vec256 _ | Const_vec512 _) ->
         Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -1020,7 +1019,6 @@ module BR = Branch_relaxation.Make (struct
     | Lprologue -> prologue_size ()
     | Lepilogue_open -> epilogue_size ()
     | Lepilogue_close -> 0
-    | Lend -> 0
     | Lop (Move | Spill | Reload) -> 1
     | Lop (Const_int n) -> num_instructions_for_intconst n
     | Lop (Const_float32 _) -> 2
@@ -1492,7 +1490,6 @@ let emit_static_cast (cast : Cmm.static_cast) i =
 let emit_instr i =
   emit_debug_info i.dbg;
   match i.desc with
-  | Lend -> ()
   | Lprologue ->
     assert !prologue_required;
     let n = frame_size () in
