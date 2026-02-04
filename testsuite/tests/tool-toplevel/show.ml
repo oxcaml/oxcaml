@@ -181,7 +181,5 @@ end
 #show Accessor.( @> )
 [%%expect{|
 module Accessor : sig val ( @> ) : unit -> unit end
->> Fatal error: modality Undefined should not be zapped.
-Uncaught exception: Misc.Fatal_error
-
+val ( @> ) : unit -> unit
 |}]
