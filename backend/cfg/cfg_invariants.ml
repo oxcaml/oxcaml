@@ -325,14 +325,31 @@ let check_block t label (block : Cfg.basic_block) =
   check_stack_offset t label block;
   ()
 
-let check_reducibility t cfg_with_layout =
+let check_reducibility t cfg_with_infos =
   match t.cfg.allowed_to_be_irreducible with
   | true -> ()
   | false -> (
-    let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
     match Cfg_reducibility.is_cfg_with_infos_reducible cfg_with_infos with
     | true -> ()
     | false -> report t "CFG is not reducible")
+
+let check_liveness t cfg_with_infos =
+  let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  let entry_block = Cfg.get_block_exn cfg cfg.entry_label in
+  let first_instruction_id = Cfg.first_instruction_id entry_block in
+  match
+    Cfg_with_infos.liveness_find_opt cfg_with_infos first_instruction_id
+  with
+  | None -> report t "Unable to get liveness for first instruction"
+  | Some { Cfg_liveness.before; across = _ } ->
+    Reg.Set.iter
+      (fun reg ->
+        match reg.loc with
+        | Reg _ | Stack (Incoming _ | Domainstate _) -> ()
+        | Unknown | Stack (Local _ | Outgoing _) ->
+          report t "Reg %a is unexpectedly live at function entry" Printreg.reg
+            reg)
+      before
 
 let run ppf cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
@@ -348,5 +365,7 @@ let run ppf cfg_with_layout =
   check_layout t layout;
   Cfg.iter_blocks ~f:(check_block t) cfg;
   check_tailrec_position t;
-  check_reducibility t cfg_with_layout;
+  let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
+  check_reducibility t cfg_with_infos;
+  check_liveness t cfg_with_infos;
   t.result
