@@ -14,14 +14,37 @@ module Kind_info = struct
         ~context:(Ctype.mk_jkind_context_check_principal env)
         kind
     in
-    Printtyp.wrap_printing_env ~verbosity env (fun () ->
-        let verbosity : Jkind.Format_verbosity.t =
-          match Mconfig.Verbosity.to_int ~for_smart:0 verbosity with
-          | 0 -> Not_verbose
-          | 1 -> Expanded
-          | _ -> Expanded_with_all_mod_bounds
+    let print_with_verbosity ~jkind_verbosity kind =
+      Printtyp.wrap_printing_env ~verbosity env (fun () ->
+          Format.asprintf "%a"
+            (Jkind.format_verbose ~verbosity:jkind_verbosity)
+            kind)
+    in
+    let jkind_verbosity : Jkind.Format_verbosity.t =
+      match Mconfig.Verbosity.to_int ~for_smart:0 verbosity with
+      | 0 -> Not_verbose
+      | 1 ->
+        (* When verbosity=1, we should show the [Expanded] jkind. But the [Expanded] jkind
+           may be the same as the [Not_verbose] jkind, in which case we want to skip
+           directly to the [Expanded_with_all_mod_bounds] jkind. *)
+        (* Printing jkinds without with bounds is cheap. *)
+        let kind_without_with_bounds =
+          { kind with jkind = { kind.jkind with with_bounds = No_with_bounds } }
         in
-        Format.asprintf "%a" (Jkind.format_verbose ~verbosity) kind)
+        let unexpanded_kind =
+          print_with_verbosity ~jkind_verbosity:Not_verbose
+            kind_without_with_bounds
+        in
+        let expanded_kind =
+          print_with_verbosity ~jkind_verbosity:Expanded
+            kind_without_with_bounds
+        in
+        if String.equal unexpanded_kind expanded_kind then
+          Expanded_with_all_mod_bounds
+        else Expanded
+      | _ -> Expanded_with_all_mod_bounds
+    in
+    print_with_verbosity ~jkind_verbosity kind
 end
 
 let loc_contains_cursor (loc : Location.t) ~cursor =
