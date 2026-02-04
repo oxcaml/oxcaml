@@ -1421,7 +1421,8 @@ let only_default_codegen = Actions.make
   (Actions_helpers.predicate
     (Config.no_stack_checks
       && not Config.poll_insertion
-      && not Config.with_address_sanitizer)
+      && not Config.with_address_sanitizer
+      && not Config.with_frame_pointers)
     "default codegen"
     "non-default codegen")
 
