@@ -16,7 +16,6 @@
  (name stdlib)
  (libraries dune_support)
  (stdlib
-<<<<<<< oxcaml
   (exit_module std_exit)
   (internal_modules Camlinternal*)
   (modules_before_stdlib camlinternalFormatBasics camlinternalAtomic))
@@ -29,22 +28,13 @@
    -extension runtime_metaprogramming
    -nostdlib
    -safe-string
-   -strict-formats))
+   -strict-formats
+   ;; CR sspies: Added from upstream 5.4 merge. This opens New_predef_types
+   ;; (defined in stdlib/dune_support/new_predef_types.mli) which provides
+   ;; the iarray type for immutable arrays across stdlib modules.
+   -open New_predef_types))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
-||||||| upstream-base
-   (exit_module std_exit)
-   (internal_modules Camlinternal*)
-   (modules_before_stdlib
-     camlinternalFormatBasics))
- (flags (:standard -w -9 -nolabels))
-=======
-   (exit_module std_exit)
-   (internal_modules Camlinternal*)
-   (modules_before_stdlib
-     camlinternalFormatBasics))
- (flags (:standard -w -9 -nolabels -open New_predef_types))
->>>>>>> upstream-incoming
  (preprocess
   (per_module
    ((action
