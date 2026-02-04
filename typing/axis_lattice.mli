@@ -75,8 +75,6 @@ val immutable_data : t
 
 val mutable_data : t
 
-val sync_data : t
-
 val value : t
 
 val arrow : t

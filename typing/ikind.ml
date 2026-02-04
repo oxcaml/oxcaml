@@ -421,12 +421,6 @@ let has_mutable_label lbls =
       match lbl.ld_mutable with Immutable -> false | Mutable _ -> true)
     lbls
 
-let has_atomic_label lbls =
-  List.exists
-    (fun (lbl : Types.label_declaration) ->
-      Types.is_atomic lbl.ld_mutable)
-    lbls
-
 (* This function determines whether the shallow axes are relevant for a given
    representation. For example, for unboxed types, shallow axes of inner data
    stay relevant. For boxed types, shallow axes of inner data are not relevant. *)
@@ -503,8 +497,6 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           let base_lat =
             if has_mutable_label lbls
             then Axis_lattice.mutable_data
-            else if has_atomic_label lbls
-            then Axis_lattice.sync_data
             else
               match rep with
               | Types.Record_unboxed -> Axis_lattice.immediate
@@ -600,21 +592,11 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                 | Types.Cstr_record lbls -> has_mutable_label lbls)
               cstrs
           in
-          let has_atomic =
-            List.exists
-              (fun (c : Types.constructor_declaration) ->
-                match c.cd_args with
-                | Types.Cstr_tuple _ -> false
-                | Types.Cstr_record lbls -> has_atomic_label lbls)
-              cstrs
-          in
           let base_lat =
             if all_args_void
             then Axis_lattice.immediate
             else if has_mutable
             then Axis_lattice.mutable_data
-            else if has_atomic
-            then Axis_lattice.sync_data
             else Axis_lattice.immutable_data
           in
           let relevant_for_shallow = shallow_axes_are_relevant_for_rep (`Variant rep) in
