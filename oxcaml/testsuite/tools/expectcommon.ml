@@ -67,7 +67,10 @@ let match_expect_extension (ext : Parsetree.extension) =
     match match_ext_name txt with
     | None -> None
     | Some kind ->
-    let invalid_payload ?(loc=extid_loc) ?(msg = "invalid [%%expect payload]") () =
+    let invalid_payload
+        ?(loc=extid_loc)
+        ?(msg = "invalid [%%expect payload]")
+        () =
       Location.raise_errorf ~loc "%s" msg
     in
     if Option.is_none !register_assembly_callback && kind = Expect_asm
@@ -88,8 +91,16 @@ let match_expect_extension (ext : Parsetree.extension) =
         (* Filter{|content|} - filter with string content *)
         match filter_of_string name with
         | Some filter -> (Some filter, string_constant arg)
-        | None -> invalid_payload ~msg:(Printf.sprintf "unexpected filter \"%s\"" name) ~loc:e.pexp_loc ())
-      | _ -> invalid_payload ~loc:e.pexp_loc ~msg:("expected {|...|} or Filter{|...|}") ()
+        | None ->
+          invalid_payload
+            ~msg:(Printf.sprintf "unexpected filter \"%s\"" name)
+            ~loc:e.pexp_loc
+            ())
+      | _ ->
+        invalid_payload
+        ~loc:e.pexp_loc
+        ~msg:("expected {|...|} or Filter{|...|}")
+        ()
     in
     let is_arch_filter = function
       | X86_64 -> true
@@ -102,7 +113,11 @@ let match_expect_extension (ext : Parsetree.extension) =
       match entries with
       | [(None, _)] -> entries
       | [(None, _); (Some Principal, _)]-> entries
-      | _ -> invalid_payload ~msg:"expected [%%expect {|...|}] or [%%expect {|...|}, Principal{|...|}]" ()
+      | _ ->
+        let msg = "expected [%%expect {|...|}] or " ^
+                  "[%%expect {|...|}, Principal{|...|}]"
+        in
+        invalid_payload ~msg ()
     in
     let validate_expect_asm entries =
       (* All entries must have architecture tags *)
@@ -112,7 +127,10 @@ let match_expect_extension (ext : Parsetree.extension) =
         | None -> false
       ) entries
       then entries
-      else invalid_payload ~msg:"expected [%%expect_asm Arch1{|...|}, Arch2{|...|}, ...]" ()
+      else
+        invalid_payload
+          ~msg:"expected [%%expect_asm Arch1{|...|}, Arch2{|...|}, ...]"
+          ()
     in
     let expectation =
       match payload with
@@ -260,14 +278,23 @@ let eval_expectation expectation ~output =
         then [(Some Principal, if_principal)]
         else [(None, if_not_principal)]
       | _ -> Misc.fatal_error "impossible: already validated")
-  | Expect_asm -> List.filter ~f:(fun (f, _) -> f = current_arch_filter ()) expectation.expected_output in
+  | Expect_asm ->
+    List.filter
+      ~f:(fun (f, _) -> f = current_arch_filter ())
+      expectation.expected_output
+  in
   match to_update with
   | [(filter, s)] when s.str <> output ->
     let s = { s with str = output } in
     Some { expectation with expected_output =
-      List.map ~f:(fun (f, e) -> (f, if f = filter then s else e)) expectation.expected_output
+      List.map
+        ~f:(fun (f, e) -> (f, if f = filter then s else e))
+        expectation.expected_output
     }
-  | _ :: _ :: _ -> Location.raise_errorf ~loc:expectation.payload_loc "duplicate architectures in [%%%%expect_asm]"
+  | _ :: _ :: _ ->
+    Location.raise_errorf
+      ~loc:expectation.payload_loc
+      "duplicate architectures in [%%%%expect_asm]"
   | _ -> None
 
 let shift_lines delta phrases =
