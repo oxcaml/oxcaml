@@ -3295,7 +3295,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
             with
             | Tcoerce_none -> ()
             | _ ->
-                if !Types.ikind_debug then
+                if !Clflags.ikinds_debug then
                   Format.eprintf
                     "[nondep-supertype] unexpected coercion@;original=%a@;\
                      nondep=%a@."
@@ -3305,7 +3305,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                   "unexpected coercion from original module type to \
                    nondep_supertype one"
             | exception Includemod.Error _ ->
-                if !Types.ikind_debug then
+                if !Clflags.ikinds_debug then
                   Format.eprintf
                     "[nondep-supertype] inclusion failure@;original=%a@;\
                      nondep=%a@."

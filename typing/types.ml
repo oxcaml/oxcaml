@@ -77,10 +77,9 @@ type constructor_ikind_entry =
 
 type type_ikind = constructor_ikind_entry
 
-let ikind_debug : bool ref = Clflags.ikinds_debug
-
 let ikinds_todo (message : string) : type_ikind =
-  if !ikind_debug then Format.eprintf "[ikinds-todo] %s@." message;
+  if !Clflags.ikinds_debug then
+    Format.eprintf "[ikinds-todo] %s@." message;
   No_constructor_ikind message
 
 type atomic =

@@ -448,8 +448,6 @@ and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
 
 val ikinds_todo : string -> type_ikind
 
-val ikind_debug : bool ref
-
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
    jkind.

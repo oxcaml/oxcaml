@@ -658,11 +658,11 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
       | Types.Constructor_ikind { base; coeffs } when !Clflags.ikinds ->
         Solver.Poly (base, coeffs)
       | Types.No_constructor_ikind reason ->
-        if !Types.ikind_debug then Format.eprintf "[ikind-miss] %s@." reason;
+        if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
         fallback ()
       | Types.Constructor_ikind _ -> fallback ()
     in
-    (if !Types.ikind_debug
+    (if !Clflags.ikinds_debug
     then
       let ikind_msg =
         match ikind with
@@ -708,7 +708,7 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
   else
     let ikind = type_declaration_ikind ~context ~path in
     let payload = ikind in
-    (if !Types.ikind_debug
+    (if !Clflags.ikinds_debug
     then
       let stored_jkind =
         match context.lookup_type path with
@@ -737,7 +737,7 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
     in
     let coeffs = Array.of_list coeffs in
     let payload = constructor_ikind ~base ~coeffs in
-    if !Types.ikind_debug
+    if !Clflags.ikinds_debug
     then
       Format.eprintf "[ikind] from jkind: base=%s; coeffs=[%s]@."
         (Ldd.pp payload.base)
@@ -766,7 +766,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
     in
     if allow_any
     then (
-      (if !Types.ikind_debug
+      (if !Clflags.ikinds_debug
       then
         let origin_suffix =
           match origin with None -> "" | Some o -> " origin=" ^ o
@@ -789,7 +789,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
       in
       let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
       let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
-      (if !Types.ikind_debug
+      (if !Clflags.ikinds_debug
       then
         let origin_suffix =
           match origin with None -> "" | Some o -> " origin=" ^ o
@@ -807,7 +807,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
       | [] -> Ok ()
       | _ ->
         let () =
-          if !Types.ikind_debug
+          if !Clflags.ikinds_debug
           then
             let axes =
               violating_axes
