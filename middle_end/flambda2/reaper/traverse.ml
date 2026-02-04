@@ -410,18 +410,24 @@ and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
 and traverse_let_cont_non_recursive denv acc cont ~body handler =
   let cont_handler = Non_recursive_let_cont_handler.handler handler in
   let traverse handler acc =
+    let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
+    let params = Bound_parameters.vars handler.bound_parameters in
     Acc.continuation_info acc cont
-      { params = Bound_parameters.vars handler.bound_parameters;
+      { params;
         arity =
           Flambda_arity.unarize
             (Bound_parameters.arity handler.bound_parameters);
-        is_exn_handler = Continuation_handler.is_exn_handler cont_handler
+        is_exn_handler
       };
-    let conts =
-      Continuation.Map.add cont
-        (Normal (Bound_parameters.vars handler.bound_parameters))
-        denv.conts
-    in
+    if is_exn_handler
+    then
+      (* The exception parameter of any exception handler is assumed to have any
+         possible source. This makes sure that we do not unbox the exception
+         parameter of exception handlers, which is incorrect when used in
+         functions (for instance, if they raise async exceptions), and would
+         also probably put incorrect backtrace information. *)
+      Acc.add_any_source acc (Code_id_or_name.var (List.hd params));
+    let conts = Continuation.Map.add cont (Normal params) denv.conts in
     let denv =
       { parent = Let_cont { cont; handler; parent = denv.parent };
         conts;
