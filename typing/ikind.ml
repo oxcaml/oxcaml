@@ -846,7 +846,6 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     | [] -> true
     | _ -> false
 
-(* CR jujacobs: this is really slow when enabled. Fix performance. *)
 let crossing_of_jkind ~(context : Jkind.jkind_context)
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
   if not (enable_crossing && !Clflags.ikinds) (* CR jujacobs: fix this *)
