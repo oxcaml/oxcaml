@@ -2856,7 +2856,24 @@ let normalize_decl_jkinds env decls =
          trust the new jkind (we really only want this check here to check
          against the user-written annotation). We might be able to do a better
          job here and save some work. Internal ticket 5117. *)
-      let apply_allow_any_crossing decl =
+      let context = Ctype.mk_jkind_context_always_principal env in
+      let type_equal = Ctype.type_equal env in
+      match
+        (* CR layouts v2.8: Consider making a function that doesn't compute
+           histories for this use-case, which doesn't need it. *)
+        Ikind.sub_jkind_l
+          ~origin:(Format.asprintf
+                     "typedecl:normalize %a (%a)"
+                     Path.print path
+                     Location.print_loc decl.type_loc)
+          ~type_equal
+          ~context
+          ~allow_any_crossing
+          ~level:(Ctype.get_current_level ())
+          decl.type_jkind
+          original_decl.type_jkind
+      with
+      | Ok _ ->
         if allow_any_crossing then
           (* If the user is asking us to allow any crossing, we use the mod- and
              with-bounds from the annotation rather than the modal bounds inferred from
@@ -2864,9 +2881,7 @@ let normalize_decl_jkinds env decls =
              we still want to be able to eg locally use a type declared as layout [any] as
              [value] if that's its actual layout! *)
           let type_jkind =
-            Jkind.unsafely_set_bounds
-              ~from:original_decl.type_jkind
-              decl.type_jkind
+            Jkind.unsafely_set_bounds ~from:original_decl.type_jkind decl.type_jkind
           in
           let umc = Some (Jkind.to_unsafe_mode_crossing type_jkind) in
           let type_kind =
@@ -2887,32 +2902,9 @@ let normalize_decl_jkinds env decls =
           in
           { decl with type_jkind; type_kind; type_ikind }
         else decl
-      in
-      if !Clflags.ikinds then
-        apply_allow_any_crossing decl
-      else
-        let context = Ctype.mk_jkind_context_always_principal env in
-        let type_equal = Ctype.type_equal env in
-        match
-          (* CR layouts v2.8: Consider making a function that doesn't compute
-             histories for this use-case, which doesn't need it. *)
-          Ikind.sub_jkind_l
-            ~origin:(Format.asprintf
-                       "typedecl:normalize %a (%a)"
-                       Path.print path
-                       Location.print_loc decl.type_loc)
-            ~type_equal
-            ~context
-            ~allow_any_crossing
-            ~level:(Ctype.get_current_level ())
-            decl.type_jkind
-            original_decl.type_jkind
-        with
-        | Ok _ -> apply_allow_any_crossing decl
-        | Error err ->
-          raise
-            (Error
-               (decl.type_loc, Jkind_mismatch_of_path (path, err)))
+      | Error err ->
+        raise(Error(decl.type_loc,
+                    Jkind_mismatch_of_path (path, err)))
     end
     else decl
   in
