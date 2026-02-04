@@ -74,6 +74,10 @@ and stack_location =
    stack locations.  Neither GC nor thread context switches can occur
    between these two times. *)
 
+val format_stack_location : Format.formatter -> stack_location -> unit
+
+val format_location : Format.formatter -> location -> unit
+
 val equal_location : location -> location -> bool
 
 val dummy : t

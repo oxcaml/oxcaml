@@ -48,6 +48,19 @@ and stack_location =
   | Outgoing of int
   | Domainstate of int
 
+let format_stack_location fmt loc =
+  match loc with
+  | Local i -> Format.fprintf fmt "local %d" i
+  | Incoming i -> Format.fprintf fmt "incoming %d" i
+  | Outgoing i -> Format.fprintf fmt "%outgoing d" i
+  | Domainstate i -> Format.fprintf fmt "domainstate %d" i
+
+let format_location fmt loc =
+  match loc with
+  | Unknown -> Format.fprintf fmt "unknown"
+  | Reg i -> Format.fprintf fmt "reg %d" i
+  | Stack s -> Format.fprintf fmt "stack (%a)" format_stack_location s
+
 type reg = t
 
 let dummy =
