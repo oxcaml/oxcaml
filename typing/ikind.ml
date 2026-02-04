@@ -848,7 +848,7 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
 
 let crossing_of_jkind ~(context : Jkind.jkind_context)
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
-  if not (enable_crossing && !Clflags.ikinds) (* CR jujacobs: fix this *)
+  if not (enable_crossing && !Clflags.ikinds)
   then Jkind.get_mode_crossing ~context jkind
   else
     let ctx = make_ctx ~mode:Solver.Round_up ~context in
