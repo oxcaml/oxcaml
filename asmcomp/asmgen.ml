@@ -97,7 +97,6 @@ let (pass_to_cfg : Cfg_format.cfg_unit_info Compiler_pass_map.t) =
   |> Compiler_pass_map.add Compiler_pass.Selection (new_cfg_unit_info ())
 
 let reset () =
-  Label.reset ();
   Zero_alloc_checker.reset_unit_info ();
   start_from_emit := false;
   Compiler_pass_map.iter

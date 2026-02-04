@@ -100,8 +100,7 @@ let match_expect_extension (ext : Parsetree.extension) =
     let validate_expect_toplevel entries =
       (* Valid formats:
          - [{|...|}] (one untagged)
-         - [{|...|}, Principal{|...|}] (untagged + Principal)
-         - [Principal{|...|}] (Principal only) *)
+         - [{|...|}, Principal{|...|}] (non-principal + principal)*)
       match entries with
       | [(None, _)] -> entries
       | [(None, _); (Some Principal, _)]-> entries

@@ -56,6 +56,7 @@ let expect_asm_callbacks = ref []
 let asm_collected_for_expect_asm = ref []
 
 let register_expect_asm_callback f =
+  Label.reset ();
   expect_asm_callbacks := f :: !expect_asm_callbacks
 
 let invoke_expect_asm_callbacks () =
