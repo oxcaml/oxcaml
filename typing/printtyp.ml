@@ -2379,7 +2379,8 @@ let tree_of_value_description id decl =
     if Mode.Modality.is_undefined decl.val_modalities then
       Mode.Modality.Const.id
     else
-      Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha decl.val_modalities
+      Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
+        decl.val_modalities
   in
   let qtvs = extract_qtvs [decl.val_type] in
   let apparent_arity =
