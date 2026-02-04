@@ -2,3 +2,5 @@
 OK
 # Preempt on tick
 OK
+# Preempt after two ticks
+OK
