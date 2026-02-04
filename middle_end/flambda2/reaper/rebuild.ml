@@ -1762,21 +1762,6 @@ and rebuild_holed (env : env) res (rev_expr : Rev_expr.rev_expr_holed)
               res )
         in
         let l = get_parameters parameters_to_keep in
-        let l =
-          List.concat_map
-            (fun param ->
-              let v = Bound_parameter.var param in
-              match DS.get_unboxed_fields env.uses (Code_id_or_name.var v) with
-              | None -> [param]
-              | Some fields ->
-                DS.fold_unboxed_with_kind
-                  (fun kind v acc ->
-                    Bound_parameter.create v (KS.anything kind)
-                      Flambda_debug_uid.none
-                    :: acc) (* CR sspies: Missing debug uid. *)
-                  fields [])
-            l
-        in
         ( RE.create_continuation_handler
             (Bound_parameters.create l)
             ~handler ~is_exn_handler ~is_cold,
