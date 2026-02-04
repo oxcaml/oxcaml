@@ -3932,13 +3932,9 @@ let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
   Typecore.reset_allocations ();
-  let hint = Hint.Legacy Toplevel in
-  let expected_mode =
-    Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
-  in
   let (str, sg, mode, to_remove_from_sg, shape, env) =
     type_structure ~toplevel:(Some sig_acc) false None env s in
-  Value.submode_err (Location.none, Structure) mode expected_mode;
+  Value.submode_err (Location.none, Structure) mode toplevel_mode;
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
   Typecore.optimise_allocations ();

@@ -1264,3 +1264,4 @@ val link_kind: inside:field_kind -> field_kind -> unit
 val link_commu: inside:commutable -> commutable -> unit
 val set_commu_ok: commutable -> unit
 val class_mode : Mode.Value.lr
+val toplevel_mode : Mode.Value.lr
