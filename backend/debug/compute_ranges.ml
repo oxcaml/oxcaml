@@ -494,6 +494,29 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     in
     if !Oxcaml_flags.dranges && not no_actions
     then Format.fprintf ppf_dump "finished applying actions.\n%!";
+    (* Check if we're at the end of the function *)
+    let subrange_state =
+      Subrange_state.advance_over_instruction subrange_state insn
+    in
+    let at_end_of_function = Option.is_none (DLL.next insn) in
+    (* Close all subranges if at end of function, BEFORE updating first_insn *)
+    let currently_open_subranges =
+      if at_end_of_function
+      then (
+        if !Oxcaml_flags.dranges
+        then Format.fprintf ppf_dump "closing subranges at end of function\n%!";
+        let currently_open_subranges =
+          KM.fold
+            (fun key _ currently_open_subranges ->
+              close_subrange key ~end_pos_offset:0 ~at_function_end:true
+                ~currently_open_subranges)
+            currently_open_subranges currently_open_subranges
+        in
+        assert (KM.is_empty currently_open_subranges);
+        currently_open_subranges)
+      else currently_open_subranges
+    in
+    (* Now update first_insn based on any labels that were created *)
     let first_insn =
       match !used_label with
       | None -> first_insn
@@ -535,27 +558,16 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
                fundecl.fun_name KS.print not_open_but_should_be'
                Printlinear.instr_data insn_data KS.print should_be_open KS.print
                currently_open_subranges));
-    let subrange_state =
-      Subrange_state.advance_over_instruction subrange_state insn
-    in
-    match DLL.next insn with
-    | None ->
-      (* End of instruction list - close all remaining subranges *)
-      if !Oxcaml_flags.dranges
-      then Format.fprintf ppf_dump "closing subranges at end of function\n%!";
-      let currently_open_subranges =
-        KM.fold
-          (fun key _ currently_open_subranges ->
-            close_subrange key ~end_pos_offset:0 ~at_function_end:true
-              ~currently_open_subranges)
-          currently_open_subranges currently_open_subranges
-      in
-      assert (KM.is_empty currently_open_subranges);
-      first_insn
-    | Some next_insn ->
-      process_instruction t fundecl ~fun_contains_calls ~fun_num_stack_slots
-        ~first_insn ~insn:next_insn ~prev_insn:(Some insn)
-        ~currently_open_subranges ~subrange_state ~ppf_dump
+    (* Return or recurse based on whether we're at the end *)
+    if at_end_of_function
+    then first_insn
+    else
+      match DLL.next insn with
+      | None -> Misc.fatal_error "compute_ranges: unreachable"
+      | Some next_insn ->
+        process_instruction t fundecl ~fun_contains_calls ~fun_num_stack_slots
+          ~first_insn ~insn:next_insn ~prev_insn:(Some insn)
+          ~currently_open_subranges ~subrange_state ~ppf_dump
 
   let process_instructions t fundecl ~fun_contains_calls ~fun_num_stack_slots
       ~first_insn ~ppf_dump =
