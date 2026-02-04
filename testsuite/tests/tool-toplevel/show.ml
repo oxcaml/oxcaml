@@ -173,3 +173,15 @@ module U :
 module type OT = Set.OrderedType
 module type OT = sig type t val compare : t -> t -> int end
 |}];;
+
+module Accessor = struct
+  let ( @> ) () = ()
+end
+
+#show Accessor.( @> )
+[%%expect{|
+module Accessor : sig val ( @> ) : unit -> unit end
+>> Fatal error: modality Undefined should not be zapped.
+Uncaught exception: Misc.Fatal_error
+
+|}]
