@@ -42,6 +42,8 @@ module Stamp : sig
   val hash : t -> int
 
   val to_string : t -> string
+
+  val format : Format.formatter -> t -> unit
 end
 
 type t = private

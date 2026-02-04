@@ -39,6 +39,8 @@ module Stamp = struct
   let hash = Fun.id
 
   let to_string = string_of_int
+
+  let format fmt s = Format.fprintf fmt "%d" s
 end
 
 type t =
