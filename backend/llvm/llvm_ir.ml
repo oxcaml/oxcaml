@@ -283,7 +283,9 @@ module Ident = struct
     match t with
     | Local s -> fprintf ppf "%%%s" s
     | Global s ->
-      let encoded = Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode) in
+      let encoded =
+        Asm_targets.(Asm_symbol.create_global s |> Asm_symbol.encode)
+      in
       fprintf ppf "@%s" encoded
 
   let to_label_string_exn = function
@@ -294,7 +296,7 @@ module Ident = struct
 
   let to_string_encoded = function
     | Local s -> s
-    | Global s -> Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode)
+    | Global s -> Asm_targets.(Asm_symbol.create_global s |> Asm_symbol.encode)
 
   module Gen = struct
     type ident = t

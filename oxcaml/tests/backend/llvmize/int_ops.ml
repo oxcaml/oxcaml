@@ -56,15 +56,15 @@ let[@inline never] asr_imm () = D.x asr imm
 
 external popcnt_intr : (int[@untagged]) -> (int[@untagged])
   = "" "caml_int_popcnt_untagged_to_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+[@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
 external ctz_intr : (int[@untagged]) -> (int[@untagged])
   = "" "caml_int_ctz_untagged_to_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+[@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
 external clz_intr : (int[@untagged]) -> (int[@untagged])
   = "" "caml_int_clz_untagged_to_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+[@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
 let[@inline never] popcnt () = popcnt_intr D.z
 

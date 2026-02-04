@@ -33,7 +33,7 @@ open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 module S = struct
   type func_call_operation =
-    | Indirect
+    | Indirect of Cmm.symbol list option
     | Direct of Cmm.symbol
 
   type external_call_operation =
@@ -62,8 +62,8 @@ module S = struct
 
   (** [int_test] represents all possible outcomes of a comparison between two
       integers. When [imm] field is [None], compare variables x and y, specified
-      by the arguments of the enclosing [instruction]. When [imm] field is [Some
-      n], compare variable x and immediate [n]. This corresponds to
+      by the arguments of the enclosing [instruction]. When [imm] field is
+      [Some n], compare variable x and immediate [n]. This corresponds to
       [Mach.Iinttest] and [Mach.Iinttest_imm] in the compiler. *)
   type int_test =
     { lt : Label.t;  (** if x < y (resp. x < n) goto [lt] label *)
@@ -85,14 +85,6 @@ module S = struct
       uo : Label.t  (** if at least one of x or y is NaN *)
     }
 
-  type irc_work_list =
-    | Unknown_list
-    | Coalesced
-    | Constrained
-    | Frozen
-    | Work_list
-    | Active
-
   type 'a instruction =
     { desc : 'a;
       id : InstructionId.t;
@@ -102,7 +94,6 @@ module S = struct
       mutable fdo : Fdo_info.t;
       mutable live : Reg.Set.t;
       mutable stack_offset : int;
-      mutable irc_work_list : irc_work_list;
       mutable available_before : Reg_availability_set.t;
       mutable available_across : Reg_availability_set.t
           (** The availability sets will be set to [Unreachable] prior to the
@@ -154,8 +145,12 @@ module S = struct
     | Tailcall_func of func_call_operation
     | Call_no_return of external_call_operation
     (* CR mshinwell: [Call_no_return] should have "external" in the name *)
-    (* CR mshinwell: [Invalid] from flambda2 should have its own terminator, to
-       avoid the hack in [can_raise_terminator] *)
+    | Invalid of
+        { message : string;
+          stack_ofs : int;
+          stack_align : Cmm.stack_align;
+          label_after : Label.t Option.t
+        }
     | Call of func_call_operation with_label_after
     | Prim of prim_call_operation with_label_after
 

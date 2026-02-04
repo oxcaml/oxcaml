@@ -80,11 +80,11 @@ let symbol ppf { txt = cunit, s; loc = _ } =
   Format.pp_print_char ppf '$';
   cunit
   |> Option.iter (fun { ident; linkage_name } ->
-         symbol_part ppf ident;
-         linkage_name
-         |> Option.iter (fun linkage_name ->
-                Format.fprintf ppf "/%a" symbol_part linkage_name);
-         Format.pp_print_char ppf '.');
+      symbol_part ppf ident;
+      linkage_name
+      |> Option.iter (fun linkage_name ->
+          Format.fprintf ppf "/%a" symbol_part linkage_name);
+      Format.pp_print_char ppf '.');
   symbol_part ppf s
 
 let ident ppf s =
@@ -304,10 +304,14 @@ let mutability ~space ppf mut =
 let array_kind ~space ppf (ak : array_kind) =
   let str =
     match ak with
-    | Values -> None
     | Immediates -> Some "imm"
+    | Gc_ignorable_values -> Some "gc_ignorable"
+    | Values -> None
     | Naked_floats -> Some "float"
     | Naked_float32s -> Some "float32"
+    | Naked_ints -> Some "int"
+    | Naked_int8s -> Some "int8"
+    | Naked_int16s -> Some "int16"
     | Naked_int32s -> Some "int32"
     | Naked_int64s -> Some "int64"
     | Naked_nativeints -> Some "nativeint"
@@ -323,6 +327,9 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
     match ak with
     | Values_or_immediates_or_naked_floats -> None
     | Naked_float32s -> Some "float32"
+    | Naked_ints -> Some "int"
+    | Naked_int8s -> Some "int8"
+    | Naked_int16s -> Some "int16"
     | Naked_int32s -> Some "int32"
     | Naked_int64s -> Some "int64"
     | Naked_nativeints -> Some "nativeint"
@@ -537,6 +544,9 @@ let string_accessor_width ppf saw =
 let array_load_kind ~space ppf (load_kind : array_load_kind) =
   let str =
     match[@ocaml.warning "-fragile-match"] load_kind with
+    | Immediates -> None
+    | Gc_ignorable_values -> Some "gc_ignorable"
+    | Values -> None
     | Naked_vec128s -> Some "vec128"
     | Naked_vec256s -> Some "vec256"
     | Naked_vec512s -> Some "vec512"
@@ -658,7 +668,8 @@ let ternop ppf t a1 a2 a3 =
     let ia =
       match set_kind with
       | Values ia -> ia
-      | Immediates | Naked_floats | Naked_float32s | Naked_int32s | Naked_int64s
+      | Gc_ignorable_values | Immediates | Naked_floats | Naked_float32s
+      | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         Initialization (* Will be ignored anyway *)
     in
@@ -764,16 +775,15 @@ let named ppf = function
 let static_closure_binding ppf (scb : static_closure_binding) =
   Format.fprintf ppf "%a =@ %a" symbol scb.symbol fun_decl scb.fun_decl
 
-let call_kind ~space ppf ck =
+let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
   match ck with
-  | Function (Indirect alloc) ->
-    alloc_mode_for_applications_opt ppf alloc ~space
-  | Function (Direct { code_id = c; function_slot = cl; alloc }) ->
+  | Function Indirect -> alloc_mode_for_applications_opt ppf alloc_mode ~space
+  | Function (Direct { code_id = c; function_slot = cl }) ->
     pp_spaced ~space ppf "@[direct(%a%a%a)@]" code_id c
       (pp_option ~space:Before (pp_like "@@%a" function_slot))
       cl
       (alloc_mode_for_applications_opt ~space:Before)
-      alloc
+      alloc_mode
   | C_call { alloc } ->
     let noalloc_kwd = if alloc then None else Some "noalloc" in
     pp_spaced ~space ppf "ccall%a"
@@ -880,6 +890,7 @@ let rec expr scope ppf = function
     (* (fun ppf () -> if cases <> [] then Format.pp_print_cut ppf ()) () *)
   | Apply
       { call_kind = kind;
+        alloc_mode;
         inlined;
         inlining_state = is;
         continuation = ret;
@@ -895,7 +906,8 @@ let rec expr scope ppf = function
     in
     Format.fprintf ppf
       "@[<hv 2>apply@[<2>%a%a%a@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ %a@]@]@]"
-      (call_kind ~space:Before) kind
+      (call_kind_and_alloc_mode ~space:Before)
+      (kind, alloc_mode)
       (inlined_attribute_opt ~space:Before)
       inlined pp_inlining_state () func_name_with_optional_arities
       (func, arities)

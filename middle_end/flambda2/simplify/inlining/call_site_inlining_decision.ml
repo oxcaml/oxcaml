@@ -126,9 +126,10 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   UA.cost_metrics uacc
 
 let argument_types_useful dacc apply =
-  if not
-       (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
-          ())
+  if
+    not
+      (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
+         ())
   then true
   else
     let typing_env = DE.typing_env (DA.denv dacc) in
@@ -137,9 +138,19 @@ let argument_types_useful dacc apply =
         Simple.pattern_match simple
           ~name:(fun name ~coercion:_ ->
             let ty = TE.find typing_env name None in
-            not (T.is_unknown typing_env ty))
+            not (T.is_unknown_maybe_null typing_env ty))
           ~const:(fun _ -> true))
       (Apply.args apply)
+
+let inlining_does_decrease_code_size ~code_or_metadata cost_metrics =
+  let[@ocamlformat "break-infix=fit-or-vertical"] original_code_size =
+    code_or_metadata
+    |> Code_or_metadata.code_metadata
+    |> Code_metadata.cost_metrics
+    |> Cost_metrics.size
+  in
+  let inlined_code_size = Cost_metrics.size cost_metrics in
+  not (Code_size.( <= ) original_code_size inlined_code_size)
 
 let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
     ~return_arity : Call_site_inlining_decision_type.t =
@@ -174,8 +185,13 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
         match decision with
         | Argument_types_not_useful ->
           Profile.Counters.incr "argument_types_not_useful" counters
-        | Speculatively_inline _ ->
-          Profile.Counters.incr "speculatively_inline" counters
+        | Speculatively_inline { cost_metrics; _ } ->
+          let counters =
+            Profile.Counters.incr "speculatively_inline" counters
+          in
+          if inlining_does_decrease_code_size ~code_or_metadata cost_metrics
+          then counters
+          else Profile.Counters.incr "same_code_size" counters
         | Speculatively_not_inline _ ->
           Profile.Counters.incr "speculatively_not_inline" counters
         | Missing_code | Definition_says_not_to_inline | In_a_stub
@@ -314,8 +330,9 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
               Flambda_features.Inlining.max_rec_depth
                 (Round (DE.round (DA.denv dacc)))
             in
-            if Simplify_rec_info_expr.depth_may_exceed dacc rec_info
-                 max_rec_depth
+            if
+              Simplify_rec_info_expr.depth_may_exceed dacc rec_info
+                max_rec_depth
             then (
               fail_if_must_inline ();
               Recursion_depth_exceeded)

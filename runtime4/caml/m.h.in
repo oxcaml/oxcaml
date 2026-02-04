@@ -108,6 +108,8 @@
 
 #undef HAS_POPCNT
 
+#undef HAS_LZCNT
+
 #undef HAS_PCLMUL
 
 #undef HAS_SSE3

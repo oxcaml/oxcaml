@@ -571,13 +571,13 @@ module type S =
   sig
     module type S0 =
       sig
-        val x1 : string -> string
-        val x2 : string -> string @@ portable
-        val x3 : string -> string
+        val x1 : string -> string @@ portable contended
+        val x2 : string -> string @@ portable contended
+        val x3 : string -> string @@ contended
       end
-    val x1 : string -> string @@ many portable
-    val x2 : string -> string @@ many portable
-    val x3 : string -> string @@ many portable
+    val x1 : string -> string @@ many portable contended
+    val x2 : string -> string @@ many portable contended
+    val x3 : string -> string @@ many portable contended
   end
 |}]
 
@@ -623,7 +623,9 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "x" (with some modality) of the record at Line 1, characters 46-54.
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -666,19 +668,13 @@ module M : sig end @@ stateless
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (X : S @ portable) = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : functor (X : S @ portable) -> sig end @@ stateless
 |}]
 
 module F (_ : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (_ : S @ portable) = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : S @ portable -> sig end @@ stateless
 |}]
 
 module M' = (M : S @ portable)
@@ -689,19 +685,13 @@ module M' : S @@ stateless
 module F (M : S @ portable) : S @ portable = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (M : S @ portable) : S @ portable = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : functor (M : S @ portable) -> S @@ stateless
 |}]
 
 module F (M : S @ portable) @ portable = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (M : S @ portable) @ portable = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : functor (M : S @ portable) -> sig end @@ stateless
 |}]
 
 
@@ -730,19 +720,23 @@ module M : S @@ stateless
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
 [%%expect{|
-Line 1, characters 37-45:
-1 | module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
-                                         ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module type S' =
+  functor () (M : S @ portable) -> S @ portable -> S @ portable
 |}]
 
 
 module type S' = () -> S @ portable -> S @ portable -> S @ portable
 [%%expect{|
-Line 1, characters 27-35:
-1 | module type S' = () -> S @ portable -> S @ portable -> S @ portable
-                               ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module type S' = functor () -> S @ portable -> S @ portable -> S @ portable
+|}]
+
+(* Unlike arrow type, which is by default interpreted as curried and extra
+   parens opt out, functor types are never treated as curried. *)
+module type S' = S @ local -> S -> S
+module type S'' = S @ local -> (S -> S)
+[%%expect{|
+module type S' = S @ local -> S -> S
+module type S'' = S @ local -> S -> S
 |}]
 
 module (F @ portable) () = struct end
@@ -753,10 +747,14 @@ module F : functor () -> sig end @@ stateless
 module (G @ portable) () = F
 
 [%%expect{|
-Line 1, characters 27-28:
-1 | module (G @ portable) () = F
-                               ^
-Error: This is "contended", but expected to be "uncontended" because it is a functor body.
+module G : functor () -> (functor () -> sig end) @ contended @@ portable
+|}]
+
+module (G @ portable) (F : (S @ unique -> S @ once) @ local) @ contended = struct end
+[%%expect{|
+module G :
+  functor (F : (S @ unique -> S @ once) @ local) -> sig end @ contended @@
+  stateless
 |}]
 
 module (G' @ portable) = F
@@ -812,8 +810,8 @@ Line 1, characters 10-24:
               ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 type t = { a : int }
@@ -841,14 +839,13 @@ let make_tuple x y z = stack_ (x, y), z
 Line 1, characters 23-36:
 1 | let make_tuple x y z = stack_ (x, y), z
                            ^^^^^^^^^^^^^
-Error: This value is "local"
-       because it is "stack_"-allocated.
+Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global"
-       because it is an element of the tuple at Line 1, characters 23-39
-       which is expected to be "global" because it is an allocation
-       which is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is an element of the tuple at Line 1, characters 23-39
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 type u = A of unit | C of int | B of int * int | D
@@ -1357,17 +1354,10 @@ type 'a contended_with_int : immutable_data with 'a @@ contended
 type 'a abstract
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | Mk : ('a : value mod portable) abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 type 'a abstract
-Lines 2-3, characters 0-67:
-2 | type existential_abstract : immutable_data with (type : value mod portable) abstract =
-3 |   | Mk : ('a : value mod portable) abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "existential_abstract" must be a subkind of
-           immutable_data with (type : value mod portable) abstract
-         because of the annotation on the declaration of the type existential_abstract.
+type existential_abstract =
+    Mk : ('a : value mod portable). 'a abstract -> existential_abstract
 |}]
 
 (* not yet supported *)
@@ -1580,7 +1570,7 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1107, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
 
 |}]
 
@@ -1619,7 +1609,59 @@ let triangle_10 = let mutable x = 0 in
 val triangle_10 : int = 55
 |}]
 
+(*****************************)
+(* attributes on type params *)
+
+type 'a[@foo]  t
+[%%expect{|
+type 'a t
+|}]
+
+type ('a[@foo] : any) t
+[%%expect{|
+type ('a : any) t
+|}]
+
+type _[@foo]  t
+[%%expect{|
+type _ t
+|}]
+
+type (_[@foo] : any) t
+[%%expect{|
+type (_ : any) t
+|}]
+
+type ('a, 'b[@foo])  t
+[%%expect{|
+type ('a, 'b) t
+|}]
+
+type ('a, 'b[@foo] : any)  t
+[%%expect{|
+type ('a, 'b : any) t
+|}]
+
+type ('a, _[@foo])  t
+[%%expect{|
+type ('a, _) t
+|}]
+
+type ('a, _[@foo] : any)  t
+[%%expect{|
+type ('a, _ : any) t
+|}]
+
 (*********************)
 (* quotations syntax *)
 
 (* Test will only be added once quotations work end-to-end. *)
+
+(*************************)
+(* unboxed unit literals *)
+
+let f #() = #()
+
+[%%expect{|
+val f : unit# -> unit# = <fun>
+|}]

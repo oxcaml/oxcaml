@@ -27,6 +27,7 @@ module String = Misc.Stdlib.String
 
 type error =
   | Assembler_error of string
+  | Binary_emitter_mismatch of string
   | Mismatched_for_pack of Compilation_unit.Prefix.t
   | Asm_generation of string * Emitaux.error
 
@@ -143,21 +144,21 @@ let save_cfg f =
 
 let save_cfg_before_regalloc (cfg_with_infos : Cfg_with_infos.t) =
   (if should_save_cfg_before_regalloc ()
-  then
-    (* CFGs and registers are mutable, so make sure what we will save is a
-       snapshot of the current state. *)
-    let copy x = Marshal.from_string (Marshal.to_string x []) 0 in
-    cfg_before_regalloc_unit_info.items
-      <- Cfg_format.(
-           Cfg_before_regalloc
-             { cfg_with_layout_and_relocatable_regs =
-                 copy
-                   ( Cfg_with_infos.cfg_with_layout cfg_with_infos,
-                     Reg.all_relocatable_regs () );
-               cmm_label = Cmm.cur_label ();
-               reg_stamp = Reg.For_testing.get_stamp ()
-             })
-         :: cfg_before_regalloc_unit_info.items);
+   then
+     (* CFGs and registers are mutable, so make sure what we will save is a
+        snapshot of the current state. *)
+     let copy x = Marshal.from_string (Marshal.to_string x []) 0 in
+     cfg_before_regalloc_unit_info.items
+       <- Cfg_format.(
+            Cfg_before_regalloc
+              { cfg_with_layout_and_relocatable_regs =
+                  copy
+                    ( Cfg_with_infos.cfg_with_layout cfg_with_infos,
+                      Reg.all_relocatable_regs () );
+                cmm_label = Cmm.cur_label ();
+                reg_stamp = Reg.For_testing.get_stamp ()
+              })
+          :: cfg_before_regalloc_unit_info.items);
   cfg_with_infos
 
 let write_ir prefix =
@@ -263,28 +264,44 @@ let count_duplicate_spills_reloads_in_block (block : Cfg.basic_block) =
   in
   dup_spills, dup_reloads
 
-let count_spills_reloads (block : Cfg.basic_block) =
-  let f ((spills, reloads) as acc) (instr : Cfg.basic Cfg.instruction) =
+type spills_reloads_moves =
+  { spills : int;
+    reloads : int;
+    moves : int
+  }
+
+let count_spills_reloads_moves (block : Cfg.basic_block) =
+  let f (acc : spills_reloads_moves) (instr : Cfg.basic Cfg.instruction) =
     match instr.desc with
-    | Op Spill -> spills + 1, reloads
-    | Op Reload -> spills, reloads + 1
+    | Op Spill -> { acc with spills = acc.spills + 1 }
+    | Op Reload -> { acc with reloads = acc.reloads + 1 }
+    | Op Move -> { acc with moves = acc.moves + 1 }
     | _ -> acc
   in
-  DLL.fold_left ~f ~init:(0, 0) block.body
+  DLL.fold_left ~f ~init:{ spills = 0; reloads = 0; moves = 0 } block.body
 
-(** Returns all CFG counters that work on a single block and are summative over the
-    blocks. *)
-let cfg_block_counters block =
+(** Returns all CFG counters that work on a single block and are summative over
+    the blocks. *)
+let cfg_block_counters (block : Cfg.basic_block) =
   let dup_spills, dup_reloads = count_duplicate_spills_reloads_in_block block in
-  let spills, reloads = count_spills_reloads block in
+  let { spills; reloads; moves } = count_spills_reloads_moves block in
+  let instructions = DLL.length block.body + 1 in
   Profile.Counters.create ()
   |> Profile.Counters.set "block_duplicate_spill" dup_spills
   |> Profile.Counters.set "block_duplicate_reload" dup_reloads
   |> Profile.Counters.set "spill" spills
   |> Profile.Counters.set "reload" reloads
+  |> Profile.Counters.set "instruction" instructions
+  |> Profile.Counters.set "block" 1
+  |> Profile.Counters.set "move" moves
 
 (** Returns all CFG counters that require the whole CFG to produce a count. *)
-let whole_cfg_counters (_ : Cfg.t) = Profile.Counters.create ()
+let whole_cfg_counters (cfg : Cfg.t) =
+  let stack_slots =
+    Stack_class.Tbl.fold cfg.fun_num_stack_slots ~init:0
+      ~f:(fun _stack_class num acc -> num + acc)
+  in
+  Profile.Counters.create () |> Profile.Counters.set "stack_slot" stack_slots
 
 let cfg_profile to_cfg =
   let total_counters = ref (Profile.Counters.create ()) in
@@ -382,13 +399,13 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   let module CSE = Cfg_cse.Cse_generic (CSE) in
   cfg_with_layout
   ++ (fun cfg_with_layout ->
-       match should_vectorize () with
-       | false -> cfg_with_layout
-       | true ->
-         cfg_with_layout
-         ++ cfg_with_layout_profile ~accumulate:true "vectorize"
-              (Vectorize.cfg ppf_dump)
-         ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
+  match should_vectorize () with
+  | false -> cfg_with_layout
+  | true ->
+    cfg_with_layout
+    ++ cfg_with_layout_profile ~accumulate:true "vectorize"
+         (Vectorize.cfg ppf_dump)
+    ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
   ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
        (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
@@ -401,16 +418,25 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
   ++ save_cfg_before_regalloc
   ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_infos ->
-         let cfg_description =
-           Regalloc_validate.Description.create
-             (Cfg_with_infos.cfg_with_layout cfg_with_infos)
-         in
-         cfg_with_infos ++ register_allocator fd_cmm
-         ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
-              (Regalloc_validate.run cfg_description))
+      let cfg_description =
+        Regalloc_validate.Description.create
+          (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+      in
+      cfg_with_infos ++ register_allocator fd_cmm
+      ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
+           (Regalloc_validate.run cfg_description))
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate
+  ++ (fun (cfg_with_infos : Cfg_with_infos.t) ->
+  (* After this point, we no longer rely on loop infos if stack checks are
+     disabled. We can thus perform rewrites that will make the CFG
+     irreducible. *)
+  if not !Oxcaml_flags.cfg_stack_checks
+  then (
+    Cfg_with_infos.invalidate_loop_infos cfg_with_infos;
+    (Cfg_with_infos.cfg cfg_with_infos).allowed_to_be_irreducible <- true);
+  cfg_with_infos)
   ++ Cfg_with_infos.cfg_with_layout
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_prologue"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
@@ -424,9 +450,14 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_layout_profile ~accumulate:true "peephole_optimize_cfg"
        Peephole_optimize.peephole_optimize_cfg
   ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
-       match !Oxcaml_flags.cfg_stack_checks with
-       | false -> cfg_with_layout
-       | true -> Cfg_stack_checks.cfg cfg_with_layout)
+  match !Oxcaml_flags.cfg_stack_checks with
+  | false -> cfg_with_layout
+  | true ->
+    let cfg_with_layout = Cfg_stack_checks.cfg cfg_with_layout in
+    (* After this point, we no longer rely on loop infos. *)
+    (Cfg_with_layout.cfg cfg_with_layout).allowed_to_be_irreducible <- true;
+    cfg_with_layout_profile ~accumulate:true "cfg_simplify"
+      Regalloc_utils.simplify_cfg cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)
@@ -458,9 +489,9 @@ let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
   ++ Profile.record ~accumulate:true "save_linear" save_linear
   ++ (fun (fd : Linear.fundecl) ->
-       match !Oxcaml_flags.cfg_stack_checks with
-       | false -> Stack_check.linear fd
-       | true -> fd)
+  match !Oxcaml_flags.cfg_stack_checks with
+  | false -> Stack_check.linear fd
+  | true -> fd)
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
 
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
@@ -469,13 +500,13 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
   ++ (fun (fd_cmm : Cmm.fundecl) ->
-       Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-       ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
+  Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
-         if !Clflags.llvm_backend
-         then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
-         else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
+      if !Clflags.llvm_backend
+      then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
+      else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
 
 let compile_data dl = dl ++ save_data ++ emit_data
 
@@ -525,7 +556,7 @@ let compile_genfuns ~ppf_dump f =
     (Generic_fns.compile ~cache:false ~shared:true
        (Generic_fns.Tbl.of_fns (Compilenv.current_unit_infos ()).ui_generic_fns))
 
-let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
+let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     ~may_reduce_heap ~ppf_dump gen =
   reset ();
   let create_asm =
@@ -585,14 +616,39 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
         ~exceptionally:remove_asm_file;
       let assemble_result = Profile.record_call "assemble" assemble_file in
       if assemble_result <> 0 then raise (Error (Assembler_error asm_filename));
-      remove_asm_file ())
+      remove_asm_file ());
+  (* Verify binary emitter output if requested. This is done outside the
+     try_finally so that verification failures don't delete the object file,
+     making it easier to debug mismatches. *)
+  if !Oxcaml_flags.verify_binary_emitter
+  then
+    let binary_sections_dir = output_prefix ^ ".binary-sections" in
+    match
+      Binary_emitter_verify.compare unix ~obj_file:obj_filename
+        ~binary_sections_dir
+    with
+    | Match { text_size; data_size } ->
+      if !Clflags.verbose
+      then
+        Format.eprintf "Binary emitter verified: text=%d data=%d bytes@."
+          text_size data_size
+    | Mismatch (Missing_binary_sections_dir _) ->
+      (* Binary sections dir missing - binary emitter didn't run (e.g.,
+         -stop-after linearization). Skip verification. *)
+      if !Clflags.verbose
+      then
+        Format.eprintf
+          "Binary emitter verification skipped (no binary sections)@."
+    | (Mismatch _ | Object_file_error _) as result ->
+      Binary_emitter_verify.print_result Format.err_formatter result;
+      raise (Error (Binary_emitter_mismatch obj_filename))
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
   Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:false ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
   ++ (fun x ->
-       if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
+  if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cmm
   ++ Profile.record "compile_phrases" (compile_phrases ~ppf_dump)
   ++ fun () -> () );
@@ -626,7 +682,7 @@ let asm_filename output_prefix =
 
 let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
     ~ppf_dump (program : Lambda.program) =
-  compile_unit ~ppf_dump ~output_prefix:prefixname
+  compile_unit unix ~ppf_dump ~output_prefix:prefixname
     ~asm_filename:(asm_filename prefixname) ~keep_asm:!keep_asm_file
     ~obj_filename:(prefixname ^ ext_obj)
     ~may_reduce_heap:(Option.is_none toplevel) (fun () ->
@@ -659,7 +715,7 @@ let linear_gen_implementation ~ppf_dump unix filename =
   emit_end_assembly ~sourcefile ()
 
 let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
-  compile_unit ~ppf_dump ~may_reduce_heap:true ~output_prefix
+  compile_unit unix ~ppf_dump ~may_reduce_heap:true ~output_prefix
     ~asm_filename:(asm_filename output_prefix)
     ~keep_asm:!keep_asm_file ~obj_filename:(output_prefix ^ ext_obj) (fun () ->
       linear_gen_implementation ~ppf_dump unix progname)
@@ -670,6 +726,9 @@ let report_error ppf = function
   | Assembler_error file ->
     fprintf ppf "Assembler error, input left in file %a" Location.print_filename
       file
+  | Binary_emitter_mismatch file ->
+    fprintf ppf "Binary emitter verification failed for %a"
+      Location.print_filename file
   | Mismatched_for_pack saved ->
     let msg prefix =
       if Compilation_unit.Prefix.is_empty prefix

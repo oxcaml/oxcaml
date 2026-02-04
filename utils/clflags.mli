@@ -79,8 +79,8 @@ val compile_only : bool ref
 val output_name : string option ref
 val include_dirs : string list ref
 val hidden_include_dirs : string list ref
-val include_paths_files : string list ref
-val hidden_include_paths_files : string list ref
+val include_manifests : string list ref
+val hidden_include_manifests : string list ref
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref
@@ -119,6 +119,7 @@ val open_modules : string list ref
 val preprocessor : string option ref
 val all_ppx : string list ref
 val absname : bool ref
+val locs : bool ref
 val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref
@@ -224,6 +225,7 @@ val default_timings_precision : int
 val timings_precision : int ref
 val profile_columns : profile_column list ref
 val profile_granularity : profile_granularity_level ref
+val profile_output_name : string option ref
 val all_profile_granularity_levels : string list
 val set_profile_granularity : string -> unit
 val flambda_invariant_checks : flambda_invariant_checks ref
@@ -244,6 +246,9 @@ val afl_instrument : bool ref
 val afl_inst_ratio : int ref
 val function_sections : bool ref
 val probes : bool ref
+val emit_optimized_probes : bool ref
+val supports_optimized_probes : bool
+
 val llvm_backend : bool ref
 
 val all_passes : string list ref
@@ -360,5 +365,14 @@ val zero_alloc_check : Zero_alloc_annotations.Check.t ref
 val zero_alloc_assert : Zero_alloc_annotations.Assert.t ref
 
 val no_auto_include_otherlibs : bool ref
+
+val dissector : bool ref
+val dissector_partition_size_default : float
+val dissector_partition_size : float option ref
+val ddissector : bool ref
+val ddissector_sizes : bool ref
+val ddissector_verbose : bool ref
+val ddissector_partitions : bool ref
+val ddissector_inputs : string option ref
 
 val prepend_directory : string -> string

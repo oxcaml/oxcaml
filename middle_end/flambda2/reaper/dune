@@ -36,7 +36,9 @@
    -open
    Flambda2_ui))
  (ocamlopt_flags
-  (:standard -O3))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3))
  (libraries
   ocamlcommon
   flambda2_algorithms

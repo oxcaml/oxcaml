@@ -43,10 +43,10 @@ Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
 Error: This value is "nonportable"
-       because it closes over the module "F" at Line 7, characters 23-24
-       which is "nonportable"
-       because it closes over the value "foo" at Line 15, characters 12-15
-       which is "nonportable".
+         because it closes over the module "F" at Line 7, characters 23-24
+         which is "nonportable"
+         because it closes over the value "foo" at Line 15, characters 12-15
+         which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -179,9 +179,10 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     N.foo ()
         ^^^^^
-Error: The value "N.foo" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-3, characters 21-12
-       which is expected to be "portable".
+Error: The value "N.foo" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-3, characters 21-12
+         which is expected to be "portable".
 |}]
 
 let (bar @ portable) () =
@@ -191,9 +192,10 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     M.foo ()
         ^^^^^
-Error: The value "M.foo" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-3, characters 21-12
-       which is expected to be "portable".
+Error: The value "M.foo" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-3, characters 21-12
+         which is expected to be "portable".
 |}]
 
 (* chained aliases. Creating alias of alias is fine. *)
@@ -216,9 +218,10 @@ let (bar @ portable) () =
 Line 4, characters 4-10:
 4 |     N'.foo ()
         ^^^^^^
-Error: The value "N'.foo" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-4, characters 21-13
-       which is expected to be "portable".
+Error: The value "N'.foo" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-4, characters 21-13
+         which is expected to be "portable".
 |}]
 
 (* module aliases in structures still walk locks. *)
@@ -231,44 +234,34 @@ let (bar @ portable) () =
 Line 3, characters 19-20:
 3 |         module L = M
                        ^
-Error: The module "M" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-5, characters 21-14
-       which is expected to be "portable".
+Error: The module "M" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-5, characters 21-14
+         which is expected to be "portable".
 |}]
 
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (X : S @ portable) = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : functor (X : S @ portable) -> sig end @@ stateless
 |}]
 
 module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
 [%%expect{|
-Line 1, characters 36-44:
-1 | module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
-                                        ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module type S = functor () (M : S @ portable) -> S @ portable -> S
 |}]
 
 module type S = functor () (M : S) (_ : S) -> S @ portable
 [%%expect{|
-Line 1, characters 50-58:
-1 | module type S = functor () (M : S) (_ : S) -> S @ portable
-                                                      ^^^^^^^^
-Error: Mode annotations on functor return are not supported yet.
+module type S = functor () (M : S) -> S -> S @ portable
 |}]
 
 module F () = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-Line 2, characters 9-12:
-2 |     let (foo @ once) () = ()
-             ^^^
-Error: This is "once", but expected to be "many" because it is inside a "many" structure.
+module F : functor () -> sig val foo : unit -> unit @@ stateless end @ once
+  @@ stateless
 |}]
 
 module type Empty = sig end
@@ -285,8 +278,8 @@ let _ =
 Line 4, characters 19-23:
 4 |     let module _ = F(M) in
                        ^^^^
-Error: Modules do not match: sig end (* in a structure at local *)
-     is not included in Empty (* in a structure at global *)
+Error: Modules do not match: sig end @ local is not included in
+       Empty @ global
      Got "local" but expected "global".
 |}]
 
@@ -307,9 +300,9 @@ Error: This application of the functor "F" is ill-typed.
          functor (X : Empty) (Y : Empty) -> ...
        1. Module M matches the expected module type Empty
        2. Modules do not match:
-            N : sig end (* in a structure at local *)
+            N : sig end @ local
           is not included in
-            Empty (* in a structure at global *)
+            Empty @ global
           Got "local" but expected "global".
 |}]
 
@@ -387,9 +380,10 @@ val foo : unit -> unit = <fun>
 Line 4, characters 14-17:
 4 |     let bar = foo
                   ^^^
-Error: The value "foo" is "nonportable" but is expected to be "portable"
-       because it is used inside the functor at Lines 3-5, characters 22-3
-       which is expected to be "portable".
+Error: The value "foo" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the functor at Lines 3-5, characters 22-3
+         which is expected to be "portable".
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct

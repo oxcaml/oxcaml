@@ -26,13 +26,13 @@ Line 5, characters 4-5:
 5 |     x
         ^
 Error: This value is "local"
-       because it is an element of the tuple at Line 3, characters 6-25
-       which is "local"
-       because it is a tuple that contains the expression at Line 3, characters 10-25
-       which is "local".
+         because it is an element of the tuple at Line 3, characters 6-25
+         which is "local"
+         because it is a tuple that contains the expression at Line 3, characters 10-25
+         which is "local".
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let f x =
@@ -46,13 +46,13 @@ Line 5, characters 4-5:
 5 |     x
         ^
 Error: This value is "local"
-       because it is an element of the tuple at Line 3, characters 6-28
-       which is "local"
-       because it is a tuple that contains the expression at Line 3, characters 12-27
-       which is "local".
+         because it is an element of the tuple at Line 3, characters 6-28
+         which is "local"
+         because it is a tuple that contains the expression at Line 3, characters 12-27
+         which is "local".
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let f e0 (e1 @ local) =
@@ -98,10 +98,10 @@ Line 4, characters 22-23:
 4 |     | x -> use_global x; ()
                           ^
 Error: This value is "local"
-       because it is allocated at Line 2, characters 10-16 containing data
-       which is "local" to the parent region
-       because it is a tuple that contains the expression at Line 2, characters 14-16
-       which is "local" to the parent region.
+         because it is allocated at Line 2, characters 10-16 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at Line 2, characters 14-16
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -114,8 +114,8 @@ Line 4, characters 30-31:
 4 |     | x -> use_global_product x; ()
                                   ^
 Error: This value is "local" to the parent region
-       because it is a tuple that contains the expression at Line 2, characters 16-18
-       which is "local" to the parent region.
+         because it is a tuple that contains the expression at Line 2, characters 16-18
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -148,15 +148,15 @@ Line 4, characters 44-46:
 4 |     | x -> use_local x; let (x0, x1) = x in x0
                                                 ^^
 Error: This value is "local"
-       because it is an element of the tuple at Line 4, characters 39-40
-       which is "local"
-       because it is allocated at Line 2, characters 10-16 containing data
-       which is "local" to the parent region
-       because it is a tuple that contains the expression at Line 2, characters 14-16
-       which is "local" to the parent region.
+         because it is an element of the tuple at Line 4, characters 39-40
+         which is "local"
+         because it is allocated at Line 2, characters 10-16 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at Line 2, characters 14-16
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let f e0 (e1 @ local) =
@@ -177,8 +177,8 @@ Line 3, characters 27-29:
 3 |     | x0, x1 -> use_global x0; use_local x1; ()
                                ^^
 Error: This value is "local" to the parent region
-       because it is an element of the tuple at Line 2, characters 32-33
-       which is "local" to the parent region.
+         because it is an element of the tuple at Line 2, characters 32-33
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -190,8 +190,8 @@ Line 3, characters 30-32:
 3 |     | #(x0, x1) -> use_global x0; use_local x1; ()
                                   ^^
 Error: This value is "local" to the parent region
-       because it is an element of the tuple at Line 2, characters 35-36
-       which is "local" to the parent region.
+         because it is an element of the tuple at Line 2, characters 35-36
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -247,13 +247,13 @@ Line 4, characters 2-4:
 4 |   a'
       ^^
 Error: This value is "local"
-       because it is an element of the tuple at Line 3, characters 16-17
-       which is "local"
-       because it is allocated at Line 2, characters 10-16 containing data
-       which is "local" to the parent region
-       because it is a tuple that contains the expression at Line 2, characters 11-12
-       which is "local" to the parent region.
+         because it is an element of the tuple at Line 3, characters 16-17
+         which is "local"
+         because it is allocated at Line 2, characters 10-16 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at Line 2, characters 11-12
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]

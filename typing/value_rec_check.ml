@@ -162,7 +162,7 @@ let classify_expression : Typedtree.expression -> sd =
         let size = classify_module_expression env mexp in
         let env = Ident.add mid size env in
         classify_expression env e
-    | Texp_ident (path, _, _, _, _) ->
+    | Texp_ident (path, _, _, _, _, _) ->
         classify_path env path
 
     (* non-binding cases *)
@@ -197,6 +197,7 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_atomic_loc _
     | Texp_extension_constructor _
     | Texp_constant _
+    | Texp_unboxed_unit
     | Texp_src_pos ->
         Static
 
@@ -226,7 +227,8 @@ let classify_expression : Typedtree.expression -> sd =
         (* CR vlaviron: Dynamic would probably be a better choice *)
         Static
 
-    | Texp_apply ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _)}, _, _, _, _)
+    | Texp_apply ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _, _)},
+        _, _, _, _)
       when is_ref vd ->
         Static
     | Texp_apply (_, args, _, _, _)
@@ -627,7 +629,7 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
     (* This is counted as a use, because constructing a generic array
        involves inspecting to decide whether to unbox (PR#6939). *)
     Dereference
-  | Lambda.Paddrarray | Lambda.Pintarray ->
+  | Lambda.Paddrarray | Lambda.Pgcignorableaddrarray | Lambda.Pintarray ->
     (* non-generic, non-float arrays act as constructors *)
     Guard
   | Lambda.Punboxedfloatarray _ | Lambda.Punboxedoruntaggedintarray _
@@ -642,7 +644,7 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
 *)
 let rec expression : Typedtree.expression -> term_judg =
   fun exp -> match exp.exp_desc with
-    | Texp_ident (pth, _, _, _, _) ->
+    | Texp_ident (pth, _, _, _, _, _) ->
       path pth
     | Texp_let (rec_flag, bindings, body) ->
       (*
@@ -689,6 +691,8 @@ let rec expression : Typedtree.expression -> term_judg =
       ]
     | Texp_constant _ ->
       empty
+    | Texp_unboxed_unit ->
+      empty
     | Texp_new (pth, _, _, _) ->
       (*
         G |- c: m[Dereference]
@@ -701,8 +705,8 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_mutvar id ->
         single id.txt << Dereference
     | Texp_apply
-        ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _)}, [_, Arg (arg, _)], _,
-         _, _)
+        ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _, _)}, [_, Arg (arg, _)],
+         _, _, _)
       when is_ref vd ->
       (*
         G |- e: m[Guard]
@@ -1525,6 +1529,7 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_var (_, _, _, _, _) -> false
     | Tpat_alias (pat, _, _, _, _, _, _) -> is_destructuring_pattern pat
     | Tpat_constant _ -> true
+    | Tpat_unboxed_unit -> true
     | Tpat_tuple _ -> true
     | Tpat_unboxed_tuple _ -> true
     | Tpat_construct _ -> true

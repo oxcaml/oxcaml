@@ -13,12 +13,12 @@ module Instruction = struct
     let map_regs arr =
       Array.map
         (fun (r : Reg.t) ->
-          { r with
-            loc =
-              (if remove_locs && not (Reg.is_preassigned r)
-              then Unknown
-              else r.loc)
-          })
+          let loc =
+            if remove_locs && not (Reg.is_preassigned r)
+            then Reg.Unknown
+            else r.loc
+          in
+          Reg.For_testing.with_loc r loc)
         arr
     in
     { desc;
@@ -27,7 +27,6 @@ module Instruction = struct
       id;
       dbg = Debuginfo.none;
       fdo = None;
-      irc_work_list = Unknown_list;
       live = Reg.Set.empty;
       stack_offset = 0;
       available_before = Unreachable;
@@ -62,8 +61,8 @@ module Block = struct
     let body =
       List.map (Basic.make ~remove_locs) body
       |> List.filter (function
-           | { desc = Op (Spill | Reload); _ } -> not remove_regalloc
-           | _ -> true)
+        | { desc = Op (Spill | Reload); _ } -> not remove_regalloc
+        | _ -> true)
     in
     let terminator = Terminator.make ~remove_locs terminator in
     let can_raise = Cfg.can_raise_terminator terminator.desc in
@@ -96,7 +95,7 @@ module Cfg_desc = struct
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
         ~fun_poll:Lambda.Default_poll
         ~next_instruction_id:(InstructionId.make_sequence ())
-        ~fun_ret_type
+        ~fun_ret_type ~allowed_to_be_irreducible:false
     in
     List.iter
       (fun (block : Block.t) ->
@@ -108,33 +107,33 @@ module Cfg_desc = struct
       (fun _ (block : Cfg.basic_block) ->
         Cfg.successor_labels ~normal:true ~exn:false block
         |> Label.Set.iter (fun suc ->
-               let suc = Label.Tbl.find cfg.blocks suc in
-               suc.predecessors <- Label.Set.add block.start suc.predecessors);
+            let suc = Label.Tbl.find cfg.blocks suc in
+            suc.predecessors <- Label.Set.add block.start suc.predecessors);
         Cfg.successor_labels ~normal:false ~exn:true block
         |> Label.Set.iter (fun suc ->
-               let suc = Label.Tbl.find cfg.blocks suc in
-               suc.predecessors <- Label.Set.add block.start suc.predecessors;
-               suc.is_trap_handler <- true))
+            let suc = Label.Tbl.find cfg.blocks suc in
+            suc.predecessors <- Label.Set.add block.start suc.predecessors;
+            suc.is_trap_handler <- true))
       cfg.blocks;
     let cfg_layout = Cfg_with_layout.create ~layout:(DLL.make_empty ()) cfg in
     let cfg_with_infos = Cfg_with_infos.make cfg_layout in
     (if not remove_locs
-    then
-      (* If we leave in the locations we want to have the actual stack slot
-         count. *)
-      let update_stack_slots i =
-        let update_slot (r : Reg.t) =
-          match r.loc, Stack_class.of_machtype r.typ with
-          | Stack (Local idx), stack_class ->
-            Stack_class.Tbl.update cfg.fun_num_stack_slots stack_class
-              ~f:(fun curr -> max curr (idx + 1))
-          | _ -> ()
-        in
-        Array.iter update_slot i.arg;
-        Array.iter update_slot i.res
-      in
-      Cfg_with_layout.iter_instructions ~instruction:update_stack_slots
-        ~terminator:update_stack_slots cfg_layout);
+     then
+       (* If we leave in the locations we want to have the actual stack slot
+          count. *)
+       let update_stack_slots i =
+         let update_slot (r : Reg.t) =
+           match r.loc, Stack_class.of_machtype r.typ with
+           | Stack (Local idx), stack_class ->
+             Stack_class.Tbl.update cfg.fun_num_stack_slots stack_class
+               ~f:(fun curr -> max curr (idx + 1))
+           | _ -> ()
+         in
+         Array.iter update_slot i.arg;
+         Array.iter update_slot i.res
+       in
+       Cfg_with_layout.iter_instructions ~instruction:update_stack_slots
+         ~terminator:update_stack_slots cfg_layout);
     cfg_with_infos
 
   let make_pre_regalloc t = make ~remove_regalloc:true ~remove_locs:true t

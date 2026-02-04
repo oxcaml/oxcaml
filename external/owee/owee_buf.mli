@@ -15,6 +15,7 @@ val size     : t -> int
 (** Minimal support for error reporting. FIXME: Improve that someday. *)
 exception Invalid_format of string
 val invalid_format : string -> 'a
+val invalid_formatf : ('a, unit, string, 'b) format4 -> 'a
 val assert_format : bool -> string -> unit
 
 (* Some aliases to make more explicit the nature of values being read. *)

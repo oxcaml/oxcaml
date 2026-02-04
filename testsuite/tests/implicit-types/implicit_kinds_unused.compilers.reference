@@ -1,0 +1,19 @@
+File "implicit_kinds_unused.ml", line 8, characters 4-17:
+8 | [@@@implicit_kind: ('a : bits64)]
+        ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "implicit_kind" attribute cannot appear in this context
+
+File "implicit_kinds_unused.ml", line 11, characters 6-19:
+11 |   [@@@implicit_kind: ('b : bits32)]
+           ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "implicit_kind" attribute cannot appear in this context
+
+File "implicit_kinds_unused.ml", line 16, characters 5-18:
+16 | let[@implicit_kind: ('c : immediate)] f x = x
+          ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "implicit_kind" attribute cannot appear in this context
+
+File "implicit_kinds_unused.ml", line 19, characters 6-19:
+19 |   [@@@implicit_kind: ('a : immediate)]
+           ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "implicit_kind" attribute cannot appear in this context

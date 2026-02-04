@@ -20,7 +20,7 @@
     - removing unused parameters of *recursive* continuations;
 
     - moving allocations out of the hot path of recursive continuations (e.g.
-    the allocation of a float that was unboxed by the simplifier). *)
+      the allocation of a float that was unboxed by the simplifier). *)
 
 (** Type alias for convenience. *)
 type t = Flow_types.Acc.t
@@ -31,8 +31,7 @@ val print : Format.formatter -> t -> unit
 (** Normalize an accumulator before begin processed. Does two things:
     - "Consume" the extra args of an accumulator in order to add them to the
       regular args and parameters in the continuation info of each continuation
-    - Rewrite the callsites of specialized continuations
-*)
+    - Rewrite the callsites of specialized continuations *)
 val normalize_acc :
   specialization_map:
     Continuation.t Apply_cont_rewrite_id.Map.t Continuation.Map.t ->

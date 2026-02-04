@@ -312,7 +312,7 @@ Line 1, characters 27-28:
 1 | let f (x : t_float64) = [| x for i = 0 to 1 |]
                                ^
 Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value)"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
        But the layout of t_float64 must be a sublayout of value
@@ -366,19 +366,6 @@ Error: This pattern matches values of type "t_float64"
          because of the definition of t_float64 at line 5, characters 0-24.
        But the layout of t_float64 must be a sublayout of value
          because it's the type of a term-level argument to a class constructor.
-|}];;
-
-(* Structure_element *)
-module type S = sig val x : t_void end
-[%%expect{|
-Line 1, characters 28-34:
-1 | module type S = sig val x : t_void end
-                                ^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of type t_void must be a sublayout of value
-         because it's the type of something stored in a module structure.
 |}];;
 
 (* Debug_printer_argument *)

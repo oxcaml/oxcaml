@@ -90,7 +90,7 @@ _profile/
 /_install
 /_runtest
 /_opam
-/.claude
+/.claude/*.local.*
 
 /oc_cflags.sexp
 /oc_cppflags.sexp
@@ -147,6 +147,8 @@ ocaml/primitives.new
 
 /emacs/ocamltags
 /emacs/*.elc
+
+/.vscode/
 
 /flexdll-sources
 

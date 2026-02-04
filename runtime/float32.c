@@ -407,7 +407,7 @@ CAMLprim value caml_signbit_float32_bytecode(value f)
 
 CAMLprim value caml_frexp_float32(value f)
 {
-  CAMLparam0 ();
+  CAMLparam1 (f);
   CAMLlocal1 (mantissa);
   value res;
   int exponent;
@@ -421,7 +421,7 @@ CAMLprim value caml_frexp_float32(value f)
 
 CAMLprim value caml_modf_float32(value f)
 {
-  CAMLparam0 ();
+  CAMLparam1 (f);
   CAMLlocal2 (quo, rem);
   value res;
   float frem;
@@ -860,7 +860,7 @@ static value caml_make_unboxed_float32_vect0(value len, int local)
   
   /* Use appropriate unboxed array tag based on even/odd length */
   tag_t tag = (num_elements % 2 == 0) 
-    ? Unboxed_float32_array_even_tag : Unboxed_float32_array_odd_tag;
+    ? Unboxed_float32_array_zero_tag : Unboxed_float32_array_one_tag;
   
   /* Mixed block with no scannable fields */
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);

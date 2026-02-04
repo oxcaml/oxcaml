@@ -36,10 +36,10 @@ external of_int : int -> (int64[@local_opt]) @@ portable = "%int64_of_int"
 external to_int : (int64[@local_opt]) -> int @@ portable = "%int64_to_int"
 external of_float : float -> int64 @@ portable
   = "caml_int64_of_float" "caml_int64_of_float_unboxed"
-  [@@unboxed] [@@noalloc]
+  [@@unboxed] [@@noalloc] [@@builtin]
 external to_float : int64 -> float @@ portable
   = "caml_int64_to_float" "caml_int64_to_float_unboxed"
-  [@@unboxed] [@@noalloc]
+  [@@unboxed] [@@noalloc] [@@builtin]
 external of_int32 : int32 -> int64 @@ portable = "%int64_of_int32"
 external to_int32 : int64 -> int32 @@ portable = "%int64_to_int32"
 external of_nativeint : nativeint -> int64 @@ portable = "%int64_of_nativeint"

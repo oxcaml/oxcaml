@@ -26,14 +26,12 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR metaprogramming aivaskovic: This file has not been code reviewed *)
-
-module Code : sig
-  type t
-end
-
+(** Translate an expression inside a Texp_quotation. The [transl] argument is a
+    function used to translate spliced expressions that need to be translated at
+    compile time. *)
 val transl_quote :
-  (Typedtree.expression -> Lambda.lambda) ->
+  scopes:Debuginfo.Scoped_location.scopes ->
+  loc:Location.t ->
+  transl:(Typedtree.expression -> Lambda.lambda) ->
   Typedtree.expression ->
-  Location.t ->
   Lambda.lambda

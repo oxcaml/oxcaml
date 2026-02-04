@@ -131,6 +131,17 @@ external readdir : string -> string array = "caml_sys_read_directory"
    in any specific order; they are not, in particular, guaranteed to
    appear in alphabetical order. *)
 
+val io_buffer_size: int
+(** Size of C buffers used by the runtime system and IO primitives of the [unix]
+    library.
+
+    Primitives that read from or write to values of type [string] or [bytes]
+    generally use an intermediate buffer of this size to avoid holding the
+    domain lock.
+
+    @since 5.4
+*)
+
 val interactive : bool ref @@ nonportable
 [@@alert unsynchronized_access
     "The interactive status is a mutable global state."
@@ -216,6 +227,18 @@ val max_unboxed_int64_array_length : int
 
 val max_unboxed_int32_array_length : int
 (** Maximum length of a [int32# array].
+    In non-native backends, equal to [max_array_length]. *)
+
+val max_untagged_int16_array_length : int
+(** Maximum length of a [int16# array].
+    In non-native backends, equal to [max_array_length]. *)
+
+val max_untagged_int8_array_length : int
+(** Maximum length of a [int8# array].
+    In non-native backends, equal to [max_array_length]. *)
+
+val max_untagged_int_array_length : int
+(** Maximum length of a [int8 array].
     In non-native backends, equal to [max_array_length]. *)
 
 val max_unboxed_nativeint_array_length : int
@@ -515,3 +538,15 @@ module Safe : sig
       The provided [signal_behavior] must be [portable] as it is shared between all
       domains. *)
 end
+
+type arch =
+  | Amd64
+  | Arm64
+
+val arch : arch
+
+val amd64 : bool
+(** True if [Sys.arch = Amd64]. *)
+
+val arm64 : bool
+(** True if [Sys.arch = Arm64]. *)

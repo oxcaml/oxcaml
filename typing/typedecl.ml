@@ -49,11 +49,13 @@ module Mixed_product_kind = struct
     | Record
     | Cstr_tuple
     | Cstr_record
+    | Module
 
   let to_plural_string = function
     | Record -> "records"
     | Cstr_tuple -> "constructors"
     | Cstr_record -> "inline record arguments to constructors"
+    | Module -> "modules"
 end
 
 type mixed_product_violation =
@@ -119,7 +121,7 @@ type error =
       ; err : Jkind.Violation.t
       }
   | Jkind_empty_record
-  | Non_value_in_sig of Jkind.Violation.t * string * type_expr
+  | Non_representable_in_module of Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
@@ -522,7 +524,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          end;
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
-          ld_modalities = ld.ld_modalities;
+          ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = Some Jkind.Sort.Const.void;
             (* Updated by [update_label_sorts] *)
           ld_type = ty;
@@ -552,7 +554,7 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
         env loc kloc ca.ca_type.ctyp_type
     end;
     {
-      Types.ca_modalities = ca.ca_modalities;
+      Types.ca_modalities = ca.ca_modalities.moda_modalities;
       ca_loc = ca.ca_loc;
       ca_type = ca.ca_type.ctyp_type;
       ca_sort = Some Jkind.Sort.Const.void;
@@ -607,7 +609,7 @@ let make_constructor
         Ctype.with_local_level_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
-            TyVarEnv.make_poly_univars_jkinds
+            TyVarEnv.make_poly_univars_jkinds env
               ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
               (List.map (fun (v, l) -> (v, l, Env.stage env)) svars)
           in
@@ -1921,6 +1923,20 @@ let update_record_kind (type rep) env loc (form : rep record_form)
          mutable first_any : Ident.t option;
       }
   end in
+  (* The compiler does not like matching on records with mutable fields, so we
+     create an immutable copy for the match below. *)
+  let module Imm_element_rep = struct
+    type element_repr_summary =
+      {  values : bool;
+         floats: bool;
+         atomic_floats : bool;
+         atomic_fields : bool;
+         float64s : bool;
+         non_float64_unboxed_fields : bool;
+         voids : bool;
+         first_any : Ident.t option;
+    }
+  end in
 
   match form, lbls, rep with
   | Legacy, [(lbl, ld_type)], Some Record_unboxed ->
@@ -1991,7 +2007,15 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       reprs lbls;
     let rep : (rep, _) Result.t =
       (* CR layouts: improve the readability of this match *)
-      match form, repr_summary with
+      let { values; floats; atomic_floats; float64s;
+             non_float64_unboxed_fields; atomic_fields; voids;
+             first_any } = repr_summary
+      in
+      let summary : Imm_element_rep.element_repr_summary =
+        { values; floats; atomic_floats; float64s;
+          non_float64_unboxed_fields; atomic_fields; voids; first_any }
+      in
+      match form, summary with
       (* We store floats flatly in mixed records if all fields are
          float/float64/void. *)
       | Legacy,
@@ -2249,7 +2273,14 @@ let rec update_decl_jkind env dpath decl =
           cstr
         ) cstrs
       in
-      let jkind = Jkind.for_boxed_variant ~loc (List.rev cstrs) in
+      let jkind =
+        Jkind.for_boxed_variant
+          ~loc
+          ~decl_params:decl.type_params
+          ~type_apply:(Ctype.apply env)
+          ~free_vars:(Ctype.free_variable_set_of_list env)
+          (List.rev cstrs)
+      in
       cstrs, Variant_boxed cstr_shapes, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
       assert false
@@ -2386,31 +2417,25 @@ let check_unboxed_paths decls ~unboxed_version_banned =
   (* We iterate on all subexpressions of the declaration to check "in depth"
      that no non-existent unboxed version is used. *)
   let open Btype in
-  let checked =
-    (* [checked] remembers the types that the iterator already
-        checked, to avoid looping on cyclic types. *)
-    ref TypeSet.empty
-  in
-  let check_ty loc ty =
-    match get_desc ty with
-    | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
-      when unboxed_version_banned path ->
-        raise (Error (loc, No_unboxed_version path))
-    | _ -> ()
-  in
-  let check_decl d =
-    let it =
-      {type_iterators with it_type_expr =
-        (fun self ty ->
-          if not (TypeSet.mem ty !checked) then begin
-            check_ty d.type_loc ty;
-            checked := TypeSet.add ty !checked;
-            self.it_do_type_expr self ty
-          end)}
+  with_type_mark (fun mark ->
+    let super = type_iterators mark in
+    let check_ty loc ty =
+      match get_desc ty with
+      | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
+        when unboxed_version_banned path ->
+          raise (Error (loc, No_unboxed_version path))
+      | _ -> ()
     in
-    it.it_type_declaration it (Ctype.generic_instance_declaration d)
-  in
-  List.iter (fun (_, d) -> check_decl d) decls
+    let check_decl d =
+      let it =
+        {super with it_do_type_expr =
+          (fun self ty ->
+              check_ty d.type_loc ty;
+              super.it_do_type_expr self ty)}
+      in
+      it.it_type_declaration it (Ctype.generic_instance_declaration d)
+    in
+    List.iter (fun (_, d) -> check_decl d) decls)
 
 (* Note: Well-foundedness for OCaml types
 
@@ -2639,11 +2664,8 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
   let open Btype in
   (* We iterate on all subexpressions of the declaration to check
      "in depth" that no ill-founded type exists. *)
-  let it =
-    let checked =
-      (* [checked] remembers the types that the iterator already
-         checked, to avoid looping on cyclic types. *)
-      ref TypeSet.empty in
+  with_type_mark begin fun mark ->
+    let super = type_iterators mark in
     let visited =
       (* [visited] remembers the inner visits performed by
          [check_well_founded] on each type expression reachable from
@@ -2651,14 +2673,14 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
          [check_well_founded] work when invoked on two parts of the
          type declaration that have common subexpressions. *)
       ref TypeMap.empty in
-    {type_iterators with it_type_expr =
-     (fun self ty ->
-       if TypeSet.mem ty !checked then () else begin
-         check_well_founded  ~abs_env env loc path to_check visited ty;
-         checked := TypeSet.add ty !checked;
-         self.it_do_type_expr self ty
-       end)} in
-  it.it_type_declaration it (Ctype.generic_instance_declaration decl)
+    let it =
+      {super with it_do_type_expr =
+       (fun self ty ->
+         check_well_founded ~abs_env env loc path to_check visited ty;
+         super.it_do_type_expr self ty
+       )} in
+    it.it_type_declaration it (Ctype.generic_instance_declaration decl)
+  end
 
 (* We only allow recursion in unboxed product types to occur through boxes,
    otherwise the type is uninhabitable and usually also infinite-size.
@@ -4009,17 +4031,44 @@ let check_for_hidden_arrow env loc ty =
       check()
   | Assert_default -> ()
 
+type transl_value_decl_modal =
+  | Str_primitive
+  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+
 (* Translate a value declaration *)
-let transl_value_decl env loc ~modalities valdecl =
+let transl_value_decl env loc ~modal ~why valdecl =
+  let mode, val_modalities, val_modal_info =
+    match modal with
+    | Str_primitive ->
+        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
+        let modes = List.map modality_to_mode valdecl.pval_modalities in
+        let modes = Typemode.transl_mode_annots modes in
+        let mode =
+          modes.mode_modes
+          |> Mode.Alloc.Const.(
+              Option.value ~default:{legacy with staticity = Static})
+          |> Mode.Alloc.of_const
+          |> Mode.alloc_as_value
+        in
+        mode, Mode.Modality.undefined, Valmi_str_primitive modes
+    | Sig_value (md_mode, sig_modalities) ->
+        let raw_modalities =
+          Typemode.transl_modalities_with_default
+            ~maturity:Stable ~default:sig_modalities valdecl.pval_modalities
+        in
+        let modalities =
+          Mode.Modality.of_const raw_modalities.moda_modalities
+        in
+        md_mode, modalities, Valmi_sig_value raw_modalities
+  in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
-  (* CR layouts v5: relax this to check for representability. *)
-  begin match Ctype.constrain_type_jkind env cty.ctyp_type
-                (Jkind.Builtin.value_or_null ~why:Structure_element) with
-  | Ok () -> ()
-  | Error err ->
-    raise(Error(cty.ctyp_loc,
-                Non_value_in_sig(err,valdecl.pval_name.txt,cty.ctyp_type)))
-  end;
+  let sort =
+    match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
+    | Ok sort -> sort
+    | Error err ->
+      raise
+        (Error (cty.ctyp_loc, Non_representable_in_module (err, cty.ctyp_type)))
+  in
   let ty = cty.ctyp_type in
   let v =
   match valdecl.pval_prim with
@@ -4068,8 +4117,10 @@ let transl_value_decl env loc ~modalities valdecl =
         | Assume _ ->
           raise (Error(valdecl.pval_loc, Zero_alloc_attr_unsupported zero_alloc))
       in
-      { val_type = ty; val_kind = Val_reg; Types.val_loc = loc;
-        val_attributes = valdecl.pval_attributes; val_modalities = modalities;
+      { val_type = ty;
+        val_kind = Val_reg sort;
+        Types.val_loc = loc;
+        val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
@@ -4106,16 +4157,17 @@ let transl_value_decl env loc ~modalities valdecl =
       if !Clflags.native_code
       && prim.prim_arity > 5
       && prim.prim_native_name = ""
+      && not (String.starts_with ~prefix:"%" prim.prim_name)
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
       { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
-        val_attributes = valdecl.pval_attributes; val_modalities = modalities;
+        val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
   in
   let (id, newenv) =
-    Env.enter_value ~mode:Mode.Value.legacy valdecl.pval_name.txt v env
+    Env.enter_value ~mode valdecl.pval_name.txt v env
       ~check:(fun s -> Warnings.Unused_value_declaration s)
   in
   Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc newenv ty;
@@ -4124,16 +4176,17 @@ let transl_value_decl env loc ~modalities valdecl =
      val_id = id;
      val_name = valdecl.pval_name;
      val_desc = cty; val_val = v;
+     val_modal_info;
      val_prim = valdecl.pval_prim;
      val_loc = valdecl.pval_loc;
      val_attributes = valdecl.pval_attributes;
     }
   in
-  desc, newenv
+  desc, mode, newenv
 
-let transl_value_decl env ~modalities loc valdecl =
+let transl_value_decl env ~modal ~why loc valdecl =
   Builtin_attributes.warning_scope valdecl.pval_attributes
-    (fun () -> transl_value_decl env ~modalities loc valdecl)
+    (fun () -> transl_value_decl env ~modal ~why loc valdecl)
 
 (* Translate a "with" constraint -- much simplified version of
    transl_type_decl. For a constraint [Sig with t = sdecl],
@@ -4909,10 +4962,10 @@ let report_error ppf = function
          ~level:(Ctype.get_current_level ())) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
-  | Non_value_in_sig (err, val_name, ty) ->
+  | Non_representable_in_module (err, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
-    fprintf ppf "@[This type signature for %a is not a value type.@ %a@]"
-      Style.inline_code val_name
+    fprintf ppf "@[The type of a module-level value must have a@ \
+                   representable layout.@ %a@]"
       (Jkind.Violation.report_with_offender ~offender
          ~level:(Ctype.get_current_level ()))
       err

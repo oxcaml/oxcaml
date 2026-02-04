@@ -46,7 +46,7 @@ let update_register_locations : State.t -> unit =
         then
           log "updating %a to %a" Printreg.reg reg
             Hardware_register.print_location location;
-        reg.Reg.loc <- Hardware_register.reg_location_of_location location)
+        Reg.set_loc reg (Hardware_register.reg_location_of_location location))
   in
   List.iter (Reg.all_relocatable_regs ()) ~f:update_register;
   if debug then dedent ()
@@ -57,6 +57,7 @@ type prio_queue = (Reg.t * Interval.t) Prio_queue.t
 
 let priority_heuristics : Reg.t -> Interval.t -> int =
  fun _reg itv ->
+  (* CR-someday xclerc for xclerc: consider using affinity *)
   match Lazy.force Priority_heuristics.value with
   | Priority_heuristics.Interval_length -> Interval.length itv
   | Priority_heuristics.Random_for_testing -> Priority_heuristics.random ()
@@ -141,8 +142,9 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
   then
     fatal "register allocation was not succesful after %d rounds (%s)"
       max_rounds (Cfg_with_infos.cfg cfg_with_infos).fun_name;
-  if State.introduced_temporary_count state
-     > State.initial_temporary_count state * max_temp_multiplier
+  if
+    State.introduced_temporary_count state
+    > State.initial_temporary_count state * max_temp_multiplier
   then
     fatal "register allocation introduced %d temporaries after starting with %d"
       (State.introduced_temporary_count state)
@@ -170,7 +172,8 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
       indent ();
       log "got register %a (prio=%d)" Printreg.reg reg priority);
     (match
-       Hardware_registers.find_available hardware_registers costs reg interval
+       Hardware_registers.find_available hardware_registers
+         (State.affinity state) costs reg interval
      with
     | For_assignment { hardware_reg } ->
       if debug
@@ -189,11 +192,11 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
           Hardware_register.print_location hardware_reg.location;
       List.iter evicted_regs
         ~f:(fun
-             { Hardware_register.pseudo_reg = evict_reg;
-               interval = evict_interval;
-               evictable
-             }
-           ->
+            { Hardware_register.pseudo_reg = evict_reg;
+              interval = evict_interval;
+              evictable
+            }
+          ->
           if not evictable
           then
             fatal
@@ -259,7 +262,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let cfg_infos, stack_slots =
+  let cfg_infos, stack_slots, affinity =
     Regalloc_rewrite.prelude
       (module Utils)
       ~on_fatal_callback:(fun () -> save_cfg "gi" cfg_with_layout)
@@ -270,7 +273,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   let all_temporaries = Reg.Set.union cfg_infos.arg cfg_infos.res in
   let initial_temporaries = Reg.Set.cardinal all_temporaries in
   if debug then log "#temporaries=%d" initial_temporaries;
-  let state = State.make ~stack_slots ~initial_temporaries in
+  let state = State.make ~stack_slots ~initial_temporaries ~affinity in
   let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
   (match Reg.Set.elements spilling_because_unused with
   | [] -> ()

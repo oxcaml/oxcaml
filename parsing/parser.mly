@@ -3122,6 +3122,8 @@ block_access:
       { Pexp_ident ($1) }
   | mkrhs(constr_longident) %prec prec_constant_constructor
       { Pexp_construct($1, None) }
+  | HASHLPAREN RPAREN
+      { Pexp_unboxed_unit }
   | name_tag %prec prec_constant_constructor
       { Pexp_variant($1, None) }
   | op(PREFIXOP) simple_expr
@@ -3788,6 +3790,8 @@ simple_pattern_not_ident:
       { Ppat_interval ($1, $3) }
   | mkrhs(constr_longident)
       { Ppat_construct($1, None) }
+  | HASHLPAREN RPAREN
+      { Ppat_unboxed_unit }
   | name_tag
       { Ppat_variant($1, None) }
   | hash mkrhs(type_longident)

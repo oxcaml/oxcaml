@@ -80,6 +80,7 @@ static struct {
 
   uintnat current_chunk;   /* sequence number of most recent chunk */
   uintnat current_chunk_size; /* size of current chunk (in pools) */
+  uintnat chunks;          /* number of chunks */
 
   uintnat chunk_words; /* total size of all chunks */
   uintnat max_chunk_words; /* maximum of chunk_words over time */
@@ -99,6 +100,7 @@ static struct {
   NULL,
   0,
   NULL,
+  0,
   0,
   0,
   0,
@@ -246,6 +248,7 @@ static pool* alloc_pool(struct caml_heap_state* local) {
       pool_freelist.fresh_pools = new_pools;
       pool_freelist.next_fresh_pool = mem;
       ++ pool_freelist.current_chunk;
+      ++ pool_freelist.chunks;
       pool_freelist.current_chunk_size = new_pools;
       pool_freelist.chunk_words += Wsize_bsize(mapping_size);
       if (pool_freelist.chunk_words > pool_freelist.max_chunk_words) {
@@ -595,11 +598,14 @@ void clear_garbage(header_t *p,
 }
 
 static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
-                         sizeclass_t sz, int release_to_global_pool) {
-  uintnat work = 0;
+                         sizeclass_t sz, int release_to_global_pool)
+{
   pool* a = *plist;
   if (!a) return 0;
+  uintnat work = 0;
+  uintnat swept = 0;
   *plist = a->next;
+  status garbage = caml_global_heap_state.GARBAGE; /* constant in this call */
 
   {
     header_t* p = POOL_FIRST_BLOCK(a, sz);
@@ -613,7 +619,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
       if (hd == 0) {
         /* already on freelist */
         all_used = 0;
-      } else if (Has_status_hd(hd, caml_global_heap_state.GARBAGE)) {
+      } else if (Has_status_hd(hd, garbage)) {
         clear_garbage(p, hd, wh, local);
         /* add to freelist */
         atomic_store_relaxed((atomic_uintnat*)p, 0);
@@ -621,7 +627,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
         CAMLassert(Is_block((value)p));
         a->next_obj = (value*)p;
         all_used = 0;
-        local->owner->swept_words += Whsize_hd(hd);
+        swept += Whsize_hd(hd);
         work += wh;
       } else {
         /* still live, the pool can't be released to the global freelist */
@@ -642,6 +648,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
   }
 
   /* Return the amount of GC budget consumed in units of words */
+  local->owner->swept_words += swept;
   return work;
 }
 
@@ -714,6 +721,7 @@ void caml_get_global_heap_stats(struct global_heap_stats *stats)
   caml_plat_lock_blocking(&pool_freelist.lock);
   stats->chunk_words = pool_freelist.chunk_words;
   stats->max_chunk_words = pool_freelist.max_chunk_words;
+  stats->chunks = pool_freelist.chunks;
   caml_plat_unlock(&pool_freelist.lock);
 }
 
@@ -1507,6 +1515,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
         caml_mem_unmap(cur_pool, Bsize_wsize(POOL_WSIZE));
         ++ unmapped;
         pool_freelist.chunk_words -= POOL_WSIZE;
+        /* We can't sensibly maintain pool_freelist.chunks. */
         cur_pool = next_pool;
       }
 
@@ -1850,6 +1859,7 @@ void compact_release_freelist(void)
       unmapped += cur_pool->chunk_size;
       caml_mem_unmap(free_pools[first], chunk_bytes);
       pool_freelist.chunk_words -= Wsize_bsize(chunk_bytes);
+      -- pool_freelist.chunks;
       i = first;
     } else { /* can't unmap this one; add to free list */
       cur_pool->next = new_free_list;

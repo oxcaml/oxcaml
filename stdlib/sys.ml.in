@@ -70,6 +70,21 @@ let max_unboxed_int32_array_length =
   | Native -> max_array_length * (word_size / 32)
   | Bytecode | Other _ -> max_array_length
 
+let max_untagged_int16_array_length =
+  match backend_type with
+  | Native -> max_array_length * (word_size / 16)
+  | Bytecode | Other _ -> max_array_length
+
+let max_untagged_int8_array_length =
+  match backend_type with
+  | Native -> max_array_length * (word_size / 8)
+  | Bytecode | Other _ -> max_array_length
+
+let max_untagged_int_array_length =
+  match backend_type with
+  | Native -> max_array_length
+  | Bytecode | Other _ -> max_array_length
+
 let max_unboxed_nativeint_array_length =
   match backend_type with
   | Native -> max_array_length
@@ -95,11 +110,7 @@ external is_regular_file : string -> bool @@ portable = "caml_sys_is_regular_fil
 external remove: string -> unit @@ portable = "caml_sys_remove"
 external rename : string -> string -> unit @@ portable = "caml_sys_rename"
 external getenv: string -> string @@ portable = "caml_sys_getenv"
-
-let getenv_opt s =
-  (* TODO: expose a non-raising primitive directly. *)
-  try Some (getenv s)
-  with Not_found -> None
+external getenv_opt: string -> string option @@ portable = "caml_sys_getenv_opt"
 
 external command: string -> int @@ portable = "caml_sys_system_command"
 external time: unit -> (float [@unboxed]) @@ portable =
@@ -109,6 +120,9 @@ external mkdir: string -> int -> unit @@ portable = "caml_sys_mkdir"
 external rmdir: string -> unit @@ portable = "caml_sys_rmdir"
 external getcwd: unit -> string @@ portable = "caml_sys_getcwd"
 external readdir : string -> string array @@ portable = "caml_sys_read_directory"
+
+external io_buffer_size: unit -> int = "caml_sys_io_buffer_size"
+let io_buffer_size = io_buffer_size ()
 
 let interactive = ref false
 
@@ -235,3 +249,24 @@ external signal
   = "caml_install_signal_handler"
 
 let set_signal sig_num sig_beh = ignore(signal sig_num sig_beh)
+
+(* Expose the value of [Config.architecture] *)
+(* CR-someday gyorsh: utils/target_system.ml already has [architecture].
+   Consider moving to [config.ml] or here. *)
+type arch =
+  | Amd64
+  | Arm64
+
+external amd64 : unit -> bool @@ portable = "%arch_amd64"
+external arm64 : unit -> bool @@ portable = "%arch_arm64"
+
+let amd64 = amd64 ()
+let arm64 = arm64 ()
+
+let arch =
+  match amd64, arm64 with
+  | true, true -> failwith "Cannot determine architecture: both amd64 and arm64 detected"
+  | false, false -> failwith "Cannot determine architecture: must be amd64 or arm64"
+  | true, false -> Amd64
+  | false, true -> Arm64
+;;

@@ -119,9 +119,13 @@ end
 module Array_kind = struct
   type t =
     | Immediates
+    | Gc_ignorable_values
     | Values
     | Naked_floats
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -133,9 +137,13 @@ module Array_kind = struct
   let rec print ppf t =
     match t with
     | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Gc_ignorable_values -> Format.pp_print_string ppf "Gc_ignorable_values"
     | Naked_floats -> Format.pp_print_string ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
     | Values -> Format.pp_print_string ppf "Values"
+    | Naked_ints -> Format.pp_print_string ppf "Naked_ints"
+    | Naked_int8s -> Format.pp_print_string ppf "Naked_int8s"
+    | Naked_int16s -> Format.pp_print_string ppf "Naked_int16s"
     | Naked_int32s -> Format.pp_print_string ppf "Naked_int32s"
     | Naked_int64s -> Format.pp_print_string ppf "Naked_int64s"
     | Naked_nativeints -> Format.pp_print_string ppf "Naked_nativeints"
@@ -152,9 +160,12 @@ module Array_kind = struct
   let rec element_kinds t =
     match t with
     | Immediates -> [K.With_subkind.tagged_immediate]
-    | Values -> [K.With_subkind.any_value]
+    | Gc_ignorable_values | Values -> [K.With_subkind.any_value]
     | Naked_floats -> [K.With_subkind.naked_float]
     | Naked_float32s -> [K.With_subkind.naked_float32]
+    | Naked_ints -> [K.With_subkind.naked_immediate]
+    | Naked_int8s -> [K.With_subkind.naked_int8]
+    | Naked_int16s -> [K.With_subkind.naked_int16]
     | Naked_int32s -> [K.With_subkind.naked_int32]
     | Naked_int64s -> [K.With_subkind.naked_int64]
     | Naked_nativeints -> [K.With_subkind.naked_nativeint]
@@ -166,13 +177,37 @@ module Array_kind = struct
   let element_kinds_for_primitive t =
     element_kinds t |> List.map K.With_subkind.kind
 
+  let rec scannability_info t =
+    match t with
+    | Immediates -> false, true
+    | Gc_ignorable_values -> false, true
+    | Values -> true, true
+    | Naked_floats -> false, false
+    | Naked_float32s -> false, false
+    | Naked_ints -> false, false
+    | Naked_int8s -> false, false
+    | Naked_int16s -> false, false
+    | Naked_int32s -> false, false
+    | Naked_int64s -> false, false
+    | Naked_nativeints -> false, false
+    | Naked_vec128s -> false, false
+    | Naked_vec256s -> false, false
+    | Naked_vec512s -> false, false
+    | Unboxed_product kinds ->
+      let must_any, all_may =
+        List.fold_left
+          (fun (must_any, all_may) kind ->
+            let must, may = scannability_info kind in
+            must_any || must, all_may && may)
+          (false, true) kinds
+      in
+      must_any, all_may
+
   let must_be_gc_scannable t =
-    let kinds = element_kinds t in
-    if not (List.exists K.With_subkind.must_be_gc_scannable kinds)
-    then false
-    else if List.for_all K.With_subkind.may_be_gc_scannable kinds
-    then true
-    else
+    match scannability_info t with
+    | false, _ -> false
+    | true, true -> true
+    | true, false ->
       Misc.fatal_errorf
         "Unboxed product array kind contains both elements that must be \
          scannable and that cannot be scanned:@ %a"
@@ -180,9 +215,9 @@ module Array_kind = struct
 
   let rec width_in_scalars t =
     match t with
-    | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-    | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-    | Naked_vec512s ->
+    | Immediates | Gc_ignorable_values | Values | Naked_floats | Naked_float32s
+    | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+    | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
       1
     | Unboxed_product kinds ->
       List.fold_left
@@ -193,9 +228,13 @@ end
 module Array_load_kind = struct
   type t =
     | Immediates
+    | Gc_ignorable_values
     | Values
     | Naked_floats
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -206,9 +245,13 @@ module Array_load_kind = struct
   let print ppf t =
     match t with
     | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Gc_ignorable_values -> Format.pp_print_string ppf "Gc_ignorable_values"
     | Values -> Format.pp_print_string ppf "Values"
     | Naked_floats -> Format.fprintf ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
+    | Naked_ints -> Format.pp_print_string ppf "Naked_ints"
+    | Naked_int8s -> Format.pp_print_string ppf "Naked_int8s"
+    | Naked_int16s -> Format.pp_print_string ppf "Naked_int16s"
     | Naked_int32s -> Format.pp_print_string ppf "Naked_int32s"
     | Naked_int64s -> Format.pp_print_string ppf "Naked_int64s"
     | Naked_nativeints -> Format.pp_print_string ppf "Naked_nativeints"
@@ -221,9 +264,13 @@ module Array_load_kind = struct
   let kind_of_loaded_value t =
     match t with
     | Immediates -> Flambda_kind.With_subkind.tagged_immediate
+    | Gc_ignorable_values -> Flambda_kind.With_subkind.any_value
     | Values -> Flambda_kind.With_subkind.any_value
     | Naked_floats -> Flambda_kind.With_subkind.naked_float
     | Naked_float32s -> Flambda_kind.With_subkind.naked_float32
+    | Naked_ints -> Flambda_kind.With_subkind.naked_immediate
+    | Naked_int8s -> Flambda_kind.With_subkind.naked_int8
+    | Naked_int16s -> Flambda_kind.With_subkind.naked_int16
     | Naked_int32s -> Flambda_kind.With_subkind.naked_int32
     | Naked_int64s -> Flambda_kind.With_subkind.naked_int64
     | Naked_nativeints -> Flambda_kind.With_subkind.naked_nativeint
@@ -235,9 +282,13 @@ end
 module Array_set_kind = struct
   type t =
     | Immediates
+    | Gc_ignorable_values
     | Values of Init_or_assign.t
     | Naked_floats
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -248,11 +299,15 @@ module Array_set_kind = struct
   let print ppf t =
     match t with
     | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Gc_ignorable_values -> Format.pp_print_string ppf "Gc_ignorable_values"
     | Values init_or_assign ->
       Format.fprintf ppf "@[<hov 1>(Values %a)@]" Init_or_assign.print
         init_or_assign
     | Naked_floats -> Format.fprintf ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
+    | Naked_ints -> Format.pp_print_string ppf "Naked_ints"
+    | Naked_int8s -> Format.pp_print_string ppf "Naked_int8s"
+    | Naked_int16s -> Format.pp_print_string ppf "Naked_int16s"
     | Naked_int32s -> Format.pp_print_string ppf "Naked_int32s"
     | Naked_int64s -> Format.pp_print_string ppf "Naked_int64s"
     | Naked_nativeints -> Format.pp_print_string ppf "Naked_nativeints"
@@ -265,9 +320,13 @@ module Array_set_kind = struct
   let kind_of_new_value t =
     match t with
     | Immediates -> Flambda_kind.With_subkind.tagged_immediate
+    | Gc_ignorable_values -> Flambda_kind.With_subkind.any_value
     | Values _ -> Flambda_kind.With_subkind.any_value
     | Naked_floats -> Flambda_kind.With_subkind.naked_float
     | Naked_float32s -> Flambda_kind.With_subkind.naked_float32
+    | Naked_ints -> Flambda_kind.With_subkind.naked_immediate
+    | Naked_int8s -> Flambda_kind.With_subkind.naked_int8
+    | Naked_int16s -> Flambda_kind.With_subkind.naked_int16
     | Naked_int32s -> Flambda_kind.With_subkind.naked_int32
     | Naked_int64s -> Flambda_kind.With_subkind.naked_int64
     | Naked_nativeints -> Flambda_kind.With_subkind.naked_nativeint
@@ -350,6 +409,9 @@ module Duplicate_array_kind = struct
     | Values
     | Naked_floats of { length : Target_ocaml_int.t option }
     | Naked_float32s of { length : Target_ocaml_int.t option }
+    | Naked_ints of { length : Target_ocaml_int.t option }
+    | Naked_int8s of { length : Target_ocaml_int.t option }
+    | Naked_int16s of { length : Target_ocaml_int.t option }
     | Naked_int32s of { length : Target_ocaml_int.t option }
     | Naked_int64s of { length : Target_ocaml_int.t option }
     | Naked_nativeints of { length : Target_ocaml_int.t option }
@@ -370,6 +432,24 @@ module Duplicate_array_kind = struct
     | Naked_float32s { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_float32s@ \
+          @[<hov 1>(length@ %a)@]\
+          )@]"
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
+    | Naked_ints { length; } ->
+      Format.fprintf ppf
+        "@[<hov 1>(Naked_ints@ \
+          @[<hov 1>(length@ %a)@]\
+          )@]"
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
+    | Naked_int8s { length; } ->
+      Format.fprintf ppf
+        "@[<hov 1>(Naked_int8s@ \
+          @[<hov 1>(length@ %a)@]\
+          )@]"
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
+    | Naked_int16s { length; } ->
+      Format.fprintf ppf
+        "@[<hov 1>(Naked_int16s@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
         (Misc.Stdlib.Option.print Target_ocaml_int.print) length
@@ -413,22 +493,17 @@ module Duplicate_array_kind = struct
   let compare t1 t2 =
     match t1, t2 with
     | Immediates, Immediates | Values, Values -> 0
-    | Naked_floats { length = length1 }, Naked_floats { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
+    | Naked_floats { length = length1 }, Naked_floats { length = length2 }
     | Naked_float32s { length = length1 }, Naked_float32s { length = length2 }
-      ->
-      Option.compare Target_ocaml_int.compare length1 length2
-    | Naked_int32s { length = length1 }, Naked_int32s { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
-    | Naked_int64s { length = length1 }, Naked_int64s { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
+    | Naked_ints { length = length1 }, Naked_ints { length = length2 }
+    | Naked_int8s { length = length1 }, Naked_int8s { length = length2 }
+    | Naked_int16s { length = length1 }, Naked_int16s { length = length2 }
+    | Naked_int32s { length = length1 }, Naked_int32s { length = length2 }
+    | Naked_int64s { length = length1 }, Naked_int64s { length = length2 }
     | ( Naked_nativeints { length = length1 },
-        Naked_nativeints { length = length2 } ) ->
-      Option.compare Target_ocaml_int.compare length1 length2
-    | Naked_vec128s { length = length1 }, Naked_vec128s { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
-    | Naked_vec256s { length = length1 }, Naked_vec256s { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
+        Naked_nativeints { length = length2 } )
+    | Naked_vec128s { length = length1 }, Naked_vec128s { length = length2 }
+    | Naked_vec256s { length = length1 }, Naked_vec256s { length = length2 }
     | Naked_vec512s { length = length1 }, Naked_vec512s { length = length2 } ->
       Option.compare Target_ocaml_int.compare length1 length2
     | Immediates, _ -> -1
@@ -439,6 +514,12 @@ module Duplicate_array_kind = struct
     | _, Naked_floats _ -> 1
     | Naked_float32s _, _ -> -1
     | _, Naked_float32s _ -> 1
+    | Naked_ints _, _ -> -1
+    | _, Naked_ints _ -> 1
+    | Naked_int8s _, _ -> -1
+    | _, Naked_int8s _ -> 1
+    | Naked_int16s _, _ -> -1
+    | _, Naked_int16s _ -> 1
     | Naked_int32s _, _ -> -1
     | _, Naked_int32s _ -> 1
     | Naked_int64s _, _ -> -1
@@ -567,6 +648,30 @@ module Block_access_kind = struct
     | Naked_floats _ -> Float_record
     | Mixed { shape; _ } -> Scannable (Mixed_record shape)
 
+  let from_block_shape (block_shape : K.Block_shape.t)
+      ~(index : Target_ocaml_int.t) ~(result_kind : K.With_subkind.t) : t =
+    let field_kind_of_value_subkind () : Block_access_field_kind.t =
+      if K.With_subkind.equal result_kind K.With_subkind.tagged_immediate
+      then Immediate
+      else Any_value
+    in
+    match block_shape with
+    | Scannable Value_only ->
+      let field_kind = field_kind_of_value_subkind () in
+      Values { tag = Unknown; size = Unknown; field_kind }
+    | Float_record -> Naked_floats { size = Unknown }
+    | Scannable (Mixed_record shape) ->
+      let value_prefix_size = K.Mixed_block_shape.value_prefix_size shape in
+      let index_int = Target_ocaml_int.to_int_exn index in
+      let field_kind : Mixed_block_access_field_kind.t =
+        if index_int < value_prefix_size
+        then Value_prefix (field_kind_of_value_subkind ())
+        else
+          let flat_suffix = K.Mixed_block_shape.flat_suffix shape in
+          Flat_suffix flat_suffix.(index_int - value_prefix_size)
+      in
+      Mixed { tag = Unknown; size = Unknown; field_kind; shape }
+
   let element_kind_for_set = element_kind_for_load
 
   let compare t1 t2 =
@@ -621,22 +726,23 @@ let effects_of_operation operation =
   | Reading -> Effects.No_effects
   | Writing -> Effects.Arbitrary_effects
 
-let reading_from_a_block mutable_or_immutable =
+let reading_from_a_block mutable_or_immutable : Effects_and_coeffects.t =
   let effects = effects_of_operation Reading in
   let coeffects =
     match (mutable_or_immutable : Mutability.t) with
     | Immutable | Immutable_unique -> Coeffects.No_coeffects
     | Mutable -> Coeffects.Has_coeffects
   in
-  effects, coeffects, Placement.Strict
+  effects, coeffects, Strict, Can't_move_before_any_branch
 
 let reading_from_an_array (array_kind : Array_kind.t)
-    (mutable_or_immutable : Mutability.t) =
+    (mutable_or_immutable : Mutability.t) : Effects_and_coeffects.t =
   let effects : Effects.t =
     match array_kind with
-    | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-    | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-    | Naked_vec512s | Unboxed_product _ ->
+    | Immediates | Values | Gc_ignorable_values | Naked_floats | Naked_float32s
+    | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+    | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+    | Unboxed_product _ ->
       No_effects
   in
   let coeffects =
@@ -644,14 +750,14 @@ let reading_from_an_array (array_kind : Array_kind.t)
     | Immutable | Immutable_unique -> Coeffects.No_coeffects
     | Mutable -> Coeffects.Has_coeffects
   in
-  effects, coeffects, Placement.Strict
+  effects, coeffects, Strict, Can't_move_before_any_branch
 
 let reading_from_a_string_or_bigstring mutable_or_immutable =
   reading_from_a_block mutable_or_immutable
 
-let writing_to_a_block =
+let writing_to_a_block : Effects_and_coeffects.t =
   let effects = effects_of_operation Writing in
-  effects, Coeffects.No_coeffects, Placement.Strict
+  effects, No_coeffects, Strict, Can't_move_before_any_branch
 
 let writing_to_an_array = writing_to_a_block
 
@@ -824,20 +930,24 @@ module Bigarray_layout = struct
     | Pbigarray_fortran_layout -> Some Fortran
 end
 
-let reading_from_a_bigarray kind =
+let reading_from_a_bigarray kind : Effects_and_coeffects.t =
   match (kind : Bigarray_kind.t) with
   | Complex32 | Complex64 ->
-    ( Effects.Only_generative_effects Immutable,
-      Coeffects.Has_coeffects,
-      Placement.Strict )
+    ( Only_generative_effects Immutable,
+      Has_coeffects,
+      Strict,
+      Can't_move_before_any_branch )
   | Float16 | Float32 | Float32_t | Float64 | Sint8 | Uint8 | Sint16 | Uint16
   | Int32 | Int64 | Int_width_int | Targetint_width_int ->
-    Effects.No_effects, Coeffects.Has_coeffects, Placement.Strict
+    ( Effects.No_effects,
+      Coeffects.Has_coeffects,
+      Placement.Strict,
+      Can't_move_before_any_branch )
 
 (* The bound checks are taken care of outside the array primitive (using an
    explicit test and switch in the flambda code, see
    lambda_to_flambda_primitives.ml). *)
-let writing_to_a_bigarray kind =
+let writing_to_a_bigarray kind : Effects_and_coeffects.t =
   match (kind : Bigarray_kind.t) with
   | Float16 | Float32 | Float32_t | Float64 | Sint8 | Uint8 | Sint16 | Uint16
   | Int32 | Int64 | Int_width_int | Targetint_width_int | Complex32
@@ -845,7 +955,7 @@ let writing_to_a_bigarray kind =
     (* Technically, the write of a complex generates read of fields from the
        given complex, but since those reads are immutable, there is no
        observable coeffect. *) ->
-    Effects.Arbitrary_effects, Coeffects.No_coeffects, Placement.Strict
+    Arbitrary_effects, No_coeffects, Strict, Can't_move_before_any_branch
 
 let bigarray_index_kind = K.value
 
@@ -954,61 +1064,57 @@ type result_kind =
 type nullary_primitive =
   | Invalid of K.t
   | Optimised_out of K.t
-  | Probe_is_enabled of { name : string }
+  | Probe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
   | Dls_get
   | Tls_get
+  | Domain_index
   | Poll
   | Cpu_relax
 
 let nullary_primitive_eligible_for_cse = function
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     false
 
 let compare_nullary_primitive p1 p2 =
+  let nullary_primitive_numbering p =
+    match p with
+    | Invalid _ -> 0
+    | Optimised_out _ -> 1
+    | Probe_is_enabled _ -> 2
+    | Enter_inlined_apply _ -> 3
+    | Dls_get -> 4
+    | Tls_get -> 5
+    | Domain_index -> 6
+    | Poll -> 7
+    | Cpu_relax -> 8
+  in
   match p1, p2 with
   | Invalid k1, Invalid k2 -> K.compare k1 k2
   | Optimised_out k1, Optimised_out k2 -> K.compare k1 k2
-  | Probe_is_enabled { name = name1 }, Probe_is_enabled { name = name2 } ->
-    String.compare name1 name2
+  | ( Probe_is_enabled { name = name1; enabled_at_init = enabled_at_init1 },
+      Probe_is_enabled { name = name2; enabled_at_init = enabled_at_init2 } ) ->
+    let c = String.compare name1 name2 in
+    if c <> 0
+    then c
+    else Option.compare Bool.compare enabled_at_init1 enabled_at_init2
   | Enter_inlined_apply { dbg = dbg1 }, Enter_inlined_apply { dbg = dbg2 } ->
     Inlined_debuginfo.compare dbg1 dbg2
   | Dls_get, Dls_get -> 0
   | Tls_get, Tls_get -> 0
+  | Domain_index, Domain_index -> 0
   | Poll, Poll -> 0
   | Cpu_relax, Cpu_relax -> 0
-  | ( Invalid _,
-      ( Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get
-      | Tls_get | Poll | Cpu_relax ) ) ->
-    -1
-  | ( Optimised_out _,
-      ( Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get | Tls_get | Poll
-      | Cpu_relax ) ) ->
-    -1
-  | Optimised_out _, Invalid _ -> 1
-  | ( Probe_is_enabled _,
-      (Enter_inlined_apply _ | Dls_get | Tls_get | Poll | Cpu_relax) ) ->
-    -1
-  | Probe_is_enabled _, (Invalid _ | Optimised_out _) -> 1
-  | Enter_inlined_apply _, (Invalid _ | Optimised_out _ | Probe_is_enabled _) ->
-    1
-  | Enter_inlined_apply _, (Dls_get | Tls_get | Poll | Cpu_relax) -> -1
-  | ( Dls_get,
-      (Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _)
-    ) ->
-    1
-  | Dls_get, (Tls_get | Poll | Cpu_relax) -> -1
-  | ( Tls_get,
-      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get ) ) ->
-    1
-  | Tls_get, (Poll | Cpu_relax) -> -1
-  | ( (Poll | Cpu_relax),
-      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Cpu_relax ) ) ->
-    1
-  | Cpu_relax, Poll -> -1
+  | ( ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ),
+      _ ) ->
+    Int.compare
+      (nullary_primitive_numbering p1)
+      (nullary_primitive_numbering p2)
 
 let equal_nullary_primitive p1 p2 = compare_nullary_primitive p1 p2 = 0
 
@@ -1020,13 +1126,17 @@ let print_nullary_primitive ppf p =
   | Optimised_out _ ->
     Format.fprintf ppf "%tOptimised_out%t" Flambda_colours.elide
       Flambda_colours.pop
-  | Probe_is_enabled { name } ->
-    Format.fprintf ppf "@[<hov 1>(Probe_is_enabled@ %s)@]" name
+  | Probe_is_enabled { name; enabled_at_init } ->
+    Format.fprintf ppf "@[<hov 1>(Probe_is_enabled@ %s%s)@]" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")
   | Enter_inlined_apply { dbg } ->
     Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a)@]"
       Inlined_debuginfo.print dbg
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
   | Tls_get -> Format.pp_print_string ppf "Tls_get"
+  | Domain_index -> Format.pp_print_string ppf "Domain_index"
   | Poll -> Format.pp_print_string ppf "Poll"
   | Cpu_relax -> Format.pp_print_string ppf "Cpu_relax"
 
@@ -1037,6 +1147,7 @@ let result_kind_of_nullary_primitive p : result_kind =
   | Probe_is_enabled _ -> Singleton K.naked_immediate
   | Enter_inlined_apply _ -> Unit
   | Dls_get | Tls_get -> Singleton K.value
+  | Domain_index -> Singleton K.naked_immediate
   | Poll | Cpu_relax -> Unit
 
 let coeffects_of_mode : Alloc_mode.For_allocations.t -> Coeffects.t = function
@@ -1045,23 +1156,27 @@ let coeffects_of_mode : Alloc_mode.For_allocations.t -> Coeffects.t = function
 
 let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
   match p with
-  | Invalid _ -> Arbitrary_effects, Has_coeffects, Strict
-  | Optimised_out _ -> No_effects, No_coeffects, Strict
+  | Invalid _ ->
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  | Optimised_out _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Probe_is_enabled _ ->
     (* This doesn't really have effects, but we want to make sure it never gets
        moved around. *)
-    Arbitrary_effects, Has_coeffects, Strict
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Enter_inlined_apply _ ->
     (* This doesn't really have effects, but without effects, these primitives
        get deleted during lambda_to_flambda. *)
-    Arbitrary_effects, Has_coeffects, Strict
-  | Dls_get | Tls_get -> No_effects, Has_coeffects, Strict
-  | Poll | Cpu_relax -> Arbitrary_effects, Has_coeffects, Strict
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  | Dls_get | Tls_get | Domain_index ->
+    No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  | Poll | Cpu_relax ->
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
 
 let nullary_classify_for_printing p =
   match p with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     Neither
 
 module Reinterpret_64_bit_word = struct
@@ -1444,7 +1559,10 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
     match source_mutability with
     | Immutable ->
       (* [Obj.truncate] has now been removed. *)
-      Only_generative_effects destination_mutability, No_coeffects, Strict
+      ( Only_generative_effects destination_mutability,
+        No_coeffects,
+        Strict,
+        Can't_move_before_any_branch )
     | Immutable_unique ->
       (* CR vlaviron: this should never occur, but it's hard to express it
          without duplicating the mutability type
@@ -1452,24 +1570,39 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
          mshinwell: Adding a second mutability type seems like a good thing to
          avoid confusion in the future. It could maybe be a submodule of
          [Mutability]. *)
-      Only_generative_effects destination_mutability, No_coeffects, Strict
+      ( Only_generative_effects destination_mutability,
+        No_coeffects,
+        Strict,
+        Can't_move_before_any_branch )
     | Mutable ->
-      Only_generative_effects destination_mutability, Has_coeffects, Strict)
+      ( Only_generative_effects destination_mutability,
+        Has_coeffects,
+        Strict,
+        Can't_move_before_any_branch ))
   | Duplicate_block { kind = _ } ->
     (* We have to assume that the fields might be mutable. (This information
        isn't currently propagated from [Lambda].) *)
-    Only_generative_effects Mutable, Has_coeffects, Strict
-  | Is_int _ | Is_null -> No_effects, No_coeffects, Strict
+    ( Only_generative_effects Mutable,
+      Has_coeffects,
+      Strict,
+      Can't_move_before_any_branch )
+  | Is_int _ | Is_null ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Get_tag ->
     (* [Obj.truncate] has now been removed. *)
-    No_effects, No_coeffects, Strict
-  | String_length _ -> No_effects, No_coeffects, Strict
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | String_length _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Int_as_pointer alloc_mode ->
-    No_effects, coeffects_of_mode alloc_mode, Strict
-  | Opaque_identity _ -> Arbitrary_effects, Has_coeffects, Strict
+    ( No_effects,
+      coeffects_of_mode alloc_mode,
+      Strict,
+      Can't_move_before_any_branch )
+  | Opaque_identity _ ->
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Int_arith (_, Swap_byte_endianness)
   | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _ ->
-    No_effects, No_coeffects, Strict
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Float_arith (_width, (Abs | Neg)) ->
     (* Float operations are not really pure since they actually access the
        globally mutable rounding mode, which can be changed (but only from C
@@ -1482,19 +1615,22 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
        (e.g. a call to a c stub that changes the rounding mode). See also the
        comment in binary_primitive_eligible_for_cse. *)
     if Flambda_features.float_const_prop ()
-    then No_effects, No_coeffects, Strict
-    else No_effects, Has_coeffects, Strict
+    then No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+    else No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   (* Since Obj.truncate has been deprecated, array_length should have no
      observable effect *)
-  | Array_length _ -> No_effects, No_coeffects, Strict
+  | Array_length _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Bigarray_length { dimension = _ } ->
     (* This is pretty much a direct access to a field of the bigarray, different
        from reading one of the values actually stored inside the array, hence
        [reading_from_a_block] (i.e. this has the same behaviour as a regular
        Block_load). *)
     reading_from_a_block Mutable
-  | Unbox_number _ | Untag_immediate -> No_effects, No_coeffects, Strict
-  | Tag_immediate -> No_effects, No_coeffects, Strict
+  | Unbox_number _ | Untag_immediate ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Tag_immediate ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Box_number (_, alloc_mode) ->
     (* Ensure boxing operations for numbers are inlined/substituted in to_cmm *)
     let placement : Placement.t =
@@ -1503,30 +1639,40 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
         (* Local allocations have coeffects, to avoid them being moved past a
            begin/end region. Hence, it is not safe to force the allocation to be
            moved, so we cannot use the `Delay` mode for those. *)
-        match alloc_mode with Heap -> Delay | Local _ -> Strict
+        match alloc_mode with
+        | Heap -> Delay
+        | Local _ -> Strict
       else Strict
     in
-    Only_generative_effects Immutable, coeffects_of_mode alloc_mode, placement
+    ( Only_generative_effects Immutable,
+      coeffects_of_mode alloc_mode,
+      placement,
+      Can't_move_before_any_branch )
   | Project_function_slot _ | Project_value_slot _ ->
-    No_effects, No_coeffects, Delay
+    No_effects, No_coeffects, Delay, Can't_move_before_any_branch
   | Is_boxed_float | Is_flat_float_array ->
     (* Tags on heap blocks are immutable. *)
-    No_effects, No_coeffects, Strict
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | End_region _ | End_try_region _ ->
     (* These can't be [Only_generative_effects] or the primitives would get
        deleted without regard to prior uses of the region. Instead there are
        special cases in [Simplify_let_expr] and [Expr_builder] for this
        primitive. *)
-    Arbitrary_effects, Has_coeffects, Strict
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Obj_dup ->
     ( Only_generative_effects Mutable (* Mutable is conservative *),
       Has_coeffects,
-      Strict )
-  | Get_header -> No_effects, No_coeffects, Strict
+      Strict,
+      Can't_move_before_any_branch )
+  | Get_header -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Peek _ ->
     (* For the moment, prevent [Peek] from being moved. *)
-    Arbitrary_effects, Has_coeffects, Strict
-  | Make_lazy _ -> Only_generative_effects Mutable, No_coeffects, Strict
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  | Make_lazy _ ->
+    ( Only_generative_effects Mutable,
+      No_coeffects,
+      Strict,
+      Can't_move_before_any_branch )
 
 let unary_classify_for_printing p =
   match p with
@@ -1885,30 +2031,34 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
     reading_from_a_string_or_bigstring Immutable
   | String_or_bigstring_load ((Bytes | Bigstring), _) ->
     reading_from_a_string_or_bigstring Mutable
-  | Phys_equal _ -> No_effects, No_coeffects, Strict
+  | Phys_equal _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Int_arith (_kind, (Add | Sub | Mul | Div | Mod | And | Or | Xor)) ->
-    No_effects, No_coeffects, Strict
-  | Int_shift _ -> No_effects, No_coeffects, Strict
-  | Int_comp _ -> No_effects, No_coeffects, Strict
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Int_shift _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Int_comp _ -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Float_arith (_width, (Add | Sub | Mul | Div)) ->
     (* See comments for Unary Float_arith *)
     if Flambda_features.float_const_prop ()
-    then No_effects, No_coeffects, Strict
-    else No_effects, Has_coeffects, Strict
+    then No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+    else No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Float_comp _ ->
     (* See comments for Unary Float_arith *)
     if Flambda_features.float_const_prop ()
-    then No_effects, No_coeffects, Strict
-    else No_effects, Has_coeffects, Strict
-  | Bigarray_get_alignment _ -> No_effects, No_coeffects, Strict
+    then No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+    else No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  | Bigarray_get_alignment _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Atomic_load_field (Any_value | Immediate) ->
-    Arbitrary_effects, Has_coeffects, Strict
-  | Poke _ -> Arbitrary_effects, No_coeffects, Strict
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  | Poke _ ->
+    Arbitrary_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Read_offset (_, mut) ->
     let coeffects : Coeffects.t =
       match mut with Immutable -> No_coeffects | Mutable -> Has_coeffects
     in
-    No_effects, coeffects, Strict
+    No_effects, coeffects, Strict, Can't_move_before_any_branch
 
 let binary_classify_for_printing p =
   match p with
@@ -1963,6 +2113,20 @@ let print_int_atomic_op ppf op =
   | Or -> fprintf ppf "or"
   | Xor -> fprintf ppf "xor"
 
+module Write_offset_kind = struct
+  type t =
+    | Into_block
+    | Into_block_or_off_heap
+
+  let compare = Stdlib.compare
+
+  let print ppf t =
+    match t with
+    | Into_block -> Format.pp_print_string ppf "Into_block"
+    | Into_block_or_off_heap ->
+      Format.pp_print_string ppf "Into_block_or_off_heap"
+end
+
 type ternary_primitive =
   | Array_set of Array_kind.t * Array_set_kind.t
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
@@ -1970,7 +2134,10 @@ type ternary_primitive =
   | Atomic_field_int_arith of int_atomic_op
   | Atomic_set_field of Block_access_field_kind.t
   | Atomic_exchange_field of Block_access_field_kind.t
-  | Write_offset of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
+  | Write_offset of
+      Write_offset_kind.t
+      * Flambda_kind.With_subkind.t
+      * Alloc_mode.For_assignments.t
 
 type quaternary_primitive =
   | Atomic_compare_and_set_field of Block_access_field_kind.t
@@ -2033,10 +2200,14 @@ let compare_ternary_primitive p1 p2 =
       Atomic_exchange_field block_access_field_kind2 ) ->
     Block_access_field_kind.compare block_access_field_kind1
       block_access_field_kind2
-  | Write_offset (array_set_kind1, mode1), Write_offset (array_set_kind2, mode2)
-    ->
-    let c = Array_set_kind.compare array_set_kind1 array_set_kind2 in
-    if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
+  | ( Write_offset (write_offset_kind1, array_set_kind1, mode1),
+      Write_offset (write_offset_kind2, array_set_kind2, mode2) ) ->
+    let c = Write_offset_kind.compare write_offset_kind1 write_offset_kind2 in
+    if c <> 0
+    then c
+    else
+      let c = Array_set_kind.compare array_set_kind1 array_set_kind2 in
+      if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
   | ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
       | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
       | Write_offset _ ),
@@ -2092,9 +2263,10 @@ let print_ternary_primitive ppf p =
   | Atomic_exchange_field block_access_field_kind ->
     fprintf ppf "@[(Atomic_exchange_field@ %a)@]" Block_access_field_kind.print
       block_access_field_kind
-  | Write_offset (kind, mode) ->
-    Format.fprintf ppf "@[(Write_offset@ %a %a)@]"
-      Flambda_kind.With_subkind.print kind Alloc_mode.For_assignments.print mode
+  | Write_offset (write_offset_kind, kind, mode) ->
+    Format.fprintf ppf "@[(Write_offset@ %a %a %a)@]" Write_offset_kind.print
+      write_offset_kind Flambda_kind.With_subkind.print kind
+      Alloc_mode.For_assignments.print mode
 
 let print_quaternary_primitive ppf p =
   let fprintf = Format.fprintf in
@@ -2148,7 +2320,8 @@ let args_kind_of_ternary_primitive p =
   | Atomic_set_field (Immediate | Any_value)
   | Atomic_exchange_field (Immediate | Any_value) ->
     K.value, K.value, K.value
-  | Write_offset (kind, _) -> K.value, K.naked_int64, K.With_subkind.kind kind
+  | Write_offset (_, kind, _) ->
+    K.value, K.naked_int64, K.With_subkind.kind kind
 
 let args_kind_of_quaternary_primitive p =
   match p with
@@ -2173,21 +2346,19 @@ let result_kind_of_quaternary_primitive p : result_kind =
   | Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _ ->
     Singleton K.value
 
-let effects_and_coeffects_of_ternary_primitive p :
-    Effects.t * Coeffects.t * Placement.t =
+let effects_and_coeffects_of_ternary_primitive p : Effects_and_coeffects.t =
   match p with
   | Array_set _ -> writing_to_an_array
   | Bytes_or_bigstring_set _ -> writing_to_bytes_or_bigstring
   | Bigarray_set (_, kind, _) -> writing_to_a_bigarray kind
   | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
-    Arbitrary_effects, Has_coeffects, Strict
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Write_offset _ -> writing_to_a_block
 
-let effects_and_coeffects_of_quaternary_primitive p :
-    Effects.t * Coeffects.t * Placement.t =
+let effects_and_coeffects_of_quaternary_primitive p : Effects_and_coeffects.t =
   match p with
   | Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _ ->
-    Arbitrary_effects, Has_coeffects, Strict
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
 
 let ternary_classify_for_printing p =
   match p with
@@ -2318,9 +2489,12 @@ let result_kind_of_variadic_primitive p : result_kind =
 
 let effects_and_coeffects_of_begin_region : Effects_and_coeffects.t =
   (* Ensure these don't get moved, but allow them to be deleted. *)
-  Only_generative_effects Mutable, Has_coeffects, Strict
+  ( Only_generative_effects Mutable,
+    Has_coeffects,
+    Strict,
+    Can't_move_before_any_branch )
 
-let effects_and_coeffects_of_variadic_primitive p =
+let effects_and_coeffects_of_variadic_primitive p : Effects_and_coeffects.t =
   match p with
   | Begin_region _ | Begin_try_region _ -> effects_and_coeffects_of_begin_region
   | Make_block (_, mut, alloc_mode) | Make_array (_, mut, alloc_mode) ->
@@ -2329,7 +2503,7 @@ let effects_and_coeffects_of_variadic_primitive p =
       | Heap -> Coeffects.No_coeffects
       | Local _ -> Coeffects.Has_coeffects
     in
-    Effects.Only_generative_effects mut, coeffects, Placement.Strict
+    Only_generative_effects mut, coeffects, Strict, Can't_move_before_any_branch
 
 let variadic_classify_for_printing p =
   match p with
@@ -2511,7 +2685,7 @@ let free_names t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
     Name_occurrences.empty
   | Unary (prim, x0) ->
     Name_occurrences.union
@@ -2545,7 +2719,7 @@ let apply_renaming t renaming =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
     t
   | Unary (prim, x0) ->
     let prim' = apply_renaming_unary_primitive prim renaming in
@@ -2584,7 +2758,7 @@ let ids_for_export t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
     Ids_for_export.empty
   | Unary (prim, x0) ->
     Ids_for_export.union
@@ -2703,21 +2877,22 @@ let effects_and_coeffects (t : t) =
 
 let no_effects_or_coeffects t =
   match effects_and_coeffects t with
-  | No_effects, No_coeffects, _ -> true
+  | No_effects, No_coeffects, _, _ -> true
   | ( (No_effects | Only_generative_effects _ | Arbitrary_effects),
       (No_coeffects | Has_coeffects),
+      _,
       _ ) ->
     false
 
 let at_most_generative_effects t =
   match effects_and_coeffects t with
-  | (No_effects | Only_generative_effects _), _, _ -> true
-  | Arbitrary_effects, _, _ -> false
+  | (No_effects | Only_generative_effects _), _, _, _ -> true
+  | Arbitrary_effects, _, _, _ -> false
 
 let only_generative_effects t =
   match effects_and_coeffects t with
-  | Only_generative_effects _, _, _ -> true
-  | (No_effects | Arbitrary_effects), _, _ -> false
+  | Only_generative_effects _, _, _, _ -> true
+  | (No_effects | Arbitrary_effects), _, _, _ -> false
 
 module Eligible_for_cse : sig
   type t
@@ -2760,14 +2935,15 @@ end = struct
     let eligible = prim_eligible && List.exists Simple.is_var (args t) in
     let effects_and_coeffects_ok =
       match effects_and_coeffects t with
-      | No_effects, No_coeffects, _ -> true
-      | Only_generative_effects Immutable, No_coeffects, _ ->
+      | No_effects, No_coeffects, _, _ -> true
+      | Only_generative_effects Immutable, No_coeffects, _, _ ->
         (* Allow constructions of immutable blocks to be shared. *)
         true
       | ( ( No_effects
           | Only_generative_effects (Immutable | Immutable_unique | Mutable)
           | Arbitrary_effects ),
           (No_coeffects | Has_coeffects),
+          _,
           _ ) ->
         false
     in
@@ -2884,8 +3060,8 @@ end = struct
             match f arg4 with
             | None -> None
             | Some arg4' ->
-              if arg1 == arg1' && arg2 == arg2' && arg3 == arg3'
-                 && arg4 == arg4'
+              if
+                arg1 == arg1' && arg2 == arg2' && arg3 == arg3' && arg4 == arg4'
               then Some t
               else Some (Quaternary (prim, arg1', arg2', arg3', arg4'))))))
     | Variadic (prim, args) ->
@@ -2959,13 +3135,13 @@ let is_begin_or_end_region t =
   | Unary ((End_region _ | End_try_region _), _) ->
     true
   | _ -> false
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]
 
 let is_begin_region t =
   match t with
   | Variadic ((Begin_region _ | Begin_try_region _), _) -> true
   | _ -> false
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]
 
 let is_end_region t =
   match t with
@@ -2976,4 +3152,4 @@ let is_end_region t =
       Misc.fatal_errorf "End_region with non-Variable argument:@ %a"
         Simple.print region)
   | _ -> None
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]

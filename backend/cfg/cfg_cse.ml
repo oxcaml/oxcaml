@@ -132,7 +132,7 @@ module Make (Op : Operation) : S with type op = Op.t = struct
     { num_next = 0; num_eqs = Equations.empty; num_reg = Reg.Map.empty }
 
   (** Generate a fresh value number [v] and associate it to register [r].
-  Returns a pair [(n',v)] with the updated value numbering [n']. *)
+      Returns a pair [(n',v)] with the updated value numbering [n']. *)
 
   let fresh_valnum_reg n r =
     let v = n.num_next in
@@ -158,11 +158,10 @@ module Make (Op : Operation) : S with type op = Op.t = struct
 
   let fresh_valnum_regs n rs = array_fold_transf fresh_valnum_reg n rs
 
-  (** [valnum_reg n r] returns the value number for the contents of
-  register [r].  If none exists, a fresh value number is returned
-  and associated with register [r].  The possibly updated numbering
-  is also returned.  [valnum_regs] is similar, but for an array of
-  registers. *)
+  (** [valnum_reg n r] returns the value number for the contents of register
+      [r]. If none exists, a fresh value number is returned and associated with
+      register [r]. The possibly updated numbering is also returned.
+      [valnum_regs] is similar, but for an array of registers. *)
 
   let valnum_reg n r =
     try n, Reg.Map.find r n.num_reg with Not_found -> fresh_valnum_reg n r
@@ -319,6 +318,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Store (_, _, asg) -> Op_store asg
     | Alloc _ | Poll -> assert false (* treated specially *)
     | Intop _ -> Op_pure
+    | Int128op _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
     | Intop_atomic _ -> Op_store true
     | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _ -> Op_pure
@@ -326,7 +326,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Name_for_debugger _ -> Op_other
     | Probe_is_enabled _ -> Op_other
     | Begin_region | End_region -> Op_other
-    | Dls_get | Tls_get -> Op_load Mutable
+    | Dls_get | Tls_get | Domain_index -> Op_load Mutable
 
   let class_of_operation op =
     match Target.class_of_operation op with
@@ -337,11 +337,11 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Const_int _ -> true
     | Move | Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Opaque | Stackoffset _
-    | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _
+    | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _ | Int128op _
     | Intop_imm (_, _)
     | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
     | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
-    | End_region | Dls_get | Tls_get ->
+    | End_region | Dls_get | Tls_get | Domain_index ->
       false
 
   let kill_loads (n : numbering) : numbering = remove_mutable_load_numbering n
@@ -381,10 +381,11 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       n2
     | Op
         (( Const_int _ | Begin_region | End_region | Dls_get | Tls_get
-         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-         | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+         | Domain_index | Const_float32 _ | Const_float _ | Const_symbol _
+         | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+         | Load _
          | Store (_, _, _)
-         | Intop _
+         | Intop _ | Int128op _
          | Intop_imm (_, _)
          | Intop_atomic _
          | Floatop (_, _)
@@ -450,7 +451,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Switch _ ->
       set_unknown_regs numbering (Proc.destroyed_at_terminator terminator.desc)
     | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-    | Call _ | Prim _ ->
+    | Call _ | Prim _ | Invalid _ ->
       (* For function calls and probes, we should at least forget: - equations
          involving memory loads, since the callee can perform arbitrary memory
          stores; - equations involving arithmetic operations that can produce
@@ -524,8 +525,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
    fun cfg_with_layout ->
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     (if not (List.mem ~set:cfg.fun_codegen_options Cfg.No_CSE)
-    then
-      let state = State.make cfg.next_instruction_id in
-      cse_blocks state cfg);
+     then
+       let state = State.make cfg.next_instruction_id in
+       cse_blocks state cfg);
     cfg_with_layout
 end

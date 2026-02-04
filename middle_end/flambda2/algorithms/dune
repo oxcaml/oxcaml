@@ -12,7 +12,11 @@
     (:include %{project_root}/sharedlib_cflags.sexp)
     (:include %{project_root}/oc_cppflags.sexp))))
  (ocamlopt_flags
-  (:standard -O3 -open Int_replace_polymorphic_compare))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3
+   -open
+   Int_replace_polymorphic_compare))
  (libraries ocamlcommon))
 
 (install

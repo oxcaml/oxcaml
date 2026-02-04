@@ -16,6 +16,8 @@ let flambda2_is_enabled () = Clflags.is_flambda2 ()
 
 let debug_flambda2 () = !Oxcaml_flags.Flambda2.debug
 
+let debug_reaper s = List.mem s !Oxcaml_flags.Flambda2.reaper_debug_flags
+
 let with_default (r : 'a Oxcaml_flags.or_default)
     ~(f : Oxcaml_flags.Flambda2.flags -> 'a) =
   match r with
@@ -82,6 +84,18 @@ let reaper_preserve_direct_calls () =
   !Oxcaml_flags.Flambda2.reaper_preserve_direct_calls
   |> with_default ~f:(fun d -> d.reaper_preserve_direct_calls)
 
+let reaper_local_fields () =
+  !Oxcaml_flags.Flambda2.reaper_local_fields
+  |> with_default ~f:(fun d -> d.reaper_local_fields)
+
+let reaper_unbox () =
+  !Oxcaml_flags.Flambda2.reaper_unbox
+  |> with_default ~f:(fun d -> d.reaper_unbox)
+
+let reaper_change_calling_conventions () =
+  !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
+  |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)
+
 let flat_float_array () = Config.flat_float_array
 
 let function_result_types ~is_a_functor =
@@ -135,7 +149,16 @@ let dump_flambda () = !Clflags.dump_flambda
 
 let dump_rawfexpr () = !Oxcaml_flags.Flambda2.Dump.rawfexpr
 
-let dump_fexpr () = !Oxcaml_flags.Flambda2.Dump.fexpr
+type pass = Oxcaml_flags.Flambda2.Dump.pass =
+  | Last_pass
+  | This_pass of string
+
+let dump_fexpr pass =
+  match pass, !Oxcaml_flags.Flambda2.Dump.fexpr_after with
+  | Last_pass, Last_pass -> !Oxcaml_flags.Flambda2.Dump.fexpr
+  | This_pass pass1, This_pass pass2 when String.equal pass1 pass2 ->
+    !Oxcaml_flags.Flambda2.Dump.fexpr
+  | (Last_pass | This_pass _), _ -> Nowhere
 
 let dump_flexpect () = !Oxcaml_flags.Flambda2.Dump.flexpect
 
@@ -257,6 +280,10 @@ module Expert = struct
   let inline_effects_in_cmm () =
     !Oxcaml_flags.Flambda2.Expert.inline_effects_in_cmm
     |> with_default ~f:(fun d -> d.inline_effects_in_cmm)
+
+  let cmm_safe_subst () =
+    !Oxcaml_flags.Flambda2.Expert.cmm_safe_subst
+    |> with_default ~f:(fun d -> d.cmm_safe_subst)
 
   (* CR mshinwell: Remove any uses of this flag, then remove the flag. *)
   let max_block_size_for_projections () =

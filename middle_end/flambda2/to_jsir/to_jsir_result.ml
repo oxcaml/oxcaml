@@ -30,9 +30,9 @@ open! Jsoo_imports.Import
 
 (** Blocks with the continuation potentially not yet defined.
 
-    For efficiency reasons, [body] will be inserted head-first,
-    so the instructions are in reverse. [end_block_with_last_exn] will
-    therefore reverse this before archiving. *)
+    For efficiency reasons, [body] will be inserted head-first, so the
+    instructions are in reverse. [end_block_with_last_exn] will therefore
+    reverse this before archiving. *)
 type partial_block =
   { params : Jsir.Var.t list;
     body : Jsir.instr list;
@@ -46,8 +46,8 @@ type t =
     reserved_addrs : Jsir.Addr.Set.t;
     invalid_switch_block : Jsir.Addr.t option;
     next_method_cache_id : int;
-        (** JSOO has a similar variable which is incremented for every method call;
-            we mimic this here. *)
+        (** JSOO has a similar variable which is incremented for every method
+            call; we mimic this here. *)
     imported_compilation_units : Compilation_unit.Set.t;
     global_data_var : Jsir.Var.t option
   }

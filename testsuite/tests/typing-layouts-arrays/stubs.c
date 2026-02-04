@@ -1,7 +1,10 @@
-
 #include <assert.h>
+#include <caml/mlvalues.h>
 
-#define BUILTIN(name) void name() { assert(0); }
+#define BUILTIN(name) CAMLprim void name() { assert(0); }
+
+BUILTIN(caml_vec128_unreachable);
+BUILTIN(caml_vec256_unreachable);
 
 BUILTIN(caml_int64x2_low_of_int64);
 BUILTIN(caml_int64x2_low_to_int64);

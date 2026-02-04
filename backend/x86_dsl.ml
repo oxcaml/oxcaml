@@ -96,6 +96,8 @@ let mem64_rip typ ?(ofs = 0) s = Mem64_RIP (typ, s, ofs)
 module I = struct
   let add x y = emit (ADD (x, y))
 
+  let adc x y = emit (ADC (x, y))
+
   let and_ x y = emit (AND (x, y))
 
   let bsf x y = emit (BSF (x, y))
@@ -184,8 +186,6 @@ module I = struct
 
   let pop x = emit (POP x)
 
-  let popcnt x y = emit (POPCNT (x, y))
-
   let prefetch is_write locality x = emit (PREFETCH (is_write, locality, x))
 
   let push x = emit (PUSH x)
@@ -212,15 +212,13 @@ module I = struct
 
   let sub x y = emit (SUB (x, y))
 
+  let sbb x y = emit (SBB (x, y))
+
   let test x y = emit (TEST (x, y))
 
   let xchg x y = emit (XCHG (x, y))
 
   let xor x y = emit (XOR (x, y))
-
-  let lzcnt x y = emit (LZCNT (x, y))
-
-  let tzcnt x y = emit (TZCNT (x, y))
 
   let simd instr args = emit (SIMD (instr, args))
 end

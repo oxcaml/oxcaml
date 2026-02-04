@@ -5,11 +5,11 @@ include Builtins.Float64x4
 
 external low_of : float -> t
   = "caml_vec256_unreachable" "caml_float64x4_low_of_float"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 external low_to : t -> float
   = "caml_vec256_unreachable" "caml_float64x4_low_to_float"
-  [@@noalloc] [@@unboxed] [@@builtin]
+[@@noalloc] [@@unboxed] [@@builtin]
 
 let () =
   let v1 = low_of 1. in

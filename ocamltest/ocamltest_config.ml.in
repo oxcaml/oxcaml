@@ -107,3 +107,5 @@ let poll_insertion = @poll_insertion@
 let naked_pointers = false
 
 let tsan = @tsan@
+
+let address_sanitizer = @address_sanitizer@

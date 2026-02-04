@@ -27,7 +27,7 @@ val reset : Unit_info.t -> unit
 
 val reset_info_tables: unit -> unit
 
-val current_unit_infos: unit -> unit_infos
+val current_unit_infos: unit -> unit unit_infos_gen
         (* Return the infos for the unit being compiled *)
 
 val get_global_export_info : Compilation_unit.t

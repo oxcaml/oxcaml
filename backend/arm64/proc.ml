@@ -73,8 +73,8 @@ let hard_reg_gen typ =
 let hard_int_reg = hard_reg_gen Int
 let hard_float_reg = hard_reg_gen Float
 
-let hard_vec128_reg = Array.map (fun r -> {r with typ = Vec128}) hard_float_reg
-let hard_float32_reg = Array.map (fun r -> {r with typ = Float32}) hard_float_reg
+let hard_vec128_reg = Array.map (Reg.create_alias ~typ:Vec128) hard_float_reg
+let hard_float32_reg = Array.map (Reg.create_alias ~typ:Float32) hard_float_reg
 
 let all_phys_regs =
   Array.concat [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg; ]
@@ -90,9 +90,10 @@ let phys_reg ty n =
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
        backend doesn't get that far. *)
+    let r = hard_int_reg.(n) in
     if !Clflags.llvm_backend
-    then { hard_int_reg.(n) with typ = ty }
-    else hard_int_reg.(n)
+    then Reg.create_alias r ~typ:ty
+    else r
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
@@ -333,6 +334,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         destroy_neon_reg7
   | Op (Intop (Iadd  | Isub | Imul | Idiv|Imod|Iand|Ior|Ixor|Ilsl
               |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _))
+  | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Specific _
         | Move | Spill | Reload
         | Floatop _
@@ -343,7 +345,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-        | Begin_region | End_region | Dls_get | Tls_get)
+        | Begin_region | End_region | Dls_get | Tls_get | Domain_index)
   | Poptrap _ | Prologue | Epilogue
   | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
@@ -372,7 +374,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   match terminator with
   | Never -> assert false
-  | Call {op = Indirect | Direct _; _} ->
+  | Call {op = Indirect _ | Direct _; _} ->
     all_phys_regs
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
@@ -381,6 +383,8 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }; _} ->
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
+  | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
+    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -390,7 +394,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
 let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_intf.S.terminator) =
   match terminator with
   | Never -> assert false
-  | Call {op = Indirect | Direct _; _} ->
+  | Call {op = Indirect _ | Direct _; _} ->
     true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
@@ -402,6 +406,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
       true
     else
     if alloc then true else false
+  | Invalid _ -> more_destruction_points
 
 (* Layout of the stack *)
 
@@ -468,6 +473,9 @@ let assemble_file infile outfile =
 let has_three_operand_float_ops () = false
 
 let operation_supported : Cmm.operation -> bool = function
+  | Caddi128 | Csubi128 | Cmuli64 _ ->
+    (* CR mslater: restore after the arm DSL is merged *)
+    false
   | Cprefetch _ | Catomic _
   | Creinterpret_cast (V128_of_vec (Vec256 | Vec512) |
                        V256_of_vec _ | V512_of_vec _)
@@ -492,6 +500,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
   | Ctls_get
+  | Cdomain_index
   | Cpoll
   | Creinterpret_cast (Int_of_value | Value_of_int |
                        Int64_of_float | Float_of_int64 |
@@ -508,7 +517,7 @@ let expression_supported : Cmm.expression -> bool = function
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
-  | Cexit _ -> true
+  | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ | Cconst_vec512 _ -> false
 
 

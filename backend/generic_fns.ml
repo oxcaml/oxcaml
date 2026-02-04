@@ -233,7 +233,7 @@ module Cache = struct
     |> Seq.map (fun f -> partition_curry f, f)
     |> Partition.Map.of_seq_multi
     |> Partition.Map.map (fun curry_fun ->
-           { Cmx_format.curry_fun; send_fun = []; apply_fun = [] })
+        { Cmx_format.curry_fun; send_fun = []; apply_fun = [] })
 
   let all_send () =
     let send =
@@ -247,7 +247,7 @@ module Cache = struct
     |> Seq.map (fun f -> partition_send f, f)
     |> Partition.Map.of_seq_multi
     |> Partition.Map.map (fun send_fun ->
-           { Cmx_format.send_fun; curry_fun = []; apply_fun = [] })
+        { Cmx_format.send_fun; curry_fun = []; apply_fun = [] })
 
   let all_apply () =
     let apply =
@@ -263,7 +263,7 @@ module Cache = struct
     |> Seq.map (fun f -> partition_apply f, f)
     |> Partition.Map.of_seq_multi
     |> Partition.Map.map (fun apply_fun ->
-           { Cmx_format.apply_fun; send_fun = []; curry_fun = [] })
+        { Cmx_format.apply_fun; send_fun = []; curry_fun = [] })
 
   let all () =
     (* [is_curry], [is_send] and [is_apply] are also used to determine if a

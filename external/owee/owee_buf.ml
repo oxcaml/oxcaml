@@ -31,6 +31,7 @@ let map_binary_write unix path size =
 
 exception Invalid_format of string
 let invalid_format msg = raise (Invalid_format msg)
+let invalid_formatf fmt = Printf.ksprintf invalid_format fmt
 
 let assert_format b msg =
   if not b then

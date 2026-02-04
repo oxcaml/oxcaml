@@ -24,5 +24,7 @@ touch dune.runtime_selection duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
 
 exit_code=0
 dune build @fmt --auto-promote || exit_code=1
+# Format owee files explicitly (external/ is vendored so dune skips it)
+ocamlformat -i external/owee/owee_archive.ml external/owee/owee_archive.mli || exit_code=1
 scripts/80ch.sh || exit_code=1
 exit $exit_code

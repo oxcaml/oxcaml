@@ -125,9 +125,9 @@ let print ppf { forest; print_locality; _ } =
 let rec flatten_tree_array arr =
   Array.to_list arr
   |> List.concat_map (fun tree ->
-         match tree with
-         | Leaf { new_index; _ } -> [new_index]
-         | Node { children } -> flatten_tree_array children)
+      match tree with
+      | Leaf { new_index; _ } -> [new_index]
+      | Node { children } -> flatten_tree_array children)
 
 let new_indexes_to_old_indexes t =
   let old_indexes_to_new_indexes =
@@ -185,6 +185,12 @@ let singleton_or_product_of_mixed_block_element
   | Word -> Singleton Word
   | Untagged_immediate -> Singleton Untagged_immediate
   | Product sub_elements -> Product sub_elements
+  | Splice_variable _ ->
+    (* CR layout poly: This is mostly unreachable, however Value_rec_compiler
+       calls it before slambda eval. Other checks should have caught this first
+       though. *)
+    Misc.fatal_error
+      "singleton_or_product_of_mixed_block_element: Splice_variable"
 
 (* CR-soon xclerc for xclerc: it is probably quite inefficient to map/concat
    repeatedly. *)

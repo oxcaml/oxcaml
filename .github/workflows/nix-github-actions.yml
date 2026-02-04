@@ -11,6 +11,7 @@ on:
     tags:
       - '*'
   pull_request:
+  merge_group:
 
 jobs:
   nix-matrix:
@@ -19,8 +20,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@v20
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - uses: cachix/install-nix-action@v31
       - id: set-matrix
         name: Generate Nix Matrix
         run: |
@@ -42,8 +42,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@v20
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - uses: cachix/install-nix-action@v31
       - run: nix build -L '.#${{ matrix.attr }}'
 
 concurrency:

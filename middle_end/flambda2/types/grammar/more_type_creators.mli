@@ -163,6 +163,15 @@ val exactly_this_closure :
   Alloc_mode.For_types.t ->
   Type_grammar.t
 
+val at_least_this_closure :
+  Function_slot.t ->
+  at_least_these_function_slots:
+    Type_grammar.function_type Or_unknown.t Function_slot.Map.t ->
+  at_least_these_closure_types:Type_grammar.t Function_slot.Map.t ->
+  at_least_these_value_slots:Type_grammar.t Value_slot.Map.t ->
+  Alloc_mode.For_types.t ->
+  Type_grammar.t
+
 val closure_with_at_least_these_function_slots :
   this_function_slot:Function_slot.t ->
   Simple.t Function_slot.Map.t ->

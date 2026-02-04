@@ -29,8 +29,9 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** Format the arguments according to the given format string
       and raise [Fatal_error] with the resulting string. *)
 
-val unboxed_small_int_arrays_are_not_implemented : unit -> _
-  (** Unboxed small int arrays are not implemented. *)
+val splices_should_not_exist_after_eval : unit -> _
+  (** Raise a [Fatal_error] explaining that a slambda splice shouldn't exist in
+      lambda code after slambda eval has happened. *)
 
 exception Fatal_error
 
@@ -135,6 +136,8 @@ module Stdlib : sig
     (** If all elements of the given list are [Some _] then [Some xs]
         is returned with the [xs] being the contents of those [Some]s, with
         order preserved.  Otherwise return [None]. *)
+
+    val map : ('a -> 'b) -> 'a t -> 'b t
 
     val map_option : ('a -> 'b option) -> 'a t -> 'b t option
     (** [map_option f l] is [some_if_all_elements_are_some (map f l)], but with
@@ -445,6 +448,11 @@ val remove_dir: string -> unit
        (** Delete the given directory if it exists, is a directory, and is
            empty. Never raises an error. *)
 
+val remove_dir_contents: string -> unit
+       (** Delete all files in the given directory, then delete the directory
+           itself. Only handles flat directories (no subdirectories).
+           Never raises an error. *)
+
 val expand_directory: string -> string -> string
        (** [expand_directory alt file] eventually expands a [+] at the
            beginning of file into [alt] (an alternate root directory) *)
@@ -479,14 +487,15 @@ val output_to_file_via_temporary:
            the channel is closed and the temporary file is renamed to
            [filename]. *)
 
-val protect_writing_to_file
-   : filename:string
-  -> f:(out_channel -> 'a)
-  -> 'a
-      (** Open the given [filename] for writing (in binary mode), pass
-          the [out_channel] to the given function, then close the
-          channel. If the function raises an exception then [filename]
-          will be removed. *)
+val protect_output_to_file : string -> (out_channel -> 'a) -> 'a
+      (** Open the given filename for binary writing, pass the [out_channel] to
+          the given function, then close the channel. If the function raises an
+          exception, then [filename] will be removed and the backtrace is
+          printed; otherwise, the file name is recorded, and the file can still
+          be retroactively removed by [remove_successful_output_files]. *)
+
+val remove_successful_output_files : unit -> unit
+(** Remove all successful writes done by [protect_output_to_file]. *)
 
 val mk_temp_dir : ?perms: int -> string -> string -> string
        (** Create a temporary directory with a random number in the name. *)
@@ -540,6 +549,14 @@ val no_overflow_mul: int -> int -> bool
 val no_overflow_lsl: int -> int -> bool
        (** [no_overflow_lsl n k] returns [true] if the computation of
            [n lsl k] does not overflow. *)
+
+val no_overflow_add_int64: int64 -> int64 -> bool
+       (** [no_overflow_add_int64 n1 n2] returns [true] if the computation of
+           [Int64.add n1 n2] does not overflow. *)
+
+val no_overflow_sub_int64: int64 -> int64 -> bool
+       (** [no_overflow_sub_int64 n1 n2] returns [true] if the computation of
+           [Int64.sub n1 n2] does not overflow. *)
 
 val letter_of_int : int -> string
 
@@ -1161,6 +1178,9 @@ module Json : sig
 
   val int : int -> string
   (** [int value] formats an integer value as a JSON number. *)
+
+  val float : float -> string
+  (** [float value] formats a float value as a JSON number. *)
 
   val object_ : string list -> string
   (** [object_ fields] creates a JSON object from a list of field strings. *)

@@ -63,9 +63,10 @@ let invariant_header_map dominators header_map =
       List.iter loops ~f:(fun loop ->
           Label.Set.iter
             (fun loop_label ->
-              if not
-                   (Cfg_dominators.is_dominating dominators header_label
-                      loop_label)
+              if
+                not
+                  (Cfg_dominators.is_dominating dominators header_label
+                     loop_label)
               then
                 fatal
                   "Cfg_loop_infos.invariant_header_map: block %a is not \
@@ -136,6 +137,11 @@ type t =
 
 let build : Cfg.t -> Cfg_dominators.t -> t =
  fun cfg doms ->
+  if cfg.allowed_to_be_irreducible
+  then
+    fatal
+      "cannot compute loop infos since the CFG is not guaranteed to be \
+       reducible";
   let back_edges = compute_back_edges cfg doms in
   let loops = compute_loops_of_back_edges cfg back_edges in
   let header_map = compute_header_map loops in

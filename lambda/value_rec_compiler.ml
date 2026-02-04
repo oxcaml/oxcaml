@@ -182,6 +182,9 @@ let compute_static_size lam =
          the latter meaning that [Value_rec_check] should have forbidden that case.
       *)
       assert false
+    | Lsplice _ ->
+      (* CR layout poly: Fix this (and split_static_function below). *)
+      Misc.fatal_error "letrec: layout poly not supported"
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -243,18 +246,20 @@ let compute_static_size lam =
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
         end
-    | Pmakeblock _ | Pmakelazyblock _ ->
+    | Pmakeblock (_, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
+        (match Lambda.mixed_block_of_block_shape shape with
+         | None -> Block (Regular_block (List.length args))
+         | Some arr -> Block (Mixed_record arr))
+    | Pmakelazyblock _ ->
         Block (Regular_block (List.length args))
-    | Pmakemixedblock (_, _, shape, _) ->
-        Block (Mixed_record (shape))
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
-        | Pgenarray | Paddrarray | Pintarray ->
+        | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray ->
             Block (Regular_block size)
         | Pfloatarray ->
             Block (Float_record size)
@@ -289,7 +294,8 @@ let compute_static_size lam =
     | Pfield_computed _
     | Pfloatfield _
     | Pmixedfield _
-    | Prunstack
+    | Pwith_stack
+    | Pwith_stack_bind
     | Pperform
     | Presume
     | Preperform
@@ -327,6 +333,7 @@ let compute_static_size lam =
     | Popaque _
     | Pdls_get
     | Ptls_get
+    | Pdomain_index
     | Ppeek _
     | Ppoke _
     | Pscalar _
@@ -514,7 +521,8 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
-               Lprim (Pmakeblock (0, lifted_block_mut, None, Lambda.alloc_heap),
+               Lprim (Pmakeblock
+                        (0, lifted_block_mut, All_value, Lambda.alloc_heap),
                       [Lvar v], no_loc))
   | Lfunction lfun ->
     let free_vars = Lambda.free_variables lfun.body in
@@ -540,7 +548,7 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = new_fun; free_vars_block_size } in
     let block =
-      Lprim (Pmakeblock (0, lifted_block_mut, None, Lambda.alloc_heap),
+      Lprim (Pmakeblock (0, lifted_block_mut, All_value, Lambda.alloc_heap),
              List.rev block_fields_rev,
              no_loc)
     in
@@ -685,6 +693,8 @@ let rec split_static_function lfun block_var local_idents lam :
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
+  | Lsplice _ ->
+    Misc.fatal_error "letrec: layout poly not supported"
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =

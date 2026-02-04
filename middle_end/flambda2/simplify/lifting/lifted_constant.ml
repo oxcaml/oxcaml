@@ -291,7 +291,7 @@ let apply_projection t proj =
     let typing_env = DE.typing_env denv in
     let meet_shortcut =
       match Symbol_projection.projection proj with
-      | Block_load { index } ->
+      | Block_load { index; block_shape = _ } ->
         let field_kind =
           Symbol_projection.kind proj |> Flambda_kind.With_subkind.kind
         in

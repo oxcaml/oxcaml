@@ -54,8 +54,8 @@ type environment =
       (Reg.t array * Backend_var.Provenance.t option * Asttypes.mutable_flag)
       V.Map.t;
     static_exceptions : static_handler Static_label.Map.t;
-        (** Which registers must be populated when jumping to the given
-        handler. *)
+        (** Which registers must be populated when jumping to the given handler.
+        *)
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t
   }
@@ -170,7 +170,7 @@ let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
 (* Infer the type of the result of an operation *)
 
 let oper_result_type = function
-  | Capply (ty, _) -> ty
+  | Capply { result_type = ty; _ } -> ty
   | Cextcall { ty; ty_args = _; alloc = _; func = _; _ } -> ty
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
@@ -185,6 +185,7 @@ let oper_result_type = function
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
   | Ctls_get -> typ_val
+  | Cdomain_index -> typ_int
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
@@ -193,6 +194,7 @@ let oper_result_type = function
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
   | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
+  | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
   | Cadda -> typ_addr
   | Cnegf Float64
@@ -362,7 +364,7 @@ module Effect_and_coeffect : sig
 
   val arbitrary : t
 
-  val effect : t -> Effect.t
+  val effect_ : t -> Effect.t
 
   val coeffect : t -> Coeffect.t
 
@@ -384,7 +386,7 @@ end = struct
 
   let arbitrary = Effect.Arbitrary, Coeffect.Arbitrary
 
-  let effect (e, _ce) = e
+  let effect_ (e, _ce) = e
 
   let coeffect (_e, ce) = ce
 
@@ -511,7 +513,7 @@ module Stack_offset_and_exn = struct
         InstructionId.format term.id
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+    | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ | Prim _ ->
       stack_offset, traps
 
   let rec process_basic :
@@ -546,10 +548,11 @@ module Stack_offset_and_exn = struct
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
-        | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
-        | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
-        | Dls_get | Tls_get | Poll | Pause | Alloc _ )
+        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
+        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
+        | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->

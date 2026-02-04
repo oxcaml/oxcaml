@@ -122,6 +122,8 @@ module Mixed_block_shape : sig
   val equal : t -> t -> bool
 
   val compare : t -> t -> int
+
+  val print : Format.formatter -> t -> unit
 end
 
 module Scannable_block_shape : sig
@@ -130,8 +132,8 @@ module Scannable_block_shape : sig
     | Mixed_record of Mixed_block_shape.t
 
   (** For now if two block shapes do not compare as equal they will be
-      incompatible. If that changes, a [compatible] function will be
-      introduced. *)
+      incompatible. If that changes, a [compatible] function will be introduced.
+  *)
   val equal : t -> t -> bool
 
   val compare : t -> t -> int
@@ -232,6 +234,9 @@ module With_subkind : sig
       | Value_array
       | Generic_array
       | Unboxed_float32_array
+      | Untagged_int_array
+      | Untagged_int8_array
+      | Untagged_int16_array
       | Unboxed_int32_array
       | Unboxed_int64_array
       | Unboxed_nativeint_array
@@ -343,8 +348,6 @@ module With_subkind : sig
   val equal_ignoring_subkind : t -> t -> bool
 
   val must_be_gc_scannable : t -> bool
-
-  val may_be_gc_scannable : t -> bool
 end
 
 module Flat_suffix_element : sig

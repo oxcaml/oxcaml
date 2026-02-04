@@ -32,8 +32,8 @@ val empty : t
 
 (** If the [t] already has an equation for the given primitive, then [add] does
     nothing. (Expected usage is that this will correspond to outermost bindings
-    taking precedence, but for simplicity, this function does not enforce
-    that.) *)
+    taking precedence, but for simplicity, this function does not enforce that.)
+*)
 val add : t -> P.Eligible_for_cse.t -> bound_to:Simple.t -> Scope.t -> t
 
 val find : t -> P.Eligible_for_cse.t -> Simple.t option

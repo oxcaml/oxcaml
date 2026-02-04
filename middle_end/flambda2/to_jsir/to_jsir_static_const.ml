@@ -103,8 +103,6 @@ let numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not ~to_bits
     let expr : Jsir.expr = Block (tag, values, array_or_not, Immutable) in
     bind_expr_to_symbol ~env ~res symbol expr
 
-let length_is_even values = List.length values mod 2 = 0
-
 let block_like ~env ~res symbol (const : Static_const.t) =
   match const with
   | Set_of_closures _closures ->
@@ -148,9 +146,8 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       ~bits_to_array:(fun bits -> Float_array bits)
   | Immutable_float32_array values ->
     let tag =
-      if length_is_even values
-      then Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
-      else Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_odd_tag
+      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_tag
+        (List.length values)
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:(fun float ->
@@ -160,24 +157,57 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Immutable_value_array values ->
     simple_block_or_array ~env ~res ~symbol ~tag:Tag.zero ~mut:Immutable
       ~array_or_not:Array values
+  | Immutable_int_array values ->
+    let tag =
+      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int_array_tag
+    in
+    numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
+      ~to_bits:Fun.id
+      ~bits_to_constant:To_jsir_shared.target_ocaml_int_to_jsir_const
+      ~bits_to_array:(fun bits ->
+        Tuple
+          ( tag,
+            Array.map To_jsir_shared.target_ocaml_int_to_jsir_const bits,
+            Array ))
+  | Immutable_int8_array values ->
+    let tag =
+      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int8_array_tag
+        (List.length values)
+    in
+    numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int8_to_jsir_const
+      ~bits_to_array:(fun bits ->
+        Tuple (tag, Array.map To_jsir_shared.int8_to_jsir_const bits, Array))
+  | Immutable_int16_array values ->
+    let tag =
+      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int16_array_tag
+        (List.length values)
+    in
+    numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int16_to_jsir_const
+      ~bits_to_array:(fun bits ->
+        Tuple (tag, Array.map To_jsir_shared.int16_to_jsir_const bits, Array))
   | Immutable_int32_array values ->
     let tag =
-      if length_is_even values
-      then Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag
-      else Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_odd_tag
+      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_tag
+        (List.length values)
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_int64_array values ->
-    let tag = Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag in
+    let tag =
+      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
+    in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int64_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int64_to_jsir_const bits, Array))
   | Immutable_nativeint_array values ->
-    let tag = Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag in
+    let tag =
+      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
+    in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Targetint_32_64.to_int32
       ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
@@ -212,17 +242,17 @@ let prepare_code ~env ~res ~code_id code =
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body
     ~f:(fun
-         ~return_continuation:_
-         ~exn_continuation:_
-         bound_params
-         ~body:_
-         ~my_closure:_
-         ~is_my_closure_used:_
-         ~my_region:_
-         ~my_ghost_region:_
-         ~my_depth:_
-         ~free_names_of_body:_
-       ->
+        ~return_continuation:_
+        ~exn_continuation:_
+        bound_params
+        ~body:_
+        ~my_closure:_
+        ~is_my_closure_used:_
+        ~my_region:_
+        ~my_ghost_region:_
+        ~my_depth:_
+        ~free_names_of_body:_
+      ->
       let params =
         List.init (Bound_parameters.cardinal bound_params) (fun _ ->
             Jsir.Var.fresh ())
@@ -258,17 +288,17 @@ let code ~env ~res ~translate_body ~code_id code =
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body
     ~f:(fun
-         ~return_continuation
-         ~exn_continuation
-         bound_params
-         ~body
-         ~my_closure
-         ~is_my_closure_used:_
-         ~my_region:_
-         ~my_ghost_region:_
-         ~my_depth:_
-         ~free_names_of_body:_
-       ->
+        ~return_continuation
+        ~exn_continuation
+        bound_params
+        ~body
+        ~my_closure
+        ~is_my_closure_used:_
+        ~my_region:_
+        ~my_ghost_region:_
+        ~my_depth:_
+        ~free_names_of_body:_
+      ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)
       let ({ addr; params = params_jvar; closure } : To_jsir_env.code_id) =

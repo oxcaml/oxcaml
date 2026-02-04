@@ -48,9 +48,8 @@ type (_, _, _) hlist =
   | [] : ('v, nil, 'v) hlist
   | ( :: ) : ('t, 'k, 's) id * ('s, 'ks, 'v) hlist -> ('t, 'k -> 'ks, 'v) hlist
 
-let rec print_keys :
-    type t k v. (t, k, v) hlist -> Format.formatter -> k Constant.hlist -> unit
-    =
+let rec print_keys : type t k v.
+    (t, k, v) hlist -> Format.formatter -> k Constant.hlist -> unit =
  fun columns ppf keys ->
   match columns, keys with
   | [], [] -> ()
@@ -73,8 +72,8 @@ let rec is_trie : type t k v. (t, k, v) hlist -> (t, k, v) Trie.is_trie =
 let compare_key : type m k v. (m, k, v) id -> k -> k -> int =
  fun column x y -> Value.compare_repr (value_repr column) x y
 
-let rec compare_keys :
-    type t k v. (t, k, v) hlist -> k Constant.hlist -> k Constant.hlist -> int =
+let rec compare_keys : type t k v.
+    (t, k, v) hlist -> k Constant.hlist -> k Constant.hlist -> int =
  fun columns xs ys ->
   match columns, xs, ys with
   | [], [], [] -> 0

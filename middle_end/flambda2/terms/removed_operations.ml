@@ -60,7 +60,7 @@ let prim (prim : Flambda_primitive.t) =
     match prim with
     | Begin_region _ | Begin_try_region _ -> zero
     | Make_block _ | Make_array _ -> alloc)
-  [@@ocaml.warning "-fragile-match"]
+[@@ocaml.warning "-fragile-match"]
 
 let branch = { zero with branch = 1 }
 

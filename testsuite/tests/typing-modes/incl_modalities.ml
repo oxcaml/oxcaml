@@ -297,3 +297,50 @@ end
 [%%expect{|
 module type T = sig module M : sig val foo : 'a -> 'a @@ portable end end
 |}]
+
+(* signature with default modality, include with a different axis *)
+module type S = sig @@ portable
+  val foo : 'a -> 'a
+end
+
+module type S' = sig
+  include S @@ contended
+end
+[%%expect{|
+module type S = sig val foo : 'a -> 'a @@ portable end
+module type S' = sig val foo : 'a -> 'a @@ portable contended end
+|}]
+
+(* signature with default modality, include does not override it *)
+module type S = sig @@ portable
+  val foo : 'a -> 'a
+end
+
+module type S' = sig
+  include S @@ nonportable contended
+end
+[%%expect{|
+module type S = sig val foo : 'a -> 'a @@ portable end
+module type S' = sig val foo : 'a -> 'a @@ portable contended end
+|}]
+
+(* signature S' with default modality, include adds modality on different axis *)
+module type S = sig
+  val foo : 'a -> 'a
+end
+
+module type S' = sig @@ portable
+  include S @@ contended
+end
+[%%expect{|
+module type S = sig val foo : 'a -> 'a end
+module type S' = sig val foo : 'a -> 'a @@ portable contended end
+|}]
+
+(* signature S' with default modality, include overrides it *)
+module type S' = sig @@ portable
+  include S @@ nonportable contended
+end
+[%%expect{|
+module type S' = sig val foo : 'a -> 'a @@ contended end
+|}]

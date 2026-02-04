@@ -272,8 +272,8 @@ end = struct
           | `Or _ as or_view -> stop orpat or_view
           | other_view -> continue orpat other_view
         )
-      | ( `Constant _ | `Tuple _ | `Unboxed_tuple _ | `Construct _ | `Variant _
-        | `Array _ | `Lazy _ ) as view ->
+      | ( `Constant _ | `Unboxed_unit | `Tuple _ | `Unboxed_tuple _
+        | `Construct _ | `Variant _ | `Array _ | `Lazy _ ) as view ->
           stop p view
     in
     aux cl
@@ -308,6 +308,7 @@ end = struct
       match p.pat_desc with
       | `Any -> `Any
       | `Constant cst -> `Constant cst
+      | `Unboxed_unit -> `Unboxed_unit
       | `Tuple ps ->
           `Tuple (List.map (fun (label, p) -> label, alpha_pat env p) ps)
       | `Unboxed_tuple ps ->
@@ -461,7 +462,7 @@ let matcher discr (p : Simple.pattern) rem =
   match (discr.pat_desc, ph.pat_desc) with
   | Any, _ -> rem
   | ( ( Constant _ | Construct _ | Variant _ | Lazy | Array _ | Record _
-      | Record_unboxed_product _ | Tuple _ | Unboxed_tuple _ ),
+      | Record_unboxed_product _ | Unboxed_unit | Tuple _ | Unboxed_tuple _ ),
       Any ) ->
       omegas @ rem
   | Constant cst, Constant cst' -> yesif (const_compare cst cst' = 0)
@@ -473,6 +474,7 @@ let matcher discr (p : Simple.pattern) rem =
   | Variant { tag; has_arg }, Variant { tag = tag'; has_arg = has_arg' } ->
       yesif (tag = tag' && has_arg = has_arg')
   | Array (am1, _, n1), Array (am2, _, n2) -> yesif (am1 = am2 && n1 = n2)
+  | Unboxed_unit, Unboxed_unit -> yes ()
   | Tuple n1, Tuple n2 -> yesif (n1 = n2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
     yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
@@ -484,7 +486,7 @@ let matcher discr (p : Simple.pattern) rem =
       yesif (List.length l = List.length l')
   | Lazy, Lazy -> yes ()
   | ( Constant _ | Construct _ | Variant _ | Lazy | Array _ | Record _
-    | Record_unboxed_product _ | Tuple _ | Unboxed_tuple _), _
+    | Record_unboxed_product _ | Unboxed_unit | Tuple _ | Unboxed_tuple _), _
     ->
       no ()
 
@@ -1262,6 +1264,7 @@ let can_group discr pat =
          potentially-compatible submatrices below it).  *)
       Types.equal_tag discr_tag pat_cstr.cstr_tag
   | Construct _, Construct _
+  | Unboxed_unit, (Unboxed_unit | Any)
   | Tuple _, (Tuple _ | Any)
   | Unboxed_tuple _, (Unboxed_tuple _ | Any)
   | Record _, (Record _ | Any)
@@ -1281,7 +1284,7 @@ let can_group discr pat =
           | Const_untagged_int8 _ | Const_untagged_int16 _
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
           | Const_untagged_int _ | Const_unboxed_nativeint _ )
-      | Construct _ | Tuple _ | Unboxed_tuple _ | Record _
+      | Construct _ | Unboxed_unit | Tuple _ | Unboxed_tuple _ | Record _
       | Record_unboxed_product _ | Array _ | Variant _ | Lazy ) ) ->
       false
 
@@ -1935,7 +1938,8 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
         Punboxed_product layouts
       | Value _ | Float_boxed _ | Float64 | Float32
       | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+      | Splice_variable _ ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
     match cstr_shape with
@@ -3939,6 +3943,10 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_no_test ~scopes value_kind
             divide_var
             Context.rshift repr partial ctx pm
+      | Unboxed_unit ->
+          compile_no_test ~scopes value_kind
+            divide_var
+            Context.rshift repr partial ctx pm
       | Tuple _ ->
           compile_no_test ~scopes value_kind
             (divide_tuple ~scopes ph)
@@ -4033,6 +4041,7 @@ let is_lazy_pat p =
   | Tpat_variant _
   | Tpat_record _
   | Tpat_record_unboxed_product _
+  | Tpat_unboxed_unit
   | Tpat_tuple _
   | Tpat_unboxed_tuple _
   | Tpat_construct _
@@ -4055,6 +4064,7 @@ let is_record_with_mutable_field p =
   | Tpat_alias _
   | Tpat_variant _
   | Tpat_lazy _
+  | Tpat_unboxed_unit
   | Tpat_tuple _
   | Tpat_unboxed_tuple _
   | Tpat_construct _
@@ -4117,7 +4127,7 @@ let failure_handler ~scopes loc ~failer () =
     Lprim
       ( Praise Raise_regular,
         [ Lprim
-            ( Pmakeblock (0, Immutable, None, alloc_heap),
+            ( Pmakeblock (0, Immutable, All_value, alloc_heap),
               [ slot;
                 Lconst
                   (Const_block
@@ -4282,7 +4292,9 @@ let rec map_return f = function
           loc, k )
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
-    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ ) as l ->
+    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lsplice _) as l ->
+      (* CR layout poly: I believe this could inhibit some optimisations in the
+         splice case. We should consider moving this after slambda eval.*)
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
@@ -4423,6 +4435,7 @@ let flatten_simple_pattern size (p : Simple.pattern) =
   | `Lazy _
   | `Construct _
   | `Constant _
+  | `Unboxed_unit
   | `Unboxed_tuple _ ->
       (* All calls to this function originate from [do_for_multiple_match],
          where we know that the scrutinee is a tuple literal.
@@ -4492,7 +4505,7 @@ let do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list pa
   let param_lambda = List.map (fun (l, _, _) -> l) paraml in
   let arg =
     let sloc = Scoped_location.of_location ~scopes loc in
-    Lprim (Pmakeblock (0, Immutable, None, mode), param_lambda, sloc)
+    Lprim (Pmakeblock (0, Immutable, All_value, mode), param_lambda, sloc)
   in
   let arg_sort = Jkind.Sort.Const.for_tuple in
   let handler =

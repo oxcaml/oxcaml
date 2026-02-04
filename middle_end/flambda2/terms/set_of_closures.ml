@@ -138,9 +138,10 @@ let apply_renaming ({ function_decls; value_slots; alloc_mode } as t) renaming =
           None))
       value_slots
   in
-  if alloc_mode == alloc_mode'
-     && function_decls == function_decls'
-     && not !changed
+  if
+    alloc_mode == alloc_mode'
+    && function_decls == function_decls'
+    && not !changed
   then t
   else
     { function_decls = function_decls';

@@ -1,0 +1,27 @@
+Test: include with module ident
+Expected: before 99 2.5 pre 42.0 hello 1.0 100 test after 3.14 7 post
+Actual:   before 99 2.5 pre 42.0 hello 1.0 100 test after 3.14 7 post
+
+Test: include with inline struct
+Expected: 42.0 hello 2 inline 3.0 3.14
+Actual:   42.0 hello 2 inline 3.0 3.14
+
+Test: include with functor
+Expected: 42.0 hello 4.0 functor 5 3.14
+Actual:   42.0 hello 4.0 functor 5 3.14
+
+Test: multiple includes
+Expected: 1.0 from A 2.0 from B 3.0 6 A 7.0 B
+Actual:   1.0 from A 2.0 from B 3.0 6 A 7.0 B
+
+Test: include shadowing include
+Expected: 20.0 overridden 100 9 override
+Actual:   20.0 overridden 100 9 override
+
+Test: include shadowing a val
+Expected: 5.0 from_include 7.0 11 from_include
+Actual:   5.0 from_include 7.0 11 from_include
+
+Test: val shadowing an include
+Expected: 9.0 from_include after_include 13 shadowed
+Actual:   9.0 from_include after_include 13 shadowed

@@ -189,6 +189,8 @@ let gdwarf_compression = ref default_gdwarf_compression
 
 let ddwarf_metrics = ref false
 
+let ddwarf_metrics_output_file : string option ref = ref None
+
 let get_dwarf_compression_flag () =
   if !dwarf_inlined_frames || not !restrict_to_upstream_dwarf
   then Some !gdwarf_compression

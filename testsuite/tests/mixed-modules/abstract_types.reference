@@ -1,0 +1,23 @@
+Test: abstract type : value
+Expected: foo bar baz 10 20 30
+Actual:   foo bar baz 10 20 30
+
+Test: abstract type : value with type t := string
+Expected: foo bar baz 10 20 30
+Actual:   foo bar baz 10 20 30
+
+Test: abstract type : float64
+Expected: foo bar 50 60 40 70
+Actual:   foo bar 50 60 40 70
+
+Test: abstract type : float64 with type t := float#
+Expected: foo bar 50 60 40 70
+Actual:   foo bar 50 60 40 70
+
+Test: abstract type : void
+Expected: foo bar 80 90
+Actual:   foo bar 80 90
+
+Test: abstract type : void with type t := void
+Expected: foo bar 80 90
+Actual:   foo bar 80 90

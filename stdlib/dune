@@ -24,11 +24,12 @@
    -g
    -absname
    -bin-annot
+   -extension runtime_metaprogramming
    -nostdlib
    -safe-string
    -strict-formats))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (preprocess
   (per_module
    ((action

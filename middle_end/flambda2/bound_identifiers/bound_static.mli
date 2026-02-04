@@ -15,8 +15,8 @@
 (**************************************************************************)
 
 (** The left-hand sides of [Let]-expressions that bind statically-allocated
-    constants and pieces of code. Used via [Bound_pattern] in the term
-    language. *)
+    constants and pieces of code. Used via [Bound_pattern] in the term language.
+*)
 
 module Pattern : sig
   type t = private

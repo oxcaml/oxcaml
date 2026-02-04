@@ -47,7 +47,7 @@ val prelude :
   (module Utils) ->
   on_fatal_callback:(unit -> unit) ->
   Cfg_with_infos.t ->
-  cfg_infos * Regalloc_stack_slots.t
+  cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t
 
 (* Runs the last steps common to register allocators, updating the CFG (stack
    slots, live fields, and prologue), running [f], and checking

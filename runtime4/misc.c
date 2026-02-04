@@ -408,7 +408,7 @@ CAMLprim value caml_get_continuation_callstack(void)
   caml_fatal_error("Effects not implemented in runtime4");
 }
 
-CAMLprim value caml_continuation_use_and_update_handler_noexc(void)
+CAMLprim value caml_continuation_update_handler_noexc(void)
 {
   caml_fatal_error("Effects not implemented in runtime4");
 }

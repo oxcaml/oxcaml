@@ -79,8 +79,8 @@ module T = struct
   type nonrec 'a t = 'a t
 end
 
-let rec tuple :
-    type a r. (a, r) Tuple.Of(T).t -> (a, r) Tuple.t -> (a, r) Tuple.t Seq.t =
+let rec tuple : type a r.
+    (a, r) Tuple.Of(T).t -> (a, r) Tuple.t -> (a, r) Tuple.t Seq.t =
  fun ts tup ->
   match ts, tup with
   | [], [] -> Seq.empty

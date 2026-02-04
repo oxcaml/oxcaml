@@ -2,14 +2,22 @@
  include stdlib_stable;
  include stdlib_upstream_compatible;
  readonly_files =
-   "gen_u_array.ml test_gen_u_array.ml gen_product_array_helpers.ml";
- modules = "${readonly_files}";
+   "gen_u_array.ml test_gen_u_array.ml vector_elem.ml gen_product_array_helpers.ml";
+ modules = "${readonly_files} stubs.c";
  flambda2;
  stack-allocation;
  {
    bytecode;
  }
  {
+   native;
+ }
+ {
+   flags = "-O3";
+   native;
+ }
+ {
+   flags = "-Oclassic";
    native;
  }
 *)

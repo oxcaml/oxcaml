@@ -92,11 +92,12 @@ and head_of_kind_naked_immediate = private
   | Get_tag of t  (** For variants only *)
   | Is_null of t
 
-(** Invariant: the float/integer sets for naked float, int<N>, and
-    nativeint heads are non-empty. (Empty sets are represented as an overall
-    bottom type.) *)
+(** Invariant: the float/integer sets for naked float, int<N>, and nativeint
+    heads are non-empty. (Empty sets are represented as an overall bottom type.)
+*)
 
-and head_of_kind_naked_float32 = private
+and head_of_kind_naked_float32 =
+  private
   Numeric_types.Float32_by_bit_pattern.Set.t
 
 and head_of_kind_naked_float = private Numeric_types.Float_by_bit_pattern.Set.t
@@ -490,6 +491,8 @@ module Closures_entry : sig
   val find_function_type :
     t -> exact:bool -> Function_slot.t -> Function_type.t Or_unknown_or_bottom.t
 
+  val function_slot_types : t -> flambda_type Function_slot.Map.t
+
   val value_slot_types : t -> flambda_type Value_slot.Map.t
 end
 
@@ -596,14 +599,14 @@ module Row_like_for_blocks : sig
       The handling of those cases could be improved:
 
       - In the case of disjunctions, if all possible nth fields point to the
-      same type, this type could be returned directly.
+        same type, this type could be returned directly.
 
       - When the tag or size is not known but there is a unique possible value,
-      it could be returned anyway
+        it could be returned anyway
 
       - There could be a distinction between the first three cases (where we
-      expect that doing the actual meet could give us a better result) and the
-      last case where we already know what the result of the meet will be. *)
+        expect that doing the actual meet could give us a better result) and the
+        last case where we already know what the result of the meet will be. *)
   val get_field : t -> Target_ocaml_int.t -> flambda_type Or_unknown_or_bottom.t
 
   val is_bottom : t -> bool

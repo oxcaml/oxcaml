@@ -67,10 +67,16 @@ let equal_arch left right =
     true
   | (X64 | X86), _ -> false
 
+let equal_reg_idx left right =
+  match left, right with
+  | Scalar left, Scalar right -> equal_reg64 left right
+  | Vector left, Vector right -> equal_regf left right
+  | (Scalar _ | Vector _), _ -> false
+
 let equal_addr left right =
   equal_arch left.arch right.arch
   && equal_data_type left.typ right.typ
-  && equal_reg64 left.idx right.idx
+  && equal_reg_idx left.idx right.idx
   && Int.equal left.scale right.scale
   && Option.equal equal_reg64 left.base right.base
   && Option.equal String.equal left.sym right.sym

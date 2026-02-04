@@ -28,6 +28,9 @@ val with_ppf_file :
 val with_ppf_dump : ?stdout:unit ->
   file_prefix:string -> (Format.formatter -> 'a) -> 'a
 
+val get_profile_file_prefix :
+  expected_suffix:string -> default_name:string -> string
+
 val auto_include : Load_path.auto_include_callback
 (** [auto_include find_in_dir fn] is a callback function to be passed to
     {!Load_path.init} and automatically adds [-I +lib] to the load path after

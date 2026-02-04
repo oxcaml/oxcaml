@@ -21,14 +21,14 @@
     descriptions are categorised according to their surrounding context:
 
     - [Lvalue] descriptions are used when the context needs to know the _place_
-    where a particular variable is stored. Typically such a description is some
-    address in the target's memory or the name of some register in the target's
-    CPU.
+      where a particular variable is stored. Typically such a description is
+      some address in the target's memory or the name of some register in the
+      target's CPU.
 
     - [Rvalue] descriptions are used when the context requires the _value_ of a
-    particular variable rather than a description of the place where it lives.
-    This is usually the case when the description is being used as some
-    sub-expression of a larger DWARF expression.
+      particular variable rather than a description of the place where it lives.
+      This is usually the case when the description is being used as some
+      sub-expression of a larger DWARF expression.
 
     Sometimes the context requires that the address of a value has to be given,
     but such address cannot be computed, for example because the value has been
@@ -143,7 +143,8 @@ module Rvalue : sig
       given by the provided simple location description at time T. *)
   val read_field : block:normal t -> field:Targetint.t -> normal t
 
-  (** V will be the contents of the given field of the given symbol at time T. *)
+  (** V will be the contents of the given field of the given symbol at time T.
+  *)
   val read_symbol_field : Asm_symbol.t -> field:Targetint.t -> normal t
 
   (** V will be found in the location given by evaluating the location

@@ -16,7 +16,13 @@
 
 open! Int_replace_polymorphic_compare
 
-(* SIMD instruction selection for AMD64 *)
+(* SIMD instruction selection for AMD64.
+
+   Some SIMD instructions have two encodings that exhibit identical behavior,
+   but are intended for use on integer vs. float data (e.g. pxor vs xorpd). On
+   some CPUs, it can be more efficient to forward the result of an integer
+   instruction to further integer instructions, and likewise for floats.
+   However, we ignore this distinction and only expose one variant. *)
 
 open Arch
 open Amd64_simd_instrs
@@ -96,9 +102,16 @@ let extract_constant args name ~max =
       | Cifthenelse (_, _, _, _, _, _)
       | Cswitch (_, _, _, _)
       | Ccatch (_, _, _)
-      | Cexit (_, _, _) ))
+      | Cexit (_, _, _)
+      | Cinvalid _ ))
     :: _ ->
     bad_immediate "Did not get integer immediate for %s" name
+
+let extract_scale args name =
+  let i, args = extract_constant args name ~max:8 in
+  match i with
+  | 1 | 2 | 4 | 8 -> i, args
+  | _ -> bad_immediate "Did not get 1, 2, 4, or 8 as scale for %s" name
 
 let int_of_float_rounding : X86_ast.rounding -> int = function
   | RoundNearest -> 0x8
@@ -122,15 +135,68 @@ let select_operation_clmul ~dbg:_ op args =
       sse_or_avx pclmulqdq vpclmulqdq ~i args
     | _ -> None
 
+let select_operation_popcnt ~dbg:_ op args =
+  if not (Arch.Extension.enabled POPCNT)
+  then None
+  else
+    match op with
+    | "caml_popcnt_int32" -> instr popcnt_r32_r32m32 args
+    | "caml_popcnt_int64" -> instr popcnt_r64_r64m64 args
+    | _ -> None
+
+let select_operation_lzcnt ~dbg:_ op args =
+  if not (Arch.Extension.enabled LZCNT)
+  then None
+  else
+    match op with
+    | "caml_lzcnt_int32" -> instr lzcnt_r32_r32m32 args
+    | "caml_lzcnt_int64" -> instr lzcnt_r64_r64m64 args
+    | _ -> None
+
+let select_operation_bmi ~dbg:_ op args =
+  if not (Arch.Extension.enabled BMI)
+  then None
+  else
+    match op with
+    | "caml_bmi_andn_int32" -> instr andn_r32_r32_r32m32 args
+    | "caml_bmi_andn_int64" -> instr andn_r64_r64_r64m64 args
+    | "caml_bmi_bextr_int32" -> instr bextr_r32_r32m32_r32 args
+    | "caml_bmi_bextr_int64" -> instr bextr_r64_r64m64_r64 args
+    | "caml_bmi_blsi_int32" -> instr blsi_r32_r32m32 args
+    | "caml_bmi_blsi_int64" -> instr blsi_r64_r64m64 args
+    | "caml_bmi_blsmsk_int32" -> instr blsmsk_r32_r32m32 args
+    | "caml_bmi_blsmsk_int64" -> instr blsmsk_r64_r64m64 args
+    | "caml_bmi_blsr_int32" -> instr blsr_r32_r32m32 args
+    | "caml_bmi_blsr_int64" -> instr blsr_r64_r64m64 args
+    | "caml_bmi_tzcnt_int32" -> instr tzcnt_r32_r32m32 args
+    | "caml_bmi_tzcnt_int64" -> instr tzcnt_r64_r64m64 args
+    | _ -> None
+
 let select_operation_bmi2 ~dbg:_ op args =
   if not (Arch.Extension.enabled BMI2)
   then None
   else
     match op with
-    | "caml_bmi2_int64_extract_bits" ->
-      sse_or_avx pext_r64_r64_r64m64 pext_r64_r64_r64m64 args
-    | "caml_bmi2_int64_deposit_bits" ->
-      sse_or_avx pdep_r64_r64_r64m64 pdep_r64_r64_r64m64 args
+    | "caml_bmi2_bzhi_int32" -> instr bzhi_r32_r32m32_r32 args
+    | "caml_bmi2_bzhi_int64" -> instr bzhi_r64_r64m64_r64 args
+    | "caml_bmi2_mulx_int32" -> instr mulx_r32_r32_r32m32_rdx args
+    | "caml_bmi2_mulx_int64" -> instr mulx_r64_r64_r64m64_rdx args
+    | "caml_bmi2_pext_int32" -> instr pext_r32_r32_r32m32 args
+    | "caml_bmi2_pext_int64" -> instr pext_r64_r64_r64m64 args
+    | "caml_bmi2_pdep_int32" -> instr pdep_r32_r32_r32m32 args
+    | "caml_bmi2_pdep_int64" -> instr pdep_r64_r64_r64m64 args
+    | "caml_bmi2_rorx_int32" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr rorx_r32_r32m32 ~i args
+    | "caml_bmi2_rorx_int64" ->
+      let i, args = extract_constant args ~max:63 op in
+      instr rorx_r64_r64m64 ~i args
+    | "caml_bmi2_sarx_int32" -> instr sarx_r32_r32m32_r32 args
+    | "caml_bmi2_sarx_int64" -> instr sarx_r64_r64m64_r64 args
+    | "caml_bmi2_shrx_int32" -> instr shrx_r32_r32m32_r32 args
+    | "caml_bmi2_shrx_int64" -> instr shrx_r64_r64m64_r64 args
+    | "caml_bmi2_shlx_int32" -> instr shlx_r32_r32m32_r32 args
+    | "caml_bmi2_shlx_int64" -> instr shlx_r64_r64m64_r64 args
     | _ -> None
 
 let select_operation_sse ~dbg op args =
@@ -385,8 +451,12 @@ let select_operation_sse3 ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_sse3_vec128_load_known_unaligned" ->
+      simd_load_sse_or_avx ~mode:Arch.identity_addressing lddqu vlddqu_X_m128
+        args
     | "caml_sse3_vec128_load_broadcast64" ->
-      simd_load_sse_or_avx ~mode:(Iindexed 0) movddup vmovddup_X_Xm64 args
+      simd_load_sse_or_avx ~mode:Arch.identity_addressing movddup
+        vmovddup_X_Xm64 args
     | "caml_sse3_float32x4_addsub" ->
       sse_or_avx addsubps vaddsubps_X_X_Xm128 args
     | "caml_sse3_float64x2_addsub" ->
@@ -445,7 +515,8 @@ let select_operation_sse41 ~dbg op args =
   else
     match op with
     | "caml_sse41_vec128_load_aligned_uncached" ->
-      simd_load_sse_or_avx ~mode:(Iindexed 0) movntdqa vmovntdqa_X_m128 args
+      simd_load_sse_or_avx ~mode:Arch.identity_addressing movntdqa
+        vmovntdqa_X_m128 args
     | "caml_sse41_vec128_blend_16" ->
       let i, args = extract_constant args ~max:255 op in
       sse_or_avx pblendw vpblendw_X_X_Xm128 ~i args
@@ -652,6 +723,8 @@ let select_operation_avx ~dbg:_ op args =
       simd_load ~mode:Arch.identity_addressing vmovapd_Y_Ym256 args
     | "caml_avx_vec256_load_unaligned" ->
       simd_load ~mode:Arch.identity_addressing vmovupd_Y_Ym256 args
+    | "caml_avx_vec256_load_known_unaligned" ->
+      simd_load ~mode:Arch.identity_addressing vlddqu_Y_m256 args
     | "caml_avx_vec256_store_aligned" ->
       simd_store ~mode:Arch.identity_addressing vmovapd_m256_Y args
     | "caml_avx_vec256_store_unaligned" ->
@@ -798,6 +871,30 @@ let select_operation_avx2 ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_avx2_vec128_gather32_index32" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherdd_X_M32X_X args
+    | "caml_avx2_vec256_gather32_index32" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherdd_Y_M32Y_Y args
+    | "caml_avx2_vec128_gather64_index32" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherdq_X_M32X_X args
+    | "caml_avx2_vec256_gather64_index32" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherdq_Y_M32X_Y args
+    | "caml_avx2_vec128_gather32_index64" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherqd_X_M64X_X args
+    | "caml_avx2_vec256_gather32_index64" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherqd_X_M64Y_X args
+    | "caml_avx2_vec128_gather64_index64" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherqq_X_M64X_X args
+    | "caml_avx2_vec256_gather64_index64" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherqq_Y_M64Y_Y args
     | "caml_avx2_int8x32_abs" -> instr vpabsb_Y_Ym256 args
     | "caml_avx2_int16x16_abs" -> instr vpabsw_Y_Ym256 args
     | "caml_avx2_int32x8_abs" -> instr vpabsd_Y_Ym256 args
@@ -1023,6 +1120,9 @@ let select_operation_cfg ~dbg op args =
   in
   None
   |> or_else select_operation_clmul
+  |> or_else select_operation_popcnt
+  |> or_else select_operation_lzcnt
+  |> or_else select_operation_bmi
   |> or_else select_operation_bmi2
   |> or_else select_operation_sse
   |> or_else select_operation_sse2
@@ -1060,14 +1160,15 @@ let maybe_pin arr i loc =
 
 let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
   Array.iteri
-    (fun i (simd_arg : Simd.arg) -> maybe_pin arg_regs i simd_arg.loc)
+    (fun i ({ loc; _ } : Simd.arg) -> maybe_pin arg_regs i loc)
     simd.args;
   (match simd.res with
   | Res_none -> ()
   | First_arg ->
     assert (not (Reg.is_preassigned arg_regs.(0)));
     arg_regs.(0) <- res_regs.(0)
-  | Res { loc; _ } -> maybe_pin res_regs 0 loc);
+  | Res rr ->
+    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr);
   arg_regs, res_regs
 
 let pseudoregs_for_operation (simd : Simd.operation) arg res =
@@ -1295,9 +1396,9 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
-      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
-      | Name_for_debugger _ | Dls_get | Tls_get | Poll ->
+      | Const_vec512 _ | Stackoffset _ | Int128op _ | Intop_atomic _ | Floatop _
+      | Csel _ | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
+      | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll ->
         assert false
     in
     assert (arg_count = 0 && res_count = 1);
@@ -1350,16 +1451,18 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
-      | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-      | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause ->
+      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+      | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
+      | Domain_index | Poll | Pause ->
         assert false
     in
     let consts = List.map extract_intop_imm_int cfg_ops in
     match create_const_vec consts, vectorize_intop intop with
     | Some [const_instruction], Some [intop_instruction] ->
-      if Array.length const_instruction.results = 1
-         && Array.length intop_instruction.arguments = 2
+      if
+        Array.length const_instruction.results = 1
+        && Array.length intop_instruction.arguments = 2
       then (
         assert (arg_count = 1 && res_count = 1);
         const_instruction.results.(0)
@@ -1391,9 +1494,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
-        | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-        | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause ->
+        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+        | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+        | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Pause ->
           assert false
       in
       let get_scale op =
@@ -1520,13 +1624,13 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
               | Izextend32 | Illvm_intrinsic _ )
-          | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Alloc _
-          | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
-          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
-          | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-          | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause
-            ->
+          | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
+          | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
+          | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+          | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+          | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
+          | Domain_index | Poll | Pause ->
             assert false
         in
         let consts = List.map extract_store_int_imm cfg_ops in
@@ -1590,10 +1694,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         let arguments = append_result results address_args in
         simd_load_sse_or_avx ~mode:addressing_mode sse avx arguments
         |> Option.map (fun (operation, arguments) ->
-               [ { Vectorize_utils.Vectorized_instruction.operation;
-                   arguments;
-                   results
-                 } ])
+            [ { Vectorize_utils.Vectorized_instruction.operation;
+                arguments;
+                results
+              } ])
       else
         (* Emit a load followed by an arithmetic operation, effectively
            reverting the decision from Arch.selection. It will probably not be
@@ -1629,7 +1733,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         intr)
   | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-  | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _
-  | Csel _ | Probe_is_enabled _ | Opaque | Pause | Begin_region | End_region
-  | Name_for_debugger _ | Dls_get | Tls_get | Poll ->
+  | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+  | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
+  | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
+  | Domain_index | Poll ->
     None

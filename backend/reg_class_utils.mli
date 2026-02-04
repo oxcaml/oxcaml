@@ -15,9 +15,9 @@ module type T = sig
   val num_registers : t -> int
 
   (** For a given register class, the DWARF register numbering for that class.
-    Given an allocated register with location [Reg n] and class [reg_class], the
-    returned array contains the corresponding DWARF register number at index
-    [n - first_available_register reg_class]. *)
+      Given an allocated register with location [Reg n] and class [reg_class],
+      the returned array contains the corresponding DWARF register number at
+      index [n - first_available_register reg_class]. *)
   val dwarf_register_numbers : t -> int array
 
   val register_name : Cmm.machtype_component -> int -> string
@@ -31,15 +31,15 @@ module type T = sig
   val of_machtype : Cmm.machtype_component -> t
 end
 
-(** Definition of tables with register classes as keys. All register classes
-    are always bound. *)
+(** Definition of tables with register classes as keys. All register classes are
+    always bound. *)
 module type Tbl = sig
   type reg_class
 
   type 'a t
 
-  (** Creates a table by calling [f] on each and every register class to
-      get the initial value for that class. *)
+  (** Creates a table by calling [f] on each and every register class to get the
+      initial value for that class. *)
   val init : f:(reg_class -> 'a) -> 'a t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t

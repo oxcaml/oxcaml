@@ -27,6 +27,9 @@ let ocamlrun_ocaml = ocamlrun Ocaml_files.ocaml
 let expect =
   Ocaml_files.expect
 
+let expectnat =
+  Ocaml_files.expectnat
+
 let ocamlrun_ocamllex = ocamlrun Ocaml_files.ocamllex
 
 let ocamlrun_ocamldoc =

@@ -42,7 +42,7 @@ let int64_popcount =
   (* 0b00001111... *)
   let h01 = 0x0101010101010101L in
   (* 1 bit set per byte *)
-  fun [@inline] x ->
+  fun[@inline] x ->
     (* gather the bit count for every pair of bits *)
     let x = x - ((x lsr 1) land m1) in
     (* gather the bit count for every 4 bits *)

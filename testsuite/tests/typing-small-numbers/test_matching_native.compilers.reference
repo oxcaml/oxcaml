@@ -4,6 +4,7 @@ Line 5, characters 4-8:
 5 |   | #'c' -> 4
         ^^^^
 Warning 11 [redundant-case]: this match case is unused.
+
 val three_redundant : int = 3
 val thirty : int = 30
 val forty : int = 40
@@ -14,6 +15,7 @@ Line 5, characters 4-14:
 5 |   | #'f'..#'t' -> 300
         ^^^^^^^^^^
 Warning 11 [redundant-case]: this match case is unused.
+
 val two_hundred_full_overlap : int = 200
 Lines 3-4, characters 2-21:
 3 | ..match #'m' with
@@ -21,12 +23,14 @@ Lines 3-4, characters 2-21:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 #'A'
+
 val five_hundred_partial : int = 500
 val seven_hundred : int = 700
 Line 6, characters 4-5:
 6 |   | _ -> 1000
         ^
 Warning 11 [redundant-case]: this match case is unused.
+
 val nine_hundred_redundant_wildcard : int = 900
 val zero : int = 0
 val one : int = 1
@@ -34,6 +38,7 @@ Line 5, characters 4-6:
 5 |   | 3s -> 4
         ^^
 Warning 11 [redundant-case]: this match case is unused.
+
 val three_redundant : int = 3
 val thirty : int = 30
 val forty : int = 40
@@ -43,6 +48,7 @@ Lines 3-4, characters 2-64:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 11s
+
 val five_hundred_partial : int = 500
 val zero : int = 0
 val one : int = 1
@@ -50,6 +56,7 @@ Line 5, characters 4-7:
 5 |   | #3s -> 4
         ^^^
 Warning 11 [redundant-case]: this match case is unused.
+
 val three_redundant : int = 3
 val thirty : int = 30
 val forty : int = 40
@@ -59,6 +66,7 @@ Lines 3-4, characters 2-75:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 #11s
+
 val five_hundred_partial : int = 500
 val zero : int = 0
 val one : int = 1
@@ -66,6 +74,7 @@ Line 5, characters 4-6:
 5 |   | 3S -> 4
         ^^
 Warning 11 [redundant-case]: this match case is unused.
+
 val three_redundant : int = 3
 val thirty : int = 30
 val forty : int = 40
@@ -75,6 +84,7 @@ Lines 3-4, characters 2-64:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 11S
+
 val five_hundred_partial : int = 500
 val zero : int = 0
 val one : int = 1
@@ -82,6 +92,7 @@ Line 5, characters 4-7:
 5 |   | #3S -> 4
         ^^^
 Warning 11 [redundant-case]: this match case is unused.
+
 val three_redundant : int = 3
 val thirty : int = 30
 val forty : int = 40
@@ -91,5 +102,6 @@ Lines 3-4, characters 2-75:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 #11S
+
 val five_hundred_partial : int = 500
 

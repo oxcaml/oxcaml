@@ -17,7 +17,7 @@
 (** Approximations used for cross-module inlining in Closure_conversion *)
 
 type 'code t =
-  | Value_unknown
+  | Unknown of Flambda_kind.t
   | Value_symbol of Symbol.t
   | Value_const of Reg_width_const.t
   | Closure_approximation of

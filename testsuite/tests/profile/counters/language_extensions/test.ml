@@ -3,6 +3,7 @@
 subdirectories = "include_functor immutable_array_comprehensions comprehensions \
                   immutable_arrays module_strengthening labeled_tuples nested";
 setup-ocamlc.byte-build-env;
+set OCAMLPARAM = "";
 ocamlc_byte_exit_status = "0";
 flags = "-dcounters -extension include_functor -extension comprehensions \
         -extension immutable_arrays -extension immutable_arrays \

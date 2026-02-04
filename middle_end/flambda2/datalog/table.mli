@@ -20,7 +20,7 @@ module Type : sig
 end
 
 module Id : sig
-  type ('t, 'k, 'v) t
+  type (!'t, !'k, !'v) t
 
   val print : Format.formatter -> ('t, 'k, 'v) t -> unit
 

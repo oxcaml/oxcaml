@@ -1,13 +1,13 @@
 open Stdlib
 
 external int64x2_of_int64s : int64 -> int64 -> int64x2 = "" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x2_low_int64 : int64x2 -> int64 = "" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x2_high_int64 : int64x2 -> int64 = "" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external lots_of_vectors :
   int64x2 ->
@@ -27,7 +27,7 @@ external lots_of_vectors :
   int64x2 ->
   int64x2 ->
   int64x2 = "" "lots_of_vectors"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external vectors_and_floats :
   int64x2 ->
@@ -55,7 +55,7 @@ external vectors_and_floats :
   float ->
   float ->
   int64x2 = "" "vectors_and_floats"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external vectors_and_floats_and_ints :
   int64x2 ->
@@ -83,7 +83,7 @@ external vectors_and_floats_and_ints :
   int64 ->
   float ->
   int64x2 = "" "vectors_and_floats_and_ints"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 let eq l r = if l <> r then Printf.printf "%Ld <> %Ld\n" l r
 

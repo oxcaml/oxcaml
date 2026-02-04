@@ -35,23 +35,10 @@ type error =
   | Wrong_arity_builtin_primitive of string
   | Wrong_layout_for_peek_or_poke of string
   | Invalid_floatarray_glb
-  | Product_iarrays_unsupported
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
 
 exception Error of Location.t * error
-
-(* CR layouts v7.1: This is temporary - we should support iarrays of unboxed
-   products. *)
-let unboxed_product_iarray_check loc kind mut =
-  match kind, mut with
-  | (Pgcscannableproductarray _ | Pgcignorableproductarray _),
-    (Immutable | Immutable_unique) ->
-    raise (Error (loc, Product_iarrays_unsupported))
-  | _, Mutable
-  | (Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _), _  ->
-    ()
 
 let unboxed_product_uninitialized_array_check loc array_kind =
   (* See comments in lambda_to_lambda_transforms.ml in Flambda 2 for more
@@ -63,7 +50,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
   | Punboxedvectorarray _ ->
     ()
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     raise (Error (loc, Invalid_array_kind_for_uninitialized_makearray_dynamic))
 
@@ -602,8 +589,10 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
-    | "%makeblock" -> Primitive ((Pmakeblock(0, Immutable, None, mode)), 1)
-    | "%makemutable" -> Primitive ((Pmakeblock(0, Mutable, None, mode)), 1)
+    | "%makeblock" ->
+       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+    | "%makemutable" ->
+       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -620,6 +609,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%ostype_win32" -> Primitive ((Pctconst Ostype_win32), 1)
     | "%ostype_cygwin" -> Primitive ((Pctconst Ostype_cygwin), 1)
     | "%runtime5" -> Primitive ((Pctconst Runtime5), 1)
+    | "%arch_amd64" -> Primitive ((Pctconst Arch_amd64), 1)
+    | "%arch_arm64" -> Primitive ((Pctconst Arch_arm64), 1)
     | "%frame_pointers" -> Frame_pointers
     | "%negint" -> unary (Integral (int, Neg))
     | "%succint" -> unary (Integral (int, Succ))
@@ -1056,16 +1047,20 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%atomic_lxor_field" -> Atomic(Lxor, Field, Immediate)
     | "%atomic_lxor_loc" -> Atomic(Lxor, Loc, Immediate)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
-    | "%runstack" ->
-      if runtime5 then Primitive (Prunstack, 3) else Unsupported Prunstack
+    | "%with_stack" ->
+      if runtime5 then Primitive (Pwith_stack, 5) else Unsupported Pwith_stack
+    | "%with_stack_bind" ->
+      if runtime5 then Primitive (Pwith_stack_bind, 7)
+      else Unsupported Pwith_stack_bind
     | "%reperform" ->
       if runtime5 then Primitive (Preperform, 3) else Unsupported Preperform
     | "%perform" ->
       if runtime5 then Primitive (Pperform, 1) else Unsupported Pperform
     | "%resume" ->
-      if runtime5 then Primitive (Presume, 4) else Unsupported Presume
+      if runtime5 then Primitive (Presume, 3) else Unsupported Presume
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
+    | "%domain_index" -> Primitive (Pdomain_index, 1)
     | "%poll" -> Primitive (Ppoll, 1)
     | "%unbox_nativeint" ->
       static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
@@ -1166,11 +1161,13 @@ and glb_scannable_kind kind1 kind2 =
 
 (* The following function computes the greatest lower bound of array kinds:
 
-        gen      unboxed-float  unboxed-int32  unboxed-int64  unboxed-nativeint
+        gen      unboxed-{float,int,int8,int16,int32,int64,nativeint}
          |
       /------\
       |      |
     addr  float
+      |
+ gcignorableaddr
       |
     int
 
@@ -1202,6 +1199,15 @@ let glb_array_type loc t1 t2 =
     Punboxedfloatarray Unboxed_float32
   | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray Untagged_int
+  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int8),
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray Untagged_int8
+  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int16),
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray Untagged_int16
   | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray Unboxed_int32
@@ -1243,14 +1249,22 @@ let glb_array_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray, (Paddrarray | Pintarray)
-  | (Paddrarray | Pintarray), Pfloatarray -> t1
+  | Pfloatarray, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray | Pgcignorableaddrarray | Pintarray), Pfloatarray -> t1
 
   (* Compute the correct GLB *)
-  | Pgenarray, ((Pgenarray | Paddrarray | Pintarray | Pfloatarray) as x)
-  | ((Paddrarray | Pintarray | Pfloatarray) as x), Pgenarray -> x
+  | Pgenarray,
+    ((Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray)
+      as x)
+  | ((Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray) as x),
+    Pgenarray -> x
   | Paddrarray, Paddrarray -> Paddrarray
+  | Paddrarray, Pgcignorableaddrarray
+  | Pgcignorableaddrarray, Paddrarray -> Pgcignorableaddrarray
   | Paddrarray, Pintarray | Pintarray, Paddrarray -> Pintarray
+  | Pgcignorableaddrarray, Pgcignorableaddrarray -> Pgcignorableaddrarray
+  | Pgcignorableaddrarray, Pintarray
+  | Pintarray, Pgcignorableaddrarray -> Pintarray
   | Pintarray, Pintarray -> Pintarray
   | Pfloatarray, Pfloatarray -> Pfloatarray
 
@@ -1274,6 +1288,15 @@ let glb_array_ref_type loc t1 t2 =
   | Punboxedfloatarray_ref _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray_ref Untagged_int
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int8),
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray_ref Untagged_int8
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int16),
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray_ref Untagged_int16
   | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_ref Unboxed_int32
@@ -1317,22 +1340,31 @@ let glb_array_ref_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray_ref _, (Paddrarray | Pintarray)
-  | (Paddrarray_ref | Pintarray_ref), Pfloatarray -> t1
+  | Pfloatarray_ref _, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref), Pfloatarray ->
+    t1
 
   (* Compute the correct GLB *)
 
   (* Pgenarray >= _ *)
   | (Pgenarray_ref _ as x), Pgenarray -> x
   | Pgenarray_ref _, Pintarray -> Pintarray_ref
+  | Pgenarray_ref _, Pgcignorableaddrarray -> Pgcignorableaddrarray_ref
   | Pgenarray_ref _, Paddrarray -> Paddrarray_ref
   | Pgenarray_ref mode, Pfloatarray -> Pfloatarray_ref mode
-  | (Paddrarray_ref | Pintarray_ref | Pfloatarray_ref _ as x), Pgenarray -> x
+  | (Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
+     | Pfloatarray_ref _ as x), Pgenarray -> x
 
   (* Paddrarray > Pintarray *)
   | Paddrarray_ref, Paddrarray -> Paddrarray_ref
+  | Paddrarray_ref, Pgcignorableaddrarray -> Pgcignorableaddrarray_ref
   | Paddrarray_ref, Pintarray -> Pintarray_ref
+  | Pgcignorableaddrarray_ref, Paddrarray -> Pgcignorableaddrarray_ref
+  | Pgcignorableaddrarray_ref, Pgcignorableaddrarray ->
+    Pgcignorableaddrarray_ref
+  | Pgcignorableaddrarray_ref, Pintarray -> Pintarray_ref
   | Pintarray_ref, Paddrarray -> Pintarray_ref
+  | Pintarray_ref, Pgcignorableaddrarray -> Pintarray_ref
 
   (* Pintarray is a minimum *)
   | Pintarray_ref, Pintarray -> Pintarray_ref
@@ -1360,6 +1392,15 @@ let glb_array_set_type loc t1 t2 =
   | Punboxedfloatarray_set _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray_set Untagged_int
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int8),
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray_set Untagged_int8
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int16),
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray_set Untagged_int16
   | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_set Unboxed_int32
@@ -1404,22 +1445,31 @@ let glb_array_set_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray_set kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray_set, (Paddrarray | Pintarray)
-  | (Paddrarray_set _ | Pintarray_set), Pfloatarray -> t1
+  | Pfloatarray_set, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set),
+      Pfloatarray -> t1
 
   (* Compute the correct GLB *)
 
   (* Pgenarray >= _ *)
   | (Pgenarray_set _ as x), Pgenarray -> x
   | Pgenarray_set _, Pintarray -> Pintarray_set
+  | Pgenarray_set _, Pgcignorableaddrarray -> Pgcignorableaddrarray_set
   | Pgenarray_set mode, Paddrarray -> Paddrarray_set mode
   | Pgenarray_set _, Pfloatarray -> Pfloatarray_set
-  | (Paddrarray_set _ | Pintarray_set | Pfloatarray_set as x), Pgenarray -> x
+  | (Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
+     | Pfloatarray_set as x), Pgenarray -> x
 
   (* Paddrarray > Pintarray *)
   | (Paddrarray_set _ as x), Paddrarray -> x
+  | (Paddrarray_set _ as x), Pgcignorableaddrarray -> x
   | Paddrarray_set _, Pintarray -> Pintarray_set
+  | Pgcignorableaddrarray_set, Paddrarray -> Pgcignorableaddrarray_set
+  | Pgcignorableaddrarray_set, Pgcignorableaddrarray ->
+    Pgcignorableaddrarray_set
+  | Pgcignorableaddrarray_set, Pintarray -> Pintarray_set
   | Pintarray_set, Paddrarray -> Pintarray_set
+  | Pintarray_set, Pgcignorableaddrarray -> Pintarray_set
 
   (* Pintarray is a minimum *)
   | Pintarray_set, Pintarray -> Pintarray_set
@@ -1449,7 +1499,8 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
     | Pvalue _
     | Punboxed_vector _
     | Punboxed_product _
-    | Pbottom ->
+    | Pbottom
+    | Psplicevar _ ->
       raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
 
 let should_specialize_primitive p =
@@ -1571,8 +1622,6 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         array_kind_of_elt ~elt_sort:None env loc p2
         |> glb_array_type loc array_kind
       in
-      let array_mut = array_type_mut env rest_ty in
-      unboxed_product_iarray_check loc new_array_kind array_mut;
       if array_kind = new_array_kind then None
       else
         Some (Primitive (Pmakearray_dynamic (
@@ -1585,8 +1634,6 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         array_type_kind ~elt_sort:None ~elt_ty:None env loc rest_ty
         |> glb_array_type loc array_kind
       in
-      let array_mut = array_type_mut env rest_ty in
-      unboxed_product_iarray_check loc new_array_kind array_mut;
       unboxed_product_uninitialized_array_check loc new_array_kind;
       if array_kind = new_array_kind then None
       else
@@ -1630,7 +1677,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       | Pbigarray_unknown, Pbigarray_unknown_layout -> None
       | _, _ -> Some (Primitive (Pbigarrayset(unsafe, n, k, l), arity))
     end
-  | Primitive (Pmakeblock(tag, mut, None, mode), arity), fields -> begin
+  | Primitive (Pmakeblock(tag, mut, All_value, mode), arity), fields ->
+    begin
       let shape =
         List.map (fun typ ->
           Lambda.must_be_value (Typeopt.layout env (to_location loc)
@@ -1639,7 +1687,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       in
       let useful = List.exists (fun knd -> knd <> Lambda.generic_value) shape in
       if useful then
-        Some (Primitive (Pmakeblock(tag, mut, Some shape, mode),arity))
+        Some (Primitive (Pmakeblock(tag, mut,
+                           Lambda.block_shape_of_value_kinds (Some shape),
+                           mode), arity))
       else None
     end
   | Comparison(comp, Compare_generic), p1 :: _ ->
@@ -2048,7 +2098,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, None, alloc_heap), [lam; arg], loc)
+      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+            [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
       Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
   | Send_self (pos, layout), [obj; meth] ->
@@ -2096,7 +2147,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (
         Praise Raise_regular,
         [Lprim (
-          Pmakeblock (0, Immutable, None, alloc_heap),
+          Pmakeblock (0, Immutable, All_value, alloc_heap),
           [exn; Lconst (Const_immstring msg)],
           loc)],
         loc)
@@ -2196,8 +2247,8 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
   | [] -> lambda_of_prim p.prim_name prim loc args None
   | _ ->
      let loc =
-       Debuginfo.Scoped_location.map_scopes (fun ~scopes ->
-         Debuginfo.Scoped_location.enter_partial_or_eta_wrapper ~scopes)
+       Debuginfo.Scoped_location.map_scopes
+         Debuginfo.Scoped_location.enter_partial_or_eta_wrapper
          loc
      in
      let body = lambda_of_prim p.prim_name prim loc args None in
@@ -2301,7 +2352,7 @@ let lambda_primitive_needs_event_after = function
   | Punboxed_nativeint_array_set_vec _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
-  | Prunstack | Pperform | Preperform | Presume
+  | Pwith_stack | Pwith_stack_bind | Pperform | Preperform | Presume
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)
@@ -2312,7 +2363,7 @@ let lambda_primitive_needs_event_after = function
   | Parray_to_iarray | Parray_of_iarray
   | Pignore
   | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
-  | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
+  | Pmakeufloatblock _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
@@ -2325,11 +2376,13 @@ let lambda_primitive_needs_event_after = function
   | Psequor | Psequand | Pnot
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu
   | Pbytessetu
-  | Pmakearray ((Pintarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
+  | Pmakearray ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
+                 | Punboxedfloatarray _
       | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
       | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Pmakearray_dynamic
-      ((Pintarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
+      ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
+        | Punboxedfloatarray _
        | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
        | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Parrayblit _
@@ -2343,6 +2396,7 @@ let lambda_primitive_needs_event_after = function
   | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
   | Ptls_get
+  | Pdomain_index
   | Pobj_magic _ | Punbox_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
@@ -2435,9 +2489,6 @@ let report_error ppf = function
       fprintf ppf
         "@[Floatarray primitives can't be used on arrays containing@ \
          unboxed types.@]"
-  | Product_iarrays_unsupported ->
-      fprintf ppf
-        "Immutable arrays of unboxed products are not yet supported."
   | Invalid_array_kind_for_uninitialized_makearray_dynamic ->
       fprintf ppf
         "%%makearray_dynamic_uninit can only be used for GC-ignorable arrays@ \

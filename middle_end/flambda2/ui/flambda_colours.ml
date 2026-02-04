@@ -162,4 +162,4 @@ let each_file ppf = push ~fg:51 ppf
 
 let lambda = expr_keyword
 
-let effect ppf = push ~fg:46 ppf
+let effect_ ppf = push ~fg:46 ppf

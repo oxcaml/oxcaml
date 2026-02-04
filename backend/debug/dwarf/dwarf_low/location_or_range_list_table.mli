@@ -12,7 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Functor generating modules that handle DWARF location or range list tables. *)
+(** Functor generating modules that handle DWARF location or range list tables.
+*)
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 

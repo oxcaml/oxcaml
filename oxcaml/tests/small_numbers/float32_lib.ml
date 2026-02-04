@@ -13,72 +13,72 @@ module CF32 = struct
 
   external to_bits : (t[@unboxed]) -> (int32[@unboxed])
     = "float32_bits_to_int_boxed" "float32_bits_to_int"
-    [@@noalloc]
+  [@@noalloc]
 
   external of_int : (int[@untagged]) -> (t[@unboxed])
     = "float32_of_int_boxed" "float32_of_int"
-    [@@noalloc]
+  [@@noalloc]
 
   external of_int64 : (int64[@unboxed]) -> (t[@unboxed])
     = "float32_of_int64_boxed" "float32_of_int64"
-    [@@noalloc]
+  [@@noalloc]
 
   external of_float : (float[@unboxed]) -> (t[@unboxed])
     = "float32_of_float_boxed" "float32_of_float"
-    [@@noalloc]
+  [@@noalloc]
 
   external to_int : (t[@unboxed]) -> (int[@untagged])
     = "float32_to_int_boxed" "float32_to_int"
-    [@@noalloc]
+  [@@noalloc]
 
   external to_int64 : (t[@unboxed]) -> (int64[@unboxed])
     = "float32_to_int64_boxed" "float32_to_int64"
-    [@@noalloc]
+  [@@noalloc]
 
   external to_float : (t[@unboxed]) -> (float[@unboxed])
     = "float32_to_float_boxed" "float32_to_float"
-    [@@noalloc]
+  [@@noalloc]
 
   external zero : unit -> (t[@unboxed]) = "float32_zero_boxed" "float32_zero"
-    [@@noalloc]
+  [@@noalloc]
 
   external neg_zero : unit -> (t[@unboxed])
     = "float32_neg_zero_boxed" "float32_neg_zero"
-    [@@noalloc]
+  [@@noalloc]
 
   external one : unit -> (t[@unboxed]) = "float32_one_boxed" "float32_one"
-    [@@noalloc]
+  [@@noalloc]
 
   external neg_one : unit -> (t[@unboxed])
     = "float32_neg_one_boxed" "float32_neg_one"
-    [@@noalloc]
+  [@@noalloc]
 
   external nan : unit -> (t[@unboxed]) = "float32_nan_boxed" "float32_nan"
-    [@@noalloc]
+  [@@noalloc]
 
   external nan2 : unit -> (t[@unboxed]) = "float32_nan2_boxed" "float32_nan2"
-    [@@noalloc]
+  [@@noalloc]
 
   external neg_infinity : unit -> (t[@unboxed])
     = "float32_neg_infinity_boxed" "float32_neg_infinity"
-    [@@noalloc]
+  [@@noalloc]
 
   external infinity : unit -> (t[@unboxed])
     = "float32_infinity_boxed" "float32_infinity"
-    [@@noalloc]
+  [@@noalloc]
 
   external maxv : unit -> (t[@unboxed]) = "float32_maxv_boxed" "float32_maxv"
-    [@@noalloc]
+  [@@noalloc]
 
   external minv : unit -> (t[@unboxed]) = "float32_minv_boxed" "float32_minv"
-    [@@noalloc]
+  [@@noalloc]
 
   external epsilon : unit -> (t[@unboxed])
     = "float32_epsilon_boxed" "float32_epsilon"
-    [@@noalloc]
+  [@@noalloc]
 
   external pi : unit -> (t[@unboxed]) = "float32_pi_boxed" "float32_pi"
-    [@@noalloc]
+  [@@noalloc]
 
   let zero = zero ()
 
@@ -106,196 +106,196 @@ module CF32 = struct
 
   external abs : (t[@unboxed]) -> (t[@unboxed])
     = "float32_abs_boxed" "float32_abs"
-    [@@noalloc]
+  [@@noalloc]
 
   external neg : (t[@unboxed]) -> (t[@unboxed])
     = "float32_neg_boxed" "float32_neg"
-    [@@noalloc]
+  [@@noalloc]
 
   external sqrt : (t[@unboxed]) -> (t[@unboxed])
     = "float32_sqrt_boxed" "float32_sqrt"
-    [@@noalloc]
+  [@@noalloc]
 
   external cbrt : (t[@unboxed]) -> (t[@unboxed])
     = "float32_cbrt_boxed" "float32_cbrt"
-    [@@noalloc]
+  [@@noalloc]
 
   external exp : (t[@unboxed]) -> (t[@unboxed])
     = "float32_exp_boxed" "float32_exp"
-    [@@noalloc]
+  [@@noalloc]
 
   external exp2 : (t[@unboxed]) -> (t[@unboxed])
     = "float32_exp2_boxed" "float32_exp2"
-    [@@noalloc]
+  [@@noalloc]
 
   external log : (t[@unboxed]) -> (t[@unboxed])
     = "float32_log_boxed" "float32_log"
-    [@@noalloc]
+  [@@noalloc]
 
   external log10 : (t[@unboxed]) -> (t[@unboxed])
     = "float32_log10_boxed" "float32_log10"
-    [@@noalloc]
+  [@@noalloc]
 
   external log2 : (t[@unboxed]) -> (t[@unboxed])
     = "float32_log2_boxed" "float32_log2"
-    [@@noalloc]
+  [@@noalloc]
 
   external expm1 : (t[@unboxed]) -> (t[@unboxed])
     = "float32_expm1_boxed" "float32_expm1"
-    [@@noalloc]
+  [@@noalloc]
 
   external log1p : (t[@unboxed]) -> (t[@unboxed])
     = "float32_log1p_boxed" "float32_log1p"
-    [@@noalloc]
+  [@@noalloc]
 
   external cos : (t[@unboxed]) -> (t[@unboxed])
     = "float32_cos_boxed" "float32_cos"
-    [@@noalloc]
+  [@@noalloc]
 
   external sin : (t[@unboxed]) -> (t[@unboxed])
     = "float32_sin_boxed" "float32_sin"
-    [@@noalloc]
+  [@@noalloc]
 
   external tan : (t[@unboxed]) -> (t[@unboxed])
     = "float32_tan_boxed" "float32_tan"
-    [@@noalloc]
+  [@@noalloc]
 
   external acos : (t[@unboxed]) -> (t[@unboxed])
     = "float32_acos_boxed" "float32_acos"
-    [@@noalloc]
+  [@@noalloc]
 
   external asin : (t[@unboxed]) -> (t[@unboxed])
     = "float32_asin_boxed" "float32_asin"
-    [@@noalloc]
+  [@@noalloc]
 
   external atan : (t[@unboxed]) -> (t[@unboxed])
     = "float32_atan_boxed" "float32_atan"
-    [@@noalloc]
+  [@@noalloc]
 
   external cosh : (t[@unboxed]) -> (t[@unboxed])
     = "float32_cosh_boxed" "float32_cosh"
-    [@@noalloc]
+  [@@noalloc]
 
   external sinh : (t[@unboxed]) -> (t[@unboxed])
     = "float32_sinh_boxed" "float32_sinh"
-    [@@noalloc]
+  [@@noalloc]
 
   external tanh : (t[@unboxed]) -> (t[@unboxed])
     = "float32_tanh_boxed" "float32_tanh"
-    [@@noalloc]
+  [@@noalloc]
 
   external acosh : (t[@unboxed]) -> (t[@unboxed])
     = "float32_acosh_boxed" "float32_acosh"
-    [@@noalloc]
+  [@@noalloc]
 
   external asinh : (t[@unboxed]) -> (t[@unboxed])
     = "float32_asinh_boxed" "float32_asinh"
-    [@@noalloc]
+  [@@noalloc]
 
   external atanh : (t[@unboxed]) -> (t[@unboxed])
     = "float32_atanh_boxed" "float32_atanh"
-    [@@noalloc]
+  [@@noalloc]
 
   external erf : (t[@unboxed]) -> (t[@unboxed])
     = "float32_erf_boxed" "float32_erf"
-    [@@noalloc]
+  [@@noalloc]
 
   external erfc : (t[@unboxed]) -> (t[@unboxed])
     = "float32_erfc_boxed" "float32_erfc"
-    [@@noalloc]
+  [@@noalloc]
 
   external trunc : (t[@unboxed]) -> (t[@unboxed])
     = "float32_trunc_boxed" "float32_trunc"
-    [@@noalloc]
+  [@@noalloc]
 
   external round : (t[@unboxed]) -> (t[@unboxed])
     = "float32_round_boxed" "float32_round"
-    [@@noalloc]
+  [@@noalloc]
 
   external ceil : (t[@unboxed]) -> (t[@unboxed])
     = "float32_ceil_boxed" "float32_ceil"
-    [@@noalloc]
+  [@@noalloc]
 
   external floor : (t[@unboxed]) -> (t[@unboxed])
     = "float32_floor_boxed" "float32_floor"
-    [@@noalloc]
+  [@@noalloc]
 
   external sign_bit : (t[@unboxed]) -> bool
     = "float32_sign_bit_boxed" "float32_sign_bit"
-    [@@noalloc]
+  [@@noalloc]
 
   external classify_float : (t[@unboxed]) -> Stdlib.fpclass
     = "float32_classify_boxed" "float32_classify"
-    [@@noalloc]
+  [@@noalloc]
 
   external succ : (t[@unboxed]) -> (t[@unboxed])
     = "float32_succ_boxed" "float32_succ"
-    [@@noalloc]
+  [@@noalloc]
 
   external pred : (t[@unboxed]) -> (t[@unboxed])
     = "float32_pred_boxed" "float32_pred"
-    [@@noalloc]
+  [@@noalloc]
 
   external is_finite : (t[@unboxed]) -> bool
     = "float32_is_finite_boxed" "float32_is_finite"
-    [@@noalloc]
+  [@@noalloc]
 
   external is_infinite : (t[@unboxed]) -> bool
     = "float32_is_infinite_boxed" "float32_is_infinite"
-    [@@noalloc]
+  [@@noalloc]
 
   external is_nan : (t[@unboxed]) -> bool
     = "float32_is_nan_boxed" "float32_is_nan"
-    [@@noalloc]
+  [@@noalloc]
 
   external is_integer : (t[@unboxed]) -> bool
     = "float32_is_integer_boxed" "float32_is_integer"
-    [@@noalloc]
+  [@@noalloc]
 
   external add : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_add_boxed" "float32_add"
-    [@@noalloc]
+  [@@noalloc]
 
   external sub : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_sub_boxed" "float32_sub"
-    [@@noalloc]
+  [@@noalloc]
 
   external mul : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_mul_boxed" "float32_mul"
-    [@@noalloc]
+  [@@noalloc]
 
   external div : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_div_boxed" "float32_div"
-    [@@noalloc]
+  [@@noalloc]
 
   external rem : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_rem_boxed" "float32_rem"
-    [@@noalloc]
+  [@@noalloc]
 
   external pow : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_pow_boxed" "float32_pow"
-    [@@noalloc]
+  [@@noalloc]
 
   external atan2 : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_atan2_boxed" "float32_atan2"
-    [@@noalloc]
+  [@@noalloc]
 
   external hypot : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_hypot_boxed" "float32_hypot"
-    [@@noalloc]
+  [@@noalloc]
 
   external next_after : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_next_after_boxed" "float32_next_after"
-    [@@noalloc]
+  [@@noalloc]
 
   external copy_sign : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_copy_sign_boxed" "float32_copy_sign"
-    [@@noalloc]
+  [@@noalloc]
 
   external fma :
     (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
     = "float32_fma_boxed" "float32_fma"
-    [@@noalloc]
+  [@@noalloc]
 
   external frexp : t -> t * int = "float32_frexp_boxed"
 

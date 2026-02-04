@@ -25,8 +25,8 @@ let fatal_errorf fmt =
 
 let fatal_error msg = fatal_errorf "%s" msg
 
-let unboxed_small_int_arrays_are_not_implemented () =
-  fatal_error "unboxed int8/int16 and untagged int arrays are not implemented"
+let splices_should_not_exist_after_eval () =
+  fatal_error "slambda splices should not exist in lambda after slambda eval"
 
 (* Exceptions *)
 
@@ -720,6 +720,14 @@ let remove_dir dirname =
   with Sys_error _msg ->
     ()
 
+let remove_dir_contents dirname =
+  try
+    Array.iter
+      (fun entry -> remove_file (Filename.concat dirname entry))
+      (Sys.readdir dirname);
+    remove_dir dirname
+  with Sys_error _ -> ()
+
 (* Expand a -I option: if it starts with +, make it relative to the standard
    library directory *)
 
@@ -797,11 +805,19 @@ let output_to_file_via_temporary ?(mode = [Open_text]) filename fn =
   | exception exn ->
       close_out oc; remove_file temp_filename; raise exn
 
-let protect_writing_to_file ~filename ~f =
+let successful_output_files = ref []
+
+let protect_output_to_file filename f =
   let outchan = open_out_bin filename in
   try_finally ~always:(fun () -> close_out outchan)
     ~exceptionally:(fun () -> remove_file filename)
-    (fun () -> f outchan)
+    (fun () ->
+      let a = f outchan in
+      successful_output_files := filename :: !successful_output_files;
+      a)
+
+let remove_successful_output_files () =
+  List.iter remove_file !successful_output_files; successful_output_files := []
 
 let prng = lazy(Random.State.make_self_init ())
 
@@ -848,6 +864,14 @@ let no_overflow_mul a b =
 
 let no_overflow_lsl a k =
   0 <= k && k < Sys.word_size - 1 && min_int asr k <= a && a <= max_int asr k
+
+let no_overflow_add_int64 a b =
+  let open Int64 in
+  compare (logor (logxor a b) (logxor a (lognot (add a b)))) 0L < 0
+
+let no_overflow_sub_int64 a b =
+  let open Int64 in
+  compare (logor (logxor a (lognot b)) (logxor b (sub a b))) 0L < 0
 
 let letter_of_int n =
   let letter = String.make 1 (Char.chr (Char.code 'a' + n mod 26)) in
@@ -1607,12 +1631,14 @@ let is_print_longer_than size p =
   let out_spaces n = count_down n in
   let out_flush _ = () in
   let out_indent _ = () in
+  let out_width = Format.utf_8_scalar_width in
   let out_functions : Format.formatter_out_functions = {
     out_string;
     out_flush;
     out_newline;
     out_spaces;
-    out_indent}
+    out_indent;
+    out_width}
   in
   let ppf = Format.formatter_of_out_functions out_functions in
   try p ppf; false
@@ -2036,6 +2062,12 @@ module Json = struct
   let string value = escape_unicode value
 
   let int value = string_of_int value
+
+  (* Use %.17g instead of string_of_float to avoid invalid JSON output.
+     [string_of_float] can produce "1." for whole numbers, which is not valid
+     JSON. %.17g provides full double precision and produces valid JSON
+     numbers. *)
+  let float value = Printf.sprintf "%.17g" value
 
   let object_ fields =
     let field_strings = String.concat ",\n" fields in

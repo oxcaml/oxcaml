@@ -15,8 +15,9 @@ let foo () =
 Line 2, characters 37-38:
 2 |     lazy (let x @ local = "hello" in x)
                                          ^
-Error: This value is "local" but is expected to be "global"
-       because it is a lazy expression and thus needs to be allocated on the heap.
+Error: This value is "local"
+       but is expected to be "global"
+         because it is a lazy expression and thus needs to be allocated on the heap.
 |}]
 
 let foo (local_ x) =
@@ -25,10 +26,11 @@ let foo (local_ x) =
 Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
-Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the lazy expression at Line 2, characters 4-26
-       which is expected to be "global"
-       because lazy expressions always need to be allocated on the heap.
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the lazy expression at Line 2, characters 4-26
+         which is expected to be "global"
+         because lazy expressions always need to be allocated on the heap.
 |}]
 
 (* For simplicity, we also require them to be [unyielding]. *)
@@ -38,10 +40,11 @@ let foo (x @ yielding) =
 Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
-Error: The value "x" is "yielding" but is expected to be "unyielding"
-       because it is used inside the lazy expression at Line 2, characters 4-26
-       which is expected to be "unyielding"
-       because lazy expressions always need to be allocated on the heap.
+Error: The value "x" is "yielding"
+       but is expected to be "unyielding"
+         because it is used inside the lazy expression at Line 2, characters 4-26
+         which is expected to be "unyielding"
+         because lazy expressions always need to be allocated on the heap.
 |}]
 
 (* lazy expression is constructed as global *)
@@ -115,8 +118,9 @@ let foo (x @ contended) =
 Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
-Error: This value is "contended" but is expected to be "uncontended"
-       because it is a lazy value being forced.
+Error: This value is "contended"
+       but is expected to be "uncontended"
+         because it is a lazy value being forced.
 |}]
 
 (* stdlib's [Lazy.force] is a special case of lazy pattern *)

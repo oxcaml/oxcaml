@@ -96,8 +96,9 @@ let mk_float_cond ~lt ~eq ~gt ~uo =
   | true, false, false, true -> Must_be_last
 
 let cross_section cfg_with_layout src dst =
-  if !Oxcaml_flags.basic_block_sections
-     && not (Label.equal dst Linear_utils.labelled_insn_end.label)
+  if
+    !Oxcaml_flags.basic_block_sections
+    && not (Label.equal dst Linear_utils.labelled_insn_end.label)
   then
     let src_section = CL.get_section cfg_with_layout src in
     let dst_section = CL.get_section cfg_with_layout dst in
@@ -123,8 +124,9 @@ let linearize_terminator cfg_with_layout (func : string) start
   (* If one of the successors is a fallthrough label, do not emit a jump for it.
      Otherwise, the last jump is unconditional. *)
   let branch_or_fallthrough d lbl =
-    if (not (Label.equal next.label lbl))
-       || cross_section cfg_with_layout start lbl
+    if
+      (not (Label.equal next.label lbl))
+      || cross_section cfg_with_layout start lbl
     then d @ [L.Lbranch lbl]
     else d
   in
@@ -149,7 +151,7 @@ let linearize_terminator cfg_with_layout (func : string) start
     match terminator.desc with
     | Return -> [L.Lreturn], None
     | Raise kind -> [L.Lraise kind], None
-    | Tailcall_func Indirect -> [L.Lcall_op Ltailcall_ind], None
+    | Tailcall_func (Indirect _) -> [L.Lcall_op Ltailcall_ind], None
     | Tailcall_func (Direct func_symbol) ->
       [L.Lcall_op (Ltailcall_imm { func = func_symbol })], None
     | Tailcall_self { destination } ->
@@ -177,10 +179,24 @@ let linearize_terminator cfg_with_layout (func : string) start
                 stack_ofs;
                 stack_align
               }))
+    | Invalid { message = _; stack_ofs; stack_align; label_after = None; _ } ->
+      single
+        (L.Lcall_op
+           (Lextcall
+              { func = Cmm.caml_flambda2_invalid;
+                alloc = false;
+                ty_args = (* Arg is a statically allocated symbol. *) [XInt];
+                ty_res = Cmm.typ_void;
+                returns = false;
+                stack_ofs;
+                stack_align
+              }))
+    | Invalid { label_after = Some _; _ } ->
+      Misc.fatal_error "Cannot linearize terminator: Invalid with a successor"
     | Call { op; label_after } ->
       let op : Linear.call_operation =
         match op with
-        | Indirect -> Lcall_ind
+        | Indirect _ -> Lcall_ind
         | Direct func_symbol -> Lcall_imm { func = func_symbol }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None
@@ -297,8 +313,9 @@ let linearize_terminator cfg_with_layout (func : string) start
         then
           (* generates one cmp instruction for all conditional jumps here *)
           let find l =
-            if (not (cross_section cfg_with_layout start l))
-               && Label.equal next.label l
+            if
+              (not (cross_section cfg_with_layout start l))
+              && Label.equal next.label l
             then None
             else Some l
           in
@@ -371,7 +388,7 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
       | Switch _ -> true
       | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-      | Call _ | Prim _ ->
+      | Call _ | Prim _ | Invalid _ ->
         false
       | Return | Raise _ | Tailcall_func _ | Tailcall_self _ | Call_no_return _
         ->
@@ -392,8 +409,8 @@ let make_Llabel cfg_with_layout label =
     { label;
       section_name =
         (if !Oxcaml_flags.basic_block_sections
-        then CL.get_section cfg_with_layout label
-        else None)
+         then CL.get_section cfg_with_layout label
+         else None)
     }
 
 (* CR-someday gyorsh: handle duplicate labels in new layout: print the same

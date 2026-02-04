@@ -26,8 +26,7 @@ type t
 (** Create a result structure.
 
     [reachable_names] specifies which names are reachable from outside the
-    compilation unit (same terminology as used in [Flambda_cmx]).
-*)
+    compilation unit (same terminology as used in [Flambda_cmx]). *)
 val create : module_symbol:Symbol.t -> reachable_names:Name_occurrences.t -> t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)

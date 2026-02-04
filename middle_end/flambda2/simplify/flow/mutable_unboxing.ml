@@ -222,8 +222,9 @@ let blocks_to_unbox ~escaping ~source_info ~required_names =
                escaping, unboxing non-required blocks might keep alive a
                reference to another unboxed block, while the primitive for
                creating it was removed. *)
-            if Simple.Set.mem (Simple.var var) escaping
-               || not (Name.Set.mem (Name.var var) required_names)
+            if
+              Simple.Set.mem (Simple.var var) escaping
+              || not (Name.Set.mem (Name.var var) required_names)
             then map
             else
               let block_to_unbox =
@@ -326,11 +327,11 @@ let continuations_with_live_block ~blocks_to_unbox ~dom ~source_info
   Control_flow_graph.fixpoint control_flow_graph
     ~init:continuations_using_blocks_but_not_defining_them ~eq:Simple.Set.equal
     ~f:(fun
-         ~caller
-         ~caller_set:old_using_blocks
-         ~callee:_
-         ~callee_set:used_blocks
-       ->
+        ~caller
+        ~caller_set:old_using_blocks
+        ~callee:_
+        ~callee_set:used_blocks
+      ->
       let defined_blocks =
         Continuation.Map.find caller continuations_defining_blocks
       in
@@ -579,8 +580,8 @@ let create ~(dom : Dominator_graph.alias_map) ~(dom_graph : Dominator_graph.t)
   let blocks_to_unbox =
     blocks_to_unbox ~escaping ~source_info ~required_names
   in
-  if (not (Simple.Map.is_empty blocks_to_unbox))
-     && Flambda_features.dump_flow ()
+  if
+    (not (Simple.Map.is_empty blocks_to_unbox)) && Flambda_features.dump_flow ()
   then
     Format.printf "Non escaping makeblocks %a@."
       (Simple.Map.print (fun ppf { tag; fields_kinds; mut } ->

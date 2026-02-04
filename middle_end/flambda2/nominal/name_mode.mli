@@ -33,7 +33,8 @@ val normal : t
 val in_types : t
 
 (** Phantom variables bind terms that are used for the generation of debugging
-    information. There is no runtime value associated with a phantom variable. *)
+    information. There is no runtime value associated with a phantom variable.
+*)
 val phantom : t
 
 val is_normal : t -> bool

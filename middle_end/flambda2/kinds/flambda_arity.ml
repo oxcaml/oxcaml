@@ -91,6 +91,7 @@ module Component_for_creation = struct
       Misc.fatal_errorf
         "Cannot convert %a to Flambda_arity.Component_for_creation"
         Printlambda.layout layout
+    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
 end
 
 let nullary = []
@@ -161,10 +162,11 @@ let from_lambda_list layouts ~machine_width =
   |> create
 
 let partially_apply t ~num_non_unarized_params_provided =
-  if num_non_unarized_params_provided < 0
-     (* We allow the case where all of the parameters are applied, to make this
-        function more general. *)
-     || num_non_unarized_params_provided > List.length t
+  if
+    num_non_unarized_params_provided < 0
+    (* We allow the case where all of the parameters are applied, to make this
+       function more general. *)
+    || num_non_unarized_params_provided > List.length t
   then
     Misc.fatal_errorf "Bad num_non_unarized_params_provided (%d): %a"
       num_non_unarized_params_provided print t

@@ -151,3 +151,6 @@ val naked_pointers : bool
 
 val tsan : bool
 (** Whether ThreadSanitizer support has been enabled at configure time *)
+
+val address_sanitizer : bool
+(** Whether AddressSanitizer support has been enabled at configure time *)

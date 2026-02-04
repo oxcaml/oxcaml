@@ -191,6 +191,7 @@ let all_coherent column =
           | Const_unboxed_float32 _
           | Const_string _), _ -> false
       end
+    | Unboxed_unit, Unboxed_unit -> true
     | Tuple l1, Tuple l2 ->
       List.equal (Option.equal String.equal) l1 l2
     | Unboxed_tuple l1, Unboxed_tuple l2 ->
@@ -208,8 +209,9 @@ let all_coherent column =
     | Record_unboxed_product ([], _, _), Record_unboxed_product ([], _, _)
     | Variant _, Variant _
     | Lazy, Lazy -> true
-    | ( Construct _ | Constant _ | Tuple _ | Unboxed_tuple _ | Record _
-      | Record_unboxed_product _ | Array _ | Variant _ | Lazy ), _ -> false
+    | ( Construct _ | Constant _ | Unboxed_unit | Tuple _ | Unboxed_tuple _
+      | Record _ | Record_unboxed_product _ | Array _ | Variant _ | Lazy ),
+      _ -> false
   in
   match
     List.find
@@ -372,6 +374,7 @@ module Compat
       l1=l2 && ocompat op1 op2
   | Tpat_constant c1, Tpat_constant c2 ->
       const_compare c1 c2 = 0
+  | Tpat_unboxed_unit, Tpat_unboxed_unit -> true
   | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs ->
       tuple_compat labeled_ps labeled_qs
   | Tpat_unboxed_tuple labeled_ps, Tpat_unboxed_tuple labeled_qs ->
@@ -457,6 +460,7 @@ let simple_match d h =
   | Lazy, Lazy -> true
   | Record _, Record _ -> true
   | Record_unboxed_product _, Record_unboxed_product _ -> true
+  | Unboxed_unit, Unboxed_unit -> true
   | Tuple lbls1, Tuple lbls2 ->
     List.equal (Option.equal String.equal) lbls1 lbls2
   | Unboxed_tuple lbls1, Unboxed_tuple lbls2 ->
@@ -465,7 +469,8 @@ let simple_match d h =
   | Array (am1, _, len1), Array (am2, _, len2) -> am1 = am2 && len1 = len2
   | _, Any -> true
   | ( Construct _ | Variant _ | Constant _ | Lazy | Record _
-    | Record_unboxed_product _ | Tuple _ | Unboxed_tuple _ | Array _ | Any),
+    | Record_unboxed_product _ | Unboxed_unit | Tuple _ | Unboxed_tuple _
+    | Array _ | Any),
     _ -> false
 
 
@@ -502,6 +507,7 @@ let simple_match_args discr head args =
   | Constant _ -> []
   | Construct _
   | Variant _
+  | Unboxed_unit
   | Tuple _
   | Unboxed_tuple _
   | Array _
@@ -522,7 +528,8 @@ let simple_match_args discr head args =
       | Unboxed_tuple lbls -> omega_list lbls
       | Variant { has_arg = false }
       | Any
-      | Constant _ -> []
+      | Constant _
+      | Unboxed_unit -> []
       end
 
 (* Consider a pattern matrix whose first column has been simplified to contain
@@ -584,7 +591,7 @@ let discr_pat q pss =
           { head with pat_desc = Record_unboxed_product (fields, sorts, repr) }
         in
         refine_pat d rows
-      | Construct _ | Constant _ | Variant _
+      | Construct _ | Constant _ | Unboxed_unit | Variant _
       | Array _ -> acc
   in
   let q, _ = deconstruct q in
@@ -678,7 +685,7 @@ let do_set_args ~erase_mutable q r = match q with
     make_pat
       (Tpat_array (am, arg_sort, args)) q.pat_type q.pat_env::
     rest
-| {pat_desc=Tpat_constant _|Tpat_any} ->
+| {pat_desc=Tpat_constant _|Tpat_any|Tpat_unboxed_unit} ->
     q::r (* case any is used in matching.ml *)
 | {pat_desc = (Tpat_var _ | Tpat_alias _ | Tpat_or _); _} ->
     fatal_error "Parmatch.set_args"
@@ -905,6 +912,7 @@ let full_match closing env =  match env with
   | Any -> assert false
   | Construct ({ cstr_tag = Extension _ ; _ }, _, _) -> false
   | Construct (c, _, _) -> List.length env = c.cstr_consts + c.cstr_nonconsts
+  | Unboxed_unit -> List.length env = 1
   | Variant { type_row; _ } ->
       let fields =
         List.map
@@ -957,8 +965,8 @@ let should_extend ext env = match ext with
           let path = get_constructor_type_path p.pat_type p.pat_env in
           Path.same path ext
       | Construct ({cstr_tag=Extension _}, _, _) -> false
-      | Constant _ | Tuple _ | Unboxed_tuple _ | Variant _ | Record _
-      | Record_unboxed_product _
+      | Constant _ | Unboxed_unit | Tuple _ | Unboxed_tuple _ | Variant _
+      | Record _ | Record_unboxed_product _
       | Array _ | Lazy -> false
       | Any -> assert false
       end
@@ -1310,7 +1318,8 @@ let build_other ext env =
 
 let rec has_instance p = match p.pat_desc with
   | Tpat_variant (l,_,r) when is_absent l r -> false
-  | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_variant (_,None,_) -> true
+  | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_unboxed_unit
+  | Tpat_variant (_,None,_) -> true
   | Tpat_alias (p,_,_,_,_,_,_) | Tpat_variant (_,Some p,_) -> has_instance p
   | Tpat_or (p1,p2,_) -> has_instance p1 || has_instance p2
   | Tpat_construct (_,_,_,ps, _) ->
@@ -2242,7 +2251,8 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
       (fun r (_, p) -> collect_paths_from_pat r p)
       (if extendable_path path then add_path path r else r)
       ps
-| Tpat_any|Tpat_var _|Tpat_constant _| Tpat_variant (_,None,_) -> r
+| Tpat_any|Tpat_var _|Tpat_constant _|Tpat_unboxed_unit
+| Tpat_variant (_,None,_) -> r
 | Tpat_tuple ps ->
     List.fold_left (fun r (_, p) -> collect_paths_from_pat r p) r ps
 | Tpat_unboxed_tuple ps ->
@@ -2347,18 +2357,19 @@ let check_unused pred casel =
                     Used
                 | _ -> r
               in
-              match r with
-              | Unused ->
+              Builtin_attributes.warning_scope q.pat_attributes (fun () ->
+                match r with
+                | Unused ->
                   Location.prerr_warning
                     q.pat_loc Warnings.Redundant_case
-              | Upartial ps ->
+                | Upartial ps ->
                   List.iter
                     (fun p ->
-                      Location.prerr_warning
-                        p.pat_loc Warnings.Redundant_subpat)
+                       Location.prerr_warning
+                         p.pat_loc Warnings.Redundant_subpat)
                     ps
-              | Used -> ()
-            with Empty | Not_found -> assert false
+                | Used -> ())
+          with Empty | Not_found -> assert false
             end ;
 
           if has_guard then
@@ -2382,8 +2393,8 @@ let inactive ~partial pat =
         match pat.pat_desc with
         | Tpat_lazy _ | Tpat_array (Mutable _, _, _) ->
           false
-        | Tpat_any | Tpat_var _ | Tpat_variant (_, None, _) ->
-            true
+        | Tpat_any | Tpat_var _ | Tpat_unboxed_unit | Tpat_variant (_, None, _)
+        -> true
         | Tpat_constant c -> begin
             match c with
             | Const_string _
@@ -2670,7 +2681,7 @@ let all_rhs_idents exp =
   let open Tast_iterator in
   let expr_iter iter exp =
     match exp.exp_desc with
-    | Texp_ident (path, _lid, _descr, _kind, _mode) ->
+    | Texp_ident (path, _lid, _descr, _kind, _mode, _actual_mode) ->
       List.iter (fun id -> ids := Ident.Set.add id !ids) (Path.heads path)
     (* Use default iterator methods for rest of match.*)
     | _ -> Tast_iterator.default_iterator.expr iter exp

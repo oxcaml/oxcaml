@@ -81,22 +81,22 @@ CAMLprim value caml_gc_quick_stat(value v)
   Store_field (res, 3, Val_long (mincoll));
   Store_field (res, 4, Val_long (majcoll));
   Store_field (res, 5, Val_long (
-    s.heap_stats.pool_words + s.heap_stats.large_words));
-  Store_field (res, 6, Val_long (0));
+    s.global_stats.chunk_words + s.heap_stats.large_words));
+  Store_field (res, 6, Val_long (s.global_stats.chunks));
   Store_field (res, 7, Val_long (
     s.heap_stats.pool_live_words + s.heap_stats.large_words));
   Store_field (res, 8, Val_long (
     s.heap_stats.pool_live_blocks + s.heap_stats.large_blocks));
   Store_field (res, 9, Val_long (
-    s.heap_stats.pool_words - s.heap_stats.pool_live_words
+    s.global_stats.chunk_words - s.heap_stats.pool_live_words
     - s.heap_stats.pool_frag_words));
-  Store_field (res, 10, Val_long (0));
-  Store_field (res, 11, Val_long (0));
+  Store_field (res, 10, Val_long (0)); /* free_blocks */
+  Store_field (res, 11, Val_long (0)); /* largest_free */
   Store_field (res, 12, Val_long (s.heap_stats.pool_frag_words));
   Store_field (res, 13, Val_long (compactions));
   Store_field (res, 14, Val_long (
     s.heap_stats.pool_max_words + s.heap_stats.large_max_words));
-  Store_field (res, 15, Val_long (0));
+  Store_field (res, 15, Val_long (0)); /* stack_size */
   Store_field (res, 16, Val_long (s.alloc_stats.forced_major_collections));
   CAMLreturn (res);
 }
@@ -447,6 +447,7 @@ static struct gc_tweak gc_tweaks[] = {
   { "gc_overhead_adjustment", &caml_gc_overhead_adjustment, 0 },
   { "nohugepage_stacks", &caml_nohugepage_stacks, 0 },
   { "enable_segv_handler", &caml_enable_segv_handler, 0 },
+  { "cache_stacks_per_class", &caml_cache_stacks_per_class, 0 },
 };
 
 enum {N_GC_TWEAKS = sizeof(gc_tweaks)/sizeof(gc_tweaks[0])};

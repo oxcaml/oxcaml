@@ -239,10 +239,14 @@ let make_array ~dbg kind alloc_mode args =
   check_alloc_fields args;
   let mode = C.alloc_mode_for_allocations_to_cmm alloc_mode in
   match (kind : P.Array_kind.t) with
-  | Immediates | Values -> C.make_alloc ~mode dbg ~tag:0 args
+  | Immediates | Gc_ignorable_values | Values ->
+    C.make_alloc ~mode dbg ~tag:0 args
   | Naked_floats ->
     C.make_float_alloc ~mode dbg ~tag:(Tag.to_int Tag.double_array_tag) args
   | Naked_float32s -> C.allocate_unboxed_float32_array ~elements:args mode dbg
+  | Naked_ints -> C.allocate_untagged_int_array ~elements:args mode dbg
+  | Naked_int8s -> C.allocate_untagged_int8_array ~elements:args mode dbg
+  | Naked_int16s -> C.allocate_untagged_int16_array ~elements:args mode dbg
   | Naked_int32s -> C.allocate_unboxed_int32_array ~elements:args mode dbg
   | Naked_int64s -> C.allocate_unboxed_int64_array ~elements:args mode dbg
   | Naked_nativeints ->
@@ -257,7 +261,21 @@ let make_array ~dbg kind alloc_mode args =
 
 let array_length ~dbg arr (kind : P.Array_kind.t) =
   match kind with
-  | Immediates | Values | Naked_floats | Unboxed_product _ ->
+  | Naked_float32s -> C.unboxed_float32_array_length arr dbg
+  | Naked_int8s -> C.untagged_int8_array_length arr dbg
+  | Naked_int16s -> C.untagged_int16_array_length arr dbg
+  | Naked_int32s -> C.unboxed_int32_array_length arr dbg
+  | Naked_ints | Naked_int64s | Naked_nativeints ->
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_length arr dbg
+  | Naked_vec128s
+  | Unboxed_product
+      ( [Naked_vec128s; Naked_vec128s]
+      | [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s] ) ->
+    C.unboxed_vec128_array_length arr dbg
+  | Naked_vec256s -> C.unboxed_vec256_array_length arr dbg
+  | Naked_vec512s -> C.unboxed_vec512_array_length arr dbg
+  | Immediates | Gc_ignorable_values | Values | Naked_floats | Unboxed_product _
+    ->
     (* [Paddrarray] may be a lie sometimes, but we know for certain that the bit
        width of floats is equal to the machine word width (see flambda2.ml).
 
@@ -268,15 +286,6 @@ let array_length ~dbg arr (kind : P.Array_kind.t) =
        elements occupy 64 bits). *)
     assert (C.wordsize_shift = C.numfloat_shift);
     C.addr_array_length arr dbg
-  | Naked_float32s -> C.unboxed_float32_array_length arr dbg
-  | Naked_int32s -> C.unboxed_int32_array_length arr dbg
-  | Naked_int64s | Naked_nativeints ->
-    (* These need a special case as they are represented by custom blocks, even
-       though the contents are of word width. *)
-    C.unboxed_int64_or_nativeint_array_length arr dbg
-  | Naked_vec128s -> C.unboxed_vec128_array_length arr dbg
-  | Naked_vec256s -> C.unboxed_vec256_array_length arr dbg
-  | Naked_vec512s -> C.unboxed_vec512_array_length arr dbg
 
 let array_load_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
     arr index =
@@ -314,13 +323,18 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
     (load_kind : P.Array_load_kind.t) ~arr ~index =
   (* CR mshinwell: refactor this function in the same way as [block_load] *)
   match array_kind, load_kind with
-  | (Values | Immediates | Unboxed_product _), Immediates ->
+  | (Immediates | Gc_ignorable_values | Values | Unboxed_product _), Immediates
+    ->
     C.int_array_ref arr index dbg
-  | (Naked_int64s | Naked_nativeints), (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
-  | Unboxed_product _, (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
-  | (Values | Immediates | Unboxed_product _), Values ->
+  | ( (Naked_ints | Naked_int64s | Naked_nativeints),
+      (Naked_ints | Naked_int64s | Naked_nativeints) ) ->
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr
+      ~array_index:index dbg
+  | Unboxed_product _, (Naked_ints | Naked_int64s | Naked_nativeints) ->
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr
+      ~array_index:index dbg
+  | ( (Immediates | Gc_ignorable_values | Values | Unboxed_product _),
+      (Gc_ignorable_values | Values) ) ->
     C.addr_array_ref arr index dbg
   | Naked_floats, Naked_floats | Unboxed_product _, Naked_floats ->
     C.unboxed_float_array_ref Mutable ~block:arr ~index dbg
@@ -328,74 +342,119 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | Unboxed_product _, Naked_float32s ->
     C.unboxed_mutable_float32_unboxed_product_array_ref arr ~array_index:index
       dbg
+  | Naked_int8s, Naked_int8s -> C.untagged_int8_array_ref arr index dbg
+  | Unboxed_product _, Naked_int8s ->
+    C.untagged_mutable_int8_unboxed_product_array_ref arr ~array_index:index dbg
+  | Naked_int16s, Naked_int16s -> C.untagged_int16_array_ref arr index dbg
+  | Unboxed_product _, Naked_int16s ->
+    C.untagged_mutable_int16_unboxed_product_array_ref arr ~array_index:index
+      dbg
   | Naked_int32s, Naked_int32s -> C.unboxed_int32_array_ref arr index dbg
   | Unboxed_product _, Naked_int32s ->
     C.unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index:index dbg
   | (Immediates | Naked_floats), Naked_vec128s ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
-  | (Naked_int64s | Naked_nativeints), Naked_vec128s ->
+  | (Naked_ints | Naked_int64s | Naked_nativeints), Naked_vec128s ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec128s ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+  | Naked_int16s, Naked_vec128s ->
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:1 arr index
+  | Naked_int8s, Naked_vec128s ->
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:0 arr index
   | Naked_vec128s, Naked_vec128s ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec256s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec512s ->
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+  | ( Unboxed_product
+        ( [Naked_vec128s; Naked_vec128s]
+        | [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s] ),
+      Naked_vec128s ) ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | (Immediates | Naked_floats), Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
-  | (Naked_int64s | Naked_nativeints), Naked_vec256s ->
+  | (Naked_ints | Naked_int64s | Naked_nativeints), Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+  | Naked_int16s, Naked_vec256s ->
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:1 arr index
+  | Naked_int8s, Naked_vec256s ->
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:0 arr index
   | Naked_vec256s, Naked_vec128s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec512s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | (Immediates | Naked_floats), Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
-  | (Naked_int64s | Naked_nativeints), Naked_vec512s ->
+  | (Naked_ints | Naked_int64s | Naked_nativeints), Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+  | Naked_int16s, Naked_vec512s ->
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:1 arr index
+  | Naked_int8s, Naked_vec512s ->
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:0 arr index
   | Naked_vec512s, Naked_vec128s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec256s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
-  | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      Values ) ->
+  | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ),
+      (Gc_ignorable_values | Values) ) ->
     Misc.fatal_errorf
       "Cannot use array load kind [Values] on naked number/vector arrays:@ %a"
       Debuginfo.print_compact dbg
-  | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+  | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ),
       Immediates )
-  | ( ( Values | Immediates | Naked_floats | Naked_int32s | Naked_float32s
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+      | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      (Naked_int64s | Naked_nativeints) )
-  | ( ( Values | Immediates | Naked_int32s | Naked_float32s | Naked_int64s
+      (Naked_ints | Naked_int64s | Naked_nativeints) )
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_float32s | Naked_ints
+      | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_floats ) ->
     Misc.fatal_errorf
       "Array reinterpret load operation (array kind %a, array ref kind %a) not \
        yet supported"
       P.Array_kind.print array_kind P.Array_load_kind.print load_kind
-  | ( ( Values | Immediates | Naked_floats | Naked_int32s | Naked_int64s
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats | Naked_ints
+      | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_float32s )
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_int64s
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+      | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int32s ) ->
     Misc.fatal_errorf
       "Array reinterpret loads with 32-bit load kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
-  | Values, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+      | Naked_float32s | Naked_ints | Naked_int8s | Naked_int32s | Naked_int64s
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      Naked_int16s ) ->
+    Misc.fatal_errorf
+      "Array reinterpret loads with 16-bit load kinds are not supported:@ %a"
+      Debuginfo.print_compact dbg
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+      | Naked_float32s | Naked_ints | Naked_int16s | Naked_int32s | Naked_int64s
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      Naked_int8s ) ->
+    Misc.fatal_errorf
+      "Array reinterpret loads with 8-bit load kinds are not supported:@ %a"
+      Debuginfo.print_compact dbg
+  | ( (Gc_ignorable_values | Values),
+      (Naked_vec128s | Naked_vec256s | Naked_vec512s) ) ->
     Misc.fatal_error "Attempted to load a SIMD vector from a value array."
   | Unboxed_product _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
     Misc.fatal_errorf
@@ -413,20 +472,35 @@ let addr_array_store init ~arr ~index ~new_value dbg =
 let array_set0 ~dbg (array_kind : P.Array_kind.t)
     (set_kind : P.Array_set_kind.t) ~arr ~index ~new_value =
   match array_kind, set_kind with
-  | (Values | Immediates | Unboxed_product _), Immediates ->
+  | ( (Immediates | Gc_ignorable_values | Values | Unboxed_product _),
+      (Immediates | Gc_ignorable_values) ) ->
     C.int_array_set arr index new_value dbg
-  | (Values | Immediates | Unboxed_product _), Values init ->
+  | (Immediates | Gc_ignorable_values | Values | Unboxed_product _), Values init
+    ->
     addr_array_store init ~arr ~index ~new_value dbg
-  | (Naked_int64s | Naked_nativeints), (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg
-  | Unboxed_product _, (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg
+  | ( (Naked_ints | Naked_int64s | Naked_nativeints),
+      (Naked_ints | Naked_int64s | Naked_nativeints) ) ->
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
+      ~new_value dbg
+  | Unboxed_product _, (Naked_ints | Naked_int64s | Naked_nativeints) ->
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
+      ~new_value dbg
   | Naked_floats, Naked_floats | Unboxed_product _, Naked_floats ->
     C.float_array_set arr index new_value dbg
   | Naked_float32s, Naked_float32s ->
     C.unboxed_float32_array_set arr ~index ~new_value dbg
   | Unboxed_product _, Naked_float32s ->
     C.unboxed_mutable_float32_unboxed_product_array_set arr ~array_index:index
+      ~new_value dbg
+  | Naked_int8s, Naked_int8s ->
+    C.untagged_int8_array_set arr ~index ~new_value dbg
+  | Unboxed_product _, Naked_int8s ->
+    C.untagged_mutable_int8_unboxed_product_array_set arr ~array_index:index
+      ~new_value dbg
+  | Naked_int16s, Naked_int16s ->
+    C.untagged_int16_array_set arr ~index ~new_value dbg
+  | Unboxed_product _, Naked_int16s ->
+    C.untagged_mutable_int16_unboxed_product_array_set arr ~array_index:index
       ~new_value dbg
   | Naked_int32s, Naked_int32s ->
     C.unboxed_int32_array_set arr ~index ~new_value dbg
@@ -436,11 +510,17 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | (Immediates | Naked_floats), Naked_vec128s ->
     array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
-  | (Naked_int64s | Naked_nativeints), Naked_vec128s ->
+  | (Naked_ints | Naked_int64s | Naked_nativeints), Naked_vec128s ->
     array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
   | (Naked_int32s | Naked_float32s), Naked_vec128s ->
     array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
+  | Naked_int16s, Naked_vec128s ->
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:1 arr index
+      new_value
+  | Naked_int8s, Naked_vec128s ->
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:0 arr index
       new_value
   | Naked_vec128s, Naked_vec128s ->
     array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
@@ -451,14 +531,26 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | Naked_vec128s, Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
       new_value
+  | ( Unboxed_product
+        ( [Naked_vec128s; Naked_vec128s]
+        | [Naked_vec128s; Naked_vec128s; Naked_vec128s; Naked_vec128s] ),
+      Naked_vec128s ) ->
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+      new_value
   | (Immediates | Naked_floats), Naked_vec256s ->
     array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
-  | (Naked_int64s | Naked_nativeints), Naked_vec256s ->
+  | (Naked_ints | Naked_int64s | Naked_nativeints), Naked_vec256s ->
     array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
   | (Naked_int32s | Naked_float32s), Naked_vec256s ->
     array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
+  | Naked_int16s, Naked_vec256s ->
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:1 arr index
+      new_value
+  | Naked_int8s, Naked_vec256s ->
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:0 arr index
       new_value
   | Naked_vec256s, Naked_vec128s ->
     array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
@@ -472,11 +564,17 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | (Immediates | Naked_floats), Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
-  | (Naked_int64s | Naked_nativeints), Naked_vec512s ->
+  | (Naked_ints | Naked_int64s | Naked_nativeints), Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
   | (Naked_int32s | Naked_float32s), Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
+  | Naked_int16s, Naked_vec512s ->
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:1 arr index
+      new_value
+  | Naked_int8s, Naked_vec512s ->
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:0 arr index
       new_value
   | Naked_vec512s, Naked_vec128s ->
     array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
@@ -487,35 +585,56 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | Naked_vec512s, Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
       new_value
-  | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      Values _ ) ->
+  | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ),
+      (Values _ | Gc_ignorable_values) ) ->
     Misc.fatal_errorf
       "Cannot use array set kind [Values] on naked number/vector arrays:@ %a"
       Debuginfo.print_compact dbg
-  | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+  | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ),
       Immediates )
-  | ( ( Values | Immediates | Naked_floats | Naked_int32s | Naked_float32s
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+      | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      (Naked_int64s | Naked_nativeints) )
-  | ( ( Values | Immediates | Naked_int32s | Naked_float32s | Naked_int64s
+      (Naked_ints | Naked_int64s | Naked_nativeints) )
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_float32s | Naked_ints
+      | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_floats ) ->
     Misc.fatal_errorf
       "Array reinterpret set operation (array kind %a, array ref kind %a) not \
        yet supported"
       P.Array_kind.print array_kind P.Array_set_kind.print set_kind
-  | ( ( Values | Immediates | Naked_floats | Naked_int32s | Naked_int64s
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats | Naked_ints
+      | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_float32s )
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_int64s
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+      | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int32s ) ->
     Misc.fatal_errorf
       "Array reinterpret stores with 32-bit set kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
-  | Values, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+      | Naked_float32s | Naked_ints | Naked_int8s | Naked_int32s | Naked_int64s
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      Naked_int16s ) ->
+    Misc.fatal_errorf
+      "Array reinterpret stores with 16-bit set kinds are not supported:@ %a"
+      Debuginfo.print_compact dbg
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+      | Naked_float32s | Naked_ints | Naked_int16s | Naked_int32s | Naked_int64s
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      Naked_int8s ) ->
+    Misc.fatal_errorf
+      "Array reinterpret stores with 8-bit set kinds are not supported:@ %a"
+      Debuginfo.print_compact dbg
+  | ( (Gc_ignorable_values | Values),
+      (Naked_vec128s | Naked_vec256s | Naked_vec512s) ) ->
     Misc.fatal_error "Attempted to store a SIMD vector to a value array."
   | Unboxed_product _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
     Misc.fatal_errorf
@@ -964,11 +1083,11 @@ let nullary_primitive _env res dbg prim =
     let expr, res = C.invalid res ~message in
     None, res, expr
   | Optimised_out _ -> Misc.fatal_errorf "TODO: phantom let-bindings in to_cmm"
-  | Probe_is_enabled { name } ->
+  | Probe_is_enabled { name; enabled_at_init } ->
     (* CR gbury: we should never manually build cmm expression in this file. We
        should instead always use smart constructors defined in `cmm_helpers` or
        `to_cmm_shared.ml` *)
-    let expr = Cmm.Cop (Cprobe_is_enabled { name }, [], dbg) in
+    let expr = Cmm.Cop (Cprobe_is_enabled { name; enabled_at_init }, [], dbg) in
     None, res, expr
   | Enter_inlined_apply _ ->
     Misc.fatal_errorf
@@ -977,6 +1096,7 @@ let nullary_primitive _env res dbg prim =
        correctly adjust the inlined debuginfo in the env."
   | Dls_get -> None, res, C.dls_get ~dbg
   | Tls_get -> None, res, C.tls_get ~dbg
+  | Domain_index -> None, res, C.domain_index ~dbg
   | Poll -> None, res, C.poll ~dbg
   | Cpu_relax -> None, res, C.cpu_relax ~dbg
 
@@ -1175,20 +1295,36 @@ let ternary_primitive _env dbg f x y z =
     C.atomic_exchange_field ~dbg
       (imm_or_ptr block_access_kind)
       x ~field:y ~new_value:z
-  | Write_offset (kind, mode) ->
-    let addr = C.add_int x y dbg in
+  | Write_offset (write_offset_kind, kind, mode) ->
     let memory_chunk = C.memory_chunk_of_kind kind in
     let store =
       if KS.must_be_gc_scannable kind
       then
-        match mode with
-        | Heap -> C.caml_modify ~dbg addr z
-        | Local ->
-          (* divide to convert offset from bytes to field number *)
-          C.caml_modify_local ~dbg x
-            (C.lsr_int y (Cconst_int (C.log2_size_addr, dbg)) dbg)
-            z
-      else C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
+        (* x = base, y = byte offset, z = new value *)
+        let write_into_block =
+          match mode with
+          | Heap ->
+            let addr = C.add_int x y dbg in
+            C.caml_modify ~dbg addr z
+          | Local ->
+            (* divide to convert offset from bytes to field number *)
+            C.caml_modify_local ~dbg x
+              (C.lsr_int y (Cconst_int (C.log2_size_addr, dbg)) dbg)
+              z
+        in
+        (* If [write_offset_kind] is [Into_block_or_off_heap], the base may be
+           NULL, in which case byte_offset is a pointer we store to directly.
+           See comment under [Write_offset] in [flambda_primitive.mli]. *)
+        match write_offset_kind with
+        | Into_block -> write_into_block
+        | Into_block_or_off_heap ->
+          let base_is_null = C.eq ~dbg x (C.nativeint ~dbg 0n) in
+          C.ite ~dbg base_is_null
+            ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
+            ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
+      else
+        let addr = C.add_int x y dbg in
+        C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store
 

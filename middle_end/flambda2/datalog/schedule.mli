@@ -13,18 +13,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Enable provenance tracking in rules.
-
-  This makes the computation of rules slower and should only be enabled for
-  debugging.
-
-  {b Warning}: This flag is used during the compilation of rules. Enabling it
-  will {b not} allow provenance tracking for rules that already exist. *)
-val enable_provenance_for_debug : unit -> unit
-
 type stats
 
-val create_stats : Table.Map.t -> stats
+val create_stats : ?with_provenance:bool -> Table.Map.t -> stats
 
 val print_stats : Format.formatter -> stats -> unit
 

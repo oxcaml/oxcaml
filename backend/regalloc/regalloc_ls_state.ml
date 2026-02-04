@@ -9,6 +9,7 @@ type t =
   { interval_dll : Interval.t DLL.t;
     active : ClassIntervals.t Reg_class.Tbl.t;
     stack_slots : Regalloc_stack_slots.t;
+    affinity : Regalloc_affinity.t;
     ls_order_tbl : int InstructionId.Tbl.t
   }
 
@@ -16,13 +17,13 @@ let for_fatal t =
   ( DLL.map t.interval_dll ~f:Interval.copy,
     Reg_class.Tbl.map t.active ~f:ClassIntervals.copy )
 
-let[@inline] make ~stack_slots =
+let[@inline] make ~stack_slots ~affinity =
   let interval_dll = DLL.make_empty () in
   let active =
     Reg_class.Tbl.init ~f:(fun _reg_class -> ClassIntervals.make ())
   in
   let ls_order_tbl = InstructionId.Tbl.create 32 in
-  { interval_dll; active; stack_slots; ls_order_tbl }
+  { interval_dll; active; stack_slots; affinity; ls_order_tbl }
 
 (* CR-someday xclerc: consider using Dynarray *)
 type class_interval_array =
@@ -111,6 +112,8 @@ let[@inline] active state ~reg_class = Reg_class.Tbl.find state.active reg_class
 let[@inline] active_classes state = state.active
 
 let[@inline] stack_slots state = state.stack_slots
+
+let[@inline] affinity state = state.affinity
 
 let[@inline] set_ls_order state ~instruction_id ~ls_order =
   InstructionId.Tbl.replace state.ls_order_tbl instruction_id ls_order

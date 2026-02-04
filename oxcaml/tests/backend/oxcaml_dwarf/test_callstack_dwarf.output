@@ -4,8 +4,6 @@
 Backtrace for simple function:
   * frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_simple_backtrace(message="hello world" : string @ value, x=42 : int @ value)
     frame #N: <ADDRESS> test_callstack_dwarf.exe`camlTest_callstack_dwarf__entry
-    frame #N: <ADDRESS> test_callstack_dwarf.exe`caml_program + 29
-    frame #N: <ADDRESS> test_callstack_dwarf.exe`<Startup code ...>
 === Testing recursive countdown with leaf function ===
     frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_leaf [inlined] Stdlib.(^)
 Backtrace at leaf function (depth 4 countdown):
@@ -17,5 +15,3 @@ Backtrace at leaf function (depth 4 countdown):
     frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_countdown(n=3 : int @ value, msg=<unavailable>)
     frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_countdown(n=4 : int @ value, msg=<unavailable>)
     frame #N: <ADDRESS> test_callstack_dwarf.exe`camlTest_callstack_dwarf__entry
-    frame #N: <ADDRESS> test_callstack_dwarf.exe`caml_program + 29
-    frame #N: <ADDRESS> test_callstack_dwarf.exe`<Startup code ...>

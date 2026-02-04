@@ -88,12 +88,12 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
     | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
     | Stack_check _
     | Op
-        ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get | Poll
-        | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-        | Load _
+        ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get
+        | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
+        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+        | Const_vec512 _ | Stackoffset _ | Load _
         | Store (_, _, _)
-        | Intop _
+        | Intop _ | Int128op _
         | Intop_imm (_, _)
         | Intop_atomic _
         | Floatop (_, _)
@@ -126,8 +126,7 @@ let equal_move_kind left right =
   | Store, Store -> true
   | (Load | Store), _ -> false
 
-let rewrite_gen :
-    type s.
+let rewrite_gen : type s.
     (module State with type t = s) ->
     (module Utils) ->
     s ->
@@ -153,7 +152,7 @@ let rewrite_gen :
         let slot =
           Regalloc_stack_slots.get_or_create (State.stack_slots state) reg
         in
-        spilled.Reg.loc <- Reg.(Stack (Local slot));
+        Reg.set_loc spilled Reg.(Stack (Local slot));
         if debug
         then Utils.log "spilling %a to %a" Printreg.reg reg Printreg.reg spilled;
         Reg.Tbl.replace spilled_map reg spilled;
@@ -207,25 +206,28 @@ let rewrite_gen :
           | Some (r, dir) -> not (equal_move_kind dir move_dir), r
         in
         (if add_instr
-        then
-          let from, to_ =
-            match move_dir with Load -> spilled, temp | Store -> temp, spilled
-          in
-          let id =
-            InstructionId.get_and_incr
-              (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
-          in
-          let new_instr = Move.make_instr move ~id ~copy:instr ~from ~to_ in
-          match direction with
-          | Load_before_cell cell -> DLL.insert_before cell new_instr
-          | Store_after_cell cell ->
-            (* See comment before Insert_skipping_name_for_debugger *)
-            Insert_skipping_name_for_debugger.insert_after cell new_instr
-              ~reg:from
-          | Load_after_list list -> DLL.add_end list new_instr
-          | Store_before_list list ->
-            (* See comment before Insert_skipping_name_for_debugger *)
-            Insert_skipping_name_for_debugger.add_begin list new_instr ~reg:from);
+         then
+           let from, to_ =
+             match move_dir with
+             | Load -> spilled, temp
+             | Store -> temp, spilled
+           in
+           let id =
+             InstructionId.get_and_incr
+               (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
+           in
+           let new_instr = Move.make_instr move ~id ~copy:instr ~from ~to_ in
+           match direction with
+           | Load_before_cell cell -> DLL.insert_before cell new_instr
+           | Store_after_cell cell ->
+             (* See comment before Insert_skipping_name_for_debugger *)
+             Insert_skipping_name_for_debugger.insert_after cell new_instr
+               ~reg:from
+           | Load_after_list list -> DLL.add_end list new_instr
+           | Store_before_list list ->
+             (* See comment before Insert_skipping_name_for_debugger *)
+             Insert_skipping_name_for_debugger.add_begin list new_instr
+               ~reg:from);
         temp)
       else reg
     in
@@ -268,10 +270,11 @@ let rewrite_gen :
                temporary is spilled, stack operands will apply to it in the next
                round in the same way it would have done to the original
                variable. *)
-            if should_coalesce_temp_spills_and_reloads
-               || Regalloc_utils.equal_stack_operands_rewrite
-                    (Regalloc_stack_operands.basic spilled_map instr)
-                    May_still_have_spilled_registers
+            if
+              should_coalesce_temp_spills_and_reloads
+              || Regalloc_utils.equal_stack_operands_rewrite
+                   (Regalloc_stack_operands.basic spilled_map instr)
+                   May_still_have_spilled_registers
             then (
               block_rewritten := true;
               let sharing = Reg.Tbl.create 8 in
@@ -283,10 +286,11 @@ let rewrite_gen :
       then
         (* CR-soon mitom: Same issue as short circuiting in basic instruction
            rewriting *)
-        if should_coalesce_temp_spills_and_reloads
-           || Regalloc_utils.equal_stack_operands_rewrite
-                (Regalloc_stack_operands.terminator spilled_map block.terminator)
-                May_still_have_spilled_registers
+        if
+          should_coalesce_temp_spills_and_reloads
+          || Regalloc_utils.equal_stack_operands_rewrite
+               (Regalloc_stack_operands.terminator spilled_map block.terminator)
+               May_still_have_spilled_registers
         then (
           block_rewritten := true;
           let sharing = Reg.Tbl.create 8 in
@@ -350,9 +354,10 @@ let compute_critical_edges : Cfg.t -> Cfg_edge.Set.t =
           Label.Set.fold
             (fun successor_label critical_edges ->
               let successor_block = Cfg.get_block_exn cfg successor_label in
-              if (not (Cfg.can_raise_terminator block.terminator.desc))
-                 && (not (Label.equal label successor_label))
-                 && Label.Set.cardinal successor_block.predecessors > 1
+              if
+                (not (Cfg.can_raise_terminator block.terminator.desc))
+                && (not (Label.equal label successor_label))
+                && Label.Set.cardinal successor_block.predecessors > 1
               then (
                 assert (not successor_block.is_trap_handler);
                 Cfg_edge.Set.add
@@ -386,7 +391,7 @@ let prelude :
     (module Utils) ->
     on_fatal_callback:(unit -> unit) ->
     Cfg_with_infos.t ->
-    cfg_infos * Regalloc_stack_slots.t =
+    cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t =
  fun (module Utils) ~on_fatal_callback cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:on_fatal_callback;
@@ -446,22 +451,24 @@ let prelude :
     Reg.Set.cardinal cfg_infos.arg
   in
   if debug then Utils.log "#temporaries(before):%d" num_temporaries;
-  if num_temporaries >= threshold_split_live_ranges
-     || Flambda2_ui.Flambda_features.classic_mode ()
-  then cfg_infos, Regalloc_stack_slots.make ()
-  else if Lazy.force Regalloc_split_utils.split_live_ranges
-  then
-    let stack_slots =
-      Profile.record ~accumulate:true "split"
-        (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
-        ()
-    in
-    let cfg_infos = collect_cfg_infos cfg_with_layout in
-    cfg_infos, stack_slots
-  else cfg_infos, Regalloc_stack_slots.make ()
+  let cfg_infos, stack_slots =
+    if
+      num_temporaries >= threshold_split_live_ranges
+      || Flambda2_ui.Flambda_features.classic_mode ()
+    then cfg_infos, Regalloc_stack_slots.make ()
+    else if Lazy.force Regalloc_split_utils.split_live_ranges
+    then
+      let stack_slots =
+        Profile.record ~accumulate:true "split"
+          (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
+          ()
+      in
+      collect_cfg_infos cfg_with_layout, stack_slots
+    else cfg_infos, Regalloc_stack_slots.make ()
+  in
+  cfg_infos, stack_slots, Regalloc_affinity.compute cfg_with_infos
 
-let postlude :
-    type s.
+let postlude : type s.
     (module State with type t = s) ->
     (module Utils) ->
     s ->
@@ -489,6 +496,7 @@ let postlude :
     Utils.dedent ());
   update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   f ();
+  (Cfg_with_layout.cfg cfg_with_layout).register_locations_are_set <- true;
   if debug && Lazy.force invariants
   then (
     Utils.log "postcondition";

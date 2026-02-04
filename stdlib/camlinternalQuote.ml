@@ -669,6 +669,12 @@ module With_free_vars : sig
   val value_bindings :
     Loc.t -> Name.t list -> (Var.Value.t list -> 'a t) -> 'a t
 
+  val value_bindings_with_constraints :
+    Loc.t ->
+    (Name.t * 'cstr) list ->
+    ((Var.Value.t * 'cstr) list -> 'a t) ->
+    'a t
+
   (** [type_var_bindings loc names t] is the value of [t]. [t] is expected to
       have a list of free type variables names are [names]. [t] is represented
       as a function from this type variable to the term itself. *)
@@ -774,6 +780,16 @@ end = struct
         let vars = Var.Map.remove_level level vars in
         { vars; v })
 
+  let value_bindings_with_constraints loc names_with_cstrs f =
+    Level.with_fresh loc (fun level ->
+        let names, cstrs = List.split names_with_cstrs in
+        let fresh_vars =
+          List.map (fun name -> Var.Value.generate level name) names
+        in
+        let { vars; v } = f (List.combine fresh_vars cstrs) in
+        let vars = Var.Map.remove_level level vars in
+        { vars; v })
+
   let complex_bindings loc ~extra ~missing ~bound_values ~bound_modules f =
     Level.with_fresh loc (fun level ->
         let fresh_value_vars =
@@ -833,7 +849,7 @@ module With_free_and_bound_vars = struct
 end
 
 type raw_ident_module_t =
-  | Compilation_unit of string
+  | Global_module of string
   | MDot of raw_ident_module_t * string
   | MVar of Var.Module.t * Loc.t
 
@@ -886,7 +902,7 @@ let print_op fmt s =
   else Format.fprintf fmt "%s" s
 
 let rec print_raw_ident_module env fmt = function
-  | Compilation_unit s -> Format.fprintf fmt "%s" s
+  | Global_module s -> Format.fprintf fmt "%s" s
   | MDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
   | MVar (vm, _) -> Format.fprintf fmt "%a" (Var.Module.print env) vm
 
@@ -911,7 +927,7 @@ let print_raw_ident_field env fmt = function
   | FDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
 
 let rec free_vars_module = function
-  | Compilation_unit _ -> Var.Map.empty
+  | Global_module _ -> Var.Map.empty
   | MDot (t, _) -> free_vars_module t
   | MVar (v, loc) -> Var.Map.singleton (Var.Module.generic v) loc
 
@@ -940,7 +956,7 @@ module Identifier = struct
 
     let mk t = With_free_vars.mk (free_vars_module t) t
 
-    let compilation_unit s = mk (Compilation_unit s)
+    let global_module s = mk (Global_module s)
 
     let dot t s =
       let+ t = t in
@@ -1016,7 +1032,7 @@ module Identifier = struct
 
     let lexing_position = TBuiltin "lexing_position" |> mk
 
-    let code = TBuiltin "code" |> mk
+    let expr = TBuiltin "expr" |> mk
 
     let unboxed_float = TBuiltin "float#" |> mk
 
@@ -1077,6 +1093,8 @@ module Identifier = struct
     let match_failure = CBuiltin "Match_failure" |> mk
 
     let out_of_memory = CBuiltin "Out_of_memory" |> mk
+
+    let out_of_fibers = CBuiltin "Out_of_fibers" |> mk
 
     let invalid_argument = CBuiltin "Invalid_argument" |> mk
 
@@ -1208,11 +1226,11 @@ module Ast = struct
     | Vtag of Variant.t * bool * core_type list
     | Vinherit of core_type
 
-  and package_type = module_type * (fragment * core_type) list
+  and package_type = module_type * (modtype_path * core_type) list
 
-  and fragment =
+  and modtype_path =
     | Name of Name.t
-    | Dot of fragment * Name.t
+    | Dot of modtype_path * Name.t
 
   type type_constraint =
     | Constraint of core_type
@@ -1223,6 +1241,7 @@ module Ast = struct
     | PatVar of Var.Value.t
     | PatAlias of pattern * Var.Value.t
     | PatConstant of constant
+    | PatUnboxedUnit
     | PatTuple of (tuple_label * pattern) list
     | PatUnboxedTuple of (tuple_label * pattern) list
     | PatConstruct of constr * pattern option
@@ -1248,7 +1267,6 @@ module Ast = struct
     | Poll
     | Loop
     | Tail_mod_cons
-    | Quotation
 
   let attribute_as_string = function
     | Inline -> "inline"
@@ -1261,7 +1279,6 @@ module Ast = struct
     | Poll -> "poll"
     | Loop -> "loop"
     | Tail_mod_cons -> "tail_mod_cons"
-    | Quotation -> "quotation"
 
   type expression =
     { desc : expression_desc;
@@ -1299,6 +1316,7 @@ module Ast = struct
     | Src_pos
     | Stack of expression
     | Exclave of expression
+    | Unboxed_unit
     | Unboxed_tuple of (tuple_label * expression) list
     | Unboxed_record_product of
         (record_field * expression) list * expression option
@@ -1308,6 +1326,7 @@ module Ast = struct
     | Extension_constructor of Name.t
     | List_comprehension of comprehension
     | Array_comprehension of comprehension
+    | Immutable_array_comprehension of comprehension
     | Quote of expression
     | Antiquote of expression
     | Eval of core_type
@@ -1342,14 +1361,18 @@ module Ast = struct
     | ModuleApply of module_expr * module_expr
     | ModuleApply_unit of module_expr
 
-  and comprehension_clause =
+  and for_comprehension_iterator =
     | Range of Var.Value.t * expression * expression * direction_flag
     | In of pattern * expression
 
+  and comprehension_clause =
+    | WhenComp of expression
+    | ForComp of for_comprehension_iterator list
+
   and comprehension =
-    | Body of expression
-    | When of comprehension * expression
-    | ForComp of comprehension * comprehension_clause
+    { comp_body : expression;
+      clauses : comprehension_clause list
+    }
 
   (* quotation printing logic *)
 
@@ -1393,8 +1416,8 @@ module Ast = struct
       List.iter
         (fun e ->
            if with_space
-           then pp fmt "%s@ %a" delim printer e
-           else pp fmt "%s@,%a" delim printer e)
+           then pp fmt "%a@ %a" pp delim printer e
+           else pp fmt "%a@,%a" pp delim printer e)
         es);
     pp fmt "@]%s" close_sym
 
@@ -1410,24 +1433,28 @@ module Ast = struct
     print_tuple_like "," "(" ")" (print_label_tup printer) fmt entries
 
   let print_obj_closed fmt closed_flag =
-    pp fmt "%s" (match closed_flag with OOpen -> ".." | OClosed -> "")
+    pp fmt "%s" (match closed_flag with OOpen -> "; .." | OClosed -> "")
 
   let print_prefix fmt rec_flag =
     match rec_flag with
     | Nonrecursive -> pp fmt "let"
     | Recursive -> pp fmt "let@ rec"
 
+  let print_dir fmt = function
+    | Upto -> pp fmt "to"
+    | Downto -> pp fmt "downto"
+
   let rec print_vb env fmt ({ pat; expr } : value_binding) =
     pp fmt "%a@ =@ @[<2>%a@]"
-      (print_pat env) pat (print_exp_with_parens env) expr
+      (print_pat ~with_parens:false env) pat (print_exp_with_parens env) expr
 
   and print_const fmt = function
     | Int n -> pp fmt "%d" n
-    | Char c -> pp fmt "\'%c\'" c
+    | Char c -> pp fmt "%C" c
     | String (s, id_opt) -> (
       match id_opt with
-      | None -> pp fmt "\"%s\"" s
-      | Some id -> pp fmt "{%s|@[%s@]|%s}" id s id)
+      | None -> pp fmt "%S" s
+      | Some id -> pp fmt "{%s|%s|%s}" id s id)
     | Float s -> pp fmt "%s" s
     | Float32 s -> pp fmt "%ss" s
     | Int32 n -> pp fmt "%ld" n
@@ -1451,21 +1478,22 @@ module Ast = struct
     | FBasic s -> pp fmt "%s" s
     | FIdent id -> print_raw_ident_field env fmt id
 
-
   and print_pat_with_parens env fmt pat =
     match pat with
-    | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedTuple _
-    | PatVariant (_, Some _) | PatRecord _ | PatUnboxedRecord _ | PatArray _ ->
+    | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedUnit
+    | PatUnboxedTuple _ | PatVariant (_, Some _) | PatRecord _
+    | PatUnboxedRecord _ | PatArray _ ->
       print_pat env fmt pat
     | _ -> pp fmt "(@[%a@])" (print_pat env) pat
 
-  and print_pat env fmt pat =
+  and print_pat ?(with_parens = true) env fmt pat =
     match pat with
     | PatAny -> pp fmt "_"
     | PatVar v -> Var.Value.print env fmt v
     | PatAlias (pat, v) ->
       pp fmt "%a@ as@ %a" (print_pat env) pat (Var.Value.print env) v
     | PatConstant c -> print_const fmt c
+    | PatUnboxedUnit -> pp fmt "#()"
     | PatTuple ts -> print_tuple (print_pat env) fmt ts
     | PatUnboxedTuple ts -> pp fmt "#%a" (print_tuple (print_pat env)) ts
     | PatConstruct (ident, pat_opt) -> (
@@ -1502,7 +1530,17 @@ module Ast = struct
     | PatOr (pat1, pat2) ->
       pp fmt "%a@ |@ %a" (print_pat env) pat1 (print_pat env) pat2
     | PatConstraint (pat, ty) ->
-      pp fmt "(%a@ :@ %a)" (print_pat env) pat (print_core_type env) ty
+      if with_parens then pp fmt "(";
+      (match pat, ty with
+      | PatUnpack _, TypePackage (ident, wcs) ->
+        (* Package types should not be preceded by "module"
+           inside unpack patterns, so we have a separate case *)
+        pp fmt "%a@ :@ %a"
+          (print_pat env) pat (print_package_type env) (ident, wcs)
+      | _ ->
+        pp fmt "%a@ :@ %a"
+          (print_pat env) pat (print_core_type env) ty);
+      if with_parens then pp fmt ")"
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
     | PatUnpack v -> pp fmt "module@ %a" (Var.Module.print env) v
@@ -1521,9 +1559,11 @@ module Ast = struct
     | Construct (_, None)
     | Variant (_, None)
     | Record (_, None)
-    | Field _ | Array _ | Send _ | Unreachable | Src_pos | Unboxed_tuple _
-    | Unboxed_record_product (_, None)
-    | List_comprehension _ | Array_comprehension _ | Quote _ ->
+    | Field _ | Array _ | Send _ | Unreachable | Src_pos | Unboxed_unit
+    | Unboxed_tuple _ | Unboxed_record_product (_, None)
+    | ConstraintExp _ | CoerceExp _
+    | List_comprehension _ | Array_comprehension _
+    | Immutable_array_comprehension _ | Quote _ ->
       (print_exp env) fmt exp
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
 
@@ -1539,9 +1579,7 @@ module Ast = struct
     if with_or then pp fmt "@ |@ ";
     match rf with
     | Vinherit ty -> print_core_type env fmt ty
-    | Vtag (_, false, []) ->
-      () (* fatal_error "Invalid polymorphic variant type" *)
-    | Vtag (variant, true, []) -> pp fmt "%a" Variant.print variant
+    | Vtag (variant, _, []) -> pp fmt "%a" Variant.print variant
     | Vtag (variant, true, tys) ->
       pp fmt "%a@ of" Variant.print variant;
       List.iter
@@ -1555,13 +1593,14 @@ module Ast = struct
         (fun ty -> pp fmt "@ &@ %a" (print_core_type_with_arrow env) ty)
         tys
 
-  and print_fragment fmt = function
+  and print_modtype_path fmt = function
     | Name s -> Name.print fmt s
-    | Dot (frag, s) -> pp fmt "%a.%a" print_fragment frag Name.print s
+    | Dot (frag, s) -> pp fmt "%a.%a" print_modtype_path frag Name.print s
 
   and print_core_type_with_arrow env fmt ty =
     match ty with
-    | TypeArrow _ -> pp fmt "(@[%a@])" (print_core_type env) ty
+    | TypeArrow _ | TypePoly (_::_, _) ->
+      pp fmt "(@[%a@])" (print_core_type env) ty
     | _ -> print_core_type env fmt ty
 
   and print_core_type_with_parens env fmt ty =
@@ -1571,7 +1610,7 @@ module Ast = struct
     | _ -> print_core_type env fmt ty
 
   and print_object_field env fmt = function
-    | Oinherit ty -> pp fmt "<inherit %a TODO>" (print_core_type env) ty
+    | Oinherit ty -> pp fmt "%a@ " (print_core_type env) ty
     | Otag (name, ty) ->
       pp fmt "%a@ :@ %a" Name.print name (print_core_type env) ty
 
@@ -1582,11 +1621,26 @@ module Ast = struct
         module_2
     | ModuleApply_unit module_ -> pp fmt "%a()" (print_module_exp env) module_
 
+  and print_package_type env fmt (ident, wcs) =
+    match wcs with
+    | [] ->
+      pp fmt "%a" (print_module_type env) ident
+    | (modtype_path, core_type) :: wcs ->
+      pp fmt "@[%a@ with@ type@ %a@ =@ %a"
+        (print_module_type env) ident
+        print_modtype_path modtype_path (print_core_type env) core_type;
+      List.iter
+        (fun (modtype_path, core_type) ->
+          pp fmt "@ and@ type@ %a@ =@ %a" print_modtype_path modtype_path
+            (print_core_type env) core_type)
+        wcs;
+      pp fmt "@]"
+
   and print_core_type env fmt = function
     | TypeAny -> pp fmt "_"
     | TypeVar v -> Var.Type_var.print env fmt v
     | TypeArrow (arg_label, ty1, ty2) ->
-      pp fmt "%a%a@ ->@ %a" print_arg_lab arg_label
+      pp fmt "%a%a@ ->@ %a" print_arrow_arg_lab arg_label
         (print_core_type_with_arrow env)
         ty1 (print_core_type env) ty2
     | TypeTuple ((tl, ty) :: ts) ->
@@ -1627,7 +1681,7 @@ module Ast = struct
       pp fmt "< %a >" print_obj_closed closed_flag
     | TypeObject (f :: fs, closed_flag) ->
       pp fmt "<@ @[";
-      print_tuple_like "," "" "" (print_object_field env) fmt (f :: fs);
+      print_tuple_like ";" "" "" (print_object_field env) fmt (f :: fs);
       print_obj_closed fmt closed_flag;
       pp fmt "@]@ >"
     | TypeClass (name, []) -> Name.print fmt name
@@ -1647,20 +1701,13 @@ module Ast = struct
       print_row_field env false fmt rf;
       List.iter (print_row_field env true fmt) row_fields;
       pp fmt " ]"
-    | TypePoly ([], _) -> () (* fatal_error "Invalid poly-type" *)
-    | TypePoly (tv :: tvs, ty) ->
-      print_tuple_like "" "" "." (Var.Type_var.print env) fmt (tv :: tvs);
-      pp fmt "@ %a" (print_core_type env) ty
-    | TypePackage (ident, []) -> print_module_type env fmt ident
-    | TypePackage (ident, (fragment, core_type) :: wcs) ->
-      pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
-        print_fragment fragment (print_core_type env) core_type;
-      List.iter
-        (fun (fragment, core_type) ->
-          pp fmt "@ and@ type@ %a@ =@ %a" print_fragment fragment
-            (print_core_type env) core_type)
-        wcs;
-      pp fmt "@]"
+    | TypePoly ([], ty) -> print_core_type env fmt ty
+    | TypePoly ((_ :: _) as tvs, ty) ->
+      pp fmt "%a@ %a"
+        (print_tuple_like "" "" "." (Var.Type_var.print env)) tvs
+        (print_core_type env) ty
+    | TypePackage (ident, wcs) ->
+      pp fmt "(module@ %a)" (print_package_type env) (ident, wcs)
     | TypeQuote core_type ->
       pp fmt "@[<2><[@,%a@,]>@]" (print_core_type env) core_type
     | TypeCallPos -> pp fmt "call_pos"
@@ -1670,11 +1717,16 @@ module Ast = struct
     | Labelled s -> pp fmt "~%s:" s
     | Optional s -> pp fmt "?%s:" s
 
+  and print_arrow_arg_lab fmt = function
+    | Nolabel -> pp fmt ""
+    | Labelled s -> pp fmt "%s:" s
+    | Optional s -> pp fmt "?%s:" s
+
   and print_param env fmt = function
     | Pparam_val (arg_lab, None, pat) ->
       pp fmt "@ %a%a" print_arg_lab arg_lab (print_pat env) pat
     | Pparam_val (arg_lab, Some exp, pat) ->
-      pp fmt "@ %a%a=(@[%a@])" print_arg_lab arg_lab (print_pat env) pat
+      pp fmt "@ %a(%a=@[%a@])" print_arg_lab arg_lab (print_pat env) pat
         (print_exp env) exp
     | Pparam_newtype ty -> pp fmt "@ (type@ %a)" (Var.Type_constr.print env) ty
 
@@ -1739,6 +1791,32 @@ module Ast = struct
            (print_exp_with_parens env) fmt items
     else print_tuple_like ";" "[" "]" (print_exp env) fmt items
 
+  and print_for_iterator env fmt = function
+    | Range (var, exp_start, exp_stop, dir) ->
+      pp fmt "@[%a = %a@]@ %a@ %a"
+        (Var.Value.print env) var (print_exp env) exp_start
+        (print_dir) dir (print_exp env) exp_stop
+    | In (pat, exp) ->
+      pp fmt "%a@ in@ %a" (print_pat env) pat (print_exp env) exp
+
+  and print_comprehension_clause env fmt = function
+    | WhenComp exp -> pp fmt "@[when@ %a@]" (print_exp env) exp
+    | ForComp [] ->
+      failwith "Empty for clause in list comprehension. This should not happen."
+    | ForComp its ->
+      pp fmt "@[for@ %a@]"
+        (print_tuple_like ~with_space:false "@ and@ " "" ""
+           (print_for_iterator env))
+        its
+
+  and print_comprehension env fmt {comp_body; clauses} =
+    pp fmt "%a@ %a"
+      (print_exp env)
+      comp_body
+      (print_tuple_like ~with_space:true "" "" ""
+         (print_comprehension_clause env))
+      clauses
+
   and print_exp_desc env fmt exp =
     match exp.desc with
     | Ident id -> print_raw_ident_value env fmt id
@@ -1761,12 +1839,16 @@ module Ast = struct
         | _ -> print_apply env fmt exp args)
       | _ -> print_apply env fmt exp args)
     | Fun { params; constraint_; body } -> (
-      match body with
-      | Pfunction_body exp ->
+      (match params with
+      | _::_ ->
         pp fmt "@[<2>fun";
         List.iter (print_param env fmt) params;
+        pp fmt "@ ->@ "
+      | [] -> ());
+      match body with
+      | Pfunction_body exp ->
         Option.iter (print_type_constraint env fmt) constraint_;
-        pp fmt "@ ->@ %a@]" (print_exp env) exp
+        pp fmt "%a@]" (print_exp env) exp
       | Pfunction_cases cases ->
         pp fmt "function@[";
         List.iter (print_case env fmt) cases;
@@ -1836,20 +1918,20 @@ module Ast = struct
         (print_exp_with_parens env)
         body
     | For (it, start, stop, dir, body) ->
-      let dir = match dir with Upto -> "to" | Downto -> "downto" in
-      pp fmt "for@ %a@ =@ %a@ %s@ %a@ do@ @,@[<2>%a@]@ @,done" (print_pat env)
-        it (print_exp env) start dir (print_exp env) stop
+      pp fmt "for@ %a@ =@ %a@ %a@ %a@ do@ @,@[<2>%a@]@ @,done" (print_pat env)
+        it (print_exp env) start print_dir dir (print_exp env) stop
         (print_exp_with_parens env)
         body
     | Send (exp, meth) ->
       pp fmt "%a#@[%a@]" (print_exp_with_parens env) exp Method.print meth
     | ConstraintExp (exp, ty) ->
-      pp fmt "%a@ :@ %a" (print_exp env) exp (print_core_type env) ty
+      pp fmt "(%a@ :@ %a)" (print_exp env) exp (print_core_type env) ty
     | CoerceExp (exp, opt_ty, ty) -> (
       match opt_ty with
-      | None -> pp fmt "%a@ :>@ %a" (print_exp env) exp (print_core_type env) ty
+      | None ->
+        pp fmt "(%a@ :>@ %a)" (print_exp env) exp (print_core_type env) ty
       | Some ty_constr ->
-        pp fmt "%a@ :@ %a@ :>@ %a" (print_exp env) exp (print_core_type env)
+        pp fmt "(%a@ :@ %a@ :>@ %a)" (print_exp env) exp (print_core_type env)
           ty_constr (print_core_type env) ty)
     | Match (exp, cases) ->
       pp fmt "@[<2>match@ @[%a@]@ with" (print_exp env) exp;
@@ -1865,7 +1947,7 @@ module Ast = struct
          pp fmt "@]");
       pp fmt "@]"
     | Setfield (obj, field, exp) ->
-      pp fmt "%a#%a <- %a"
+      pp fmt "%a.%a <- %a"
         (print_exp_with_parens env)
         obj (print_field env) field (print_exp env) exp
     | Letmodule (None, module_exp, exp) ->
@@ -1884,22 +1966,30 @@ module Ast = struct
       pp fmt "@[<2>let@ exception@ %s@ in@ %a@]" name (print_exp env) exp
     | Extension_constructor name ->
       pp fmt "@[[%%extension_constructor@ %a]@]" Name.print name
+    | Unboxed_unit -> pp fmt "#()"
     | Unboxed_tuple ts ->
       pp fmt "#";
       print_tuple (print_exp env) fmt ts
-    | Unboxed_record_product (ts, exp_opt) -> print_record env fmt (ts, exp_opt)
+    | Unboxed_record_product (ts, exp_opt) ->
+      pp fmt "#%a" (print_record env) (ts, exp_opt)
     | Unboxed_field (exp, rec_field) ->
-      pp fmt "#%a.%a" (print_exp env) exp (print_field env) rec_field
+      pp fmt "%a.#%a" (print_exp env) exp (print_field env) rec_field
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
     | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
-    | List_comprehension _ | Array_comprehension _ ->
-      pp fmt "(* comprehension *)"
+    | List_comprehension compr ->
+      pp fmt "@[<2>[@ %a@ ]@]" (print_comprehension env) compr
+    | Array_comprehension compr ->
+      pp fmt "@[<2>[|@ %a@ |]@]" (print_comprehension env) compr
+    | Immutable_array_comprehension compr ->
+      pp fmt "@[<2>[:@ %a@ :]@]" (print_comprehension env) compr
     | Eval typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
     | Unreachable | Src_pos -> pp fmt "."
 
   and print_exp env fmt exp =
+    if exp.attributes <> [] then pp fmt "(@[";
     print_exp_desc env fmt exp;
-    List.iter (print_attribute fmt) exp.attributes
+    List.iter (print_attribute fmt) exp.attributes;
+    if exp.attributes <> [] then pp fmt "@])"
 end
 
 module Label = struct
@@ -1920,8 +2010,8 @@ module Label = struct
   let optional s = Ast.Optional s
 end
 
-module Fragment = struct
-  type t = Ast.fragment
+module Modtype_path = struct
+  type t = Ast.modtype_path
 
   let name s = Ast.Name s
 
@@ -2041,20 +2131,6 @@ module Field = struct
   let of_string s = return (Ast.FBasic s)
 end
 
-module Object_field = struct
-  type t = Ast.object_field With_free_vars.t
-
-  let ( let+ ) m f = With_free_vars.map f m
-
-  let inherit_ ty =
-    let+ ty = ty in
-    Ast.Oinherit ty
-
-  let tag name ty =
-    let+ ty = ty in
-    Ast.Otag (name, ty)
-end
-
 module Pat = struct
   open With_free_and_bound_vars
 
@@ -2081,6 +2157,8 @@ module Pat = struct
     Ast.PatAlias (p, v)
 
   let constant const = return (Ast.PatConstant const)
+
+  let unboxed_unit = return Ast.PatUnboxedUnit
 
   let tuple ts =
     let ps =
@@ -2185,9 +2263,45 @@ module Exp_attribute = struct
   let loop = Ast.Loop
 
   let tail_mod_cons = Ast.Tail_mod_cons
-
-  let quotation = Ast.Quotation
 end
+
+
+module Object_type = struct
+  module Object_closed_flag = struct
+    type t =
+      | Open
+      | Closed
+
+    let open_ = Open
+
+    let closed = Closed
+
+    let to_ast_object_closed_flag = function
+      | Open -> Ast.OOpen
+      | Closed -> Ast.OClosed
+  end
+
+  module Object_field = struct
+    type t = Ast.object_field With_free_vars.t
+
+    let ( let+ ) m f = With_free_vars.map f m
+
+    let inherit_ ty =
+      let+ ty = ty in
+      Ast.Oinherit ty
+
+    let tag method_ type_ =
+      let+ type_ in
+      Ast.Otag (method_, type_)
+  end
+
+  type t = Ast.object_field list With_free_vars.t * Ast.object_closed_flag
+
+  let of_object_fields_list object_fields object_closed_flag =
+    With_free_vars.all object_fields,
+    Object_closed_flag.to_ast_object_closed_flag object_closed_flag
+end
+
 
 module Variant_type = struct
   module Variant_form = struct
@@ -2271,9 +2385,8 @@ module Type = struct
     let+ ts = all typs and+ cons = cons in
     Ast.TypeConstr (cons, ts)
 
-  let object_ object_fields is_closed =
-    let closed_flag = if is_closed then Ast.OClosed else Ast.OOpen in
-    let+ object_fields = all object_fields in
+  let object_ (object_fields, closed_flag) =
+    let+ object_fields in
     Ast.TypeObject (object_fields, closed_flag)
 
   let class_ name tys =
@@ -2460,37 +2573,52 @@ module Function = struct
 end
 
 module Comprehension = struct
+  module Iterator = struct
+    type t = Ast.for_comprehension_iterator With_free_vars.t
+    let ( let+ ) m f = With_free_vars.map f m
+    let ( and+ ) = With_free_vars.both
+
+    let range var start stop direction =
+      let+ start = start and+ stop = stop in
+      let dir = if direction then Ast.Upto else Ast.Downto in
+      Ast.Range (var, start, stop, dir)
+
+    let in_ loc vars pat exp =
+      let+ pat = pat and+ exp = exp in
+      let p =
+        With_bound_vars.value
+          ~extra:(Binding_error.unexpected_at_loc loc)
+          ~missing:Binding_error.missing pat
+          (Var.Value.generic_list vars)
+      in
+      Ast.In (p, exp)
+  end
+
   type t = Ast.comprehension With_free_vars.t
 
   let ( let+ ) m f = With_free_vars.map f m
-
   let ( and+ ) = With_free_vars.both
+
+  let mk clauses comp_body = Ast.{clauses; comp_body}
 
   let body exp =
     let+ exp = exp in
-    Ast.Body exp
+    mk [] exp
 
-  let when_clause exp compr =
-    let+ exp = exp and+ compr = compr in
-    Ast.When (compr, exp)
+  let when_ exp comprehension =
+    let+ Ast.{clauses; comp_body} = comprehension
+    and+ exp = exp
+    in
+    mk ((Ast.WhenComp exp) :: clauses) comp_body
 
-  let for_range loc name start stop direction compr =
-    With_free_vars.value_binding loc name (fun var ->
-        let+ start = start and+ stop = stop and+ compr = compr var in
-        let dir = if direction then Ast.Upto else Ast.Downto in
-        Ast.ForComp (compr, Ast.Range (var, start, stop, dir)))
-
-  let for_in loc exp names compr =
-    With_free_vars.value_bindings loc names (fun vars ->
-        let pat, compr = compr vars in
-        let+ pat = pat and+ compr = compr and+ exp = exp in
-        let p =
-          With_bound_vars.value
-            ~extra:(Binding_error.unexpected_at_loc loc)
-            ~missing:Binding_error.missing pat
-            (Var.Value.generic_list vars)
-        in
-        Ast.ForComp (compr, Ast.In (p, exp)))
+  let for_ loc names frest =
+    let+ its, Ast.{clauses; comp_body} =
+      With_free_vars.value_bindings loc names (fun vars ->
+        let its, comprehension = frest vars in
+        let+ its = With_free_vars.all its and+ comprehension = comprehension
+        in (its, comprehension))
+    in
+    mk ((Ast.ForComp its) :: clauses) comp_body
 end
 
 module Code = struct
@@ -2559,18 +2687,25 @@ module Exp_desc = struct
 
   let constant (const : Constant.t) = return (Ast.Constant const)
 
-  let let_rec_simple loc names f =
-    With_free_vars.value_bindings loc names (fun vars ->
+  let let_rec_simple loc names_with_cstrs f =
+    With_free_vars.value_bindings_with_constraints
+      loc names_with_cstrs
+      (fun (vars_with_cstrs : (Var.Value.t * Type.t option) list) ->
+        let vars, _ = List.split vars_with_cstrs in
         let defs, body = f vars in
-        let+ defs = all defs and+ body = body in
-        let vbs_rev =
-          List.rev_map2
-            (fun var def ->
-              let pat = Ast.PatVar var in
+        let+ vbs =
+          List.map2
+            (fun (var, cstr) def ->
+              let+ cstr = optional cstr and+ def = def in
+              let pat =
+                match cstr with
+                | None -> Ast.PatVar var
+                | Some ct -> Ast.PatConstraint (Ast.PatVar var, ct)
+              in
               mk_vb pat def)
-            vars defs
-        in
-        let vbs = List.rev vbs_rev in
+            vars_with_cstrs defs
+          |> all
+        and+ body = body in
         Ast.Let (Recursive, vbs, body))
 
   let let_ loc names_values names_modules defs f =
@@ -2737,6 +2872,12 @@ module Exp_desc = struct
   let array_comprehension compr =
     let+ compr = compr in
     Ast.Array_comprehension compr
+
+  let immutable_array_comprehension compr =
+    let+ compr = compr in
+    Ast.Immutable_array_comprehension compr
+
+  let unboxed_unit = return Ast.Unboxed_unit
 
   let unboxed_tuple fs =
     let entries =

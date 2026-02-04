@@ -2,7 +2,7 @@
   description = "OxCaml - A performance-focused fork of OCaml";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/ca534a76c4afb2bdc07b681dbc11b453bab21af8";
     flake-utils.url = "github:numtide/flake-utils";
     nix-github-actions = {
       url = "github:nix-community/nix-github-actions";

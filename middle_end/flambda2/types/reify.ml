@@ -40,6 +40,9 @@ type to_lift =
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.t
   | Immutable_float32_array of { fields : Float32.t list }
   | Immutable_float_array of { fields : Float.t list }
+  | Immutable_int_array of { fields : Target_ocaml_int.t list }
+  | Immutable_int8_array of { fields : Int8.t list }
+  | Immutable_int16_array of { fields : Int16.t list }
   | Immutable_int32_array of { fields : Int32.t list }
   | Immutable_int64_array of { fields : Int64.t list }
   | Immutable_nativeint_array of { fields : Targetint_32_64.t list }
@@ -130,6 +133,30 @@ module Lift_array_of_naked_floats = Make_lift_array_of_naked_numbers (struct
   let prove = Provers.meet_naked_floats
 
   let build_to_lift ~fields = Immutable_float_array { fields }
+end)
+
+module Lift_array_of_naked_ints = Make_lift_array_of_naked_numbers (struct
+  module N = Target_ocaml_int
+
+  let prove = Provers.meet_naked_immediates
+
+  let build_to_lift ~fields = Immutable_int_array { fields }
+end)
+
+module Lift_array_of_naked_int8s = Make_lift_array_of_naked_numbers (struct
+  module N = Int8
+
+  let prove = Provers.meet_naked_int8s
+
+  let build_to_lift ~fields = Immutable_int8_array { fields }
+end)
+
+module Lift_array_of_naked_int16s = Make_lift_array_of_naked_numbers (struct
+  module N = Int16
+
+  let prove = Provers.meet_naked_int16s
+
+  let build_to_lift ~fields = Immutable_int16_array { fields }
 end)
 
 module Lift_array_of_naked_int32s = Make_lift_array_of_naked_numbers (struct
@@ -236,18 +263,18 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
       try_canonical_simple ()
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null =
-              Ok
-                (Variant
-                  { is_unique;
-                    blocks;
-                    immediates;
-                    is_int = _;
-                    get_tag = _;
-                    extensions = _
-                  })
-          }) -> (
+           { is_null = Not_null;
+             non_null =
+               Ok
+                 (Variant
+                    { is_unique;
+                      blocks;
+                      immediates;
+                      is_int = _;
+                      get_tag = _;
+                      extensions = _
+                    })
+           }) -> (
       match blocks, immediates with
       | Known blocks, Known imms ->
         if Expand_head.is_bottom env imms
@@ -310,9 +337,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
       try_canonical_simple ()
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Closures { by_function_slot = _; alloc_mode = _ })
-          }) ->
+           { is_null = Not_null;
+             non_null = Ok (Closures { by_function_slot = _; alloc_mode = _ })
+           }) ->
       try_canonical_simple ()
       (* CR vlaviron: This rather complicated code could be useful, but since a
          while ago Reification simply ignores List_set_of_closures results. So
@@ -497,9 +524,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
        is an alias type. That would require checking the alloc mode. *)
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Boxed_float (ty_naked_float, _alloc_mode))
-          }) -> (
+           { is_null = Not_null;
+             non_null = Ok (Boxed_float (ty_naked_float, _alloc_mode))
+           }) -> (
       match Provers.meet_naked_floats env ty_naked_float with
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid
@@ -513,9 +540,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         | Some f -> Lift (Boxed_float f)))
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Boxed_float32 (ty_naked_float32, _alloc_mode))
-          }) -> (
+           { is_null = Not_null;
+             non_null = Ok (Boxed_float32 (ty_naked_float32, _alloc_mode))
+           }) -> (
       match Provers.meet_naked_float32s env ty_naked_float32 with
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid
@@ -529,9 +556,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         | Some f -> Lift (Boxed_float32 f)))
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Boxed_int32 (ty_naked_int32, _alloc_mode))
-          }) -> (
+           { is_null = Not_null;
+             non_null = Ok (Boxed_int32 (ty_naked_int32, _alloc_mode))
+           }) -> (
       match Provers.meet_naked_int32s env ty_naked_int32 with
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid
@@ -541,9 +568,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         | Some n -> Lift (Boxed_int32 n)))
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Boxed_int64 (ty_naked_int64, _alloc_mode))
-          }) -> (
+           { is_null = Not_null;
+             non_null = Ok (Boxed_int64 (ty_naked_int64, _alloc_mode))
+           }) -> (
       match Provers.meet_naked_int64s env ty_naked_int64 with
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid
@@ -553,9 +580,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         | Some n -> Lift (Boxed_int64 n)))
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Boxed_nativeint (ty_naked_nativeint, _alloc_mode))
-          }) -> (
+           { is_null = Not_null;
+             non_null = Ok (Boxed_nativeint (ty_naked_nativeint, _alloc_mode))
+           }) -> (
       match Provers.meet_naked_nativeints env ty_naked_nativeint with
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid
@@ -565,9 +592,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         | Some n -> Lift (Boxed_nativeint n)))
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Boxed_vec128 (ty_naked_vec128, _alloc_mode))
-          }) -> (
+           { is_null = Not_null;
+             non_null = Ok (Boxed_vec128 (ty_naked_vec128, _alloc_mode))
+           }) -> (
       match Provers.meet_naked_vec128s env ty_naked_vec128 with
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid
@@ -577,9 +604,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         | Some n -> Lift (Boxed_vec128 n)))
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Boxed_vec256 (ty_naked_vec256, _alloc_mode))
-          }) -> (
+           { is_null = Not_null;
+             non_null = Ok (Boxed_vec256 (ty_naked_vec256, _alloc_mode))
+           }) -> (
       match Provers.meet_naked_vec256s env ty_naked_vec256 with
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid
@@ -589,9 +616,9 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         | Some n -> Lift (Boxed_vec256 n)))
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null = Ok (Boxed_vec512 (ty_naked_vec512, _alloc_mode))
-          }) -> (
+           { is_null = Not_null;
+             non_null = Ok (Boxed_vec512 (ty_naked_vec512, _alloc_mode))
+           }) -> (
       match Provers.meet_naked_vec512s env ty_naked_vec512 with
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid
@@ -601,21 +628,22 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         | Some n -> Lift (Boxed_vec512 n)))
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null =
-              Ok
-                (Array
-                  { contents = Unknown | Known Mutable;
-                    length;
-                    element_kind;
-                    alloc_mode = _
-                  })
-          }) -> (
+           { is_null = Not_null;
+             non_null =
+               Ok
+                 (Array
+                    { contents = Unknown | Known Mutable;
+                      length;
+                      element_kind;
+                      alloc_mode = _
+                    })
+           }) -> (
       match Provers.meet_equals_single_tagged_immediate env length with
       | Known_result length -> (
-        if not
-             (Target_ocaml_int.equal length
-                (Target_ocaml_int.zero (TE.machine_width env)))
+        if
+          not
+            (Target_ocaml_int.equal length
+               (Target_ocaml_int.zero (TE.machine_width env)))
         then try_canonical_simple ()
         else
           match element_kind with
@@ -630,16 +658,16 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
       | Invalid -> Invalid)
     | Value
         (Ok
-          { is_null = Not_null;
-            non_null =
-              Ok
-                (Array
-                  { contents = Known (Immutable { fields });
-                    length = _;
-                    alloc_mode;
-                    element_kind
-                  })
-          }) -> (
+           { is_null = Not_null;
+             non_null =
+               Ok
+                 (Array
+                    { contents = Known (Immutable { fields });
+                      length = _;
+                      alloc_mode;
+                      element_kind
+                    })
+           }) -> (
       match fields with
       | [||] -> (
         match element_kind with
@@ -674,6 +702,10 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
             Lift_array_of_naked_floats.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_float32 ->
             Lift_array_of_naked_float32s.lift env ~fields ~try_canonical_simple
+          | Naked_number Naked_int8 ->
+            Lift_array_of_naked_int8s.lift env ~fields ~try_canonical_simple
+          | Naked_number Naked_int16 ->
+            Lift_array_of_naked_int16s.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_int32 ->
             Lift_array_of_naked_int32s.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_int64 ->
@@ -681,13 +713,14 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
           | Naked_number Naked_nativeint ->
             Lift_array_of_naked_nativeints.lift env ~fields
               ~try_canonical_simple
+          | Naked_number Naked_immediate ->
+            Lift_array_of_naked_ints.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_vec128 ->
             Lift_array_of_naked_vec128s.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_vec256 ->
             Lift_array_of_naked_vec256s.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_vec512 ->
             Lift_array_of_naked_vec512s.lift env ~fields ~try_canonical_simple
-          | Naked_number (Naked_immediate | Naked_int8 | Naked_int16)
           | Region | Rec_info ->
             Misc.fatal_errorf
               "Unexpected kind %a in immutable array case when reifying type:@ \

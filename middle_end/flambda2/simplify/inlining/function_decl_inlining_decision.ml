@@ -42,8 +42,9 @@ let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
       let can_inline_recursive_functions =
         Flambda_features.Expert.can_inline_recursive_functions ()
       in
-      if is_recursive && (not should_unroll)
-         && not can_inline_recursive_functions
+      if
+        is_recursive && (not should_unroll)
+        && not can_inline_recursive_functions
       then Recursive
       else if is_a_functor
       then Functor { size }

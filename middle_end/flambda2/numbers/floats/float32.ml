@@ -22,26 +22,26 @@ let to_bits x = x
 let of_bits x = x
 
 external neg : t -> t = "compiler_float32_neg_boxed" "compiler_float32_neg"
-  [@@unboxed]
+[@@unboxed]
 
 external abs : t -> t = "compiler_float32_abs_boxed" "compiler_float32_abs"
-  [@@unboxed]
+[@@unboxed]
 
 external add : t -> t -> t = "compiler_float32_add_boxed" "compiler_float32_add"
-  [@@unboxed]
+[@@unboxed]
 
 external sub : t -> t -> t = "compiler_float32_sub_boxed" "compiler_float32_sub"
-  [@@unboxed]
+[@@unboxed]
 
 external mul : t -> t -> t = "compiler_float32_mul_boxed" "compiler_float32_mul"
-  [@@unboxed]
+[@@unboxed]
 
 external div : t -> t -> t = "compiler_float32_div_boxed" "compiler_float32_div"
-  [@@unboxed]
+[@@unboxed]
 
 external mod_ : t -> t -> t
   = "compiler_float32_mod_boxed" "compiler_float32_mod"
-  [@@unboxed]
+[@@unboxed]
 
 external compare : (t[@unboxed]) -> (t[@unboxed]) -> int
   = "compiler_float32_compare_boxed" "compiler_float32_compare"
@@ -51,11 +51,11 @@ external equal : (t[@unboxed]) -> (t[@unboxed]) -> bool
 
 external of_float : float -> t
   = "compiler_float32_of_float_boxed" "compiler_float32_of_float"
-  [@@unboxed]
+[@@unboxed]
 
 external to_float : t -> float
   = "compiler_float32_to_float_boxed" "compiler_float32_to_float"
-  [@@unboxed]
+[@@unboxed]
 
 external of_string : string -> t = "compiler_float32_of_string"
 

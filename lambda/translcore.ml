@@ -102,7 +102,8 @@ let transl_extension_constructor ~scopes env path ext =
       (* Extension constructors are currently always Alloc_heap.
          They could be Alloc_local, but that would require changes
          to pattern typing, as patterns can close over them. *)
-      Lprim (Pmakeblock (Obj.object_tag, Immutable_unique, None, alloc_heap),
+      Lprim (Pmakeblock
+          (Obj.object_tag, Immutable_unique, All_value, alloc_heap),
         [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
          Lprim (prim_fresh_oo_id, [lambda_unit], loc)],
         loc)
@@ -137,6 +138,9 @@ let maybe_region get_layout lam =
        Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout)
     | Lregion _ as lam -> lam
     | Lexclave lam -> lam
+    | Lsplice _ ->
+      fatal_error "Translcore.remove_tail_markers_and_exclave: \
+        splices shouldn't be reachable"
     | lam ->
        Lambda.shallow_map ~tail:remove_tail_markers_and_exclave ~non_tail:Fun.id lam
   in
@@ -230,7 +234,7 @@ let assert_failed loc ~scopes exp =
   in
   let loc = of_location ~scopes exp.exp_loc in
   Lprim(Praise Raise_regular, [event_after ~scopes exp
-    (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
+    (Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
           [slot;
            Lconst(Const_block(0,
               [Const_base(Const_string (fname, exp.exp_loc, None));
@@ -285,7 +289,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
       let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
       { params = self_param :: method_.params;
         body = method_.body;
-        return_mode = transl_alloc_mode_l method_.ret_mode;
+        return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
         return_sort;
         region = true;
       }
@@ -307,7 +311,7 @@ let transl_ident loc env ty path desc kind =
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
-  | (Val_reg | Val_self _), Id_value ->
+  | (Val_reg _ | Val_self _), Id_value ->
       transl_value_path loc env path
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
 
@@ -334,7 +338,7 @@ let zero_alloc_of_application
   | Some assume, _ ->
     (* The user wrote a zero_alloc attribute on the application - keep it. *)
     Builtin_attributes.assume_zero_alloc ~inferred:false assume
-  | None, Texp_ident (_, _, { val_zero_alloc; _ }, _, _) ->
+  | None, Texp_ident (_, _, { val_zero_alloc; _ }, _, _, _) ->
     (* We assume the call is zero_alloc if the function is known to be
        zero_alloc. If the function is zero_alloc opt, then we need to be sure
        that the opt checks were run to license this assumption. We judge
@@ -382,7 +386,7 @@ and transl_exp1 ~scopes ~in_new_scope sort e =
 
 and transl_exp0 ~in_new_scope ~scopes sort e =
   match e.exp_desc with
-  | Texp_ident(path, _, desc, kind, _) ->
+  | Texp_ident(path, _, desc, kind, _, _) ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
   | Texp_constant cst -> Lconst (Const_base cst)
@@ -400,7 +404,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
   | Texp_apply({ exp_desc = Texp_ident(path, _, {val_kind = Val_prim p},
-                                       Id_prim (pmode, psort), _);
+                                       Id_prim (pmode, psort), _, _);
                  exp_type = prim_type; } as funct,
                oargs, pos, ap_mode, zero_alloc)
     when can_apply_primitive p pmode pos oargs ->
@@ -433,7 +437,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       in
       let lam =
         let loc =
-          map_scopes (update_assume_zero_alloc ~assume_zero_alloc)
+          map_scopes
+            (fun ~scopes ~loc:_ ->
+              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             (of_location ~scopes e.exp_loc)
         in
         Translprim.transl_primitive_application
@@ -483,6 +489,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes sort pat_expr_list),
                return_layout)
+  | Texp_unboxed_unit ->
+      Lprim(Punbox_unit, [lambda_unit], of_location ~scopes e.exp_loc)
   | Texp_tuple (el, alloc_mode) ->
       let ll, shape =
         transl_value_list_with_shape ~scopes
@@ -491,7 +499,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       begin try
         Lconst(Const_block(0, List.map extract_constant ll))
       with Not_constant ->
-        Lprim(Pmakeblock(0, Immutable, Some shape,
+        Lprim(Pmakeblock(0, Immutable,
+                         Lambda.block_shape_of_value_kinds (Some shape),
                          transl_alloc_mode alloc_mode),
               ll,
               (of_location ~scopes e.exp_loc))
@@ -566,13 +575,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                           Lambda.must_be_value (layout_exp sort e))
                         args_with_sorts
                     in
-                    Pmakeblock(runtime_tag, Immutable, Some shape, alloc_mode)
+                    Pmakeblock(runtime_tag, Immutable,
+                               Lambda.block_shape_of_value_kinds (Some shape),
+                               alloc_mode)
                 | Constructor_mixed shape ->
                     (* CR layouts v5: once all-void records are allowed, handle
                        constructors with all-void inline records, which are
                        stored as immediates *)
                     let shape = Lambda.transl_mixed_product_shape shape in
-                    Pmakemixedblock(runtime_tag, Immutable, shape, alloc_mode)
+                    Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
           end
@@ -599,8 +610,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                         Lambda.must_be_value (layout_exp sort e))
                       args_with_sorts
                   in
-                  Pmakeblock(0, Immutable, Some (Lambda.generic_value :: shape),
-                            alloc_mode)
+                  Pmakeblock(0, Immutable,
+                             Lambda.block_shape_of_value_kinds
+                               (Some (Lambda.generic_value :: shape)),
+                             alloc_mode)
               | Some (Constructor_mixed shape) ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
@@ -613,7 +626,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                        value prefix of a mixed block. *)
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
-                  Pmakemixedblock(0, Immutable, shape, alloc_mode)
+                  Pmakeblock(0, Immutable, Shape shape, alloc_mode)
               | None ->
                   fatal_error "Unexpected indeterminate representation in extensible \
                                variant"
@@ -634,7 +647,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Lconst(Const_block(0, [const_int tag;
                                    extract_constant lam]))
           with Not_constant ->
-            Lprim(Pmakeblock(0, Immutable, None,
+            Lprim(Pmakeblock(0, Immutable, All_value,
                              transl_alloc_mode alloc_mode),
                   [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)
@@ -649,10 +662,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         fields representation extended_expression
   | Texp_atomic_loc (arg, arg_sort, _id, lbl, alloc_mode) ->
       let shape =
-        Some
-          [ Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type;
-            { raw_kind = Pintval; nullable = Non_nullable }
-          ]
+        (Shape
+            [| Value (Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type);
+               Value { raw_kind = Pintval; nullable = Non_nullable }
+            |])
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let repres =
@@ -897,7 +910,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 imm_array
               else
                 match kind with
-                | Paddrarray | Pintarray ->
+                | Paddrarray | Pgcignorableaddrarray | Pintarray ->
                   Lconst(Const_block(0, cl))
                 | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
@@ -927,7 +940,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
       let array_kind = Typeopt.array_kind e elt_sort in
       begin match array_kind with
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+      | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
       | Punboxedvectorarray _ ->
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
@@ -1058,7 +1071,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
              modifs
              (Lvar cpy))
   | Texp_letmodule(None, loc, Mp_present, modl, body) ->
-      let lam = !transl_module ~scopes Tcoerce_none None modl in
+      let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
+      let lam = !transl_module ~scopes:mod_scopes Tcoerce_none None modl in
       Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
                 transl_exp ~scopes sort body)
   | Texp_letmodule(Some id, _loc, Mp_present, modl, body) ->
@@ -1173,14 +1187,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | _ ->
           let oid = Ident.create_local "open" in
           let oid_duid = Lambda.debug_uid_none in
+          let open_repr = transl_module_representation od.open_items_repr in
           let body, _ =
-            (* CR layouts v5: Currently we only allow values at the top of a
-               module.  When that changes, some adjustments may be needed
-               here. *)
             List.fold_left (fun (body, pos) id ->
-              Llet(Alias, Lambda.layout_module_field, id,
+              Llet(Alias, layout_of_module_field open_repr pos, id,
                    Lambda.debug_uid_none,
-                   Lprim(mod_field pos, [Lvar oid],
+                   Lprim(mod_field pos open_repr, [Lvar oid],
                          of_location ~scopes od.open_loc), body),
               pos + 1
             ) (transl_exp ~scopes sort e, 0)
@@ -1299,27 +1311,45 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (* CR zqian: the handler function doesn't have a region. However, the
              [region] field is currently broken. *)
       in
-      let app =
+      let ap_loc = of_location e.exp_loc ~scopes in
+      let app ~ap_probe =
         { ap_func = Lvar funcid;
           ap_args;
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
-          ap_loc = of_location e.exp_loc ~scopes;
+          ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
           ap_specialised = Always_specialise;
-          ap_probe = Some {name; enabled_at_init};
+          ap_probe;
         }
       in
-      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
-            Lapply app)
+      let lam =
+        if !Clflags.emit_optimized_probes then
+          let ap_probe = Some {name; enabled_at_init} in
+          Lapply (app ~ap_probe)
+        else
+          (* Slower implementation of probes where there isn't clever
+             architecture-specific codegen. Read the semaphore each time. *)
+          (Lifthenelse
+             ( Lprim
+                 (Pprobe_is_enabled
+                    { name; enabled_at_init = Some enabled_at_init },
+                      [], ap_loc),
+               (* probe handler has type [unit] *)
+               Lapply (app ~ap_probe:None),
+               lambda_unit,
+               layout_unit ))
+      in
+      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler, lam)
     end else begin
       lambda_unit
     end
   | Texp_probe_is_enabled {name} ->
     if !Clflags.native_code && !Clflags.probes then
-      Lprim(Pprobe_is_enabled {name}, [], of_location ~scopes e.exp_loc)
+      Lprim(Pprobe_is_enabled {name; enabled_at_init = None},
+            [], of_location ~scopes e.exp_loc)
     else
       lambda_unit
   | Texp_exclave e ->
@@ -1342,7 +1372,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_quotation exp ->
-      Translquote.transl_quote (transl_exp ~scopes sort) exp e.exp_loc
+      Translquote.transl_quote
+        ~scopes ~loc:e.exp_loc ~transl:(transl_exp ~scopes sort) exp
   (* TODO: update scopes *)
   | Texp_antiquotation exp ->
       fatal_errorf
@@ -1459,7 +1490,10 @@ and transl_apply ~scopes
          It's fine for [Lsend] cases because [assume_zero_alloc] is
          always false currently for them. *)
         let loc =
-          map_scopes (update_assume_zero_alloc ~assume_zero_alloc) loc
+          map_scopes
+            (fun ~scopes ~loc:_ ->
+              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            loc
         in
         Lapply {
           ap_loc=loc;
@@ -1611,7 +1645,7 @@ and transl_tupled_function
       Tfunction_body body ->
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let case = { c_lhs = pat; c_guard = None; c_rhs = body } in
-        Some ([ case ], fp_partial, pat, fp_mode, fp_sort)
+        Some ([ case ], fp_partial, pat, fp_mode.mode_modes, fp_sort)
     | _ -> None
   in
   (* Cases can be eligible for flattening if they belong to the only param
@@ -1729,7 +1763,9 @@ and transl_curried_function ~scopes loc repr params body
     ~return_sort ~return_layout ~return_mode ~region ~mode
   =
   let { nlocal } =
-    let param_curries = List.map (fun fp -> fp.fp_curry, fp.fp_mode) params in
+    let param_curries =
+      List.map (fun fp -> fp.fp_curry, fp.fp_mode.mode_modes) params
+    in
     curried_function_kind
       ~return_mode
       ~mode
@@ -1793,7 +1829,7 @@ and transl_curried_function ~scopes loc repr params body
         in
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let arg_layout = layout arg_env fp_loc fp_sort arg_type in
-        let arg_mode = transl_alloc_mode_l fp_mode in
+        let arg_mode = transl_alloc_mode_l fp_mode.mode_modes in
         let param =
           { name = fp_param;
             debug_uid = fp_param_debug_uid;
@@ -1919,9 +1955,9 @@ and transl_function ~in_new_scope ~scopes e params body
   let scopes =
     if in_new_scope then
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
-    else enter_anonymous_function ~scopes ~assume_zero_alloc
+    else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
   in
-  let sreturn_mode = transl_alloc_mode_l sreturn_mode in
+  let sreturn_mode = transl_alloc_mode_l sreturn_mode.mode_modes in
   let { params; body; return_sort; return_mode; region } =
     fuse_method_arity
       { params; body;
@@ -2247,12 +2283,15 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         match repres with
           Record_boxed _ ->
             let shape = List.map must_be_value shape in
-            Lprim(Pmakeblock(0, mut, Some shape, Option.get mode), ll, loc)
+            Lprim(Pmakeblock(0, mut,
+                             Lambda.block_shape_of_value_kinds (Some shape),
+                             Option.get mode), ll, loc)
         | Record_inlined (Ordinary {runtime_tag},
                           Constructor_uniform_value, Variant_boxed _) ->
             let shape = List.map must_be_value shape in
-            Lprim(Pmakeblock(runtime_tag, mut, Some shape, Option.get mode),
-                  ll, loc)
+            Lprim(Pmakeblock(runtime_tag, mut,
+                             Lambda.block_shape_of_value_kinds (Some shape),
+                             Option.get mode), ll, loc)
         | Record_unboxed | Record_inlined (Ordinary _, _, Variant_unboxed) ->
             (match ll with [v] -> v | _ -> assert false)
         | Record_float ->
@@ -2270,7 +2309,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             let slot = transl_extension_path loc env path in
             Lprim(Pmakeblock(0,
                              mut,
-                             Some (Lambda.generic_value :: shape),
+                             Lambda.block_shape_of_value_kinds
+                               (Some (Lambda.generic_value :: shape)),
                              Option.get mode),
                   slot :: ll, loc)
         | Record_inlined (Extension _, _, (Variant_unboxed | Variant_boxed _))
@@ -2278,14 +2318,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             assert false
         | Record_mixed shape ->
             let shape = Lambda.transl_mixed_product_shape shape in
-            Lprim (Pmakemixedblock (0, mut, shape, Option.get mode), ll, loc)
+            Lprim (Pmakeblock (0, mut, Shape shape, Option.get mode), ll, loc)
         | Record_inlined (Ordinary { runtime_tag },
                           Constructor_mixed shape, Variant_boxed _) ->
             (* CR layouts v5: once all-void records are allowed, handle
               constructors with all-void inline records, which are stored as
               immediates *)
             let shape = Lambda.transl_mixed_product_shape shape in
-            Lprim (Pmakemixedblock (runtime_tag, mut, shape, Option.get mode),
+            Lprim (Pmakeblock (runtime_tag, mut, Shape shape, Option.get mode),
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_inlined (Null, _, _) -> assert false
@@ -2660,7 +2700,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
              (Tfunction_cases
                 { fc_cases = [case]; fc_param = param;
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
-                  fc_loc = ghost_loc; fc_exp_extra = None; fc_attributes = [];
+                  fc_loc = ghost_loc; fc_exp_extra = []; fc_attributes = [];
                   fc_arg_mode = Mode.Alloc.disallow_right Mode.Alloc.legacy;
                   fc_arg_sort = param_sort; fc_env = env;
                   fc_ret_type = case.c_rhs.exp_type;
@@ -2757,8 +2797,9 @@ let report_error ppf = function
          enforce, see [Lambda.Mixed_product_bytes_wrt_path] *)
       fprintf ppf
         "This block index cannot be created because it refers to values@ \
-         and non-values that are separated by 2^16 or more bytes in their@ \
+         and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
+        (64 - Mixed_product_bytes.block_index_offset_bits)
   | Element_would_be_reordered_in_record ->
       fprintf ppf
         "Block indices into arrays whose element layout contains a@ \

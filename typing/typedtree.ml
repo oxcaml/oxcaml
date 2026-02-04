@@ -42,6 +42,16 @@ type constant =
 
 module Uid = Shape.Uid
 
+type 'a modes = 'a Typemode.modes =
+  { mode_modes : 'a;
+    mode_desc : Mode.Alloc.atom Location.loc list
+  }
+
+type modalities = Typemode.modalities =
+  { moda_modalities : Mode.Modality.Const.t;
+    moda_desc : Mode.Modality.atom Location.loc list
+  }
+
 (* Value expressions for the core language *)
 
 type partial = Partial | Total
@@ -128,6 +138,19 @@ let aliased_many_use =
   ( Mode.Uniqueness.disallow_left Mode.Uniqueness.aliased,
     Mode.Linearity.disallow_right Mode.Linearity.many )
 
+type label_ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
+type _ type_inspection =
+  | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
+  | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
+
+and _ poly_param =
+  | Param : type_expr -> [`pat] poly_param
+  | Arrow : (arg_label * type_expr option) list -> [`exp] poly_param
+  | Method : string loc * type_expr -> [`exp] poly_param
+
 type record_sorts =
   | Fixed
   | Variable of Jkind.Sort.Const.t array
@@ -146,10 +169,11 @@ and 'a pattern_data =
    }
 
 and pat_extra =
-  | Tpat_constraint of core_type
+  | Tpat_constraint of core_type * Mode.Alloc.Const.t modes
   | Tpat_type of Path.t * Longident.t loc
   | Tpat_open of Path.t * Longident.t loc * Env.t
   | Tpat_unpack
+  | Tpat_inspected_type of [ `pat ] type_inspection
 
 and 'k pattern_desc =
   (* value patterns *)
@@ -161,6 +185,7 @@ and 'k pattern_desc =
       value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
       * Mode.Value.l * Types.type_expr -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
+  | Tpat_unboxed_unit : value pattern_desc
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
   | Tpat_unboxed_tuple :
       (string option * value general_pattern * Jkind.sort) list ->
@@ -215,7 +240,8 @@ and exp_extra =
   | Texp_newtype of Ident.t * string loc *
                     Parsetree.jkind_annotation option * Uid.t
   | Texp_stack
-  | Texp_mode of Mode.Alloc.Const.Option.t
+  | Texp_mode of Mode.Alloc.Const.Option.t modes
+  | Texp_inspected_type of [ `exp ] type_inspection
 
 and arg_label = Types.arg_label =
   | Nolabel
@@ -225,14 +251,15 @@ and arg_label = Types.arg_label =
 
 and expression_desc =
     Texp_ident of
-      Path.t * Longident.t loc * Types.value_description * ident_kind * unique_use
+      Path.t * Longident.t loc * Types.value_description * ident_kind *
+        unique_use * Mode.Value.l
   | Texp_constant of constant
   | Texp_let of rec_flag * value_binding list * expression
   | Texp_letmutable of value_binding * expression
   | Texp_function of
       { params : function_param list;
         body : function_body;
-        ret_mode : Mode.Alloc.l;
+        ret_mode : Mode.Alloc.l modes;
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
         zero_alloc : Zero_alloc.t;
@@ -242,6 +269,7 @@ and expression_desc =
         Mode.Locality.l * Zero_alloc.assume option
   | Texp_match of expression * Jkind.sort * computation case list * partial
   | Texp_try of expression * value case list
+  | Texp_unboxed_unit
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
@@ -424,7 +452,7 @@ and function_param =
     fp_partial: partial;
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
-    fp_mode: Mode.Alloc.l;
+    fp_mode: Mode.Alloc.l modes;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -449,7 +477,7 @@ and function_cases =
     fc_param: Ident.t;
     fc_param_debug_uid: Shape.Uid.t;
     fc_loc: Location.t;
-    fc_exp_extra: exp_extra option;
+    fc_exp_extra: exp_extra list;
     fc_attributes: attributes;
   }
 
@@ -559,11 +587,12 @@ and module_expr =
 
 and module_type_constraint =
   Tmodtype_implicit
-| Tmodtype_explicit of module_type
+| Tmodtype_explicit of module_type * Mode.Value.lr modes
 
 and functor_parameter =
   | Unit
-  | Named of Ident.t option * string option loc * module_type
+  | Named of Ident.t option * string option loc * module_type *
+             Mode.Alloc.Const.t modes
 
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
@@ -626,8 +655,12 @@ and value_binding =
 
 and module_coercion =
     Tcoerce_none
-  | Tcoerce_structure of (int * module_coercion) list *
-                         (Ident.t * int * module_coercion) list
+  | Tcoerce_structure of
+      { input_repr : Types.module_representation
+      ; output_repr : Types.module_representation
+      ; pos_cc_list : (int * module_coercion) list
+      ; id_pos_list : (Ident.t * int * module_coercion) list
+      }
   | Tcoerce_functor of module_coercion * module_coercion
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
@@ -643,7 +676,7 @@ and module_type =
 and module_type_desc =
     Tmty_ident of Path.t * Longident.t loc
   | Tmty_signature of signature
-  | Tmty_functor of functor_parameter * module_type
+  | Tmty_functor of functor_parameter * module_type * Mode.Alloc.Const.t modes
   | Tmty_with of module_type * (Path.t * Longident.t loc * with_constraint) list
   | Tmty_typeof of module_expr
   | Tmty_alias of Path.t * Longident.t loc
@@ -662,7 +695,7 @@ and primitive_coercion =
 
 and signature = {
   sig_items : signature_item list;
-  sig_modalities : Mode.Modality.Const.t;
+  sig_modalities : modalities;
   sig_type : Types.signature;
   sig_final_env : Env.t;
   sig_sloc : Location.t;
@@ -685,7 +718,7 @@ and signature_item_desc =
   | Tsig_modtype of module_type_declaration
   | Tsig_modtypesubst of module_type_declaration
   | Tsig_open of open_description
-  | Tsig_include of include_description * Mode.Modality.Const.t
+  | Tsig_include of include_description * modalities
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
@@ -697,7 +730,7 @@ and module_declaration =
      md_uid: Uid.t;
      md_presence: module_presence;
      md_type: module_type;
-     md_modalities: Mode.Modality.t;
+     md_modalities: modalities;
      md_attributes: attribute list;
      md_loc: Location.t;
     }
@@ -727,6 +760,7 @@ and 'a open_infos =
     {
      open_expr: 'a;
      open_bound_items: Types.signature;
+     open_items_repr: Types.module_representation;
      open_override: override_flag;
      open_env: Env.t;
      open_loc: Location.t;
@@ -739,13 +773,20 @@ and open_declaration = module_expr open_infos
 
 and include_kind =
   | Tincl_structure
-  | Tincl_functor of (Ident.t * module_coercion) list
-  | Tincl_gen_functor of (Ident.t * module_coercion) list
+  | Tincl_functor of
+      { input_coercion : (Ident.t * module_coercion) list
+      ; input_repr : Types.module_representation
+      }
+  | Tincl_gen_functor of
+      { input_coercion : (Ident.t * module_coercion) list
+      ; input_repr : Types.module_representation
+      }
 
 and 'a include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
+     incl_repr: Types.module_representation;
      incl_loc: Location.t;
      incl_kind: include_kind;
      incl_attributes: attribute list;
@@ -775,7 +816,8 @@ and core_type =
 
 and core_type_desc =
   | Ttyp_var of string option * Parsetree.jkind_annotation option
-  | Ttyp_arrow of arg_label * core_type * core_type
+  | Ttyp_arrow of arg_label * core_type * Mode.Alloc.Const.t modes *
+                  core_type * Mode.Alloc.Const.t modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list
@@ -819,11 +861,16 @@ and object_field_desc =
   | OTtag of string loc * core_type
   | OTinherit of core_type
 
+and value_description_modal_info =
+  | Valmi_sig_value of modalities
+  | Valmi_str_primitive of Mode.Alloc.Const.Option.t modes
+
 and value_description =
   { val_id: Ident.t;
     val_name: string loc;
     val_desc: core_type;
     val_val: Types.value_description;
+    val_modal_info: value_description_modal_info;
     val_prim: string list;
     val_loc: Location.t;
     val_attributes: attribute list;
@@ -856,7 +903,7 @@ and label_declaration =
      ld_name: string loc;
      ld_uid: Uid.t;
      ld_mutable: mutability;
-     ld_modalities: Modality.Const.t;
+     ld_modalities: modalities;
      ld_type: core_type;
      ld_loc: Location.t;
      ld_attributes: attribute list;
@@ -876,7 +923,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Modality.Const.t;
+    ca_modalities: modalities;
     ca_type: core_type;
     ca_loc: Location.t;
   }
@@ -1025,6 +1072,7 @@ let function_arity params body =
 let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   function
   | Tpat_alias _ -> Value
+  | Tpat_unboxed_unit -> Value
   | Tpat_tuple _ -> Value
   | Tpat_unboxed_tuple _ -> Value
   | Tpat_construct _ -> Value
@@ -1069,7 +1117,8 @@ let shallow_iter_pattern_desc
   | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
-  | Tpat_constant _ -> ()
+  | Tpat_constant _
+  | Tpat_unboxed_unit -> ()
   | Tpat_value p -> f.f p
   | Tpat_exception p -> f.f p
   | Tpat_or(p1, p2, _) -> f.f p1; f.f p2
@@ -1101,6 +1150,7 @@ let shallow_map_pattern_desc
       Tpat_variant (x1, Some (f.f p1), x2)
   | Tpat_var _
   | Tpat_constant _
+  | Tpat_unboxed_unit
   | Tpat_any
   | Tpat_variant (_,None,_) -> d
   | Tpat_value p -> Tpat_value (f.f p)
@@ -1148,11 +1198,11 @@ let rec iter_bound_idents
   : type k . _ -> k general_pattern -> _
   = fun f pat ->
   match pat.pat_desc with
-  | Tpat_var (id, s, uid, _sort, _mode) ->
-     f (id,s,pat.pat_type, uid)
-  | Tpat_alias(p, id, s, uid, _sort, _mode, ty) ->
+  | Tpat_var (id, s, uid, sort, _mode) ->
+      f (id, s, pat.pat_type, sort, uid)
+  | Tpat_alias(p, id, s, uid, sort, _mode, ty) ->
       iter_bound_idents f p;
-      f (id, s, ty, uid)
+      f (id, s, ty, sort, uid)
   | Tpat_or(p1, _, _) ->
       (* Invariant : both arguments bind the same variables *)
       iter_bound_idents f p1
@@ -1210,7 +1260,7 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
       | Tpat_lazy p | Tpat_exception p -> loop f p
-      | Tpat_any | Tpat_constant _ -> ()
+      | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit -> ()
   in
   loop f pat
 
@@ -1285,7 +1335,7 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
     ) Ident.Map.empty bindings
   in
   List.rev_map
-    (fun (id, _, _, _) ->
+    (fun (id, _, _, _, _) ->
        let zero_alloc =
          Option.value (Ident.Map.find_opt id checks) ~default:Zero_alloc.default
        in
@@ -1294,8 +1344,13 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
 
 let let_bound_idents_full bindings =
   List.rev (rev_let_bound_idents_full bindings)
+
+let let_bound_idents_with_sorts pat =
+  List.rev_map (fun (id,_,_,sort,_) -> (id, sort))
+    (rev_let_bound_idents_full pat)
+
 let let_bound_idents pat =
-  List.rev_map (fun (id,_,_,_) -> id) (rev_let_bound_idents_full pat)
+  List.rev_map (fun (id,_,_,_,_) -> id) (rev_let_bound_idents_full pat)
 
 let alpha_var env id = List.assoc id env
 
@@ -1380,7 +1435,7 @@ let loc_of_decl ~uid =
   | Value_binding vb ->
     let bound_idents = let_bound_idents_full [vb] in
     let name = ListLabels.find_map
-      ~f:(fun (_, name, _, uid') -> if uid = uid' then Some name else None)
+      ~f:(fun (_, name, _, _, uid') -> if uid = uid' then Some name else None)
       bound_idents in
     (match name with
     | Some name -> name
@@ -1407,7 +1462,7 @@ let mode_without_locks_exn = function
 
 let rec fold_antiquote_exp f  acc exp =
   match exp.exp_desc with
-  | Texp_ident _ | Texp_constant _ -> acc
+  | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit -> acc
   | Texp_let (_, vbs, exp) ->
       let acc = fold_antiquote_value_bindings f acc vbs in
       fold_antiquote_exp f acc exp

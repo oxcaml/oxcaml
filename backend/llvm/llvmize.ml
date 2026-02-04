@@ -524,7 +524,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
     (* [Indirect] has the function in i.arg.(0) *)
     match op with
     | Direct _ -> 0, Array.length i.arg
-    | Indirect -> 1, Array.length i.arg - 1
+    | Indirect _ -> 1, Array.length i.arg - 1
   in
   let arg_regs = Array.sub i.arg args_begin args_end |> reg_list_for_call in
   let args = prepare_call_args_from_regs t arg_regs in
@@ -540,7 +540,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
     | Direct { sym_name; sym_global = _ } ->
       add_referenced_symbol t sym_name;
       LL.Ident.global sym_name
-    | Indirect -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
+    | Indirect _ -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
   in
   let attrs = gc_attr ~can_call_gc:true t i in
   let res =
@@ -808,6 +808,10 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
     | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
       extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
       br_label t label_after)
+  | Invalid { message = _; stack_ofs; stack_align; label_after = _ } ->
+    extcall t i ~func_symbol:Cmm.caml_flambda2_invalid ~alloc:false ~stack_ofs
+      ~stack_align;
+    emit_ins_no_res t I.unreachable
 
 (* Basic instructions *)
 
@@ -930,6 +934,14 @@ let float_op t (i : Cfg.basic Cfg.instruction) (width : Cmm.float_width)
       emit_ins t (I.convert Zext ~arg:bool_res ~to_:T.i64)
   in
   store_into_reg t i.res.(0) res
+
+let int128_op _t (i : Cfg.basic Cfg.instruction)
+    (op : Operation.int128_operation) =
+  (* CR-soon mslater for gyorsh: implement these in llvm intrinsics *)
+  match op with
+  | Iadd128 -> not_implemented_basic ~msg:"Iadd128" i
+  | Isub128 -> not_implemented_basic ~msg:"Isub128" i
+  | Imul64 { signed = _ } -> not_implemented_basic ~msg:"Imul64" i
 
 (* CR yusumez: add a generic Cfg instruction for bswap *)
 let bswap t (i : Cfg.basic Cfg.instruction) (bitwidth : Arch.bswap_bitwidth) =
@@ -1225,6 +1237,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Store (memory_chunk, addressing_mode, _is_modify) ->
     store t i memory_chunk addressing_mode
   | Intop op -> int_op t i op ~imm:None
+  | Int128op op -> int128_op t i op
   | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
   | Floatop (width, op) -> float_op t i width op
   | Begin_region ->
@@ -1284,6 +1297,10 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     let tls_state_ptr = load_domainstate_addr t Domain_tls_state in
     let tls_state = emit_ins t (I.load ~ptr:tls_state_ptr ~typ:T.i64) in
     store_into_reg t i.res.(0) tls_state
+  | Domain_index ->
+    let domain_id_ptr = load_domainstate_addr t Domain_id in
+    let domain_id = emit_ins t (I.load ~ptr:domain_id_ptr ~typ:T.i64) in
+    store_into_reg t i.res.(0) domain_id
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
@@ -1472,7 +1489,9 @@ let prepare_fun_info t (cfg : Cfg.t) =
         fun_num_stack_slots = _ (* only available after regalloc *);
         fun_poll = _ (* not needed after poll insertion *);
         next_instruction_id = _;
-        fun_ret_type
+        fun_ret_type;
+        allowed_to_be_irreducible = _;
+        register_locations_are_set = _
       } =
     cfg
   in
@@ -1820,7 +1839,10 @@ let define_wrap_try t =
       ~attrs:[Returns_twice; Noinline] ~dbg:Debuginfo.none ~private_:true
   in
   reset_fun_info t emitter;
-  let runtime_args = E.get_args_as_values emitter (* All are runtime regs *) in
+  let runtime_args =
+    E.get_args_as_values emitter
+    (* All are runtime regs *)
+  in
   let try_res = V.of_int ~typ:T.i64 0 in
   let res =
     assemble_struct t res_type
@@ -1831,7 +1853,8 @@ let define_wrap_try t =
 
 let define_restore_rbp t =
   List.iter
-    (fun ({ recover_rbp_asm_ident; recover_rbp_var_ident; _ } : trap_block_info) ->
+    (fun ({ recover_rbp_asm_ident; recover_rbp_var_ident; _ } : trap_block_info)
+       ->
       let recover_rbp_asm = LL.Ident.to_string_encoded recover_rbp_asm_ident in
       let recover_rbp_var = LL.Ident.to_string_encoded recover_rbp_var_ident in
       add_module_asm t

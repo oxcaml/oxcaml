@@ -33,8 +33,8 @@ open Compilenv
 type emit = Compile_common.info -> unit
 
 module type File_extensions = sig
-  (** File extensions include exactly one dot, so they can be added with regular string
-      append, and removed by Filename.strip_extension *)
+  (** File extensions include exactly one dot, so they can be added with regular
+      string append, and removed by Filename.strip_extension *)
 
   val ext_obj : string
 
@@ -44,8 +44,8 @@ module type File_extensions = sig
 
   val ext_flambda_lib : string
 
-  (** Name of executable produced by linking if none is given with -o,
-      e.g. [a.out] under Unix. *)
+  (** Name of executable produced by linking if none is given with -o, e.g.
+      [a.out] under Unix. *)
   val default_executable_name : string
 end
 

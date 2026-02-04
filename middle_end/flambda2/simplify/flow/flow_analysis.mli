@@ -20,7 +20,7 @@
     - removing unused parameters of *recursive* continuations;
 
     - moving allocations out of the hot path of recursive continuations (e.g.
-    the allocation of a float that was unboxed by the simplifier). *)
+      the allocation of a float that was unboxed by the simplifier). *)
 
 (** Analyze the uses. *)
 val analyze :

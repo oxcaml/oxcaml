@@ -74,6 +74,8 @@ val typ_vec256 : machtype
 
 val typ_vec512 : machtype
 
+val typ_int128 : machtype
+
 (** Least upper bound of two [machtype_component]s. *)
 val lub_component :
   machtype_component -> machtype_component -> machtype_component
@@ -82,16 +84,16 @@ val lub_component :
     or equal to the second under the relation used by [lub_component]. *)
 val ge_component : machtype_component -> machtype_component -> bool
 
-(** A variant of [machtype] used to describe arguments
-    to external C functions *)
+(** A variant of [machtype] used to describe arguments to external C functions
+*)
 type exttype =
   | XInt  (**r OCaml value, word-sized integer *)
   | XInt8  (**r 8-bit integer *)
   | XInt16  (**r 16-bit integer *)
   | XInt32  (**r 32-bit integer *)
-  | XInt64  (**r 64-bit integer  *)
+  | XInt64  (**r 64-bit integer *)
   | XFloat32  (**r single-precision FP number *)
-  | XFloat  (**r double-precision FP number  *)
+  | XFloat  (**r double-precision FP number *)
   | XVec128  (**r 128-bit vector *)
   | XVec256  (**r 256-bit vector *)
   | XVec512  (**r 512-bit vector *)
@@ -186,39 +188,39 @@ type phantom_defining_expr =
      representation of "target-width OCaml integers of type [int]" becomes when
      merged). *)
   | Cphantom_const_int of Targetint.t
-      (** The phantom-let-bound variable is a constant integer.
-      The argument must be the tagged representation of an integer within
-      the range of type [int] on the target.  (Analogously to [Cconst_int].) *)
+      (** The phantom-let-bound variable is a constant integer. The argument
+          must be the tagged representation of an integer within the range of
+          type [int] on the target. (Analogously to [Cconst_int].) *)
   | Cphantom_const_symbol of string
       (** The phantom-let-bound variable is an alias for a symbol. *)
   | Cphantom_var of Backend_var.t
-      (** The phantom-let-bound variable is an alias for another variable.  The
-      aliased variable must not be a bound by a phantom let. *)
+      (** The phantom-let-bound variable is an alias for another variable. The
+          aliased variable must not be a bound by a phantom let. *)
   | Cphantom_offset_var of
       { var : Backend_var.t;
         offset_in_words : int
       }
       (** The phantom-let-bound-variable's value is defined by adding the given
-      number of words to the pointer contained in the given identifier. *)
+          number of words to the pointer contained in the given identifier. *)
   | Cphantom_read_field of
       { var : Backend_var.t;
         field : int
       }
       (** The phantom-let-bound-variable's value is found by adding the given
-      number of words to the pointer contained in the given identifier, then
-      dereferencing. *)
+          number of words to the pointer contained in the given identifier, then
+          dereferencing. *)
   | Cphantom_read_symbol_field of
       { sym : string;
         field : int
       }
-      (** As for [Uphantom_read_var_field], but with the pointer specified by
-      a symbol. *)
+      (** As for [Uphantom_read_var_field], but with the pointer specified by a
+          symbol. *)
   | Cphantom_block of
       { tag : int;
         fields : Backend_var.t list
       }
       (** The phantom-let-bound variable points at a block with the given
-      structure. *)
+          structure. *)
 
 type trywith_shared_label = Lambda.static_label (* Same as Ccatch handlers *)
 
@@ -292,6 +294,9 @@ type memory_chunk =
   | Fivetwelve_unaligned (* word-aligned 512-bit vector *)
   | Fivetwelve_aligned (* 64-byte-aligned 512-bit vector *)
 
+(** Size in bytes of a memory access for the given chunk type. *)
+val size_of_memory_chunk : memory_chunk -> int
+
 (* These casts compile to a single move instruction. If the operands are
    assigned the same physical register, the move will be omitted entirely. *)
 type reinterpret_cast =
@@ -350,17 +355,20 @@ type alloc_block_kind =
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
+  | Alloc_block_kind_int_u_array
+  | Alloc_block_kind_int8_u_array
+  | Alloc_block_kind_int16_u_array
   | Alloc_block_kind_int32_u_array
   | Alloc_block_kind_int64_u_array
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
 
-(** Due to Comballoc, a single Ialloc instruction may combine several
-    unrelated allocations. Their Debuginfo.t (which may differ) are stored
-    as a list of alloc_dbginfo. This list is in order of increasing memory
-    address, which is the reverse of the original allocation order. Later
-    allocations are consed to the front of this list by Comballoc. *)
+(** Due to Comballoc, a single Ialloc instruction may combine several unrelated
+    allocations. Their Debuginfo.t (which may differ) are stored as a list of
+    alloc_dbginfo. This list is in order of increasing memory address, which is
+    the reverse of the original allocation order. Later allocations are consed
+    to the front of this list by Comballoc. *)
 type alloc_dbginfo_item =
   { alloc_words : int;
     alloc_block_kind : alloc_block_kind;
@@ -369,8 +377,37 @@ type alloc_dbginfo_item =
 
 type alloc_dbginfo = alloc_dbginfo_item list
 
+type is_global =
+  | Global
+  | Local
+
+val equal_is_global : is_global -> is_global -> bool
+
+(* Symbols are marked with whether they are local or global, at both definition
+   and use sites.
+
+   Symbols defined as [Local] may only be referenced within the same file, and
+   all such references must also be [Local].
+
+   Symbols defined as [Global] may be referenced from other files. References
+   from other files must be [Global], but references from the same file may be
+   [Local].
+
+   (Marking symbols in this way speeds up linking, as many references can then
+   be resolved early) *)
+type symbol =
+  { sym_name : string;
+    sym_global : is_global
+  }
+
 type operation =
-  | Capply of machtype * Lambda.region_close
+  | Capply of
+      { result_type : machtype;
+        region : Lambda.region_close;
+        callees : symbol list option
+            (* List of possible callees, or [None] if not known. The actual
+               callee might be a re-optimized versions of one these callees. *)
+      }
   | Cextcall of
       { func : string;
         ty : machtype;
@@ -381,10 +418,10 @@ type operation =
         effects : effects;
         coeffects : coeffects
       }
-      (** The [machtype] is the machine type of the result.
-          The [exttype list] describes the unboxing types of the arguments.
-          An empty list means "all arguments are machine words [XInt]".
-          The boolean indicates whether the function may allocate. *)
+      (** The [machtype] is the machine type of the result. The [exttype list]
+          describes the unboxing types of the arguments. An empty list means
+          "all arguments are machine words [XInt]". The boolean indicates
+          whether the function may allocate. *)
   | Cload of
       { memory_chunk : memory_chunk;
         mutability : Asttypes.mutable_flag;
@@ -398,6 +435,9 @@ type operation =
   | Cmulhi of { signed : bool }
   | Cdivi
   | Cmodi
+  | Caddi128
+  | Csubi128
+  | Cmuli64 of { signed : bool }
   | Cand
   | Cor
   | Cxor
@@ -436,7 +476,10 @@ type operation =
         handler_code_sym : string;
         enabled_at_init : bool
       }
-  | Cprobe_is_enabled of { name : string }
+  | Cprobe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Copaque (* Sys.opaque_identity *)
   | Cbeginregion
   | Cendregion
@@ -444,31 +487,9 @@ type operation =
     (* the [machtype array] refers to the whole tuple *)
   | Cdls_get
   | Ctls_get
+  | Cdomain_index
   | Cpoll
   | Cpause
-
-type is_global =
-  | Global
-  | Local
-
-val equal_is_global : is_global -> is_global -> bool
-
-(* Symbols are marked with whether they are local or global, at both definition
-   and use sites.
-
-   Symbols defined as [Local] may only be referenced within the same file, and
-   all such references must also be [Local].
-
-   Symbols defined as [Global] may be referenced from other files. References
-   from other files must be [Global], but references from the same file may be
-   [Local].
-
-   (Marking symbols in this way speeds up linking, as many references can then
-   be resolved early) *)
-type symbol =
-  { sym_name : string;
-    sym_global : is_global
-  }
 
 (* SIMD vectors are untyped in the backend. This record holds the bitwise
    representation of a 128-bit value. [word0] is the least significant word. *)
@@ -539,6 +560,10 @@ and expression =
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
+  | Cinvalid of
+      { message : string;
+        symbol : symbol
+      }
 
 type codegen_option =
   | Reduce_code_size
@@ -573,9 +598,8 @@ type fundecl =
     fields are 64-bits wide, the following rules apply:
 
     - For int32, the value is sign extended.
-    - For float32, the value is zero extended.  It is ok to rely on
-      zero-initialization of the data section to achieve this.
-*)
+    - For float32, the value is zero extended. It is ok to rely on
+      zero-initialization of the data section to achieve this. *)
 type data_item =
   | Cdefine_symbol of symbol
   | Cint8 of int
@@ -617,23 +641,22 @@ val ctrywith :
 
 val reset : unit -> unit
 
-(** Either apply the callback to all immediate sub-expressions that
-      can produce the final result for the expression and return
-      [true], or do nothing and return [false].  Note that the notion
-      of "tail" sub-expression used here does not match the one used
-      to trigger tail calls; in particular, try...with handlers are
-      considered to be in tail position (because their result become
-      the final result for the expression).  *)
+(** Either apply the callback to all immediate sub-expressions that can produce
+    the final result for the expression and return [true], or do nothing and
+    return [false]. Note that the notion of "tail" sub-expression used here does
+    not match the one used to trigger tail calls; in particular, try...with
+    handlers are considered to be in tail position (because their result become
+    the final result for the expression). *)
 val iter_shallow_tail : (expression -> unit) -> expression -> bool
 
-(** Apply the transformation to those immediate sub-expressions of an
-      expression that are in tail position, using the same definition of "tail"
-      as [iter_shallow_tail] *)
+(** Apply the transformation to those immediate sub-expressions of an expression
+    that are in tail position, using the same definition of "tail" as
+    [iter_shallow_tail] *)
 val map_shallow_tail : (expression -> expression) -> expression -> expression
 
-(** Apply the transformation to an expression, trying to push it
-      to all inner sub-expressions that can produce the final result,
-      by recursively applying map_shallow_tail *)
+(** Apply the transformation to an expression, trying to push it to all inner
+    sub-expressions that can produce the final result, by recursively applying
+    map_shallow_tail *)
 val map_tail : (expression -> expression) -> expression -> expression
 
 (** Apply the callback to each immediate sub-expression. *)
@@ -669,3 +692,5 @@ val is_int : machtype_component -> bool
 val is_addr : machtype_component -> bool
 
 val is_exn_handler : ccatch_flag -> bool
+
+val equal_exit_label : exit_label -> exit_label -> bool

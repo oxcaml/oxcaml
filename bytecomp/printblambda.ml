@@ -118,7 +118,7 @@ let rec blambda ppf = function
     let matching_cases cases i =
       ListLabels.mapi cases ~f:(fun n j -> n, j)
       |> ListLabels.filter_map ~f:(fun (n, j) ->
-             if i <> j then None else Some n)
+          if i <> j then None else Some n)
     in
     let or_pattern ppf = function
       | [] -> ()
@@ -210,7 +210,8 @@ let rec blambda ppf = function
       match op with
       | Perform -> "perform"
       | Reperform -> "reperform"
-      | Runstack -> "runstack"
+      | With_stack -> "with_stack"
+      | With_stack_bind -> "with_stack_bind"
       | Resume -> "resume"
     in
     fprintf ppf "@[<2>(%s@ %a)@]" op

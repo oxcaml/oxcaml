@@ -42,9 +42,9 @@ let
       (mkFlag syntaxQuotations "syntax-quotations")
     ];
 
-  upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
 
-  ocaml = (upstream.ocaml.override { inherit stdenv; }).overrideAttrs {
+  # Boot compilers
+  ocaml_4_14_2 = (pkgs.ocaml-ng.ocamlPackages_4_14.ocaml.override { inherit stdenv; }).overrideAttrs {
     # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
     # compiler that we use to bootstrap ourselves on ARM64
     patches = [
@@ -52,7 +52,26 @@ let
     ];
   };
 
-  dune = upstream.dune_3.overrideAttrs rec {
+  ocaml_5_4_0 = (pkgs.callPackage (
+    import (pkgs.path + "/pkgs/development/compilers/ocaml/generic.nix") {
+      major_version = "5";
+      minor_version = "4";
+      patch_version = "0";
+      sha256 = "sha256-36qKLhHHmbwXZdi+9EkRQG7l9IAwJxkDgqk5+IyRImY=";
+    }) {
+      inherit stdenv;
+    }).overrideAttrs {
+      # This patch fixes an issue in the upstream compiler that we use to
+      # bootstrap ourselves on ARM64
+      patches = [
+        ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.5.4.0+oxcaml/files/ocaml-base-compiler.5.4.0+oxcaml.patch
+      ];
+    };
+
+  # CR sspies: For the time being, we use dune built with the vanilla 4.14.2 compiler.
+  # Over time, we should probably define something like a "boot environment" and build
+  # dune and the other dependencies with the patched system compiler.
+  dune = pkgs.ocaml-ng.ocamlPackages_4_14.dune_3.overrideAttrs rec {
     version = "3.19.1";
     src = pkgs.fetchurl {
       url = "https://github.com/ocaml/dune/releases/download/${version}/dune-${version}.tbz";
@@ -60,7 +79,17 @@ let
     };
   };
 
-  menhirLib = upstream.menhirLib.overrideAttrs (
+  ocamlformat = pkgs.ocaml-ng.ocamlPackages_4_14.ocamlformat.overrideAttrs (old: rec {
+      name = "${old.pname}-${version}";
+      version = "0.28.1";
+      src = pkgs.fetchurl {
+        url = "https://github.com/ocaml-ppx/ocamlformat/releases/download/${version}/ocamlformat-${version}.tbz";
+        sha256 = "sha256-cL2gN9C+2WHtkb21GYsu7vVCREdQqLAV2AzLlLP/Qfs=";
+      };
+  });
+
+
+  menhirLib = pkgs.ocaml-ng.ocamlPackages_4_14.menhirLib.overrideAttrs (
     new: old: rec {
       version = "20231231";
       src = pkgs.fetchFromGitLab {
@@ -75,9 +104,9 @@ let
 
   menhir =
     let
-      menhirSdk = upstream.menhirSdk.override { inherit menhirLib; };
+      menhirSdk = pkgs.ocaml-ng.ocamlPackages_4_14.menhirSdk.override { inherit menhirLib; };
     in
-    (upstream.menhir.override { inherit menhirLib; }).overrideAttrs (
+    (pkgs.ocaml-ng.ocamlPackages_4_14.menhir.override { inherit menhirLib; }).overrideAttrs (
       new: old: {
         buildInputs = [
           menhirLib
@@ -187,14 +216,14 @@ stdenv.mkDerivation {
     [
       pkgs.autoconf
       menhir
-      ocaml
+      ocaml_5_4_0
       dune
       pkgs.pkg-config
       pkgs.rsync
       pkgs.which
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
-      upstream.ocamlformat_0_24_1 # required for make fmt
+      ocamlformat # required for make fmt
       pkgs.removeReferencesTo
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
@@ -257,5 +286,9 @@ stdenv.mkDerivation {
 
   meta =
     { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+
+  passthru = {
+    inherit ocaml_4_14_2 ocaml_5_4_0 ocamlformat;
+  };
 
 }

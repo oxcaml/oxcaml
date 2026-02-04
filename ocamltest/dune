@@ -42,7 +42,7 @@
  ; This executable is built using the *system* compiler, so we can't use
  ; our own otherlibs/unix/, and neither can we depend on the "unix" library
  ; or this same one will be used.
- (ocamlopt_flags unix.cmxa)
+ (ocamlopt_flags (:standard -I +unix unix.cmxa))
  (foreign_stubs
   (language c)
   (names run_unix run_stubs)

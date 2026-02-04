@@ -1,0 +1,4 @@
+(tests
+ (names test)
+ (libraries arm64_ast)
+ (modules decode test))

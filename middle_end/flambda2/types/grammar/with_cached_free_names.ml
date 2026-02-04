@@ -38,8 +38,9 @@ let[@inline always] free_names_no_cache ~free_names_descr t =
 
 let apply_renaming ~apply_renaming_descr ~free_names_descr t renaming =
   let free_names = free_names ~free_names_descr t in
-  if (not (Renaming.has_import_map renaming))
-     && not (Name_occurrences.affected_by_renaming free_names renaming)
+  if
+    (not (Renaming.has_import_map renaming))
+    && not (Name_occurrences.affected_by_renaming free_names renaming)
   then t
   else
     let descr = apply_renaming_descr t.descr renaming in

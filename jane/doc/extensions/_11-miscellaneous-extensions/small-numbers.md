@@ -6,8 +6,8 @@ title: Small Numbers
 
 # Small Numbers
 
-The small numbers extension adds `float32`, `int16`, and `int8` types to OxCaml.
-Currently, only `float32` (single-precision IEEE float) is implemented.
+The small numbers extension adds the types `float32`, `int16`, and `int8` to
+OxCaml.
 
 ## Float32
 
@@ -90,7 +90,13 @@ int8
 int8#
 int16
 int16#
+int8 array
+int8# array
+int16 array
+int16# array
 ```
+
+Pattern matching is supported for all of these types.
 
 Literals use `s` for `int8` and `S` for `int16`:
 ```
@@ -108,15 +114,20 @@ libraries.
 
 ### Representation
 
-Coming soon
+The boxed `int8` and `int16` types are encoded as tagged immediates, similar to
+regular OCaml `int`s. Similarly, `int8 array` and `int16 array` are not packed.
 
-### Small int arrays
-
-Coming soon
+The unboxed `int8#` and `int16#` types are passed around using general purpose
+registers, but do not have a tag bit, unlike `int8` and `int16`. The ints in
+`int8# array`s and `int16# array`s are packed, but they are not packed in any
+other context. For example, an `int8# array` of length 30 takes up 4 words of
+space, plus the header word, but a `#(int8# * int8#)` takes up 2 words of space
+and requires 2 registers to pass around.
 
 ## Untagged Char
 
-When small numbers are enabled, the type `char#` is available.
+When small numbers are enabled, the types `char#` and `char# array`
+are available.
 
 Literals are prefixed with `#`:
 ```
@@ -141,4 +152,5 @@ library.
 
 ### Representation
 
-Untagged chars have the same layout as `int8#`.
+Untagged chars have the same layout as `int8#`, and `char# array`s are packed
+like `int8# array`s.

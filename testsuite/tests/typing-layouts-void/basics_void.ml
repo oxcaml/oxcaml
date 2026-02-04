@@ -2,6 +2,19 @@
  expect;
 *)
 
+(* unit# can be ignored with [;] *)
+
+external unbox_unit : unit -> unit# = "%unbox_unit"
+[%%expect{|
+external unbox_unit : unit -> unit# = "%unbox_unit"
+|}]
+
+let () =
+  unbox_unit ();
+  ()
+[%%expect{|
+|}]
+
 type unit_u : void mod everything
 [%%expect{|
 type unit_u : void mod everything

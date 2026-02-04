@@ -44,8 +44,8 @@ val make_instr :
 
     The exit block is where more instructions are being added, which means that
     the terminator of an in-construction "sub" CFG is `Never`, and will be
-    changed only when no additional instructions will be inserted to the
-    block. *)
+    changed only when no additional instructions will be inserted to the block.
+*)
 
 type t
 

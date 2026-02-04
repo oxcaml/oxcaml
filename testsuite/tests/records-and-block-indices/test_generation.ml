@@ -114,10 +114,9 @@ let interesting_type_trees test : Type_structure.t Tree.t list =
     )
     (* fewer trees, more types *)
     @ List.concat_map enumerated_trees ~f:(fun shape ->
-          Tree.enumerate ~shape
-            ~leaves:
-              (if patient then more_interesting_types else interesting_types)
-      )
+        Tree.enumerate ~shape
+          ~leaves:(if patient then more_interesting_types else interesting_types)
+    )
     @ hardcoded_type_trees
   in
   let enumerated_type_trees =
@@ -759,35 +758,32 @@ let main test ~bytecode =
   line "%s" preamble;
   List.iter (Type_naming.decls_code naming) ~f:(fun s -> line "%s" s);
   line "";
-  begin
-    match test with
-    | Array_idx_access { local } ->
-      line "let test size =";
-      with_indent (fun () ->
-          List.iter types ~f:(test_array_idx_access ~local);
-          line "()"
-      );
-      print_endline ";;";
-      print_newline ();
-      toplevel_unit_block (fun () -> line "iter sizes ~f:test;")
-    | Array_idx_deepening ->
-      toplevel_unit_block (fun () -> List.iter types ~f:test_array_idx_deepening)
-    | Record_idx_access { local } ->
-      toplevel_unit_block (fun () ->
-          List.iter types ~f:(test_record_idx_access ~local)
-      )
-    | Record_idx_deepening ->
-      toplevel_unit_block (fun () ->
-          List.iter types ~f:test_record_idx_deepening
-      )
-    | Record_size ->
-      List.iter types ~f:(fun ty ->
-          toplevel_unit_block (fun () -> test_record_size ~bytecode ty)
-      )
-    | Record_access { local } ->
-      List.iter types ~f:(fun ty ->
-          toplevel_unit_block (fun () -> test_record_access ~local ty)
-      )
+  begin match test with
+  | Array_idx_access { local } ->
+    line "let test size =";
+    with_indent (fun () ->
+        List.iter types ~f:(test_array_idx_access ~local);
+        line "()"
+    );
+    print_endline ";;";
+    print_newline ();
+    toplevel_unit_block (fun () -> line "iter sizes ~f:test;")
+  | Array_idx_deepening ->
+    toplevel_unit_block (fun () -> List.iter types ~f:test_array_idx_deepening)
+  | Record_idx_access { local } ->
+    toplevel_unit_block (fun () ->
+        List.iter types ~f:(test_record_idx_access ~local)
+    )
+  | Record_idx_deepening ->
+    toplevel_unit_block (fun () -> List.iter types ~f:test_record_idx_deepening)
+  | Record_size ->
+    List.iter types ~f:(fun ty ->
+        toplevel_unit_block (fun () -> test_record_size ~bytecode ty)
+    )
+  | Record_access { local } ->
+    List.iter types ~f:(fun ty ->
+        toplevel_unit_block (fun () -> test_record_access ~local ty)
+    )
   end;
   line "for i = 1 to %d do" !test_id;
   with_indent (fun () ->

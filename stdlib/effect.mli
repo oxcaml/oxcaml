@@ -33,6 +33,10 @@ exception Continuation_already_resumed
 (** Exception raised when a continuation is continued or discontinued more
     than once. *)
 
+exception Out_of_fibers
+(** Exception raised by functions that allocate fibers. Does not
+    necessarily imply that heap memory has been exhausted. *)
+
 external perform : 'a t -> 'a = "%perform"
 (** [perform e] performs an effect [e].
 
@@ -76,7 +80,9 @@ module Deep : sig
       effects performed by the computation enclosed by the handler. *)
 
   val match_with: ('c -> 'a) -> 'c -> ('a,'b) handler -> 'b
-  (** [match_with f x h] runs the computation [f x] in the handler [h]. *)
+  (** [match_with f x h] runs the computation [f x] in the handler [h].
+
+      @raise Out_of_fibers if unable to allocate a fiber. *)
 
   type 'a effect_handler =
     { effc: 'b. 'b t -> (('b, 'a) continuation -> 'a) option }
@@ -85,7 +91,9 @@ module Deep : sig
       [fun e -> raise e]. *)
 
   val try_with: ('b -> 'a) -> 'b -> 'a effect_handler -> 'a
-  (** [try_with f x h] runs the computation [f x] under the handler [h]. *)
+  (** [try_with f x h] runs the computation [f x] under the handler [h].
+
+      @raise Out_of_fibers if unable to allocate a fiber. *)
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
@@ -102,7 +110,9 @@ module Shallow : sig
       value and returns a ['b] value. *)
 
   val fiber : ('a -> 'b) -> ('a, 'b) continuation
-  (** [fiber f] constructs a continuation that runs the computation [f]. *)
+  (** [fiber f] constructs a continuation that runs the computation [f].
+
+      @raise Out_of_fibers if unable to allocate a fiber. *)
 
   type ('a,'b) handler =
     { retc: 'a -> 'b;

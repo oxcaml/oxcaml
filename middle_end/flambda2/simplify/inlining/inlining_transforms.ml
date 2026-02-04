@@ -105,14 +105,15 @@ let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
 
 let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   let callee = Apply.callee apply in
-  let region_inlined_into =
+  let () =
     match Apply.call_kind apply with
-    | Function { alloc_mode; _ } -> alloc_mode
+    | Function _ -> ()
     | Method _ | C_call _ | Effect _ ->
       Misc.fatal_error
         "Trying to call [Inlining_transforms.inline] on something other than \
          an OCaml function call."
   in
+  let region_inlined_into = Apply.alloc_mode apply in
   let args = Apply.args apply in
   let apply_return_continuation = Apply.continuation apply in
   let apply_exn_continuation = Apply.exn_continuation apply in
@@ -145,17 +146,17 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
     let params_and_body = Code.params_and_body code in
     Function_params_and_body.pattern_match params_and_body
       ~f:(fun
-           ~return_continuation
-           ~exn_continuation
-           params
-           ~body
-           ~my_closure
-           ~is_my_closure_used:_
-           ~my_region
-           ~my_ghost_region
-           ~my_depth
-           ~free_names_of_body:_
-         ->
+          ~return_continuation
+          ~exn_continuation
+          params
+          ~body
+          ~my_closure
+          ~is_my_closure_used:_
+          ~my_region
+          ~my_ghost_region
+          ~my_depth
+          ~free_names_of_body:_
+        ->
         let make_inlined_body () =
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)
             ~region_inlined_into ~unroll_to

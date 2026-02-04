@@ -155,20 +155,20 @@ Error: Signature mismatch:
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a
-         end (* at stateful *)
+         end @ stateful
        is not included in
          sig
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* at stateful *)
+         end @ stateful
        Values do not match:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
        The left-hand side is "stateful"
-       because it contains a usage (of the value "y" at Line 11, characters 29-30)
-       which is expected to be "read_write".
+         because it contains a usage (of the value "y" at Line 11, characters 29-30)
+         which is expected to be "read_write".
        However, the right-hand side is "stateless".
 |}, Principal{|
 Lines 8-12, characters 33-5:
@@ -179,20 +179,20 @@ Lines 8-12, characters 33-5:
 12 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* at stateful *)
+         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end @ stateful
        is not included in
          sig
            val y : int ref
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* at stateful *)
+         end @ stateful
        Values do not match:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
        The left-hand side is "stateful"
-       because it contains a usage (of the value "y" at Line 11, characters 29-30)
-       which is expected to be "read_write".
+         because it contains a usage (of the value "y" at Line 11, characters 29-30)
+         which is expected to be "read_write".
        However, the right-hand side is "stateless".
 |}]
 
@@ -322,9 +322,9 @@ Lines 4-6, characters 22-5:
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ stateless contended end (* at uncontended *)
+         sig val x : string ref @@ stateless contended end @ uncontended
        is not included in
-         sig val x : string ref end (* at uncontended *)
+         sig val x : string ref end @ uncontended
        Values do not match:
          val x : string ref @@ stateless contended (* in a structure at uncontended *)
        is not included in
@@ -338,9 +338,9 @@ Lines 4-6, characters 22-5:
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ contended end (* at uncontended *)
+         sig val x : string ref @@ contended end @ uncontended
        is not included in
-         sig val x : string ref end (* at uncontended *)
+         sig val x : string ref end @ uncontended
        Values do not match:
          val x : string ref @@ contended (* in a structure at uncontended *)
        is not included in
@@ -448,8 +448,8 @@ Line 7, characters 20-23:
 7 |     uncontended_use M.r
                         ^^^
 Error: This value is "contended"
-       because it is used inside the function at Lines 5-7, characters 23-23
-       which is expected to be "portable".
+         because it is used inside the function at Lines 5-7, characters 23-23
+         which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
@@ -465,9 +465,10 @@ end
 Line 6, characters 12-15:
 6 |     let _ = M.x in
                 ^^^
-Error: The value "M.x" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 5-7, characters 23-6
-       which is expected to be "portable".
+Error: The value "M.x" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 5-7, characters 23-6
+         which is expected to be "portable".
 |}]
 
 (* Modalities on primitives are supported, but are interpreted differently in
@@ -490,11 +491,11 @@ Error: Signature mismatch:
          sig
            val x : 'a -> 'a @@ stateless nonportable
            external length : string -> int = "%string_length"
-         end (* at nonportable *)
+         end @ nonportable
        is not included in
          sig
            external length : string -> int @@ portable = "%string_length"
-         end (* at nonportable *)
+         end @ nonportable
        Values do not match:
          external length : string -> int = "%string_length" (* in a structure at nonportable *)
        is not included in
@@ -611,18 +612,18 @@ Error: Signature mismatch:
            module Plain : sig val f : int -> int end
            module type S_plain =
              sig module M : sig val f : int -> int end end
-         end (* at nonportable *)
+         end @ nonportable
        is not included in
          sig
            module Plain : sig val f : int -> int @@ portable end
            module type S_plain =
              sig module M : sig val f : int -> int @@ portable end end
-         end (* at nonportable *)
+         end @ nonportable
        In module "Plain":
        Modules do not match:
-         sig val f : int -> int end (* at nonportable *)
+         sig val f : int -> int end @ nonportable
        is not included in
-         sig val f : int -> int @@ portable end (* at nonportable *)
+         sig val f : int -> int @@ portable end @ nonportable
        In module "Plain":
        Values do not match:
          val f : int -> int (* in a structure at nonportable *)
@@ -709,12 +710,12 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val t : [> `Foo ] @@ stateless nonportable end (* at nonportable *)
+         sig val t : [> `Foo ] @@ stateless nonportable end @ nonportable
        is not included in
          sig
            val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@
              portable
-         end (* at nonportable *)
+         end @ nonportable
        Values do not match:
          val t : [> `Foo ] @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
@@ -1008,13 +1009,12 @@ end
 module type T = sig module type T = sig val foo : 'a -> 'a end end
 |}]
 
-(* default modalities is overridden as a whole, not per-axis *)
-(* CR zqian: make overriding per-axis *)
+(* explicit modalities on val compose with default modalities per-axis *)
 module type T = sig @@ portable
   val foo : 'a -> 'a @@ contended
 end
 [%%expect{|
-module type T = sig val foo : 'a -> 'a @@ contended end
+module type T = sig val foo : 'a -> 'a @@ portable contended end
 |}]
 
 (* default modalities is a syntax sugar that doesn't constitute the meaning of
@@ -1054,9 +1054,10 @@ let (foo @ portable) () =
 Line 3, characters 12-13:
 3 |     let _ = f in
                 ^
-Error: The value "f" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-4, characters 21-6
-       which is expected to be "portable".
+Error: The value "f" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-4, characters 21-6
+         which is expected to be "portable".
 |}]
 
 let (_foo @ portable) () =
@@ -1079,9 +1080,10 @@ let () =
 Line 4, characters 12-13:
 4 |     let _ = f in
                 ^
-Error: The value "f" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 3-5, characters 23-6
-       which is expected to be "portable".
+Error: The value "f" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 3-5, characters 23-6
+         which is expected to be "portable".
 |}]
 
 let () =
@@ -1217,9 +1219,10 @@ let (bar @ portable) () =
 Line 2, characters 18-19:
 2 |   let k = (module M : Func_nonportable) in
                       ^
-Error: The value "M.baz" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-3, characters 21-3
-       which is expected to be "portable".
+Error: The value "M.baz" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-3, characters 21-3
+         which is expected to be "portable".
 |}]
 
 (* global function can't close over a local module, even though it's coerced
@@ -1234,9 +1237,10 @@ let _ =
 Line 4, characters 12-13:
 4 |     (module M : Empty)
                 ^
-Error: The module "M" is "local" but is expected to be "global"
-       because it is used inside the function at Lines 3-4, characters 21-22
-       which is expected to be "global".
+Error: The module "M" is "local"
+       but is expected to be "global"
+         because it is used inside the function at Lines 3-4, characters 21-22
+         which is expected to be "global".
 |}]
 
 (* similar test to above but checks that a mode error is given even when
@@ -1251,9 +1255,10 @@ let bar () =
 Line 4, characters 12-13:
 4 |     (module M : Empty)
                 ^
-Error: The module "M" is "local" but is expected to be "global"
-       because it is used inside the function at Lines 3-4, characters 21-22
-       which is expected to be "global".
+Error: The module "M" is "local"
+       but is expected to be "global"
+         because it is used inside the function at Lines 3-4, characters 21-22
+         which is expected to be "global".
 |}]
 
 (* Empty signature crosses linearity and portability *)
@@ -1312,8 +1317,8 @@ Line 3, characters 18-34:
                       ^^^^^^^^^^^^^^^^
 Error: The module "M_Func_portable'" is "nonportable"
        but is expected to be "portable"
-       because it is used inside the function at Lines 2-4, characters 21-3
-       which is expected to be "portable".
+         because it is used inside the function at Lines 2-4, characters 21-3
+         which is expected to be "portable".
 |}]
 
 (* Moreover, note that modules don't cross locality *)
@@ -1328,9 +1333,10 @@ let _ =
 Line 4, characters 20-36:
 4 |     let k = (module M_Func_portable' : Func_portable) in
                         ^^^^^^^^^^^^^^^^
-Error: The module "M_Func_portable'" is "local" but is expected to be "global"
-       because it is used inside the function at Lines 3-5, characters 21-5
-       which is expected to be "global".
+Error: The module "M_Func_portable'" is "local"
+       but is expected to be "global"
+         because it is used inside the function at Lines 3-5, characters 21-5
+         which is expected to be "global".
 |}]
 
 (* Closing over a module in a module. *)
@@ -1341,9 +1347,10 @@ let (bar @ portable) () =
 Line 2, characters 18-20:
 2 |   let k = (module M' : Module) in
                       ^^
-Error: The value "M'.M.baz" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-3, characters 21-3
-       which is expected to be "portable".
+Error: The value "M'.M.baz" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-3, characters 21-3
+         which is expected to be "portable".
 |}]
 
 module type S'_Func_portable = sig module M : Func_portable end
@@ -1368,9 +1375,10 @@ module F : functor (X : sig end) -> sig end @@ stateless nonportable
 Line 4, characters 18-19:
 4 |   let k = (module F : F) in
                       ^
-Error: The module "F" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 3-5, characters 21-3
-       which is expected to be "portable".
+Error: The module "F" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 3-5, characters 21-3
+         which is expected to be "portable".
 |}]
 
 (* closing over a portable functor is fine *)
@@ -1396,9 +1404,10 @@ always legacy. *)
 Line 2, characters 18-19:
 2 |   let k = (module M : Class) in
                       ^
-Error: The class "M.cla" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-3, characters 21-3
-       which is expected to be "portable".
+Error: The class "M.cla" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-3, characters 21-3
+         which is expected to be "portable".
 |}]
 
 (* Pmod_unpack requires type equality instead of inclusion, so for a closing-over
@@ -1417,9 +1426,10 @@ let (bar @ portable) () =
 Line 2, characters 25-26:
 2 |     let module M' = (val m : Func_portable) in
                              ^
-Error: The value "m" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Lines 1-3, characters 21-6
-       which is expected to be "portable".
+Error: The value "m" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at Lines 1-3, characters 21-6
+         which is expected to be "portable".
 |}]
 
 (* closing over values from modules crosses modes *)
@@ -1481,9 +1491,9 @@ Lines 8-10, characters 20-3:
 10 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a end (* at nonportable *)
+         sig val f : 'a -> 'a end @ nonportable
        is not included in
-         sig val f : 'a -> 'a @@ portable end (* at nonportable *)
+         sig val f : 'a -> 'a @@ portable end @ nonportable
        Values do not match:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
@@ -1509,9 +1519,9 @@ Lines 3-5, characters 17-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a end (* at nonportable *)
+         sig val f : 'a -> 'a end @ nonportable
        is not included in
-         sig val f : 'a -> 'a end (* at portable *)
+         sig val f : 'a -> 'a end @ portable
        Values do not match:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
@@ -1550,10 +1560,19 @@ Line 2, characters 12-13:
                 ^
 Error: Signature mismatch:
        Modules do not match:
-         sig class foo : object  end end (* at nonportable *)
+         sig class foo : object  end end @ nonportable
        is not included in
-         sig class foo : object  end end (* at portable *)
+         sig class foo : object  end end @ portable
        Class declarations foo do not match:
        First is "nonportable"
        but second is "portable".
+|}]
+
+module M = struct
+  external foo : unit -> unit @@ static = "%identity"
+
+  let _ @ static = foo
+end
+[%%expect{|
+module M : sig external foo : unit -> unit = "%identity" end
 |}]

@@ -405,7 +405,7 @@ let string_unshare = let x : string = "hello" in ignore x; unique x
 Line 1, characters 66-67:
 1 | let string_unshare = let x : string = "hello" in ignore x; unique x
                                                                       ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 1, characters 56-57:
 1 | let string_unshare = let x : string = "hello" in ignore x; unique x
                                                             ^
@@ -419,7 +419,7 @@ let int_unshare = let x : int = 5 in ignore x; unique x
 Line 1, characters 54-55:
 1 | let int_unshare = let x : int = 5 in ignore x; unique x
                                                           ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 1, characters 44-45:
 1 | let int_unshare = let x : int = 5 in ignore x; unique x
                                                 ^
@@ -433,7 +433,7 @@ let string_list_unshare =
 Line 2, characters 57-58:
 2 |   let x : string list = ["hi";"bye"] in ignore x; unique x
                                                              ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 2, characters 47-48:
 2 |   let x : string list = ["hi";"bye"] in ignore x; unique x
                                                    ^
@@ -446,7 +446,7 @@ let int_list_unshare = let x : int list = [4;5] in ignore x; unique x
 Line 1, characters 68-69:
 1 | let int_list_unshare = let x : int list = [4;5] in ignore x; unique x
                                                                         ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 1, characters 58-59:
 1 | let int_list_unshare = let x : int list = [4;5] in ignore x; unique x
                                                               ^
@@ -471,7 +471,7 @@ let hidden_int_unshare =
 Line 2, characters 64-65:
 2 |   let x : Hidden_int.t = Hidden_int.hide 42 in ignore x; unique x
                                                                     ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 2, characters 54-55:
 2 |   let x : Hidden_int.t = Hidden_int.hide 42 in ignore x; unique x
                                                           ^
@@ -487,7 +487,10 @@ let hidden_string_list_unshare =
 Line 4, characters 22-23:
 4 |   in ignore x; unique x
                           ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because it contains (via constructor "::") the expression at Line 3, characters 5-28
+         which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let hidden_int_list_unshare =
@@ -499,7 +502,7 @@ let hidden_int_list_unshare =
 Line 4, characters 22-23:
 4 |   in ignore x; unique x
                           ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 4, characters 12-13:
 4 |   in ignore x; unique x
                 ^
@@ -513,7 +516,7 @@ let float_unshare = let x : float = 3.14 in ignore x; unique x
 Line 1, characters 61-62:
 1 | let float_unshare = let x : float = 3.14 in ignore x; unique x
                                                                  ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 1, characters 51-52:
 1 | let float_unshare = let x : float = 3.14 in ignore x; unique x
                                                        ^
@@ -529,7 +532,7 @@ let float_u_unshare () = let x : float# = #3.14 in Float_u.ignore x; Float_u.uni
 Line 1, characters 84-85:
 1 | let float_u_unshare () = let x : float# = #3.14 in Float_u.ignore x; Float_u.unique x
                                                                                         ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 1, characters 66-67:
 1 | let float_u_unshare () = let x : float# = #3.14 in Float_u.ignore x; Float_u.unique x
                                                                       ^
@@ -543,7 +546,7 @@ let int64_u_unshare () = let x : int64# = #314L in Int64_u.ignore x; Int64_u.uni
 Line 1, characters 84-85:
 1 | let int64_u_unshare () = let x : int64# = #314L in Int64_u.ignore x; Int64_u.unique x
                                                                                         ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 1, characters 66-67:
 1 | let int64_u_unshare () = let x : int64# = #314L in Int64_u.ignore x; Int64_u.unique x
                                                                       ^
@@ -569,7 +572,7 @@ let hidden_float_u_unshare () =
 Line 3, characters 35-36:
 3 |   Float_u.ignore x; Float_u.unique x
                                        ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 3, characters 17-18:
 3 |   Float_u.ignore x; Float_u.unique x
                      ^
@@ -584,7 +587,7 @@ let hidden_int64_u_unshare () =
 Line 3, characters 35-36:
 3 |   Int64_u.ignore x; Int64_u.unique x
                                        ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 3, characters 17-18:
 3 |   Int64_u.ignore x; Int64_u.unique x
                      ^
@@ -598,7 +601,7 @@ let float_u_record_unshare =
 Line 2, characters 73-74:
 2 |   let x : float_u_record = { x = #3.14; y = #2.718 } in ignore x; unique x
                                                                              ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 2, characters 63-64:
 2 |   let x : float_u_record = { x = #3.14; y = #2.718 } in ignore x; unique x
                                                                    ^
@@ -612,7 +615,7 @@ let float_u_record_list_unshare =
 Line 2, characters 55-56:
 2 |   let x : float_u_record list = [] in ignore x; unique x
                                                            ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 2, characters 45-46:
 2 |   let x : float_u_record list = [] in ignore x; unique x
                                                  ^
@@ -626,7 +629,7 @@ let function_unshare = let x : int -> int = fun y -> y in ignore x; unique x
 Line 1, characters 75-76:
 1 | let function_unshare = let x : int -> int = fun y -> y in ignore x; unique x
                                                                                ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 1, characters 65-66:
 1 | let function_unshare = let x : int -> int = fun y -> y in ignore x; unique x
                                                                      ^
@@ -640,7 +643,7 @@ let function_list_unshare =
 Line 2, characters 81-82:
 2 |   let x : (int -> int) list = [(fun y -> y); fun z -> z + 1] in ignore x; unique x
                                                                                      ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 2, characters 71-72:
 2 |   let x : (int -> int) list = [(fun y -> y); fun z -> z + 1] in ignore x; unique x
                                                                            ^

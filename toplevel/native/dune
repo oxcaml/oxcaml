@@ -21,7 +21,7 @@
  (flags
   (:standard -w -70))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries
   ocamlcommon
   ocamlbytecomp

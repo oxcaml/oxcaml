@@ -201,6 +201,9 @@ and core_type_desc =
 
            - As the {{!value_description.pval_type}[pval_type]} field of a
            {!value_description}.
+
+           - As the {!core_type} of a
+           {{!function_param_desc.Pparam_val}[Pparam_val]}.
          *)
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
@@ -274,6 +277,7 @@ and pattern_desc =
 
            Other forms of interval are recognized by the parser
            but rejected by the type-checker. *)
+  | Ppat_unboxed_unit (** [#()] *)
   | Ppat_tuple of (string option * pattern) list * Asttypes.closed_flag
       (** [Ppat_tuple(pl, Closed)] represents
           - [(P1, ..., Pn)]       when [pl] is [(None, P1);...;(None, Pn)]
@@ -410,6 +414,7 @@ and expression_desc =
       (** [match E0 with P1 -> E1 | ... | Pn -> En] *)
   | Pexp_try of expression * case list
       (** [try E0 with P1 -> E1 | ... | Pn -> En] *)
+  | Pexp_unboxed_unit (** [#()] *)
   | Pexp_tuple of (string option * expression) list
       (** [Pexp_tuple(el)] represents
           - [(E1, ..., En)]

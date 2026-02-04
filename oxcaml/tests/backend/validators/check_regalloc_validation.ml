@@ -1,7 +1,7 @@
 open Cfg_intf.S
 open Utils
 
-(** CR xclerc for xclerc: that test relies on the use of the polymorphic
+(*= CR xclerc for xclerc: that test relies on the use of the polymorphic
         comparison over CFG values, but that can no longer be used since instruction
         lists now contain circular values.
    let () =
@@ -78,7 +78,8 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
     let locs = f (Array.map (fun (r : Reg.t) -> r.typ) regs) in
     let regs =
       Array.map2
-        (fun (reg : Reg.t) (loc : Reg.t) -> { reg with loc = loc.loc })
+        (fun (reg : Reg.t) (loc : Reg.t) ->
+          Reg.For_testing.with_loc reg loc.loc)
         regs locs
     in
     regs, locs
@@ -88,7 +89,7 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
      [fun f x y a -> let y = f x y a in let x = x + y in x] *)
   let int_arg1 = int.(0) in
   let int_arg2 = int.(1) in
-  let stack_loc = Reg.create_at_location int_arg1.typ (Stack (Local 0)) in
+  let stack_loc = Reg.For_testing.with_loc int_arg1 (Stack (Local 0)) in
   let args, arg_locs =
     make_locs [| val_.(0); int_arg1; int_arg2; float.(0) |] Proc.loc_parameters
   in
@@ -139,7 +140,8 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
             exn = None;
             terminator =
               { id = make_id ();
-                desc = Call { op = Indirect; label_after = move_tmp_res_label };
+                desc =
+                  Call { op = Indirect None; label_after = move_tmp_res_label };
                 arg = arg_locs;
                 res = tmp_result_locs
               }
@@ -376,12 +378,12 @@ let () =
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
       (if String.equal Config.architecture "amd64"
-      then
-        ">> Fatal error: instruction 20 has a register (anon:V/37) with an \
-         unknown location"
-      else
-        ">> Fatal error: instruction 20 has a register (anon:V/68) with an \
-         unknown location")
+       then
+         ">> Fatal error: instruction 20 has a register (anon:V/37) with an \
+          unknown location"
+       else
+         ">> Fatal error: instruction 20 has a register (anon:V/68) with an \
+          unknown location")
 
 let () =
   check "Precoloring can't change"
@@ -425,7 +427,7 @@ let () =
     ~exp_err:
       ">> Fatal error: Register allocation changed existing instruction no. 23 \
        into a register allocation specific instruction"
-  (* CR xclerc for xclerc: same as above (polymorphic commpare on values
+(*= CR xclerc for xclerc: same as above (polymorphic compare on values
       with cycles).
       let () =
      check "Regalloc added non-regalloc specific instr"
@@ -443,7 +445,7 @@ let () =
          ">> Fatal error: Register allocation added non-regalloc specific \
           instruction no. 26"
   *)
-  (* CR xclerc for xclerc: same as above (polymorphic commpare on values
+(*= CR xclerc for xclerc: same as above (polymorphic compare on values
      with cycles).
      let () =
        check "Regalloc added a 'goto' and a block"
@@ -472,7 +474,7 @@ let () =
            cfg1, cfg2)
          ~exp_std:"" ~exp_err:""
   *)
-  [@@ocamlformat "wrap-comments=false"]
+[@@ocamlformat "wrap-comments=false"]
 
 let () =
   check "Regalloc added a fallthrough block that goes to the wrong label"
@@ -554,9 +556,9 @@ let () =
       let cfg1 = Cfg_desc.make_pre_regalloc templ in
       let block = templ.&(move_tmp_res_label) in
       block.body
-        <- (block.body |> List.rev |> function
-            | i1 :: i2 :: t -> i2 :: i1 :: t
-            | l -> l |> List.rev);
+        <- ( block.body |> List.rev |> function
+             | i1 :: i2 :: t -> i2 :: i1 :: t
+             | l -> l |> List.rev );
       let cfg2 = Cfg_desc.make_post_regalloc templ in
       cfg1, cfg2)
     ~exp_std:"fatal exception raised when validating description"
@@ -643,7 +645,8 @@ let make_loop ~loop_loc_first n =
     let locs = f (Array.map (fun (r : Reg.t) -> r.typ) regs) in
     let regs =
       Array.map2
-        (fun (reg : Reg.t) (loc : Reg.t) -> { reg with loc = loc.loc })
+        (fun (reg : Reg.t) (loc : Reg.t) ->
+          Reg.For_testing.with_loc reg loc.loc)
         regs locs
     in
     regs, locs
@@ -669,7 +672,7 @@ let make_loop ~loop_loc_first n =
   let int_arg2 = args.(1) in
   let int_arg3 = args.(2) in
   let extra_regs =
-    Array.init n (fun _ -> { (Reg.create Int) with loc = int_arg3.loc })
+    Array.init n (fun _ -> Reg.create_at_location Int int_arg3.loc)
   in
   let results, result_locs = make_locs [| int_arg1 |] Proc.loc_results_return in
   let make_moves src dst =
@@ -697,18 +700,18 @@ let make_loop ~loop_loc_first n =
               make_moves arg_locs args
               (* Move [arg3] to all [extra_regs]. *)
               @ List.init n (fun n ->
-                    { Instruction.id = make_id ();
-                      desc = Op Move;
-                      arg = [| int_arg3 |];
-                      res = [| extra_regs.(n) |]
-                    })
+                  { Instruction.id = make_id ();
+                    desc = Op Move;
+                    arg = [| int_arg3 |];
+                    res = [| extra_regs.(n) |]
+                  })
               (* Spill [arg3] to locations [0;n-1] *)
               @ List.init n (fun n ->
-                    { Instruction.id = make_id ();
-                      desc = Op Spill;
-                      arg = [| int_arg3 |];
-                      res = [| stack_loc n |]
-                    })
+                  { Instruction.id = make_id ();
+                    desc = Op Spill;
+                    arg = [| int_arg3 |];
+                    res = [| stack_loc n |]
+                  })
               (* Spill [arg2] to location n. If we spilled [arg3] the code would
                  be correct. *)
               @ [ { Instruction.id = make_id ();

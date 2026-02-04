@@ -43,6 +43,8 @@ type t =
     flat : int
   }
 
+let block_index_offset_bits = 52
+
 let zero = { value = 0; flat = 0 }
 
 let add { value; flat } { value = value'; flat = flat' } =
@@ -60,6 +62,8 @@ let rec count (el : _ Lambda.mixed_block_element) : t =
   | Vec512 -> { value = 0; flat = 64 }
   | Product layouts ->
     Array.fold_left (fun cts l -> add cts (count l)) zero layouts
+  | Splice_variable _ ->
+    Misc.fatal_error "Mixed_product_bytes_count: layout poly not supported"
 
 let has_value_and_flat { value; flat } = value > 0 && flat > 0
 
@@ -83,7 +87,10 @@ module Wrt_path = struct
       | Product shape -> count_shape_wrt_path shape i path_rest
       | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
       | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
-        Misc.fatal_error "Mixed_product_bytes_wrt_path: bad mixed block path")
+        Misc.fatal_error "Mixed_product_bytes_wrt_path: bad mixed block path"
+      | Splice_variable _ ->
+        Misc.fatal_error
+          "Mixed_product_bytes_wrt_path: layout poly not supported")
 
   and count_shape_wrt_path (shape : Lambda.mixed_block_shape) pos path =
     let _, totals =
@@ -92,10 +99,10 @@ module Wrt_path = struct
           ( i + 1,
             add totals
               (if i = pos
-              then count_wrt_path el path
-              else if i < pos
-              then { zero with left = count el }
-              else { zero with right = count el }) ))
+               then count_wrt_path el path
+               else if i < pos
+               then { zero with left = count el }
+               else { zero with right = count el }) ))
         (0, zero) shape
     in
     totals
@@ -109,7 +116,7 @@ module Wrt_path = struct
     let flat = Byte_count.(add (add here.flat left.flat) right.flat) in
     { value; flat }
 
-  let lowest_invalid_gap_on_64_bit_arch = 1 lsl 16
+  let lowest_invalid_gap_on_64_bit_arch = 1 lsl (64 - block_index_offset_bits)
 
   type offset_and_gap_bytes =
     { offset_bytes : Byte_count.t;
@@ -134,8 +141,9 @@ module Wrt_path = struct
       let deepened_gap_upper_bound =
         Byte_count.(add (add gap_bytes here.value) here.flat)
       in
-      if Byte_count.on_64_bit_arch deepened_gap_upper_bound
-         >= lowest_invalid_gap_on_64_bit_arch
+      if
+        Byte_count.on_64_bit_arch deepened_gap_upper_bound
+        >= lowest_invalid_gap_on_64_bit_arch
       then None
       else Some { offset_bytes; gap_bytes }
     else Some { offset_bytes; gap_bytes = Byte_count.zero }

@@ -151,8 +151,9 @@ let reexport_function_slots function_slot_set offsets =
   let imported_offsets = imported_offsets () in
   Function_slot.Set.fold
     (fun function_slot offsets ->
-      if Compilation_unit.is_current
-           (Function_slot.get_compilation_unit function_slot)
+      if
+        Compilation_unit.is_current
+          (Function_slot.get_compilation_unit function_slot)
       then offsets
       else
         match function_slot_offset imported_offsets function_slot with
@@ -168,8 +169,8 @@ let reexport_value_slots value_slot_set offsets =
   let imported_offsets = imported_offsets () in
   Value_slot.Set.fold
     (fun value_slot offsets ->
-      if Compilation_unit.is_current
-           (Value_slot.get_compilation_unit value_slot)
+      if
+        Compilation_unit.is_current (Value_slot.get_compilation_unit value_slot)
       then offsets
       else
         match value_slot_offset imported_offsets value_slot with

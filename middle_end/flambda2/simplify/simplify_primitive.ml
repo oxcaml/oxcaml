@@ -141,8 +141,9 @@ let simplify_primitive dacc (prim : P.t) dbg ~result_var =
     let arg1_kind, arg2_kind, arg3_kind =
       P.args_kind_of_ternary_primitive ternary_prim
     in
-    if arg_kind_mismatch prim
-         [arg1_ty, arg1_kind; arg2_ty, arg2_kind; arg3_ty, arg3_kind]
+    if
+      arg_kind_mismatch prim
+        [arg1_ty, arg1_kind; arg2_ty, arg2_kind; arg3_ty, arg3_kind]
     then SPR.create_invalid dacc
     else
       let original_prim : P.t =
@@ -165,16 +166,18 @@ let simplify_primitive dacc (prim : P.t) dbg ~result_var =
     let arg1_kind, arg2_kind, arg3_kind, arg4_kind =
       P.args_kind_of_quaternary_primitive quaternary_prim
     in
-    if arg_kind_mismatch prim
-         [ arg1_ty, arg1_kind;
-           arg2_ty, arg2_kind;
-           arg3_ty, arg3_kind;
-           arg4_ty, arg4_kind ]
+    if
+      arg_kind_mismatch prim
+        [ arg1_ty, arg1_kind;
+          arg2_ty, arg2_kind;
+          arg3_ty, arg3_kind;
+          arg4_ty, arg4_kind ]
     then SPR.create_invalid dacc
     else
       let original_prim : P.t =
-        if orig_arg1 == arg1 && orig_arg2 == arg2 && orig_arg3 == arg3
-           && orig_arg4 == arg4
+        if
+          orig_arg1 == arg1 && orig_arg2 == arg2 && orig_arg3 == arg3
+          && orig_arg4 == arg4
         then prim
         else Quaternary (quaternary_prim, arg1, arg2, arg3, arg4)
       in

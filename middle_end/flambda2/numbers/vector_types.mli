@@ -25,8 +25,8 @@ end
 
 module Vec128 : sig
   module Bit_pattern : sig
-    (** 128-bit value whose comparison and equality relations are lexicographically
-      ordered by bit pattern. *)
+    (** 128-bit value whose comparison and equality relations are
+        lexicographically ordered by bit pattern. *)
 
     include Container_types.S
 
@@ -45,8 +45,8 @@ end
 
 module Vec256 : sig
   module Bit_pattern : sig
-    (** 256-bit value whose comparison and equality relations are lexicographically
-      ordered by bit pattern. *)
+    (** 256-bit value whose comparison and equality relations are
+        lexicographically ordered by bit pattern. *)
 
     include Container_types.S
 
@@ -67,8 +67,8 @@ end
 
 module Vec512 : sig
   module Bit_pattern : sig
-    (** 512-bit value whose comparison and equality relations are lexicographically
-      ordered by bit pattern. *)
+    (** 512-bit value whose comparison and equality relations are
+        lexicographically ordered by bit pattern. *)
 
     include Container_types.S
 

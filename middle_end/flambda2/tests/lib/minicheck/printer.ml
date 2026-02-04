@@ -46,8 +46,7 @@ end
 
 let tuple : ('a, 'r) Tuple.Of(T).t -> ('a, 'r) Tuple.t t =
  fun ts ppf tup ->
-  let rec loop :
-      type a r.
+  let rec loop : type a r.
       first:bool ->
       (a, r) Tuple.Of(T).t ->
       Format.formatter ->

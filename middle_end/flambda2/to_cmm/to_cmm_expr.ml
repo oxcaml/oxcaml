@@ -270,7 +270,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
   match Apply.call_kind apply with
-  | Function { function_call = Direct code_id; alloc_mode = _ } -> (
+  | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
     let params_arity = Code_metadata.params_arity code_metadata in
     if not (C.check_arity params_arity args)
@@ -298,7 +298,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     | None ->
       ( C.direct_call ~dbg
           (C.Extended_machtype.to_machtype return_ty)
-          pos (C.symbol ~dbg code_sym) args,
+          pos code_sym args,
         free_vars,
         env,
         res,
@@ -311,7 +311,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all ))
-  | Function { function_call = Indirect_unknown_arity; alloc_mode } ->
+  | Function { function_call = Indirect_unknown_arity } ->
     fail_if_probe apply;
     let callee =
       match callee with
@@ -322,13 +322,13 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           Apply.print apply
     in
     ( C.indirect_call ~dbg return_ty pos
-        (C.alloc_mode_for_applications_to_cmx alloc_mode)
+        (C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply))
         callee args_ty (split_args ()),
       free_vars,
       env,
       res,
       Ece.all )
-  | Function { function_call = Indirect_known_arity; alloc_mode } ->
+  | Function { function_call = Indirect_known_arity callees } ->
     fail_if_probe apply;
     let callee =
       match callee with
@@ -338,25 +338,33 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
+    let callees =
+      match callees with
+      | Unknown -> None
+      | Known code_id_set ->
+        Some
+          (List.map
+             (fun code_id ->
+               To_cmm_result.symbol_of_code_id res code_id
+                 ~currently_in_inlined_body:(Env.currently_in_inlined_body env))
+             (Code_id.Set.elements code_id_set))
+    in
     if not (C.check_arity (Apply.args_arity apply) args)
     then
       Misc.fatal_errorf
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos
-          (C.alloc_mode_for_applications_to_cmx alloc_mode)
-          callee args_ty args,
+      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
         free_vars,
         env,
         res,
         Ece.all )
-  | C_call
-      { needs_caml_c_call; is_c_builtin; effects; coeffects; alloc_mode = _ } ->
+  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
     translate_external_call env res ~free_vars apply ~callee_simple ~args
       ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
       ~coeffects
-  | Method { kind; obj; alloc_mode } ->
+  | Method { kind; obj } ->
     fail_if_probe apply;
     let callee =
       match callee with
@@ -375,7 +383,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     let free_vars = Backend_var.Set.union free_vars obj_free_vars in
     let kind = Call_kind.Method_kind.to_lambda kind in
-    let alloc_mode = C.alloc_mode_for_applications_to_cmx alloc_mode in
+    let alloc_mode =
+      C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply)
+    in
     ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
         dbg,
       free_vars,
@@ -404,9 +414,69 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
       C.reperform ~dbg ~eff ~cont ~last_fiber, free_vars, env, res, Ece.all
-    | Run_stack { stack; f; arg } ->
-      let { env; res; expr = { cmm = stack; free_vars = fv0; effs = _ } } =
-        simple env res stack
+    | With_stack { valuec; exnc; effc; f; arg } ->
+      let { env; res; expr = { cmm = valuec; free_vars = fv0; effs = _ } } =
+        simple env res valuec
+      in
+      let { env; res; expr = { cmm = exnc; free_vars = fv1; effs = _ } } =
+        simple env res exnc
+      in
+      let { env; res; expr = { cmm = effc; free_vars = fv2; effs = _ } } =
+        simple env res effc
+      in
+      let { env; res; expr = { cmm = f; free_vars = fv3; effs = _ } } =
+        simple env res f
+      in
+      let { env; res; expr = { cmm = arg; free_vars = fv4; effs = _ } } =
+        simple env res arg
+      in
+      let free_vars =
+        BV.Set.union
+          (BV.Set.union fv0 (BV.Set.union fv1 fv2))
+          (BV.Set.union fv3 fv4)
+      in
+      ( C.with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg,
+        free_vars,
+        env,
+        res,
+        Ece.all )
+    | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+      let { env; res; expr = { cmm = valuec; free_vars = fv0; effs = _ } } =
+        simple env res valuec
+      in
+      let { env; res; expr = { cmm = exnc; free_vars = fv1; effs = _ } } =
+        simple env res exnc
+      in
+      let { env; res; expr = { cmm = effc; free_vars = fv2; effs = _ } } =
+        simple env res effc
+      in
+      let { env; res; expr = { cmm = dyn; free_vars = fv3; effs = _ } } =
+        simple env res dyn
+      in
+      let { env; res; expr = { cmm = bind; free_vars = fv4; effs = _ } } =
+        simple env res bind
+      in
+      let { env; res; expr = { cmm = f; free_vars = fv5; effs = _ } } =
+        simple env res f
+      in
+      let { env; res; expr = { cmm = arg; free_vars = fv6; effs = _ } } =
+        simple env res arg
+      in
+      let free_vars =
+        BV.Set.union
+          (BV.Set.union
+             (BV.Set.union fv0 (BV.Set.union fv1 fv2))
+             (BV.Set.union fv3 fv4))
+          (BV.Set.union fv5 fv6)
+      in
+      ( C.with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg,
+        free_vars,
+        env,
+        res,
+        Ece.all )
+    | Resume { cont; f; arg } ->
+      let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
+        simple env res cont
       in
       let { env; res; expr = { cmm = f; free_vars = fv1; effs = _ } } =
         simple env res f
@@ -415,24 +485,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res arg
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
-      C.run_stack ~dbg ~stack ~f ~arg, free_vars, env, res, Ece.all
-    | Resume { stack; f; arg; last_fiber } ->
-      let { env; res; expr = { cmm = stack; free_vars = fv0; effs = _ } } =
-        simple env res stack
-      in
-      let { env; res; expr = { cmm = f; free_vars = fv1; effs = _ } } =
-        simple env res f
-      in
-      let { env; res; expr = { cmm = arg; free_vars = fv2; effs = _ } } =
-        simple env res arg
-      in
-      let { env; res; expr = { cmm = last_fiber; free_vars = fv3; effs = _ } } =
-        simple env res last_fiber
-      in
-      let free_vars =
-        BV.Set.union (BV.Set.union fv0 fv1) (BV.Set.union fv2 fv3)
-      in
-      C.resume ~dbg ~stack ~f ~arg ~last_fiber, free_vars, env, res, Ece.all)
+      C.resume ~dbg ~cont ~f ~arg, free_vars, env, res, Ece.all)
 
 let translate_apply env res apply =
   let dbg = Env.add_inlined_debuginfo env (Apply.dbg apply) in
@@ -537,7 +590,7 @@ let translate_raise ~dbg_with_inlined:dbg env res apply exn_handler args =
       C.simple_list ~dbg env res extra
     in
     let free_vars = Backend_var.Set.union exn_free_vars extra_free_vars in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm = C.raise_prim raise_kind exn ~extra_args:extra dbg in
     let cmm, free_vars, symbol_inits =
       wrap cmm free_vars Env.Symbol_inits.empty
@@ -563,7 +616,7 @@ let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
     in
     let args = C.remove_skipped_args args types in
     let args, free_vars, env, res, _ = C.simple_list ~dbg env res args in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm, free_vars, symbol_inits =
       wrap (C.cexit cont args trap_actions) free_vars Env.Symbol_inits.empty
     in
@@ -584,7 +637,7 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
       C.simple_list ~dbg env res args
     in
     let return_value = C.make_tuple return_values in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     match Apply_cont.trap_action apply with
     | None ->
       let cmm, free_vars, symbol_inits =
@@ -611,7 +664,7 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
 (* Invalid expressions *)
 let invalid env res ~message =
   let wrap, _empty_env, res =
-    Env.flush_delayed_lets ~mode:Branching_point env res
+    Env.flush_delayed_lets ~mode:Flush_everything env res
   in
   let cmm_invalid, res = C.invalid res ~message in
   let cmm, free_vars, symbol_inits =
@@ -988,7 +1041,7 @@ and apply_expr env res apply =
   match Apply.continuation apply with
   | Never_returns ->
     (* Case 1 *)
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm, free_vars, symbol_inits =
       wrap call free_vars Env.Symbol_inits.empty
     in
@@ -1003,7 +1056,7 @@ and apply_expr env res apply =
       if List.compare_lengths apply_result_arity param_types = 0
       then
         let wrap, _, res =
-          Env.flush_delayed_lets ~mode:Branching_point env res
+          Env.flush_delayed_lets ~mode:Flush_everything env res
         in
         let cmm, free_vars, symbol_inits =
           wrap call free_vars Env.Symbol_inits.empty
@@ -1016,7 +1069,9 @@ and apply_expr env res apply =
           param_types Apply.print apply
     | Jump { param_types = _; cont } ->
       (* Case 2 *)
-      let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+      let wrap, _, res =
+        Env.flush_delayed_lets ~mode:Flush_everything env res
+      in
       let cmm, free_vars, symbol_inits =
         wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty
       in

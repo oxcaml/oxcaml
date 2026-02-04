@@ -27,6 +27,7 @@
 #define CAML_NEGF_MASK _caml_negf_mask
 #define CAML_ABSF_MASK _caml_absf_mask
 #define CAML_CALL_GC _caml_call_gc
+#define CAML_CALL_GC_SSE _caml_call_gc_sse
 #define CAML_CALL_GC_AVX _caml_call_gc_avx
 #define CAML_CALL_GC_AVX512 _caml_call_gc_avx512
 #else
@@ -35,6 +36,7 @@
 #define CAML_NEGF_MASK caml_negf_mask
 #define CAML_ABSF_MASK caml_absf_mask
 #define CAML_CALL_GC caml_call_gc
+#define CAML_CALL_GC_SSE caml_call_gc_sse
 #define CAML_CALL_GC_AVX caml_call_gc_avx
 #define CAML_CALL_GC_AVX512 caml_call_gc_avx512
 #endif
@@ -42,6 +44,10 @@
         .globl CAML_CALL_GC
         WEAK CAML_CALL_GC
 CAML_CALL_GC:
+        int3
+        .globl CAML_CALL_GC_SSE
+        WEAK CAML_CALL_GC_SSE
+CAML_CALL_GC_SSE:
         int3
         .globl CAML_CALL_GC_AVX
         WEAK CAML_CALL_GC_AVX

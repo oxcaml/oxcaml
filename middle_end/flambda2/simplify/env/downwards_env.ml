@@ -365,14 +365,14 @@ let define_symbol t sym kind =
 
 let define_name t name kind =
   Name.pattern_match (Bound_name.name name)
-    ~var:(fun [@inline] var ->
+    ~var:(fun[@inline] var ->
       (define_variable [@inlined hint]) t
         (Bound_var.create var Flambda_debug_uid.none
            (* CR sspies: In the future, improve the debug UID propagation
               here. *)
            (Bound_name.name_mode name))
         kind)
-    ~symbol:(fun [@inline] sym -> (define_symbol [@inlined hint]) t sym kind)
+    ~symbol:(fun[@inline] sym -> (define_symbol [@inlined hint]) t sym kind)
 
 let add_variable0 ~extra t var ty =
   let t = (define_variable0 [@inlined hint]) ~extra t var (T.kind ty) in
@@ -389,14 +389,14 @@ let add_symbol t sym ty =
 
 let add_name t name ty =
   Name.pattern_match (Bound_name.name name)
-    ~var:(fun [@inline] var ->
+    ~var:(fun[@inline] var ->
       add_variable t
         (Bound_var.create var Flambda_debug_uid.none
            (* CR sspies: In the future, improve the debug UID propagation
               here. *)
            (Bound_name.name_mode name))
         ty)
-    ~symbol:(fun [@inline] sym -> add_symbol t sym ty)
+    ~symbol:(fun[@inline] sym -> add_symbol t sym ty)
 
 let add_equation_on_variable t var ty =
   let typing_env = TE.add_equation t.typing_env (Name.var var) ty in
@@ -526,9 +526,10 @@ let find_code_exn t id =
     Exported_code.find_exn (t.get_imported_code ()) id
 
 let define_code t ~code_id ~code =
-  if not
-       (Code_id.in_compilation_unit code_id
-          (Compilation_unit.get_current_exn ()))
+  if
+    not
+      (Code_id.in_compilation_unit code_id
+         (Compilation_unit.get_current_exn ()))
   then
     Misc.fatal_errorf "Cannot define code ID %a as it is from another unit:@ %a"
       Code_id.print code_id Code.print code;
@@ -633,14 +634,14 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
        less than in other scenarios. *)
     Inlining_state.with_arguments arguments
       (if Code.stub called_code
-      then t.inlining_state
-      else
-        let by =
-          if was_inline_always
-          then 1
-          else Flambda_features.Inlining.depth_scaling_factor
-        in
-        Inlining_state.increment_depth t.inlining_state ~by)
+       then t.inlining_state
+       else
+         let by =
+           if was_inline_always
+           then 1
+           else Flambda_features.Inlining.depth_scaling_factor
+         in
+         Inlining_state.increment_depth t.inlining_state ~by)
   in
   let inlined_debuginfo =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)

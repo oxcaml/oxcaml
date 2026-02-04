@@ -200,10 +200,17 @@ val fold_arg_or_omitted :
 val option_of_arg_or_omitted : apply_arg -> (expression * arg_identifier) option
 val mk_constructor_description : string -> constructor_description
 
+type value_binding_identifier
+
+val value_binding_identifier_from_texp_match_identifier :
+  texp_match_identifier -> value_binding_identifier
+
 val mk_value_binding :
+  ?id:value_binding_identifier ->
   vb_pat:value general_pattern ->
   vb_expr:expression ->
   vb_attributes:attributes ->
+  unit ->
   value_binding
 
 val mk_value_description :

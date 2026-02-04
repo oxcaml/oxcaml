@@ -215,6 +215,15 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
   | Immutable_float32_array fields ->
     rebuild_naked_number_array dacc ~bind_result_sym KS.naked_float32
       T.this_naked_float32 RSC.create_immutable_float32_array ~fields
+  | Immutable_int_array fields ->
+    rebuild_naked_number_array dacc ~bind_result_sym KS.naked_immediate
+      T.this_naked_immediate RSC.create_immutable_int_array ~fields
+  | Immutable_int8_array fields ->
+    rebuild_naked_number_array dacc ~bind_result_sym KS.naked_int8
+      T.this_naked_int8 RSC.create_immutable_int8_array ~fields
+  | Immutable_int16_array fields ->
+    rebuild_naked_number_array dacc ~bind_result_sym KS.naked_int16
+      T.this_naked_int16 RSC.create_immutable_int16_array ~fields
   | Immutable_int32_array fields ->
     rebuild_naked_number_array dacc ~bind_result_sym KS.naked_int32
       T.this_naked_int32 RSC.create_immutable_int32_array ~fields
@@ -406,8 +415,8 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
           dacc ))
       ~deleted_code:(fun acc _code_id -> acc)
       ~set_of_closures:(fun acc ~closure_symbols:_ _ -> acc)
-      ~block_like:
-        (fun (bound_static, static_consts, dacc) symbol static_const ->
+      ~block_like:(fun
+          (bound_static, static_consts, dacc) symbol static_const ->
         let static_const, dacc =
           simplify_static_const_of_kind_value dacc static_const
             ~result_sym:symbol
@@ -429,9 +438,11 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
       ~code:(fun acc _ _ -> acc)
       ~deleted_code:(fun acc _ -> acc)
       ~block_like:(fun acc _ _ -> acc)
-      ~set_of_closures:
-        (fun (closure_bound_names_all_sets, sets_of_closures) ~closure_symbols
-             set_of_closures ->
+      ~set_of_closures:(fun
+          (closure_bound_names_all_sets, sets_of_closures)
+          ~closure_symbols
+          set_of_closures
+        ->
         let closure_bound_names =
           Function_slot.Lmap.fold
             (fun function_slot symbol closure_bound_names_all_sets ->

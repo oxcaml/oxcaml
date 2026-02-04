@@ -28,7 +28,7 @@
    -strict-formats
    -nolabels ; for UnixLabels
    ))
- (ocamlopt_flags (:include %{project_root}/ocamlopt_flags.sexp))
+ (ocamlopt_flags (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags (:standard -linkall))
  (modules unix unixLabels)
  (foreign_stubs (language c) (names

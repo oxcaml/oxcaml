@@ -20,6 +20,8 @@ by a *type*. The type system knows about a collection of fixed *base* layouts:
 
 * `value` is the layout occupied by almost every OCaml type. Every type you have ever
   conceived of before reading this description is a `value`.
+* `value_or_null` is a superlayout of `value` including normal OCaml values
+  and null pointers.
 * `immediate` is a sublayout of `value`, describing those values that are represented
   without a pointer. That is, `int : immediate`, as well as `private` and `[@@unboxed]`
   wrappers around `int`.  `immediate` is a sublayout of `value`, and so you can use an
@@ -31,21 +33,15 @@ by a *type*. The type system knows about a collection of fixed *base* layouts:
   `immediate64`.
 * `float64` is the layout of the `float#` unboxed float type.
 * `float32` is the layout of the `float32#` unboxed 32-bit float type.
+* `void` is the layout of the `unit#` unbox unit type. It has no runtime representation.
+* `bits8` is the layout of the `int8#` unboxed int8 type.
+* `bits16` is the layout of the `int16#` unboxed int16 type.
 * `bits32` is the layout of the `int32#` unboxed int32 type.
 * `bits64` is the layout of the `int64#` unboxed int64 type.
 * `vec128` is the layout of 128-bit unboxed SIMD vector types.
 * `word` is the layout of the `nativeint#` unboxed nativeint type.
 * `any` is a layout that is the superlayout of all other layouts.  It doesn't correspond
   to a specific runtime representation. More information [below](#the-any-layout).
-
-* `value_or_null` is a superlayout of `value` including normal OCaml values
-  and null pointers. Unless `-extension-universe alpha` is set, it is displayed
-  as `value` and can't be used in jkind annotations.
-
-* `any_non_null` is a sublayout of `any` forbidding null pointers. Unless
-  `-extension-universe alpha` is set, it is displayed as `any`.
-  Additionally, `any` jkind annotations are interpreted as `any_non_null` for
-  backwards compatibility for definitions using arrays.
 
 The type system also supports one *composite* layout: unboxed products:
 * `l1 & l2 & ... & lk` is the layout of unboxed products where the first element
@@ -156,7 +152,6 @@ Each numeric type has its own library for working with it: `float_u`,
   functions, and have limited support in records (details below).
 
 * Unboxed numbers may *not* appear...
-   * ... top-level in a module (e.g. you cannot have `val pi : float#`)
    * ... in a tuple (e.g. you cannot have `int32# * int32#`)
    * ... as a field of a constructor (e.g. you cannot have `| K of int64#` or `| K of {
      x : nativeint# }`)
@@ -186,6 +181,13 @@ Each numeric type has its own library for working with it: `float_u`,
 We now have `type 'a or_null : value_or_null`, the type of unboxed options.
 It has constructors `Null` and `This v`. See the [`or_null` document](../02-or-null)
 for more details.
+
+## Unboxed unit
+
+While we do not have support for unboxed variants in their full generality, we have
+limited support for specific built-in types, including `unit#`, the type of unboxed
+units. Values of this type can be constructed as `#()` in expressions, and destructed
+as `#()` in patterns.
 
 # Unboxed products
 
@@ -450,7 +452,6 @@ Unboxed numbers can't be put in these structures:
   * Constructors with inline record fields
   * Exceptions
   * Extensible variant constructors
-  * Top-level fields of modules
   * Tuples
 
 There aren't fundamental issues with the structures that lack support. They will
@@ -498,7 +499,8 @@ on the runtime representation of values. It is stable in the sense that it never
 changes the relative order of two values, or of two non-values.  Immediates
 count as values for this purpose (they are always moved to the prefix).
 
-There is a special case for records that consist solely of `float` and
+There is a special case for records (but not modules) that consist solely of
+`float` and
 `float#` fields. The "flat float record optimization" applies to any such
 record&mdash;all of the fields are stored flat, even the `float` ones that will
 require boxing upon projection. The fields are also not reordered. This special
@@ -556,7 +558,7 @@ To ensure that your C code will need to be updated when the layout changes, use
 the `Assert_mixed_block_layout_v#` family of macros. For example,
 
 ```
-Assert_mixed_block_layout_v4;
+Assert_mixed_block_layout_v5;
 ```
 
 Write the above in statement context, i.e. either at the top-level of a file or
@@ -586,7 +588,7 @@ type t =
 Here is the recommend way to access fields:
 
 ```c
-Assert_mixed_block_layout_v4;
+Assert_mixed_block_layout_v5;
 #define Foo_t_x(foo) (*(int32_t*)&Field(foo, 0))
 #define Foo_t_y(foo) (*(int32_t*)&Field(foo, 1))
 ```

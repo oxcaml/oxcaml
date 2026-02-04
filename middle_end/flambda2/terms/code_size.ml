@@ -173,11 +173,12 @@ let block_load (kind : Flambda_primitive.Block_access_kind.t) =
 let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   match kind with
   | Immediates -> 1 (* cadda + load *)
-  | Naked_floats | Values -> 1
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
-    (* more computation is needed because of the representation using a custom
-       block *)
+  | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints
+  | Gc_ignorable_values | Values ->
+    1
+  | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
+  | Naked_vec256s | Naked_vec512s ->
+    (* more computation is needed because of the non-word width *)
     2
 
 let block_set (kind : Flambda_primitive.Block_access_kind.t)
@@ -195,9 +196,11 @@ let array_set (kind : Flambda_primitive.Array_set_kind.t) =
   match kind with
   | Values (Assignment Heap) -> does_not_need_caml_c_call_extcall_size
   | Values (Assignment Local | Initialization) -> 1
-  | Immediates | Naked_floats -> 1
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+  | Gc_ignorable_values -> 1
+  | Immediates | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints ->
+    1
+  | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
+  | Naked_vec256s | Naked_vec512s ->
     2 (* as above *)
 
 let string_or_bigstring_load ~machine_width kind width =
@@ -240,12 +243,12 @@ let divmod_bi_check ~machine_width else_branch_size
     (bi : Flambda_kind.Standard_int.t) =
   (* CR gbury: we should allow check Arch.division_crashed_on_overflow, but
      that's likely a dependency we want to avoid ? *)
-  if Target_system.Machine_width.is_32_bit machine_width
-     ||
-     match bi with
-     | Naked_int8 | Naked_int16 | Naked_int32 -> false
-     | Naked_int64 | Naked_nativeint | Naked_immediate | Tagged_immediate ->
-       true
+  if
+    Target_system.Machine_width.is_32_bit machine_width
+    ||
+    match bi with
+    | Naked_int8 | Naked_int16 | Naked_int32 -> false
+    | Naked_int64 | Naked_nativeint | Naked_immediate | Tagged_immediate -> true
   then 2 + else_branch_size
   else 0
 
@@ -384,10 +387,11 @@ let nullary_prim_size prim =
   (* CR gbury: check this *)
   | Invalid _ -> 0
   | Optimised_out _ -> 0
-  | Probe_is_enabled { name = _ } -> 4
+  | Probe_is_enabled { name = _; enabled_at_init = _ } -> 4
   | Enter_inlined_apply _ -> 0
   | Dls_get -> 1
   | Tls_get -> 1
+  | Domain_index -> 1
   | Poll | Cpu_relax -> alloc_size
 
 let unary_prim_size ~machine_width prim =
@@ -399,13 +403,16 @@ let unary_prim_size ~machine_width prim =
   | Array_length array_kind -> (
     match array_kind with
     | Array_kind
-        ( Immediates | Values | Naked_floats | Naked_int64s | Naked_nativeints
-        | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ) ->
+        ( Immediates | Values | Gc_ignorable_values | Naked_floats
+        | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+        | Naked_vec512s | Unboxed_product _ ) ->
       array_length_size
-    | Array_kind (Naked_int32s | Naked_float32s) ->
-      (* There is a dynamic check here to see if the array has an odd or even
-         number of elements *)
-      array_length_size + 2 (* compare + load *)
+    | Array_kind
+        (Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_float32s)
+      ->
+      (* There is some arithmetic here to see how many elements in the last
+         word *)
+      array_length_size + 3 (* lsl + land + sub *)
     | Float_array_opt_dynamic -> array_length_size + 3 (* a bit approximate *))
   | Bigarray_length _ -> 2 (* cadda + load *)
   | String_length _ -> 5
@@ -519,10 +526,8 @@ let apply apply =
   match Apply_expr.call_kind apply with
   | Function { function_call = Direct _; _ } -> direct_call_size
   (* CR mshinwell: Check / fix these numbers *)
-  | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
-    indirect_call_size
-  | Function { function_call = Indirect_known_arity; alloc_mode = _ } ->
-    indirect_call_size
+  | Function { function_call = Indirect_unknown_arity } -> indirect_call_size
+  | Function { function_call = Indirect_known_arity _ } -> indirect_call_size
   | C_call { needs_caml_c_call = true; _ } -> needs_caml_c_call_extcall_size
   | C_call { needs_caml_c_call = false; _ } ->
     does_not_need_caml_c_call_extcall_size

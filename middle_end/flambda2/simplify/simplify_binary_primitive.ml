@@ -238,8 +238,9 @@ end = struct
     | Known_result nums1, Known_result nums2 when N.ok_to_evaluate denv ->
       assert (not (N.Lhs.Set.is_empty nums1));
       assert (not (N.Rhs.Set.is_empty nums2));
-      if N.Lhs.Set.cardinal nums1 > max_num_possible_results
-         || N.Rhs.Set.cardinal nums2 > max_num_possible_results
+      if
+        N.Lhs.Set.cardinal nums1 > max_num_possible_results
+        || N.Rhs.Set.cardinal nums2 > max_num_possible_results
       then result_unknown ()
       else
         let all_pairs = N.cross_product nums1 nums2 in
@@ -397,8 +398,7 @@ end = struct
       then The_other_side
       else if Num.equal rhs (Num.minus_one machine_width)
       then
-        Negation_of_the_other_side
-        (* CR mshinwell: Add 0 / x = 0 when x <> 0 *)
+        Negation_of_the_other_side (* CR mshinwell: Add 0 / x = 0 when x <> 0 *)
       else Cannot_simplify
     | Mod ->
       (* CR mshinwell: We could be more clever for Mod and And *)
@@ -1000,9 +1000,12 @@ let simplify_array_load (array_kind : P.Array_kind.t)
   let result_kind =
     match array_load_kind with
     | Immediates -> (* CR mshinwell: use the subkind *) K.value
-    | Values -> K.value
+    | Gc_ignorable_values | Values -> K.value
     | Naked_floats -> K.naked_float
     | Naked_float32s -> K.naked_float32
+    | Naked_ints -> K.naked_immediate
+    | Naked_int8s -> K.naked_int8
+    | Naked_int16s -> K.naked_int16
     | Naked_int32s -> K.naked_int32
     | Naked_int64s -> K.naked_int64
     | Naked_nativeints -> K.naked_nativeint
@@ -1052,11 +1055,11 @@ let simplify_array_load (array_kind : P.Array_kind.t)
             | None -> contents_unknown ()
             | Some imm ->
               let machine_width = DE.machine_width (DA.denv dacc) in
-              if Target_ocaml_int.( < ) imm
-                   (Target_ocaml_int.zero machine_width)
-                 || Target_ocaml_int.( >= ) imm
-                      (Array.length fields
-                      |> Target_ocaml_int.of_int machine_width)
+              if
+                Target_ocaml_int.( < ) imm (Target_ocaml_int.zero machine_width)
+                || Target_ocaml_int.( >= ) imm
+                     (Array.length fields
+                     |> Target_ocaml_int.of_int machine_width)
               then SPR.create_invalid dacc
               else
                 return_given_type

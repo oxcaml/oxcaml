@@ -67,6 +67,8 @@ module Expanded_type : sig
 
   val is_unknown : t -> bool
 
+  val is_unknown_maybe_null : t -> bool
+
   val to_type : t -> Type_grammar.t
 
   type descr = private
@@ -214,6 +216,17 @@ end = struct
 
   let is_unknown t =
     match t.descr with Unknown -> true | Bottom | Ok _ -> false
+
+  let is_unknown_maybe_null t =
+    match t.descr with
+    | Unknown | Ok (Value { is_null = _; non_null = Unknown }) -> true
+    | Bottom
+    | Ok
+        ( Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
+        | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
+        | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+        | Rec_info _ | Region _ ) ->
+      false
 
   let of_non_alias_type ?coercion ty : t =
     match TG.descr ty with
@@ -506,6 +519,8 @@ let is_bottom env t = ET.is_bottom (expand_head env t)
 
 let is_unknown env t = ET.is_unknown (expand_head env t)
 
+let is_unknown_maybe_null env t = ET.is_unknown_maybe_null (expand_head env t)
+
 let is_alias_to_a_symbol t =
   match TG.get_alias_opt t with
   | None -> false
@@ -552,8 +567,8 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
         then
           Misc.fatal_errorf
             "Variable to be bound %a is expected to already be\n\
-            \   bound in the [suitable_for] environment:@ %a" Name.print bind_to
-            TE.print suitable_for)
+            \   bound in the [suitable_for] environment:@ %a"
+            Name.print bind_to TE.print suitable_for)
       bind_to_and_types
   | All_variables_except _ -> ());
   (* Do a quick free variables check first to try to catch easy cases. *)
@@ -603,15 +618,16 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
         in
         Name_occurrences.fold_variables free_vars ~init:([], [], [])
           ~f:(fun
-               (( unavailable_vars_renamed,
-                  unavailable_vars_expanded,
-                  unavailable_vars_removed ) as unavailable_vars)
-               var
-             ->
+              (( unavailable_vars_renamed,
+                 unavailable_vars_expanded,
+                 unavailable_vars_removed ) as unavailable_vars)
+              var
+            ->
             if erase var
             then
-              if Name_occurrences.mem_var free_vars_except_through_value_slots
-                   var
+              if
+                Name_occurrences.mem_var free_vars_except_through_value_slots
+                  var
               then
                 match Name_occurrences.count_variable free_vars var with
                 | Zero ->

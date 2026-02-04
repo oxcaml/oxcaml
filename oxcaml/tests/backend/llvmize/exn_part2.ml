@@ -26,7 +26,7 @@ let[@inline never] [@local never] catch_exn1_nested_from_llvm () =
     my_print_int n [@nontail]
 
 let[@inline never] [@local never] raise_1 n () : unit =
-  (raise_exn1_from_ocaml n [@nontail])
+  raise_exn1_from_ocaml n [@nontail]
 
 let[@inline never] [@local never] raise_2 () : unit = raise Exn2
 

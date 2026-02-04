@@ -15,7 +15,7 @@
 (* Effects, coeffects and placements *)
 
 (** A triple of an effect, a coeffect, and a placement. *)
-type t = Effects.t * Coeffects.t * Placement.t
+type t = Effects.t * Coeffects.t * Placement.t * Validity.t
 
 (** Print *)
 val print : Format.formatter -> t -> unit
@@ -33,8 +33,8 @@ val pure : t
 val pure_can_be_duplicated : t
 
 (** The value stating that any effects and/or coeffects may take place (with
-    strict placement). This is exactly [Arbitrary_effects, Has_coeffects,
-    Strict]. *)
+    strict placement). This is exactly
+    [Arbitrary_effects, Has_coeffects, Strict]. *)
 val all : t
 
 (** The value stating that a read (i.e only a coeffect) takes place (with strict
@@ -43,3 +43,6 @@ val read : t
 
 (** Join two effects, coeffects and placements. *)
 val join : t -> t -> t
+
+(** Projection *)
+val validity : t -> Validity.t

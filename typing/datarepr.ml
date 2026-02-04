@@ -18,28 +18,30 @@
 
 open Types
 open Btype
+module Jkind = Btype.Jkind0
 
 (* Simplified version of Ctype.free_vars *)
 let free_vars ?(param=false) ty =
   let ret = ref TypeSet.empty in
-  let rec loop ty =
-    if try_mark_node ty then
-      match get_desc ty with
-      | Tvar _ ->
-          ret := TypeSet.add ty !ret
-      | Tvariant row ->
-        iter_row loop row;
-        if not (static_row row) then begin
-          match get_desc (row_more row) with
-          | Tvar _ when param -> ret := TypeSet.add ty !ret
-          | _ -> loop (row_more row)
-        end
-      (* XXX: What about Tobject ? *)
-      | _ ->
-          iter_type_expr loop ty
-  in
-  loop ty;
-  unmark_type ty;
+  with_type_mark begin fun mark ->
+    let rec loop ty =
+      if try_mark_node mark ty then
+        match get_desc ty with
+        | Tvar _ ->
+            ret := TypeSet.add ty !ret
+        | Tvariant row ->
+          iter_row loop row;
+          if not (static_row row) then begin
+            match get_desc (row_more row) with
+            | Tvar _ when param -> ret := TypeSet.add ty !ret
+            | _ -> loop (row_more row)
+          end
+        (* XXX: What about Tobject ? *)
+        | _ ->
+            iter_type_expr loop ty
+    in
+    loop ty
+  end;
   !ret
 
 let newgenconstr path tyl = newgenty (Tconstr (path, tyl, ref Mnil))
@@ -98,7 +100,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort = Some Jkind.Sort.Const.value;
+          ca_sort = Some Jkind_types.Sort.Const.value;
           ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
@@ -139,7 +141,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
       [| Some (Constructor_uniform_value, [| |])
-       ; Some (Constructor_uniform_value, [| Jkind.Sort.Const.value |]) |],
+       ; Some (Constructor_uniform_value, [| Jkind_types.Sort.Const.value |]) |],
       false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
@@ -156,7 +158,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
                 aren't all void. *)
              false
            | Some (_, sorts) ->
-             Array.for_all Jkind.Sort.Const.all_void sorts
+             Array.for_all Jkind_types.Sort.Const.all_void sorts
          in
          (* constant constructors are constructors of non-[@@unboxed] variants
             with 0 bits of payload *)
@@ -261,7 +263,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
-    lbl_sort = Some Jkind.Sort.Const.void;
+    lbl_sort = Some Jkind_types.Sort.Const.void;
     lbl_pos = -1; lbl_all = [||];
     lbl_repres = Some repres;
     lbl_private = Public;

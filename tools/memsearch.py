@@ -82,8 +82,6 @@
 import gdb
 
 import re
-# a file line from "maintenance info sections"
-maint_file_re = re.compile(r"^([a-zA-Z]+) file: '(.*)'.*$")
 # a section line from "maintenance info sections"
 maint_section_re = re.compile(r'^ *\[[0-9]+\] +0x([0-9a-f]+)->0x([0-9a-f]+) at.*: (.*)$')
 
@@ -112,11 +110,10 @@ def get_mappings():
         text = gdb.execute('maintenance info sections ALLOC', to_string=True)
         in_core_file = False
         for l in text.split('\n'):
-            m = maint_file_re.match(l)
-            if m:
-                in_core_file = (m.group(1) == 'Core')
+            if 'Core file' in l:
+                in_core_file = True
                 continue
-            if not in_core_file:
+            if not in_core_file: # skip everything before 'Core file' line.
                 continue
             m = maint_section_re.match(l)
             if m:
@@ -137,6 +134,8 @@ def search(arg, val, size):
     size_char = {1:'b', 2:'h', 4:'w', 8:'g'}
     if size not in size_char:
         raise ValueError(f"don't know how to search for values size {size}")
+    found = 0
+    searched = 0
 
     for base, limit, file, perms in get_mappings():
         if limit-base < size:
@@ -148,18 +147,20 @@ def search(arg, val, size):
         # "find".
         cmd = f'find /{size_char[size]} 0x{base:x},+0x{limit-base:x},0x{v:016x}'
         text = gdb.execute(cmd, to_string=True)
+        searched += 1
         if "Pattern not found" in text:
             continue
         for line in text.split('\n'):
             if not line.startswith('0x'):
                 continue
+            found += 1
             words = line.split(' ')
             if len(words) > 1:
                 print(f"Found at {words[0]}: {words[1]}")
             else:
                 print(f"Found at {words[0]} (no symbol)")
 
-        # Broken Python version:
+        # Broken Python version (inf.search_memory not working for some GDBs)
         #
         # needle = bytes(v >> (8*i) & 255 for i in range(8))
         # p = base
@@ -172,6 +173,8 @@ def search(arg, val, size):
         #         break
         #     print(f"Found at 0x{p:x} in {base:x}-{limit:x} ({file}:{perms})")
         #     p += 8
+    # Important for sanity-checking; this will reveal if get_mappings() is nonsense.
+    print(f"Found {found} instances in {searched} address ranges.")
 
 class SearchCommand(gdb.Command):
     "ocaml find <expr>: report the location of <expr> on the OCaml heap."

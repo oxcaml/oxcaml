@@ -68,7 +68,8 @@ let (#?) x y = (x, y);;
 val ( #? ) : 'a -> 'b -> 'a * 'b = <fun>
 
 let (.%()) x y = x.(y);;
-val ( .%() ) : 'a array -> int -> 'a = <fun>
+val ( .%() ) : ('a : value_or_null mod separable). 'a array -> int -> 'a =
+  <fun>
 
 let x = [|0|];;
 val x : int array = [|0|]

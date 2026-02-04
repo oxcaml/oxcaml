@@ -442,13 +442,13 @@ let match_guard_unique (unique_ r) =
   | { y } when String.equal ((unique_use r).x) "" -> y
   | _ -> ""
 [%%expect{|
-Line 3, characters 4-9:
-3 |   | { y } when String.equal ((unique_use r).x) "" -> y
-        ^^^^^
-Error: This value is read from here, but it is already being used as unique:
 Line 3, characters 41-42:
 3 |   | { y } when String.equal ((unique_use r).x) "" -> y
                                              ^
+Error: This value is used here as unique, but it is also being read from at:
+Line 3, characters 4-9:
+3 |   | { y } when String.equal ((unique_use r).x) "" -> y
+        ^^^^^
 
 |}]
 
@@ -468,7 +468,7 @@ Line 2, characters 2-35:
 2 |   overwrite_ r with { x = Some "" }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1107, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
 
 |}]
 
@@ -479,7 +479,7 @@ Line 2, characters 2-35:
 2 |   overwrite_ r with { x = Some "" }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1107, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
 
 |}]
 
@@ -500,7 +500,7 @@ Line 2, characters 10-41:
 2 |   let x = overwrite_ r with { x = "foo" } in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1107, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
 
 |}]
 
@@ -512,6 +512,6 @@ Line 2, characters 10-41:
 2 |   let x = overwrite_ r with { y = "foo" } in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1107, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
 
 |}]

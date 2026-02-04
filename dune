@@ -55,6 +55,8 @@
 
 (copy_files# asmcomp/*.ml{,i})
 
+(copy_files# asmcomp/dissector/*.ml{,i})
+
 (copy_files# optcomp/*.ml{,i})
 
 (copy_files# backend/*.ml{,i})
@@ -123,7 +125,7 @@
    ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (preprocess
   (per_module
    ((action
@@ -357,7 +359,7 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlcommon)
  (modules
   ;; bytecomp/
@@ -399,7 +401,7 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlcommon flambda2)
  (modules jsmaindriver jscompile jslibrarian))
 
@@ -516,7 +518,7 @@
  (flags
   (:standard -w -27-32-33-34-37-39-60-69-70))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
  (modules_without_implementation
@@ -534,10 +536,26 @@
   compilenv
   ;; asmcomp/
   asmgen
+  binary_emitter_verify
   asmlink
   cm_bundle
   linkenv
   optlink
+  ;; asmcomp/dissector/
+  dissector_log
+  build_igot_and_iplt
+  build_linker_args
+  dissector
+  extract_relocations
+  form_rewrite_plan
+  igot
+  iplt
+  linker_script
+  measure_object_files
+  partial_link
+  partition
+  partition_object_files
+  rewrite_sections
   ;; backend/
   afl_instrument
   arch
@@ -554,6 +572,7 @@
   cmm
   cmmgen_state
   CSE
+  dsl_helpers
   emit
   emitaux
   fdo_info
@@ -570,9 +589,9 @@
   printoperation
   printreg
   proc
+  probe_emission
   simd
   simd_selection
-  simd_proc
   amd64_simd_defs
   amd64_simd_instrs
   stack_check
@@ -596,7 +615,7 @@
   x86_gas
   x86_masm
   x86_proc
-  arm64_ast
+  jit_backend
   zero_alloc_checker
   zero_alloc_info
   ;; backend/cfg
@@ -604,6 +623,7 @@
   cfg_available_regs
   cfg_edge
   cfg_intf
+  cfg_reducibility
   cfg_to_linear
   cfg_with_layout
   cfg_with_infos
@@ -631,6 +651,7 @@
   llvm_ir
   llvmize
   ;; backend/regalloc
+  regalloc_affinity
   regalloc_gi
   regalloc_gi_state
   regalloc_gi_utils
@@ -700,8 +721,10 @@
   flambda2_cmx
   compiler_owee
   gc_timings
+  arm64_ast
   dwarf_low
-  dwarf_high))
+  dwarf_high
+  binary_emitter_intf))
 
 (library
  (name oxcaml_common)
@@ -719,7 +742,7 @@
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
    ))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
  (libraries ocamlcommon dwarf_flags asm_targets)
@@ -773,8 +796,8 @@
   (backend bisect_ppx))
  ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
  ; to be built against the system compiler, which won't work.
- (ocamlc_flags unix.cma)
- (ocamlopt_flags unix.cmxa)
+ (ocamlc_flags (:standard -I +unix unix.cma))
+ (ocamlopt_flags (:standard -I +unix unix.cmxa))
  (libraries
   flambda2
   flambda2_ui
@@ -794,6 +817,8 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.a}
    %{dep:backend/asm_targets/asm_targets.a}
+   %{dep:backend/arm64/ast/arm64_ast.a}
+   %{dep:backend/binary_emitter_intf/binary_emitter_intf.a}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
    %{dep:oxcaml_common.a}
@@ -833,6 +858,8 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cma}
    %{dep:backend/asm_targets/asm_targets.cma}
+   %{dep:backend/arm64/ast/arm64_ast.cma}
+   %{dep:backend/binary_emitter_intf/binary_emitter_intf.cma}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
    %{dep:oxcaml_common.cma}
@@ -872,6 +899,8 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cmxa}
    %{dep:backend/asm_targets/asm_targets.cmxa}
+   %{dep:backend/arm64/ast/arm64_ast.cmxa}
+   %{dep:backend/binary_emitter_intf/binary_emitter_intf.cmxa}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
    %{dep:oxcaml_common.cmxa}

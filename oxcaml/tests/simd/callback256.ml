@@ -16,19 +16,19 @@ external run_callback_stack_args :
 
 external int64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> int64x4
   = "" "vec256_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x4_first_int64 : int64x4 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x4_second_int64 : int64x4 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x4_third_int64 : int64x4 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external int64x4_fourth_int64 : int64x4 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 external lots_of_vectors :
   int64x4 ->
@@ -48,7 +48,7 @@ external lots_of_vectors :
   int64x4 ->
   int64x4 ->
   int64x4 = "" "lots_of_vectors256"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 let eq l r = if l <> r then Printf.printf "%Ld <> %Ld\n" l r
 
@@ -116,7 +116,7 @@ let () =
   | Sys.Break -> callback ()
   | _ -> assert false
 
-let[@loop never] rec stack_overflow () = (stack_overflow () [@nontail])
+let[@loop never] rec stack_overflow () = stack_overflow () [@nontail]
 
 let () =
   try Sys.with_async_exns stack_overflow with

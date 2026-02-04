@@ -40,6 +40,7 @@ module Simple : sig
   type view = [
     | `Any
     | `Constant of constant
+    | `Unboxed_unit
     | `Tuple of (string option * pattern) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
@@ -89,6 +90,7 @@ module Head : sig
     | Construct of
         constructor_description * constructor_representation * Jkind.sort list
     | Constant of constant
+    | Unboxed_unit
     | Tuple of string option list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of

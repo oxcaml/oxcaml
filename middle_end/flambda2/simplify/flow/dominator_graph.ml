@@ -96,8 +96,9 @@ let add_continuation_info map _k (elt : T.Continuation_info.t) t
   in
   Continuation.Map.fold
     (fun k rewrite_ids t ->
-      if Continuation.equal return_continuation k
-         || Continuation.equal exn_continuation k
+      if
+        Continuation.equal return_continuation k
+        || Continuation.equal exn_continuation k
       then t
       else
         let params =

@@ -74,6 +74,7 @@ type box_type = CamlinternalFormatBasics.block_type =
    elements that drive indentation and line splitting. *)
 type pp_token =
   | Pp_text of string          (* normal text *)
+  | Pp_substring of { source:string; pos:int; len:int} (* slice of text *)
   | Pp_break of {              (* complete break *)
       fits: string * int * string;   (* line is not split *)
       breaks: string * int * string; (* line is split *)
@@ -174,6 +175,7 @@ type formatter = {
   mutable pp_ellipsis : string;
   (* Output function. *)
   mutable pp_out_string : string -> int -> int -> unit;
+  mutable pp_out_width : string -> pos:int -> len:int -> int;
   (* Flushing function. *)
   mutable pp_out_flush : unit -> unit;
   (* Output of new lines. *)
@@ -208,6 +210,7 @@ type formatter_stag_functions = {
 (* The formatter functions to output material. *)
 type formatter_out_functions = {
   out_string : string -> int -> int -> unit;
+  out_width: string -> pos:int -> len:int -> int;
   out_flush : unit -> unit;
   out_newline : unit -> unit;
   out_spaces : int -> unit;
@@ -256,6 +259,10 @@ let pp_infinity = 1000000010
 
 (* Output functions for the formatter. *)
 let pp_output_string state s = state.pp_out_string s 0 (String.length s)
+let pp_string_width state s = state.pp_out_width s ~pos:0 ~len:(String.length s)
+and pp_output_substring state ~pos ~len s =
+  state.pp_out_string s pos len
+and pp_substring_width state ~pos ~len s = state.pp_out_width s ~pos ~len
 and pp_output_newline state = state.pp_out_newline ()
 and pp_output_spaces state n = state.pp_out_spaces n
 and pp_output_indent state n = state.pp_out_indent n
@@ -266,9 +273,15 @@ let format_pp_text state size text =
   pp_output_string state text;
   state.pp_is_new_line <- false
 
+(* Format a slice *)
+let format_pp_substring state size ~pos ~len source =
+  state.pp_space_left <- state.pp_space_left - size;
+  pp_output_substring state ~pos ~len source;
+  state.pp_is_new_line <- false
+
 (* Format a string by its length, if not empty *)
 let format_string state s =
-  if s <> "" then format_pp_text state (String.length s) s
+  if s <> "" then format_pp_text state (pp_string_width state s) s
 
 (* To format a break, indenting a new line. *)
 let break_new_line state (before, offset, after) width =
@@ -325,10 +338,10 @@ let pp_skip_token state =
 
 (* Formatting a token with a given size. *)
 let format_pp_token state size = function
-
   | Pp_text s ->
     format_pp_text state size s
-
+  | Pp_substring {source;pos;len} ->
+    format_pp_substring state size ~pos ~len source
   | Pp_begin (off, ty) ->
     let insertion_point = state.pp_margin - state.pp_space_left in
     if insertion_point > state.pp_max_indent then
@@ -398,13 +411,13 @@ let format_pp_token state size = function
     | Some { box_type; width } ->
       begin match box_type with
       | Pp_hovbox ->
-        if size + String.length before > state.pp_space_left
+        if size + pp_string_width state before > state.pp_space_left
         then break_new_line state breaks width
         else break_same_line state fits
       | Pp_box ->
         (* Have the line just been broken here ? *)
         if state.pp_is_new_line then break_same_line state fits else
-        if size + String.length before > state.pp_space_left
+        if size + pp_string_width state before > state.pp_space_left
           then break_new_line state breaks width else
         (* break the line here leads to new indentation ? *)
         if state.pp_current_indent > state.pp_margin - width + off
@@ -456,9 +469,14 @@ let enqueue_advance state tok = pp_enqueue state tok; advance_left state
 let enqueue_string_as state size s =
   enqueue_advance state { size; token = Pp_text s; length = Size.to_int size }
 
+(* To enqueue substrings. *)
+let enqueue_substring_as ~pos ~len state size source =
+  let token = Pp_substring {source;pos;len} in
+  enqueue_advance state { size; token; length = Size.to_int size }
 
 let enqueue_string state s =
-  enqueue_string_as state (Size.of_int (String.length s)) s
+  let size = pp_string_width state s in
+  enqueue_string_as state (Size.of_int size) s
 
 
 (* Routines for scan stack
@@ -499,7 +517,7 @@ let set_size state ty =
           queue_elem.size <- Size.of_int (state.pp_right_total + size);
           Stack.pop_opt state.pp_scan_stack |> ignore
         end
-      | Pp_text _ | Pp_stab | Pp_tbegin _ | Pp_tend | Pp_end
+      | Pp_text _ | Pp_substring _ | Pp_stab | Pp_tbegin _ | Pp_tend | Pp_end
       | Pp_newline | Pp_if_newline | Pp_open_tag _ | Pp_close_tag ->
         () (* scan_push is only used for breaks and boxes. *)
 
@@ -638,7 +656,15 @@ let pp_print_as state isize s =
 
 
 let pp_print_string state s =
-  pp_print_as state (String.length s) s
+  pp_print_as state (pp_string_width state s) s
+
+let pp_print_substring_as ~pos ~len state size s =
+  if state.pp_curr_depth < state.pp_max_boxes
+  then enqueue_substring_as ~pos ~len state (Size.of_int size) s
+
+let pp_print_substring ~pos ~len state s =
+  let width = pp_substring_width state ~pos ~len s in
+  pp_print_substring_as ~pos ~len state width s
 
 let pp_print_bytes state s =
   pp_print_as state (Bytes.length s) (Bytes.to_string s)
@@ -702,7 +728,11 @@ let pp_print_custom_break state ~fits ~breaks =
   if state.pp_curr_depth < state.pp_max_boxes then
     let size = Size.of_int (- state.pp_right_total) in
     let token = Pp_break { fits; breaks } in
-    let length = String.length before + width + String.length after in
+    let length =
+      pp_string_width state before
+      + width
+      + pp_string_width state after
+    in
     let elem = { size; token; length } in
     scan_push state true elem
 
@@ -870,12 +900,14 @@ let pp_update_geometry state update =
 (* Setting a formatter basic output functions. *)
 let pp_set_formatter_out_functions state {
       out_string = f;
+      out_width = f2;
       out_flush = g;
       out_newline = h;
       out_spaces = i;
       out_indent = j;
     } =
   state.pp_out_string <- f;
+  state.pp_out_width <- f2;
   state.pp_out_flush <- g;
   state.pp_out_newline <- h;
   state.pp_out_spaces <- i;
@@ -883,6 +915,7 @@ let pp_set_formatter_out_functions state {
 
 let pp_get_formatter_out_functions state () = {
   out_string = state.pp_out_string;
+  out_width = state.pp_out_width;
   out_flush = state.pp_out_flush;
   out_newline = state.pp_out_newline;
   out_spaces = state.pp_out_spaces;
@@ -940,6 +973,18 @@ let default_pp_mark_close_tag = function
 let default_pp_print_open_tag = ignore
 let default_pp_print_close_tag = ignore
 
+let utf_8_scalar_width s ~pos ~len =
+  let rec width s count current stop =
+    if current >= stop then count
+    else
+      let decode = String.get_utf_8_uchar s current in
+      let advance = Uchar.utf_decode_length decode in
+      width s (count + 1) (current+advance) stop
+  in
+  width s 0 pos (pos + len)
+
+let ascii_width _ ~pos:_ ~len = len
+
 (* Building a formatter given its basic output functions.
    Other fields get reasonable default values. *)
 let pp_make_formatter f g h i j =
@@ -951,6 +996,7 @@ let pp_make_formatter f g h i j =
   let scan_stack = Stack.create () in
   initialize_scan_stack scan_stack;
   Stack.push { left_total = 1; queue_elem = sys_tok } scan_stack;
+  let pp_out_width = utf_8_scalar_width in
   let pp_margin = 78
   and pp_min_space_left = 10 in
   {
@@ -975,6 +1021,7 @@ let pp_make_formatter f g h i j =
     pp_out_newline = h;
     pp_out_spaces = i;
     pp_out_indent = j;
+    pp_out_width;
     pp_print_tags = false;
     pp_mark_tags = false;
     pp_mark_open_tag = default_pp_mark_open_tag;
@@ -1207,6 +1254,8 @@ and open_stag = apply1 pp_open_stag
 and close_stag = apply1 pp_close_stag
 and print_as = apply2 pp_print_as
 and print_string = apply1 pp_print_string
+and print_substring ~pos ~len = apply1 (pp_print_substring ~pos ~len)
+and print_substring_as ~pos ~len = apply2 (pp_print_substring_as ~pos ~len)
 and print_bytes b =
   let s = Bytes.to_string b in
   apply1 pp_print_string s
@@ -1297,7 +1346,7 @@ let pp_print_text ppf s =
   let left = ref 0 in
   let right = ref 0 in
   let flush () =
-    pp_print_string ppf (String.sub s !left (!right - !left));
+    pp_print_substring ppf s ~pos:!left ~len:(!right - !left);
     incr right; left := !right;
   in
   while (!right <> len) do

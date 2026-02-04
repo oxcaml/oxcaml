@@ -141,10 +141,11 @@ let define_continuations conts replay =
       } -> (
     match prev_bound with
     | Bound_continuations prev_conts ->
-      if not
-           (List.compare_lengths prev_conts conts = 0
-           && Misc.Stdlib.List.equal Continuation.is_renamed_version_of
-                prev_conts conts)
+      if
+        not
+          (List.compare_lengths prev_conts conts = 0
+          && Misc.Stdlib.List.equal Continuation.is_renamed_version_of
+               prev_conts conts)
       then error_not_renamed_version_of replay prev_bound action
       else
         let continuations =

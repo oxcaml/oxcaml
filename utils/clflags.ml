@@ -69,8 +69,8 @@ let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : string list)  (* -I *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
-and include_paths_files = ref ([] : string list) (* -I-paths *)
-and hidden_include_paths_files = ref ([] : string list) (* -H-paths *)
+and include_manifests = ref ([] : string list) (* -I-manifest *)
+and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
@@ -123,6 +123,7 @@ and safer_matching = ref false          (* -safer-matching *)
 and preprocessor = ref(None : string option) (* -pp *)
 and all_ppx = ref ([] : string list)        (* -ppx *)
 let absname = ref false                 (* -absname *)
+let locs = ref true                     (* -locs *)
 let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
@@ -197,6 +198,7 @@ let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
 let profile_granularity : profile_granularity_level ref = ref File_level (* -dgranularity *)
+let profile_output_name : string option ref = ref None (* -dprofile-output *)
 
 let profile_granularity_level_mapping = [
   "file", File_level;
@@ -258,6 +260,21 @@ let afl_inst_ratio = ref 100           (* -afl-inst-ratio *)
 
 let function_sections = ref false      (* -function-sections *)
 let probes = ref Config.probes         (* -probes *)
+
+let supports_optimized_probes =
+  Config.probes
+  && match Target_system.architecture () with
+    | X86_64 -> true
+    | IA32
+    | ARM
+    | AArch64
+    | POWER
+    | Z
+    | Riscv -> false
+
+let emit_optimized_probes =
+  ref supports_optimized_probes (* -probes-optimized *)
+
 let simplify_rounds = ref None        (* -rounds *)
 let default_simplify_rounds = ref 1        (* -rounds *)
 let rounds () =
@@ -829,7 +846,7 @@ module Register_allocator = struct
     match left, right with
     | Cfg, Cfg | Irc, Irc | Ls, Ls | Gi, Gi -> true
     | (Cfg | Irc | Ls | Gi), _ -> false
-  
+
   let to_string = function
     | Cfg -> "cfg"
     | Irc -> "irc"
@@ -839,7 +856,7 @@ module Register_allocator = struct
   let assoc_list = List.map (fun regalloc -> to_string regalloc, regalloc) all
 
   let of_string s = List.assoc_opt (String.lowercase_ascii s) assoc_list
-  
+
   let format ppf regalloc =
     Format.fprintf ppf "%s" (to_string regalloc)
 end
@@ -878,6 +895,15 @@ let zero_alloc_check = ref Zero_alloc_annotations.Check.Check_default  (* -zero-
 let zero_alloc_assert = ref Zero_alloc_annotations.Assert.Assert_default (* -zero-alloc-assert all *)
 
 let no_auto_include_otherlibs = ref false      (* -no-auto-include-otherlibs *)
+
+let dissector = ref false                      (* -dissector *)
+let dissector_partition_size_default = 1.0     (* Default size in GiB *)
+let dissector_partition_size = ref None        (* -dissector-partition-size *)
+let ddissector = ref false                     (* -ddissector *)
+let ddissector_sizes = ref false               (* -ddissector-sizes *)
+let ddissector_verbose = ref false             (* -ddissector-verbose *)
+let ddissector_partitions = ref false          (* -ddissector-partitions *)
+let ddissector_inputs = ref None               (* -ddissector-inputs <file> *)
 
 let prepend_directory file_name =
   match !directory with

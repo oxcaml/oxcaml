@@ -254,7 +254,7 @@ let static_cast : Cmm.static_cast -> string = function
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
-  | Capply (_ty, _) -> "app" ^ location d
+  | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)
   | Cload { memory_chunk; mutability; is_atomic } -> (
@@ -277,6 +277,9 @@ let operation d = function
   | Cmulhi { signed } -> "*h" ^ if signed then "" else "u"
   | Cdivi -> "/"
   | Cmodi -> "mod"
+  | Caddi128 -> "+128"
+  | Csubi128 -> "-128"
+  | Cmuli64 { signed } -> "*128" ^ if signed then "" else "u"
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"
@@ -314,7 +317,11 @@ let operation d = function
   | Cprobe { name; handler_code_sym; enabled_at_init } ->
     Printf.sprintf "probe[%s %s%s]" name handler_code_sym
       (if enabled_at_init then " enabled_at_init" else "")
-  | Cprobe_is_enabled { name } -> Printf.sprintf "probe_is_enabled[%s]" name
+  | Cprobe_is_enabled { name; enabled_at_init } ->
+    Printf.sprintf "probe_is_enabled[%s%s]" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")
   | Cprefetch { is_write; locality } ->
     Printf.sprintf "prefetch is_write=%b prefetch_temporal_locality_hint=%s"
       is_write
@@ -326,6 +333,7 @@ let operation d = function
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field
   | Cdls_get -> "dls_get"
   | Ctls_get -> "tls_get"
+  | Cdomain_index -> "domain_index"
   | Cpoll -> "poll"
   | Cpause -> "pause"
 
@@ -392,7 +400,7 @@ let rec expr ppf = function
         fprintf ppf "@[<2>(%s" (operation dbg op);
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
-        | Capply (mty, _) -> fprintf ppf "@ %a" machtype mty
+        | Capply { result_type = mty; _ } -> fprintf ppf "@ %a" machtype mty
         | Cextcall
             { ty;
               ty_args;
@@ -451,6 +459,8 @@ let rec expr ppf = function
     fprintf ppf "@[<2>(exit%a %a" trap_action_list traps exit_label i;
     List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
     fprintf ppf ")@]"
+  | Cinvalid { message; symbol = sym } ->
+    fprintf ppf "@[<2>(invalid@ %S@ %a)@]" message symbol sym
 
 and sequence ppf = function[@warning "-4"]
   | Csequence (e1, e2) -> fprintf ppf "%a@ %a" sequence e1 sequence e2

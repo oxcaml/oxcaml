@@ -763,6 +763,7 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         record_pattern ctxt f ~unboxed:false l closed
     | Ppat_record_unboxed_product (l, closed) ->
         record_pattern ctxt f ~unboxed:true l closed
+    | Ppat_unboxed_unit -> pp f "#()"
     | Ppat_tuple (l, closed) ->
         labeled_tuple_pattern ctxt f ~unboxed:false l closed
     | Ppat_unboxed_tuple (l, closed) ->
@@ -1179,6 +1180,7 @@ and simple_expr ctxt f x =
     | Pexp_constant c -> constant f c;
     | Pexp_pack me ->
         pp f "(module@;%a)" (module_expr ctxt) me
+    | Pexp_unboxed_unit -> pp f "#()"
     | Pexp_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:false l
     | Pexp_unboxed_tuple l ->
@@ -2016,12 +2018,17 @@ and structure_item ctxt f x =
 
 (* Don't just use [core_type] because we do not want parens around params
    with jkind annotations *)
-and core_type_param f ct = match ct.ptyp_desc with
-  | Ptyp_any None -> pp f "_"
-  | Ptyp_any (Some jk) -> pp f "_ : %a" (jkind_annotation reset_ctxt) jk
-  | Ptyp_var (s, None) -> tyvar f s
+and core_type_param f ct =
+  let attrs = attributes reset_ctxt in
+  match ct.ptyp_desc with
+  | Ptyp_any None -> pp f "_%a" attrs ct.ptyp_attributes
+  | Ptyp_any (Some jk) ->
+    pp f "_%a : %a" attrs ct.ptyp_attributes (jkind_annotation reset_ctxt) jk
+  | Ptyp_var (s, None) ->
+    pp f "%a%a" tyvar s attrs ct.ptyp_attributes
   | Ptyp_var (s, Some jk) ->
-    pp f "%a : %a" tyvar s (jkind_annotation reset_ctxt) jk
+    pp f "%a%a : %a" tyvar s attrs ct.ptyp_attributes
+      (jkind_annotation reset_ctxt) jk
   | _ -> Misc.fatal_error "unexpected type in core_type_param"
 
 and type_param f (ct, (a,b)) =

@@ -149,7 +149,7 @@ val unsigned_to_int : int64 -> int option
 
 external of_float : float -> int64
   = "caml_int64_of_float" "caml_int64_of_float_unboxed"
-  [@@unboxed] [@@noalloc]
+  [@@unboxed] [@@noalloc] [@@builtin]
 (** Convert the given floating-point number to a 64-bit integer,
    discarding the fractional part (truncate towards 0).
    If the truncated floating-point number is outside the range
@@ -158,7 +158,7 @@ external of_float : float -> int64
 
 external to_float : int64 -> float
   = "caml_int64_to_float" "caml_int64_to_float_unboxed"
-  [@@unboxed] [@@noalloc]
+  [@@unboxed] [@@noalloc] [@@builtin]
 (** Convert the given 64-bit integer to a floating-point number. *)
 
 

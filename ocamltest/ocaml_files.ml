@@ -66,6 +66,11 @@ let expect =
     [Ocaml_directories.srcdir; "testsuite"; "tools";
      Filename.mkexe "expect"]
 
+let expectnat =
+  Filename.make_path
+    [Ocaml_directories.srcdir; "testsuite"; "tools";
+     Filename.mkexe "expectnat"]
+
 let ocamllex =
   Filename.make_path
     [Ocaml_directories.srcdir; "lex"; Filename.mkexe "ocamllex"]

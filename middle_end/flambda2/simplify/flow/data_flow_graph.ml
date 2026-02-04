@@ -343,8 +343,9 @@ let add_continuation_info map ~return_continuation ~exn_continuation
      arguments. *)
   Continuation.Map.fold
     (fun k rewrite_ids t ->
-      if Continuation.equal return_continuation k
-         || Continuation.equal exn_continuation k
+      if
+        Continuation.equal return_continuation k
+        || Continuation.equal exn_continuation k
       then
         Apply_cont_rewrite_id.Map.fold
           (fun _rewrite_id args t ->

@@ -371,6 +371,7 @@ stdlib__Float.cmi : float.mli \
     stdlib.cmi \
     stdlib__Seq.cmi
 stdlib__Format.cmo : format.ml \
+    stdlib__Uchar.cmi \
     stdlib__String.cmi \
     stdlib.cmi \
     stdlib__Stack.cmi \
@@ -387,6 +388,7 @@ stdlib__Format.cmo : format.ml \
     stdlib__Array.cmi \
     stdlib__Format.cmi
 stdlib__Format.cmx : format.ml \
+    stdlib__Uchar.cmx \
     stdlib__String.cmx \
     stdlib.cmx \
     stdlib__Stack.cmx \

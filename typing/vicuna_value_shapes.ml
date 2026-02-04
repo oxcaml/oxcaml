@@ -30,8 +30,8 @@ type value_shape =
   | Value  (** anything of C type [value] *)
   | Imm  (** immediate, tagged with a one at the end *)
   | Nativeint
-      (** block of a native word integer, e.g., 64-bit integer on amd64
-          target *)
+      (** block of a native word integer, e.g., 64-bit integer on amd64 target
+      *)
   | Double  (** block of a native double *)
   | Int64  (** block of a 64-bit integer *)
   | Int32  (** block of a 32-bit integer *)
@@ -41,15 +41,15 @@ type value_shape =
   | FloatArray  (** block containing native doubles *)
   | Block of (int * value_shape list) option
       (** Block whose tag is below no-scan tag (i.e., a normal ocaml block
-     value). If the argment is [None], then the block could have any tag and any
-     elements. If the argument is [Some (t, shs)], then [t] is the tag of the
-     block and [shs] contains the shapes of its fields. In the case of
-     [Some (t, shs)], the number of fields is known statically (i.e., the length
-     of the list [shs]).
+          value). If the argment is [None], then the block could have any tag
+          and any elements. If the argument is [Some (t, shs)], then [t] is the
+          tag of the block and [shs] contains the shapes of its fields. In the
+          case of [Some (t, shs)], the number of fields is known statically
+          (i.e., the length of the list [shs]).
 
-     To represent arrays (which are blocks with tag 0 at run time, but whose
-     size is not statically known), there is a separate construtor, [Array sh],
-     which keeps track of the shapes of the elements. *)
+          To represent arrays (which are blocks with tag 0 at run time, but
+          whose size is not statically known), there is a separate construtor,
+          [Array sh], which keeps track of the shapes of the elements. *)
   | Array of value_shape
       (** Block with tag 0 and a fixed size (not known statically). The shape of
           the elements is given by the argument. *)
@@ -131,8 +131,8 @@ let print_fn_value_shapes_readable fmt { arguments; return } =
     breaking the serialized form. *)
 type extfun_desc =
   { shape : fn_value_shapes option
-        (** If the shape is not present, then we fallback on the arity of the
-            C code. *)
+        (** If the shape is not present, then we fallback on the arity of the C
+            code. *)
   }
 
 let print_extfun_desc ppf { shape } =

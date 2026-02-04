@@ -151,15 +151,16 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         List.fold_right
           (fun info reqd ->
             let li_name = CU.name info.li_name in
-            if info.li_force_link || !Clflags.link_everything
-               || Linkenv.is_required linkenv info.li_name
+            if
+              info.li_force_link || !Clflags.link_everything
+              || Linkenv.is_required linkenv info.li_name
             then (
               Linkenv.remove_required linkenv info.li_name;
               let req_by = file_name, Some li_name in
               info.li_imports_cmx
               |> Misc.Bitmap.iter (fun i ->
-                     let import = infos.lib_imports_cmx.(i) in
-                     Linkenv.add_required linkenv req_by import);
+                  let import = infos.lib_imports_cmx.(i) in
+                  Linkenv.add_required linkenv req_by import);
               let imports_list tbl bits =
                 List.init (Array.length tbl) (fun i ->
                     if Misc.Bitmap.get bits i then Some tbl.(i) else None)
@@ -370,10 +371,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             ([], ml_objfiles, units_tolink, cached_genfns_imports)
         in
         (if not shared
-        then
-          match Linkenv.extract_missing_globals linkenv with
-          | [] -> ()
-          | mg -> raise (Linkenv.Error (Missing_implementations mg)));
+         then
+           match Linkenv.extract_missing_globals linkenv with
+           | [] -> ()
+           | mg -> raise (Linkenv.Error (Missing_implementations mg)));
         Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
         (* put user's opts first *)

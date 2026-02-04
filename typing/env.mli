@@ -17,6 +17,7 @@
 
 open Types
 open Misc
+module Jkind = Btype.Jkind0
 
 type value_unbound_reason =
   | Val_unbound_instance_variable
@@ -56,7 +57,7 @@ type summary =
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * Jkind_types.Sort.t array * int
 
 type t
 
@@ -124,6 +125,9 @@ val find_modtype_expansion_lazy: Path.t -> t -> Subst.Lazy.module_type
 
 val find_hash_type: Path.t -> t -> type_declaration
 (* Find the "#t" type given the path for "t" *)
+
+val find_implicit_jkind: string -> t -> jkind_lr option
+(* Find the implicit jkind for a type variable name. *)
 
 val find_value_address: Path.t -> t -> address
 val find_module_address: Path.t -> t -> address
@@ -217,6 +221,12 @@ type no_open_quotations_context =
   | Struct_qt
   | Sig_qt
   | Open_qt
+  | Object_field_with_attribute_qt
+  | Variant_tag_with_attribute_qt
+
+type none_in_quotations_context =
+  | Constructor
+  | Label
 
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
@@ -252,7 +262,8 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
-  | No_constructor_in_stage of Longident.t * Location.t * int
+  | Unbound_in_stage of
+      none_in_quotations_context * Longident.t * Location.t * stage * stage
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -331,7 +342,7 @@ val lookup_all_labels_from_type:
 
 type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
-  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
+  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind_types.Sort.t
 
 (** For a mutable variable, [use] means mark as mutated. For an instance
     variable, it means mark as used. *)
@@ -423,6 +434,8 @@ val add_modtype_lazy: update_summary:bool ->
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
 val add_local_constraint: Path.t -> type_declaration -> t -> t
+val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
+val clear_implicit_jkinds : t -> t
 
 (* Insertion of persistent signatures *)
 
@@ -437,6 +450,9 @@ val add_persistent_structure : Ident.t -> t -> t
  (* Returns the set of persistent structures found in the given
    directory. *)
 val persistent_structures_of_dir : Load_path.Dir.t -> Misc.Stdlib.String.Set.t
+
+(* Convert the given list of basenames to the set of persistent structures. *)
+val persistent_structures_of_basenames : string list -> Misc.Stdlib.String.Set.t
 
 (* [filter_non_loaded_persistent f env] removes all the persistent
    structures that are not yet loaded and for which [f] returns
@@ -616,6 +632,11 @@ val env_of_only_summary : (summary -> Subst.t -> t) -> t -> t
 type error =
   | Missing_module of Location.t * Path.t * Path.t
   | Illegal_value_name of Location.t * string
+  | Implicit_jkind_already_defined of {
+      loc : Location.t;
+      name : string;
+      defined_at : Location.t;
+    }
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
   | Toplevel_splice of Location.t
@@ -668,6 +689,10 @@ val print_longident: (Format.formatter -> Longident.t -> unit) ref
 val print_path: (Format.formatter -> Path.t -> unit) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_type_expr: (Format.formatter -> Types.type_expr -> unit) ref
+(* Forward declaration to break mutual recursion with Jkind. *)
+val report_jkind_violation_with_offender:
+  (offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
+   Jkind.Violation.t -> unit) ref
 
 
 (** Folds *)
@@ -687,11 +712,11 @@ val fold_labels:
 
 (** Persistent structures are only traversed if they are already loaded. *)
 val fold_modules:
-  (string -> Path.t -> module_declaration -> 'a -> 'a) ->
+  (string -> Path.t -> Subst.Lazy.module_declaration -> 'a -> 'a) ->
   Longident.t option -> t -> 'a -> 'a
 
 val fold_modtypes:
-  (string -> Path.t -> modtype_declaration -> 'a -> 'a) ->
+  (string -> Path.t -> Subst.Lazy.modtype_declaration -> 'a -> 'a) ->
   Longident.t option -> t -> 'a -> 'a
 val fold_classes:
   (string -> Path.t -> class_declaration -> 'a -> 'a) ->

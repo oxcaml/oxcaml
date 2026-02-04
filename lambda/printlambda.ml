@@ -79,12 +79,14 @@ let rec ignorable_product_element_kinds kinds =
 and ignorable_product_element_kind = function
   | Pint_ignorable -> "int"
   | Punboxedfloat_ignorable f -> unboxed_float f
+  | Punboxedvector_ignorable v -> unboxed_vector v
   | Punboxedoruntaggedint_ignorable i -> unboxed_integer i
   | Pproduct_ignorable kinds -> ignorable_product_element_kinds kinds
 
 let array_kind = function
   | Pgenarray -> "gen"
   | Paddrarray -> "addr"
+  | Pgcignorableaddrarray -> "gcignorableaddr"
   | Pintarray -> "int"
   | Pfloatarray -> "float"
   | Punboxedfloatarray f -> unboxed_float f
@@ -107,6 +109,7 @@ let array_ref_kind ppf k =
   match k with
   | Pgenarray_ref mode -> fprintf ppf "gen%a" pp_mode mode
   | Paddrarray_ref -> fprintf ppf "addr"
+  | Pgcignorableaddrarray_ref -> fprintf ppf "gcignorableaddr"
   | Pintarray_ref -> fprintf ppf "int"
   | Pfloatarray_ref mode -> fprintf ppf "float%a" pp_mode mode
   | Punboxedfloatarray_ref Unboxed_float64 -> fprintf ppf "unboxed_float"
@@ -134,6 +137,7 @@ let array_set_kind ppf k =
   match k with
   | Pgenarray_set mode -> fprintf ppf "gen%a" pp_mode mode
   | Paddrarray_set mode -> fprintf ppf "addr%a" pp_mode mode
+  | Pgcignorableaddrarray_set -> fprintf ppf "gcignorableaddr"
   | Pintarray_set -> fprintf ppf "int"
   | Pfloatarray_set -> fprintf ppf "float"
   | Punboxedfloatarray_set Unboxed_float64 -> fprintf ppf "unboxed_float"
@@ -175,6 +179,7 @@ let rec mixed_block_element print_value_kind ppf el =
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
+  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
@@ -238,6 +243,7 @@ let rec layout ppf layout_ =
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
+  | Psplicevar id -> fprintf ppf "$%a" Ident.print id
 
 let layout_annotation ppf layout_ =
   match layout_ with
@@ -277,8 +283,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
-
-let field_kind = value_kind
+  | Psplicevar id -> fprintf ppf ": $%a@ " Ident.print id
 
 let locality_kind = function
   | Alloc_heap -> ""
@@ -316,18 +321,6 @@ let record_rep ppf r = match r with
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
 
-let block_shape ppf shape = match shape with
-  | None | Some [] -> ()
-  | Some l when List.for_all ((=) Lambda.generic_value) l -> ()
-  | Some [elt] ->
-      Format.fprintf ppf " (%a)" field_kind elt
-  | Some (h :: t) ->
-      Format.fprintf ppf " (%a" field_kind h;
-      List.iter (fun elt ->
-          Format.fprintf ppf ",%a" field_kind elt)
-        t;
-      Format.fprintf ppf ")"
-
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
   fun print_mode ppf elt ->
@@ -347,6 +340,7 @@ let rec mixed_block_element
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
+  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
 and mixed_block_shape
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
@@ -363,6 +357,12 @@ and mixed_block_shape
       shape;
     fprintf ppf ")"
   end
+
+let block_shape ppf shape = match shape with
+  | All_value -> ()
+  | Shape arr ->
+      if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) arr then ()
+      else mixed_block_shape (fun _ () -> ()) ppf arr
 
 let field_read_semantics ppf sem =
   match sem with
@@ -425,15 +425,6 @@ let primitive ppf = function
   | Pmakeufloatblock (Mutable, mode) ->
      fprintf ppf "make%sufloatblock Mutable"
         (locality_mode_if_local mode)
-  | Pmakemixedblock (tag, Immutable, abs, mode) ->
-      fprintf ppf "make%amixedblock %i Immutable%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
-  | Pmakemixedblock (tag, Immutable_unique, abs, mode) ->
-     fprintf ppf "make%amixedblock %i Immutable_unique%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
-  | Pmakemixedblock (tag, Mutable, abs, mode) ->
-     fprintf ppf "make%amixedblock %i Mutable%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
   | Pmakelazyblock Lazy_tag ->
       fprintf ppf "makelazyblock"
   | Pmakelazyblock Forward_tag ->
@@ -520,7 +511,8 @@ let primitive ppf = function
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
         (mixed_block_shape (fun _ _ -> ())) shape
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
-  | Prunstack -> fprintf ppf "runstack"
+  | Pwith_stack -> fprintf ppf "with_stack"
+  | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
   | Pperform -> fprintf ppf "perform"
   | Presume -> fprintf ppf "resume"
   | Preperform -> fprintf ppf "reperform"
@@ -615,6 +607,8 @@ let primitive ppf = function
        | Ostype_win32 -> "ostype_win32"
        | Ostype_cygwin -> "ostype_cygwin"
        | Backend_type -> "backend_type"
+       | Arch_amd64 -> "arch_amd64"
+       | Arch_arm64 -> "arch_arm64"
        | Runtime5 -> "runtime5" in
      fprintf ppf "sys.constant_%s" const_name
   | Pisint { variant_only } ->
@@ -825,6 +819,7 @@ let primitive ppf = function
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ptls_get -> fprintf ppf "tls_get"
+  | Pdomain_index -> fprintf ppf "domain_index"
   | Ppoll -> fprintf ppf "poll"
   | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
@@ -882,7 +877,6 @@ let name_of_primitive = function
   | Pmakeblock _ -> "Pmakeblock"
   | Pmakefloatblock _ -> "Pmakefloatblock"
   | Pmakeufloatblock _ -> "Pmakeufloatblock"
-  | Pmakemixedblock _ -> "Pmakemixedblock"
   | Pmakelazyblock _ -> "Pmakelazyblock"
   | Pfield _ -> "Pfield"
   | Pfield_computed _ -> "Pfield_computed"
@@ -1002,12 +996,14 @@ let name_of_primitive = function
   | Patomic_lxor_field -> "Patomic_lxor_field"
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
-  | Prunstack -> "Prunstack"
+  | Pwith_stack -> "Pwith_stack"
+  | Pwith_stack_bind -> "Pwith_stack_bind"
   | Presume -> "Presume"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"
   | Ptls_get -> "Ptls_get"
+  | Pdomain_index -> "Pdomain_index"
   | Ppoll -> "Ppoll"
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
@@ -1359,6 +1355,8 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
+  | Lsplice { splice_loc = _;  slambda } ->
+      fprintf ppf "$(%a)" (Printslambda0.slambda0 lam) slambda
 
 and sequence ppf = function
   | Lsequence(l1, l2) ->

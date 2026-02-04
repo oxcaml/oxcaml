@@ -135,6 +135,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_FLOAT [@symbol "float"]
 %token KWD_GENERIC [@symbol "generic"]
 %token KWD_HCF   [@symbol "halt_and_catch_fire"]
+%token KWD_GC_IGNORABLE [@symbol "gc_ignorable"]
 %token KWD_HEAP_OR_LOCAL [@symbol "heap_or_local"]
 %token KWD_HINT  [@symbol "hint"]
 %token KWD_ID    [@symbol "id"]
@@ -485,6 +486,7 @@ array_kind:
   | { (Values : array_kind) }
   | KWD_IMM { (Immediates : array_kind) }
   | KWD_FLOAT { (Naked_floats : array_kind) }
+  | KWD_GC_IGNORABLE { (Gc_ignorable_values : array_kind) }
 
 array_kind_for_length:
   | kind = array_kind { Array_kind kind }
@@ -604,9 +606,13 @@ binop_app:
     let array_load_kind : array_load_kind =
       match ak with
       | Immediates -> Immediates
+      | Gc_ignorable_values -> Gc_ignorable_values
       | Values -> Values
       | Naked_floats -> Naked_floats
       | Naked_float32s -> Naked_float32s
+      | Naked_ints -> Naked_ints
+      | Naked_int8s -> Naked_int8s
+      | Naked_int16s -> Naked_int16s
       | Naked_int32s -> Naked_int32s
       | Naked_int64s -> Naked_int64s
       | Naked_nativeints -> Naked_nativeints
@@ -641,9 +647,13 @@ ternop_app:
       let array_set_kind : array_set_kind =
         match ak with
         | Immediates -> Immediates
+        | Gc_ignorable_values -> Gc_ignorable_values
         | Values -> Values ia
         | Naked_floats -> Naked_floats
         | Naked_float32s -> Naked_float32s
+        | Naked_ints -> Naked_ints
+        | Naked_int8s -> Naked_int8s
+        | Naked_int16s -> Naked_int16s
         | Naked_int32s -> Naked_int32s
         | Naked_int64s -> Naked_int64s
         | Naked_nativeints -> Naked_nativeints
@@ -860,19 +870,21 @@ fun_decl:
 ;
 
 apply_expr:
-  | call_kind = call_kind;
+  | call_kind_and_alloc_mode = call_kind;
     inlined = option(inlined);
     inlining_state = option(inlining_state);
     func = func_name_with_optional_arities;
     args = simple_args;
     MINUSGREATER
     r = result_continuation e = exn_continuation
-     { let (func, arities) = func in {
+     { let (func, arities) = func in
+       let (call_kind, alloc_mode) = call_kind_and_alloc_mode in {
        func;
           continuation = r;
           exn_continuation = e;
           args = args;
           call_kind;
+          alloc_mode;
           inlined;
           inlining_state;
           arities;
@@ -880,15 +892,15 @@ apply_expr:
 ;
 
 call_kind:
-  | alloc = alloc_mode_for_applications_opt; { Function (Indirect alloc) }
+  | alloc = alloc_mode_for_applications_opt; { (Function Indirect, alloc) }
   | KWD_DIRECT; LPAREN;
       code_id = code_id;
       function_slot = function_slot_opt;
       alloc = alloc_mode_for_applications_opt;
     RPAREN
-    { Function (Direct { code_id; function_slot; alloc }) }
+    { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC)
-    { C_call { alloc = not noalloc } }
+    { (C_call { alloc = not noalloc }, (Heap : alloc_mode_for_applications)) }
 ;
 
 inline:

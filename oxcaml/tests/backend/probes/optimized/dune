@@ -1,0 +1,16 @@
+(include dune.optimized-probes)
+
+(copy_files ../*.ml)
+(copy_files ../*.expected)
+(copy_files ../*.sh)
+
+(rule
+ (target dune.optimized-probes.corrected)
+ (deps ../dune.no-optimized-probes)
+ (action (with-outputs-to %{target}
+         (pipe-outputs (run cat %{deps})
+                  (bash "sed 's/-no-probes-optimized//g'")))))
+
+(rule
+ (alias   runtest)
+ (action (diff dune.optimized-probes dune.optimized-probes.corrected)))

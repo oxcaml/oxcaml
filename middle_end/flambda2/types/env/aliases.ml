@@ -281,7 +281,7 @@ module Alias_set = struct
     | None ->
       Name.Map.choose_opt names
       |> Option.map (fun (name, coercion) ->
-             Simple.with_coercion (Simple.name name) coercion)
+          Simple.with_coercion (Simple.name name) coercion)
 
   let get_singleton { const; names } =
     match const with
@@ -290,7 +290,7 @@ module Alias_set = struct
     | None ->
       Name.Map.get_singleton names
       |> Option.map (fun (name, coercion) ->
-             Simple.with_coercion (Simple.name name) coercion)
+          Simple.with_coercion (Simple.name name) coercion)
 
   let [@ocamlformat "disable"] print ppf { const; names; } =
     let none ppf () =
@@ -497,12 +497,13 @@ let invariant ~binding_time_resolver ~binding_times_and_modes t =
         (fun canonical_element aliases all_aliases ->
           Aliases_of_canonical_element.invariant aliases;
           let aliases = Aliases_of_canonical_element.all aliases in
-          if not
-               (Name.Map.for_all
-                  (fun elt _coercion ->
-                    name_defined_earlier ~binding_time_resolver
-                      ~binding_times_and_modes canonical_element ~than:elt)
-                  aliases)
+          if
+            not
+              (Name.Map.for_all
+                 (fun elt _coercion ->
+                   name_defined_earlier ~binding_time_resolver
+                     ~binding_times_and_modes canonical_element ~than:elt)
+                 aliases)
           then
             Misc.fatal_errorf
               "Canonical element %a is not earlier than all of its aliases:@ %a"
@@ -724,8 +725,9 @@ type to_be_demoted =
 
 let choose_canonical_element_to_be_demoted ~binding_time_resolver
     ~binding_times_and_modes ~canonical_element1 ~canonical_element2 =
-  if defined_earlier ~binding_time_resolver ~binding_times_and_modes
-       canonical_element1 ~than:canonical_element2
+  if
+    defined_earlier ~binding_time_resolver ~binding_times_and_modes
+      canonical_element1 ~than:canonical_element2
   then Demote_canonical_element2
   else Demote_canonical_element1
 
@@ -740,9 +742,10 @@ let invariant_add_result ~binding_time_resolver ~binding_times_and_modes
   if Flambda_features.check_invariants ()
   then (
     invariant ~binding_time_resolver ~binding_times_and_modes t;
-    if not
-         (defined_earlier ~binding_time_resolver ~binding_times_and_modes
-            canonical_element ~than:(Simple.name demoted_name))
+    if
+      not
+        (defined_earlier ~binding_time_resolver ~binding_times_and_modes
+           canonical_element ~than:(Simple.name demoted_name))
     then
       Misc.fatal_errorf
         "Canonical element %a should be defined earlier than %a after alias \
@@ -887,8 +890,9 @@ let find_earliest_alias t ~canonical_element ~binding_times_and_modes
     let earliest, coercion_from_earliest_to_canonical =
       Name.Map.fold
         (fun elt coercion ((min_elt, _min_coercion) as min_binding) ->
-          if name_defined_earlier ~binding_time_resolver
-               ~binding_times_and_modes elt ~than:min_elt
+          if
+            name_defined_earlier ~binding_time_resolver ~binding_times_and_modes
+              elt ~than:min_elt
           then elt, coercion
           else min_binding)
         at_earliest_mode
@@ -976,22 +980,22 @@ let get_aliases t element =
         ~then_:coercion_from_canonical_to_element
     in
     (if Flambda_features.check_invariants ()
-    then
-      let element_coerced_to_canonical =
-        Simple.apply_coercion_exn element coercion_from_element_to_canonical
-      in
-      (* These aliases are all equivalent to the canonical element, and so is
-         our original [element] if we coerce it first, so the coerced form of
-         [element] should be among the aliases. *)
-      assert (
-        Name.Map.exists
-          (fun name coercion_from_name_to_canonical ->
-            let name_coerced_to_canonical =
-              Simple.apply_coercion_exn (Simple.name name)
-                coercion_from_name_to_canonical
-            in
-            Simple.equal element_coerced_to_canonical name_coerced_to_canonical)
-          alias_names_with_coercions_to_canonical));
+     then
+       let element_coerced_to_canonical =
+         Simple.apply_coercion_exn element coercion_from_element_to_canonical
+       in
+       (* These aliases are all equivalent to the canonical element, and so is
+          our original [element] if we coerce it first, so the coerced form of
+          [element] should be among the aliases. *)
+       assert (
+         Name.Map.exists
+           (fun name coercion_from_name_to_canonical ->
+             let name_coerced_to_canonical =
+               Simple.apply_coercion_exn (Simple.name name)
+                 coercion_from_name_to_canonical
+             in
+             Simple.equal element_coerced_to_canonical name_coerced_to_canonical)
+           alias_names_with_coercions_to_canonical));
     Alias_set.create_aliases_of_element ~element ~canonical_element
       ~coercion_from_canonical_to_element ~alias_names_with_coercions_to_element
 
@@ -1040,9 +1044,10 @@ let add_alias_set ~binding_time_resolver ~binding_times_and_modes t name aliases
      efficient implementations *)
   let canonical = get_canonical_ignoring_name_mode t name in
   let add_alias (t, canonical_element1) elt =
-    if Simple.equal
-         (Simple.without_coercion canonical_element1)
-         (Simple.without_coercion elt)
+    if
+      Simple.equal
+        (Simple.without_coercion canonical_element1)
+        (Simple.without_coercion elt)
     then t, canonical_element1
     else
       match

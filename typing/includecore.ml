@@ -47,11 +47,12 @@ type value_mismatch =
 
 exception Dont_match of value_mismatch
 
-type close_over_coercion = Env.locks * Longident.t * Location.t
-
 type mmodes =
   | All
-  | Specific of Mode.Value.l * Mode.Value.r * close_over_coercion option
+  | Specific :
+      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
+      ('l * Mode.allowed) Mode.Value.t ->
+      mmodes
 
 let child_close_over_coercion_opt id c =
   match c with
@@ -60,9 +61,9 @@ let child_close_over_coercion_opt id c =
 
 let child_modes id = function
   | All -> All
-  | Specific (m0, m1, c) ->
+  | Specific ((m0, c), m1) ->
     let c = child_close_over_coercion_opt id c in
-    Specific (m0, m1, c)
+    Specific ((m0, c), m1)
 
 let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
   | All ->
@@ -70,7 +71,7 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
       | Ok () -> Ok All
       | Error e -> Error e
     end
-  | Specific (m0, m1, c) ->
+  | Specific ((m0, c), m1)->
     let c = child_close_over_coercion_opt id c in
     begin match Mode.Modality.to_const_opt moda1 with
     | None ->
@@ -83,15 +84,15 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
     | Some moda1 ->
       let m0 = Mode.Modality.apply moda0 m0 in
       let m1 = Mode.Modality.Const.apply moda1 m1 in
-      Ok (Specific (m0, m1, c))
+      Ok (Specific ((m0, c), m1))
     end
 
 let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
   | All -> Ok ()
-  | Specific (m0, m1, c) ->
+  | Specific ((m0, c), m1) ->
       let m0 =
         match c with
-        | None -> m0
+        | None -> m0 |> Mode.Value.disallow_right
         | Some (locks, lid, loc) ->
             let m0 = Crossing.apply_left crossing m0 in
             Env.walk_locks ~env ~loc lid ~item typ (m0, locks)
@@ -355,13 +356,16 @@ let report_mode_sub_error got expected ppf e =
   let {left; right} : _ Mode.simple_error =
     Mode.Value.print_error (Location.none, Unknown) e
   in
-  Format.fprintf ppf "%s " (String.capitalize_ascii got);
+  let open Format in
+  let open_box = dprintf "@[<hov 2>" in
+  let reopen_box = dprintf "@]@ %t" open_box in
+  fprintf ppf "%t%s " open_box (String.capitalize_ascii got);
   begin match left ppf with
-  | Mode -> Format.fprintf ppf "@ but %s " expected
-  | Mode_with_hint -> Format.fprintf ppf ".@\nHowever, %s " expected
+  | Mode -> fprintf ppf "%tbut %s " reopen_box expected
+  | Mode_with_hint -> fprintf ppf ".%tHowever, %s " reopen_box expected
   end;
   ignore (right ppf);
-  Format.pp_print_string ppf "."
+  fprintf ppf ".@]"
 
 let report_modality_equate_error first second ppf
   ((equate_step, sub_error) : Modality.equate_error) =

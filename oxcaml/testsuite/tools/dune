@@ -1,9 +1,22 @@
+(library
+ (name expectcommon)
+ (modes byte native)
+ (libraries ocamlcommon)
+ (modules expectcommon))
+
 (executable
  (name expect)
  (modes byte)
- (libraries ocamlcommon ocamltoplevel)
+ (libraries expectcommon ocamltoplevel)
  (flags (:standard -linkall))
  (modules expect))
+
+(executable
+ (name expectnat)
+ (modes native)
+ (libraries expectcommon ocamlopttoplevel)
+ (flags (:standard -linkall))
+ (modules expectnat))
 
 (ocamllex
  (modules lexcmm))

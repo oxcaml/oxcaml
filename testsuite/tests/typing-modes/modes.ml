@@ -73,8 +73,8 @@ Line 1, characters 22-36:
                           ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ "hello"
@@ -84,8 +84,8 @@ Line 1, characters 29-43:
                                  ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let foo a b @ local = exclave_ "hello"
@@ -106,8 +106,8 @@ Line 1, characters 22-31:
                           ^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ 42
@@ -117,8 +117,8 @@ Line 1, characters 29-38:
                                  ^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let foo a b : int @ local = local_ 42
@@ -138,8 +138,8 @@ Line 1, characters 22-31:
                           ^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ 42
@@ -149,8 +149,8 @@ Line 1, characters 29-38:
                                  ^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-       because it is a function return value.
-       Hint: Use exclave_ to return a local value.
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 
@@ -651,4 +651,22 @@ Line 3, characters 32-47:
                                     ^^^^^^^^^^^^^^^
 Error: This expression has type "'a -> unit"
        but an expression was expected of type "'b @ contended -> 'c"
+|}]
+
+let f : unit -> (unit -> string) @ local = fun () -> fun () -> "hello"
+[%%expect{|
+val f : unit -> (unit -> string) @ local = <fun>
+|}]
+
+(* type error should preempt the mode error *)
+let _ : string @ global = f ()
+[%%expect{|
+Line 1, characters 26-30:
+1 | let _ : string @ global = f ()
+                              ^^^^
+Error: This expression has type "unit -> string"
+       but an expression was expected of type "string"
+       Hint: Did you forget to provide "()" as argument?
+  Hint: This function application is partial,
+  maybe some arguments are missing.
 |}]

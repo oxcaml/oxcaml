@@ -490,7 +490,7 @@ let enter_ancestor_met ~loc name ~sign ~meths ~cl_num ~ty ~attrs met_env =
   let check s = Warnings.Unused_ancestor s in
   let kind = Val_anc (sign, meths, cl_num) in
   let desc =
-    { val_type = ty; val_modalities = Modality.id; val_kind = kind;
+    { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
@@ -506,7 +506,7 @@ let add_self_met loc id sign self_var_kind vars cl_num
   in
   let kind = Val_self (sign, self_var_kind, vars, cl_num) in
   let desc =
-    { val_type = ty; val_modalities = Modality.id; val_kind = kind;
+    { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
@@ -522,7 +522,7 @@ let add_instance_var_met loc label id sign cl_num attrs met_env =
   in
   let kind = Val_ivar (mut, cl_num) in
   let desc =
-    { val_type = ty; val_modalities = Modality.id; val_kind = kind;
+    { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
       val_attributes = attrs;
       Types.val_loc = loc;
       val_zero_alloc = Zero_alloc.default;
@@ -1260,7 +1260,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
             (id,
              {exp_desc =
               Texp_ident(path, mknoloc (Longident.Lident (Ident.name id)), vd,
-                         Id_value, aliased_many_use);
+                         Id_value, aliased_many_use,
+                         Mode.Value.(disallow_right legacy));
               exp_loc = Location.none; exp_extra = [];
               exp_type = Ctype.instance vd.val_type;
               exp_attributes = []; (* check *)
@@ -1468,7 +1469,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              let expr =
                {exp_desc =
                 Texp_ident(path, mknoloc(Longident.Lident (Ident.name id)),vd,
-                           Id_value, aliased_many_use);
+                           Id_value, aliased_many_use,
+                           Mode.Value.(disallow_right legacy));
                 exp_loc = Location.none; exp_extra = [];
                 exp_type = ty;
                 exp_attributes = [];
@@ -1477,7 +1479,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              in
              let desc =
                {val_type = expr.exp_type;
-                val_modalities = Modality.id;
+                val_modalities = Modality.undefined;
                 val_kind = Val_ivar (Immutable, cl_num);
                 val_attributes = [];
                 val_zero_alloc = Zero_alloc.default;

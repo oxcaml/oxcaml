@@ -167,6 +167,7 @@ module T = struct
        ptype_private = _;
        ptype_manifest;
        ptype_attributes;
+       ptype_jkind_annotation;
        ptype_loc} =
     iter_loc sub ptype_name;
     List.iter (iter_fst (sub.typ sub)) ptype_params;
@@ -176,7 +177,8 @@ module T = struct
     sub.type_kind sub ptype_kind;
     iter_opt (sub.typ sub) ptype_manifest;
     sub.location sub ptype_loc;
-    sub.attributes sub ptype_attributes
+    sub.attributes sub ptype_attributes;
+    Option.iter (sub.jkind_annotation sub) ptype_jkind_annotation
 
   let iter_type_kind sub = function
     | Ptype_abstract -> ()
@@ -484,6 +486,7 @@ module E = struct
     | Pexp_match (e, pel) ->
         sub.expr sub e; sub.cases sub pel
     | Pexp_try (e, pel) -> sub.expr sub e; sub.cases sub pel
+    | Pexp_unboxed_unit -> ()
     | Pexp_tuple el -> iter_labeled_tuple sub el
     | Pexp_unboxed_tuple el -> iter_labeled_tuple sub el
     | Pexp_construct (lid, arg) ->
@@ -580,6 +583,7 @@ module P = struct
     | Ppat_alias (p, s) -> sub.pat sub p; iter_loc sub s
     | Ppat_constant _ -> ()
     | Ppat_interval _ -> ()
+    | Ppat_unboxed_unit -> ()
     | Ppat_tuple (pl, _) -> iter_labeled_tuple sub pl
     | Ppat_unboxed_tuple (pl, _) -> iter_labeled_tuple sub pl
     | Ppat_construct (l, p) ->

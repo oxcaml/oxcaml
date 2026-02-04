@@ -13,8 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** This type represents maps from continuations to (maps from) rewrite ids
-    to values. *)
+(** This type represents maps from continuations to (maps from) rewrite ids to
+    values. *)
 type 'a t = 'a Apply_cont_rewrite_id.Map.t Continuation.Map.t
 
 (** Print function. *)

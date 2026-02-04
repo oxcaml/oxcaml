@@ -64,8 +64,9 @@ let inter_removing_conflicting_debug_info t1 t2 =
             let reg =
               (* Clear out any conflicting debug info, but remember that the
                  register is available. *)
-              if Option.equal RD.Debug_info.equal (RD.debug_info reg1)
-                   (RD.debug_info reg2)
+              if
+                Option.equal RD.Debug_info.equal (RD.debug_info reg1)
+                  (RD.debug_info reg2)
               then
                 (* [reg1] has the same location and debug info as [reg2] *)
                 reg1

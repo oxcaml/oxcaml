@@ -477,7 +477,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
         (Format.pp_print_list ~pp_sep:Format.pp_print_space pp_projected_field)
         (Array.to_list fields)
       (* field should exist *)
-    else None, Shape.leaf' None, Sort.Value
+    else None, Shape.unknown_type (), Sort.Value
   | [i] -> (
     match Array.get fields i with
     | name, sh, Base ly -> name, sh, ly
@@ -498,7 +498,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
     let field_name = Option.value ~default:("." ^ Int.to_string i) field_name in
     let field_name_with_projection = field_name_with_path field_name subpath in
     ( Some field_name_with_projection,
-      Shape.leaf' None,
+      Shape.unknown_type (),
       (* CR sspies: To properly support unboxed records in mixed records, we we
          need to propagate the right shape information here. *)
       project_layout field_layout subpath )
@@ -928,7 +928,8 @@ let create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
   in
   let simple_constructors, complex_constructors =
     List.partition_map
-      (fun ({ pv_constr_name; pv_constr_args } : _ S.poly_variant_constructor) ->
+      (fun ({ pv_constr_name; pv_constr_args } : _ S.poly_variant_constructor)
+         ->
         match pv_constr_args with
         | [] -> Left pv_constr_name
         | _ :: _ -> Right (pv_constr_name, pv_constr_args))
@@ -1384,8 +1385,8 @@ let find_in_cache (type_shape : Shape.t) (type_layout : Layout.t) ~rec_env =
   else None
 
 (** This second cache is for named type shapes. Every type name should be
-    associated with at most one DWARF die, so this cache maps type names to
-    type shapes and DWARF dies. *)
+    associated with at most one DWARF die, so this cache maps type names to type
+    shapes and DWARF dies. *)
 let name_cache = String.Tbl.create 16
 
 (* CR sspies: We have to be careful here, because LLDB currently disambiguates
@@ -1405,9 +1406,19 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
        such that it is easier to change this code if in the future we want to
        change how the names of types are handled. *)
     (match type_shape.desc with
-    | Leaf ->
+    | Leaf | Unknown_type ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
+    | At_layout (sh, _) ->
+      (* CR sspies: Currently, the layout is unused. Should be used in a future
+         PR.*)
+      let reference' =
+        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
+          type_layout ~rec_env
+      in
+      (* CR sspies: This typedef is only needed if the name is [Some]. Reduce
+         the number of typedefs here. *)
+      create_typedef_die ~reference ~parent_proto_die ?name reference'
     | Constr _ ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
@@ -1772,7 +1783,11 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   in
   let known_value = [Known (type_shape, Sort.Value)] in
   match type_shape.desc, type_layout with
-  | Leaf, _ -> unknown_base_layouts type_layout
+  | Leaf, _ | Unknown_type, _ -> unknown_base_layouts type_layout
+  | At_layout (shape, _), _ ->
+    flatten_shape shape type_layout
+    (* We simply drop these for now. The [flatten_shape] function will be
+       deleted when revisiting the layouts. *)
   | Tuple _, Base Value ->
     known_value (* boxed tuples are only a single base layout wide *)
   | Tuple _, _ ->
@@ -2077,12 +2092,19 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         Env.empty
     in
     D.record_before_reduction reduction_diagnostics type_shape;
-    let type_shape = shape_reduce type_shape in
+    let type_shape =
+      Profile.record "shape_reduce"
+        (fun () -> shape_reduce type_shape)
+        ~accumulate:true ()
+    in
     D.record_after_reduction reduction_diagnostics type_shape;
     let type_shape =
-      Type_shape.unfold_and_evaluate
-        ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
-        type_shape
+      Profile.record "unfold_and_evaluate"
+        (fun () ->
+          Type_shape.unfold_and_evaluate
+            ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
+            type_shape)
+        ~accumulate:true ()
     in
     D.record_after_evaluation reduction_diagnostics type_shape;
     let type_shape =
@@ -2122,26 +2144,29 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
     in
     D.record_before_dwarf_generation reduction_diagnostics parent_proto_die;
     let reference =
-      match type_shape with
-      | Known (type_shape, base_layout) ->
-        let reference =
-          type_shape_to_dwarf_die_with_aliased_name type_name type_shape
-            base_layout ~parent_proto_die ~fallback_value_die
-        in
-        if Debugging_the_compiler.enabled ()
-        then (
-          Format.eprintf "%a has become %a@." Uid.print var_uid
-            Asm_targets.Asm_label.print reference;
-          Debugging_the_compiler.print ~die:parent_proto_die);
-        reference
-      | Unknown base_layout ->
-        let reference = Proto_die.create_reference () in
-        create_base_layout_type ~reference ~parent_proto_die
-          ~name:("unknown @ " ^ Sort.to_string_base base_layout)
-          ~fallback_value_die base_layout ();
-        (* CR sspies: We do have the type name available here, so we could be
-           more precise in principle. *)
-        reference
+      Profile.record "dwarf_produce_dies"
+        (fun () ->
+          match type_shape with
+          | Known (type_shape, base_layout) ->
+            let reference =
+              type_shape_to_dwarf_die_with_aliased_name type_name type_shape
+                base_layout ~parent_proto_die ~fallback_value_die
+            in
+            if Debugging_the_compiler.enabled ()
+            then (
+              Format.eprintf "%a has become %a@." Uid.print var_uid
+                Asm_targets.Asm_label.print reference;
+              Debugging_the_compiler.print ~die:parent_proto_die);
+            reference
+          | Unknown base_layout ->
+            let reference = Proto_die.create_reference () in
+            create_base_layout_type ~reference ~parent_proto_die
+              ~name:("unknown @ " ^ Sort.to_string_base base_layout)
+              ~fallback_value_die base_layout ();
+            (* CR sspies: We do have the type name available here, so we could
+               be more precise in principle. *)
+            reference)
+        ~accumulate:true ()
     in
     D.record_after_dwarf_generation reduction_diagnostics parent_proto_die;
     D.append_diagnostics_to_dwarf_state state reduction_diagnostics;

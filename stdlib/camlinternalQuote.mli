@@ -114,7 +114,7 @@ module Identifier : sig
   module Module : sig
     type t
 
-    val compilation_unit : string -> t
+    val global_module : string -> t
 
     val dot : t -> string -> t
 
@@ -176,7 +176,7 @@ module Identifier : sig
 
     val lexing_position : t
 
-    val code : t
+    val expr : t
 
     val unboxed_float : t
 
@@ -227,6 +227,8 @@ module Identifier : sig
     val match_failure : t
 
     val out_of_memory : t
+
+    val out_of_fibers : t
 
     val invalid_argument : t
 
@@ -286,7 +288,7 @@ module Method : sig
   val of_string : string -> t
 end
 
-module Fragment : sig
+module Modtype_path : sig
   type t
 
   val name : string -> t
@@ -328,7 +330,29 @@ module Module_type : sig
   val of_string : string -> t
 end
 
-module rec Variant_type : sig
+module rec Object_type : sig
+  module Object_closed_flag : sig
+    type t
+
+    val open_ : t
+
+    val closed : t
+  end
+
+  module Object_field : sig
+    type t
+
+    val inherit_ : Type.t -> t
+
+    val tag : Method.t -> Type.t -> t
+  end
+
+  type t
+
+  val of_object_fields_list : Object_field.t list -> Object_closed_flag.t -> t
+end
+
+and Variant_type : sig
   module Variant_form : sig
     type t
 
@@ -352,14 +376,6 @@ module rec Variant_type : sig
   val of_row_fields_list : Row_field.t list -> Variant_form.t -> t
 end
 
-and Object_field : sig
-  type t
-
-  val inherit_ : Type.t -> t
-
-  val tag : Name.t -> Type.t -> t
-end
-
 and Type : sig
   type t
 
@@ -373,7 +389,7 @@ and Type : sig
 
   val constr : Identifier.Type.t -> t list -> t
 
-  val object_ : Object_field.t list -> bool -> t
+  val object_ : Object_type.t -> t
 
   val class_ : Name.t -> t list -> t
 
@@ -383,7 +399,7 @@ and Type : sig
 
   val poly : Loc.t -> Name.t list -> (Var.Type_var.t list -> t) lam -> t
 
-  val package : Module_type.t -> (Fragment.t * t) list -> t
+  val package : Module_type.t -> (Modtype_path.t * t) list -> t
 
   val quote : t -> t
 
@@ -400,6 +416,8 @@ module Pat : sig
   val alias : t -> Var.Value.t -> t
 
   val constant : Constant.t -> t
+
+  val unboxed_unit : t
 
   val tuple : (Label.Nonoptional.t * t) list -> t
 
@@ -450,8 +468,6 @@ module Exp_attribute : sig
   val loop : t
 
   val tail_mod_cons : t
-
-  val quotation : t
 end
 
 module rec Case : sig
@@ -515,17 +531,22 @@ and Function : sig
 end
 
 and Comprehension : sig
+  module Iterator : sig
+    type t
+
+    val range : Var.Value.t -> Exp.t -> Exp.t -> bool -> t
+
+    val in_ : Loc.t -> Var.Value.t list -> Pat.t -> Exp.t -> t
+  end
+
   type t
 
   val body : Exp.t -> t
 
-  val when_clause : Exp.t -> t -> t
+  val when_ : Exp.t -> t -> t
 
-  val for_range :
-    Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> t) lam -> t
-
-  val for_in :
-    Loc.t -> Exp.t -> Name.t list -> (Var.Value.t list -> Pat.t * t) lam -> t
+  val for_ :
+    Loc.t -> Name.t list -> (Var.Value.t list -> Iterator.t list * t) lam -> t
 end
 
 and Exp_desc : sig
@@ -536,7 +557,10 @@ and Exp_desc : sig
   val constant : Constant.t -> t
 
   val let_rec_simple :
-    Loc.t -> Name.t list -> (Var.Value.t list -> Exp.t list * Exp.t) lam -> t
+    Loc.t ->
+    (Name.t * Type.t option) list ->
+    (Var.Value.t list -> Exp.t list * Exp.t) lam ->
+    t
 
   val let_ :
     Loc.t ->
@@ -613,6 +637,10 @@ and Exp_desc : sig
   val list_comprehension : Comprehension.t -> t
 
   val array_comprehension : Comprehension.t -> t
+
+  val immutable_array_comprehension : Comprehension.t -> t
+
+  val unboxed_unit : t
 
   val unboxed_tuple : (Label.Nonoptional.t * Exp.t) list -> t
 

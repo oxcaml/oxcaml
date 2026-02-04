@@ -267,7 +267,8 @@ let () =
                 exn = None;
                 terminator =
                   { id = make_id ();
-                    desc = Call { op = Indirect; label_after = new_label 1 };
+                    desc =
+                      Call { op = Indirect None; label_after = new_label 1 };
                     arg = [||];
                     res = [||]
                   }
@@ -293,7 +294,9 @@ let () =
             instr.stack_offset <- acc;
             (* The actual value of the stack offset is not important for the
                validator, just that it's non-zero. *)
-            match instr.desc with Pushtrap _ -> acc + 1 | _ -> acc)
+            match instr.desc with
+            | Pushtrap _ -> acc + 1
+            | _ -> acc)
           ~init:0
       in
       cfg_with_infos)

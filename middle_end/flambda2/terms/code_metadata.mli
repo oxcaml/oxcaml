@@ -142,6 +142,8 @@ val with_param_modes : Alloc_mode.For_types.t list -> t -> t
 
 val with_is_tupled : bool -> t -> t
 
+val with_result_types : Result_types.t Or_unknown_or_bottom.t -> t -> t
+
 val print : Format.formatter -> t -> unit
 
 (** [free_names] does not return occurrences of value slots inside the

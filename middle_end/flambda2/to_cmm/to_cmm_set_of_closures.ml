@@ -536,8 +536,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   then
     Misc.fatal_errorf
       "Unbound free_vars in function body when translating to cmm: %a@\n\
-       function body: %a" Backend_var.Set.print fun_free_vars
-      Printcmm.expression fun_body;
+       function body: %a"
+      Backend_var.Set.print fun_free_vars Printcmm.expression fun_body;
   let fun_body =
     if !Clflags.afl_instrument
     then Afl_instrument.instrument_function fun_body fun_dbg
@@ -577,17 +577,17 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~(translate_expr : translate_expr) =
   Function_params_and_body.pattern_match p
     ~f:(fun
-         ~return_continuation
-         ~exn_continuation
-         params
-         ~body
-         ~my_closure
-         ~is_my_closure_used
-         ~my_region
-         ~my_ghost_region
-         ~my_depth:_
-         ~free_names_of_body:_
-       ->
+        ~return_continuation
+        ~exn_continuation
+        params
+        ~body
+        ~my_closure
+        ~is_my_closure_used
+        ~my_region
+        ~my_ghost_region
+        ~my_depth:_
+        ~free_names_of_body:_
+      ->
       try
         params_and_body0 env res code_id ~result_arity ~fun_dbg
           ~zero_alloc_attribute ~return_continuation ~exn_continuation params
@@ -618,8 +618,8 @@ let debuginfo_for_set_of_closures env set =
     Set_of_closures.function_decls set
     |> Function_declarations.funs |> Function_slot.Map.data
     |> List.map
-         (fun (code_id : Function_declarations.code_id_in_function_declaration)
-         ->
+         (fun
+           (code_id : Function_declarations.code_id_in_function_declaration) ->
            match code_id with
            | Deleted { dbg; _ } -> dbg
            | Code_id { code_id; only_full_applications = _ } ->
@@ -693,19 +693,18 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
   let layout = layout_for_set_of_closures env set in
   let_static_set_of_closures0 env res closure_symbols layout set ~prev_updates
 
-(* Sets of closures with no value slots can be statically allocated. This
+(*= Sets of closures with no value slots can be statically allocated. This
    usually happens earlier (in Simplify, or Closure_conversion for classic mode)
    but the extra information that To_cmm has about unused closure variables
    enables certain extra cases to be caught. For example the following closure
    [g] is not lifted by Simplify, but can be in To_cmm:
 
- * let f () =
- *   let x = Sys.opaque_identity 0 in
- *   let y = true in
- *   let g () = if y then 1 else x in
- *   g
-
- *)
+   let f () =
+     let x = Sys.opaque_identity 0 in
+     let y = true in
+     let g () = if y then 1 else x in
+     g
+*)
 let lift_set_of_closures env res ~body ~bound_vars layout set
     ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
@@ -766,7 +765,8 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
       (match closure_alloc_mode with
       | Heap -> No_coeffects
       | Local _ -> Has_coeffects),
-      Strict )
+      Strict,
+      Can_move_anywhere )
   in
   let decl_map =
     decls |> Function_slot.Lmap.bindings |> Function_slot.Map.of_list

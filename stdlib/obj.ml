@@ -59,9 +59,35 @@ external floatarray_set :
 let [@inline always] double_field x i = floatarray_get (obj x : floatarray) i
 let [@inline always] set_double_field x i v =
   floatarray_set (obj x : floatarray) i v
-external raw_field : t -> int -> raw_data @@ portable = "caml_obj_raw_field"
-external set_raw_field : t -> int -> raw_data -> unit @@ portable
-                                          = "caml_obj_set_raw_field"
+external box_int64 : int64# -> int64 @@ portable = "%box_int64"
+external unbox_int64 : int64 -> int64# @@ portable = "%unbox_int64"
+external unsafe_get_int64_field : t -> int64# -> int64# @@ portable
+  = "%unsafe_get_idx"
+external unsafe_set_int64_field : t -> int64# -> int64# -> unit @@ portable
+  = "%unsafe_set_idx"
+external raw_field_bytecode : t -> int -> raw_data @@ portable
+  = "caml_obj_raw_field"
+external set_raw_field_bytecode : t -> int -> raw_data -> unit @@ portable
+  = "caml_obj_set_raw_field"
+
+let [@inline always] raw_field t i =
+  (match Sys.backend_type with
+  | Native ->
+    let byte_offset = Int64.mul (Int64.of_int i) 8L in
+    Int64.to_nativeint
+      (box_int64 (unsafe_get_int64_field t (unbox_int64 byte_offset)))
+  | Bytecode | Other _ ->
+    raw_field_bytecode t i)
+
+let [@inline always] set_raw_field t i v =
+  (match Sys.backend_type with
+  | Native ->
+    let byte_offset = Int64.mul (Int64.of_int i) 8L in
+    unsafe_set_int64_field t
+      (unbox_int64 byte_offset)
+      (unbox_int64 (Int64.of_nativeint v))
+  | Bytecode | Other _ ->
+    set_raw_field_bytecode t i v)
 
 external new_block : int -> int -> t @@ portable = "caml_obj_block"
 

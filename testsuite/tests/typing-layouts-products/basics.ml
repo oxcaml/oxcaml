@@ -437,8 +437,8 @@ module F :
 |}]
 
 (***************************************************************************)
-(* Test 4: Unboxed products can go blocks that are nominally typed, but not
-   structurally typed. *)
+(* Test 4: Unboxed products can go in blocks that are nominally typed, and the
+   only structurally typed blocks that support them are modules. *)
 
 type poly_var_type = [ `Foo of #(int * bool) ]
 [%%expect{|
@@ -511,25 +511,14 @@ module type S = sig
   val x : #(int * bool)
 end
 [%%expect{|
-Line 2, characters 10-23:
-2 |   val x : #(int * bool)
-              ^^^^^^^^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type #(int * bool) is value & value
-         because it is an unboxed tuple.
-       But the layout of type #(int * bool) must be a sublayout of value
-         because it's the type of something stored in a module structure.
+module type S = sig val x : #(int * bool) end
 |}]
 
 module M = struct
   let x = #(1, 2)
 end
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let x = #(1, 2)
-          ^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x" has layout "value & value".
+module M : sig val x : #(int * int) end
 |}]
 
 type object_type = < x : #(int * bool) >
@@ -678,14 +667,7 @@ module type S = sig
 end
 [%%expect{|
 type sig_inner = #{ i : int; b : bool; }
-Line 3, characters 10-19:
-3 |   val x : sig_inner
-              ^^^^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type sig_inner is value & value
-         because of the definition of sig_inner at line 1, characters 0-39.
-       But the layout of type sig_inner must be a sublayout of value
-         because it's the type of something stored in a module structure.
+module type S = sig val x : sig_inner end
 |}]
 
 type m_record = #{ i1 : int; i2 : int }
@@ -694,11 +676,7 @@ module M = struct
 end
 [%%expect{|
 type m_record = #{ i1 : int; i2 : int; }
-Line 3, characters 6-7:
-3 |   let x = #{ i1 = 1; i2 = 2 }
-          ^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x" has layout "value & value".
+module M : sig val x : m_record end
 |}]
 
 type object_inner = #{ i : int; b : bool }
@@ -1589,7 +1567,8 @@ Line 1, characters 31-37:
 1 | let _ = Array.init 3 (fun _ -> #(1,2))
                                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value)"
+       but an expression was expected of type
+         "('c : value_or_null mod separable)"
        The layout of #('a * 'b) is
            '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
@@ -1673,7 +1652,8 @@ Line 2, characters 31-50:
 2 | let _ = Array.init 3 (fun _ -> #{ i1 = 1; i2 = 2 })
                                    ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "array_init_record"
-       but an expression was expected of type "('a : value)"
+       but an expression was expected of type
+         "('a : value_or_null mod separable)"
        The layout of array_init_record is value & value
          because of the definition of array_init_record at line 1, characters 0-48.
        But the layout of array_init_record must be a sublayout of value.

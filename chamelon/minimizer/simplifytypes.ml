@@ -66,8 +66,8 @@ let remove_cons_mapper (cons_to_rem, cons_typ) =
                 e with
                 exp_desc =
                   (if Seq.is_empty nlab_list then apply_dummy2.exp_desc
-                  else
-                    Texp_record { record with fields = Array.of_seq nlab_list });
+                   else
+                     Texp_record { record with fields = Array.of_seq nlab_list });
               }
           | Texp_function (f, id) ->
               let f_as_cases = Function_compat.function_to_cases_view f in

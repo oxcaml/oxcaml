@@ -10,6 +10,7 @@ on:
     tags:
       - '*'
   pull_request:
+  merge_group:
 jobs:
   build:
     name: ${{ matrix.name }}
@@ -22,6 +23,7 @@ jobs:
           - name: runtime5 (x86_64-linux)
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
+            build_debug: true
 
           - name: runtime5 stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
@@ -39,9 +41,12 @@ jobs:
             config: --disable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
 
+          # We use a custom install prefix for this workflow.
+          # Consider renaming it to indicate as such when convenient.
           - name: runtime5 dev (x86_64-linux)
             config: --enable-runtime5 --enable-dev
             os: warp-ubuntu-latest-x64-8x
+            install_path: _custom_install
 
           - name: runtime5 debug stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
@@ -66,7 +71,7 @@ jobs:
           - name: runtime4 O3 metrics (x86_64-linux)
             config: --disable-runtime5
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
+            build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
             collect_metrics: true
 
@@ -75,7 +80,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml'
 
           - name: runtime4 (aarch64-darwin)
             config: --disable-runtime5 --disable-warn-error
@@ -99,6 +104,13 @@ jobs:
 
           - name: runtime5 regalloc (aarch64-linux)
             config: --enable-runtime5 --disable-warn-error
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            run_regalloc_tool: true
+
+          - name: runtime5 regalloc multidomain (aarch64-linux)
+            config: --enable-runtime5 --enable-poll-insertion --enable-multidomain --disable-warn-error
             os: warp-ubuntu-latest-arm64-8x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
@@ -157,6 +169,17 @@ jobs:
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
 
+          - name: runtime5 musl (x86_64-linux)
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            cc: musl-gcc
+
+          - name: runtime5 reaper
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,reaper=1'
+            ocamlparam: '_,reaper=1'
+
     env:
       J: "8"
       run_testsuite: "true"
@@ -168,6 +191,18 @@ jobs:
       - name: Install clang (Linux)
         if: runner.os == 'Linux' && matrix.cc == 'clang'
         run: sudo apt-get install clang
+
+      - name: Install musl (Linux)
+        if: runner.os == 'Linux' && matrix.cc == 'musl-gcc'
+        run: |
+          sudo apt-get install musl musl-tools
+          # Install musl-compatible kernel headers
+          mkdir musl-kernel
+          filename='v4.19.88-1.tar.gz'
+          wget "https://github.com/sabotage-linux/kernel-headers/archive/refs/tags/$filename"
+          shasum --check <(echo "44a07e9f18033cff7840dbb112fff2862c0fb8fc  $filename")
+          tar -xzf "$filename" -C musl-kernel --strip-components=1
+          echo "C_INCLUDE_PATH=$PWD/musl-kernel/x86/include" >> "$GITHUB_ENV"
 
       - name: Install autoconf and bash and parallel (macOS)
         if: runner.os == 'macOS'
@@ -182,7 +217,7 @@ jobs:
       - name: Set up Opam
         uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: oxcaml-ci-deps.5.2.0
+          ocaml-compiler: oxcaml-ci-deps.5.2.0-with-ocaml.5.4.0
           opam-repositories: |
             local: file://${{ github.workspace }}/tools/ci/local-opam
             default: https://github.com/ocaml/opam-repository.git
@@ -206,9 +241,14 @@ jobs:
           if [[ -n "${{matrix.cc}}" ]]; then
             export CC="${{matrix.cc}}"
           fi
+          if [[ -n "${{matrix.install_path}}" ]]; then
+            install_path="_install"
+          else
+            install_path="${{matrix.install_path}}"
+          fi
           autoconf
           ./configure \
-            --prefix=$GITHUB_WORKSPACE/_install \
+            --prefix=$GITHUB_WORKSPACE/$install_path \
             ${{ matrix.config }}
 
       - name: Setup for saving core files (Linux)
@@ -233,6 +273,13 @@ jobs:
       - name: Build, install and test OxCaml
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
         run: |
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            mkdir $GITHUB_WORKSPACE/_profile_csv
+            ORIG_BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM"
+            ORIG_OCAMLPARAM="$OCAMLPARAM"
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
           if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
           ulimit -c unlimited
           make $target \
@@ -241,6 +288,8 @@ jobs:
           # Install the compiler for metrics_collection configuration to populate _install directory
           # This is needed for the metrics collection step to analyze installed artifacts
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            BUILD_OCAMLPARAM="$ORIG_BUILD_OCAMLPARAM"
+            OCAMLPARAM="$ORIG_OCAMLPARAM"
             make install
           fi
         env:
@@ -365,6 +414,10 @@ jobs:
         if: matrix.check_arch == true
         run: make check_all_arches
 
+      - name: Build debug target
+        if: matrix.build_debug == true
+        run: make debug
+
       - name: Run register allocation on artifacts
         if: matrix.run_regalloc_tool == true
         run: |
@@ -380,6 +433,10 @@ jobs:
             ./_build/main/tools/regalloc/regalloc.exe _build \
               -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
           done
+          for allocator in irc ls gi; do \
+            ./_build/main/tools/regalloc/regalloc.exe _build \
+              -validate -param AFFINITY:on -regalloc $allocator || exit 1; \
+          done
 
       - name: Collect and push metrics
         if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -390,8 +447,8 @@ jobs:
           # Checkout metrics repository
           gh repo clone oxcaml/oxcaml-metrics metrics-repo
 
-          # Create data directory if it doesn't exist
-          mkdir -p metrics-repo/data
+          # Create raw-data directory if it doesn't exist
+          mkdir -p metrics-repo/raw-data
 
           # Determine the actual commit being tested (not the merge commit for PRs)
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -402,12 +459,6 @@ jobs:
           SHORT_HASH="${COMMIT_HASH:0:8}"
           DATE=$(date -u +"%Y-%m-%d")
 
-          # Extract PR number from commit message
-          PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oP '\(#\K[0-9]+(?=\))' || echo "N/A")
-
-          # CSV filename
-          CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
-
           # Determine the actual commit being tested (not the merge commit for PRs)
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
@@ -416,11 +467,12 @@ jobs:
           fi
 
           # Use the metrics collection script (CSV filename and PR number computed internally)
-          python3 ${{ github.workspace }}/scripts/collect-size-metrics.py \
-            "${{ github.workspace }}/_install" \
-            "metrics-repo/data" \
-            "$COMMIT_HASH" \
-            "$COMMIT_MESSAGE" \
+          python3 ${{ github.workspace }}/scripts/collect-metrics.py \
+            --install-dir "${{ github.workspace }}/_install" \
+            --output-dir "metrics-repo/raw-data" \
+            --commit-hash "$COMMIT_HASH" \
+            --commit-message "$COMMIT_MESSAGE" \
+            --profile-dir "${{ github.workspace }}/_profile_csv" \
             --verbose
 
           # Commit and push metrics
@@ -432,7 +484,7 @@ jobs:
           git config --local credential.helper ""
           git config --local credential.https://github.com.helper "!gh auth git-credential"
 
-          git add data/
+          git add raw-data/
           git commit -m "Add metrics for commit ${COMMIT_HASH}"
           git push
 

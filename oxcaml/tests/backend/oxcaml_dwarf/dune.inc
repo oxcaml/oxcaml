@@ -537,3 +537,52 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (enabled_if (= %{context_name} "main"))
  (deps test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)
  (action (diff test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)))
+
+(executable
+ (name test_ocaml_and_c_dwarf)
+ (modules test_ocaml_and_c_dwarf)
+ (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
+ (ocamlopt_flags
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
+ (foreign_archives simd_stubs))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{env:OXCAML_LLDB=} "")))
+ (targets test_ocaml_and_c_dwarf.output.corrected)
+ (deps test_ocaml_and_c_dwarf.exe test_ocaml_and_c_dwarf.lldb filter_for_function_call_only.sh)
+ (action
+  (progn
+   (bash
+    "sed -e 's/^(lldb) //' -e '/^[[:space:]]*$/d' test_ocaml_and_c_dwarf.lldb > \
+     test_ocaml_and_c_dwarf_clean.lldb")
+   (with-outputs-to test_ocaml_and_c_dwarf.output.corrected
+    (pipe-outputs
+     (run %{env:OXCAML_LLDB=} -s test_ocaml_and_c_dwarf_clean.lldb ./test_ocaml_and_c_dwarf.exe)
+     (run sh ./filter_for_function_call_only.sh))))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{env:OXCAML_LLDB=} "")))
+ (targets test_ocaml_and_c_dwarf.output.corrected)
+ (deps test_ocaml_and_c_dwarf.exe)
+ (action
+  (progn
+   (echo
+    "ERROR: OXCAML_LLDB environment variable not set.\n\
+DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
+the path of your custom LLDB binary.\n\
+Example: export OXCAML_LLDB=/path/to/custom/lldb")
+   (bash "exit 1"))))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (= %{context_name} "main"))
+ (deps test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)
+ (action (diff test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)))

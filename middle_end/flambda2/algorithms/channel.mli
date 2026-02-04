@@ -30,8 +30,8 @@
 (** {1 Channels} *)
 
 (** A channel is really just a reference, but we use separate [sender] and
-     [receiver] types to indicate whether we expect to only write or only read to
-     a specific reference. *)
+    [receiver] types to indicate whether we expect to only write or only read to
+    a specific reference. *)
 
 type 'a sender
 

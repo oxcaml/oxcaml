@@ -11,6 +11,8 @@ amd64/stack_class.ml
 amd64/vectorize_specific.ml
 amd64/regalloc_stack_operands.ml
 arm64/cfg_selection.ml
+arm64/dsl_helpers.ml
+arm64/dsl_helpers.mli
 arm64/emit.ml
 arm64/reg_class.ml
 arm64/reg_class.mli
@@ -21,8 +23,8 @@ arm64/stack_check.ml
 arm64/stack_class.ml
 arm64/vectorize_specific.ml
 arm64/regalloc_stack_operands.ml
-arm64_ast.ml
-arm64_ast.mli
+arm64/ast/*.ml
+arm64/ast/*.mli
 asm_targets/**/*.ml
 asm_targets/**/*.mli
 branch_relaxation.ml
@@ -71,6 +73,10 @@ printoperation.ml
 printoperation.mli
 printreg.ml
 printreg.mli
+probe_emission.ml
+probe_emission.mli
+reg.ml
+reg.mli
 reg_class.mli
 reg_class_utils.ml
 reg_class_utils.mli

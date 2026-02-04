@@ -358,7 +358,7 @@ module Inlining = struct
       |> Inlining_history.Absolute.compilation_unit
     in
     match (callee_approx : Env.value_approximation option) with
-    | None | Some Value_unknown ->
+    | None | Some (Unknown _) ->
       Inlining_report.record_decision_at_call_site_for_unknown_function ~tracker
         ~apply ~pass:After_closure_conversion ();
       Not_inlinable
@@ -371,8 +371,9 @@ module Inlining = struct
       let fun_params_length =
         Code_metadata.params_arity metadata |> Flambda_arity.num_params
       in
-      if (not (Code_or_metadata.code_present code))
-         || fun_params_length > List.length (Apply_expr.args apply)
+      if
+        (not (Code_or_metadata.code_present code))
+        || fun_params_length > List.length (Apply_expr.args apply)
       then (
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
@@ -481,14 +482,15 @@ module Inlining = struct
   let inline acc ~apply ~apply_depth ~func_desc:code =
     let apply_dbg = Apply.dbg apply in
     let callee = Apply.callee apply in
-    let region_inlined_into =
+    let () =
       match Apply.call_kind apply with
-      | Function { alloc_mode; _ } -> alloc_mode
+      | Function _ -> ()
       | Method _ | C_call _ | Effect _ ->
         Misc.fatal_error
           "Trying to call [Closure_conversion.Inlining.inline] on a non-OCaml \
            function call."
     in
+    let region_inlined_into = Apply.alloc_mode apply in
     let args = Apply.args apply in
     let apply_return_continuation = Apply.continuation apply in
     let apply_exn_continuation = Apply.exn_continuation apply in
@@ -496,17 +498,17 @@ module Inlining = struct
     let cost_metrics = Code.cost_metrics code in
     Function_params_and_body.pattern_match params_and_body
       ~f:(fun
-           ~return_continuation
-           ~exn_continuation
-           params
-           ~body
-           ~my_closure
-           ~is_my_closure_used:_
-           ~my_region
-           ~my_ghost_region
-           ~my_depth
-           ~free_names_of_body
-         ->
+          ~return_continuation
+          ~exn_continuation
+          params
+          ~body
+          ~my_closure
+          ~is_my_closure_used:_
+          ~my_region
+          ~my_ghost_region
+          ~my_depth
+          ~free_names_of_body
+        ->
         let free_names_of_body =
           match free_names_of_body with
           | Unknown ->
@@ -787,7 +789,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
   let coeffects = Coeffects.from_lambda prim_coeffects in
   let call_kind =
     Call_kind.c_call ~needs_caml_c_call:prim_alloc ~is_c_builtin:prim_c_builtin
-      ~effects ~coeffects alloc_mode_app
+      ~effects ~coeffects
   in
   let call_symbol =
     let prim_name =
@@ -851,8 +853,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       let apply =
         Apply.create ~callee:(Some callee)
           ~continuation:(Return return_continuation) exn_continuation ~args
-          ~args_arity:param_arity ~return_arity ~call_kind dbg
-          ~inlined:Default_inlined
+          ~args_arity:param_arity ~return_arity ~call_kind
+          ~alloc_mode:alloc_mode_app dbg ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
           ~probe:None ~position:Normal
           ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -1084,7 +1086,8 @@ let close_effect_primitive acc env ~dbg exn_continuation
         ~return_arity:
           (Flambda_arity.create_singletons
              [Flambda_kind.With_subkind.any_value])
-        ~call_kind dbg ~inlined:Never_inlined
+        ~call_kind ~alloc_mode:Alloc_mode.For_applications.heap dbg
+        ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
@@ -1109,16 +1112,21 @@ let close_effect_primitive acc env ~dbg exn_continuation
   let module E = C.Effect in
   match[@ocaml.warning "-fragile-match"] prim, args with
   | Pperform, [[eff]] ->
-    let call_kind = C.effect (E.perform ~eff) in
+    let call_kind = C.effect_ (E.perform ~eff) in
     close call_kind
-  | Prunstack, [[stack]; [f]; [arg]] ->
-    let call_kind = C.effect (E.run_stack ~stack ~f ~arg) in
+  | Pwith_stack, [[valuec]; [exnc]; [effc]; [f]; [arg]] ->
+    let call_kind = C.effect_ (E.with_stack ~valuec ~exnc ~effc ~f ~arg) in
     close call_kind
-  | Presume, [[stack]; [f]; [arg]; [last_fiber]] ->
-    let call_kind = C.effect (E.resume ~stack ~f ~arg ~last_fiber) in
+  | Pwith_stack_bind, [[valuec]; [exnc]; [effc]; [dyn]; [bind]; [f]; [arg]] ->
+    let call_kind =
+      C.effect_ (E.with_stack_bind ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg)
+    in
+    close call_kind
+  | Presume, [[cont]; [f]; [arg]] ->
+    let call_kind = C.effect_ (E.resume ~cont ~f ~arg) in
     close call_kind
   | Preperform, [[eff]; [cont]; [last_fiber]] ->
-    let call_kind = C.effect (E.reperform ~eff ~cont ~last_fiber) in
+    let call_kind = C.effect_ (E.reperform ~eff ~cont ~last_fiber) in
     close call_kind
   | _ ->
     Misc.fatal_errorf
@@ -1179,28 +1187,31 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Some exn_continuation -> exn_continuation
     in
     close_raise0 acc env ~raise_kind ~arg ~dbg exn_continuation
-  | ( ( Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _
-      | Pmakemixedblock _ ),
-      [] ) ->
+  | (Pmakeblock _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakearray _), []
+    ->
     (* Special case for liftable empty block or array *)
     let acc, sym =
       match prim with
-      | Pmakeblock (tag, _, _, _mode) ->
+      | Pmakeblock (tag, _, shape, _mode) ->
         if tag <> 0
         then
           (* There should not be any way to reach this from Ocaml code. *)
           Misc.fatal_error
             "Non-zero tag on empty block allocation in [Closure_conversion]"
-        else
-          register_const0 acc
-            (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-            "empty_block"
+        else begin
+          if Lambda.is_uniform_block_shape shape
+          then
+            register_const0 acc
+              (Static_const.block Tag.Scannable.zero Immutable Value_only [])
+              "empty_block"
+          else
+            Misc.fatal_error
+              "Unexpected empty mixed block in [Closure_conversion]"
+        end
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
         Misc.fatal_error "Unexpected empty float# block in [Closure_conversion]"
-      | Pmakemixedblock _ ->
-        Misc.fatal_error "Unexpected empty mixed block in [Closure_conversion]"
       | Pmakearray (array_kind, _, _mode) ->
         let array_kind = Empty_array_kind.of_lambda array_kind in
         register_const0 acc (Static_const.empty_array array_kind) "empty_array"
@@ -1236,22 +1247,22 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pmakelazyblock _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
       | Pmake_unboxed_product _ | Punboxed_product_field _
-      | Parray_element_size_in_bytes _ | Pget_header _ | Prunstack | Pperform
-      | Presume | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
-      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
-      | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
-      | Patomic_compare_set_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get | Ppoll
-      | Patomic_load_field _ | Patomic_set_field _
-      | Preinterpret_tagged_int63_as_unboxed_int64
+      | Parray_element_size_in_bytes _ | Pget_header _ | Pwith_stack
+      | Pwith_stack_bind | Pperform | Presume | Preperform | Pmake_idx_field _
+      | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _
+      | Pset_idx _ | Pget_ptr _ | Pset_ptr _ | Patomic_exchange_field _
+      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
+      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
+      | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
+      | Patomic_set_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
         (* Inconsistent with outer match *)
         assert false
     in
     k acc [Named.create_simple (Simple.symbol sym)]
-  | (Pperform | Prunstack | Presume | Preperform), args ->
+  | (Pperform | Pwith_stack | Pwith_stack_bind | Presume | Preperform), args ->
     let exn_continuation =
       match exn_continuation with
       | None ->
@@ -1302,8 +1313,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
       in
       Variadic
         ( (if is_try_region
-          then Begin_try_region { ghost }
-          else Begin_region { ghost }),
+           then Begin_try_region { ghost }
+           else Begin_region { ghost }),
           arg )
     in
     Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
@@ -1313,8 +1324,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
     let prim : Lambda_to_flambda_primitives_helpers.expr_primitive =
       Unary
         ( (if is_try_region
-          then End_try_region { ghost }
-          else End_region { ghost }),
+           then End_try_region { ghost }
+           else End_region { ghost }),
           Simple named )
     in
     Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
@@ -1336,7 +1347,7 @@ type simplified_block_load =
 
 let simplify_block_load acc body_env ~block ~field : simplified_block_load =
   match find_value_approximation_through_symbol acc body_env block with
-  | Value_unknown -> Unknown
+  | Unknown _ -> Unknown
   | Closure_approximation _ | Value_symbol _ | Value_const _ -> Not_a_block
   | Block_approximation (_tag, _shape, approx, _alloc_mode) -> (
     let approx =
@@ -1371,9 +1382,10 @@ let classify_fields_of_block env fields alloc_mode =
             ~const:(fun _cst -> Some (f :: fields))
             ~symbol:(fun _sym ~coercion:_ -> Some (f :: fields))
             ~var:(fun _var ~coercion:_ ->
-              if Env.at_toplevel env
-                 && Flambda_features.classic_mode ()
-                 && not is_local
+              if
+                Env.at_toplevel env
+                && Flambda_features.classic_mode ()
+                && not is_local
               then Some (f :: fields)
               else None))
       (Some []) fields
@@ -1382,10 +1394,11 @@ let classify_fields_of_block env fields alloc_mode =
   match static_fields with
   | None -> Dynamic_block
   | Some fields ->
-    if List.exists
-         (fun simple_with_dbg ->
-           Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
-         fields
+    if
+      List.exists
+        (fun simple_with_dbg ->
+          Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
+        fields
     then Computed_static fields
     else Constant fields
 
@@ -1509,7 +1522,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                   Static_const.immutable_float_block static_fields
                 in
                 (* Note: no approximations are currently provided for these. *)
-                let approx = Value_approximation.Value_unknown in
+                let approx = Value_approximation.Unknown Flambda_kind.value in
                 approx, static_const
             in
             match fields_kind with
@@ -1599,7 +1612,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           in
           let acc =
             Acc.add_symbol_approximation acc symbol
-              Value_approximation.Value_unknown
+              (Value_approximation.Unknown Flambda_kind.value)
           in
           let acc, body = body acc body_env in
           Let_with_acc.create acc
@@ -1643,13 +1656,13 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
     ~(handler : Acc.t -> Env.t -> Expr_with_acc.t)
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
   (if is_exn_handler
-  then
-    match recursive with
-    | Nonrecursive -> ()
-    | Recursive ->
-      Misc.fatal_errorf
-        "[Let_cont]s marked as exception handlers must be [Nonrecursive]: %a"
-        Continuation.print name);
+   then
+     match recursive with
+     | Nonrecursive -> ()
+     | Recursive ->
+       Misc.fatal_errorf
+         "[Let_cont]s marked as exception handlers must be [Nonrecursive]: %a"
+         Continuation.print name);
   let handler_env, env_params = Env.add_vars_like env params in
   let handler_params =
     List.map2
@@ -1734,15 +1747,16 @@ let close_exact_or_unknown_apply acc env
           (* CR keryan : We could do better here since we know the arity, but we
              would have to untuple the arguments and we lack information for
              now *)
-          acc, Call_kind.indirect_function_call_unknown_arity mode, false
+          acc, Call_kind.indirect_function_call_unknown_arity, false
         else
           let result_arity_from_code = Code_metadata.result_arity meta in
-          if (* See comment about when this check can be done, in
-                simplify_apply_expr.ml *)
-             Flambda_features.kind_checks ()
-             && not
-                  (Flambda_arity.equal_ignoring_subkinds return_arity
-                     result_arity_from_code)
+          if
+            (* See comment about when this check can be done, in
+               simplify_apply_expr.ml *)
+            Flambda_features.kind_checks ()
+            && not
+                 (Flambda_arity.equal_ignoring_subkinds return_arity
+                    result_arity_from_code)
           then
             Misc.fatal_errorf
               "Wrong return arity for direct OCaml function call to %a@ \
@@ -1754,16 +1768,15 @@ let close_exact_or_unknown_apply acc env
             Flambda_features.classic_mode ()
             && not (Code_metadata.is_my_closure_used meta)
           in
-          acc, Call_kind.direct_function_call code_id mode, can_erase_callee
-      | None -> acc, Call_kind.indirect_function_call_unknown_arity mode, false
-      | Some
-          ( Value_unknown | Value_symbol _ | Value_const _
-          | Block_approximation _ ) ->
+          acc, Call_kind.direct_function_call code_id, can_erase_callee
+      | None -> acc, Call_kind.indirect_function_call_unknown_arity, false
+      | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
+        ->
         assert false (* See [close_apply] *))
     | Method { kind; obj } ->
       let acc, obj = find_simple acc env obj in
       ( acc,
-        Call_kind.method_call (Call_kind.Method_kind.from_lambda kind) ~obj mode,
+        Call_kind.method_call (Call_kind.Method_kind.from_lambda kind) ~obj,
         false )
   in
   let acc, apply_exn_continuation =
@@ -1781,7 +1794,8 @@ let close_exact_or_unknown_apply acc env
     Apply.create
       ~callee:(if can_erase_callee then None else Some callee)
       ~continuation:(Return continuation) apply_exn_continuation ~args
-      ~args_arity ~return_arity ~call_kind dbg ~inlined:inlined_call
+      ~args_arity ~return_arity ~call_kind ~alloc_mode:mode dbg
+      ~inlined:inlined_call
       ~inlining_state:(Inlining_state.default ~round:0)
       ~probe ~position
       ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -2286,11 +2300,11 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         ~continuation:(Return cont)
         (Exn_continuation.create ~exn_handler:exn_continuation ~extra_args:[])
         ~args ~args_arity ~return_arity:result_arity_main_code
-        ~call_kind:
-          (Call_kind.direct_function_call main_code_id
-             (Alloc_mode.For_applications.from_lambda
-                (Function_decl.result_mode decl)
-                ~current_region:my_region ~current_ghost_region:my_ghost_region))
+        ~call_kind:(Call_kind.direct_function_call main_code_id)
+        ~alloc_mode:
+          (Alloc_mode.For_applications.from_lambda
+             (Function_decl.result_mode decl)
+             ~current_region:my_region ~current_ghost_region:my_ghost_region)
         Debuginfo.none ~inlined:Inlined_attribute.Default_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
@@ -2752,8 +2766,9 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
        functions in a set a recursive definitions with more than one function,
        we do not try to reproduce this particular property and can mark as
        inlinable such functions. *)
-    if contains_subfunctions
-       && Flambda_features.Expert.fallback_inlining_heuristic ()
+    if
+      contains_subfunctions
+      && Flambda_features.Expert.fallback_inlining_heuristic ()
     then Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in
@@ -2938,10 +2953,11 @@ let close_functions acc external_env ~current_region function_declarations =
     List.fold_left
       (fun map decl ->
         let function_slot = Function_decl.function_slot decl in
+        let function_dbg = Debuginfo.from_location (Function_decl.loc decl) in
         let code_id =
           Code_id.create
             ~name:(Function_slot.to_string function_slot)
-            compilation_unit
+            ~debug:function_dbg compilation_unit
         in
         Function_slot.Map.add function_slot code_id map)
       Function_slot.Map.empty func_decl_list
@@ -3040,7 +3056,8 @@ let close_functions acc external_env ~current_region function_declarations =
   in
   let acc, (approximations, function_code_ids_in_order) =
     List.fold_left
-      (fun (acc, (by_function_slot, function_code_ids_in_order)) function_decl ->
+      (fun (acc, (by_function_slot, function_code_ids_in_order)) function_decl
+         ->
         let code_id =
           Function_slot.Map.find
             (Function_decl.function_slot function_decl)
@@ -3346,8 +3363,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   let free_idents_of_body =
     List.fold_left
       (fun ids -> function
-        | IR.Var id -> Ident.Set.add id ids
-        | IR.Const _ -> ids)
+        | IR.Var id -> Ident.Set.add id ids | IR.Const _ -> ids)
       (Ident.Set.singleton apply.func)
       all_args
   in
@@ -3435,10 +3451,9 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
-    let call_kind =
-      Call_kind.indirect_function_call_unknown_arity
-        (Alloc_mode.For_applications.from_lambda apply.mode
-           ~current_region:apply_region ~current_ghost_region:apply_ghost_region)
+    let alloc_mode =
+      Alloc_mode.For_applications.from_lambda apply.mode
+        ~current_region:apply_region ~current_ghost_region:apply_ghost_region
     in
     let continuation =
       match needs_region with
@@ -3449,7 +3464,8 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       Apply.create
         ~callee:(Some (Simple.var returned_func))
         ~continuation apply_exn_continuation ~args:remaining
-        ~args_arity:remaining_arity ~return_arity:apply.return_arity ~call_kind
+        ~args_arity:remaining_arity ~return_arity:apply.return_arity
+        ~call_kind:Call_kind.indirect_function_call_unknown_arity ~alloc_mode
         apply_dbg ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
@@ -3570,7 +3586,7 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
           Code_metadata.param_modes metadata,
           Code_metadata.first_complex_local_param metadata,
           Code_metadata.result_mode metadata )
-    | Value_unknown -> None
+    | Unknown _ -> None
     | Value_symbol _ | Value_const _ | Block_approximation _ ->
       if Flambda_features.check_invariants ()
       then
@@ -3812,11 +3828,61 @@ let bind_static_consts_and_code acc body =
         defining_expr ~body)
     (acc, body) components
 
+(* Returns a tuple [block_shape, field_count, block_access, kind_of_field].
+   [block_access] and [kind_of_field] are function that take an index [pos] and
+   return the block_access/kind of the [pos]th field of the module. "Fields" are
+   physical, so unboxed products count as more than one field when indexing and
+   determining [field_count]. *)
+let final_module_block_representation acc
+    ~(module_repr : Lambda.module_representation) =
+  match module_repr with
+  | Module_value_only { field_count } ->
+    let block_access _pos : P.Block_access_kind.t =
+      Values
+        { tag = Known Tag.Scannable.zero;
+          size =
+            Known (Target_ocaml_int.of_int (Acc.machine_width acc) field_count);
+          field_kind = Any_value
+        }
+    in
+    ( K.Scannable_block_shape.Value_only,
+      field_count,
+      block_access,
+      fun _ -> K.value )
+  | Module_mixed (shape, _) ->
+    let shape =
+      K.Mixed_block_lambda_shape.of_mixed_block_elements shape
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+    in
+    let flattened_reordered_shape =
+      K.Mixed_block_lambda_shape.flattened_reordered_shape shape
+    in
+    let field_count = Array.length flattened_reordered_shape in
+    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+    let field_kinds = K.Mixed_block_shape.field_kinds kind_shape in
+    let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
+    let block_access pos : P.Block_access_kind.t =
+      let field_kind =
+        Lambda_to_flambda_primitives_helpers.mixed_block_access_field_kind
+          flattened_reordered_shape.(pos)
+      in
+      Mixed
+        { tag = Known Tag.Scannable.zero;
+          size = Unknown;
+          field_kind;
+          shape = kind_shape
+        }
+    in
+    block_shape, field_count, block_access, fun pos -> field_kinds.(pos)
+
 let wrap_final_module_block acc env ~program ~prog_return_cont
-    ~module_block_size_in_words ~return_cont ~module_symbol =
+    ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
+  let block_shape, field_count, block_access, kind_of_field =
+    final_module_block_representation acc ~module_repr
+  in
   let load_fields_body acc =
     let env =
       match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
@@ -3830,12 +3896,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       | _ -> simple_var
     in
     let field_vars =
-      List.init module_block_size_in_words (fun pos ->
+      List.init field_count (fun pos ->
           let pos_str = string_of_int pos in
           ( pos,
-            Variable.create ("field_" ^ pos_str) K.value
-            (* CR mixed-modules: Find the right kind from the module block
-               shape *),
+            Variable.create ("field_" ^ pos_str) (kind_of_field pos),
             Flambda_debug_uid.none ))
     in
     let acc, body =
@@ -3846,7 +3910,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
               Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
             field_vars
         in
-        Static_const.block module_block_tag Immutable Value_only field_vars
+        Static_const.block module_block_tag Immutable block_shape field_vars
       in
       let acc, apply_cont =
         (* Module initialisers return unit, but since that is taken care of
@@ -3869,29 +3933,18 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         (Bound_pattern.static bound_static)
         named ~body:return
     in
-    let block_access : P.Block_access_kind.t =
-      Values
-        { tag = Known Tag.Scannable.zero;
-          size =
-            Known
-              (Target_ocaml_int.of_int (Acc.machine_width acc)
-                 module_block_size_in_words);
-          field_kind = Any_value
-        }
-    in
     List.fold_left
       (fun (acc, body) (pos, var, var_duid) ->
         let var = VB.create var var_duid Name_mode.normal in
         let pat = Bound_pattern.singleton var in
-        let pos = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
+        let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
         let block = module_block_simple in
-        match simplify_block_load acc env ~block ~field:pos with
+        match simplify_block_load acc env ~block ~field with
         | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
           let named =
             Named.create_prim
               (Unary
-                 ( Block_load
-                     { kind = block_access; mut = Immutable; field = pos },
+                 ( Block_load { kind = block_access pos; mut = Immutable; field },
                    block ))
               Debuginfo.none
           in
@@ -3919,9 +3972,9 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
     ~is_exn_handler:false ~is_cold:false
 
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
-    ~machine_width ~big_endian ~cmx_loader ~compilation_unit
-    ~module_block_size_in_words ~program ~prog_return_cont ~exn_continuation
-    ~toplevel_my_region ~toplevel_my_ghost_region : mode close_program_result =
+    ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
+    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
+    ~toplevel_my_ghost_region : mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
@@ -3938,8 +3991,8 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
   in
   let acc = Acc.create ~cmx_loader ~machine_width in
   let acc, body =
-    wrap_final_module_block acc env ~program ~prog_return_cont
-      ~module_block_size_in_words ~return_cont ~module_symbol
+    wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
+      ~return_cont ~module_symbol
   in
   let module_block_approximation =
     match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
@@ -3947,7 +4000,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     | Some [Value_approximation.Value_symbol s] ->
       Acc.find_symbol_approximation acc s
     | Some [approx] -> approx
-    | _ -> Value_approximation.Value_unknown
+    | _ -> Value_approximation.Unknown Flambda_kind.value
   in
   (* We must make sure there is always an outer [Let_symbol] binding so that
      lifted constants not in the scope of any other [Let_symbol] binding get put

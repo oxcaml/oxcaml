@@ -19,6 +19,7 @@ open! Int_replace_polymorphic_compare
 open X86_ast
 open X86_proc
 open Amd64_simd_instrs
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 let bprintf = Printf.bprintf
 
@@ -34,9 +35,8 @@ let opt_displ b displ =
   else bprintf b "%d" displ
 
 let arg_mem b { arch; typ = _; idx; scale; base; sym; displ } =
-  let string_of_register =
-    match arch with X86 -> string_of_reg32 | X64 -> string_of_reg64
-  in
+  let string_of_gpr = string_of_gpr arch in
+  let string_of_reg_idx = string_of_reg_idx arch in
   (match sym with
   | None ->
     if displ <> 0 || scale = 0 then Buffer.add_string b (Int.to_string displ)
@@ -46,11 +46,9 @@ let arg_mem b { arch; typ = _; idx; scale; base; sym; displ } =
   if scale <> 0
   then (
     Buffer.add_char b '(';
-    (match base with
-    | None -> ()
-    | Some base -> print_reg b string_of_register base);
+    (match base with None -> () | Some base -> print_reg b string_of_gpr base);
     if base != None || scale <> 1 then Buffer.add_char b ',';
-    print_reg b string_of_register idx;
+    print_reg b string_of_reg_idx idx;
     if scale <> 1 then bprintf b ",%s" (Int.to_string scale);
     Buffer.add_char b ')')
 
@@ -116,6 +114,7 @@ let i1_call_jmp b s = function
 
 let print_instr b = function
   | ADD (arg1, arg2) -> i2_s b "add" arg1 arg2
+  | ADC (arg1, arg2) -> i2_s b "adc" arg1 arg2
   | AND (arg1, arg2) -> i2_s b "and" arg1 arg2
   | BSF (arg1, arg2) -> i2_s b "bsf" arg1 arg2
   | BSR (arg1, arg2) -> i2_s b "bsr" arg1 arg2
@@ -167,7 +166,6 @@ let print_instr b = function
   | OR (arg1, arg2) -> i2_s b "or" arg1 arg2
   | PAUSE -> i0 b "pause"
   | POP arg -> i1_s b "pop" arg
-  | POPCNT (arg1, arg2) -> i2_s b "popcnt" arg1 arg2
   | PREFETCH (is_write, hint, arg1) -> (
     match is_write, hint with
     | true, T0 -> i1 b "prefetchw" arg1
@@ -186,11 +184,10 @@ let print_instr b = function
   | SET (c, arg) -> i1 b ("set" ^ string_of_condition c) arg
   | SHR (arg1, arg2) -> i2_s b "shr" arg1 arg2
   | SUB (arg1, arg2) -> i2_s b "sub" arg1 arg2
+  | SBB (arg1, arg2) -> i2_s b "sbb" arg1 arg2
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
-  | LZCNT (arg1, arg2) -> i2_s b "lzcnt" arg1 arg2
-  | TZCNT (arg1, arg2) -> i2_s b "tzcnt" arg1 arg2
   | SIMD (instr, args) -> (
     match[@warning "-4"] instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)
@@ -227,10 +224,8 @@ let generate_asm oc lines =
   let b = Buffer.create 10000 in
   output_string oc "\t.file \"\"\n";
   (* PR#7037 *)
-  List.iter
-    (fun i ->
+  DLL.iter lines ~f:(fun i ->
       Buffer.clear b;
       print_line b i;
       Buffer.add_char b '\n';
       Buffer.output_buffer oc b)
-    lines

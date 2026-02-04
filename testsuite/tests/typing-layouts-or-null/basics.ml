@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension comprehensions";
  expect;
 *)
 
@@ -59,12 +60,11 @@ end
 Line 2, characters 10-29:
 2 |   val x : t_any_mod_separable
               ^^^^^^^^^^^^^^^^^^^
-Error: This type signature for "x" is not a value type.
+Error: The type of a module-level value must have a representable layout.
        The layout of type t_any_mod_separable is any
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of type t_any_mod_separable must be a sublayout of
-           value
-         because it's the type of something stored in a module structure.
+       But the layout of type t_any_mod_separable must be representable
+         because it's the type of something in a signature.
 |}]
 
 module type S2 = sig
@@ -485,4 +485,63 @@ Line 2, characters 10-11:
 Warning 26 [unused-var]: unused variable x.
 
 val u : unit -> unit = <fun>
+|}]
+
+(* [or_null] is allowed as a function argument in a recursive module *)
+
+module rec M : sig
+  val x : string or_null -> string or_null
+end = struct
+  let x = M.x
+end
+
+[%%expect{|
+module rec M : sig val x : string or_null -> string or_null end
+|}]
+
+(* [or_null] arguments work for polymorphic variants *)
+
+let x = `A Null
+let y = `B (This "idea")
+
+[%%expect{|
+val x : ('a : value_or_null mod non_null). [> `A of 'a or_null ] = `A Null
+val y : [> `B of string or_null ] = `B (This "idea")
+|}]
+
+(* [or_null] arguments work for parameterized #-patterns *)
+
+type ('a : value_or_null) t = [ `A of 'a | `B ]
+
+let f1 : string t -> _ = function
+  | #t -> 42
+
+let f2 : string or_null t -> _ = function
+  | #t -> 42
+
+[%%expect{|
+type ('a : value_or_null) t = [ `A of 'a | `B ]
+val f1 : string t -> int = <fun>
+val f2 : string or_null t -> int = <fun>
+|}]
+
+(* [or_null] works in array comprehensions *)
+
+let f arr = [| This x for x in arr |]
+let g arr = [: This x for x in arr :]
+
+[%%expect{|
+val f : ('a : value_or_null mod non_null). 'a array -> 'a or_null array =
+  <fun>
+val g : ('a : value_or_null mod non_null). 'a iarray -> 'a or_null iarray =
+  <fun>
+|}]
+
+
+let x = [| "stutter" for _y in [| This 1; This 2; Null |] |]
+let y = [: "stutter" for _x in [: This 1; This 2; Null :] :]
+
+[%%expect{|
+val x : string array = [|"stutter"; "stutter"; "stutter"|]
+val y : string iarray = [:"stutter"; "stutter"; "stutter":]
 |}]

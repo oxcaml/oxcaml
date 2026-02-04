@@ -178,17 +178,7 @@ let typecheck_impl i parsetree =
 let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
   Profile.(record_call (annotate_file_name (
     Unit_info.raw_source_file info.target))) @@ fun () ->
-  let exceptionally () =
-    let sufs =
-      match info.backend with
-      | Opt Native ->  Unit_info.[ cmx; obj ]
-      | Byte -> Unit_info.[ cmo ]
-      | Opt Js_of_ocaml -> Unit_info.[ cmjx; cmjo ]
-    in
-    List.iter
-      (fun suf -> remove_file (Unit_info.Artifact.filename @@ suf info.target))
-      sufs;
-  in
+  let exceptionally = Misc.remove_successful_output_files in
   Misc.try_finally ?always:None ~exceptionally (fun () ->
     let { ast = parsed; info } : _ Parse_result.t = parse_impl info in
     hook_parse_tree parsed;

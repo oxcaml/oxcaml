@@ -209,8 +209,9 @@ let extra_args_for_aliases_overapproximation ~required_names
                    that dominator. *)
                 Simple.pattern_match' dom
                   ~var:(fun dom_var ~coercion:_ ->
-                    if Variable.equal param dom_var
-                       || Simple.Set.mem dom unboxed_blocks
+                    if
+                      Variable.equal param dom_var
+                      || Simple.Set.mem dom unboxed_blocks
                     then acc
                     else Variable.Set.add dom_var acc)
                   ~symbol:(fun _ ~coercion:_ -> acc)
@@ -225,11 +226,11 @@ let extra_args_for_aliases_overapproximation ~required_names
   let added_extra_args =
     fixpoint t ~init ~eq:Variable.Set.equal
       ~f:(fun
-           ~caller
-           ~caller_set:caller_aliases_needed
-           ~callee:_
-           ~callee_set:callee_aliases_needed
-         ->
+          ~caller
+          ~caller_set:caller_aliases_needed
+          ~callee:_
+          ~callee_set:callee_aliases_needed
+        ->
         Variable.Set.union caller_aliases_needed
           (remove_vars_in_scope_of caller callee_aliases_needed))
   in
@@ -364,8 +365,9 @@ let compute_continuation_extra_args_for_aliases ~speculative ~required_names
      Note that while this is true for aliases, we do not need a similar
      mechanism for mutable unboxing, since when doing mutable unboxing, we
      require that we have seen the creation of the block. *)
-  if (not speculative)
-     && not (Variable.Set.is_empty extra_args_for_toplevel_cont)
+  if
+    (not speculative)
+    && not (Variable.Set.is_empty extra_args_for_toplevel_cont)
   then
     Misc.fatal_errorf
       "ERROR:@\n\

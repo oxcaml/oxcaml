@@ -168,6 +168,9 @@ let pseudoregs_for_operation op arg res =
      rcx. *)
   | Intop Idiv -> [| rax; rcx |], [| rax |]
   | Intop Imod -> [| rax; rcx |], [| rdx |]
+  | Int128op (Iadd128 | Isub128) ->
+    [| res.(0); res.(1); arg.(2); arg.(3) |], res
+  | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
   | Floatop (Float64, Icompf cond) ->
     (* We need to temporarily store the result of the comparison in a float
        register, but we don't want to clobber any of the inputs if they would
@@ -219,7 +222,7 @@ let pseudoregs_for_operation op arg res =
   | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-  | Begin_region | End_region | Poll | Dls_get | Tls_get ->
+  | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
@@ -295,7 +298,8 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cifthenelse (_, _, _, _, _, _)
   | Cswitch (_, _, _, _)
   | Ccatch (_, _, _)
-  | Cexit (_, _, _) ->
+  | Cexit (_, _, _)
+  | Cinvalid _ ->
     Use_default
 
 let select_store ~is_assign addr (exp : Cmm.expression) :

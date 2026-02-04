@@ -91,7 +91,7 @@ let iter_on_declaration f decl =
   | Value vd -> f vd.val_val.val_uid decl;
   | Value_binding vb ->
       let bound_idents = let_bound_idents_full [vb] in
-      List.iter (fun (_, _, _, uid) -> f uid decl) bound_idents
+      List.iter (fun (_, _, _, _, uid) -> f uid decl) bound_idents
   | Type td ->
       if not (Btype.is_row_name (Ident.name td.typ_id)) then
         f td.typ_type.type_uid (Type td)
@@ -220,7 +220,7 @@ let iter_on_occurrences
 
   expr = (fun sub ({ exp_desc; exp_env; _ } as e) ->
       (match exp_desc with
-      | Texp_ident (path, lid, _, _, _) ->
+      | Texp_ident (path, lid, _, _, _, _) ->
           f ~namespace:Value exp_env path lid
       | Texp_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description exp_env lid constr_desc
@@ -254,8 +254,8 @@ let iter_on_occurrences
       | Texp_extension_constructor (lid, path) ->
           f ~namespace:Extension_constructor exp_env path lid
       | Texp_constant _ | Texp_let _ | Texp_letmutable _ | Texp_function _
-      | Texp_apply _ | Texp_match _ | Texp_try _ | Texp_tuple _
-      | Texp_unboxed_tuple _ | Texp_variant _ | Texp_array _
+      | Texp_apply _ | Texp_match _ | Texp_try _ | Texp_unboxed_unit
+      | Texp_tuple _ | Texp_unboxed_tuple _ | Texp_variant _ | Texp_array _
       | Texp_ifthenelse _ | Texp_sequence _ | Texp_while _ | Texp_for _
       | Texp_send _
       | Texp_letmodule _ | Texp_letexception _ | Texp_assert _ | Texp_lazy _
@@ -300,8 +300,8 @@ let iter_on_occurrences
         iter_field_pats ~namespace:Label pat_env fields
       | Tpat_record_unboxed_product (fields, _, _, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
-      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
-      | Tpat_unboxed_tuple _
+      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ 
+      | Tpat_unboxed_unit | Tpat_tuple _ | Tpat_unboxed_tuple _
       | Tpat_variant _ | Tpat_array _ | Tpat_lazy _ | Tpat_value _
       | Tpat_exception _ | Tpat_or _ -> ());
       List.iter  (fun (pat_extra, _, _) ->
@@ -310,7 +310,7 @@ let iter_on_occurrences
             f ~namespace:Module pat_env path lid
         | Tpat_type (path, lid) ->
             f ~namespace:Type pat_env path lid
-        | Tpat_constraint _ | Tpat_unpack -> ())
+        | Tpat_constraint _ | Tpat_unpack | Tpat_inspected_type _ -> ())
         pat_extra;
       default_iterator.pat sub pat);
 

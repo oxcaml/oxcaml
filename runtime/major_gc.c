@@ -1198,14 +1198,14 @@ Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
 again:
       if (Tag_hd(hd) == Lazy_tag || Tag_hd(hd) == Forcing_tag) {
         if (!atomic_compare_exchange_strong(Hp_atomic_val(block), &hd,
-              With_status_hd(hd, caml_global_heap_state.MARKED))) {
+              With_status_hd(hd, heap_state.MARKED))) {
           hd = Hd_val(block);
           goto again;
         }
       } else {
         atomic_store_relaxed(
             Hp_atomic_val(block),
-            With_status_hd(hd, caml_global_heap_state.MARKED));
+            With_status_hd(hd, heap_state.MARKED));
       }
 
       budget--; /* header word */

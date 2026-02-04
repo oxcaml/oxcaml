@@ -37,8 +37,12 @@ let cfg_eliminate_dead_trap_handlers = ref false  (* -cfg-eliminate-dead-trap-ha
 
 let cfg_prologue_validate = ref false    (* -[no-]cfg-prologue-validate *)
 let cfg_prologue_shrink_wrap = ref false    (* -[no-]cfg-prologue-shrink-wrap *)
-let cfg_prologue_shrink_wrap_threshold = ref 16384 
+let cfg_prologue_shrink_wrap_threshold = ref 16384
                                        (* -cfg-prologue-shrink-wrap-threshold *)
+
+let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
+let cfg_value_propagation_float = ref false
+                                        (* -[no]-cfg-value-propagation-float *)
 
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
 let basic_block_sections = ref false    (* -basic-block-sections *)
@@ -51,7 +55,8 @@ let default_heap_reduction_threshold = 500_000_000 / (Sys.word_size / 8)
 let heap_reduction_threshold = ref default_heap_reduction_threshold (* -heap-reduction-threshold *)
 let dump_zero_alloc = ref false          (* -dzero-alloc *)
 let disable_zero_alloc_checker = ref false       (* -disable-zero-alloc-checker *)
-let disable_precise_zero_alloc_checker = ref false  (* -disable-precise-zero_alloc_checker *)
+let disable_precise_zero_alloc_checker = ref false
+                                      (* -disable-precise-zero-alloc-checker *)
 
 type zero_alloc_checker_details_cutoff =
   | Keep_all
@@ -120,6 +125,8 @@ let opt_level = ref Default
 
 let internal_assembler = ref false
 
+let verify_binary_emitter = ref false
+
 let gc_timings = ref false
 
 let symbol_visibility_protected = ref false (* -symbol-visibility-protected*)
@@ -143,6 +150,7 @@ let llvm_flags = ref "" (* -llvm-flags *)
 
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
+  let reaper_debug_flags = ref [] (* -reaper-debug-flags *)
 
   module Default = struct
     let classic_mode = false
@@ -154,7 +162,10 @@ module Flambda2 = struct
     let join_algorithm = Binary
     let function_result_types : function_result_types = Never
     let enable_reaper = false
-    let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Zero_alloc
+    let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Auto
+    let reaper_local_fields = false
+    let reaper_unbox = true
+    let reaper_change_calling_conventions = true
     let unicode = true
     let kind_checks = false
   end
@@ -170,6 +181,9 @@ module Flambda2 = struct
     function_result_types : function_result_types;
     enable_reaper : bool;
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
+    reaper_local_fields : bool;
+    reaper_unbox : bool;
+    reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
   }
@@ -185,6 +199,10 @@ module Flambda2 = struct
     function_result_types = Default.function_result_types;
     enable_reaper = Default.enable_reaper;
     reaper_preserve_direct_calls = Default.reaper_preserve_direct_calls;
+    reaper_local_fields = Default.reaper_local_fields;
+    reaper_unbox = Default.reaper_unbox;
+    reaper_change_calling_conventions =
+      Default.reaper_change_calling_conventions;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
   }
@@ -222,12 +240,17 @@ module Flambda2 = struct
   let function_result_types = ref Default
   let enable_reaper = ref Default
   let reaper_preserve_direct_calls = ref Default
+  let reaper_local_fields = ref Default
+  let reaper_unbox = ref Default
+  let reaper_change_calling_conventions = ref Default
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
+    type pass = Last_pass | This_pass of string
 
     let rawfexpr = ref Nowhere
     let fexpr = ref Nowhere
+    let fexpr_after = ref Last_pass
     let flexpect = ref Nowhere
     let slot_offsets = ref false
     let freshen = ref false
@@ -240,6 +263,7 @@ module Flambda2 = struct
     module Default = struct
       let fallback_inlining_heuristic = false
       let inline_effects_in_cmm = false
+      let cmm_safe_subst = false
       let phantom_lets = false
       let max_block_size_for_projections = None
       let max_unboxing_depth = 3
@@ -253,6 +277,7 @@ module Flambda2 = struct
     type flags = {
       fallback_inlining_heuristic : bool;
       inline_effects_in_cmm : bool;
+      cmm_safe_subst : bool;
       phantom_lets : bool;
       max_block_size_for_projections : int option;
       max_unboxing_depth : int;
@@ -266,6 +291,7 @@ module Flambda2 = struct
     let default = {
       fallback_inlining_heuristic = Default.fallback_inlining_heuristic;
       inline_effects_in_cmm = Default.inline_effects_in_cmm;
+      cmm_safe_subst = Default.cmm_safe_subst;
       phantom_lets = Default.phantom_lets;
       max_block_size_for_projections = Default.max_block_size_for_projections;
       max_unboxing_depth = Default.max_unboxing_depth;
@@ -294,6 +320,7 @@ module Flambda2 = struct
 
     let fallback_inlining_heuristic = ref Default
     let inline_effects_in_cmm = ref Default
+    let cmm_safe_subst = ref Default
     let phantom_lets = ref Default
     let max_block_size_for_projections = ref Default
     let max_unboxing_depth = ref Default

@@ -354,7 +354,6 @@ end
 
 module Int_ids_in_env () = struct
   module Variable = Id_in_env (Variable) ()
-
   module Symbol = Id_in_env (Symbol) ()
 
   module Name : sig
@@ -457,7 +456,6 @@ module Int_ids_in_env () = struct
 end
 
 module Int_ids_in_source_env = Int_ids_in_env ()
-
 module Variable_in_source_env = Int_ids_in_source_env.Variable
 module Name_in_source_env = Int_ids_in_source_env.Name
 module Symbol_in_source_env = Int_ids_in_source_env.Symbol
@@ -496,14 +494,11 @@ module Int_ids_from_source_env () = struct
 end
 
 module Int_ids_in_target_env = Int_ids_from_source_env ()
-
 module Variable_in_target_env = Int_ids_in_target_env.Variable
 module Symbol_in_target_env = Int_ids_in_target_env.Symbol
 module Name_in_target_env = Int_ids_in_target_env.Name
 module Simple_in_target_env = Int_ids_in_target_env.Simple
-
 module Int_ids_in_one_joined_env = Int_ids_from_source_env ()
-
 module Variable_in_one_joined_env = Int_ids_in_one_joined_env.Variable
 
 module Symbol_in_one_joined_env = struct
@@ -620,11 +615,6 @@ module Source_env : sig
 
   val create : TE.t -> t
 
-  val code_age_relation : t -> Code_age_relation.t
-
-  val code_age_relation_resolver :
-    t -> Compilation_unit.t -> Code_age_relation.t option
-
   val machine_width : t -> Target_system.Machine_width.t
 
   val exists_in_source_env : t -> Variable.t -> Variable_in_source_env.t option
@@ -639,14 +629,14 @@ module Source_env : sig
 
             It may or may not be defined in the source environment. *)
     | Latest_bound_source_var of Variable_in_source_env.t * Coercion.t
-        (** This variable is the one with the latest binding time amongst
-            the variables in joined environments that exist in the source
+        (** This variable is the one with the latest binding time amongst the
+            variables in joined environments that exist in the source
             environment.
 
             If there is any simple in the source environment that is equal to
-            the provided set of simples in each joined environments, it can
-            only be this variable because of our assumption on binding times
-            being coherent (see {!section-coherent_binding_times}). *)
+            the provided set of simples in each joined environments, it can only
+            be this variable because of our assumption on binding times being
+            coherent (see {!section-coherent_binding_times}). *)
 
   val candidate_canonical_in_source_env :
     t -> Simples_in_joined_envs.t -> candidate_canonical_in_source_env
@@ -654,11 +644,6 @@ end = struct
   type t = { source_env : TE.t } [@@unboxed]
 
   let create source_env = { source_env }
-
-  let code_age_relation { source_env } = TE.code_age_relation source_env
-
-  let code_age_relation_resolver { source_env } =
-    TE.code_age_relation_resolver source_env
 
   let machine_width { source_env; _ } = TE.machine_width source_env
 
@@ -934,9 +919,10 @@ end = struct
         (Simple_in_target_env.coercion canonical_element_with_coercion)
         ~then_:coercion_to_name_to_be_demoted
     in
-    if Simple_in_target_env.equal canonical_element
-         (Simple_in_target_env.from_source_env
-            (Simple_in_source_env.name name_to_be_demoted))
+    if
+      Simple_in_target_env.equal canonical_element
+        (Simple_in_target_env.from_source_env
+           (Simple_in_source_env.name name_to_be_demoted))
     then
       if Coercion.is_id coercion_from_canonical_element_to_name_to_be_demoted
       then t
@@ -1181,7 +1167,7 @@ end = struct
           : Coercion.t Name_in_target_env.Map.t Name_in_one_joined_env.Map.t
           :> Coercion.t Name_in_target_env.Map.t Name.Map.t)
         ~init:equations
-        ~f:(fun [@inline] name ty aliases equations ->
+        ~f:(fun[@inline] name ty aliases equations ->
           let kind = Type_in_one_joined_env.kind ty in
           let name = Name_in_one_joined_env.create name in
           Name_in_target_env.Map.fold
@@ -1283,8 +1269,9 @@ end = struct
   let alias_types_of t kind var =
     Index.Map.filter_map
       (fun _index (env, _) ->
-        if TE.mem ~min_name_mode:Name_mode.in_types env
-             (Name.var (var : Variable_in_one_joined_env.t :> Variable.t))
+        if
+          TE.mem ~min_name_mode:Name_mode.in_types env
+            (Name.var (var : Variable_in_one_joined_env.t :> Variable.t))
         then
           let canonical =
             get_canonical_simple_ignoring_name_mode env
@@ -1319,13 +1306,6 @@ type t =
 type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 
 let joined_env t index = Joined_envs.get_nth_joined_env t.joined_envs index
-
-let code_age_relation t =
-  Source_env.code_age_relation (Bindings_in_target_env.source_env t.bindings)
-
-let code_age_relation_resolver t =
-  Source_env.code_age_relation_resolver
-    (Bindings_in_target_env.source_env t.bindings)
 
 let machine_width t =
   Source_env.machine_width (Bindings_in_target_env.source_env t.bindings)
@@ -1362,16 +1342,17 @@ let get_canonical_in_target_env ~bindings ~joined_envs canonicals_in_joined_envs
         | None -> Import_from_all_joined_envs (var, coercion))
   | Latest_bound_source_var (var, coercion) ->
     let latest_simple = Simple_in_source_env.var var ~coercion in
-    if Joined_envs.equal_in_all_joined_envs joined_envs
-         (Simple_in_one_joined_env.from_source_env latest_simple)
-         canonicals_in_joined_envs
+    if
+      Joined_envs.equal_in_all_joined_envs joined_envs
+        (Simple_in_one_joined_env.from_source_env latest_simple)
+        canonicals_in_joined_envs
     then Canonical_in_source_env latest_simple
     else Existential_for_these_simples
 
 let fold_incremental_join ~f ~init equations_to_join =
   fold_incremental_join ~f ~init
     { fold =
-        (fun [@inline] f init ->
+        (fun[@inline] f init ->
           Index.Map.fold
             (fun index (env, maps) -> f (index, env) maps)
             equations_to_join init)
@@ -1517,8 +1498,9 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
     types_in_target_env =
   Name_in_target_env.Map.fold
     (fun name types (types_in_target_env, t) ->
-      if Flambda_features.check_light_invariants ()
-         && Name_in_target_env.Map.mem name types_in_target_env
+      if
+        Flambda_features.check_light_invariants ()
+        && Name_in_target_env.Map.mem name types_in_target_env
       then
         Misc.fatal_errorf
           "Processing join of %a but we already have a type for it."
@@ -1535,7 +1517,7 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
         Name_in_target_env.Map.add name ty types_in_target_env, t)
     equations_to_join (types_in_target_env, t)
 
-(** {2:n-way-join} Cut and n-way join *)
+(** {2:n-way-join Cut and n-way join} *)
 
 let get_canonical_simple_if_exists ~bindings ~joined_envs simples =
   match get_canonical_in_target_env ~bindings ~joined_envs simples with
@@ -1855,7 +1837,7 @@ let n_way_join_simples t kind simples : _ Or_bottom.t * t =
     ( Ok (canonical_in_target_env : Simple_in_target_env.t :> Simple.t),
       { t with bindings } )
 
-(** {2:extensions} Join of extensions *)
+(** {2:extensions Join of extensions} *)
 
 let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
   let joined_envs_and_extensions =
@@ -2037,10 +2019,10 @@ let join_aliases_in_env_extension ~joined_envs ~bindings equations_to_join =
     ~exists_in_target_env:(Bindings_in_target_env.exists_in_target_env bindings)
     ~init:(Name_in_target_env.Map.empty, Name_in_target_env.Map.empty, bindings)
     ~f:(fun
-         name
-         join_entry
-         (equations_in_target_env, equations_to_join, bindings)
-       ->
+        name
+        join_entry
+        (equations_in_target_env, equations_to_join, bindings)
+      ->
       match get_types_in_joined_envs join_entry with
       | Bottom -> Misc.fatal_error "Unexpected bottom during join"
       | Ok (No_alias_in_some_env types) ->

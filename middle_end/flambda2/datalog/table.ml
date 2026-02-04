@@ -56,7 +56,7 @@ let concat is_trie ~earlier:t1 ~later:t2 =
   Trie.union is_trie (fun _ v -> Some v) t1 t2
 
 module Id = struct
-  type ('t, 'k, 'v) t =
+  type (!'t, !'k, !'v) t =
     { id : ('t * 'k) Type.Id.t;
       name : string;
       is_trie : ('t, 'k, 'v) Trie.is_trie;
@@ -118,11 +118,11 @@ module Id = struct
     let send_value, recv_value = Channel.create default_value in
     let iterator = Trie.Iterator.create is_trie recv_trie send_value in
     let rec get_names : type a. a Trie.Iterator.hlist -> int -> string list =
-      fun (type a) (iterators : a Trie.Iterator.hlist) i : string list ->
-       match iterators with
-       | [] -> []
-       | _ :: iterators ->
-         (name ^ "." ^ string_of_int i) :: get_names iterators (i + 1)
+     fun (type a) (iterators : a Trie.Iterator.hlist) i : string list ->
+      match iterators with
+      | [] -> []
+      | _ :: iterators ->
+        (name ^ "." ^ string_of_int i) :: get_names iterators (i + 1)
     in
     send_trie, { values = iterator; names = get_names iterator 0 }, recv_value
 end

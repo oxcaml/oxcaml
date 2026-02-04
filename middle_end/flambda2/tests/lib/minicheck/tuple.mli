@@ -14,9 +14,9 @@
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-(** A list of values of specified types. For example, [[1; true; "hello"] : (int
-    -> bool -> string -> 'r, 'r) t]. ['r] should be left polymorphic (a la
-    [format3] and friends). *)
+(** A list of values of specified types. For example,
+    [[1; true; "hello"] : (int -> bool -> string -> 'r, 'r) t]. ['r] should be
+    left polymorphic (a la [format3] and friends). *)
 type ('a, 'r) t =
   | [] : ('r, 'r) t
   | ( :: ) : 'a * ('b, 'r) t -> ('a -> 'b, 'r) t
@@ -47,8 +47,8 @@ end
 module Of (T : T1) : sig
   (** A list of values, each of which has type ['a T.t] for different ['a]. This
       allows us to describe, say, a tuple of lists, without constraining the
-      lists to have the same element type. For example, [[[1]; [true]; []] :
-      (int -> bool -> string -> 'r, 'r) Of(List).t]. *)
+      lists to have the same element type. For example,
+      [[[1]; [true]; []] : (int -> bool -> string -> 'r, 'r) Of(List).t]. *)
   type ('a, 'r) t =
     | [] : ('r, 'r) t
     | ( :: ) : 'a T.t * ('b, 'r) t -> ('a -> 'b, 'r) t
@@ -61,9 +61,11 @@ module Map (From : T1) (Into : T1) : sig
       Needing to apply the functor makes using this a bit fiddly; a suggested
       idiom is
 
-      {[let hd_opt = function [] -> None | x::_ -> Some x
+      {[
+        let hd_opt = function [] -> None | x::_ -> Some x
 
-      let open Tuple.Map(List)(Option) in map ~f:{f = hd_opt} lists]} *)
+        let open Tuple.Map(List)(Option) in map ~f:{f = hd_opt} lists
+      ]} *)
   val map : ('a, 'r) Of(From).t -> f:f -> ('a, 'r) Of(Into).t
 end
 
@@ -74,8 +76,9 @@ end
 module Of2 (T : T2) : sig
   (** Similar to [Of], but where [T.t] has two arguments. ['a] collects the
       first arguments together and ['b] collects the second arguments. For
-      example, [[Left 3; Right true] : (int -> unit -> 'r, unit -> bool -> 'r,
-      'r) Of2(Either).t]. *)
+      example,
+      [[Left 3; Right true] : (int -> unit -> 'r, unit -> bool -> 'r, 'r)
+       Of2(Either).t]. *)
   type ('a, 'b, 'r) t =
     | [] : ('r, 'r, 'r) t
     | ( :: ) : ('a, 'b) T.t * ('c, 'd, 'r) t -> ('a -> 'c, 'b -> 'd, 'r) t
