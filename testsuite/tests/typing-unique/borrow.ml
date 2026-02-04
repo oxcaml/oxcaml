@@ -707,3 +707,43 @@ Error: This value is "local"
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
+
+let rec foo x =
+  let _ = foo (borrow_ x) in
+  ()
+[%%expect{|
+val foo : 'a @ local -> unit = <fun>
+|}]
+
+(* id function cannot leak *)
+let id (x @ local) = x
+let foo x =
+  let _ = id (borrow_ x) in
+  ()
+[%%expect{|
+val id : 'a @ local -> 'a @ local = <fun>
+Line 3, characters 10-24:
+3 |   let _ = id (borrow_ x) in
+              ^^^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it escapes the borrow region at Line 3, characters 10-24.
+|}]
+
+let foo () =
+  let _ =
+    let y = borrow_ "hello" in
+    (fun () -> y)
+  in
+  ()
+[%%expect{|
+Line 4, characters 15-16:
+4 |     (fun () -> y)
+                   ^
+Error: The value "y" is "local" because it is borrowed.
+       However, the value "y" highlighted is expected to be "global"
+         because it is used inside the function at Line 4, characters 4-17
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it escapes the borrow region at Lines 3-4, characters 4-17.
+|}]
