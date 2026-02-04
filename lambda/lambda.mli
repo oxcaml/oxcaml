@@ -1301,6 +1301,11 @@ val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> unit mixed_block_element
 
+(** Returns the element at the given path in a mixed block shape.
+    The path is a list of field indices for navigating into nested products. *)
+val project_from_mixed_block_shape
+  : 'a mixed_block_element array -> path:int list -> 'a mixed_block_element
+
 (** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
     externality, and [Pgenval] otherwise. *)
 val value_kind_of_value_with_externality
