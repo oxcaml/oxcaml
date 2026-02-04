@@ -8,7 +8,7 @@
 (lldb) c
 (lldb) bt 5
 (lldb) script print("=== Testing OCaml/C boundary - array allocation ===")
-(lldb) br set -o true -n caml_make_vect
+(lldb) br set -o true -n caml_array_make
 (lldb) c
 (lldb) bt 4
 (lldb) script print("=== Testing OCaml/C boundary - bytes blit ===")

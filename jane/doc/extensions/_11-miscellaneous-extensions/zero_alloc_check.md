@@ -425,7 +425,7 @@ File "test.ml", line 10, characters 11-16:
 File "test.ml", line 12, characters 2-21:
 12 |   Dep.inline_always y
        ^^^^^^^^^^^^^^^^^^^
-Error: called function may allocate (external call to caml_make_vect) (test.ml:12,2--21;dep.ml:2,2--38)
+Error: called function may allocate (external call to caml_array_make) (test.ml:12,2--21;dep.ml:2,2--38)
 ```
 
 If we remove `[@inline never]` annotation from `bar`, the compiler can optimize some but
@@ -451,7 +451,7 @@ Error: allocation of 24 bytes
 File "test.ml", line 12, characters 2-21:
 12 |   Dep.inline_always y
        ^^^^^^^^^^^^^^^^^^^
-Error: called function may allocate (external call to caml_make_vect) (test.ml:12,2--21;dep.ml:2,2--38)
+Error: called function may allocate (external call to caml_array_make) (test.ml:12,2--21;dep.ml:2,2--38)
 
 ```
 

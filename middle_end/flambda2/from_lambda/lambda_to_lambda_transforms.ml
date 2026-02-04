@@ -258,14 +258,25 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
     =
   let non_empty = String.length name > 0 in
   let name =
-    Printf.sprintf "caml_make%s_%s%svect%s"
-      (match mode with
-      | Alloc_heap -> ""
-      | Alloc_local when !Clflags.jsir -> ""
-      | Alloc_local -> "_local")
-      name
-      (if non_empty then "_" else "")
-      (if non_empty && !Clflags.jsir then "_bytecode" else "")
+    if non_empty
+    then
+      Printf.sprintf "caml_make%s_%s_vect%s"
+        (match mode with
+        | Alloc_heap -> ""
+        | Alloc_local when !Clflags.jsir -> ""
+        | Alloc_local -> "_local")
+        name
+        (if !Clflags.jsir then "_bytecode" else "")
+    else if
+      (* For regular (boxed) arrays, use the new #13003 names. JSOO doesn't have
+         the new names yet, so we fall back to the old ones. It also doesn't
+         discriminate between local and heap allocations. *)
+      !Clflags.jsir
+    then "caml_make_vect"
+    else
+      match mode with
+      | Alloc_heap -> "caml_array_make"
+      | Alloc_local -> "caml_array_make_local"
   in
   let external_call_desc =
     Primitive.make ~name ~alloc:true (* the C stub may raise an exception *)
@@ -446,7 +457,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     (mode : L.locality_mode) (has_init : L.has_initializer) args loc :
     Env.t * primitive_transform_result =
   (* %makearray_dynamic is analogous to (from stdlib/array.ml):
-   *   external create: int -> 'a -> 'a array = "caml_make_vect"
+   *   external create: int -> 'a -> 'a array = "caml_array_make"
    * except that it works on any layout, including unboxed products, at both
    * heap and local modes.
    * Additionally, if the initializer is omitted, an uninitialized array will

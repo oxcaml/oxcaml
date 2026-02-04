@@ -1594,23 +1594,23 @@ Error: This expression has type "#('a * 'b)"
 |}]
 
 external make : ('a : value & value) . int -> 'a -> 'a array =
-  "caml_make_vect" "caml_make_vect"
+  "caml_array_make" "caml_array_make"
 [%%expect{|
 Line 1, characters 16-60:
 1 | external make : ('a : value & value) . int -> 'a -> 'a array =
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [caml_make_vect] is used in an invalid declaration.
+Error: The primitive [caml_array_make] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
 external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
-  "caml_make_vect"
+  "caml_array_make"
 
 let _ = make 3 #(1,2)
 [%%expect{|
-Lines 1-2, characters 0-18:
+Lines 1-2, characters 0-19:
 1 | external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
-2 |   "caml_make_vect"
+2 |   "caml_array_make"
 Error: Attribute "[@layout_poly]" can only be used on built-in primitives.
 |}]
 

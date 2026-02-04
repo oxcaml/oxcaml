@@ -62,7 +62,7 @@ external set : ('a : value_or_null mod separable).
    if [n] is outside the range 0 to [length a - 1]. *)
 
 external make : ('a : value_or_null mod separable).
-   int -> 'a -> 'a array = "caml_make_vect"
+   int -> 'a -> 'a array = "caml_array_make"
 (** [make n x] returns a fresh array of length [n],
    initialized with [x].
    All the elements of this new array are initially
@@ -76,7 +76,7 @@ external make : ('a : value_or_null mod separable).
    size is only [Sys.max_array_length / 2].*)
 
 external create_float : ('a : value_or_null mod separable).
-   int -> float array = "caml_make_float_vect"
+   int -> float array = "caml_array_create_float"
 (** [create_float n] returns a fresh float array of length [n],
     with uninitialized data.
     @since 4.03 *)
