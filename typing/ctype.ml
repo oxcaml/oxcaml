@@ -4637,8 +4637,7 @@ and gen_constrain_eval ty ~to_ =
 and constrain_eval uenv ty ~to_ =
   gen_constrain_eval ty ~to_ |> constrain_eval' uenv
 
-(** Place an evals-to constraint [c] on a type variable [tv],
-    so that we unify [tv ~ c.to_]. *)
+(** Place an evals-to constraint [c] on a type variable [tv]. *)
 and constrain_eval' uenv (tv, c) =
   assert (c.n_evals >= 1);
   unification_evals_to_check uenv tv c;
