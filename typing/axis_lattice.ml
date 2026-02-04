@@ -498,6 +498,18 @@ let mutable_data : t =
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
 
+let sync_data : t =
+  const_of_levels ~areality:Mode.Regionality.Const.max
+    ~linearity:Mode.Linearity.Const.min ~uniqueness:Mode.Uniqueness.Const.Unique
+    ~portability:Mode.Portability.Const.min
+    ~contention:Mode.Contention.Const.Contended
+    ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
+    ~statefulness:Mode.Statefulness.Const.min
+    ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+    ~nullability:Jkind_axis.Nullability.Non_null
+    ~separability:Jkind_axis.Separability.Non_float
+
 let value : t =
   const_of_levels ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.max ~uniqueness:Mode.Uniqueness.Const.Unique

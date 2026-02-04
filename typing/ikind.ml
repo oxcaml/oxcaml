@@ -415,11 +415,13 @@ let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
   done;
   ({ Types.base = base; coeffs } : Types.constructor_ikind)
 
-let has_mutable_label lbls =
-  List.exists
-    (fun (lbl : Types.label_declaration) ->
-      match lbl.ld_mutable with Immutable -> false | Mutable _ -> true)
-    lbls
+let base_with_label_mutability base (lbl : Types.label_declaration) =
+  match lbl.ld_mutable with
+  | Immutable -> base
+  | Mutable { atomic = Atomic; _ } ->
+    Axis_lattice.join base Axis_lattice.sync_data
+  | Mutable { atomic = Nonatomic; _ } ->
+    Axis_lattice.join base Axis_lattice.mutable_data
 
 (* This function determines whether the shallow axes are relevant for a given
    representation. For example, for unboxed types, shallow axes of inner data
@@ -494,45 +496,52 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
         | Types.Type_record (lbls, rep, _umc_opt) ->
           (* Build from components: base (non-float value) + per-label
              contributions. *)
-          let base_lat =
-            if has_mutable_label lbls
-            then Axis_lattice.mutable_data
-            else
-              match rep with
-              | Types.Record_unboxed -> Axis_lattice.immediate
-              | _ -> Axis_lattice.immutable_data
+          let immutable_base =
+            match rep with
+            | Types.Record_unboxed -> Axis_lattice.immediate
+            | _ -> Axis_lattice.immutable_data
           in
-          let relevant_for_shallow = shallow_axes_are_relevant_for_rep (`Record rep) in
+          let relevant_for_shallow =
+            shallow_axes_are_relevant_for_rep (`Record rep)
+          in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
+            let base_lat, acc =
+              List.fold_left
+                (fun (base_lat, acc) (lbl : Types.label_declaration) ->
+                  let base_lat = base_with_label_mutability base_lat lbl in
+                  let mask =
+                    Axis_lattice.mask_of_modality ~relevant_for_shallow
+                      lbl.ld_modalities
+                  in
+                  let acc =
+                    Ldd.join acc
+                      (Ldd.meet (Ldd.const mask) (Solver.kind ctx lbl.ld_type))
+                  in
+                  base_lat, acc)
+                (immutable_base, Ldd.const Axis_lattice.bot)
+                lbls
+            in
             let base = Ldd.const base_lat in
-            List.fold_left
-              (fun acc (lbl : Types.label_declaration) ->
-                let mask =
-                  Axis_lattice.mask_of_modality ~relevant_for_shallow
-                    lbl.ld_modalities
-                in
-                Ldd.join acc
-                  (Ldd.meet (Ldd.const mask) (Solver.kind ctx lbl.ld_type)))
-              base lbls
+            Ldd.join base acc
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
           (* Unboxed products: non-float base; shallow axes relevant only
              for arity = 1. *)
           let base_lat =
-            if has_mutable_label lbls
-            then
-              (* Unboxed record products disallow mutable labels in [typedecl.ml]
-                 (see [Unboxed_mutable_label]). Fail here to
-                 raise alarm if that restriction is removed. *)
-              failwith
-                "ikind: mutable fields in unboxed records are not supported"
-            else Axis_lattice.immediate
+            List.fold_left base_with_label_mutability Axis_lattice.immediate lbls
           in
+          if not (Axis_lattice.equal base_lat Axis_lattice.immediate)
+          then
+            (* Unboxed record products disallow mutable labels in
+               [typedecl.ml] (see [Unboxed_mutable_label]). Fail here to
+               raise alarm if that restriction is removed. *)
+            failwith
+              "ikind: mutable fields in unboxed records are not supported";
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
-            let base = Ldd.const base_lat in
+            let base = Ldd.const Axis_lattice.immediate in
             let relevant_for_shallow =
               match List.length lbls with 1 -> `Relevant | _ -> `Irrelevant
             in
@@ -566,8 +575,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                 Option.is_some c.cd_res)
               cstrs
           in
-          (* Choose base: immediate for void-only variants; mutable if any
-             record constructor has a mutable field; otherwise immutable. *)
+          (* Choose base: immediate for void-only variants; sync if any record
+             field is atomic; mutable if any non-atomic mutable field appears;
+             otherwise immutable. *)
           let all_args_void =
             List.for_all
               (fun (c : Types.constructor_declaration) ->
@@ -584,22 +594,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                     lbls)
               cstrs
           in
-          let has_mutable =
-            List.exists
-              (fun (c : Types.constructor_declaration) ->
-                match c.cd_args with
-                | Types.Cstr_tuple _ -> false
-                | Types.Cstr_record lbls -> has_mutable_label lbls)
-              cstrs
+          let relevant_for_shallow =
+            shallow_axes_are_relevant_for_rep (`Variant rep)
           in
-          let base_lat =
-            if all_args_void
-            then Axis_lattice.immediate
-            else if has_mutable
-            then Axis_lattice.mutable_data
-            else Axis_lattice.immutable_data
-          in
-          let relevant_for_shallow = shallow_axes_are_relevant_for_rep (`Variant rep) in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             let ctx =
@@ -607,35 +604,56 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
               then Solver.reset_for_mode ctx ~mode:Solver.Round_up
               else ctx
             in
+            let base_lat0 =
+              if all_args_void
+              then Axis_lattice.immediate
+              else Axis_lattice.immutable_data
+            in
+            let base_lat, acc =
+              List.fold_left
+                (fun (base_lat, acc) (c : Types.constructor_declaration) ->
+                  let base_lat =
+                    if all_args_void
+                    then base_lat
+                    else
+                      match c.cd_args with
+                      | Types.Cstr_tuple _ -> base_lat
+                      | Types.Cstr_record lbls ->
+                        List.fold_left base_with_label_mutability base_lat lbls
+                  in
+                  let acc =
+                    match c.cd_args with
+                    | Types.Cstr_tuple args ->
+                      List.fold_left
+                        (fun acc (arg : Types.constructor_argument) ->
+                          let mask =
+                            Axis_lattice.mask_of_modality
+                              ~relevant_for_shallow arg.ca_modalities
+                          in
+                          Ldd.join acc
+                            (Ldd.meet
+                               (Ldd.const mask)
+                               (Solver.kind ctx arg.ca_type)))
+                        acc args
+                    | Types.Cstr_record lbls ->
+                      List.fold_left
+                        (fun acc (lbl : Types.label_declaration) ->
+                          let mask =
+                            Axis_lattice.mask_of_modality
+                              ~relevant_for_shallow lbl.ld_modalities
+                          in
+                          Ldd.join acc
+                            (Ldd.meet
+                               (Ldd.const mask)
+                               (Solver.kind ctx lbl.ld_type)))
+                        acc lbls
+                  in
+                  base_lat, acc)
+                (base_lat0, Ldd.const Axis_lattice.bot)
+                cstrs
+            in
             let base = Ldd.const base_lat in
-            List.fold_left
-              (fun acc (c : Types.constructor_declaration) ->
-                match c.cd_args with
-                | Types.Cstr_tuple args ->
-                  List.fold_left
-                    (fun acc (arg : Types.constructor_argument) ->
-                      let mask =
-                        Axis_lattice.mask_of_modality ~relevant_for_shallow
-                          arg.ca_modalities
-                      in
-                      Ldd.join acc
-                        (Ldd.meet
-                           (Ldd.const mask)
-                           (Solver.kind ctx arg.ca_type)))
-                    acc args
-                | Types.Cstr_record lbls ->
-                  List.fold_left
-                    (fun acc (lbl : Types.label_declaration) ->
-                      let mask =
-                        Axis_lattice.mask_of_modality ~relevant_for_shallow
-                          lbl.ld_modalities
-                      in
-                      Ldd.join acc
-                        (Ldd.meet
-                           (Ldd.const mask)
-                           (Solver.kind ctx lbl.ld_type)))
-                    acc lbls)
-              base cstrs
+            Ldd.join base acc
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_open ->
