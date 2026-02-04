@@ -347,8 +347,8 @@ let check_liveness t cfg_with_infos =
         match reg.loc with
         | Reg _ | Stack (Incoming _ | Local _ | Domainstate _) -> ()
         | Unknown | Stack (Outgoing _) ->
-          report t "Reg %a is unexpectedly live (%a) at function entry" Printreg.reg
-            reg Reg.format_location reg.loc)
+          report t "Reg %a is unexpectedly live (%a) at function entry"
+            Printreg.reg reg Reg.format_location reg.loc)
       before
 
 let run ppf cfg_with_layout =
