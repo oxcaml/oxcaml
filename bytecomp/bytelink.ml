@@ -918,7 +918,7 @@ let link objfiles output_name =
 open Format_doc
 module Style = Misc.Style
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | File_not_found name ->
       fprintf ppf "Cannot find file %a"
         Location.Doc.quoted_filename name
@@ -932,7 +932,7 @@ let report_error ppf = function
   | Symbol_error(name, err) ->
       fprintf ppf "Error while linking %a:@ %a"
         Location.Doc.quoted_filename name
-        Symtable.report_error err
+        Symtable.report_error_doc err
   | Inconsistent_import(intf, file1, file2) ->
       fprintf ppf
         "@[<hov>Files %a@ and %a@ \
@@ -976,9 +976,11 @@ let report_error ppf = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
+
+let report_error = Format_doc.compat report_error_doc
 
 let reset () =
   lib_ccobjs := [];

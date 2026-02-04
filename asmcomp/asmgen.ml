@@ -726,7 +726,7 @@ let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
 
 let fprintf = Format_doc.fprintf
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Assembler_error file ->
     fprintf ppf "Assembler error, input left in file %a"
       Location.Doc.quoted_filename file
@@ -744,9 +744,11 @@ let report_error ppf = function
       (msg saved)
   | Asm_generation (fn, err) ->
     fprintf ppf "Error producing assembly code for %s: %a" fn
-      Emitaux.report_error err
+      Emitaux.report_error_doc err
 
 let () =
   Location.register_error_of_exn (function
-    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | Error err -> Some (Location.error_of_printer_file report_error_doc err)
     | _ -> None)
+
+let report_error = Format_doc.compat report_error_doc

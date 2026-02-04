@@ -4849,7 +4849,7 @@ let print_unbound_in_quotation ppf =
 
 let quoted_longident = Style.as_inline_code pp_longident
 
-let report_lookup_error ~level _loc env ppf = function
+let report_lookup_error_doc ~level _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
       fprintf ppf "Unbound value %a" quoted_longident lid;
       spellcheck ppf extract_values env lid;
@@ -5071,7 +5071,7 @@ let report_lookup_error ~level _loc env ppf = function
       | _ -> ()
       end
   | Error_from_persistent_env err ->
-      Persistent_env.report_error ppf err
+      Persistent_env.report_error_doc ppf err
   | Mutable_value_used_in_closure ctx ->
       fprintf ppf
         "@[Mutable variable cannot be used inside %t.@]"
@@ -5103,7 +5103,7 @@ let report_lookup_error ~level _loc env ppf = function
         quoted_longident lid
         print_stage avail_stage
 
-let report_error ~level ppf = function
+let report_error_doc ~level ppf = function
   | Missing_module(_, path1, path2) ->
       fprintf ppf "@[@[<hov>";
       if Path.same path1 path2 then
@@ -5125,7 +5125,7 @@ let report_error ~level ppf = function
         "@[<hov>The implicit kind for %a is already defined at %a.@]"
         Style.inline_code name
         (Location.Doc.loc ~capitalize_first:false) defined_at
-  | Lookup_error(loc, t, err) -> report_lookup_error ~level loc t ppf err
+  | Lookup_error(loc, t, err) -> report_lookup_error_doc ~level loc t ppf err
   | Incomplete_instantiation { unset_param } ->
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
                    required.@]"
@@ -5162,7 +5162,7 @@ let () =
             then Location.error_of_printer_file
             else Location.error_of_printer ~loc ?sub:None
           in
-          Some (error_of_printer (report_error ~level:Btype.generic_level) err)
+          Some (error_of_printer (report_error_doc ~level:Btype.generic_level) err)
       | _ ->
           None
     )
@@ -5172,3 +5172,7 @@ let () =
     Option.map Unit_info.modname (get_unit_name ())
   in
   Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
+
+let report_lookup_error ~level loc t =
+  Format_doc.compat (report_lookup_error_doc ~level loc t)
+let report_error ~level = Format_doc.compat (report_error_doc ~level)

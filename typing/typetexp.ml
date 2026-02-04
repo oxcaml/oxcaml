@@ -1597,7 +1597,7 @@ let report_unbound_variable_reason ppf = function
                    Enable non-erasable extensions to disable this check."
   | None -> ()
 
-let report_error env ppf =
+let report_error_doc env ppf =
   function
   | Unbound_type_variable (name, in_scope_names, reason) ->
     fprintf ppf "The type variable %a is unbound in this type declaration.@ %a"
@@ -1788,9 +1788,11 @@ let () =
   Location.register_error_of_exn
     (function
       | Error (loc, env, err) ->
-        Some (Location.error_of_printer ~loc (report_error env) err)
+        Some (Location.error_of_printer ~loc (report_error_doc env) err)
       | Error_forward err ->
         Some err
       | _ ->
         None
     )
+
+let report_error = Format_doc.compat1 report_error_doc
