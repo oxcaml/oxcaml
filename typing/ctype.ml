@@ -4660,15 +4660,22 @@ and unify_evals_to uenv c c' =
     is consistent with the new constraint [c]. *)
 and unification_evals_to_check uenv tv c =
   match get_desc tv with
-  | Tvar { evals_to = None; _ } -> ()
-  | Tvar { evals_to = Some c' } ->
+  | Tvar { evals_to = None } | Tunivar { evals_to = None } -> ()
+  | Tvar { evals_to = Some c' } | Tunivar { evals_to = Some c' } ->
     unify_evals_to uenv c c'
   | _ -> assert false
 
 (** Ensure that any existing evals-to constraint on [tv]
     is consistent with unifying [tv ~ to_]. *)
 and unification_evals_to_check_direct uenv tv ~to_ =
-  unification_evals_to_check uenv tv { to_; stage_offset = 0; n_evals = 0 }
+  (* In [unify_var], this might be called after a recursive call links
+     [tv] against a concrete type. In that case, the only possibility
+     has to be that [tv] and [to] were unified which must have already
+     been checked, so we can skip the evals-to check. *)
+  match get_desc tv with
+  | Tvar _ | Tunivar _ ->
+    unification_evals_to_check uenv tv { to_; stage_offset = 0; n_evals = 0 }
+  | _ -> ()
 
 and unify_fields uenv ty1 ty2 =          (* Optimization *)
   let (fields1, rest1) = flatten_fields ty1
@@ -4958,8 +4965,8 @@ let unify_var uenv t1 t2 =
         occur_for Unify uenv t1 t2;
         update_level_for Unify env (get_level t1) t2;
         update_scope_for Unify (get_scope t1) t2;
-        unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
         unification_evals_to_check_direct uenv t1 ~to_:t2;
+        unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
         link_type t1 t2;
         reset_trace_gadt_instances reset_tracing;
       with Unify_trace trace ->
