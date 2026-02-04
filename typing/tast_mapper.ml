@@ -411,6 +411,8 @@ let extra sub = function
     Texp_coerce (Option.map (sub.typ sub) cty1, sub.typ sub cty2)
   | Texp_newtype _ as d -> d
   | Texp_poly cto -> Texp_poly (Option.map (sub.typ sub) cto)
+  | Texp_borrowed as d -> d
+  | Texp_ghost_region as d -> d
   | Texp_stack as d -> d
   | Texp_mode modes -> Texp_mode (sub.modes sub modes)
   | Texp_inspected_type (Label_disambiguation _) as d -> d

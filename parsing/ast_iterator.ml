@@ -562,6 +562,7 @@ module E = struct
     | Pexp_quote e -> sub.expr sub e
     | Pexp_splice e -> sub.expr sub e
     | Pexp_hole -> ()
+    | Pexp_borrow e -> sub.expr sub e
 
   let iter_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =
     iter_loc sub pbop_op;

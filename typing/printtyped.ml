@@ -591,6 +591,10 @@ and expression_extra i ppf x attrs =
   | Texp_newtype (_, s, k, _) ->
       line i ppf "Texp_newtype %a\n" (typevar_jkind ~print_quote:false) (s.txt, k);
       attributes i ppf attrs;
+  | Texp_borrowed ->
+      line i ppf "Texp_borrowed\n"
+  | Texp_ghost_region ->
+      line i ppf "Texp_ghost_region\n"
   | Texp_stack ->
       line i ppf "Texp_stack\n";
       attributes i ppf attrs

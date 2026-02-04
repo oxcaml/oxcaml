@@ -87,6 +87,7 @@ let keyword_table =
     "repr_", REPR;
     "sig", SIG;
     "stack_", STACK;
+    "borrow_", BORROW;
     "struct", STRUCT;
     "then", THEN;
     "to", TO;

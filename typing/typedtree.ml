@@ -243,6 +243,8 @@ and exp_extra =
   | Texp_stack
   | Texp_mode of Mode.Alloc.Const.Option.t modes
   | Texp_inspected_type of [ `exp ] type_inspection
+  | Texp_borrowed
+  | Texp_ghost_region
 
 and arg_label = Types.arg_label =
   | Nolabel

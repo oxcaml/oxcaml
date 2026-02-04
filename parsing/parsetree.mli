@@ -540,6 +540,8 @@ and expression_desc =
   | Pexp_quote of expression (** runtime metaprogramming quotations <[E]> *)
   | Pexp_splice of expression (** runtime metaprogramming splicing $(E) *)
   | Pexp_hole (** _ *)
+  | Pexp_borrow of expression
+    (** borrow_ exp *)
 
 and case =
     {
