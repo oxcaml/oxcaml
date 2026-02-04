@@ -1413,6 +1413,19 @@ let runtime5 = Actions.make
 let ocamldoc = Ocaml_tools.ocamldoc
 module Ocamldoc = (val ocamldoc)
 
+let only_default_codegen = Actions.make
+  ~name:"only-default-codegen"
+  ~description:"Passes if all the codegen options are at the current default, \
+                useful for [%%expect_asm]"
+  ~does_something:false
+  (Actions_helpers.predicate
+    (Config.no_stack_checks
+      && not Config.poll_insertion
+      && not Config.with_address_sanitizer)
+    "default codegen"
+    "non-default codegen")
+
+
 let ocamldoc_output_file env prefix =
   let backend =
     Environments.safe_lookup Ocaml_variables.ocamldoc_backend env in
@@ -1631,5 +1644,6 @@ let init () =
     stack_checks;
     no_stack_checks;
     runtime4;
-    runtime5
+    runtime5;
+    only_default_codegen
   ]

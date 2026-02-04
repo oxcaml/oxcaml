@@ -114,8 +114,8 @@ let match_expect_extension (ext : Parsetree.extension) =
       | [(None, _)] -> entries
       | [(None, _); (Some Principal, _)]-> entries
       | _ ->
-        let msg = "expected [%%expect {|...|}] or " ^
-                  "[%%expect {|...|}, Principal{|...|}]"
+        let msg = "expected [%%expect {|...|}] or \
+                   [%%expect {|...|}, Principal{|...|}]"
         in
         invalid_payload ~msg ()
     in

@@ -1,5 +1,6 @@
 (* TEST
  flags += " -O3";
+ only-default-codegen;
  expect.opt;
 *)
 
