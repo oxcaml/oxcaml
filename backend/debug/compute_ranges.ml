@@ -382,7 +382,13 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
         in
         let label_insn =
           if at_function_end
-          then DLL.insert_and_return_after insn label_data
+          then (
+            (* At function end, add to the end of the DLL like Lend was *)
+            DLL.add_end fundecl.fun_body label_data;
+            match DLL.last_cell fundecl.fun_body with
+            | Some cell -> cell
+            | None ->
+              Misc.fatal_error "compute_ranges: empty fun_body after add_end")
           else DLL.insert_and_return_before insn label_data
         in
         used_label := Some (label, label_insn);
