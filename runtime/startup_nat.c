@@ -233,15 +233,16 @@ caml_unit_deps_find(const char *name)
 void caml_register_dyn_globals(void **globals, int nglobals);
 
 /* Initialize a module and its dependencies in topological order.
-   Uses a recursive depth-first approach. */
-static void caml_init_module_rec(struct caml_unit_deps_entry *entry)
+   Uses a recursive depth-first approach.
+   Returns an exception result on failure, Val_unit on success. */
+static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
 {
   CAMLparam0();
   CAMLlocal1(closure);
 
   /* Check current state */
   if (entry->init_state == INIT_STATE_DONE) {
-    CAMLreturn0;
+    CAMLreturn(Val_unit);
   }
 
   if (entry->init_state == INIT_STATE_INITIALIZING) {
@@ -261,7 +262,10 @@ static void caml_init_module_rec(struct caml_unit_deps_entry *entry)
       caml_fatal_error("caml_init_module: dependency %s of %s not found",
                        dep_name, entry->unit_name);
     }
-    caml_init_module_rec(dep);
+    value result = caml_init_module_rec(dep);
+    if (Is_exception_result(result)) {
+      CAMLreturn(result);
+    }
   }
 
   /* Create a closure wrapper for the entry function.
@@ -271,11 +275,10 @@ static void caml_init_module_rec(struct caml_unit_deps_entry *entry)
   Field(closure, 0) = (value)entry->entry_fn;
   Closinfo_val(closure) = Make_closinfo(0, 2, 1);
 
-  /* Call the entry function (takes no arguments, pass Val_unit) */
+  /* Call the entry function (takes no arguments, but pass Val_unit) */
   value result = caml_callback_exn(closure, Val_unit);
-
   if (Is_exception_result(result)) {
-    caml_raise(Extract_exception(result));
+    CAMLreturn(result);
   }
 
   /* Register the gc_roots with the dynamic globals list.
@@ -289,17 +292,26 @@ static void caml_init_module_rec(struct caml_unit_deps_entry *entry)
   /* Mark as done */
   entry->init_state = INIT_STATE_DONE;
 
-  CAMLreturn0;
+  CAMLreturn(Val_unit);
 }
 
-/* Public API: Initialize a module by name */
-CAMLexport void caml_init_module(const char *name)
+/* Public API: Initialize a module by name (exception-returning variant) */
+CAMLexport value caml_init_module_exn(const char *name)
 {
   struct caml_unit_deps_entry *entry = caml_unit_deps_find(name);
   if (entry == NULL) {
     caml_fatal_error("caml_init_module: unit %s not found", name);
   }
-  caml_init_module_rec(entry);
+  return caml_init_module_rec(entry);
+}
+
+/* Public API: Initialize a module by name (raises on failure) */
+CAMLexport void caml_init_module(const char *name)
+{
+  value result = caml_init_module_exn(name);
+  if (Is_exception_result(result)) {
+    caml_raise(Extract_exception(result));
+  }
 }
 
 /* OCaml-callable wrapper: Initialize a module by name (string -> unit) */
