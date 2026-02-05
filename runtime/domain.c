@@ -2184,6 +2184,7 @@ static void domain_terminate (void)
   domain_root_remove(&domain_state->dls_state);
   domain_root_remove(&domain_state->tls_state);
   domain_root_remove(&domain_state->backtrace_last_exn);
+  domain_root_remove(&domain_state->preemption);
   caml_stat_free(domain_state->final_info);
   caml_stat_free(domain_state->ephe_info);
   caml_free_intern_state();
