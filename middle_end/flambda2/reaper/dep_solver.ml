@@ -1856,6 +1856,10 @@ let classify_field_map fields =
           | Code_of_closure _ | Apply _ | Code_id_of_call_witness ->
             `Could_not_classify
           | Value_slot vs ->
+            Value_slot_debug.log_field_view
+              "dep_solver.ml:classify_field_map:Field.view" vs;
+            Value_slot_debug.log_map_add "dep_solver.ml:classify_field_map:add"
+              vs;
             closure_fields (fun ~value_slots ~function_slots ->
                 `Closure_fields
                   (Value_slot.Map.add vs x value_slots, function_slots))
@@ -2457,6 +2461,8 @@ module Rewriter = struct
       let acc, pats =
         List.fold_left_map
           (fun acc (value_slot, use) ->
+            Value_slot_debug.log
+              "dep_solver.ml:patterns_for_unboxed_fields:closure" value_slot;
             let acc, pat = for_one_use (Field.value_slot value_slot) use acc in
             acc, Pattern.value_slot value_slot pat)
           acc value_slots
@@ -2715,6 +2721,10 @@ module Rewriter = struct
           let all_value_slots_in_set =
             List.fold_left
               (fun m (var, value_slot) ->
+                Value_slot_debug.log_kind
+                  "dep_solver.ml:set_of_closures_rule:kind" value_slot;
+                Value_slot_debug.log_map_add
+                  "dep_solver.ml:set_of_closures_rule:add" value_slot;
                 let e =
                   match var with
                   | None -> Expr.unknown (Value_slot.kind value_slot)
@@ -2737,6 +2747,8 @@ module Rewriter = struct
           let all_value_slots_in_set =
             Value_slot.Map.filter_map
               (fun value_slot metadata ->
+                Value_slot_debug.log_map_iter
+                  "dep_solver.ml:no_representation_change:filter_map" value_slot;
                 match metadata with
                 | No_usages -> None
                 | No_source -> assert false
@@ -2875,6 +2887,9 @@ module Rewriter = struct
             no_representation_change current_function_slot
               (Value_slot.Map.mapi
                  (fun value_slot _value_slot_type ->
+                   Value_slot_debug.log_map_iter
+                     "dep_solver.ml:set_of_closures_rule:From_set_of_closures:mapi"
+                     value_slot;
                    follow_field_for_set_of_closures result set_of_closures
                      value_slot)
                  value_slot_types)
@@ -2927,6 +2942,9 @@ module Rewriter = struct
             let usages_of_value_slots =
               Value_slot.Map.mapi
                 (fun value_slot _value_slot_type ->
+                  Value_slot_debug.log_map_iter
+                    "dep_solver.ml:set_of_closures_rule:Value_slots_usages:mapi"
+                    value_slot;
                   match
                     get_one_field db
                       (Field.value_slot value_slot)
@@ -2941,6 +2959,8 @@ module Rewriter = struct
               usages_of_function_slots
         | Value_slots_any_usages ->
           let is_local_value_slot vs _ =
+            Value_slot_debug.log_compilation_unit
+              "dep_solver.ml:set_of_closures_rule:is_local_value_slot" vs;
             Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
           in
           let is_local_function_slot fs _ =
@@ -3051,6 +3071,9 @@ module Rewriter = struct
                 no_representation_change current_function_slot
                   (Value_slot.Map.mapi
                      (fun value_slot _value_slot_type ->
+                       Value_slot_debug.log_map_iter
+                         "dep_solver.ml:set_of_closures_rule:Value_slots_any_usages:local:mapi"
+                         value_slot;
                        follow_field_for_set_of_closures result set_of_closures
                          value_slot)
                      value_slot_types)
@@ -3415,9 +3438,14 @@ let fixpoint (graph : Global_flow_graph.graph) =
           add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
         | Set_of_closures l ->
           let mk kind name =
-            Value_slot.create
-              (Compilation_unit.get_current_exn ())
-              ~name ~is_always_immediate:false kind
+            let vs =
+              Value_slot.create
+                (Compilation_unit.get_current_exn ())
+                ~name ~is_always_immediate:false kind
+            in
+            Value_slot_debug.log_create
+              "dep_solver.ml:compute_changed_representations:create" vs;
+            vs
           in
           let fields =
             get_fields_usage_of_constructors db

@@ -52,7 +52,9 @@ type view =
 
 let hash_view = function
   | Block (i, kind) -> hash3 0 i (Flambda_kind.hash kind)
-  | Value_slot vs -> hash2 1 (Value_slot.hash vs)
+  | Value_slot vs ->
+    Value_slot_debug.log "field.ml:hash_view" vs;
+    hash2 1 (Value_slot.hash vs)
   | Function_slot fs -> hash2 2 (Function_slot.hash fs)
   | Code_of_closure ep -> hash2 3 (closure_entry_point_to_int ep)
   | Is_int -> 4
@@ -65,7 +67,10 @@ let equal_view v1 v2 =
   match v1, v2 with
   | Block (i1, kind1), Block (i2, kind2) ->
     i1 = i2 && Flambda_kind.equal kind1 kind2
-  | Value_slot vs1, Value_slot vs2 -> Value_slot.equal vs1 vs2
+  | Value_slot vs1, Value_slot vs2 ->
+    Value_slot_debug.log "field.ml:equal_view:vs1" vs1;
+    Value_slot_debug.log "field.ml:equal_view:vs2" vs2;
+    Value_slot.equal vs1 vs2
   | Function_slot fs1, Function_slot fs2 -> Function_slot.equal fs1 fs2
   | Code_of_closure ep1, Code_of_closure ep2 ->
     closure_entry_point_to_int ep1 = closure_entry_point_to_int ep2
@@ -85,7 +90,9 @@ let equal_view v1 v2 =
 
 let print_view ppf = function
   | Block (i, k) -> Format.fprintf ppf "%i_%a" i Flambda_kind.print k
-  | Value_slot s -> Format.fprintf ppf "%a" Value_slot.print s
+  | Value_slot s ->
+    Value_slot_debug.log "field.ml:print_view" s;
+    Format.fprintf ppf "%a" Value_slot.print s
   | Function_slot f -> Format.fprintf ppf "%a" Function_slot.print f
   | Code_of_closure ep ->
     Format.fprintf ppf "Code %s" (closure_entry_point_to_string ep)
@@ -121,7 +128,9 @@ end)
 
 let block i k = create (Block (i, k))
 
-let value_slot vs = create (Value_slot vs)
+let value_slot vs =
+  Value_slot_debug.log_create "field.ml:value_slot" vs;
+  create (Value_slot vs)
 
 let function_slot fs = create (Function_slot fs)
 
@@ -138,7 +147,9 @@ let code_id_of_call_witness = create Code_id_of_call_witness
 let kind t =
   match view t with
   | Block (_, kind) -> kind
-  | Value_slot vs -> Value_slot.kind vs
+  | Value_slot vs ->
+    Value_slot_debug.log_kind "field.ml:kind" vs;
+    Value_slot.kind vs
   | Function_slot _ -> Flambda_kind.value
   | Is_int | Get_tag -> Flambda_kind.naked_immediate
   | (Code_of_closure _ | Apply _ | Code_id_of_call_witness) as view ->
@@ -146,7 +157,9 @@ let kind t =
 
 let is_value_slot t =
   match view t with
-  | Value_slot _ -> true
+  | Value_slot vs ->
+    Value_slot_debug.log_field_view "field.ml:is_value_slot" vs;
+    true
   | Block _ | Function_slot _ | Is_int | Get_tag | Code_of_closure _ | Apply _
   | Code_id_of_call_witness ->
     false
@@ -170,6 +183,7 @@ let is_local f =
   &&
   match view f with
   | Value_slot vs ->
+    Value_slot_debug.log_compilation_unit "field.ml:is_local" vs;
     Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
   | Function_slot fs ->
     Compilation_unit.is_current (Function_slot.get_compilation_unit fs)

@@ -131,6 +131,8 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     (fun _function_slot function_slot_name ->
       Value_slot.Map.iter
         (fun value_slot simple ->
+          Value_slot_debug.log_map_iter
+            "traverse.ml:record_set_of_closures_deps" value_slot;
           let from = Acc.simple_to_node acc ~denv simple in
           Acc.add_constructor_dep acc
             ~base:(Code_id_or_name.name function_slot_name)

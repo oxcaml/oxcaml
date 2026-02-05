@@ -427,6 +427,8 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
       let value_slots =
         Value_slot.Map.filter_map
           (fun slot simple ->
+            Value_slot_debug.log_map_iter
+              "rebuild.ml:rebuild_set_of_closures:filter_map" slot;
             if not (slot_is_used (Field.value_slot slot))
             then None
             else Some (rewrite_simple env simple))
@@ -450,11 +452,17 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
               assert false
             | Function_slot _ -> assert false
             | Value_slot value_slot -> (
+              Value_slot_debug.log_field_view
+                "rebuild.ml:rebuild_set_of_closures:Field.view" value_slot;
+              Value_slot_debug.log_map_find
+                "rebuild.ml:rebuild_set_of_closures:find" value_slot;
               let arg = Value_slot.Map.find value_slot existing_value_slots in
               if simple_is_unboxable env arg
               then
                 fold2_unboxed_subset
                   (fun ff var value_slots ->
+                    Value_slot_debug.log_map_add
+                      "rebuild.ml:rebuild_set_of_closures:add_unboxed" ff;
                     Value_slot.Map.add ff (Simple.var var) value_slots)
                   uf
                   (Unboxed (get_simple_unboxable env arg))
@@ -462,6 +470,8 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
               else
                 match uf with
                 | Not_unboxed ff ->
+                  Value_slot_debug.log_map_add
+                    "rebuild.ml:rebuild_set_of_closures:add_not_unboxed" ff;
                   Value_slot.Map.add ff (rewrite_simple env arg) value_slots
                 | Unboxed _ -> Misc.fatal_errorf "trying to unbox simple"))
           fields Value_slot.Map.empty
@@ -1285,6 +1295,10 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
           (fun field (var : _ DS.unboxed_fields) hole ->
             match Field.view field with
             | Value_slot value_slot ->
+              Value_slot_debug.log_field_view
+                "rebuild.ml:bind_unboxed_closure_fields:Field.view" value_slot;
+              Value_slot_debug.log_map_find
+                "rebuild.ml:bind_unboxed_closure_fields:find" value_slot;
               let arg = Value_slot.Map.find value_slot value_slots in
               if simple_is_unboxable env arg
               then bind_fields var (Unboxed (get_simple_unboxable env arg)) hole
