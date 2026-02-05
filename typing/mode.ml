@@ -2029,8 +2029,6 @@ module Report = struct
 
   [@@@warning "-4"]
 
-  module Fmt = Format_doc
-
   type sound =
     | Consonant
     | Vowel
