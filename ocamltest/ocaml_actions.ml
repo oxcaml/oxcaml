@@ -722,7 +722,11 @@ let run_fexpr_check log env =
   List.fold_left (fun (res, env) pass_sfx ->
       if Result.is_pass res then
         let pass_dump_file = Filename.make_filename test_name pass_sfx in
-        let pass_ref_file = Filename.(make_filename (chop_extension pass_dump_file) "reference") in
+        let pass_ref_file =
+          Filename.(make_filename
+                      (chop_extension pass_dump_file)
+                      "reference")
+        in
         let dump_file =
           Filename.make_path [test_build_dir; pass_dump_file]
         in
@@ -736,7 +740,9 @@ let run_fexpr_check log env =
 
 let check_fexpr_dump =
   native_action @@
-  Actions.make ~name:"check_fexpr_dump" ~description:"Compare passes fexpr dumps to reference" ~does_something:true run_fexpr_check
+  Actions.make ~name:"check_fexpr_dump"
+    ~description:"Compare passes fexpr dumps to reference"
+    ~does_something:true run_fexpr_check
 
 let finalise_codegen_cc test_basename _log env =
   let test_module =

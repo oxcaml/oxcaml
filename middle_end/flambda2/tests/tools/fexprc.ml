@@ -18,7 +18,8 @@ let parse_flambda filename =
     check_invariants fl2;
     (* CR gbury/lmaurer/bclement: add a proper traversal to compute the actual
        code_slot_offsets here (as well as free_names) *)
-    Flambda2.flambda_to_flambda ~ppf_dump:Format.std_formatter ~prefixname:(Filename.chop_extension filename)
+    Flambda2.flambda_to_flambda ~ppf_dump:Format.std_formatter
+      ~prefixname:(Filename.chop_extension filename)
       ~machine_width:Sixty_four fl2
   | Error e ->
     Test_utils.dump_error e;

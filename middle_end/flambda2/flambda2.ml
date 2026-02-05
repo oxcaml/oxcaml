@@ -57,9 +57,11 @@ let pp_flambda_as_fexpr ppf unit =
 let dump_fexpr_annot ~prefixname suffix unit =
   let dump =
     Flambda_features.dump_fexpr_annot ()
-    || List.exists (String.equal suffix) (Flambda_features.dump_fexpr_annot_pass ())
+    || List.exists (String.equal suffix)
+         (Flambda_features.dump_fexpr_annot_pass ())
   in
-  if dump then
+  if dump
+  then
     Misc.protect_output_to_file
       (prefixname ^ "." ^ suffix ^ ".fl")
       (fun out ->
