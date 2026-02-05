@@ -124,7 +124,7 @@ void caml_redo_preempted_allocation(void)
   }
 
   /* CR aspsmith: What if this brings us over the limit? */
-  dom_st->young_ptr -= Whsize_wosize(allocsz) * sizeof(value);
+  dom_st->young_ptr -= Whsize_wosize(allocsz);
 }
 
 #ifdef STACK_GUARD_PAGES
