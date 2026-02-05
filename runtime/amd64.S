@@ -1445,6 +1445,9 @@ CFI_STARTPROC
         movq    $0, 1*8(%rbx)   /* set last fiber of continuation to NULL */
         movq    Caml_state(gc_regs), %r12
         movq    %r12, 2*8(%rbx) /* save gc_regs in continuation */
+        /* clear gc_regs, as we'll be leaving the runtime after the effect is
+           performed */
+        movq    $0, Caml_state(gc_regs)
         /* Perform the preemption effect */
         jmp     LBL(do_perform)
 CFI_ENDPROC
