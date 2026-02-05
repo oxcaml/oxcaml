@@ -84,7 +84,7 @@ let enter_continuation continuation ~recursive ~is_exn_handler params (t : t) =
   in
   { t with stack = cont_info :: t.stack }
 
-let init_toplevel ~dummy_toplevel_cont params _t =
+let init_toplevel ~dummy_toplevel_cont params =
   enter_continuation dummy_toplevel_cont ~recursive:false ~is_exn_handler:false
     params
     { (empty ()) with dummy_toplevel_cont }
