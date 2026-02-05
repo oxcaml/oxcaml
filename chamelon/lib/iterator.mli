@@ -28,14 +28,19 @@
 type strategy
 
 val basic : strategy
+
 val dichotomy : strategy
+
 val test : pos:int -> len:int -> strategy
 
 type ('a, 'b) schedule
 
 val minimizer : ('a, 'b) Utils.minimizer -> ('a, 'b) schedule
+
 val list : ('a, 'b) schedule list -> ('a, 'b) schedule
+
 val with_strategy : strategy -> ('a, 'b) schedule list -> ('a, 'b) schedule
+
 val fix : ('a, 'b) schedule list -> ('a, 'b) schedule
 
 val run :
