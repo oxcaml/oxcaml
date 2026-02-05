@@ -4,7 +4,7 @@
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
 #include <caml/callback.h>
-#include <caml/globroots.h>
+#include <caml/startup.h>
 #include <caml/fail.h>
 
 /* This stub is called during Reentrant_b initialization.

@@ -4,7 +4,7 @@
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
 #include <caml/callback.h>
-#include <caml/globroots.h>
+#include <caml/startup.h>
 
 /* This stub tries to initialize Cycle_module while we're already initializing it.
    This should be detected as a cycle and trigger caml_fatal_error. */
