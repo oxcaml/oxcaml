@@ -886,6 +886,11 @@ let constrain_type_jkind = ref (fun _ _ _ -> assert false)
 
 let check_well_formed_module = ref (fun _ -> assert false)
 
+let initial_ikind_context = ref (fun _ -> assert false)
+
+let type_declaration_ikind_gated =
+  ref (fun ~context:_ ~path:_ -> assert false)
+
 (* Helper to decide whether to report an identifier shadowing
    by some 'open'. For labels and constructors, we do not report
    if the two elements are from the same re-exported declaration.
@@ -3096,6 +3101,37 @@ let add_language_extension_types env =
       f (add_type ?shape:None ~check:false) env
     | false -> env
   in
+  let add_initial_ikinds env =
+    if not !Clflags.ikinds then env
+    else begin
+      let context = !initial_ikind_context env in
+      IdTbl.fold_name wrap_identity
+        (fun _name (path, tda) acc_env ->
+           let decl = tda.tda_declaration in
+           match path with
+           | Path.Pident id ->
+             let type_ikind =
+               !type_declaration_ikind_gated ~context ~path
+             in
+             let type_unboxed_version =
+               Option.map
+                 (fun ud ->
+                    let uik =
+                      !type_declaration_ikind_gated
+                        ~context
+                        ~path:(Path.unboxed_version path)
+                    in
+                    { ud with type_ikind = uik })
+                 decl.type_unboxed_version
+             in
+             let decl' =
+               { decl with type_ikind; type_unboxed_version }
+             in
+             add_type ~check:false id decl' acc_env
+           | _ -> acc_env)
+        env.types env
+    end
+  in
   lazy
     Language_extension.(env ()
     |> add SIMD Stable Predef.add_simd_stable_extension_types
@@ -3103,7 +3139,8 @@ let add_language_extension_types env =
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
     |> add Small_numbers Stable Predef.add_small_number_extension_types
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-    |> add Layouts Stable Predef.add_or_null)
+    |> add Layouts Stable Predef.add_or_null
+    |> add_initial_ikinds)
 
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not

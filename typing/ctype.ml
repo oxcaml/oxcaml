@@ -2805,7 +2805,12 @@ let constrain_type_jkind env ty jkind =
   constrain_type_jkind ~fixed:false env ty jkind
 
 let () =
-  Env.constrain_type_jkind := constrain_type_jkind
+  Env.constrain_type_jkind := constrain_type_jkind;
+  let initial_ikind_context env =
+    mk_jkind_context env (fun ty -> Some (type_jkind env ty))
+  in
+  Env.initial_ikind_context := initial_ikind_context;
+  Env.type_declaration_ikind_gated := Ikind.type_declaration_ikind_gated
 
 let check_type_externality env ty ext =
   let upper_bound =
