@@ -940,7 +940,7 @@ Line 1, characters 55-56:
 1 | module F (M : S @ local) : S @ global = struct include M end
                                                            ^
 Error: The value "f" in the structure is "local"
-         because it is the value "f" in the structure at line 1, characters 47-56
+         because it is the value "f" in the structure at line 1, characters 55-56
          which is "local".
        However, the value "f" in the structure highlighted is expected to be "global"
          because it is the value "f" in the structure at line 1, characters 47-56
@@ -981,7 +981,7 @@ Error: Signature mismatch:
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The left-hand side is "nonportable"
-         because it is the value "f" in the structure at line 3, characters 32-44
+         because it is the value "f" in the structure at line 3, characters 40-44
          which is "nonportable".
        However, the right-hand side is "portable".
 |}]

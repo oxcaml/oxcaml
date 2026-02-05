@@ -138,10 +138,17 @@ let location_of_structure sstr =
   | [] -> Location.none
   | (_ :: _) as xs -> Location.merge xs
 
-(** [pp] is the [pinpoint] of some value, while [is_contained_by] describes how
-      that value is contained in a structure. [md_mode] is the mode of the
-      structure and [mode] is the mode of the value. *)
-let infer_modalities pp is_contained_by ~md_mode ~mode =
+let apply_is_contained_by ~loc_md item ?modalities mode =
+  let is_contained_by : Hint.is_contained_by =
+    { containing = Structure (item, Modality);
+      container = (loc_md, Structure) }
+  in
+  Ctype.apply_is_contained_by is_contained_by ?modalities mode
+
+(** Given a value whose location in the source code is described by [pp] and at
+[mode], infer the modalities on the value when it's placed as an [item] in a
+structure. The structure is at [loc_md] and [md_mode] *)
+let infer_modalities pp ~loc_md item ~md_mode ~mode =
     (* Values are packed into a structure at modes weaker than they actually
       are. This is to allow our legacy zapping behavior. For example:
 
@@ -170,11 +177,8 @@ let infer_modalities pp is_contained_by ~md_mode ~mode =
     For monadic (descriptive) axes, the restriction is not on the
     construction but on the projection, which is modelled by the
     [Diff] modality in [mode.ml]. *)
-    let mode' = Mode.(
-      md_mode.comonadic |>
-      Value.Comonadic.apply_hint (Is_contained_by (Comonadic, is_contained_by)))
-    in
-    Mode.Value.Comonadic.submode_err pp mode.Mode.comonadic mode';
+    let mode' = md_mode |> apply_is_contained_by ~loc_md item in
+    Value.Comonadic.submode_err pp mode.comonadic mode'.comonadic;
     Mode.Modality.infer ~md_mode ~mode
 
 (** For an [include M] clause where [M] is at [mode] and [loc], and an [item] in
@@ -184,14 +188,14 @@ let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
   let pp : Mode.Hint.pinpoint = (loc, Structure_item item) in
   let is_contained_by : Mode.Hint.is_contained_by =
     { containing = Structure (item, Modality);
-      container = (loc_md, Structure)}
+      container = (loc, Structure)}
   in
   let hint =
     { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
       comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
   in
   let mode = Modality.apply ~hint modalities mode in
-  infer_modalities pp is_contained_by ~md_mode ~mode
+  infer_modalities pp ~loc_md item ~md_mode ~mode
 
 (** Similiar to [rebase_modalities] but lifted to signatures. *)
 let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
@@ -3445,11 +3449,6 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
   let _, md_mode = register_allocation () in
   let loc_md = location_of_structure sstr in
 
-  let item item_category id : Mode.Hint.is_contained_by =
-    { containing = Structure ((item_category, id), Modality);
-      container = (loc_md, Structure) }
-  in
-
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
     let modl, modl_shape =
@@ -3546,7 +3545,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
               let vd = Subst.Lazy.force_value_description vd in
               let pp : Mode.Hint.pinpoint = (first_loc, Expression) in
               let modalities =
-                infer_modalities pp (item Value id) ~md_mode ~mode
+                infer_modalities pp ~loc_md (Value, id) ~md_mode ~mode
               in
               let vd =
                 { vd with
@@ -3571,7 +3570,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         assert (desc.val_val.val_modalities |> Modality.is_undefined);
         let pp : Mode.Hint.pinpoint = (desc.val_loc, Expression) in
         let val_modalities =
-          infer_modalities pp (item Value desc.val_id) ~md_mode ~mode
+          infer_modalities pp ~loc_md (Value, desc.val_id) ~md_mode ~mode
         in
         let val_val = {desc.val_val with val_modalities} in
         let desc = {desc with val_val} in
@@ -3672,7 +3671,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
             Signature_names.check_module names pmb_loc id;
             let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
             let md_modalities =
-              infer_modalities pp (item Module id) ~md_mode ~mode
+              infer_modalities pp ~loc_md (Module, id) ~md_mode ~mode
             in
             Some id, e,
             [Sig_module(id, pres,
@@ -3775,7 +3774,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
             let mode = mode_without_locks_exn mb.mb_expr.mod_mode in
             let pp : Mode.Hint.pinpoint = (mb.mb_expr.mod_loc, Module) in
             let md_modalities =
-              infer_modalities pp (item Module id) ~md_mode ~mode
+              infer_modalities pp ~loc_md (Module, id) ~md_mode ~mode
             in
             Sig_module(id, Mp_present, {
                 md_type=mb.mb_expr.mod_type;
@@ -3812,7 +3811,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
           |> fun (cls : _ Typeclass.class_info) ->
               cls.cls_id, cls.cls_decl.cty_loc
         in
-        let mode = Ctype.apply_is_contained_by (item Class first_id) md_mode in
+        let mode = apply_is_contained_by ~loc_md (Class, first_id) md_mode in
         Mode.Value.submode_err (first_loc, Class) Types.class_mode mode;
         let shape_map = List.fold_left (fun acc cls ->
             let open Typeclass in
