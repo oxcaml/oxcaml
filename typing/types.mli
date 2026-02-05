@@ -160,6 +160,9 @@ and type_desc =
   | Tsplice of type_expr
   (** [Tsplice t] ==> [$t] *)
 
+  | Tquote_eval of type_expr
+  (** [Tquote_eval t] ==> [<[ t ]> eval] *)
+
   | Tnil
   (** [Tnil] ==> [<...; >] *)
 
