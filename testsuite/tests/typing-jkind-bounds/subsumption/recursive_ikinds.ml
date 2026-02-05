@@ -20,7 +20,7 @@ type 'a my_list = Nil | Cons of 'a * 'a foo
 and 'a foo = 'a my_list
 |}]
 
-(* CR layouts v2.8: this should be accepted. Internal ticket 4770 *)
+(* CR layouts v2.8: this should be accepted. Internal ticket 6480 *)
 type 'a my_list : immutable_data with 'a =
   | Nil
   | Cons of 'a * 'a my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list

@@ -598,8 +598,8 @@ Error: This value is "aliased" but is expected to be "unique".
 
 (***********************************************************************)
 type ('a : immutable_data) t = Flat | Nested of 'a t t
-(* CR layouts v2.8: fix this. Internal ticket 4770 *)
-(* CR jujacobs: this fails due to the ('a : immutable_data) constraint *)
+(* CR layouts v2.8: fix this. Internal ticket 6480 *)
+(* This fails due to the ('a : immutable_data) constraint *)
 [%%expect {|
 Line 1, characters 0-54:
 1 | type ('a : immutable_data) t = Flat | Nested of 'a t t

@@ -208,8 +208,6 @@ module M :
   sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
 |}]
 
-(* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data.
-   Internal ticket 4770. *)
 module M = struct
   type ('a : immutable_data) u : immutable_data with 'a
   type 'a t : immutable_data = 'a u
