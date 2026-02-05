@@ -1885,18 +1885,18 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
       || dom_st->major_slice_epoch < atomic_load (&caml_major_slice_epoch)) {
     interrupt_domain_local(dom_st);
   }
-  /* We might be here due to a recently-recorded signal or forced
-     systhread switching, so we need to remember that we must run
-     signal handlers or systhread's yield. In addition, in the case of
-     long-running C code (that may regularly poll with
-     caml_process_pending_actions), we want to force a query of all
-     callbacks at every minor collection or major slice (similarly to
-     the OCaml behaviour).
+  /* We might be here due to a recently-recorded signal or forced systhread
+     switching, so we need to remember that we must run signal handlers,
+     systhread's yield or preemption. In addition, in the case of long-running C
+     code (that may regularly poll with caml_process_pending_actions), we want
+     to force a query of all callbacks at every minor collection or major slice
+     (similarly to the OCaml behaviour).
 
      We don't need to check for internally triggered pending actions
      (Memprof and finalisers), because they will already have set
      action_pending if needed. */
-  if (caml_check_pending_signals() || Caml_state->requested_external_interrupt)
+  if (caml_check_pending_signals() || Caml_state->requested_external_interrupt
+      || Is_block(Caml_state->preemption))
     caml_set_action_pending(dom_st);
 }
 
