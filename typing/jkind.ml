@@ -1626,22 +1626,33 @@ let of_type_decl ~context ~transl_type (decl : Parsetree.type_declaration) =
     raise ~loc:decl.ptype_loc
       (Multiple_jkinds { from_annotation; from_attribute })
 
-let of_type_decl_default ?(skip_with_bounds = false) ~context ~transl_type
-    ~default (decl : Parsetree.type_declaration) =
-  (* Used to avoid computing with-kinds when we have no environment. *)
+let of_type_decl_overapproximate_unknown ~context
+    (decl : Parsetree.type_declaration) =
+  (* CR with-kinds: we could avoid this syntactic check and instead return
+     [None] if [transl_type] is ever called. However, then we end up parsing
+     the jkind annotation multiple times. We should refactor the code to
+     avoid passing the unparsed annotation around. *)
   let rec has_with_bounds (jkind : Parsetree.jkind_annotation) =
     match jkind.pjkind_desc with
     | Pjk_with _ -> true
     | Pjk_mod (base, _) -> has_with_bounds base
     | Pjk_product jkinds -> List.exists has_with_bounds jkinds
-    | Pjk_abbreviation _ | Pjk_default | Pjk_kind_of _ -> false
+    | Pjk_abbreviation _ -> false
+    | Pjk_default | Pjk_kind_of _ ->
+      raise ~loc:jkind.pjkind_loc Unimplemented_syntax
+  in
+  let transl_type sty =
+    Misc.fatal_errorf
+      "@[Unexpected call to [transl_type] in \
+       [of_type_decl_overapproximate_unknown]. Please report this to the Jane \
+       Street OCaml Language team."
+      Pprintast.core_type sty
   in
   match decl.ptype_jkind_annotation with
-  | Some annot when skip_with_bounds && has_with_bounds annot -> default
-  | _ -> (
-    match of_type_decl ~context ~transl_type decl with
-    | Some (t, _) -> t
-    | None -> default)
+  | Some annot when has_with_bounds annot ->
+    (* CR with-kinds: we could still compute the layout here. *)
+    Some (Builtin.any ~why:Overapproximation)
+  | _ -> of_type_decl ~context decl ~transl_type |> Option.map fst
 
 let for_unboxed_record lbls =
   let open Types in
@@ -2176,6 +2187,8 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s any"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Overapproximation ->
+      fprintf ppf "its exact kind couldn't be deduced by the compiler"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -2987,6 +3000,7 @@ module Debug_printers = struct
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         !printtyp_path parent_path
+    | Overapproximation -> fprintf ppf "Overapproximation"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function

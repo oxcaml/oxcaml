@@ -92,12 +92,14 @@ module rec My_list : sig
 end = My_list
 (* CR layouts v2.8: fix this. Internal ticket 5127 *)
 [%%expect {|
->> Fatal error: I do not yet know how to deal with [with]-types (such as
-                'a)
-                in recursive modules. Please contact the Jane Street OCaml Language
-                team for help if you see this.
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 43-70:
+2 |   type 'a t : immutable_data with 'a = Nil | Cons of 'a * 'a My_list.t
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Constructor argument types must have a representable layout.
+       The layout of 'a My_list.t is any
+         because its exact kind couldn't be deduced by the compiler.
+       But the layout of 'a My_list.t must be representable
+         because it's the type of a constructor field.
 |}]
 
 module rec My_list : sig

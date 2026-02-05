@@ -269,18 +269,10 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
      are checked and then unified with the real manifest and checked against the
      kind. *)
   let type_jkind =
-    let transl_type sty =
-      Misc.fatal_errorf
-        "@[Unexpected [with]-type or [kind_of] (such as %a)@ in enter_type. \
-         Please report this to the Jane Street OCaml Language team."
-        Pprintast.core_type sty
-    in
-    Jkind.of_type_decl_default
-      ~skip_with_bounds:true
+    Jkind.of_type_decl_overapproximate_unknown
       ~context:(Type_declaration path)
-      ~transl_type
-      ~default:(Jkind.disallow_right any)
       sdecl
+    |> Option.value ~default:(Jkind.disallow_right any)
   in
   let abstract_source, type_manifest, unboxed_type_manifest =
     match sdecl.ptype_manifest, abstract_abbrevs with
@@ -4319,19 +4311,11 @@ let approx_type_decl sdecl_list =
        let id = Ident.create_scoped ~scope sdecl.ptype_name.txt in
        let path = Path.Pident id in
        let injective = sdecl.ptype_kind <> Ptype_abstract in
-       let transl_type sty =
-         Misc.fatal_errorf
-           "@[I do not yet know how to deal with [with]-types (such as %a)@ in \
-            recursive modules. Please contact the Jane Street OCaml Language@ \
-            team for help if you see this."
-           Pprintast.core_type sty
-       in
        let jkind =
-         Jkind.of_type_decl_default
+         Jkind.of_type_decl_overapproximate_unknown
            ~context:(Type_declaration path)
-           ~transl_type
-           ~default:(Jkind.Builtin.value ~why:Default_type_jkind)
            sdecl
+         |> Option.value ~default:(Jkind.Builtin.value ~why:Default_type_jkind)
        in
        let params =
          List.map (fun (param, _) -> get_type_param_jkind path param)

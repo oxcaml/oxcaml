@@ -391,18 +391,15 @@ val of_type_decl :
   Parsetree.type_declaration ->
   (Types.jkind_l * Parsetree.jkind_annotation option) option
 
-(** Find a jkind from a type declaration in the same way as [of_type_decl],
-    defaulting to ~default. Returns a jkind at quality [Not_best]; call
-    [mark_best] to mark it as [Best].
+(** Find a jkind from a type declaration in the same way as [of_type_decl], but
+    avoiding translating types in with-bounds. Overapproximates kinds containing
+    with-bounds as [any].
 
-    Raises if a disallowed or unknown jkind is present. *)
-val of_type_decl_default :
-  ?skip_with_bounds:bool ->
+    Returns the jkind (at quality [Not_best]). *)
+val of_type_decl_overapproximate_unknown :
   context:History.annotation_context_l ->
-  transl_type:(Parsetree.core_type -> Types.type_expr) ->
-  default:Types.jkind_l ->
   Parsetree.type_declaration ->
-  Types.jkind_l
+  Types.jkind_l option
 
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
