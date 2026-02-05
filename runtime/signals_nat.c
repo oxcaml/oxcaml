@@ -123,8 +123,11 @@ void caml_redo_preempted_allocation(void)
     return;
   }
 
-  /* CR aspsmith: What if this brings us over the limit? */
   dom_st->young_ptr -= Whsize_wosize(allocsz);
+  /* Check to see if that put us over the limit, and GC if so */
+  if (Caml_check_gc_interrupt(dom_st)) {
+    Alloc_small_enter_GC(dom_st, allocsz);
+  }
 }
 
 #ifdef STACK_GUARD_PAGES
