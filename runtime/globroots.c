@@ -395,6 +395,16 @@ CAMLexport void caml_init_module(const char *name)
   caml_init_module_rec(entry);
 }
 
+/* OCaml-callable wrapper: Initialize a module by name (string -> unit) */
+CAMLprim value caml_init_module_from_ocaml(value v_name)
+{
+  /* Copy the string to C heap since caml_init_module may trigger GC */
+  char *name = caml_stat_strdup(String_val(v_name));
+  caml_init_module(name);
+  caml_stat_free(name);
+  return Val_unit;
+}
+
 #endif
 
 /* Iterate a GC scanning action over a global root list */
