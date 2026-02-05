@@ -767,20 +767,17 @@ LBL(resume_from_preempt):
         cmpq    $GC_REGS_NO, %r11
         jne     1f
         RESTORE_ALL_REGS(NO)
-        LEAVE_FUNCTION
-        ret
+        jmp     4f
 1:      cmpq    $GC_REGS_XMM, %r11
         jne     2f
         RESTORE_ALL_REGS(XMM)
-        LEAVE_FUNCTION
-        ret
+        jmp     4f
 2:      cmpq    $GC_REGS_YMM, %r11
         jne      3f
         RESTORE_ALL_REGS(YMM)
-        LEAVE_FUNCTION
-        ret
+        jmp     4f
 3:      RESTORE_ALL_REGS(ZMM)
-        LEAVE_FUNCTION
+4:      LEAVE_FUNCTION
         ret
 CFI_ENDPROC
 ENDFUNCTION(G(caml_do_call_gc))
