@@ -38,6 +38,9 @@ val with_denv : t -> Downwards_env.t -> t
 (** Extract the dataflow analysis accumulator *)
 val flow_acc : t -> Flow.Acc.t
 
+(** MSet the dataflow analysis accumulator of the given dacc. *)
+val with_flow_acc : Flow.Acc.t -> t -> t
+
 (** Map the dataflow analysis accumulator of the given dacc. *)
 val map_flow_acc : t -> f:(Flow.Acc.t -> Flow.Acc.t) -> t
 
