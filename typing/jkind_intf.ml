@@ -380,6 +380,7 @@ module History = struct
           position : int;
           arity : int
         }
+    | Overapproximation_of_with_bounds
 
   type product_creation_reason =
     | Unboxed_tuple

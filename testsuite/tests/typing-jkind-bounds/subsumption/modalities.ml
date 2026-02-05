@@ -364,16 +364,6 @@ Line 4, characters 40-48:
                                             ^^^^^^^^
 Warning 213: This portability is overriden by portable later.
 
-Line 4, characters 40-48:
-4 |   type 'a t : immutable_data with 'a @@ portable contended portable
-                                            ^^^^^^^^
-Warning 213: This portability is overriden by portable later.
-
-Line 4, characters 40-48:
-4 |   type 'a t : immutable_data with 'a @@ portable contended portable
-                                            ^^^^^^^^
-Warning 213: This portability is overriden by portable later.
-
 module M : sig type 'a t : immutable_data with 'a @@ portable end
 |}]
 

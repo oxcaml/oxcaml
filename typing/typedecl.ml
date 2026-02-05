@@ -269,24 +269,10 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
      are checked and then unified with the real manifest and checked against the
      kind. *)
   let type_jkind =
-    Jkind.of_type_decl_default
+    Jkind.of_type_decl_overapproximate_unknown
       ~context:(Type_declaration path)
-      (* CR layouts v2.8: This next line is truly terrible. But I think it's OK
-         for now: it will mean that any [with] constraints get interpreted to
-         mean that the thing does not cross that mode. That's OK: the jkind
-         produced here can be an overapproximation of the correct jkind (note
-         that [any] is the default).  Indeed the only reason (I think) we need a
-         non-[any] jkind here is to produce better error messages.
-
-         Doing better here will be annoying, because a type is in scope in its
-         own jkind... and yet we don't have an env that we can use at this
-         point. I think probably the solution will be to have
-         [Jkind.of_type_decl_default] just return [max] every time it sees a
-         [with]-kind... which basically just does this [type_exn] trick but much
-         more sanely. Internal ticket 5116. *)
-      ~transl_type:(fun _ -> Predef.type_exn)
-      ~default:(Jkind.disallow_right any)
       sdecl
+    |> Option.value ~default:(Jkind.disallow_right any)
   in
   let abstract_source, type_manifest, unboxed_type_manifest =
     match sdecl.ptype_manifest, abstract_abbrevs with
@@ -4325,19 +4311,11 @@ let approx_type_decl sdecl_list =
        let id = Ident.create_scoped ~scope sdecl.ptype_name.txt in
        let path = Path.Pident id in
        let injective = sdecl.ptype_kind <> Ptype_abstract in
-       let transl_type sty =
-         Misc.fatal_errorf
-           "@[I do not yet know how to deal with [with]-types (such as %a)@ in \
-            recursive modules. Please contact the Jane Street OCaml Language@ \
-            team for help if you see this."
-           Pprintast.core_type sty
-       in
        let jkind =
-         Jkind.of_type_decl_default
+         Jkind.of_type_decl_overapproximate_unknown
            ~context:(Type_declaration path)
-           ~transl_type
-           ~default:(Jkind.Builtin.value ~why:Default_type_jkind)
            sdecl
+         |> Option.value ~default:(Jkind.Builtin.value ~why:Default_type_jkind)
        in
        let params =
          List.map (fun (param, _) -> get_type_param_jkind path param)
