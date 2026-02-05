@@ -48,6 +48,18 @@ int main(int argc, char **argv)
   printf("Step 5: done\n\n");
   fflush(stdout);
 
+  printf("Step 6: Test re-entrant caml_init_module (Reentrant_b calls C stub that inits Reentrant_a)\n");
+  fflush(stdout);
+  caml_init_module("Reentrant_b");
+  printf("Step 6: done\n\n");
+  fflush(stdout);
+
+  printf("Step 7: Verify Reentrant_a is now initialized (should be no-op)\n");
+  fflush(stdout);
+  caml_init_module("Reentrant_a");
+  printf("Step 7: done\n\n");
+  fflush(stdout);
+
   printf("=== All tests passed ===\n");
   return 0;
 }

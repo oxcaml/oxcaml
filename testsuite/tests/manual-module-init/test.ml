@@ -1,5 +1,5 @@
 (* TEST
- readonly_files = "base.ml dep_a.ml dep_b.ml diamond.ml gc_test.ml closures.ml gc_compact_test.ml driver.c";
+ readonly_files = "base.ml dep_a.ml dep_b.ml diamond.ml gc_test.ml closures.ml gc_compact_test.ml reentrant_a.ml reentrant_b.ml reentrant_c.ml reentrant_stubs.c driver.c";
  {
    setup-ocamlopt.byte-build-env;
 
@@ -19,17 +19,26 @@
    ocamlopt.byte;
    module = "gc_compact_test.ml";
    ocamlopt.byte;
-
-   (* Create complete object with all modules *)
-   module = "";
-   flags = "-manual-module-init -output-complete-obj";
-   program = "test_modules.${objext}";
-   all_modules = "base.cmx dep_a.cmx dep_b.cmx diamond.cmx gc_test.cmx closures.cmx gc_compact_test.cmx";
+   module = "reentrant_a.ml";
+   ocamlopt.byte;
+   module = "reentrant_c.ml";
+   ocamlopt.byte;
+   module = "reentrant_b.ml";
    ocamlopt.byte;
 
-   (* Link with C driver *)
-   script = "${mkexe} -I${ocamlsrcdir}/${runtime_dir} -o test_driver test_modules.${objext} ${bytecc_libs} driver.c";
-   output = "${compiler_output}";
+   (* Compile the C stubs *)
+   module = "";
+   script = "${cc} ${cflags} -I${ocamlsrcdir}/${runtime_dir} -c reentrant_stubs.c -o reentrant_stubs.${objext}";
+   script;
+
+   (* Create complete object with all modules *)
+   flags = "-manual-module-init -output-complete-obj";
+   program = "test_modules.${objext}";
+   all_modules = "base.cmx dep_a.cmx dep_b.cmx diamond.cmx gc_test.cmx closures.cmx gc_compact_test.cmx reentrant_a.cmx reentrant_c.cmx reentrant_b.cmx";
+   ocamlopt.byte;
+
+   (* Link with C driver and stubs *)
+   script = "${mkexe} -I${ocamlsrcdir}/${runtime_dir} -o test_driver test_modules.${objext} reentrant_stubs.${objext} ${bytecc_libs} driver.c";
    script;
 
    (* Run the test *)
