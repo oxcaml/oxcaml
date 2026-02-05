@@ -1704,3 +1704,42 @@ let f (_ : (repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) = ()
 [%%expect{|
 val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
 |}]
+
+(*****************)
+(* let poly_ and val poly_ *)
+
+let poly_ id : 'a. 'a -> 'a = fun x -> x
+[%%expect{|
+Line 1, characters 10-12:
+1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
+              ^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+[%%expect{|
+Line 1, characters 10-15:
+1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+module type S_poly = sig
+  val poly_ f : 'a. 'a -> 'a
+  val poly_ g : 'a 'b. 'a -> 'b -> 'a
+end
+[%%expect{|
+Line 2, characters 2-28:
+2 |   val poly_ f : 'a. 'a -> 'a
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "val poly_" annotation is not yet implemented.
+|}]
+
+let poly_ f : 'a. 'a -> 'a = fun x -> x
+and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+[%%expect{|
+Line 1, characters 10-11:
+1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
+              ^
+Error: The "let poly_" annotation is not yet implemented.
+|}]

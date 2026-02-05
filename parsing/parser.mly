@@ -655,12 +655,13 @@ let extra_rhs_core_type ct ~pos =
   let docs = rhs_info pos in
   { ct with ptyp_attributes = add_info_attrs docs ct.ptyp_attributes }
 
-let mklb first ~loc (p, e, typ, modes, is_pun) attrs =
+let mklb first ~loc (p, e, typ, modes, is_pun, poly) attrs =
   {
     lb_pattern = p;
     lb_expression = e;
     lb_constraint=typ;
     lb_is_pun = is_pun;
+    lb_poly = poly;
     lb_modes = modes;
     lb_attributes = attrs;
     lb_docs = symbol_docs_lazy loc;
@@ -687,6 +688,7 @@ let val_of_let_bindings ~loc lbs =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~poly:lb.lb_poly
            ~modes:lb.lb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -1074,6 +1076,7 @@ let maybe_pmod_constraint mode expr =
 %token OR                     "or"
 %token OVERWRITE              "overwrite_"
 /* %token PARSER              "parser" */
+%token POLY                   "poly_"
 %token PERCENT                "%"
 %token PLUS                   "+"
 %token PLUSDOT                "+."
@@ -3327,11 +3330,12 @@ let_binding_body_no_punning:
       }
 ;
 let_binding_body:
-  | let_binding_body_no_punning
-      { let p,e,c,modes = $1 in (p,e,c,modes,false) }
+  | poly_flag = poly_flag let_binding_body_no_punning
+      { let p,e,c,modes = $2 in (p,e,c,modes,false,poly_flag) }
 /* BEGIN AVOID */
-  | val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1, None, [], true) }
+  | poly_flag = poly_flag val_ident %prec below_HASH
+      { (mkpatvar ~loc:$loc $2, ghexpvar ~loc:$loc $2, None, [], true,
+         poly_flag) }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the
@@ -3907,6 +3911,7 @@ value_description:
   VAL
   ext = ext
   attrs1 = attributes
+  poly_flag = poly_flag
   id = mkrhs(val_ident)
   COLON
   ty = possibly_poly(core_type)
@@ -3915,7 +3920,7 @@ value_description:
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~attrs ~modalities ~loc ~docs,
+      Val.mk id ty ~poly:poly_flag ~attrs ~modalities ~loc ~docs,
       ext }
 ;
 
@@ -5236,6 +5241,10 @@ mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
 ;
+poly_flag:
+    /* empty */                                 { false }
+  | POLY                                        { true }
+;
 mutable_or_global_flag:
     /* empty */
     { Immutable, [] }
@@ -5346,6 +5355,7 @@ single_attr_id:
   | OF { "of" }
   | OPEN { "open" }
   | OR { "or" }
+  | POLY { "poly_" }
   | PRIVATE { "private" }
   | REC { "rec" }
   | SIG { "sig" }

@@ -716,8 +716,8 @@ let default_iterator =
     type_exception = T.iter_type_exception;
     extension_constructor = T.iter_extension_constructor;
     value_description =
-      (fun this {pval_name; pval_type; pval_modalities; pval_prim = _; pval_loc;
-                 pval_attributes} ->
+      (fun this {pval_name; pval_type; pval_modalities; pval_prim = _;
+                 pval_poly=_; pval_loc; pval_attributes} ->
         iter_loc this pval_name;
         this.typ this pval_type;
         this.location this pval_loc;
@@ -791,7 +791,8 @@ let default_iterator =
 
 
     value_binding =
-      (fun this {pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_constraint; pvb_modes} ->
+      (fun this {pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_constraint;
+                 pvb_poly=_; pvb_modes} ->
          this.modes this pvb_modes;
          this.pat this pvb_pat;
          this.expr this pvb_expr;
