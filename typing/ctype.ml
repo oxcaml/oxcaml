@@ -2809,8 +2809,7 @@ let () =
   let initial_ikind_context env =
     mk_jkind_context env (fun ty -> Some (type_jkind env ty))
   in
-  Env.initial_ikind_context := initial_ikind_context;
-  Env.type_declaration_ikind_gated := Ikind.type_declaration_ikind_gated
+  Env.initial_ikind_context := initial_ikind_context
 
 let check_type_externality env ty ext =
   let upper_bound =
