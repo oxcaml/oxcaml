@@ -320,7 +320,8 @@ module Flambda2 = struct
 
     let o3 = {
       default with
-      cont_lifting_budget = 1_000; (* worst case : 1_000 budget -> ~+18% compilation time *)
+      cont_lifting_budget = 1_000;
+      (* in the worss case : 1_000 budget -> ~+18% compilation time *)
       cont_spec_threshold = 0.;
     }
 
