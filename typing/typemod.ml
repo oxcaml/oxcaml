@@ -185,8 +185,8 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
 [M] with [modalities] on it, calculate the modalities on the [item] to be used
 in the enclosing structure which is at [md_mode] and [loc_md]. *)
 let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
-  let pp : Mode.Hint.pinpoint = (loc, Structure_item item) in
-  let is_contained_by : Mode.Hint.is_contained_by =
+  let pp : Hint.pinpoint = (loc, Structure_item item) in
+  let is_contained_by : Hint.is_contained_by =
     { containing = Structure (item, Modality);
       container = (loc, Structure)}
   in
@@ -3543,7 +3543,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
               Signature_names.check_value names first_loc id;
               let vd, mode =  Env.find_value_no_locks_exn id newenv in
               let vd = Subst.Lazy.force_value_description vd in
-              let pp : Mode.Hint.pinpoint = (first_loc, Expression) in
+              let pp : Hint.pinpoint = (first_loc, Expression) in
               let modalities =
                 infer_modalities pp ~loc_md (Value, id) ~md_mode ~mode
               in
@@ -3812,7 +3812,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
               cls.cls_id, cls.cls_decl.cty_loc
         in
         let mode = apply_is_contained_by ~loc_md (Class, first_id) md_mode in
-        Mode.Value.submode_err (first_loc, Class) Types.class_mode mode;
+        Value.submode_err (first_loc, Class) Types.class_mode mode;
         let shape_map = List.fold_left (fun acc cls ->
             let open Typeclass in
             let loc = cls.cls_id_loc.Location.loc in
