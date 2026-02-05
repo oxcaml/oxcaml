@@ -374,5 +374,6 @@ val ddissector_sizes : bool ref
 val ddissector_verbose : bool ref
 val ddissector_partitions : bool ref
 val ddissector_inputs : string option ref
+val ddissector_linker_script : bool ref
 
 val prepend_directory : string -> string

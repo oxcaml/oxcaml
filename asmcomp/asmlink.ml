@@ -453,18 +453,26 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
       Some linker_args, Some temp_dir)
     else None, None
   in
+  let print_linker_script_path () =
+    match dissector_args with
+    | Some linker_args when !Clflags.ddissector_linker_script ->
+      Printf.eprintf "Dissector linker script: %s\n%!"
+        (Build_linker_args.linker_script linker_args)
+    | _ -> ()
+  in
   let cleanup_dissector_temp_dir () =
     match dissector_temp_dir with
     | None -> ()
     | Some dir ->
       if !Clflags.ddissector_partitions
-      then () (* Keep partition files for debugging *)
+      then () (* Keep files for debugging *)
       else Misc.remove_dir_contents dir
   in
   Misc.try_finally
     (fun () -> call_linker ?dissector_args ml_objfiles startup_obj output_name)
     ~always:(fun () ->
       remove_file startup_obj;
+      print_linker_script_path ();
       cleanup_dissector_temp_dir ())
 
 let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns

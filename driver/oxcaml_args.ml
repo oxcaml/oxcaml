@@ -442,6 +442,11 @@ let mk_no_manual_module_init f =
     Arg.Unit f,
     " Disable manual module initialization (default)" )
 
+let mk_ddissector_linker_script f =
+  ( "-ddissector-linker-script",
+    Arg.Unit f,
+    " Print path to linker script (implies -ddissector-partitions)" )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -1197,6 +1202,7 @@ module type Oxcaml_options = sig
   val no_dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
   val manual_module_init : unit -> unit
   val no_manual_module_init : unit -> unit
+  val ddissector_linker_script : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -1361,6 +1367,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_dissector_assume_lld_without_64_bit_eh_frames;
       mk_manual_module_init F.manual_module_init;
       mk_no_manual_module_init F.no_manual_module_init;
+      mk_ddissector_linker_script F.ddissector_linker_script;
       mk_gc_timings F.gc_timings;
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
@@ -1626,6 +1633,11 @@ module Oxcaml_options_impl = struct
 
   let manual_module_init = set' Oxcaml_flags.manual_module_init
   let no_manual_module_init = clear' Oxcaml_flags.manual_module_init
+
+  let ddissector_linker_script () =
+    Clflags.ddissector_linker_script := true;
+    Clflags.ddissector_partitions := true
+
   let gc_timings = set' Oxcaml_flags.gc_timings
   let no_mach_ir () = ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
@@ -2305,6 +2317,10 @@ module Extra_params = struct
     | "manual-module-init" -> set' Oxcaml_flags.manual_module_init
     | "no-manual-module-init" ->
         Oxcaml_flags.manual_module_init := false;
+        true
+    | "ddissector-linker-script" ->
+        Clflags.ddissector_linker_script := true;
+        Clflags.ddissector_partitions := true;
         true
     | _ -> false
 end
