@@ -888,9 +888,6 @@ let check_well_formed_module = ref (fun _ -> assert false)
 
 let initial_ikind_context = ref (fun _ -> assert false)
 
-let type_declaration_ikind_gated =
-  ref (fun ~context:_ ~path:_ -> assert false)
-
 (* Helper to decide whether to report an identifier shadowing
    by some 'open'. For labels and constructors, we do not report
    if the two elements are from the same re-exported declaration.
@@ -3111,13 +3108,13 @@ let add_language_extension_types env =
            match path with
            | Path.Pident id ->
              let type_ikind =
-               !type_declaration_ikind_gated ~context ~path
+               Ikind.type_declaration_ikind_gated ~context ~path
              in
              let type_unboxed_version =
                Option.map
                  (fun ud ->
                     let uik =
-                      !type_declaration_ikind_gated
+                      Ikind.type_declaration_ikind_gated
                         ~context
                         ~path:(Path.unboxed_version path)
                     in

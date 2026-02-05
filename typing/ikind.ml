@@ -723,9 +723,6 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
            (Array.to_list (Array.map Ldd.pp payload.coeffs))));
     Types.Constructor_ikind ikind
 
-let () =
-  Env.type_declaration_ikind_gated := type_declaration_ikind_gated
-
 let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
     ~(params : Types.type_expr list) (type_jkind : Types.jkind_l) :
     Types.type_ikind =
