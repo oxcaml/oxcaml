@@ -29,9 +29,23 @@ module Name = struct
     | Var var -> Var (V.create_local (prefix ^ "-" ^ V.name var))
 end
 
+module Stamp = struct
+  type t = int
+
+  let compare = Int.compare
+
+  let equal = Int.equal
+
+  let hash = Fun.id
+
+  let to_string = string_of_int
+
+  let format fmt s = Format.fprintf fmt "%d" s
+end
+
 type t =
   { name : Name.t;
-    stamp : int;
+    stamp : Stamp.t;
     typ : Cmm.machtype_component;
     preassigned : bool;
     mutable loc : location
