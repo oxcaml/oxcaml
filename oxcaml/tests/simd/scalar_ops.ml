@@ -232,6 +232,146 @@ module Int32 = struct
     check count_set_bits popcnt
 end
 
+module Int16 = struct
+  external count_leading_zeros : (int16[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int16_clz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external count_leading_zeros_nonzero_arg :
+    (int16[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int16_clz_nonzero_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external count_trailing_zeros : (int16[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int16_ctz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (** Same as [count_trailing_zeros] except if the argument is zero, then the
+      result is undefined. Emits more efficient code. *)
+  external count_trailing_zeros_nonzero_arg :
+    (int16[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int16_ctz_nonzero_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (** [count_set_bits n] returns the number of bits that are 1 in [n]. *)
+  external count_set_bits : (int16[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int16_popcnt_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  let check ?nonzero f g =
+    let nz = Option.value ~default:false nonzero in
+    let open Stdlib_stable.Int16 in
+    Random.set_state (Random.State.make [| 1234567890 |]);
+    if not nz then eqi (f zero) (g zero);
+    eqi (f one) (g one);
+    eqi (f minus_one) (g minus_one);
+    eqi (f max_int) (g max_int);
+    eqi (f min_int) (g min_int);
+    for _ = 0 to 100_000 do
+      let i = Random.int (to_int max_int) |> of_int in
+      let i = if Random.bool () then i else neg i in
+      if (not nz) || i <> 0S then eqi (f i) (g i)
+    done
+
+  let rec clz i =
+    if i = 0S
+    then 16
+    else if Stdlib_stable.Int16.(logand i 0x8000S = 0x8000S)
+    then 0
+    else 1 + clz (Stdlib_stable.Int16.shift_left i 1)
+
+  let rec ctz i =
+    if i = 0S
+    then 16
+    else if Stdlib_stable.Int16.(logand i 1S = 1S)
+    then 0
+    else 1 + ctz (Stdlib_stable.Int16.shift_right_logical i 1)
+
+  let rec popcnt i =
+    if i = 0S
+    then 0
+    else
+      Stdlib_stable.Int16.(logand i 1S |> to_int)
+      + popcnt Stdlib_stable.Int16.(shift_right_logical i 1)
+
+  let () =
+    check count_leading_zeros clz;
+    check ~nonzero:true count_leading_zeros_nonzero_arg clz;
+    check count_trailing_zeros ctz;
+    check ~nonzero:true count_trailing_zeros_nonzero_arg ctz;
+    check count_set_bits popcnt
+end
+
+module Int8 = struct
+  external count_leading_zeros : (int8[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int8_clz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external count_leading_zeros_nonzero_arg :
+    (int8[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int8_clz_nonzero_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external count_trailing_zeros : (int8[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int8_ctz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (** Same as [count_trailing_zeros] except if the argument is zero, then the
+      result is undefined. Emits more efficient code. *)
+  external count_trailing_zeros_nonzero_arg :
+    (int8[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int8_ctz_nonzero_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (** [count_set_bits n] returns the number of bits that are 1 in [n]. *)
+  external count_set_bits : (int8[@untagged]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_int8_popcnt_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  let check ?nonzero f g =
+    let nz = Option.value ~default:false nonzero in
+    let open Stdlib_stable.Int8 in
+    Random.set_state (Random.State.make [| 1234567890 |]);
+    if not nz then eqi (f zero) (g zero);
+    eqi (f one) (g one);
+    eqi (f minus_one) (g minus_one);
+    eqi (f max_int) (g max_int);
+    eqi (f min_int) (g min_int);
+    for _ = 0 to 100_000 do
+      let i = Random.int (to_int max_int) |> of_int in
+      let i = if Random.bool () then i else neg i in
+      if (not nz) || i <> 0s then eqi (f i) (g i)
+    done
+
+  let rec clz i =
+    if i = 0s
+    then 8
+    else if Stdlib_stable.Int8.(logand i 0x80s = 0x80s)
+    then 0
+    else 1 + clz (Stdlib_stable.Int8.shift_left i 1)
+
+  let rec ctz i =
+    if i = 0s
+    then 8
+    else if Stdlib_stable.Int8.(logand i 1s = 1s)
+    then 0
+    else 1 + ctz (Stdlib_stable.Int8.shift_right_logical i 1)
+
+  let rec popcnt i =
+    if i = 0s
+    then 0
+    else
+      Stdlib_stable.Int8.(logand i 1s |> to_int)
+      + popcnt Stdlib_stable.Int8.(shift_right_logical i 1)
+
+  let () =
+    check count_leading_zeros clz;
+    check ~nonzero:true count_leading_zeros_nonzero_arg clz;
+    check count_trailing_zeros ctz;
+    check ~nonzero:true count_trailing_zeros_nonzero_arg ctz;
+    check count_set_bits popcnt
+end
+
 module Float = struct
   external to_int64 : float -> int64
     = "caml_int64_of_float" "caml_int64_of_float_unboxed"
