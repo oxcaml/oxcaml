@@ -58,4 +58,10 @@ extern enum caml_byte_program_mode caml_byte_program_mode;
 
 #endif /* CAML_INTERNALS */
 
+/* Initialize a module and its dependencies by name.
+   Requires the executable to be compiled with -manual-module-init (native code).
+   In bytecode, raises a fatal error / exception since manual module init
+   is not supported. */
+CAMLextern void caml_init_module(const char *name);
+
 #endif /* CAML_STARTUP_H */
