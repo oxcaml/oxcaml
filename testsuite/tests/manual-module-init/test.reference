@@ -84,4 +84,17 @@ Step 6: done
 Step 7: Verify Reentrant_a is now initialized (should be no-op)
 Step 7: done
 
+Step 8: Test init_module called from OCaml (Ocaml_init uses caml_init_module_from_ocaml)
+Ocaml_init: initializing
+Ocaml_init: calling init_module "Reentrant_c" from OCaml
+Ocaml_init: Reentrant_c initialized from OCaml
+Ocaml_init: got Reentrant_c magic_value = 777 via C stub
+Ocaml_init: calling init_module "Reentrant_a" from OCaml
+Ocaml_init: Reentrant_a initialized from OCaml
+Ocaml_init: calling init_module "Base" (should be no-op)
+Ocaml_init: Base init returned
+Ocaml_init: Base.base_value = 100
+Ocaml_init: initialization complete
+Step 8: done
+
 === All tests passed ===

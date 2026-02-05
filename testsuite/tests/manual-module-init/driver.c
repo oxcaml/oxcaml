@@ -60,6 +60,12 @@ int main(int argc, char **argv)
   printf("Step 7: done\n\n");
   fflush(stdout);
 
+  printf("Step 8: Test init_module called from OCaml (Ocaml_init uses caml_init_module_from_ocaml)\n");
+  fflush(stdout);
+  caml_init_module("Ocaml_init");
+  printf("Step 8: done\n\n");
+  fflush(stdout);
+
   printf("=== All tests passed ===\n");
   return 0;
 }

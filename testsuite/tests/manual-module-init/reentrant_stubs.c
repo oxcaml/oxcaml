@@ -59,3 +59,21 @@ CAMLprim value init_reentrant_a_stub(value unit)
   CAMLreturn(Val_int(42));
 }
 
+/* Get the magic value from Reentrant_c via callback.
+   Used by Ocaml_init to verify Reentrant_c was initialized. */
+CAMLprim value get_reentrant_c_magic_stub(value unit)
+{
+  CAMLparam1(unit);
+  CAMLlocal1(result);
+  const value *get_magic_fn;
+
+  get_magic_fn = caml_named_value("get_reentrant_c_magic");
+  if (get_magic_fn == NULL) {
+    printf("C stub: ERROR - get_reentrant_c_magic callback not found!\n");
+    fflush(stdout);
+    CAMLreturn(Val_int(-1));
+  }
+
+  result = caml_callback(*get_magic_fn, Val_unit);
+  CAMLreturn(result);
+}
