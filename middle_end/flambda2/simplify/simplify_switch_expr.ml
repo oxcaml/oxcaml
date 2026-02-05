@@ -792,8 +792,9 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
                 cost_metrics
             in
             let threshold = Flambda_features.Expert.cont_spec_threshold () in
-            if Float.compare threshold 0. < 0
-               || Float.compare final_cost threshold > 0
+            if
+              Float.compare threshold 0. < 0
+              || Float.compare final_cost threshold > 0
             then dacc, cont, `Too_costly
             else
               let dacc =
