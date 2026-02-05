@@ -341,7 +341,7 @@ let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
 let predef_ikind_context =
-  let unreachable _ = assert false in
+  let unreachable _ = failwith "[predef_ikind_context] We unexpectedly hit a type when computing ikinds for predef types" in
   {
     Jkind.jkind_of_type = unreachable;
     is_abstract = unreachable;
