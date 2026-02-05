@@ -1256,30 +1256,22 @@ let map_ext fn exts =
   | d1 :: dl -> fn Text_first d1 :: List.map (fn Text_next) dl
 
 let rec apply_modalities_signature ~recursive env modalities sg =
+  let open Mode.Modality in
   let env = Env.add_signature sg env in
   let concat_modalities m =
-    m
-    |> Mode.Modality.to_const_exn
-    |> (fun then_ -> Mode.Modality.Const.concat ~then_ modalities)
-    |> Mode.Modality.of_const
+    Const.concat ~then_:(to_const_exn m) modalities
   in
   List.map (function
   | Sig_value (id, vd, vis) ->
       let val_modalities = concat_modalities vd.val_modalities in
-      let vd = {vd with val_modalities} in
+      let vd = {vd with val_modalities = of_const val_modalities} in
       Sig_value (id, vd, vis)
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
-      let md_type = apply_modalities_module_type env modalities md.md_type in
-      let md_modalities =
-        match md_type with
-        | Mty_functor _ | Mty_alias _ ->
-            (* Functors/aliases: add modalities to md_modalities *)
-            concat_modalities md.md_modalities
-        | Mty_ident _ | Mty_signature _ | Mty_strengthen _ ->
-            (* Signatures: modalities applied deeply, keep md_modalities *)
-            md.md_modalities
+      let md_modalities = concat_modalities md.md_modalities in
+      let md_type, md_modalities =
+        apply_modalities_module_type env md_modalities md.md_type
       in
-      let md = {md with md_type; md_modalities} in
+      let md = {md with md_type; md_modalities = of_const md_modalities} in
       Sig_module (id, pres, md, rec_, vis)
   | item -> item
   ) sg
@@ -1288,15 +1280,18 @@ and apply_modalities_module_type env modalities = function
   | Mty_ident p ->
       let mtd = Env.find_modtype p env in
       begin match mtd.mtd_type with
-      | None -> Mty_ident p
+      | None -> Mty_ident p, Mode.Modality.Const.id
       | Some mty -> apply_modalities_module_type env modalities mty
       end
   | Mty_strengthen (mty, p, alias) ->
-      Mty_strengthen (apply_modalities_module_type env modalities mty, p, alias)
+      let mty', modalities' =
+        apply_modalities_module_type env modalities mty
+      in
+      Mty_strengthen (mty', p, alias), modalities'
   | Mty_signature sg ->
       let sg = apply_modalities_signature ~recursive:true env modalities sg in
-      Mty_signature sg
-  | (Mty_functor _ | Mty_alias _) as mty -> mty
+      Mty_signature sg, Mode.Modality.Const.id
+  | (Mty_functor _ | Mty_alias _) as mty  -> mty, modalities
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
@@ -1332,20 +1327,10 @@ let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
   match Mode.Modality.Const.is_id modalities.moda_modalities with
   | true -> mty, modalities
   | false ->
-      let mty' =
-        apply_modalities_module_type env modalities.moda_modalities mty
-      in
-      let return_modalities =
-        match mty with
-        | Mty_functor _ | Mty_alias _ ->
-            (* Functors/aliases: keep modalities on md_modalities *)
-            modalities
-        | Mty_ident _ | Mty_signature _ | Mty_strengthen _ ->
-            (* Signatures: modalities were applied deeply, reset them *)
-            (* CR modes: do not reset here.*)
-            { modalities with moda_modalities = Mode.Modality.Const.id }
-      in
-      (mty', return_modalities)
+    let mty, moda_modalities =
+      apply_modalities_module_type env modalities.moda_modalities mty
+    in
+    mty, { modalities with moda_modalities }
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
