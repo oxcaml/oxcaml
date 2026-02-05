@@ -2029,10 +2029,7 @@ module Report = struct
 
   [@@@warning "-4"]
 
-  (* Preserve access to Report.t before shadowing with open *)
-  type 'a report = 'a t
-
-  open Format_doc
+  module Fmt = Format_doc
 
   type sound =
     | Consonant
@@ -2048,7 +2045,7 @@ module Report = struct
     let article =
       if capitalize then String.capitalize_ascii article else article
     in
-    dprintf "%s %s" article s
+    Fmt.dprintf "%s %s" article s
 
   let print_lock_item : lock_item -> _ = function
     | Module -> print_article_noun Consonant "module"
@@ -2061,7 +2058,7 @@ module Report = struct
     | Ident { category; lid } ->
       Some
         (fun ~definite ~capitalize ->
-          dprintf "%t %a"
+          Fmt.dprintf "%t %a"
             (print_lock_item ~definite ~capitalize category)
             (Misc.Style.as_inline_code !print_longident)
             lid)
@@ -2077,7 +2074,7 @@ module Report = struct
     | Cases_result ->
       Some
         (fun ~definite ~capitalize ->
-          dprintf "%t of %t"
+          Fmt.dprintf "%t of %t"
             (print_article_noun ~definite:true ~capitalize Consonant "result")
             (print_article_noun ~definite ~capitalize:false Consonant "cases"))
 
@@ -2088,12 +2085,12 @@ module Report = struct
         match Location.is_none loc, definite with
         | true, _ -> print_desc ~definite:false ~capitalize ppf
         | false, true ->
-          fprintf ppf "%t at %a"
+          Fmt.fprintf ppf "%t at %a"
             (print_desc ~definite ~capitalize)
             (Location.Doc.loc ~capitalize_first:false)
             loc
         | false, false ->
-          fprintf ppf "%t (at %a)"
+          Fmt.fprintf ppf "%t (at %a)"
             (print_desc ~definite ~capitalize)
             (Location.Doc.loc ~capitalize_first:false)
             loc)
@@ -2103,19 +2100,20 @@ module Report = struct
     | _ -> true
 
   let print_mutable_part ppf = function
-    | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s
-    | Array_elements -> fprintf ppf "array elements"
+    | Record_field s ->
+      Fmt.fprintf ppf "mutable field %a" Misc.Style.inline_code s
+    | Array_elements -> Fmt.fprintf ppf "array elements"
 
   let print_always_dynamic = function
-    | Application -> dprintf "function applications"
-    | Try_with -> dprintf "try-with clauses"
+    | Application -> Fmt.dprintf "function applications"
+    | Try_with -> Fmt.dprintf "try-with clauses"
 
   let print_region_desc : region_desc -> _ = function
     | Borrow -> print_article_noun Consonant "borrow region"
 
   let print_region : capitalize:_ -> region -> _ =
    fun ~capitalize (loc, desc) ->
-    dprintf "%t at %a"
+    Fmt.dprintf "%t at %a"
       (print_region_desc desc ~definite:true ~capitalize)
       (Location.Doc.loc ~capitalize_first:false)
       loc
@@ -2128,89 +2126,91 @@ module Report = struct
       (match pp_desc with
       | Lazy ->
         (* if we already said it's a lazy, we don't need to emphasize it again. *)
-        pp_print_string ppf "lazy expressions always need"
-      | _ -> pp_print_string ppf "it is a lazy expression and thus needs");
-      pp_print_string ppf " to be allocated on the heap"
+        Fmt.pp_print_string ppf "lazy expressions always need"
+      | _ -> Fmt.pp_print_string ppf "it is a lazy expression and thus needs");
+      Fmt.pp_print_string ppf " to be allocated on the heap"
     | Class_legacy_monadic | Class_legacy_comonadic ->
       (match pp_desc with
       | Ident { category = Class; _ } ->
         (* if we already said it's a class, we don't need to emphasize it again. *)
-        pp_print_string ppf "classes are always"
-      | _ -> pp_print_string ppf "it is a class and thus");
-      pp_print_string ppf " at the legacy modes"
+        Fmt.pp_print_string ppf "classes are always"
+      | _ -> Fmt.pp_print_string ppf "it is a class and thus");
+      Fmt.pp_print_string ppf " at the legacy modes"
     | Tailcall_function ->
-      pp_print_string ppf "it is the function in a tail call"
+      Fmt.pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
-      pp_print_string ppf "it is an argument in a tail call"
-    | Mutable_read m -> fprintf ppf "its %a is being read" print_mutable_part m
+      Fmt.pp_print_string ppf "it is an argument in a tail call"
+    | Mutable_read m ->
+      Fmt.fprintf ppf "its %a is being read" print_mutable_part m
     | Mutable_write m ->
-      fprintf ppf "its %a is being written" print_mutable_part m
+      Fmt.fprintf ppf "its %a is being written" print_mutable_part m
     | Lazy_forced -> (
       match pp_desc with
       | Lazy ->
         (* if we already said it's a lazy, we don't need to emphasize it again. *)
-        pp_print_string ppf "it is being forced"
-      | _ -> pp_print_string ppf "it is a lazy value being forced")
+        Fmt.pp_print_string ppf "it is being forced"
+      | _ -> Fmt.pp_print_string ppf "it is a lazy value being forced")
     | Function_return ->
-      fprintf ppf
+      Fmt.fprintf ppf
         "it is a function return value.@ Hint: Use exclave_ to return a local \
          value"
     | Stack_expression ->
-      fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
+      Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
     | Module_allocated_on_heap ->
       (match pp_desc with
       | Ident { category = Module; _ } | Functor ->
         (* if we already said it's a module, we don't need to emphasize it again. *)
-        pp_print_string ppf "modules always need"
-      | _ -> pp_print_string ppf "it is a module and thus needs");
-      pp_print_string ppf " to be allocated on the heap"
+        Fmt.pp_print_string ppf "modules always need"
+      | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
+      Fmt.pp_print_string ppf " to be allocated on the heap"
     | Is_used_in pp ->
       let print_pp = print_pinpoint pp |> Option.get in
-      fprintf ppf "it is used in %t"
+      Fmt.fprintf ppf "it is used in %t"
         (print_pp ~definite:false ~capitalize:false)
     | Always_dynamic x ->
-      fprintf ppf "%t are always dynamic" (print_always_dynamic x)
-    | Branching -> fprintf ppf "it has branches"
-    | Borrowed _ -> fprintf ppf "it is borrowed"
+      Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
+    | Branching -> Fmt.fprintf ppf "it has branches"
+    | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->
-      fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
+      Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
 
-  let print_allocation_l : allocation -> formatter -> unit =
+  let print_allocation_l : allocation -> Fmt.formatter -> unit =
    fun { txt; loc } ->
     match txt with
     | Unknown ->
-      dprintf "is allocated at %a containing data"
+      Fmt.dprintf "is allocated at %a containing data"
         (Location.Doc.loc ~capitalize_first:false)
         loc
     | Optional_argument ->
-      dprintf
+      Fmt.dprintf
         "is an optional argument wrapper (and thus allocated) of the value at \
          %a"
         (Location.Doc.loc ~capitalize_first:false)
         loc
     | Function_coercion ->
-      dprintf
+      Fmt.dprintf
         "is a partial application of the function at %a on omittable parameters"
         (Location.Doc.loc ~capitalize_first:false)
         loc
     | Float_projection ->
-      dprintf "is projected (at %a) from a float record (and thus allocated)"
+      Fmt.dprintf
+        "is projected (at %a) from a float record (and thus allocated)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
 
-  let print_allocation_r : allocation -> formatter -> unit =
+  let print_allocation_r : allocation -> Fmt.formatter -> unit =
    fun { txt; _ } ->
     match txt with
-    | Unknown -> dprintf "is an allocation"
+    | Unknown -> Fmt.dprintf "is an allocation"
     | Optional_argument ->
-      dprintf
+      Fmt.dprintf
         "is to be put in an optional argument wrapper (and thus an allocation)"
     | Function_coercion ->
-      dprintf
+      Fmt.dprintf
         "is to omit some parameters by partial application (and thus an \
          allocation)"
     | Float_projection ->
-      dprintf "is a float-record projection (and thus an allocation)"
+      Fmt.dprintf "is a float-record projection (and thus an allocation)"
 
   let modality_if_relevant ~fixpoint pp =
     if
@@ -2223,11 +2223,11 @@ module Report = struct
          axis is total ordering, the modality is solely responsible for the
          bound, and we omit the remaining chain. *)
       (* CR-someday zqian: print the modality on the offending axis. *)
-      ( (fun ppf Modality -> fprintf ppf " (with some modality)"),
+      ( (fun ppf Modality -> Fmt.fprintf ppf " (with some modality)"),
         (Location.none, Unknown : pinpoint) )
 
   let print_contains :
-      fixpoint:bool -> contains -> ((formatter -> unit) * pinpoint) option =
+      fixpoint:bool -> contains -> ((Fmt.formatter -> unit) * pinpoint) option =
    fun ~fixpoint { containing; contained } ->
     print_pinpoint contained
     |> Option.map (fun print_pp ->
@@ -2237,21 +2237,21 @@ module Report = struct
         in
         let pr =
           match containing with
-          | Tuple -> dprintf "is a tuple that contains %t" print_pp
+          | Tuple -> Fmt.dprintf "is a tuple that contains %t" print_pp
           | Record (s, moda) ->
-            dprintf "is a record whose field %a%a is %t" Misc.Style.inline_code
-              s maybe_modality moda print_pp
+            Fmt.dprintf "is a record whose field %a%a is %t"
+              Misc.Style.inline_code s maybe_modality moda print_pp
           | Array moda ->
-            dprintf "is an array that contains%a %t" maybe_modality moda
+            Fmt.dprintf "is an array that contains%a %t" maybe_modality moda
               print_pp
           | Constructor (s, moda) ->
-            dprintf "contains (via constructor %a)%a %t" Misc.Style.inline_code
-              s maybe_modality moda print_pp
+            Fmt.dprintf "contains (via constructor %a)%a %t"
+              Misc.Style.inline_code s maybe_modality moda print_pp
         in
         pr, contained)
 
   let print_is_contained_by :
-      fixpoint:bool -> is_contained_by -> (formatter -> unit) * pinpoint =
+      fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =
    fun ~fixpoint { containing; container } ->
     let maybe_modality, pp =
       modality_if_relevant ~fixpoint (container, Expression)
@@ -2259,20 +2259,20 @@ module Report = struct
     let pr =
       match containing with
       | Tuple ->
-        dprintf "is an element of the tuple at %a"
+        Fmt.dprintf "is an element of the tuple at %a"
           (Location.Doc.loc ~capitalize_first:false)
           container
       | Record (s, moda) ->
-        dprintf "is the field %a%a of the record at %a" Misc.Style.inline_code s
-          maybe_modality moda
+        Fmt.dprintf "is the field %a%a of the record at %a"
+          Misc.Style.inline_code s maybe_modality moda
           (Location.Doc.loc ~capitalize_first:false)
           container
       | Array moda ->
-        dprintf "is an element%a of the array at %a" maybe_modality moda
+        Fmt.dprintf "is an element%a of the array at %a" maybe_modality moda
           (Location.Doc.loc ~capitalize_first:false)
           container
       | Constructor (s, moda) ->
-        dprintf "is contained (via constructor %a)%a in the value at %a"
+        Fmt.dprintf "is contained (via constructor %a)%a in the value at %a"
           Misc.Style.inline_code s maybe_modality moda
           (Location.Doc.loc ~capitalize_first:false)
           container
@@ -2287,36 +2287,37 @@ module Report = struct
       fixpoint:bool ->
       pinpoint ->
       (l * r) morph ->
-      ((formatter -> unit) * pinpoint) option =
+      ((Fmt.formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
-          ( dprintf "closes over %t" (print_pp ~definite:true ~capitalize:false),
+          ( Fmt.dprintf "closes over %t"
+              (print_pp ~definite:true ~capitalize:false),
             pp ))
     | Close_over (Monadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
-          ( dprintf "contains a usage (of %t)"
+          ( Fmt.dprintf "contains a usage (of %t)"
               (print_pp ~definite:true ~capitalize:false),
             pp ))
     | Is_closed_by (_, { closure = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
-          ( dprintf "is used inside %t"
+          ( Fmt.dprintf "is used inside %t"
               (print_pp ~definite:true ~capitalize:false),
             pp ))
     | Captured_by_partial_application ->
       Some
-        ( dprintf "is captured by a partial application",
+        ( Fmt.dprintf "is captured by a partial application",
           (Location.none, Expression) )
     | Adj_captured_by_partial_application ->
       Some
-        ( dprintf "has a partial application capturing a value",
+        ( Fmt.dprintf "has a partial application capturing a value",
           (Location.none, Expression) )
-    | Crossing -> Some (dprintf "crosses with something", pp)
+    | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
     | Contains_l (_, contains) -> print_contains ~fixpoint contains
@@ -2438,7 +2439,7 @@ module Report = struct
     | Left ahint -> print_ahint `Left pp obj ppf ahint
     | Right ahint -> print_ahint `Right pp obj ppf ahint
 
-  let print : type a. pinpoint -> a C.obj -> a report -> print_error =
+  let print : type a. pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj { left; right } ->
     let actual, expected =
       if C.is_opposite obj
@@ -2494,12 +2495,12 @@ module Error = struct
     let open Format_doc in
     let loc, desc = pp in
     let print ppf () =
-      let open_box = dprintf "@[<hov 2>" in
-      let reopen_box = dprintf "@]@ %t" open_box in
+      let open_box = Fmt.dprintf "@[<hov 2>" in
+      let reopen_box = Fmt.dprintf "@]@ %t" open_box in
       let print_desc = Report.print_pinpoint_desc desc in
       (let print_desc =
          match print_desc with
-         | None -> dprintf "This"
+         | None -> Fmt.dprintf "This"
          | Some print_desc -> print_desc ~definite:true ~capitalize:true
        in
        fprintf ppf "%t%t is " open_box print_desc);
@@ -2508,9 +2509,9 @@ module Error = struct
       | Mode_with_hint ->
         let print_desc =
           match print_desc with
-          | None -> dprintf "the highlighted"
+          | None -> Fmt.dprintf "the highlighted"
           | Some print_desc ->
-            dprintf "%t highlighted"
+            Fmt.dprintf "%t highlighted"
               (print_desc ~definite:true ~capitalize:false)
         in
         fprintf ppf ".%tHowever, %t is expected to be " reopen_box print_desc
