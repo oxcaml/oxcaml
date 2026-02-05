@@ -44,8 +44,8 @@ let bound_continuations = function
   | Recursive { continuation_handlers; _ } ->
     Continuation.Lmap.keys continuation_handlers
 
-let is_wrapper = function
-  | Non_recursive { is_wrapper; _ } -> is_wrapper
+let can_be_lifted = function
+  | Non_recursive { can_be_lifted; _ } -> can_be_lifted
   | Recursive _ -> false
 
 let add_params_to_lift t params_to_lift =
@@ -76,7 +76,7 @@ let add_params_to_lift t params_to_lift =
         lifted_params = old_lifted;
         handler;
         is_exn_handler;
-        is_wrapper;
+        can_be_lifted;
         is_cold
       } ->
     if Lifted_cont_params.is_empty old_lifted
@@ -84,7 +84,7 @@ let add_params_to_lift t params_to_lift =
       let handler = Flambda.Expr.apply_renaming handler renaming in
       let non_rec =
         Non_recursive_handler.create ~cont ~params ~lifted_params ~handler
-          ~is_exn_handler ~is_wrapper ~is_cold
+          ~is_exn_handler ~can_be_lifted ~is_cold
       in
       Non_recursive non_rec
     else fail ()

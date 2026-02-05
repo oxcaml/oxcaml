@@ -225,7 +225,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
       { handler;
         num_free_occurrences = _;
         is_applied_with_traps = _;
-        wrapper = _
+        can_be_lifted = _
       } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
         let handler = Non_recursive_let_cont_handler.handler handler in

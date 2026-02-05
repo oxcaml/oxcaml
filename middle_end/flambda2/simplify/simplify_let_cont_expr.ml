@@ -164,7 +164,7 @@ type rebuild_let_cont_data =
 
 (* Helpers *)
 
-let split_non_recursive_let_cont ~wrapper:is_wrapper handler =
+let split_non_recursive_let_cont ~can_be_lifted handler =
   let cont, body =
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
         cont, body)
@@ -177,7 +177,7 @@ let split_non_recursive_let_cont ~wrapper:is_wrapper handler =
   in
   ( body,
     Non_recursive_handler.create ~cont ~params ~handler
-      ~lifted_params:Lifted_cont_params.empty ~is_exn_handler ~is_wrapper
+      ~lifted_params:Lifted_cont_params.empty ~is_exn_handler ~can_be_lifted
       ~is_cold )
 
 let split_recursive_let_cont handlers =
@@ -1551,7 +1551,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
          handler;
          is_exn_handler;
          is_cold;
-         is_wrapper = _
+         can_be_lifted = _
        } as original) -> (
     match
       Continuation_uses_env.get_continuation_uses body_continuation_uses_env
@@ -1716,7 +1716,7 @@ and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
   let denv_for_join = data.denv_for_join in
   match DA.are_lifting_conts dacc with
   | Lifting_out_of { continuation = _ } ->
-    if Original_handlers.is_wrapper data.handlers
+    if not (Original_handlers.can_be_lifted data.handlers)
     then
       (* wrapper continuations are not lifted, and will be duplicated and
          re-simplified for each specialized continuation, so we can just not
@@ -1804,7 +1804,7 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     in
     DE.add_lifting_cost lifting_cost
       (DE.define_continuations denv_for_body bound_continuations
-         ~is_wrapper:(Original_handlers.is_wrapper data.handlers))
+         ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers))
   in
   (* During specialization, we must take care of correctly handling let-bound
      continuations that have been lifted during the first downwards pass, and
@@ -1819,7 +1819,7 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     | Replayed continuation_mapping -> (
       match data.handlers with
       | Non_recursive non_rec_handler ->
-        if non_rec_handler.is_wrapper
+        if not non_rec_handler.can_be_lifted
         then
           (* wrapper continuations (such as the ones introduced for
              over-applications), are not lifted, and are duplicated.
@@ -1895,9 +1895,9 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
      call [simplify_let_cont_stage1]. *)
   let body, handlers =
     match (let_cont : Let_cont.t) with
-    | Non_recursive { handler; wrapper; _ } ->
+    | Non_recursive { handler; can_be_lifted; _ } ->
       let body, non_rec_handler =
-        split_non_recursive_let_cont ~wrapper handler
+        split_non_recursive_let_cont ~can_be_lifted handler
       in
       let original_handlers =
         Original_handlers.create_non_recursive non_rec_handler

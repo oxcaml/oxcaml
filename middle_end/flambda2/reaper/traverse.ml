@@ -402,7 +402,7 @@ and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
       { handler;
         num_free_occurrences = _;
         is_applied_with_traps = _;
-        wrapper = _
+        can_be_lifted = _
       } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
         traverse_let_cont_non_recursive denv acc cont ~body handler)

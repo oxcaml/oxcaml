@@ -19,7 +19,7 @@ type t = private
     lifted_params : Lifted_cont_params.t;
     handler : Flambda.Expr.t;
     is_exn_handler : bool;
-    is_wrapper : bool;
+    can_be_lifted : bool;
     is_cold : bool
   }
 
@@ -29,7 +29,7 @@ val create :
   lifted_params:Lifted_cont_params.t ->
   handler:Flambda.Expr.t ->
   is_exn_handler:bool ->
-  is_wrapper:bool ->
+  can_be_lifted:bool ->
   is_cold:bool ->
   t
 

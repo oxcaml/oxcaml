@@ -129,7 +129,7 @@ let define_variable var replay =
     | Bound_continuations _ -> error_mismatched_action replay prev_bound action)
   | Replaying { previous_history = []; _ } -> error_empty_history replay action
 
-let define_continuations ~is_wrapper conts replay =
+let define_continuations ~can_be_lifted conts replay =
   let action : Action.t = Bound_continuations conts in
   match replay with
   | First_pass { history } -> First_pass { history = action :: history }
@@ -144,11 +144,12 @@ let define_continuations ~is_wrapper conts replay =
       (* Continuations that are created during the downwards pass (e.g. wrapper
          continuations for over-applications) cannot be renamed versions of each
          other, so the check does not make sense. *)
-      if (not is_wrapper)
-         && not
-              (List.compare_lengths prev_conts conts = 0
-              && Misc.Stdlib.List.equal Continuation.is_renamed_version_of
-                   prev_conts conts)
+      if
+        can_be_lifted
+        && not
+             (List.compare_lengths prev_conts conts = 0
+             && Misc.Stdlib.List.equal Continuation.is_renamed_version_of
+                  prev_conts conts)
       then error_not_renamed_version_of replay prev_bound action
       else
         let continuations =
