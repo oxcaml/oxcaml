@@ -46,6 +46,8 @@ module type S = sig
 
   val meet : node -> node -> node
 
+  val sum : node -> ('a -> node) -> 'a list -> node
+
   (** [sub_subsets a b] computes co-Heyting subtraction (a - b) for LDDs. *)
   val sub_subsets : node -> node -> node
 

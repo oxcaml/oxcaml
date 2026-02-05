@@ -334,6 +334,12 @@ module Make (V : Ordered) = struct
   (* --------- public constructors --------- *)
   let[@inline] const (c : Axis_lattice.t) = leaf c
 
+  let sum base f xs =
+    List.fold_left
+      (fun acc x -> join acc (f x))
+      base
+      xs
+
   let[@inline] node_of_var (v : var) : node = v.var_node
 
   let rigid (name : V.t) = Var.make_rigid ~name ()
