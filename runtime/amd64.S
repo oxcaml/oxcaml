@@ -1472,7 +1472,7 @@ CFI_STARTPROC
         movq    %r12, %rax      /* %rax := argument to the function in %rbx */
     /*  check if stack null, then already used */
         testq   %r10, %r10
-        jz      4f
+        jz      LBL(continuation_already_resumed)
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers %rax, %rsi and %r10 before C call */
         ENTER_FUNCTION
@@ -1527,7 +1527,8 @@ CFI_STARTPROC
         /* Jump into the second half of caml_do_call_gc, which will restore the
            registers and `ret` to resume */
         jmp     LBL(resume_from_preempt)
-4:      ENTER_FUNCTION
+LBL(continuation_already_resumed):
+        ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
                                   in the TSan backtrace */
         LEA_VAR(caml_raise_continuation_already_resumed, %rax)
