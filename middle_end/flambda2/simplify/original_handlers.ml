@@ -46,7 +46,7 @@ let bound_continuations = function
 
 let can_be_lifted = function
   | Non_recursive { can_be_lifted; _ } -> can_be_lifted
-  | Recursive _ -> false
+  | Recursive _ -> true
 
 let add_params_to_lift t params_to_lift =
   let lifted_params, renaming = Lifted_cont_params.rename params_to_lift in
