@@ -1058,7 +1058,7 @@ void caml_free_gc_regs_buckets(value *gc_regs_buckets)
   }
 }
 
-void assert_is_cont(value cont) {
+static void assert_is_cont(value cont) {
   CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
 }
 
