@@ -432,6 +432,16 @@ let mk_no_dissector_assume_lld_without_64_bit_eh_frames f =
     Arg.Unit f,
     " Do not assume LLD linker limitation" )
 
+let mk_manual_module_init f =
+  ( "-manual-module-init",
+    Arg.Unit f,
+    " Enable manual module initialization (emit unit dependency table)" )
+
+let mk_no_manual_module_init f =
+  ( "-no-manual-module-init",
+    Arg.Unit f,
+    " Disable manual module initialization (default)" )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -1195,6 +1205,8 @@ module type Oxcaml_options = sig
   val ddissector_inputs : string -> unit
   val dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
   val no_dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val manual_module_init : unit -> unit
+  val no_manual_module_init : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -1359,6 +1371,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.dissector_assume_lld_without_64_bit_eh_frames;
       mk_no_dissector_assume_lld_without_64_bit_eh_frames
         F.no_dissector_assume_lld_without_64_bit_eh_frames;
+      mk_manual_module_init F.manual_module_init;
+      mk_no_manual_module_init F.no_manual_module_init;
       mk_gc_timings F.gc_timings;
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
@@ -1624,6 +1638,8 @@ module Oxcaml_options_impl = struct
   let no_dissector_assume_lld_without_64_bit_eh_frames =
     clear' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
 
+  let manual_module_init = set' Oxcaml_flags.manual_module_init
+  let no_manual_module_init = clear' Oxcaml_flags.manual_module_init
   let gc_timings = set' Oxcaml_flags.gc_timings
   let no_mach_ir () = ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
@@ -2306,6 +2322,10 @@ module Extra_params = struct
         set' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
     | "no-dissector-assume-lld-without-64-bit-eh-frames" ->
         Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames := false;
+        true
+    | "manual-module-init" -> set' Oxcaml_flags.manual_module_init
+    | "no-manual-module-init" ->
+        Oxcaml_flags.manual_module_init := false;
         true
     | _ -> false
 end

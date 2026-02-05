@@ -496,5 +496,8 @@ let cached_generic_functions_path =
 let dissector_assume_lld_without_64_bit_eh_frames = ref true
   (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)
 
+let manual_module_init = ref false
+  (* -[no-]manual-module-init *)
+
 let () =
   if Clflags.is_flambda2 () then set_o2 ()
