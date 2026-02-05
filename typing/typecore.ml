@@ -7574,7 +7574,10 @@ and type_expect_
           Alloc.Const.legacy typ
       in
       let () =
-        match constrain_type_jkind env typ.ctyp_type (Jkind.Builtin.value ~why:Quotation_result) with
+        match
+          constrain_type_jkind env typ.ctyp_type
+            (Jkind.Builtin.value ~why:Quotation_result)
+        with
         | Ok () -> ()
         | Error err ->
             raise (Error (loc, env, Eval_non_value (typ.ctyp_type, err)))

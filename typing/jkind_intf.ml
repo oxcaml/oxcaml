@@ -341,6 +341,7 @@ module History = struct
     | Evaluation_result
     | Tquote
     | Tsplice
+    | Tquote_eval
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =

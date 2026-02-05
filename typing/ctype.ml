@@ -829,8 +829,12 @@ let rec generalize stage_offset ty =
           lower_all ty
         else
           iter_type_expr (generalize stage_offset) ty
-    | Tquote ty' -> generalize (stage_offset + 1) ty'
-    | Tsplice ty' -> generalize (stage_offset - 1) ty'
+    | Tquote ty' ->
+        generalize (stage_offset + 1) ty'
+    | Tquote_eval ty' ->
+        generalize (stage_offset + 1) ty'
+    | Tsplice ty' ->
+        generalize (stage_offset - 1) ty'
     | Tconstr (_, _, abbrev) ->
         iter_abbrev (generalize stage_offset) !abbrev;
         iter_type_expr (generalize stage_offset) ty
@@ -2221,6 +2225,7 @@ let rec extract_concrete_typedecl env ty =
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
+  | Tquote_eval ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2369,7 +2374,7 @@ let contained_without_boxing env ty =
   | Tpoly (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
-  | Tquote _ | Tsplice _ -> []
+  | Tquote _ | Tsplice _ | Tquote_eval _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -2481,6 +2486,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
   | Tquote _ -> Jkind.Builtin.value ~why:Tquote
   | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
+  | Tquote_eval _ -> Jkind.Builtin.value ~why:Tquote_eval
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3563,6 +3569,8 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs env t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->
             mcomp type_pairs env t1 t2
+        | (Tquote_eval t1, Tquote_eval t2, _, _) ->
+            mcomp type_pairs env t1 t2
         | (Tsplice t1, _, _, _) ->
             mcomp type_pairs env t1 t2'
         | (_, Tsplice t2, _, _) ->
@@ -4190,8 +4198,11 @@ and unify3 uenv t1 t1' t2 t2' =
       unify3_var uenv jkind t1' t2 t2'
   | (_, Tvar { jkind }) ->
       unify3_var uenv jkind t2' t1 t1'
-  | (Tquote t1, Tquote t2)
+  | (Tquote t1, Tquote t2) ->
+      unify uenv t1 t2
   | (Tsplice t1, Tsplice t2) ->
+      unify uenv t1 t2
+  | (Tquote_eval t1, Tquote_eval t2) ->
       unify uenv t1 t2
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       set_type_desc t2' d2;
@@ -5549,6 +5560,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tsplice t1, Tsplice t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
+          | (Tquote_eval t1, Tquote_eval t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (Tquote t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
               moregen inst_nongen variance type_pairs env t1 t2
@@ -6012,6 +6025,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote t1, Tquote t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Tquote_eval t1, Tquote_eval t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
@@ -6723,6 +6738,10 @@ let rec build_subtype env (visited : transient_expr list)
   | Tsplice t1 ->
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tsplice t1'), c)
+      else (t, Unchanged)
+  | Tquote_eval t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tquote_eval t1'), c)
       else (t, Unchanged)
   | Tnil ->
       if posi then
