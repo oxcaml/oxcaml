@@ -904,6 +904,7 @@ let ddissector_sizes = ref false               (* -ddissector-sizes *)
 let ddissector_verbose = ref false             (* -ddissector-verbose *)
 let ddissector_partitions = ref false          (* -ddissector-partitions *)
 let ddissector_inputs = ref None               (* -ddissector-inputs <file> *)
+let ddissector_linker_script = ref false       (* -ddissector-linker-script *)
 
 let prepend_directory file_name =
   match !directory with
