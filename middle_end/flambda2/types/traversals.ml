@@ -839,34 +839,44 @@ struct
       let canonical =
         TE.get_canonical_simple_exn ~min_name_mode:Name_mode.in_types env alias
       in
-      let canonical_with_metadata, acc =
-        Simple.pattern_match canonical
-          ~const:(fun _ -> canonical, acc)
-          ~name:(fun name ~coercion ->
-            let coercion, acc =
-              let acc_ref = ref acc in
-              let coercion =
-                Coercion.map_depth_variables coercion ~f:(fun variable ->
-                    if
-                      not
-                        (Compilation_unit.equal
-                           (Variable.compilation_unit variable)
-                           (Compilation_unit.get_current_exn ()))
-                    then variable
-                    else
-                      let canonical_var, acc =
-                        get_canonical_with !acc_ref (Name.var variable)
-                          K.rec_info (X.in_coercion abs)
-                      in
-                      acc_ref := acc;
-                      match Name.must_be_var_opt canonical_var with
-                      | Some var -> var
-                      | None ->
-                        Misc.fatal_error
-                          "Canonical name of depth variable is a symbol")
-              in
-              coercion, !acc_ref
+      Simple.pattern_match canonical
+        ~const:(fun const ->
+          (* CR bclement: unlike for names, we don't have a cache for constants.
+             This means that if we ever try to rewrite a constant to something
+             that also contain the same constant with the same abstraction, we
+             will loop.
+
+             This is highly unlikely to occur, however -- constants are
+             typically only going to be rewritten with either constants, or an
+             unknown type. *)
+          let ty = MTC.type_for_const const in
+          rewrite env acc abs ty)
+        ~name:(fun name ~coercion ->
+          let coercion, acc =
+            let acc_ref = ref acc in
+            let coercion =
+              Coercion.map_depth_variables coercion ~f:(fun variable ->
+                  if
+                    not
+                      (Compilation_unit.equal
+                         (Variable.compilation_unit variable)
+                         (Compilation_unit.get_current_exn ()))
+                  then variable
+                  else
+                    let canonical_var, acc =
+                      get_canonical_with !acc_ref (Name.var variable) K.rec_info
+                        (X.in_coercion abs)
+                    in
+                    acc_ref := acc;
+                    match Name.must_be_var_opt canonical_var with
+                    | Some var -> var
+                    | None ->
+                      Misc.fatal_error
+                        "Canonical name of depth variable is a symbol")
             in
+            coercion, !acc_ref
+          in
+          let canonical_with_metadata, acc =
             (* Do not rewrite the types of names coming from other compilation
                units, since we can't re-define them and it's hard to think of a
                situation where it would be useful anyways.
@@ -886,9 +896,9 @@ struct
                 get_canonical_with acc name (TG.kind ty) abs
               in
               let simple = Simple.name canonical_name in
-              Simple.with_coercion simple coercion, acc)
-      in
-      TG.alias_type_of (TG.kind ty) canonical_with_metadata, acc
+              Simple.with_coercion simple coercion, acc
+          in
+          TG.alias_type_of (TG.kind ty) canonical_with_metadata, acc)
     | None -> (
       try rewrite env acc abs ty
       with Misc.Fatal_error as e ->
