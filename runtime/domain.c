@@ -1948,7 +1948,8 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
      action_pending if needed. */
   if (caml_check_pending_signals() ||
       atomic_load_relaxed(&Caml_state->requested_tick) ||
-      caml_memprof_pending_external_interrupt(dom_st))
+      caml_memprof_pending_external_interrupt(dom_st) ||
+      Is_block(Caml_state->preemption))
     caml_set_action_pending(dom_st);
 }
 
