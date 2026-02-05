@@ -124,6 +124,7 @@ val path_extension_constructor: Path.t
 val path_floatarray: Path.t
 val path_lexing_position: Path.t
 val path_code: Path.t
+val path_eval: Path.t
 
 val path_unboxed_unit : Path.t
 val path_unboxed_bool : Path.t
@@ -247,6 +248,11 @@ val add_small_number_beta_extension_types :
 (* Add [or_null] to an environment.  This is separate from [build_initial_env]
    because we'd like to only do it if layouts are set to [Alpha]. *)
 val add_or_null :
+   (Ident.t -> type_declaration -> 'a -> 'a) -> 'a -> 'a
+
+(* Add [expr] and [eval] to an environment.
+   Intended for use when [Runtime_metaprogramming] is enabled. *)
+val add_runtime_metaprogramming_types :
    (Ident.t -> type_declaration -> 'a -> 'a) -> 'a -> 'a
 
 (* Construct the [type_kind] of [or_null]. For re-exporting [or_null]
