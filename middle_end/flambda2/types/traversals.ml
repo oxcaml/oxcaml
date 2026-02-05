@@ -791,10 +791,20 @@ struct
       let canonical =
         TE.get_canonical_simple_exn ~min_name_mode:Name_mode.in_types env alias
       in
-      let canonical_with_metadata, acc =
-        Simple.pattern_match canonical
-          ~const:(fun _ -> canonical, acc)
-          ~name:(fun name ~coercion ->
+      Simple.pattern_match canonical
+        ~const:(fun const ->
+          (* CR bclement: unlike for names, we don't have a cache for constants.
+             This means that if we ever try to rewrite a constant to something
+             that also contain the same constant with the same abstraction, we
+             will loop.
+
+             This is highly unlikely to occur, however -- constants are
+             typically only going to be rewritten with either constants, or an
+             unknown type. *)
+          let ty = MTC.type_for_const const in
+          rewrite env acc abs ty)
+        ~name:(fun name ~coercion ->
+          let canonical_with_metadata, acc =
             (* Do not rewrite the types of names coming from other compilation
                units, since we can't re-define them and it's hard to think of a
                situation where it would be useful anyways.
@@ -813,9 +823,9 @@ struct
                 get_canonical_with acc name (TG.kind ty) abs
               in
               let simple = Simple.name canonical_name in
-              Simple.with_coercion simple coercion, acc)
-      in
-      TG.alias_type_of (TG.kind ty) canonical_with_metadata, acc
+              Simple.with_coercion simple coercion, acc
+          in
+          TG.alias_type_of (TG.kind ty) canonical_with_metadata, acc)
     | None -> (
       try rewrite env acc abs ty
       with Misc.Fatal_error as e ->
