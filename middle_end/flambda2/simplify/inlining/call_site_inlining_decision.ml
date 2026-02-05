@@ -63,8 +63,9 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
     Continuation.create ~name:"speculative_inlining_toplevel_continuation" ()
   in
   let dacc =
-    DA.map_flow_acc dacc ~f:(fun _ ->
-        Flow.Acc.init_toplevel ~dummy_toplevel_cont Bound_parameters.empty)
+    DA.with_flow_acc
+      (Flow.Acc.init_toplevel ~dummy_toplevel_cont Bound_parameters.empty)
+      dacc
   in
   let _, uacc =
     simplify_expr dacc expr ~down_to_up:(fun dacc ~rebuild ->
