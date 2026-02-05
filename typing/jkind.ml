@@ -1651,7 +1651,7 @@ let of_type_decl_overapproximate_unknown ~context
   match decl.ptype_jkind_annotation with
   | Some annot when has_with_bounds annot ->
     (* CR with-kinds: we could still compute the layout here. *)
-    Some (Builtin.any ~why:Overapproximation)
+    Some (Builtin.any ~why:Overapproximation_of_with_bounds)
   | _ -> of_type_decl ~context decl ~transl_type |> Option.map fst
 
 let for_unboxed_record lbls =
@@ -2187,8 +2187,10 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s any"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
-    | Overapproximation ->
-      fprintf ppf "its exact kind couldn't be deduced by the compiler"
+    | Overapproximation_of_with_bounds ->
+      fprintf ppf
+        "the compiler failed to deduce its exact kind@ due to with-bound \
+         checking limitations"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -3000,7 +3002,8 @@ module Debug_printers = struct
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         !printtyp_path parent_path
-    | Overapproximation -> fprintf ppf "Overapproximation"
+    | Overapproximation_of_with_bounds ->
+      fprintf ppf "Overapproximation_of_with_bounds"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function

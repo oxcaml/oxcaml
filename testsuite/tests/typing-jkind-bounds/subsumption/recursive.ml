@@ -97,7 +97,8 @@ Line 2, characters 43-70:
                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Constructor argument types must have a representable layout.
        The layout of 'a My_list.t is any
-         because its exact kind couldn't be deduced by the compiler.
+         because the compiler failed to deduce its exact kind
+         due to with-bound checking limitations.
        But the layout of 'a My_list.t must be representable
          because it's the type of a constructor field.
 |}]
