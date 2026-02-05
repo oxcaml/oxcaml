@@ -48,7 +48,7 @@ int main(int argc, char **argv)
   printf("Step 5: done\n\n");
   fflush(stdout);
 
-  printf("Step 6: Test re-entrant caml_init_module (Reentrant_b calls C stub that inits Reentrant_a)\n");
+  printf("Step 6: Test re-entrant caml_init_module\n");
   fflush(stdout);
   caml_init_module("Reentrant_b");
   printf("Step 6: done\n\n");

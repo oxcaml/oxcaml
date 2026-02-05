@@ -10,15 +10,6 @@ let magic_from_c = init_reentrant_c ()
 
 let () = Printf.printf "Reentrant_b: C stub returned magic_value=%d from Reentrant_c\n%!" magic_from_c
 
-(* Also test re-initializing ourselves (should be detected as cycle) *)
-external try_init_self : unit -> int = "try_init_self_stub"
-
-let () = Printf.printf "Reentrant_b: calling C stub that will try to init Reentrant_b (should detect cycle)\n%!"
-
-let self_result = try_init_self ()
-
-let () = Printf.printf "Reentrant_b: self init result = %d\n%!" self_result
-
 (* Now also init Reentrant_a via C stub (Reentrant_a IS a dependency, so already initialized) *)
 external init_reentrant_a : unit -> int = "init_reentrant_a_stub"
 

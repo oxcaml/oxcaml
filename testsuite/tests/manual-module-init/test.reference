@@ -62,7 +62,7 @@ Gc_compact_test: Dep_a.add_seed 1000 = 1864
 Gc_compact_test: all checks passed
 Step 5: done
 
-Step 6: Test re-entrant caml_init_module (Reentrant_b calls C stub that inits Reentrant_a)
+Step 6: Test re-entrant caml_init_module
 Reentrant_a: initializing
 Reentrant_a: initialized with value_a=999
 Reentrant_b: initializing
@@ -73,10 +73,6 @@ Reentrant_c: initialized with magic_value=777
 C stub: Reentrant_c initialized, getting magic value via callback
 C stub: got magic_value = 777
 Reentrant_b: C stub returned magic_value=777 from Reentrant_c
-Reentrant_b: calling C stub that will try to init Reentrant_b (should detect cycle)
-C stub: try_init_self_stub called, will try to init Reentrant_b (expect cycle)
-C stub: (skipping actual re-init to avoid fatal error - cycle would be detected)
-Reentrant_b: self init result = -1
 Reentrant_b: calling C stub that will init Reentrant_a (already a dependency)
 C stub: init_reentrant_a_stub called, will init Reentrant_a
 C stub: Reentrant_a init returned (was already done)

@@ -59,24 +59,3 @@ CAMLprim value init_reentrant_a_stub(value unit)
   CAMLreturn(Val_int(42));
 }
 
-/* This stub tries to initialize Reentrant_b while we're already initializing it.
-   This should be detected as a cycle. */
-CAMLprim value try_init_self_stub(value unit)
-{
-  CAMLparam1(unit);
-
-  printf("C stub: try_init_self_stub called, will try to init Reentrant_b (expect cycle)\n");
-  fflush(stdout);
-
-  /* Note: caml_init_module will call caml_fatal_error on cycle detection.
-     In a real application this would abort, but for testing we just
-     note that attempting this would be an error.
-
-     For this test, we'll just return a marker value to indicate
-     we would have detected a cycle if we tried. */
-
-  printf("C stub: (skipping actual re-init to avoid fatal error - cycle would be detected)\n");
-  fflush(stdout);
-
-  CAMLreturn(Val_int(-1));
-}
