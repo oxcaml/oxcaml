@@ -341,52 +341,12 @@ let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
 let predef_ikind_context =
-  (* This is a hack to get an env with int+string because
-     some of the types below add them as with-bounds. *)
-  let stub_decl ident jkind =
-    {
-      type_params = [];
-      type_arity = 0;
-      type_kind = Type_abstract Definition;
-      type_jkind = Jkind.mark_best jkind;
-      type_ikind = No_constructor_ikind "predef stub";
-      type_loc = Location.none;
-      type_private = Asttypes.Public;
-      type_manifest = None;
-      type_variance = [];
-      type_separability = [];
-      type_is_newtype = false;
-      type_expansion_scope = lowest_level;
-      type_attributes = [];
-      type_unboxed_default = false;
-      type_uid = Uid.of_predef_id ident;
-      type_unboxed_version = None;
-    }
-  in
-  let int_decl =
-    stub_decl ident_int
-      (Jkind.of_builtin ~why:(Primitive ident_int)
-         Jkind.Const.Builtin.immediate)
-  in
-  let string_decl =
-    stub_decl ident_string
-      (Jkind.of_builtin ~why:(Primitive ident_string)
-         Jkind.Const.Builtin.immutable_data)
-  in
-  let lookup_type path =
-    if Path.same path path_int
-    then Some int_decl
-    else if Path.same path path_string
-    then Some string_decl
-    else (
-      Format.eprintf "[predef_ikind_context.lookup_type] %a@." Path.print path;
-      assert false)
-  in
+  let unreachable _ = assert false in
   {
-    Jkind.jkind_of_type = (fun _ -> assert false);
-    is_abstract = (fun _ -> false);
-    lookup_type;
-    debug_print_env = (fun _ -> assert false);
+    Jkind.jkind_of_type = unreachable;
+    is_abstract = unreachable;
+    lookup_type = unreachable;
+    debug_print_env = unreachable;
   }
 
 let ikind_of_jkind ~params jkind =
@@ -727,16 +687,12 @@ let build_initial_env add_type add_extension empty_env =
            None
          )
        )
-       (* CR layouts v2.8: Possibly remove this -- and simplify [mk_add_type] --
-          when we have a better jkind subsumption check. Internal ticket 5104 *)
+       (* Fields are [int] and [string], so [immutable_data] already captures
+          their direct contribution. Encoding this directly avoids predef-time
+          constructor lookups when deriving ikinds from jkinds. *)
        ~jkind:Jkind.(
          of_builtin Const.Builtin.immutable_data
-           ~why:(Primitive ident_lexing_position) |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id
-          ~type_expr:type_string)
+           ~why:(Primitive ident_lexing_position))
   |> add_type1 ident_atomic_loc
        ~variance:Variance.full
        ~separability:Separability.Ind
