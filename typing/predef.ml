@@ -340,6 +340,59 @@ let list_argument_sort = Jkind.Sort.Const.value
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
+let predef_ikind_context =
+  (* This is a hack to get an env with int+string because
+     some of the types below add them as with-bounds. *)
+  let stub_decl ident jkind =
+    {
+      type_params = [];
+      type_arity = 0;
+      type_kind = Type_abstract Definition;
+      type_jkind = Jkind.mark_best jkind;
+      type_ikind = No_constructor_ikind "predef stub";
+      type_loc = Location.none;
+      type_private = Asttypes.Public;
+      type_manifest = None;
+      type_variance = [];
+      type_separability = [];
+      type_is_newtype = false;
+      type_expansion_scope = lowest_level;
+      type_attributes = [];
+      type_unboxed_default = false;
+      type_uid = Uid.of_predef_id ident;
+      type_unboxed_version = None;
+    }
+  in
+  let int_decl =
+    stub_decl ident_int
+      (Jkind.of_builtin ~why:(Primitive ident_int)
+         Jkind.Const.Builtin.immediate)
+  in
+  let string_decl =
+    stub_decl ident_string
+      (Jkind.of_builtin ~why:(Primitive ident_string)
+         Jkind.Const.Builtin.immutable_data)
+  in
+  let lookup_type path =
+    if Path.same path path_int
+    then Some int_decl
+    else if Path.same path path_string
+    then Some string_decl
+    else (
+      Format.eprintf "[predef_ikind_context.lookup_type] %a@." Path.print path;
+      assert false)
+  in
+  {
+    Jkind.jkind_of_type = (fun _ -> assert false);
+    is_abstract = (fun _ -> false);
+    lookup_type;
+    debug_print_env = (fun _ -> assert false);
+  }
+
+let ikind_of_jkind ~params jkind =
+  Ikind.type_declaration_ikind_of_jkind
+    ~context:predef_ikind_context ~params jkind
+
 let mk_add_type add_type =
   let add_type_with_jkind
       ?manifest type_ident
@@ -354,6 +407,8 @@ let mk_add_type add_type =
         let type_jkind =
           Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
         in
+        let type_jkind = Jkind.mark_best type_jkind in
+        let type_ikind = ikind_of_jkind ~params:[] type_jkind in
         let type_kind =
           match kind with
             | Type_abstract Definition -> Type_abstract Definition
@@ -370,10 +425,8 @@ let mk_add_type add_type =
           type_params = [];
           type_arity = 0;
           type_kind;
-          type_jkind = Jkind.mark_best type_jkind;
-          type_ikind =
-            Types.ikinds_todo
-              (Format.asprintf "predef unboxed %s" (Ident.name type_ident));
+          type_jkind;
+          type_ikind;
           type_loc = Location.none;
           type_private = Asttypes.Public;
           type_manifest;
@@ -387,14 +440,14 @@ let mk_add_type add_type =
           type_unboxed_version = None;
         }
     in
+    let type_jkind = Jkind.mark_best jkind in
+    let type_ikind = ikind_of_jkind ~params:[] type_jkind in
     let decl =
       {type_params = [];
       type_arity = 0;
       type_kind = kind;
-      type_jkind = Jkind.mark_best jkind;
-      type_ikind =
-        Types.ikinds_todo
-          (Format.asprintf "predef %s" (Ident.name type_ident));
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = manifest;
@@ -427,14 +480,14 @@ let mk_add_type1 add_type type_ident
       ))
     ~variance ~separability env =
   let param = newgenvar param_jkind in
+  let type_jkind = Jkind.mark_best (jkind param) in
+  let type_ikind = ikind_of_jkind ~params:[param] type_jkind in
   let decl =
     {type_params = [param];
       type_arity = 1;
       type_kind = kind param;
-      type_jkind = Jkind.mark_best (jkind param);
-      type_ikind =
-        Types.ikinds_todo
-          (Format.asprintf "predef %s" (Ident.name type_ident));
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = None;
@@ -454,14 +507,14 @@ let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
       ~type_variance ~type_separability env =
   let param1 = newgenvar param1_jkind in
   let param2 = newgenvar param2_jkind in
+  let type_jkind = Jkind.mark_best jkind in
+  let type_ikind = ikind_of_jkind ~params:[param1; param2] type_jkind in
   let decl =
     { type_params = [param1; param2];
       type_arity = 2;
       type_kind = Type_abstract Definition;
-      type_jkind = Jkind.mark_best (jkind);
-      type_ikind =
-        Types.ikinds_todo
-          (Format.asprintf "predef %s" (Ident.name type_ident));
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = None;

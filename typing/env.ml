@@ -3071,37 +3071,6 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
-let add_initial_ikinds env =
-  if not !Clflags.ikinds then env
-  else begin
-    let context = !initial_ikind_context env in
-    IdTbl.fold_name wrap_identity
-      (fun _name (path, tda) acc_env ->
-         let decl = tda.tda_declaration in
-         match path with
-         | Path.Pident id ->
-           let type_ikind =
-             Ikind.type_declaration_ikind_gated ~context ~path
-           in
-           let type_unboxed_version =
-             Option.map
-               (fun ud ->
-                  let uik =
-                    Ikind.type_declaration_ikind_gated
-                      ~context
-                      ~path:(Path.unboxed_version path)
-                  in
-                  { ud with type_ikind = uik })
-               decl.type_unboxed_version
-           in
-           let decl' =
-             { decl with type_ikind; type_unboxed_version }
-           in
-           add_type ~check:false id decl' acc_env
-         | _ -> acc_env)
-      env.types env
-  end
-
 let add_language_extension_types env =
   let add ext lvl f env  =
     match Language_extension.is_at_least ext lvl with
@@ -3137,7 +3106,6 @@ let initial () =
   in
   initial_env
   |> add_language_extension_types
-  |> add_initial_ikinds
 
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not
