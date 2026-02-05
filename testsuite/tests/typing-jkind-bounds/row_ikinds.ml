@@ -152,7 +152,7 @@ module type S2 =
 |}]
 
 (* CR layouts v2.8: ['a abstract] should get the kind [immutable_data with 'a polyvar]
-   and this should fail: (Internal ticket 4294) *)
+   and this should fail: (Internal ticket 6481) *)
 module type S3 = S with type 'a record = 'a simple
 [%%expect{|
 Line 1, characters 17-50:
@@ -164,7 +164,7 @@ Error: The signature constrained by "with" has no component named "record"
 
 (* Harder cases: row variables *)
 
-(* CR layouts v2.8: These are both correct, but we could probably infer a more precise kind for both. Internal ticket 4294 *)
+(* CR layouts v2.8: These are both correct, but we could probably infer a more precise kind for both. Internal ticket 6481 *)
 type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
 [%%expect{|
 Line 1, characters 0-66:
@@ -192,7 +192,7 @@ Error: The kind of type "[> `X | `Y of 'a ]" is value mod non_float
 
 let f (x : [< `A of int | `B of string] @ contended) =
   use_uncontended x
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294  *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 6481  *)
 [%%expect{|
 Line 2, characters 18-19:
 2 |   use_uncontended x
@@ -200,7 +200,7 @@ Line 2, characters 18-19:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
-(* CR layouts v2.8: This should also be accepted, but not with a best quality. Internal ticket 4294 *)
+(* CR layouts v2.8: This should also be accepted, but not with a best quality. Internal ticket 6481 *)
 module M : sig
   type 'a t : immutable_data with 'a = private [< `A of 'a | `B of ('a * 'a) | `C ]
 end = struct
@@ -238,7 +238,7 @@ Error: This alias is bound to type "[> `Foo of int ]"
 |}]
 
 type t2 = { f : ('a : value mod portable). ([< `Foo of int] as 'a) -> unit }
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 6481 *)
 [%%expect{|
 Line 1, characters 64-65:
 1 | type t2 = { f : ('a : value mod portable). ([< `Foo of int] as 'a) -> unit }
@@ -325,7 +325,7 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 6481 *)
 [%%expect{|
 type t3 = C of string
 |}, Principal{|
@@ -352,7 +352,7 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 6481 *)
 [%%expect{|
 type t3 = C of string
 |}, Principal{|

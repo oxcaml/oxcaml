@@ -214,7 +214,7 @@ end = struct
   type a = [`a of string | `b]
   type t
 end
-(* CR layouts v2.8: this is fine to accept. Internal ticket 4294. *)
+(* CR layouts v2.8: this is fine to accept. Internal ticket 6481. *)
 [%%expect {|
 Lines 4-7, characters 6-3:
 4 | ......struct
