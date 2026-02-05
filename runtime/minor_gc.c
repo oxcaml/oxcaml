@@ -326,7 +326,9 @@ static void oldify_one (void* st_v, value v, volatile value *p)
       #ifdef DEBUG
       Field(result, 0) = Val_long(1);
       Field(result, 1) = Val_long(1);
-      Field(result, 2) = Val_long(1);
+      if (size == 3) {
+        Field(result, 2) = Val_long(1);
+      }
       #endif
     }
   } else if (tag < Infix_tag) {
