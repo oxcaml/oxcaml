@@ -415,13 +415,14 @@ let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
   done;
   ({ Types.base = base; coeffs } : Types.constructor_ikind)
 
-let base_with_label_mutability base (lbl : Types.label_declaration) =
-  match lbl.ld_mutable with
-  | Immutable -> base
-  | Mutable { atomic = Atomic; _ } ->
-    Axis_lattice.join base Axis_lattice.sync_data
-  | Mutable { atomic = Nonatomic; _ } ->
-    Axis_lattice.join base Axis_lattice.mutable_data
+let label_mutability_contribution (lbl : Types.label_declaration) =
+  Ldd.const (
+    match lbl.ld_mutable with
+    | Immutable -> Axis_lattice.immediate
+    | Mutable { atomic = Atomic; _ } ->
+      Axis_lattice.sync_data
+    | Mutable { atomic = Nonatomic; _ } ->
+      Axis_lattice.mutable_data)
 
 (* This function determines whether the shallow axes are relevant for a given
    representation. For example, for unboxed types, shallow axes of inner data
@@ -497,48 +498,30 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           (* Build from components: base (non-float value) + per-label
              contributions. *)
           let immutable_base =
-            match rep with
-            | Types.Record_unboxed -> Axis_lattice.immediate
-            | _ -> Axis_lattice.immutable_data
+            Ldd.const (match rep with
+              | Types.Record_unboxed -> Axis_lattice.immediate
+              | _ -> Axis_lattice.immutable_data)
           in
           let relevant_for_shallow =
             shallow_axes_are_relevant_for_rep (`Record rep)
           in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
-            let base_lat, acc =
               List.fold_left
-                (fun (base_lat, acc) (lbl : Types.label_declaration) ->
-                  let base_lat = base_with_label_mutability base_lat lbl in
+                (fun acc (lbl : Types.label_declaration) ->
                   let mask =
                     Axis_lattice.mask_of_modality ~relevant_for_shallow
                       lbl.ld_modalities
                   in
-                  let acc =
-                    Ldd.join acc
-                      (Ldd.meet (Ldd.const mask) (Solver.kind ctx lbl.ld_type))
-                  in
-                  base_lat, acc)
-                (immutable_base, Ldd.const Axis_lattice.bot)
+                  Ldd.join acc
+                    (Ldd.join (label_mutability_contribution lbl)
+                      (Ldd.meet (Ldd.const mask) (Solver.kind ctx lbl.ld_type))))
+                immutable_base
                 lbls
-            in
-            let base = Ldd.const base_lat in
-            Ldd.join base acc
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
-          (* Unboxed products: non-float base; shallow axes relevant only
-             for arity = 1. *)
-          let base_lat =
-            List.fold_left base_with_label_mutability Axis_lattice.immediate lbls
-          in
-          if not (Axis_lattice.equal base_lat Axis_lattice.immediate)
-          then
-            (* Unboxed record products disallow mutable labels in
-               [typedecl.ml] (see [Unboxed_mutable_label]). Fail here to
-               raise alarm if that restriction is removed. *)
-            failwith
-              "ikind: mutable fields in unboxed records are not supported";
+          (* Unboxed products: shallow axes relevant only for arity = 1. *)
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             let base = Ldd.const Axis_lattice.immediate in
@@ -547,12 +530,18 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
             in
             List.fold_left
               (fun acc (lbl : Types.label_declaration) ->
+                (* Check that the label is not mutable. *)
+                (match lbl.ld_mutable with
+                | Immutable -> ()
+                | Mutable _ ->
+                  failwith "ikind: mutable fields in unboxed records are not supported");
                 let mask =
                   Axis_lattice.mask_of_modality ~relevant_for_shallow
                     lbl.ld_modalities
                 in
                 Ldd.join acc
-                  (Ldd.meet (Ldd.const mask) (Solver.kind ctx lbl.ld_type)))
+                  (Ldd.join (label_mutability_contribution lbl)
+                    (Ldd.meet (Ldd.const mask) (Solver.kind ctx lbl.ld_type))))
               base lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
@@ -609,51 +598,36 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
               then Axis_lattice.immediate
               else Axis_lattice.immutable_data
             in
-            let base_lat, acc =
-              List.fold_left
-                (fun (base_lat, acc) (c : Types.constructor_declaration) ->
-                  let base_lat =
-                    if all_args_void
-                    then base_lat
-                    else
-                      match c.cd_args with
-                      | Types.Cstr_tuple _ -> base_lat
-                      | Types.Cstr_record lbls ->
-                        List.fold_left base_with_label_mutability base_lat lbls
-                  in
-                  let acc =
-                    match c.cd_args with
-                    | Types.Cstr_tuple args ->
-                      List.fold_left
-                        (fun acc (arg : Types.constructor_argument) ->
-                          let mask =
-                            Axis_lattice.mask_of_modality
-                              ~relevant_for_shallow arg.ca_modalities
-                          in
-                          Ldd.join acc
-                            (Ldd.meet
-                               (Ldd.const mask)
-                               (Solver.kind ctx arg.ca_type)))
-                        acc args
-                    | Types.Cstr_record lbls ->
-                      List.fold_left
-                        (fun acc (lbl : Types.label_declaration) ->
-                          let mask =
-                            Axis_lattice.mask_of_modality
-                              ~relevant_for_shallow lbl.ld_modalities
-                          in
-                          Ldd.join acc
-                            (Ldd.meet
-                               (Ldd.const mask)
-                               (Solver.kind ctx lbl.ld_type)))
-                        acc lbls
-                  in
-                  base_lat, acc)
-                (base_lat0, Ldd.const Axis_lattice.bot)
-                cstrs
-            in
-            let base = Ldd.const base_lat in
-            Ldd.join base acc
+            List.fold_left
+              (fun acc (c : Types.constructor_declaration) ->
+                match c.cd_args with
+                | Types.Cstr_tuple args ->
+                  List.fold_left
+                    (fun acc (arg : Types.constructor_argument) ->
+                      let mask =
+                        Axis_lattice.mask_of_modality
+                          ~relevant_for_shallow arg.ca_modalities
+                      in
+                      Ldd.join acc
+                        (Ldd.meet
+                            (Ldd.const mask)
+                            (Solver.kind ctx arg.ca_type)))
+                    acc args
+                | Types.Cstr_record lbls ->
+                  List.fold_left
+                    (fun acc (lbl : Types.label_declaration) ->
+                      let mask =
+                        Axis_lattice.mask_of_modality
+                          ~relevant_for_shallow lbl.ld_modalities
+                      in
+                      Ldd.join acc
+                        (Ldd.join (label_mutability_contribution lbl)
+                          (Ldd.meet
+                              (Ldd.const mask)
+                              (Solver.kind ctx lbl.ld_type))))
+                    acc lbls)
+              (Ldd.const base_lat0)
+              cstrs
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_open ->
