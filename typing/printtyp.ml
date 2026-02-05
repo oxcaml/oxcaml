@@ -733,6 +733,16 @@ and raw_type_desc ppf = function
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
         raw_type_list tl
+  | Trepr (t, sort_vars) ->
+      let print_sort_univar ppf (uv : Jkind_types.Sort.univar) =
+        match uv.name with
+        | Some n -> fprintf ppf "%s" n
+        | None -> fprintf ppf "_"
+      in
+      fprintf ppf "@[<hov1>Trepr(@,%a,@,[@[%a@]])@]"
+        raw_type t
+        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+          print_sort_univar) sort_vars
   | Tvariant row ->
     raw_row_desc ppf row
   | Tpackage (p, fl) ->
@@ -1315,7 +1325,7 @@ let add_printed_alias ty = add_printed_alias_proxy (proxy ty)
 
 let aliasable ty =
   match get_desc ty with
-    Tvar _ | Tunivar _ | Tpoly _ -> false
+    Tvar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
   | Tconstr (p, _, _) ->
       not (is_nth (snd (best_type_path p)))
   | _ -> true
@@ -1614,7 +1624,7 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_stuff "<Tsubst>"
     | Tlink _ ->
         fatal_error "Printtyp.tree_of_typexp"
-    | Tpoly (ty, []) ->
+    | Tpoly (ty, []) | Trepr (ty, []) ->
         tree_of_typexp mode alloc_mode ty
     | Tpoly (ty, tyl) ->
         (*let print_names () =
@@ -1630,6 +1640,48 @@ let rec tree_of_modal_typexp mode modal ty =
         (* Forget names when we leave scope *)
         Names.remove_names tyl;
         delayed := old_delayed; tr
+    | Trepr (ty, sort_vars) ->
+        (* Trepr wraps a Tpoly that contains the type variables
+           corresponding to the sort variables. Extract them and print. *)
+        (match get_desc ty with
+         | Tpoly (inner_ty, (_ :: _ as tyl))  ->
+             (* Check that the sort_vars match the jkinds of tyl *)
+             let sorts_match =
+               match
+                 List.for_all2
+                   (fun sort_var ty ->
+                     match get_desc ty with
+                     | Tunivar { jkind } ->
+                       (match Jkind.get_layout jkind with
+                        | Some layout ->
+                          (match Jkind.Layout.Const.get_sort layout with
+                           | Some (Jkind.Sort.Const.Univar uv) ->
+                             uv == sort_var
+                           | _ -> false)
+                        | None -> false)
+                     | _ -> false)
+                   sort_vars tyl
+               with
+               | result -> result
+               | exception Invalid_argument _ -> false
+             in
+             if sorts_match then begin
+               let tyl = List.map Transient_expr.repr tyl in
+               let old_delayed = !delayed in
+               List.iter add_delayed tyl;
+               let sort_names = tree_of_qsvs tyl in
+               let tr =
+                Otyp_repr (sort_names, tree_of_typexp mode alloc_mode inner_ty)
+              in
+               Names.remove_names tyl;
+               delayed := old_delayed;
+               tr
+             end else
+               (* Mismatch: print Trepr and Tpoly separately *)
+               tree_of_typexp mode alloc_mode ty
+         | _ ->
+             (* No type variables, just print the body *)
+             tree_of_typexp mode alloc_mode ty)
     | Tunivar _ ->
         Otyp_var (false, Names.name_of_type Names.new_name tty)
     | Tpackage (p, fl) ->
@@ -1684,6 +1736,18 @@ and tree_of_qtvs qtvs =
     | _ -> None
   in
   List.filter_map tree_of_qtv qtvs
+
+(* qsvs = quantified sort variables (for Trepr) *)
+(* Extract names from type variables corresponding to sort variables *)
+and tree_of_qsvs qtvs =
+  List.filter_map
+    (fun v ->
+      match v.desc with
+      | Tvar _ when v.level = generic_level ->
+        Some (Names.name_of_type Names.new_name v)
+      | Tunivar _ -> Some (Names.name_of_type Names.new_name v)
+      | _ -> None)
+    qtvs
 
 and tree_of_row_field (l, f) =
   match row_field_repr f with
@@ -2305,7 +2369,11 @@ let tree_of_value_description id decl =
      resets the naming context *)
   wrap_mutation (fun () ->
   let moda =
-    Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha decl.val_modalities
+    if Mode.Modality.is_undefined decl.val_modalities then
+      Mode.Modality.Const.id
+    else
+      Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
+        decl.val_modalities
   in
   let qtvs = extract_qtvs [decl.val_type] in
   let apparent_arity =

@@ -976,6 +976,7 @@ let maybe_pmod_constraint mode expr =
 %token BARBAR                 "||"
 %token BARRBRACKET            "|]"
 %token BEGIN                  "begin"
+%token BORROW                 "borrow_"
 %token <char> CHAR            "'a'" (* just an example *)
 %token <char> HASH_CHAR       "#'a'" (* just an example *)
 %token CLASS                  "class"
@@ -1013,6 +1014,8 @@ let maybe_pmod_constraint mode expr =
 %token GREATERRBRACKET        ">]"
 %token HASHLPAREN             "#("
 %token HASHLBRACE             "#{"
+%token HASHFALSE              "#false"
+%token HASHTRUE               "#true"
 %token IF                     "if"
 %token IN                     "in"
 %token INCLUDE                "include"
@@ -1083,6 +1086,7 @@ let maybe_pmod_constraint mode expr =
 %token RBRACKET               "]"
 %token RBRACKETGREATER        "]>"
 %token REC                    "rec"
+%token REPR                   "repr_"
 %token RPAREN                 ")"
 %token SEMI                   ";"
 %token SEMISEMI               ";;"
@@ -1186,6 +1190,7 @@ The precedences must be listed from low to high.
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
           NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
+          HASHFALSE HASHTRUE
 
 /* Entry points */
 
@@ -2910,6 +2915,8 @@ fun_expr:
   | simple_expr nonempty_llist(labeled_simple_expr)
       { mkexp ~loc:$sloc (Pexp_apply($1, $2)) }
   | stack(simple_expr) %prec below_HASH { $1 }
+  | BORROW simple_expr %prec below_HASH
+      { Exp.borrow ~loc:(make_loc $sloc) $2 }
   | labeled_tuple %prec below_COMMA
       { mkexp ~loc:$sloc (Pexp_tuple $1) }
   | maybe_stack (
@@ -3124,6 +3131,10 @@ block_access:
       { Pexp_construct($1, None) }
   | HASHLPAREN RPAREN
       { Pexp_unboxed_unit }
+  | HASHFALSE
+      { Pexp_unboxed_bool false }
+  | HASHTRUE
+      { Pexp_unboxed_bool true }
   | name_tag %prec prec_constant_constructor
       { Pexp_variant($1, None) }
   | op(PREFIXOP) simple_expr
@@ -3792,6 +3803,10 @@ simple_pattern_not_ident:
       { Ppat_construct($1, None) }
   | HASHLPAREN RPAREN
       { Ppat_unboxed_unit }
+  | HASHFALSE
+      { Ppat_unboxed_bool false }
+  | HASHTRUE
+      { Ppat_unboxed_bool true }
   | name_tag
       { Ppat_variant($1, None) }
   | hash mkrhs(type_longident)
@@ -4380,19 +4395,35 @@ with_type_binder:
     | LPAREN QUOTE tyvar=mkrhs(ident) COLON jkind=jkind_annotation RPAREN
       { (tyvar, Some jkind) }
 ;
+%inline typevar_repr: (* : string with_loc *)
+  LPAREN REPR QUOTE mkrhs(ident) RPAREN
+    { $4 }
+;
 %inline typevar_list:
   (* : (string with_loc * jkind_annotation option) list *)
   nonempty_llist(typevar)
+    { $1 }
+;
+%inline typevar_repr_list:
+  (* : string with_loc list *)
+  nonempty_llist(typevar_repr)
     { $1 }
 ;
 %inline poly(X):
   typevar_list DOT X
     { ($1, $3) }
 ;
+%inline repr(X):
+  typevar_repr_list DOT X
+    { ($1, $3) }
+;
 %inline strictly_poly(X):
 | poly(X)
     { let bound_vars, inner_type = $1 in
       mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
+| repr(X)
+    { let bound_vars, inner_type = $1 in
+      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
 ;
 
 possibly_poly(X):
@@ -4665,6 +4696,11 @@ optional_atat_modalities_expr:
   | mktyp(
     LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
       { Ptyp_poly (bound_vars, inner_type) }
+    )
+    { $1 }
+  | mktyp(
+    LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
+      { Ptyp_repr (bound_vars, inner_type) }
     )
     { $1 }
   | ty = tuple_type
@@ -5277,6 +5313,7 @@ single_attr_id:
   | AS { "as" }
   | ASSERT { "assert" }
   | BEGIN { "begin" }
+  | BORROW { "borrow_" }
   | CLASS { "class" }
   | CONSTRAINT { "constraint" }
   | DO { "do" }

@@ -414,7 +414,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | [] -> block
           | _ :: _ ->
             (* for the floatarray hack *)
-            Prim (Ccall "caml_make_array", [block])))
+            Prim (Ccall "caml_array_of_uniform_array", [block])))
     | Presume -> context_switch Resume ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
     | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
@@ -844,8 +844,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ -> (
         match locality with
-        | Alloc_heap -> binary (Ccall "caml_make_vect")
-        | Alloc_local -> binary (Ccall "caml_make_local_vect")))
+        | Alloc_heap -> binary (Ccall "caml_array_make")
+        | Alloc_local -> binary (Ccall "caml_array_make_local")))
     | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()

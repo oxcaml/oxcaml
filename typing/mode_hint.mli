@@ -42,6 +42,21 @@ type always_dynamic =
   | Application
   | Try_with
 
+(* CR-soon zqian: add loop and function body to [region_desc] *)
+type region_desc = Borrow
+
+type region = Location.t * region_desc
+
+type ('d0, 'd1) polarity =
+  | Monadic : ('l * 'r, 'r * 'l) polarity
+  | Comonadic : ('l * 'r, 'l * 'r) polarity
+  constraint 'd0 = _ * _ constraint 'd1 = _ * _
+[@@warning "-62"]
+
+(* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
+the RHS". They are similiar to the [Skip] morph hint and should raise when being
+printed. *)
+
 (** Hint for a constant bound. See [Mode.Report.print_const] for what each
     non-trivial constructor means. *)
 type 'd const =
@@ -62,14 +77,10 @@ type 'd const =
   | Is_used_in : pinpoint -> (disallowed * 'r) const
       (** A variant of [Is_closed_by] where the closure mode is constant.
           INVARIANT: The [pinpoint] cannot be [Unknown]. *)
+  | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
+  | Escape_region : region -> (disallowed * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
-
-type ('d0, 'd1) polarity =
-  | Monadic : ('l * 'r, 'r * 'l) polarity
-  | Comonadic : ('l * 'r, 'l * 'r) polarity
-  constraint 'd0 = _ * _ constraint 'd1 = _ * _
-[@@warning "-62"]
 
 type closure_details =
   { closure : pinpoint;
@@ -111,11 +122,6 @@ type allocation = allocation_desc Location.loc
     [Mode.Report.print_morph] for what each non-trivial constructor means. *)
 type 'd morph =
   | Unknown : ('l * 'r) morph  (** The morphism is not explained. *)
-  | Unknown_non_rigid : ('l * 'r) morph
-      (** Similiar to [Unknown], but in the special case where the morph doesn't
-          change the bound, it can be skipped. *)
-  (* CR-soon zqian: usages of [Unknown_non_rigid] should be replaced with
-     corresponding proper hints *)
   | Skip : ('l * 'r) morph
       (** The morphism doesn't change the bound and should be skipped in
           printing. *)
@@ -137,5 +143,7 @@ type 'd morph =
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
+    (* CR-someday zqian: add [Tail_of_region] which connects the mode of region
+       to the mode of the region's tail *)
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

@@ -363,6 +363,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_unboxed_unit -> Ppat_unboxed_unit
+    | Tpat_unboxed_bool b -> Ppat_unboxed_bool b
     | Tpat_tuple list ->
         Ppat_tuple
           ( List.map (fun (label, p) -> label, sub.pat sub p) list
@@ -433,6 +434,8 @@ let exp_extra sub (extra, loc, attrs) sexp =
         (* Type inspections are unnecessary in a Parsetree,
            as type inference reproduces them *)
         sexp.pexp_desc
+    | Texp_borrowed -> Pexp_borrow sexp
+    | Texp_ghost_region ->sexp.pexp_desc
   in
   Exp.mk ~loc ~attrs desc
 
@@ -554,6 +557,7 @@ let expression sub exp =
                         [], modes
                       | Texp_poly _ | Texp_newtype _ | Texp_stack
                       | Texp_inspected_type _ -> [], []
+                      | Texp_ghost_region | Texp_borrowed -> [], []
                     in
                     new_type_constraints @ ret_type_constraints,
                     new_mode_annotations @ ret_mode_annotations)
@@ -615,6 +619,7 @@ let expression sub exp =
     | Texp_try (exp, cases) ->
         Pexp_try (sub.expr sub exp, List.map (sub.case sub) cases)
     | Texp_unboxed_unit -> Pexp_unboxed_unit
+    | Texp_unboxed_bool b -> Pexp_unboxed_bool b
     | Texp_tuple (list, _) ->
         Pexp_tuple (List.map (fun (lbl, e) -> lbl, sub.expr sub e) list)
     | Texp_unboxed_tuple list ->
@@ -1083,6 +1088,9 @@ let core_type sub ct =
     | Ttyp_open (_path, mod_ident, t) -> Ptyp_open (mod_ident, sub.typ sub t)
     | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
+    | Ttyp_repr (list, ct) ->
+        let bound_vars = List.map (fun v -> mkloc v loc) list in
+        Ptyp_repr (bound_vars, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension

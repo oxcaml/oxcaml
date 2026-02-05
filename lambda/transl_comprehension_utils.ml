@@ -179,10 +179,10 @@ module Lambda_utils = struct
       fun ~loc x y z -> Lprim (prim, [x; y; z], loc)
 
     let make_vect =
-      let make_vect = binary "caml_make_vect" in
+      let make_vect = binary "caml_array_make" in
       fun ~loc ~length ~init -> make_vect ~loc length init
 
-    let make_float_vect = unary "caml_make_float_vect"
+    let make_float_vect = unary "caml_array_create_float"
 
     let make_unboxed_float32_vect = unary "caml_make_unboxed_float32_vect"
 

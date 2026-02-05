@@ -152,7 +152,7 @@ end
 module Reg_id : sig
   type t =
     | Preassigned of { location : Location.t }
-    | Named of { stamp : int }
+    | Named of { stamp : Reg.Stamp.t }
 
   val compare : t -> t -> int
 
@@ -162,7 +162,7 @@ module Reg_id : sig
 end = struct
   type t =
     | Preassigned of { location : Location.t }
-    | Named of { stamp : int }
+    | Named of { stamp : Reg.Stamp.t }
 
   let of_reg (reg : Reg.t) =
     let loc = Location.of_reg reg in
@@ -213,7 +213,7 @@ end = struct
   module For_print = struct
     type t =
       { name : Reg.Name.t;
-        stamp : int;
+        stamp : Reg.Stamp.t;
         preassigned : bool;
         typ : Cmm.machtype_component
       }

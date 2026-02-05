@@ -1504,6 +1504,8 @@ module Pat : sig
 
   val unboxed_unit : t'
 
+  val unboxed_bool : Debuginfo.Scoped_location.t -> bool -> t'
+
   val tuple :
     Debuginfo.Scoped_location.t -> (Label.Nonoptional.t * t) list -> t'
 
@@ -1550,6 +1552,8 @@ end = struct
   let constant loc a1 = apply1 "Pat" "constant" loc (extract a1)
 
   let unboxed_unit = use "Pat" "unboxed_unit"
+
+  let unboxed_bool loc a1 = apply1 "Pat" "unboxed_bool" loc (transl_bool a1)
 
   let tuple loc a1 =
     apply1 "Pat" "tuple" loc
@@ -1898,6 +1902,8 @@ and Exp_desc : sig
 
   val unboxed_unit : t'
 
+  val unboxed_bool : Debuginfo.Scoped_location.t -> bool -> t'
+
   val tuple :
     Debuginfo.Scoped_location.t -> (Label.Nonoptional.t * Exp.t) list -> t'
 
@@ -1961,6 +1967,8 @@ and Exp_desc : sig
   val src_pos : t'
 
   val stack : Debuginfo.Scoped_location.t -> Exp.t -> t'
+
+  val borrow : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
   val extension_constructor : Debuginfo.Scoped_location.t -> Name.t -> t'
 
@@ -2043,6 +2051,9 @@ end = struct
 
   let unboxed_unit = use "Exp_desc" "unboxed_unit"
 
+  let unboxed_bool loc a1 =
+    apply1 "Exp_desc" "unboxed_bool" loc (transl_bool a1)
+
   let tuple loc a1 =
     apply1 "Exp_desc" "tuple" loc
       (mk_list ~loc
@@ -2109,6 +2120,8 @@ end = struct
   let src_pos = use "Exp_desc" "src_pos"
 
   let stack loc a1 = apply1 "Exp_desc" "stack" loc (extract a1)
+
+  let borrow loc a1 = apply1 "Exp_desc" "borrow" loc (extract a1)
 
   let extension_constructor loc a1 =
     apply1 "Exp_desc" "extension_constructor" loc (extract a1)
@@ -2499,6 +2512,7 @@ let rec with_new_idents_pat pat =
     with_new_idents_pat pat
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
+  | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> with_new_idents_pat pat) args
   | Tpat_construct (_, _, args, _) ->
     List.iter (fun pat -> with_new_idents_pat pat) args
@@ -2529,6 +2543,7 @@ let rec without_idents_pat pat =
     without_idents_pat pat
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
+  | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> without_idents_pat pat) args
   | Tpat_construct (_, _, args, _) ->
     List.iter (fun pat -> without_idents_pat pat) args
@@ -2655,6 +2670,9 @@ let type_for_annotation ~env ~loc typ =
           match List.filter_map unwrap_univar tyl with
           | [] -> cty.ctyp_desc
           | _ :: _ as ctyl -> Ttyp_poly (ctyl, go ty))
+        | Trepr _ ->
+          Misc.fatal_errorf "Translquote [at %a]: no support for Trepr"
+            Location.print_loc_in_lowercase loc
         | Ttuple tyl -> Ttyp_tuple (List.map (fun (l, ty') -> l, go ty') tyl)
         | Tunboxed_tuple tyl ->
           Ttyp_unboxed_tuple (List.map (fun (l, ty') -> l, go ty') tyl)
@@ -2772,6 +2790,7 @@ and quote_value_pattern ~scopes p =
       let const = quote_constant loc const in
       Pat.constant loc const
     | Tpat_unboxed_unit -> Pat.unboxed_unit
+    | Tpat_unboxed_bool b -> Pat.unboxed_bool loc b
     | Tpat_tuple pats ->
       let pats =
         List.map
@@ -2994,6 +3013,7 @@ and quote_core_type ~scopes ty =
     Type.package loc mod_type with_types |> Type.wrap
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ~scopes ty) |> Type.wrap
   | Ttyp_splice _ -> Type.var loc None |> Type.wrap
+  | Ttyp_repr _ -> fatal_error "Translquote: Ttyp_repr not implemented."
   | Ttyp_open _ ->
     fatal_errorf "Translquote [at %a]: Ttyp_open not implemented."
       Location.print_loc (to_location loc)
@@ -3394,6 +3414,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
       (Type_constraint.constraint_ loc (quote_core_type ~scopes cty)
       |> Type_constraint.wrap)
     |> Exp_desc.wrap
+  | Texp_ghost_region -> lambda
+  | Texp_borrowed ->
+    Exp_desc.borrow loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
 
 and update_env_with_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3406,6 +3429,8 @@ and update_env_with_extra ~loc extra =
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type (Polymorphic_parameter _) -> ()
+  | Texp_ghost_region -> ()
+  | Texp_borrowed -> ()
 
 and update_env_without_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3418,6 +3443,8 @@ and update_env_without_extra ~loc extra =
   | Texp_mode _ -> ()
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type (Polymorphic_parameter _) -> ()
+  | Texp_ghost_region -> ()
+  | Texp_borrowed -> ()
 
 and quote_expression_desc ~scopes ~transl stage e =
   let env = e.exp_env in
@@ -3543,6 +3570,7 @@ and quote_expression_desc ~scopes ~transl stage e =
       in
       Exp_desc.try_ loc exp cases
     | Texp_unboxed_unit -> Exp_desc.unboxed_unit
+    | Texp_unboxed_bool b -> Exp_desc.unboxed_bool loc b
     | Texp_tuple (exps, _) ->
       let exps =
         List.map

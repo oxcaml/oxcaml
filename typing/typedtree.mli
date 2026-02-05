@@ -222,6 +222,8 @@ and 'k pattern_desc =
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
         (** #() *)
+  | Tpat_unboxed_bool : bool -> value pattern_desc
+        (** #false, #true *)
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
         (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
             (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
@@ -350,6 +352,21 @@ and exp_extra =
             during inference. Generally, elaborated to a type constraint.
 
             See specific [type_inspection] cases for details. *)
+  | Texp_borrowed
+        (** Indicate that the current expression is wrapped in a [borrow_]
+        operator. The uniqueness analysis pairs this with an innermost
+        [Texp_ghost_region] and assumes that typecore guarantees the borrowed
+        value doesn't escape the ghost region.
+
+        Note that there could be other regions (such as loop or function body)
+        inner than the ghost region, and it's the innermost region that typecore
+        actually guarantees for. That is, the actual guarantee is stronger than
+        what's assumed by the UA. Therefore, such a mismatch would be sound. *)
+  | Texp_ghost_region
+        (** This expression is wrapped inside a ghost region. *)
+        (* NB. If an expression has both [Texp_borrowed] and
+        [Texp_ghost_region], we assume the [Texp_borrowed] is inner than
+        [Texp_ghost_region]. Currently it's impossible. *)
 
 and arg_label = Types.arg_label =
   | Nolabel
@@ -440,6 +457,8 @@ and expression_desc =
         (** try E with P1 -> E1 | ... | PN -> EN *)
   | Texp_unboxed_unit
         (** #() *)
+  | Texp_unboxed_bool of bool
+        (** #false, #true *)
   | Texp_tuple of (string option * expression) list * alloc_mode
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]
@@ -1117,6 +1136,7 @@ and core_type_desc =
   | Ttyp_open of Path.t * Longident.t loc * core_type
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
+  | Ttyp_repr of string list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position

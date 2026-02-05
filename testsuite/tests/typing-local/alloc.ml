@@ -269,7 +269,7 @@ let makelongarray n =
       n; n; n; n; n; n; n; n; n; n; n; n; n; n; n; n; |];
   ()
 
-external local_array: int -> 'a -> local_ 'a array = "caml_make_local_vect"
+external local_array: int -> 'a -> local_ 'a array = "caml_array_make_local"
 
 external array_concat : local_ 'a array list -> local_ 'a array =
   "caml_array_concat_local"

@@ -416,6 +416,12 @@ let rec print_out_type_0 ppf =
       fprintf ppf "@[<hov 2>%a.@ %a@]"
         pr_var_jkinds sl
         print_out_type_0 ty
+  | Otyp_repr ([], ty) ->
+      print_out_type_0 ppf ty  (* no "." if there are no vars *)
+  | Otyp_repr (sl, ty) ->
+      fprintf ppf "@[<hov 2>%a.@ %a@]"
+        pr_var_reprs sl
+        print_out_type_0 ty
   | ty ->
       print_out_type_1 ppf ty
 
@@ -501,7 +507,8 @@ and print_out_type_3 ppf =
          else if tags = None then "> " else "? ")
         print_fields row_fields
         print_present tags
-  | Otyp_alias _ | Otyp_poly _ | Otyp_arrow _ | Otyp_tuple _ as ty ->
+  | Otyp_alias _ | Otyp_poly _ | Otyp_repr _ | Otyp_arrow _ | Otyp_tuple _
+    as ty ->
       pp_open_box ppf 1;
       pp_print_char ppf '(';
       print_out_type_0 ppf ty;
@@ -700,9 +707,14 @@ and pr_var_jkind ppf (v, l) = match l with
     | Some lay -> fprintf ppf "(%a : %a)"
                     pr_var v
                     print_out_jkind lay
-
 and pr_var_jkinds jks =
   print_list pr_var_jkind (fun ppf -> fprintf ppf "@ ") jks
+
+and pr_var_repr ppf v =
+  fprintf ppf "(repr_@ %a)" pr_var v
+
+and pr_var_reprs vs =
+  print_list pr_var_repr (fun ppf -> fprintf ppf "@ ") vs
 
 let out_label = ref print_out_label
 

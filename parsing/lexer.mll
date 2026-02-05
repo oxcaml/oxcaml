@@ -84,8 +84,10 @@ let keyword_table =
 (*  "parser", PARSER; *)
     "private", PRIVATE;
     "rec", REC;
+    "repr_", REPR;
     "sig", SIG;
     "stack_", STACK;
+    "borrow_", BORROW;
     "struct", STRUCT;
     "then", THEN;
     "to", TO;
@@ -774,6 +776,8 @@ rule token = parse
   | ")"  { RPAREN }
   | "#(" { HASHLPAREN }
   | "#{" { HASHLBRACE }
+  | "#false" { HASHFALSE }
+  | "#true" { HASHTRUE }
   | "*"  { STAR }
   | ","  { COMMA }
   | "->" { MINUSGREATER }

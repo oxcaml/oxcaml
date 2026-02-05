@@ -126,6 +126,7 @@ let rec add_type bv ty =
   | Ptyp_quote t -> add_type bv t
   | Ptyp_splice t -> add_type bv t
   | Ptyp_of_kind jkind -> add_jkind bv jkind
+  | Ptyp_repr(_, t) -> add_type bv t
   | Ptyp_extension e -> handle_extension e
 
 and add_type_labeled_tuple bv tl =
@@ -207,6 +208,7 @@ let rec add_pattern bv pat =
   | Ppat_interval _
   | Ppat_constant _ -> ()
   | Ppat_unboxed_unit -> ()
+  | Ppat_unboxed_bool _ -> ()
   | Ppat_tuple (pl, _) -> add_pattern_labeled_tuple bv pl
   | Ppat_unboxed_tuple (pl, _)-> add_pattern_labeled_tuple bv pl
   | Ppat_construct(c, opt) ->
@@ -254,6 +256,7 @@ let rec add_expr bv exp =
   | Pexp_match(e, pel) -> add_expr bv e; add_cases bv pel
   | Pexp_try(e, pel) -> add_expr bv e; add_cases bv pel
   | Pexp_unboxed_unit -> ()
+  | Pexp_unboxed_bool _ -> ()
   | Pexp_tuple el -> add_labeled_tuple_expr bv el
   | Pexp_unboxed_tuple el -> add_labeled_tuple_expr bv el
   | Pexp_construct(c, opte) -> add bv c; add_opt add_expr bv opte
@@ -330,6 +333,7 @@ let rec add_expr bv exp =
   | Pexp_hole -> ()
   | Pexp_unreachable -> ()
   | Pexp_comprehension x -> add_comprehension_expr bv x
+  | Pexp_borrow e -> add_expr bv e
 
 and add_comprehension_expr bv = function
   | Pcomp_list_comprehension comp -> add_comprehension bv comp

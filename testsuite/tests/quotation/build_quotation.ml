@@ -72,6 +72,12 @@
 - : <[bool]> expr = <[false]>
 |}];;
 
+<[ function #false -> #true | #true -> #false ]>;;
+[%%expect {|
+- : <[bool# -> bool#]> expr = <[function | #false -> #true | #true -> #false
+]>
+|}];;
+
 <[ () ]>;;
 [%%expect {|
 - : <[unit]> expr = <[()]>
@@ -681,6 +687,16 @@ Hint: Label "x" is defined outside any quotations.
 <[fun () -> exclave_ stack_ (Some 42)]>
 |}];;
 
+<[ let x = borrow_ 42 in x + 1 ]>;;
+[%%expect {|
+- : <[int]> expr = <[let x = (borrow_ 42) in x + 1]>
+|}];;
+
+<[ fun x -> let y = borrow_ x in y + 1 ]>;;
+[%%expect {|
+- : <[int -> int]> expr = <[fun x -> let y = (borrow_ x) in y + 1]>
+|}];;
+
 module type S = sig
   type t
   type t2
@@ -983,4 +999,19 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 <[(fun (f : 'a. 'a -> 'a) -> ((f 42), (f "abc")) : ('a__1. 'a__1 -> 'a__1) ->
   (int) * (string))
 ]>
+|}];;
+
+let x = <[ "foo" ]> in <[ let y = (borrow_ $x) in (fun (a @ local) -> ()) y ]>
+[%%expect{|
+- : <[unit]> expr = <[let y = (borrow_ "foo") in (fun a -> ()) y]>
+|}];;
+
+let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
+[%%expect{|
+Line 1, characters 43-44:
+1 | let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
+                                               ^
+Error: Identifier "x" is used at line 1, characters 43-44,
+       inside a quotation (<[ ... ]>);
+       it is introduced at line 1, characters 4-5, outside any quotations.
 |}];;

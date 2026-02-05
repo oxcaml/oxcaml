@@ -72,6 +72,12 @@ let fmt_constant f x =
   | Pconst_unboxed_float (s,m) ->
       fprintf f "PConst_unboxed_float (%s,%a)" s fmt_char_option m
 
+let fmt_bool f x =
+  match x with
+  | false -> fprintf f "false";
+  | true -> fprintf f "true";
+;;
+
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -238,6 +244,10 @@ let rec core_type i ppf x =
       core_type i ppf t
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i + 1)) jkind
+  | Ptyp_repr (lvars, ct) ->
+      line i ppf "Ptyp_repr\n";
+      list i reprvar ppf lvars;
+      core_type i ppf ct
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
@@ -245,6 +255,9 @@ let rec core_type i ppf x =
 and typevar i ppf (s, jkind) =
   line i ppf "var: %s\n" s.txt;
   jkind_annotation_opt (i+1) ppf jkind
+
+and reprvar i ppf s =
+  line i ppf "reprvar: %s\n" s.txt
 
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident_loc s;
@@ -264,6 +277,7 @@ and pattern i ppf x =
   | Ppat_interval (c1, c2) ->
       line i ppf "Ppat_interval %a..%a\n" fmt_constant c1 fmt_constant c2;
   | Ppat_unboxed_unit -> line i ppf "Ppat_unboxed_unit\n";
+  | Ppat_unboxed_bool b -> line i ppf "Ppat_unboxed_bool %a\n" fmt_bool b;
   | Ppat_tuple (l, c) ->
       line i ppf "Ppat_tuple\n %a\n" fmt_closed_flag c;
       list i (labeled_tuple_element pattern) ppf l
@@ -349,6 +363,7 @@ and expression i ppf x =
       expression i ppf e;
       list i case ppf l;
   | Pexp_unboxed_unit -> line i ppf "Pexp_unboxed_unit\n";
+  | Pexp_unboxed_bool b -> line i ppf "Pexp_unboxed_bool %a\n" fmt_bool b;
   | Pexp_tuple (l) ->
       line i ppf "Pexp_tuple\n";
       list i (labeled_tuple_element expression) ppf l;
@@ -488,6 +503,9 @@ and expression i ppf x =
       expression i ppf e
   | Pexp_hole ->
     line i ppf "Pexp_hole"
+  | Pexp_borrow e ->
+      line i ppf "Pexp_borrow\n";
+      expression i ppf e
 
 and block_access i ppf = function
   | Baccess_field lid ->

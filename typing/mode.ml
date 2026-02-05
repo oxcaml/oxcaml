@@ -47,7 +47,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Captured_by_partial_application ->
         (Location.none, Expression), Adj_captured_by_partial_application
       | Crossing -> pp, Crossing
-      | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation_l loc
       | Contains_r (Comonadic, { containing; contained }) ->
@@ -74,7 +73,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Adj_captured_by_partial_application ->
         (Location.none, Expression), Captured_by_partial_application
       | Crossing -> pp, Crossing
-      | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation_r loc
       | Contains_l (Comonadic, { containing; contained }) ->
@@ -102,7 +100,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
-        | Unknown_non_rigid -> Unknown_non_rigid
         | Allocation_l loc -> Allocation_l loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
@@ -118,7 +115,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Captured_by_partial_application -> Captured_by_partial_application
         | Crossing -> Crossing
-        | Unknown_non_rigid -> Unknown_non_rigid
         | Allocation_r loc -> Allocation_r loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
@@ -138,7 +134,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
-        | Unknown_non_rigid -> Unknown_non_rigid
         | Allocation_r loc -> Allocation_r loc
         | Allocation_l loc -> Allocation_l loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
@@ -161,7 +156,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Adj_captured_by_partial_application ->
           Adj_captured_by_partial_application
         | Crossing -> Crossing
-        | Unknown_non_rigid -> Unknown_non_rigid
         | Allocation_l loc -> Allocation_l loc
         | Allocation_r loc -> Allocation_r loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
@@ -194,6 +188,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Mutable_read m -> Mutable_read m
         | Mutable_write m -> Mutable_write m
         | Lazy_forced -> Lazy_forced
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -208,6 +204,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Escape_region x -> Escape_region x
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -227,6 +226,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Escape_region x -> Escape_region x
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -246,6 +248,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Escape_region x -> Escape_region x
     end)
   end
 end
@@ -2105,6 +2110,16 @@ module Report = struct
     | Application -> dprintf "function applications"
     | Try_with -> dprintf "try-with clauses"
 
+  let print_region_desc : region_desc -> _ = function
+    | Borrow -> print_article_noun Consonant "borrow region"
+
+  let print_region : capitalize:_ -> region -> _ =
+   fun ~capitalize (loc, desc) ->
+    dprintf "%t at %a"
+      (print_region_desc desc ~definite:true ~capitalize)
+      (Location.Doc.loc ~capitalize_first:false)
+      loc
+
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
       prints the const to explain the mode on the pinpoint. *)
   let print_const (type l r) (_, pp_desc) ppf : (l * r) const -> unit = function
@@ -2156,6 +2171,9 @@ module Report = struct
     | Always_dynamic x ->
       fprintf ppf "%t are always dynamic" (print_always_dynamic x)
     | Branching -> fprintf ppf "it has branches"
+    | Borrowed _ -> fprintf ppf "it is borrowed"
+    | Escape_region reg ->
+      fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
 
   let print_allocation_l : allocation -> formatter -> unit =
    fun { txt; loc } ->
@@ -2272,7 +2290,7 @@ module Report = struct
       ((formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
-    | Unknown | Unknown_non_rigid -> None
+    | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
@@ -2357,8 +2375,7 @@ module Report = struct
     | Contains_l _ | Contains_r _ | Is_contained_by _
     | Adj_captured_by_partial_application ->
       true
-    | Allocation_r _ | Allocation_l _ | Skip | Crossing | Unknown_non_rigid ->
-      false
+    | Allocation_r _ | Allocation_l _ | Skip | Crossing -> false
 
   let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
@@ -4143,7 +4160,7 @@ module Modality = struct
       let apply : type l r.
           ?hint:(l * r) neg Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
           =
-       fun ?(hint = Hint.Unknown_non_rigid) t x ->
+       fun ?(hint = Hint.Unknown) t x ->
         match t with Join_const c -> Mode.join_const ~hint c x
 
       let proj ax (Join_const c) : _ Atom.t = Join_with (Axis.proj ax c)
@@ -4289,7 +4306,7 @@ module Modality = struct
       let apply : type l r.
           ?hint:(l * r) pos Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
           =
-       fun ?(hint = Hint.Unknown_non_rigid) t x ->
+       fun ?(hint = Hint.Unknown) t x ->
         match t with Meet_const c -> Mode.meet_const ~hint c x
 
       let proj ax (Meet_const c) : _ Atom.t = Meet_with (Axis.proj ax c)

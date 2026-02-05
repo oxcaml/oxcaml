@@ -321,7 +321,8 @@ let pat
     match x.pat_desc with
     | Tpat_any
     | Tpat_constant _
-    | Tpat_unboxed_unit -> x.pat_desc
+    | Tpat_unboxed_unit
+    | Tpat_unboxed_bool _ -> x.pat_desc
     | Tpat_var (id, s, uid, sort, m) ->
       Tpat_var (id, map_loc sub s, uid, sort, m)
     | Tpat_tuple l ->
@@ -406,6 +407,8 @@ let extra sub = function
     Texp_coerce (Option.map (sub.typ sub) cty1, sub.typ sub cty2)
   | Texp_newtype _ as d -> d
   | Texp_poly cto -> Texp_poly (Option.map (sub.typ sub) cto)
+  | Texp_borrowed as d -> d
+  | Texp_ghost_region as d -> d
   | Texp_stack as d -> d
   | Texp_mode modes -> Texp_mode (sub.modes sub modes)
   | Texp_inspected_type (Label_disambiguation _) as d -> d
@@ -534,6 +537,7 @@ let expr sub x =
           List.map (sub.case sub) cases
         )
     | Texp_unboxed_unit -> Texp_unboxed_unit
+    | Texp_unboxed_bool b -> Texp_unboxed_bool b
     | Texp_tuple (list, am) ->
         Texp_tuple (List.map (fun (label, e) -> label, sub.expr sub e) list, am)
     | Texp_unboxed_tuple list ->
@@ -1009,6 +1013,7 @@ let typ sub x =
         Ttyp_package (sub.package_type sub pack)
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
+    | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)

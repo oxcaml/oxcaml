@@ -93,6 +93,7 @@ module Typ :
     val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
+    val repr: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
 
     val force_poly: core_type -> core_type
@@ -120,6 +121,7 @@ module Pat:
     val constant: ?loc:loc -> ?attrs:attrs -> constant -> pattern
     val interval: ?loc:loc -> ?attrs:attrs -> constant -> constant -> pattern
     val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> pattern
+    val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> pattern
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * pattern) list ->
       closed_flag -> pattern
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
@@ -164,6 +166,7 @@ module Exp:
                 -> expression
     val try_: ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
     val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> expression
+    val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> expression
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * expression) list -> expression
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
                        -> (string option * expression) list -> expression
@@ -229,6 +232,7 @@ module Exp:
 
     val case: pattern -> ?guard:expression -> expression -> case
     val binding_op: str -> pattern -> expression -> loc -> binding_op
+    val borrow : ?loc:loc -> ?attrs:attrs -> expression -> expression
   end
 
 (** Value declarations *)

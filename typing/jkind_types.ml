@@ -28,10 +28,28 @@ module Sort = struct
     | Vec256
     | Vec512
 
+  type univar = { name : string option }
+
+  (* Tracking univar correspondences for Trepr unification *)
+  let univar_pairs : (univar * univar) list ref = ref []
+
+  let equal_univar_univar uv1 uv2 =
+    uv1 == uv2
+    || List.mem (uv1, uv2) !univar_pairs
+    || List.mem (uv2, uv1) !univar_pairs
+
+  (* Establish correspondence between sort univars positionally.
+     Since Trepr respects order, we just pair them up directly. *)
+  let enter_repr pairs f =
+    let old_univars = !univar_pairs in
+    univar_pairs := pairs @ old_univars;
+    Misc.try_finally f ~always:(fun () -> univar_pairs := old_univars)
+
   type t =
     | Var of var
     | Base of base
     | Product of t list
+    | Univar of univar
 
   and var =
     { mutable contents : t option;
@@ -79,12 +97,14 @@ module Sort = struct
     type t =
       | Base of base
       | Product of t list
+      | Univar of univar
 
     let rec equal c1 c2 =
       match c1, c2 with
       | Base b1, Base b2 -> equal_base b1 b2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-      | (Base _ | Product _), _ -> false
+      | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
+      | (Base _ | Product _ | Univar _), _ -> false
 
     let format ppf c =
       let module Fmt = Format_doc in
@@ -93,6 +113,8 @@ module Sort = struct
         | Product cs ->
           let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
           Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf cs
+        | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
+        | Univar { name = None } -> Fmt.fprintf ppf "_"
       in
       pp_element ~nested:false ppf c
 
@@ -102,6 +124,7 @@ module Sort = struct
           ( Value | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
           | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 ) ->
         false
+      | Univar _ -> Misc.fatal_error "Sort.Const.all_void: Univar"
       | Product ts -> List.for_all all_void ts
 
     let value = Base Value
@@ -154,6 +177,8 @@ module Sort = struct
             Format.fprintf ppf "Product [%a]"
               (Misc.pp_nested_list ~nested ~pp_element ~pp_sep)
               cs
+          | Univar { name = Some n } -> Format.fprintf ppf "Univar '%s" n
+          | Univar { name = None } -> Format.fprintf ppf "Univar '_"
         in
         pp_element ~nested:false ppf c
     end
@@ -262,6 +287,8 @@ module Sort = struct
         fprintf ppf "Product [ %a ]"
           (pp_print_list ~pp_sep:(fun ppf () -> pp_print_text ppf "; ") t)
           ts
+      | Univar { name = Some n } -> fprintf ppf "Univar '%s" n
+      | Univar { name = None } -> fprintf ppf "Univar '_"
 
     and opt_t ppf = function
       | Some s -> fprintf ppf "Some %a" t s
@@ -291,7 +318,7 @@ module Sort = struct
 
   let rec t_iter ~f = function
     | Var v -> f v
-    | Base _ -> ()
+    | Base _ | Univar _ -> ()
     | Product ts -> List.iter (fun t -> t_iter ~f t) ts
 
   let update_level u v =
@@ -361,6 +388,7 @@ module Sort = struct
       let rec of_const : Const.t -> t = function
         | Base b -> of_base b
         | Product cs -> Product (List.map of_const cs)
+        | Univar uv -> Univar uv
     end
 
     module T_option = struct
@@ -411,6 +439,7 @@ module Sort = struct
           Option.map
             (fun x -> Product x)
             (Misc.Stdlib.List.map_option of_const cs)
+        | Univar uv -> Some (Univar uv)
     end
 
     module Const = struct
@@ -468,7 +497,7 @@ module Sort = struct
     Var { contents = None; uid = !last_var_uid; level }
 
   let rec get : t -> t = function
-    | Base _ as t -> t
+    | (Base _ | Univar _) as t -> t
     | Product ts as t ->
       let ts' = List.map get ts in
       if List.for_all2 ( == ) ts ts' then t else Product ts'
@@ -484,6 +513,7 @@ module Sort = struct
   let rec default_to_value_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
     | Product ts -> Product (List.map default_to_value_and_get ts)
+    | Univar uv -> Univar uv
     | Var r -> (
       match r.contents with
       | None ->
@@ -521,19 +551,35 @@ module Sort = struct
        but that would be much less readable. *)
     match s with
     | Product sorts -> sorts
-    | Var _ | Base _ -> Misc.fatal_error "Jkind_types.sorts_of_product"
+    | Var _ | Base _ | Univar _ ->
+      Misc.fatal_error "Jkind_types.sorts_of_product"
 
   let rec equate_sort_sort s1 s2 =
     match s1 with
     | Base b1 -> swap_equate_result (equate_sort_base s2 b1)
     | Var v1 -> equate_var_sort v1 s2
     | Product _ -> swap_equate_result (equate_sort_product s2 s1)
+    | Univar uv1 -> swap_equate_result (equate_sort_univar s2 uv1)
 
   and equate_sort_base s1 b2 =
     match s1 with
     | Base b1 -> if equal_base b1 b2 then Equal_no_mutation else Unequal
     | Var v1 -> equate_var_base v1 b2
-    | Product _ -> Unequal
+    | Product _ | Univar _ -> Unequal
+
+  and equate_sort_univar s1 uv2 =
+    match s1 with
+    | Univar uv1 ->
+      if equal_univar_univar uv1 uv2 then Equal_no_mutation else Unequal
+    | Base _ | Product _ -> Unequal
+    | Var v1 -> equate_var_univar v1 uv2
+
+  and equate_var_univar v1 uv2 =
+    match v1.contents with
+    | Some s1 -> equate_sort_univar s1 uv2
+    | None ->
+      set v1 (Some (Univar uv2));
+      Equal_mutated_first
 
   and equate_var_base v1 b2 =
     match v1.contents with
@@ -547,6 +593,7 @@ module Sort = struct
     | Base b2 -> equate_var_base v1 b2
     | Var v2 -> equate_var_var v1 v2
     | Product _ -> equate_var_product v1 s2
+    | Univar uv2 -> equate_var_univar v1 uv2
 
   and equate_var_var v1 v2 =
     if v1 == v2
@@ -568,7 +615,7 @@ module Sort = struct
 
   and equate_sort_product s1 s2 =
     match s1 with
-    | Base _ -> Unequal
+    | Base _ | Univar _ -> Unequal
     | Product sorts1 ->
       let sorts2 = sorts_of_product s2 in
       equate_sorts sorts1 sorts2
@@ -618,6 +665,7 @@ module Sort = struct
         ( Value | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
         | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
       false
+    | Univar _ -> Misc.fatal_error "is_void_defaulting: Univar"
     | Product _ -> false
 
   let decompose_into_product ~level t n =
@@ -635,6 +683,8 @@ module Sort = struct
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf " & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+      | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
+      | Univar { name = None } -> Fmt.fprintf ppf "_"
     in
     pp_element ~nested:false ppf t
 
@@ -643,6 +693,7 @@ module Sort = struct
   module Flat = struct
     type t =
       | Var of Var.id
+      | Univar of univar
       | Base of base
   end
 end
@@ -658,6 +709,7 @@ module Layout = struct
       | Any
       | Base of Sort.base
       | Product of t list
+      | Univar of Sort.univar
 
     let max = Any
 
@@ -666,7 +718,8 @@ module Layout = struct
       | Base b1, Base b2 -> Sort.equal_base b1 b2
       | Any, Any -> true
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-      | (Base _ | Any | Product _), _ -> false
+      | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
+      | (Base _ | Any | Product _ | Univar _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any -> None
@@ -675,6 +728,7 @@ module Layout = struct
         Option.map
           (fun x -> Sort.Const.Product x)
           (Misc.Stdlib.List.map_option get_sort ts)
+      | Univar uv -> Some (Sort.Const.Univar uv)
 
     module Static = struct
       let value = Base Sort.Value
@@ -728,11 +782,15 @@ module Layout = struct
             (fun x -> Product x)
             (* [Sort.get] is deep, so no need to repeat it here *)
             (Misc.Stdlib.List.map_option of_sort sorts)
+        | Univar uv -> Some (Univar uv)
       in
       of_sort (Sort.get s)
 
+    let of_univar uv = Univar uv
+
     let of_flat_sort : Sort.Flat.t -> _ = function
       | Var _ -> None
+      | Univar uv -> Some (of_univar uv)
       | Base b -> Some (Static.of_base b)
   end
 
@@ -741,6 +799,7 @@ module Layout = struct
     | Any -> Any
     | Base b -> Sort (Sort.of_base b)
     | Product cs -> Product (List.map of_const cs)
+    | Univar uv -> Sort (Sort.Univar uv)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"

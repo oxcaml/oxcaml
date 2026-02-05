@@ -474,6 +474,7 @@ module Repr_check = struct
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
     | Base _ -> false
+    | Univar _ -> Misc.fatal_error "sort_is_product: univar"
 
   let valid_c_stub_arg = function
     | Same_as_ocaml_repr s ->
@@ -489,6 +490,8 @@ module Repr_check = struct
       not (sort_is_product s1) &&
       not (sort_is_product s2)
     | Same_as_ocaml_repr (Product _) -> false
+    | Same_as_ocaml_repr (Univar _) ->
+      Misc.fatal_error "valid_c_stub_return: univar"
 
   let check checks prim =
     let reprs = args_res_reprs prim in

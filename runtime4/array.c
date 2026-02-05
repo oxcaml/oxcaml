@@ -368,7 +368,7 @@ CAMLprim value caml_make_local_unboxed_float64_vect(value len)
 }
 
 /* [len] is a [value] representing number of words or floats */
-static value make_vect_gen(value len, value init, int local)
+static value make_array_gen(value len, value init, int local)
 {
   CAMLparam2 (len, init);
   CAMLlocal1 (res);
@@ -421,21 +421,26 @@ static value make_vect_gen(value len, value init, int local)
   CAMLreturn (res);
 }
 
-CAMLprim value caml_make_vect(value len, value init)
+/* Naming convention: "make" is used for functions that take an init value,
+   while "create" is used for functions that create arrays with uninitialized
+   contents.
+   See https://github.com/ocaml/ocaml/pull/13003#issuecomment-2046623594 */
+
+CAMLprim value caml_array_make(value len, value init)
 {
-  return make_vect_gen(len, init, 0);
+  return make_array_gen(len, init, 0);
 }
 
-CAMLprim value caml_make_local_vect(value len, value init)
+CAMLprim value caml_array_make_local(value len, value init)
 {
-  return make_vect_gen(len, init, 1);
+  return make_array_gen(len, init, 1);
 }
 
 CAMLprim value caml_makearray_dynamic_non_scannable_unboxed_product(
   value v_num_components, value v_is_local,
   value v_non_unarized_length)
 {
-  // Some of this is similar to [caml_make_vect], above.
+  // Some of this is similar to [caml_array_make], above.
   // This function is only used for native code.
 
   CAMLparam0();
@@ -492,7 +497,7 @@ CAMLprim value caml_makearray_dynamic_non_scannable_unboxed_product(
 CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
   value v_init, value v_is_local, value v_non_unarized_length)
 {
-  // Some of this is similar to [caml_make_vect], above.
+  // Some of this is similar to [caml_array_make], above.
 
   CAMLparam1(v_init);
   CAMLlocal1(res);
@@ -578,7 +583,9 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
 
 /* [len] is a [value] representing number of floats */
 /* [ int -> float array ] */
-CAMLprim value caml_make_float_vect(value len)
+/* This function is named "create" (not "make") because it does not take an
+   init value. See the comment above caml_array_make for more details. */
+CAMLprim value caml_array_create_float(value len)
 {
 #ifdef FLAT_FLOAT_ARRAY
   return caml_floatarray_create (len);
@@ -588,7 +595,7 @@ CAMLprim value caml_make_float_vect(value len)
     uninitialized_float = caml_alloc_shr (Double_wosize, Double_tag);
     caml_register_generational_global_root (&uninitialized_float);
   }
-  return caml_make_vect (len, uninitialized_float);
+  return caml_array_make (len, uninitialized_float);
 #endif
 }
 
@@ -638,7 +645,7 @@ CAMLprim value caml_make_local_untagged_int8_vect(value len)
 
 CAMLprim value caml_make_untagged_int8_vect_bytecode(value len)
 {
-  return caml_make_vect(len, 1);
+  return caml_array_make(len, 1);
 }
 
 CAMLprim value caml_make_untagged_int16_vect(value len)
@@ -653,7 +660,7 @@ CAMLprim value caml_make_local_untagged_int16_vect(value len)
 
 CAMLprim value caml_make_untagged_int16_vect_bytecode(value len)
 {
-  return caml_make_vect(len, 1);
+  return caml_array_make(len, 1);
 }
 
 CAMLprim value caml_make_unboxed_int32_vect(value len)
@@ -668,7 +675,7 @@ CAMLprim value caml_make_local_unboxed_int32_vect(value len)
 
 CAMLprim value caml_make_unboxed_int32_vect_bytecode(value len)
 {
-  return caml_make_vect(len, caml_copy_int32(0));
+  return caml_array_make(len, caml_copy_int32(0));
 }
 
 static value caml_make_unboxed_int64_vect0(value len, int local)
@@ -703,7 +710,7 @@ CAMLprim value caml_make_local_unboxed_int64_vect(value len)
 
 CAMLprim value caml_make_unboxed_int64_vect_bytecode(value len)
 {
-  return caml_make_vect(len, caml_copy_int64(0));
+  return caml_array_make(len, caml_copy_int64(0));
 }
 
 static value caml_make_unboxed_nativeint_vect0(value len, int local)
@@ -740,7 +747,7 @@ CAMLprim value caml_make_local_unboxed_nativeint_vect(value len)
 
 CAMLprim value caml_make_unboxed_nativeint_vect_bytecode(value len)
 {
-  return caml_make_vect(len, caml_copy_nativeint(0));
+  return caml_array_make(len, caml_copy_nativeint(0));
 }
 
 static value caml_make_untagged_int_vect0(value len, int local)
@@ -777,7 +784,7 @@ CAMLprim value caml_make_local_untagged_int_vect(value len)
 
 CAMLprim value caml_make_untagged_int_vect_bytecode(value len)
 {
-  return caml_make_vect(len, 1);
+  return caml_array_make(len, 1);
 }
 
 /* This primitive is used internally by the compiler to compile
@@ -786,7 +793,7 @@ CAMLprim value caml_make_untagged_int_vect_bytecode(value len)
    boxed floats and returns the corresponding flat-allocated [float array].
    In all other cases, it just returns its argument unchanged.
 */
-static value make_array_gen(value init, int local)
+static value uniform_array_gen(value init, int local)
 {
 #ifdef FLAT_FLOAT_ARRAY
   CAMLparam1 (init);
@@ -826,14 +833,42 @@ static value make_array_gen(value init, int local)
 #endif
 }
 
+CAMLprim value caml_array_of_uniform_array(value init)
+{
+  return uniform_array_gen(init, 0);
+}
+
+CAMLprim value caml_array_of_uniform_array_local(value init)
+{
+  return uniform_array_gen(init, 1);
+}
+
+/* #13003: previous names for array-creation primitives,
+   kept for backward-compatibility only. */
+
+CAMLprim value caml_make_vect(value len, value init)
+{
+  return caml_array_make(len, init);
+}
+
+CAMLprim value caml_make_local_vect(value len, value init)
+{
+  return caml_array_make_local(len, init);
+}
+
+CAMLprim value caml_make_float_vect(value len)
+{
+  return caml_array_create_float(len);
+}
+
 CAMLprim value caml_make_array(value init)
 {
-  return make_array_gen(init, 0);
+  return caml_array_of_uniform_array(init);
 }
 
 CAMLprim value caml_make_array_local(value init)
 {
-  return make_array_gen(init, 1);
+  return caml_array_of_uniform_array_local(init);
 }
 
 /* Blitting */

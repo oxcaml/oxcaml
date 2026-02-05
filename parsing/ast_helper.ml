@@ -76,6 +76,7 @@ module Typ = struct
   let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
   let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
   let splice ?loc ?attrs t = mk ?loc ?attrs (Ptyp_splice t)
+  let repr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_repr (a, b))
   let of_kind ?loc ?attrs a = mk ?loc ?attrs (Ptyp_of_kind a)
 
   let force_poly t =
@@ -141,6 +142,8 @@ module Typ = struct
             Ptyp_splice (loop core_type)
         | Ptyp_of_kind jkind ->
             Ptyp_of_kind (loop_jkind jkind)
+        | Ptyp_repr (var_lst, core_type) ->
+            Ptyp_repr (var_lst, loop core_type)
         | Ptyp_extension (s, arg) ->
             Ptyp_extension (s, arg)
       in
@@ -192,6 +195,7 @@ module Pat = struct
   let constant ?loc ?attrs a = mk ?loc ?attrs (Ppat_constant a)
   let interval ?loc ?attrs a b = mk ?loc ?attrs (Ppat_interval (a, b))
   let unboxed_unit ?loc ?attrs () = mk ?loc ?attrs Ppat_unboxed_unit
+  let unboxed_bool ?loc ?attrs b = mk ?loc ?attrs (Ppat_unboxed_bool b)
   let tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_tuple (a, b))
   let unboxed_tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_unboxed_tuple (a, b))
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Ppat_construct (a, b))
@@ -226,6 +230,7 @@ module Exp = struct
   let match_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_match (a, b))
   let try_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_try (a, b))
   let unboxed_unit ?loc ?attrs () = mk ?loc ?attrs Pexp_unboxed_unit
+  let unboxed_bool ?loc ?attrs b = mk ?loc ?attrs (Pexp_unboxed_bool b)
   let tuple ?loc ?attrs a = mk ?loc ?attrs (Pexp_tuple a)
   let unboxed_tuple ?loc ?attrs a = mk ?loc ?attrs (Pexp_unboxed_tuple a)
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Pexp_construct (a, b))
@@ -282,6 +287,8 @@ module Exp = struct
       pbop_exp = exp;
       pbop_loc = loc;
     }
+
+  let borrow ?loc ?attrs a = mk ?loc ?attrs (Pexp_borrow a)
 end
 
 module Mty = struct

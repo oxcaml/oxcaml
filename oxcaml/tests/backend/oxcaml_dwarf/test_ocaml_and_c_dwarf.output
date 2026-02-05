@@ -7,8 +7,8 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string [inlined] Stdlib.String.make
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string(param=[100, 120] : ocaml_value)
 === Testing OCaml/C boundary - array allocation ===
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_make_vect(len=#101L : value, init=#201L : value)
-  * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_make_vect(len=#101L : value, init=#201L : value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_array_make(len=#101L : value, init=#201L : value)
+  * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_array_make(len=#101L : value, init=#201L : value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_inner(x=50 : int @ value, y=100 : int @ value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_outer(n=<unavailable>)
