@@ -315,10 +315,10 @@ module Solver = struct
            under id modality. *)
         let base = Ldd.const Axis_lattice.immutable_data in
         let mask = Ldd.const Axis_lattice.mask_shallow in
-        Ldd.sum base
-          (fun (_lbl, t) ->
+        Ldd.sum elts
+          ~base
+          ~f:(fun (_lbl, t) ->
             Ldd.meet mask (kind ctx t))
-          elts
       | Types.Tunboxed_tuple elts ->
         (* Unboxed tuples: per-element contributions; shallow axes relevant
            only for arity = 1. *)
@@ -328,10 +328,10 @@ module Solver = struct
           | _ -> Axis_lattice.mask_shallow (* arity > 1: exclude shallow axes *)
         in
         let mask = Ldd.const mask in
-        Ldd.sum Ldd.bot
-          (fun (_lbl, t) ->
+        Ldd.sum elts
+          ~base:Ldd.bot
+          ~f:(fun (_lbl, t) ->
             Ldd.meet mask (kind ctx t))
-          elts
       | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
         (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
         Ldd.const Axis_lattice.arrow
@@ -510,8 +510,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
-            Ldd.sum immutable_base
-              (fun (lbl : Types.label_declaration) ->
+            Ldd.sum lbls
+              ~base:immutable_base
+              ~f:(fun (lbl : Types.label_declaration) ->
                 let mask =
                   Axis_lattice.mask_of_modality ~relevant_for_shallow
                     lbl.ld_modalities
@@ -521,7 +522,6 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                   (Ldd.meet
                      (Ldd.const mask)
                      (Solver.kind ctx lbl.ld_type)))
-              lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
@@ -532,8 +532,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
             let relevant_for_shallow =
               match List.length lbls with 1 -> `Relevant | _ -> `Irrelevant
             in
-            Ldd.sum base
-              (fun (lbl : Types.label_declaration) ->
+            Ldd.sum lbls
+              ~base
+              ~f:(fun (lbl : Types.label_declaration) ->
                 (* Check that the label is not mutable. *)
                 (match lbl.ld_mutable with
                 | Immutable -> ()
@@ -550,7 +551,6 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                   (Ldd.meet
                      (Ldd.const mask)
                      (Solver.kind ctx lbl.ld_type)))
-              lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
@@ -609,8 +609,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
             let constructor_contrib (c : Types.constructor_declaration) =
               match c.cd_args with
               | Types.Cstr_tuple args ->
-                Ldd.sum Ldd.bot
-                  (fun (arg : Types.constructor_argument) ->
+                Ldd.sum args
+                  ~base:Ldd.bot
+                  ~f:(fun (arg : Types.constructor_argument) ->
                     let mask =
                       Axis_lattice.mask_of_modality
                         ~relevant_for_shallow arg.ca_modalities
@@ -618,10 +619,10 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                     Ldd.meet
                       (Ldd.const mask)
                       (Solver.kind ctx arg.ca_type))
-                  args
               | Types.Cstr_record lbls ->
-                Ldd.sum Ldd.bot
-                  (fun (lbl : Types.label_declaration) ->
+                Ldd.sum lbls
+                  ~base:Ldd.bot
+                  ~f:(fun (lbl : Types.label_declaration) ->
                     let mask =
                       Axis_lattice.mask_of_modality
                         ~relevant_for_shallow lbl.ld_modalities
@@ -631,12 +632,10 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                       (Ldd.meet
                          (Ldd.const mask)
                          (Solver.kind ctx lbl.ld_type)))
-                  lbls
             in
-            Ldd.sum
-              (Ldd.const base_lat0)
-              constructor_contrib
-              cstrs
+            Ldd.sum cstrs
+              ~base:(Ldd.const base_lat0)
+              ~f:constructor_contrib
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_open ->

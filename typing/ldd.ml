@@ -334,7 +334,7 @@ module Make (V : Ordered) = struct
   (* --------- public constructors --------- *)
   let[@inline] const (c : Axis_lattice.t) = leaf c
 
-  let sum base f xs =
+  let sum xs ~base ~f =
     List.fold_left
       (fun acc x -> join acc (f x))
       base
