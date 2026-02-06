@@ -753,7 +753,7 @@ AC_ARG_ENABLE([multidomain],
 AC_ARG_ENABLE([assembler-suitable-for-dissector],
   [AS_HELP_STRING([--enable-assembler-suitable-for-dissector@<:@=PATH@:>@],
     [Use LLVM assembler with large code mode for dissector. If PATH is not
-     specified, llvm-mc must be on PATH])])
+     specified, llvm-mc must be on PATH.  Overrides any setting of AS])])
 
 AC_ARG_WITH([flexdll],
   [AS_HELP_STRING([--with-flexdll],
@@ -1796,9 +1796,7 @@ AS_IF([test "$with_pic"],
 # Handle --enable-assembler-suitable-for-dissector
 AS_IF([test x"$enable_assembler_suitable_for_dissector" != "x" && \
        test x"$enable_assembler_suitable_for_dissector" != "xno"],
-  [AS_IF([test -n "$AS"],
-    [AC_MSG_ERROR(m4_normalize([Cannot use
-      --enable-assembler-suitable-for-dissector when AS is already set]))])
+  [
   AS_IF([test x"$enable_assembler_suitable_for_dissector" = "xyes"],
     [AC_PATH_PROG([llvm_mc], [llvm-mc], [])
     AS_IF([test -z "$llvm_mc"],
