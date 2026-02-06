@@ -197,7 +197,7 @@ struct caml_unit_deps_entry {
   value *gc_roots;            /* pointer to gc_roots (module block) */
   intnat *frametable;         /* pointer to frametable */
   intnat num_deps;            /* number of dependencies */
-  const char * const *dep_names;  /* array of dependency names */
+  const intnat *dep_indices;  /* array of indices into caml_unit_deps_table */
   value init_state;           /* one of INIT_STATE_* */
 };
 
@@ -258,12 +258,9 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
 
   /* Initialize all dependencies first */
   for (intnat i = 0; i < entry->num_deps; i++) {
-    const char *dep_name = entry->dep_names[i];
-    struct caml_unit_deps_entry *dep = caml_unit_deps_find(dep_name);
-    if (dep == NULL) {
-      caml_fatal_error("caml_init_module: dependency %s of %s not found",
-                       dep_name, entry->unit_name);
-    }
+    intnat dep_idx = entry->dep_indices[i];
+    struct caml_unit_deps_entry *dep =
+      &caml_unit_deps_table.entries[dep_idx];
     value result = caml_init_module_rec(dep);
     if (Is_exception_result(result)) {
       CAMLreturn(result);

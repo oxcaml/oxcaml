@@ -4398,52 +4398,46 @@ let global_table namelist =
  *     gc_roots : value *      -- pointer to gc_roots (module block)
  *     frametable : intnat *   -- pointer to frametable
  *     num_deps : intnat       -- number of dependencies
- *     dep_names : char**      -- pointer to array of dependency name strings
+ *     dep_indices : intnat *  -- pointer to array of indices into entries[]
  *     init_state : value      -- Val_int 0 = not init, 1 = initializing,
  *                                2 = done
  *   }
  *
  *  Entries are sorted by unit_name for binary search lookup.
+ *  Dependencies reference other entries by index, avoiding name lookups.
  *)
 let unit_deps_table units =
   let module CU = Compilation_unit in
-  let module StringSet = Set.Make (String) in
   let module StringMap = Map.Make (String) in
-  (* Get full path string for a compilation unit *)
   let unit_name cu = CU.full_path_as_string cu in
-  (* Collect all unique unit name strings (units and their deps) *)
-  let all_names =
-    List.fold_left
-      (fun acc (cu, deps) ->
-        let acc = StringSet.add (unit_name cu) acc in
-        List.fold_left
-          (fun acc import ->
-            StringSet.add (unit_name (Import_info.cu import)) acc)
-          acc deps)
-      StringSet.empty units
-  in
-  (* Create symbol for each string *)
-  let name_symbols =
-    StringSet.fold
-      (fun name acc ->
-        let sym_name = Compilenv.new_const_symbol () in
-        StringMap.add name { sym_name; sym_global = Local } acc)
-      all_names StringMap.empty
-  in
-  (* Emit string data: symbol followed by null-terminated string, then align *)
-  let string_data =
-    StringMap.fold
-      (fun name sym acc ->
-        Cdefine_symbol sym :: Cstring (name ^ "\000") :: Calign size_int :: acc)
-      name_symbols []
-  in
   (* Sort units by name for binary search *)
   let sorted_units =
     List.sort
       (fun (cu1, _) (cu2, _) -> String.compare (unit_name cu1) (unit_name cu2))
       units
   in
-  (* Emit dependency arrays and collect their symbols *)
+  (* Build map from unit name to sorted index *)
+  let index_map =
+    List.fold_left
+      (fun (acc, i) (cu, _) -> StringMap.add (unit_name cu) i acc, i + 1)
+      (StringMap.empty, 0) sorted_units
+    |> fst
+  in
+  (* Emit unit name strings *)
+  let name_symbols =
+    List.fold_left
+      (fun acc (cu, _) ->
+        let sym_name = Compilenv.new_const_symbol () in
+        StringMap.add (unit_name cu) { sym_name; sym_global = Local } acc)
+      StringMap.empty sorted_units
+  in
+  let string_data =
+    StringMap.fold
+      (fun name sym acc ->
+        Cdefine_symbol sym :: Cstring (name ^ "\000") :: Calign size_int :: acc)
+      name_symbols []
+  in
+  (* Emit dependency index arrays *)
   let dep_arrays, dep_array_symbols =
     List.fold_left
       (fun (data_acc, sym_acc) (cu, deps) ->
@@ -4454,10 +4448,12 @@ let unit_deps_table units =
           let arr_sym = { sym_name = arr_sym_name; sym_global = Local } in
           let arr_data =
             Cdefine_symbol arr_sym
-            :: List.map
+            :: List.filter_map
                  (fun import ->
                    let dep_name = unit_name (Import_info.cu import) in
-                   Csymbol_address (StringMap.find dep_name name_symbols))
+                   match StringMap.find_opt dep_name index_map with
+                   | Some idx -> Some (Cint (Nativeint.of_int idx))
+                   | None -> None)
                  deps
           in
           ( arr_data @ data_acc,
@@ -4484,7 +4480,13 @@ let unit_deps_table units =
         let frametable_sym =
           global_symbol (make_symbol ~compilation_unit:cu "frametable")
         in
-        let num_deps = List.length deps in
+        let num_deps =
+          List.length
+            (List.filter
+               (fun import ->
+                 StringMap.mem (unit_name (Import_info.cu import)) index_map)
+               deps)
+        in
         let deps_sym_item =
           match StringMap.find name dep_array_symbols with
           | None -> cint_zero
