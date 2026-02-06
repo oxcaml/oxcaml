@@ -22,11 +22,4 @@ type error =
 
 exception Error of error
 
-<<<<<<< HEAD:oxcaml/testsuite/tools/lexcmm.mli
 val report_error: Lexing.lexbuf -> error -> unit
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311)):asmcomp/asmlibrarian.mli
-val report_error: error Format_doc.printer
-=======
-val report_error: error Format_doc.format_printer
-val report_error_doc: error Format_doc.printer
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311)):asmcomp/asmlibrarian.mli

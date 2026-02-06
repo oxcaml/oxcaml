@@ -1634,7 +1634,6 @@ module Style = Misc.Style
 let pp_tag ppf t = fprintf ppf "`%s" t
 let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
 
-<<<<<<< HEAD
 let report_unbound_variable_reason ppf = function
   | Some Upstream_compatibility ->
       fprintf ppf "@.Hint: Explicit quantification requires quantifying all \
@@ -1642,16 +1641,9 @@ let report_unbound_variable_reason ppf = function
                    Enable non-erasable extensions to disable this check."
   | None -> ()
 
-let report_error env ppf =
+let report_error_doc env ppf =
   function
   | Unbound_type_variable (name, in_scope_names, reason) ->
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-let report_error env ppf = function
-  | Unbound_type_variable (name, in_scope_names) ->
-=======
-let report_error_doc env ppf = function
-  | Unbound_type_variable (name, in_scope_names) ->
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
     fprintf ppf "The type variable %a is unbound in this type declaration.@ %a"
       Style.inline_code name
       did_you_mean (fun () -> Misc.spellcheck in_scope_names name );

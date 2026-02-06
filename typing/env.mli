@@ -645,25 +645,13 @@ type error =
 exception Error of error
 
 
-<<<<<<< HEAD
-val report_error: level:int -> error Format_doc.printer
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-val report_error: error Format_doc.printer
-=======
-val report_error: error Format_doc.format_printer
-val report_error_doc: error Format_doc.printer
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+val report_error: level:int -> error Format_doc.format_printer
+val report_error_doc: level:int -> error Format_doc.printer
 
 val report_lookup_error:
-<<<<<<< HEAD
-    level:int -> Location.t -> t -> lookup_error Format_doc.printer
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-val report_lookup_error: Location.t -> t -> lookup_error Format_doc.printer
-=======
-  Location.t -> t -> lookup_error Format_doc.format_printer
+    level:int -> Location.t -> t -> lookup_error Format_doc.format_printer
 val report_lookup_error_doc:
-  Location.t -> t -> lookup_error Format_doc.printer
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+    level:int -> Location.t -> t -> lookup_error Format_doc.printer
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool

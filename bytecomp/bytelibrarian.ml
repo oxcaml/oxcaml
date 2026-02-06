@@ -119,14 +119,6 @@ let report_error_doc ppf = function
   | Not_an_object_file name ->
       fprintf ppf "The file %a is not a bytecode object file"
         Location.Doc.quoted_filename name
-<<<<<<< HEAD
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-  | Link_error e ->
-      Linkdeps.report_error ~print_filename:Location.Doc.filename ppf e
-=======
-  | Link_error e ->
-      Linkdeps.report_error_doc ~print_filename:Location.Doc.filename ppf e
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
 
 let () =
   Location.register_error_of_exn

@@ -251,21 +251,11 @@ let () =
       | _ -> None
     )
 
-<<<<<<< HEAD
+let report_error = Format_doc.compat report_error_doc
+
 let parse_file ~tool_name invariant_fun parse kind source_file =
   Location.input_name := source_file;
   let inputfile = preprocess source_file in
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-let parse_file ~tool_name invariant_fun parse kind sourcefile =
-  Location.input_name := sourcefile;
-  let inputfile = preprocess sourcefile in
-=======
-let report_error = Format_doc.compat report_error_doc
-
-let parse_file ~tool_name invariant_fun parse kind sourcefile =
-  Location.input_name := sourcefile;
-  let inputfile = preprocess sourcefile in
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
   Misc.try_finally
     (fun () ->
        Profile.record_call "parsing" @@ fun () ->

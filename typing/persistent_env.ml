@@ -888,16 +888,8 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
         Location.prerr_warning loc warn
   | Cmi_format.Error err ->
       let msg = Format.asprintf "%a"
-<<<<<<< HEAD
-          (Format_doc.compat Cmi_format.report_error) err in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-          (Format_doc.compat Cmi_format.report_error) err in
-      let warn = Warnings.No_cmi_file(name, Some msg) in
-=======
           Cmi_format.report_error err in
-      let warn = Warnings.No_cmi_file(name, Some msg) in
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
   | Error err ->
       let msg =
@@ -1239,18 +1231,12 @@ let () =
   Location.register_error_of_exn
     (function
       | Error err ->
-<<<<<<< HEAD
           (* Note that this module don't have location info in its errors, since
              (unlike [Env]) it doesn't take [Location.t]s as arguments. However,
              [Env] is often able to add location info to our errors by
              re-raising them with the [Env.Error_from_persistent_env]
              constructor. *)
-          Some (Location.error_of_printer_file report_error err)
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-          Some (Location.error_of_printer_file report_error err)
-=======
           Some (Location.error_of_printer_file report_error_doc err)
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
       | _ -> None
     )
 

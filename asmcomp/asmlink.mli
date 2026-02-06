@@ -40,49 +40,4 @@ val link_shared :
   ppf_dump:Format.formatter ->
   unit
 
-<<<<<<< HEAD
 val call_linker_shared : ?native_toplevel:bool -> string list -> string -> unit
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-val call_linker_shared: string list -> string -> unit
-
-val reset : unit -> unit
-val check_consistency: filepath -> Cmx_format.unit_infos -> Digest.t -> unit
-val extract_crc_interfaces: unit -> crcs
-val extract_crc_implementations: unit -> crcs
-
-type error =
-  | File_not_found of filepath
-  | Not_an_object_file of filepath
-  | Inconsistent_interface of modname * filepath * filepath
-  | Inconsistent_implementation of modname * filepath * filepath
-  | Assembler_error of filepath
-  | Linking_error of int
-  | Missing_cmx of filepath * modname
-  | Link_error of Linkdeps.error
-
-exception Error of error
-
-val report_error: error Format_doc.printer
-=======
-val call_linker_shared: string list -> string -> unit
-
-val reset : unit -> unit
-val check_consistency: filepath -> Cmx_format.unit_infos -> Digest.t -> unit
-val extract_crc_interfaces: unit -> crcs
-val extract_crc_implementations: unit -> crcs
-
-type error =
-  | File_not_found of filepath
-  | Not_an_object_file of filepath
-  | Inconsistent_interface of modname * filepath * filepath
-  | Inconsistent_implementation of modname * filepath * filepath
-  | Assembler_error of filepath
-  | Linking_error of int
-  | Missing_cmx of filepath * modname
-  | Link_error of Linkdeps.error
-
-exception Error of error
-
-val report_error: error Format_doc.format_printer
-val report_error_doc: error Format_doc.printer
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))

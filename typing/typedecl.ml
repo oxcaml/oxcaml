@@ -4459,13 +4459,7 @@ let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
        ~level:(Ctype.get_current_level ())) violation
 
 let quoted_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
-<<<<<<< HEAD
-let report_error ppf = function
-||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
-let report_error ppf = function
-=======
 let report_error_doc ppf = function
->>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
   | Repeated_parameter ->
       fprintf ppf "A type parameter occurs several times"
   | Duplicate_constructor s ->
