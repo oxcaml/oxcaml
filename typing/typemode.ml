@@ -571,7 +571,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
         | true -> None
         | false ->
           let s =
-            Format.asprintf "%a"
+            Format_doc.asprintf "%a"
               (Modality.Per_axis.print ax)
               (Modality.Const.proj ax modality)
           in
