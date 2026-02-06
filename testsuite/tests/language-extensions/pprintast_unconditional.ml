@@ -186,8 +186,8 @@ end = struct
   module Doc = struct
     let longident = Doc.longident
     let tyvar = Doc.tyvar
+    let jkind_annotation = Doc.jkind_annotation
   end
-  let jkind_annotation_doc = jkind_annotation_doc
 end
 
 

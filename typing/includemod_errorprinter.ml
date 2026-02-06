@@ -293,7 +293,7 @@ let zap_axis_to_ceil
         (Mode.Value.proj_monadic ax m)
 
 let print_out_mode
-: type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> Fmt.formatter -> unit
+: type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> _ -> _
 = fun ?(in_structure=false) ax mode ->
   let print = Mode.Value.Const.print_axis ax in
   if in_structure then

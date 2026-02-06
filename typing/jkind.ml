@@ -3161,13 +3161,13 @@ let report_error ~loc : Error.t -> _ = function
          When RAE tried this, some types got printed like [t/2], but the
          [/2] shouldn't be there. Investigate and fix. *)
       "@[<v>Unknown layout %a@]"
-      Pprintast.jkind_annotation_doc jkind
+      Pprintast.Doc.jkind_annotation jkind
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\
        This declaration has an layout annotation (%a) and a layout attribute \
        ([@@@@%s]).@]"
-      Pprintast.jkind_annotation_doc from_annotation
+      Pprintast.Doc.jkind_annotation from_annotation
       (Builtin_attributes.jkind_attribute_to_string from_attribute.txt)
   | Insufficient_level { jkind; required_layouts_level } -> (
     let hint ppf =
@@ -3187,7 +3187,7 @@ let report_error ~loc : Error.t -> _ = function
         "@[<v>Layout %a is more experimental than allowed by the enabled \
          layouts extension.@;\
          %t@]"
-        Pprintast.jkind_annotation_doc jkind hint)
+        Pprintast.Doc.jkind_annotation jkind hint)
   | Unimplemented_syntax ->
     Location.errorf ~loc "@[<v>Unimplemented kind syntax@]"
   | With_on_right ->

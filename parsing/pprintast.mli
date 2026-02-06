@@ -71,6 +71,5 @@ val mode : Format.formatter -> Parsetree.mode Location.loc -> unit
 module Doc:sig
   val longident: Longident.t Format_doc.printer
   val tyvar: string Format_doc.printer
+  val jkind_annotation: Parsetree.jkind_annotation Format_doc.printer
 end
-
-val jkind_annotation_doc: Parsetree.jkind_annotation Format_doc.printer

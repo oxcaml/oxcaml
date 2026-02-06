@@ -106,7 +106,9 @@ let tyvar_of_name s =
   else
     "'" ^ s
 
-module Doc = struct
+(* Unlike upstream, we call this module [Doc_internal] and define [Doc] at the
+   end of the file to include [jkind_annotation]. *)
+module Doc_internal = struct
 (* Turn an arbitrary variable name into a valid OCaml identifier by adding \#
   in case it is a keyword, or parenthesis when it is an infix or prefix
   operator. *)
@@ -138,8 +140,8 @@ module Doc = struct
     Format_doc.fprintf ppf "%s" (tyvar_of_name s)
 end
 
-let longident ppf l = Format_doc.compat Doc.longident ppf l
-let ident_of_name ppf i = Format_doc.compat Doc.ident_of_name ppf i
+let longident ppf l = Format_doc.compat Doc_internal.longident ppf l
+let ident_of_name ppf i = Format_doc.compat Doc_internal.ident_of_name ppf i
 
 let is_curry_attr attr =
   attr.attr_name.txt = Builtin_attributes.curry_attr_name
@@ -324,7 +326,7 @@ let constant_string f s = pp f "%S" s
 
 
 
-let tyvar ppf v = Format_doc.compat Doc.tyvar ppf v
+let tyvar ppf v = Format_doc.compat Doc_internal.tyvar ppf v
 
 let string_loc ppf x = fprintf ppf "%s" x.txt
 
@@ -2496,5 +2498,8 @@ let payload = print_reset_with_maximal_extensions payload
 let type_declaration = print_reset_with_maximal_extensions type_declaration
 let jkind_annotation = print_reset_with_maximal_extensions jkind_annotation
 
-let jkind_annotation_doc ppf jkind =
-  Format_doc.deprecated_printer (fun fmt -> jkind_annotation fmt jkind) ppf
+module Doc = struct
+  include Doc_internal
+  let jkind_annotation ppf jkind =
+    Format_doc.deprecated_printer (fun fmt -> jkind_annotation fmt jkind) ppf
+end
